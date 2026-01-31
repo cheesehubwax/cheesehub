@@ -12,7 +12,6 @@ import {
 
 const tools = [
   {
-    emoji: "⚡",
     title: "CHEESE",
     titleHighlight: "Up",
     description: "Powered by the CHEESEPOWERZ smart contract CHEESEUp allows $CHEESE holders to power-up CPU and NET with $CHEESE. The $CHEESE is sent to eosio.null and leaves circulation forever",
@@ -20,7 +19,6 @@ const tools = [
     buttonLabel: "Go to CHEESEUp",
   },
   {
-    emoji: "🧀",
     title: "CHEESE",
     titleHighlight: "Faucet",
     description: "Powered by the CHEESEFAUCET and CHEESECHEESE smart contracts, Hosted on GitHub users stake their $CHEESE to claim mine $CHEESE at a high APR",
@@ -28,7 +26,6 @@ const tools = [
     buttonLabel: "Go to CHEESEFaucet",
   },
   {
-    emoji: "🏛️",
     title: "CHEESE",
     titleHighlight: "Dao",
     description: "Powered by the DAO.WAXDAO and CHEESEFEEFEE smart contracts and acting as an alternate Front-End CHEESEDao allows all WAX users to create DAOs and vote on Governance Proposals",
@@ -36,7 +33,6 @@ const tools = [
     buttonLabel: "Go to CHEESEDao",
   },
   {
-    emoji: "🌱",
     title: "CHEESE",
     titleHighlight: "Farm",
     description: "Powered by the FARMS.WAXDAO and CHEESEFEEFEE smart contracts and acting as an alternate Front-End CHEESEFarm allows all WAX users to create and participate in V2 non-custodial NFT staking farms",
@@ -44,7 +40,6 @@ const tools = [
     buttonLabel: "Go to CHEESEFarm",
   },
   {
-    emoji: "🔐",
     title: "CHEESE",
     titleHighlight: "Lock",
     description: "Powered by the WAXDAOLOCKER smart contract and acting as an alternate Front-End CHEESELock allows all WAX users to time-lock tokens and/or LP tokens",
@@ -52,7 +47,6 @@ const tools = [
     buttonLabel: "Go to CHEESELock",
   },
   {
-    emoji: "💧",
     title: "CHEESE",
     titleHighlight: "Drop",
     description: "Powered by the NFTHIVEDROP smart contract and acting as an alternate Front-End CHEESEDrop allows all WAX users to create NFT drops and sell them for various WAX tokens",
@@ -60,7 +54,6 @@ const tools = [
     buttonLabel: "Go to CHEESEDrop",
   },
   {
-    emoji: "👛",
     title: "CHEESE",
     titleHighlight: "Wallet",
     description: "A simple, clean wallet UI. Send tokens OR NFTs. Stake WAX for resources. Rent CPU and NET. Buy and sell RAM. Vote for Block Producers or nominate a Proxy. Claim vote rewards.",
@@ -69,7 +62,6 @@ const tools = [
     onClick: () => window.dispatchEvent(new CustomEvent('open-cheese-wallet')),
   },
   {
-    emoji: "🎧",
     title: "CHEESE",
     titleHighlight: "Amp",
     description: "A simple, clean NFT music player that populates a list automatically with your music NFTS. Play videos, create playlists, shuffle tracks and enjoy your musical blockchain assets like never before. Minimizes to mini player and keeps playing while you work or browse the web",
