@@ -2,9 +2,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
-import cheeseCoin from '@/assets/cheese-coin.png';
 
 interface ToolCardProps {
+  emoji: string;
   title: string;
   titleHighlight: string;
   description: string;
@@ -16,6 +16,7 @@ interface ToolCardProps {
 }
 
 export function ToolCard({
+  emoji,
   title,
   titleHighlight,
   description,
@@ -35,11 +36,9 @@ export function ToolCard({
   return (
     <Card className="bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border-cheese/20 hover:border-cheese/40 transition-colors">
       <CardContent className="py-12 text-center">
-        {/* Floating Cheese Orb */}
-        <div className="h-20 w-20 mx-auto mb-6 animate-float cheese-glow rounded-full flex items-center justify-center">
-          <img src={cheeseCoin} alt="CHEESE" className="w-16 h-16 object-contain" />
+        <div className="h-16 w-16 rounded-full bg-cheese/20 flex items-center justify-center mx-auto mb-6">
+          <span className="text-4xl">{emoji}</span>
         </div>
-        
         <h2 className="text-2xl font-bold mb-4">
           <span className="text-cheese">{title}</span>
           <span className="text-foreground">{titleHighlight}</span>
