@@ -8,6 +8,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { WalletTransferDialog } from "@/components/wallet/WalletTransferDialog";
 import { useWax } from "@/context/WaxContext";
 import { Wallet, LogOut, ChevronDown, Send } from "lucide-react";
 import {
@@ -118,21 +119,8 @@ export function WalletConnect() {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Wallet Dialog - Placeholder for now */}
-      <Dialog open={walletOpen} onOpenChange={setWalletOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>CHEESEWallet</DialogTitle>
-            <DialogDescription>
-              Manage your tokens, NFTs, and resources
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-8 text-center text-muted-foreground">
-            <p>Wallet features coming soon...</p>
-            <p className="text-sm mt-2">Balance: {formatBalance(cheeseBalance)} CHEESE</p>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Wallet Dialog */}
+      <WalletTransferDialog open={walletOpen} onOpenChange={setWalletOpen} />
     </div>
   );
 }
