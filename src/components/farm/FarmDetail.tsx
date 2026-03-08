@@ -60,7 +60,7 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
   const handleStake = async () => {
     if (!accountName || selectedNFTs.length === 0) return;
     const action = buildStakeNftsAction(accountName, farmName, selectedNFTs);
-    const result = await transact(action);
+    const result = await executeTransaction(Array.isArray(action) ? action : [action]);
     if (result.success) {
       toast({ title: "NFTs Staked! 🌱", description: `Staked ${selectedNFTs.length} NFTs` });
       setSelectedNFTs([]);
