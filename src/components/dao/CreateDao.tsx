@@ -13,7 +13,8 @@ import { FeePaymentSelector } from "@/components/shared/FeePaymentSelector";
 
 export function CreateDao() {
   const { accountName, session, isConnected } = useWax();
-  const { transact, loading } = useWaxTransaction();
+  const { executeTransaction } = useWaxTransaction(session);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   const [daoName, setDaoName] = useState("");

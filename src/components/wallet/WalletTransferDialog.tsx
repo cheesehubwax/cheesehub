@@ -21,7 +21,8 @@ interface WalletTransferDialogProps {
 
 export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialogProps) {
   const { accountName, isConnected, session, cheeseBalance, transferToken, transferNFTs } = useWax();
-  const { transact, loading: txLoading } = useWaxTransaction();
+  const { executeTransaction } = useWaxTransaction(session);
+  const [txLoading, setTxLoading] = useState(false);
   const { balances } = useAllTokenBalances(accountName || undefined);
   const { nfts } = useUserNFTs(accountName || undefined);
   const { toast } = useToast();

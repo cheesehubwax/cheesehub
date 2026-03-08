@@ -17,7 +17,8 @@ interface FarmDetailProps {
 
 export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
   const { accountName, isConnected } = useWax();
-  const { transact, loading: txLoading } = useWaxTransaction();
+  const { executeTransaction } = useWaxTransaction(session);
+  const [txLoading, setTxLoading] = useState(false);
   const { toast } = useToast();
   const [farm, setFarm] = useState<FarmInfo | null>(null);
   const [loading, setLoading] = useState(true);

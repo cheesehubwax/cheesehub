@@ -25,7 +25,8 @@ const statusColors: Record<string, string> = {
 
 export function ProposalCard({ proposal, daoName }: ProposalCardProps) {
   const { accountName, session } = useWax();
-  const { transact, loading: txLoading } = useWaxTransaction();
+  const { executeTransaction } = useWaxTransaction(session);
+  const [txLoading, setTxLoading] = useState(false);
   const [votingChoice, setVotingChoice] = useState<string | null>(null);
 
   const existingVote = accountName ? getVote(accountName, daoName, proposal.proposal_id) : null;

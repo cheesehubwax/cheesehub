@@ -13,7 +13,8 @@ import { FeePaymentSelector } from "@/components/shared/FeePaymentSelector";
 
 export function CreateFarm() {
   const { accountName, isConnected } = useWax();
-  const { transact, loading } = useWaxTransaction();
+  const { executeTransaction } = useWaxTransaction(session);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   const [farmName, setFarmName] = useState("");

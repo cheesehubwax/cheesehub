@@ -20,7 +20,8 @@ interface CreateProposalProps {
 
 export function CreateProposal({ daoName, dao, onClose, onCreated }: CreateProposalProps) {
   const { accountName, session } = useWax();
-  const { transact, loading } = useWaxTransaction();
+  const { executeTransaction } = useWaxTransaction(session);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   const [title, setTitle] = useState("");
