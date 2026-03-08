@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { FeePaymentSelector } from "@/components/shared/FeePaymentSelector";
 
 export function CreateFarm() {
-  const { accountName, isConnected } = useWax();
+  const { accountName, isConnected, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
