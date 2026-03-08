@@ -8,7 +8,8 @@ import { BrowseFarms } from "@/components/farm/BrowseFarms";
 import { CreateFarm } from "@/components/farm/CreateFarm";
 import { MyFarms } from "@/components/farm/MyFarms";
 import { FarmDetail } from "@/components/farm/FarmDetail";
-import cheeseLogo from "@/assets/cheese-logo.png";
+import cheeseDropOrb from "@/assets/cheesedrop.png";
+import { playRandomFart } from "@/lib/fartSounds";
 
 const Farm = () => {
   const { farmName: routeFarmName } = useParams<{ farmName?: string }>();
