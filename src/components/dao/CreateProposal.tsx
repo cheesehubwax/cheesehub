@@ -63,7 +63,7 @@ export function CreateProposal({ daoName, dao, onClose, onCreated }: CreatePropo
       },
     });
 
-    const result = await transact(actions);
+    const result = await executeTransaction(actions);
     if (result.success) {
       toast({ title: "Proposal Created! 🧀", description: `"${title}" has been submitted` });
       onCreated();

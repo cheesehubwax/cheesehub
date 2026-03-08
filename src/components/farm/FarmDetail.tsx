@@ -80,7 +80,7 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
   const handleClaim = async () => {
     if (!accountName) return;
     const action = buildClaimRewardsAction(accountName, farmName);
-    const result = await transact(action);
+    const result = await executeTransaction(Array.isArray(action) ? action : [action]);
     if (result.success) {
       toast({ title: "Rewards Claimed! 💰", description: "Your rewards have been claimed" });
     }

@@ -56,7 +56,7 @@ export function ProposalCard({ proposal, daoName }: ProposalCardProps) {
   const handleFinalize = async () => {
     if (!session || !accountName) return;
     const action = buildFinalizeProposalAction(accountName, daoName, proposal.proposal_id);
-    await transact(action);
+    await executeTransaction(Array.isArray(action) ? action : [action]);
   };
 
   return (

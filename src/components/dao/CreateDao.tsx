@@ -65,7 +65,7 @@ export function CreateDao() {
       },
     });
 
-    const result = await transact(actions);
+    const result = await executeTransaction(actions);
     if (result.success) {
       toast({ title: "DAO Created! 🧀🏛️", description: `${daoName} has been created` });
     }

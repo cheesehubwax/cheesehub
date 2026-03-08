@@ -54,7 +54,7 @@ export function CreateFarm() {
       },
     });
 
-    const result = await transact(actions);
+    const result = await executeTransaction(actions);
     if (result.success) {
       toast({ title: "Farm Created! 🌱", description: `${farmName} has been created` });
     }

@@ -128,7 +128,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
         producers: [],
       },
     };
-    const result = await transact(action);
+    const result = await executeTransaction([action]);
     if (result.success) {
       toast({ title: "Vote Proxy Set!", description: `Voting through ${proxyAccount}` });
     }
