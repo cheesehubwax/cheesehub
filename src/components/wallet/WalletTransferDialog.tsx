@@ -99,7 +99,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
         quant: `${parseFloat(ramAmount).toFixed(8)} WAX`,
       },
     };
-    const result = await transact(action);
+    const result = await executeTransaction([action]);
     if (result.success) {
       toast({ title: "RAM Purchased!", description: `Bought RAM with ${ramAmount} WAX` });
       setRamAmount("");
