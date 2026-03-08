@@ -146,9 +146,9 @@ export function CreateDao() {
           </div>
 
           <FeePaymentSelector
-            feeType="dao"
-            paymentMethod={paymentMethod}
-            onPaymentMethodChange={setPaymentMethod}
+            selectedMethod={paymentMethod}
+            onMethodChange={setPaymentMethod}
+            onCheeseAmountChange={() => {}}
           />
 
           <Button onClick={handleCreate} disabled={loading} className="w-full bg-primary text-primary-foreground" size="lg">
