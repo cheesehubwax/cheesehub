@@ -12,8 +12,9 @@ import { useToast } from "@/hooks/use-toast";
 import { FeePaymentSelector } from "@/components/shared/FeePaymentSelector";
 
 export function CreateFarm() {
-  const { accountName, isConnected } = useWax();
-  const { transact, loading } = useWaxTransaction();
+  const { accountName, isConnected, session } = useWax();
+  const { executeTransaction } = useWaxTransaction(session);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   const [farmName, setFarmName] = useState("");
@@ -53,7 +54,7 @@ export function CreateFarm() {
       },
     });
 
-    const result = await transact(actions);
+    const result = await executeTransaction(actions);
     if (result.success) {
       toast({ title: "Farm Created! 🌱", description: `${farmName} has been created` });
     }

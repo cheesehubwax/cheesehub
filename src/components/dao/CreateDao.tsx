@@ -13,7 +13,8 @@ import { FeePaymentSelector } from "@/components/shared/FeePaymentSelector";
 
 export function CreateDao() {
   const { accountName, session, isConnected } = useWax();
-  const { transact, loading } = useWaxTransaction();
+  const { executeTransaction } = useWaxTransaction(session);
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   const [daoName, setDaoName] = useState("");
@@ -64,7 +65,7 @@ export function CreateDao() {
       },
     });
 
-    const result = await transact(actions);
+    const result = await executeTransaction(actions);
     if (result.success) {
       toast({ title: "DAO Created! 🧀🏛️", description: `${daoName} has been created` });
     }

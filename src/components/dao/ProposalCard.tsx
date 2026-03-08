@@ -25,7 +25,8 @@ const statusColors: Record<string, string> = {
 
 export function ProposalCard({ proposal, daoName }: ProposalCardProps) {
   const { accountName, session } = useWax();
-  const { transact, loading: txLoading } = useWaxTransaction();
+  const { executeTransaction } = useWaxTransaction(session);
+  const [txLoading, setTxLoading] = useState(false);
   const [votingChoice, setVotingChoice] = useState<string | null>(null);
 
   const existingVote = accountName ? getVote(accountName, daoName, proposal.proposal_id) : null;
@@ -41,7 +42,7 @@ export function ProposalCard({ proposal, daoName }: ProposalCardProps) {
     setVotingChoice(vote);
 
     const action = buildVoteAction(accountName, daoName, proposal.proposal_id, vote);
-    const result = await transact(action);
+    const result = await executeTransaction(Array.isArray(action) ? action : [action]);
 
     if (result.success) {
       saveVote(accountName, daoName, proposal.proposal_id, {
@@ -55,7 +56,7 @@ export function ProposalCard({ proposal, daoName }: ProposalCardProps) {
   const handleFinalize = async () => {
     if (!session || !accountName) return;
     const action = buildFinalizeProposalAction(accountName, daoName, proposal.proposal_id);
-    await transact(action);
+    await executeTransaction(Array.isArray(action) ? action : [action]);
   };
 
   return (

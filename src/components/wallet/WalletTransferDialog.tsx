@@ -21,7 +21,8 @@ interface WalletTransferDialogProps {
 
 export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialogProps) {
   const { accountName, isConnected, session, cheeseBalance, transferToken, transferNFTs } = useWax();
-  const { transact, loading: txLoading } = useWaxTransaction();
+  const { executeTransaction } = useWaxTransaction(session);
+  const [txLoading, setTxLoading] = useState(false);
   const { balances } = useAllTokenBalances(accountName || undefined);
   const { nfts } = useUserNFTs(accountName || undefined);
   const { toast } = useToast();
@@ -79,7 +80,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
         transfer: false,
       },
     };
-    const result = await transact(action);
+    const result = await executeTransaction([action]);
     if (result.success) {
       toast({ title: "Staked!", description: `Staked ${stakeAmount} WAX for ${resourceType.toUpperCase()}` });
       setStakeAmount("");
@@ -98,7 +99,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
         quant: `${parseFloat(ramAmount).toFixed(8)} WAX`,
       },
     };
-    const result = await transact(action);
+    const result = await executeTransaction([action]);
     if (result.success) {
       toast({ title: "RAM Purchased!", description: `Bought RAM with ${ramAmount} WAX` });
       setRamAmount("");
@@ -127,7 +128,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
         producers: [],
       },
     };
-    const result = await transact(action);
+    const result = await executeTransaction([action]);
     if (result.success) {
       toast({ title: "Vote Proxy Set!", description: `Voting through ${proxyAccount}` });
     }

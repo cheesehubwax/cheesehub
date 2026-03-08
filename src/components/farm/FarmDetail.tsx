@@ -16,8 +16,9 @@ interface FarmDetailProps {
 }
 
 export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
-  const { accountName, isConnected } = useWax();
-  const { transact, loading: txLoading } = useWaxTransaction();
+  const { accountName, isConnected, session } = useWax();
+  const { executeTransaction } = useWaxTransaction(session);
+  const [txLoading, setTxLoading] = useState(false);
   const { toast } = useToast();
   const [farm, setFarm] = useState<FarmInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,7 +60,7 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
   const handleStake = async () => {
     if (!accountName || selectedNFTs.length === 0) return;
     const action = buildStakeNftsAction(accountName, farmName, selectedNFTs);
-    const result = await transact(action);
+    const result = await executeTransaction(Array.isArray(action) ? action : [action]);
     if (result.success) {
       toast({ title: "NFTs Staked! 🌱", description: `Staked ${selectedNFTs.length} NFTs` });
       setSelectedNFTs([]);
@@ -69,7 +70,7 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
   const handleUnstake = async () => {
     if (!accountName || selectedStaked.length === 0) return;
     const action = buildUnstakeNftsAction(accountName, farmName, selectedStaked);
-    const result = await transact(action);
+    const result = await executeTransaction(Array.isArray(action) ? action : [action]);
     if (result.success) {
       toast({ title: "NFTs Unstaked!", description: `Unstaked ${selectedStaked.length} NFTs` });
       setSelectedStaked([]);
@@ -79,7 +80,7 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
   const handleClaim = async () => {
     if (!accountName) return;
     const action = buildClaimRewardsAction(accountName, farmName);
-    const result = await transact(action);
+    const result = await executeTransaction(Array.isArray(action) ? action : [action]);
     if (result.success) {
       toast({ title: "Rewards Claimed! 💰", description: "Your rewards have been claimed" });
     }

@@ -1,75 +1,133 @@
-import { useState, useCallback } from 'react';
-import { useWax } from '@/context/WaxContext';
+import { useCallback } from 'react';
+import { Session } from '@wharfkit/session';
+import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
+import { useToast } from '@/hooks/use-toast';
 
-export interface TransactionResult {
+interface TransactionOptions {
+  successTitle?: string;
+  successDescription?: string;
+  errorTitle?: string;
+  showSuccessToast?: boolean;
+  showErrorToast?: boolean;
+}
+
+interface TransactionResult {
   success: boolean;
-  transactionId?: string;
-  error?: string;
+  txId: string | null;
+  error?: Error;
 }
 
-export interface TransactionAction {
-  account: string;
-  name: string;
-  authorization: { actor: string; permission: string }[];
-  data: Record<string, unknown>;
-}
+/**
+ * A hook that wraps WAX transactions with automatic modal cleanup.
+ * This prevents stuck Anchor/WharfKit modals after transaction failures or cancellations.
+ *
+ * Usage:
+ * const { executeTransaction } = useWaxTransaction(session);
+ * const result = await executeTransaction(actions, { successTitle: 'Done!' });
+ */
+export function useWaxTransaction(session: Session | null) {
+  const { toast } = useToast();
 
-export function useWaxTransaction() {
-  const { session, accountName } = useWax();
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<TransactionResult | null>(null);
-
-  const transact = useCallback(async (
-    actions: TransactionAction | TransactionAction[]
+  const executeTransaction = useCallback(async (
+    actions: any[],
+    options: TransactionOptions = {}
   ): Promise<TransactionResult> => {
-    if (!session || !accountName) {
-      const error = { success: false, error: 'Wallet not connected' };
-      setResult(error);
-      return error;
-    }
+    const {
+      successTitle = 'Transaction Successful',
+      successDescription,
+      errorTitle = 'Transaction Failed',
+      showSuccessToast = true,
+      showErrorToast = true,
+    } = options;
 
-    setLoading(true);
-    setResult(null);
+    if (!session) {
+      toast({
+        title: 'Wallet Not Connected',
+        description: 'Please connect your wallet first',
+        variant: 'destructive',
+      });
+      return { success: false, txId: null };
+    }
 
     try {
-      const actionsArray = Array.isArray(actions) ? actions : [actions];
+      const result = await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
+      const txId = result.resolved?.transaction.id?.toString() || null;
 
-      const tx = await session.transact({ actions: actionsArray });
-      const transactionId = tx.resolved?.transaction.id?.toString();
+      if (showSuccessToast) {
+        toast({
+          title: successTitle,
+          description: successDescription,
+        });
+      }
 
-      const success = { success: true, transactionId };
-      setResult(success);
-      return success;
-    } catch (err) {
-      const error = {
-        success: false,
-        error: err instanceof Error ? err.message : 'Transaction failed',
-      };
-      setResult(error);
-      return error;
+      return { success: true, txId };
+    } catch (error) {
+      console.error('Transaction failed:', error);
+
+      // Immediately clean up any stuck modals
+      closeWharfkitModals();
+
+      const errorMessage = error instanceof Error ? error.message : 'Transaction failed';
+      const isExpired = errorMessage.toLowerCase().includes('expired');
+      const isCancelled = errorMessage.toLowerCase().includes('cancel') ||
+                          errorMessage.toLowerCase().includes('rejected');
+
+      if (showErrorToast) {
+        toast({
+          title: isExpired ? 'Request Expired' : (isCancelled ? 'Transaction Cancelled' : errorTitle),
+          description: isExpired
+            ? 'The signing request timed out. Please try again.'
+            : errorMessage,
+          variant: 'destructive',
+        });
+      }
+
+      return { success: false, txId: null, error: error instanceof Error ? error : new Error(errorMessage) };
     } finally {
-      setLoading(false);
+      // Aggressive cleanup with small delay to catch any lingering modals
+      setTimeout(() => closeWharfkitModals(), 100);
+      setTimeout(() => closeWharfkitModals(), 500);
     }
-  }, [session, accountName]);
+  }, [session, toast]);
 
-  const clearResult = useCallback(() => {
-    setResult(null);
-  }, []);
+  /**
+   * Execute a raw transaction using session.transact directly.
+   * For cases where you need the full result object.
+   */
+  const executeRawTransaction = useCallback(async (
+    actions: any[],
+    options: TransactionOptions = {}
+  ) => {
+    const {
+      errorTitle = 'Transaction Failed',
+      showErrorToast = true,
+    } = options;
 
-  const buildAction = useCallback((
-    contract: string,
-    action: string,
-    data: Record<string, unknown>
-  ): TransactionAction => {
-    if (!accountName) throw new Error('Wallet not connected');
+    if (!session) {
+      throw new Error('Wallet not connected');
+    }
 
-    return {
-      account: contract,
-      name: action,
-      authorization: [{ actor: accountName, permission: 'active' }],
-      data,
-    };
-  }, [accountName]);
+    try {
+      return await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
+    } catch (error) {
+      console.error('Transaction failed:', error);
+      closeWharfkitModals();
 
-  return { transact, loading, result, clearResult, buildAction };
+      if (showErrorToast) {
+        const errorMessage = error instanceof Error ? error.message : 'Transaction failed';
+        toast({
+          title: errorTitle,
+          description: errorMessage,
+          variant: 'destructive',
+        });
+      }
+
+      throw error;
+    } finally {
+      setTimeout(() => closeWharfkitModals(), 100);
+      setTimeout(() => closeWharfkitModals(), 500);
+    }
+  }, [session, toast]);
+
+  return { executeTransaction, executeRawTransaction };
 }
