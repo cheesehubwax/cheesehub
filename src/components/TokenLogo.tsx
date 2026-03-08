@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { getTokenLogoUrl, TOKEN_LOGO_PLACEHOLDER } from '@/lib/tokenLogos';
+import { getTokenLogoUrl } from '@/lib/tokenLogos';
 import { cn } from '@/lib/utils';
+
+const TOKEN_LOGO_PLACEHOLDER = '/placeholder.svg';
 
 interface TokenLogoProps {
   contract: string;
