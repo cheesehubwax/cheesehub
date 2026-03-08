@@ -7,7 +7,8 @@ import { BrowseDaos } from "@/components/dao/BrowseDaos";
 import { CreateDao } from "@/components/dao/CreateDao";
 import { MyDaos } from "@/components/dao/MyDaos";
 import { DaoDetail } from "@/components/dao/DaoDetail";
-import cheeseLogo from "@/assets/cheese-logo.png";
+import cheeseDropOrb from "@/assets/cheesedrop.png";
+import { playRandomFart } from "@/lib/fartSounds";
 
 const Dao = () => {
   const [selectedDao, setSelectedDao] = useState<string | null>(null);
@@ -29,8 +30,11 @@ const Dao = () => {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
         <div className="container relative z-10">
           <div className="flex flex-col items-center gap-6">
-            <div className="h-24 w-24 animate-float cheese-glow rounded-full flex items-center justify-center">
-              <img src={cheeseLogo} alt="CHEESE" className="w-20 h-20 object-contain" />
+            <div
+              className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer"
+              onClick={playRandomFart}
+            >
+              <img src={cheeseDropOrb} alt="CHEESE" className="w-24 h-24 object-contain" />
             </div>
             <div className="text-center space-y-2">
               <h1 className="text-3xl md:text-4xl font-bold">

@@ -5,7 +5,8 @@ import { useWax } from "@/context/WaxContext";
 import { usePowerupStats } from "@/hooks/usePowerupStats";
 import { usePowerupLeaderboard } from "@/hooks/usePowerupLeaderboard";
 import { PowerupLeaderboard } from "@/components/powerup/PowerupLeaderboard";
-import cheeseLogo from "@/assets/cheese-logo.png";
+import cheeseDropOrb from "@/assets/cheesedrop.png";
+import { playRandomFart } from "@/lib/fartSounds";
 
 const PowerUp = () => {
   const { isConnected, accountName, isLoading, session, cheeseBalance, login, logout, refreshBalance } = useWax();
@@ -28,8 +29,11 @@ const PowerUp = () => {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
         <div className="container relative z-10">
            <div className="flex flex-col items-center gap-8">
-            <div className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center">
-              <img src={cheeseLogo} alt="CHEESE" className="w-24 h-24 object-contain" />
+            <div
+              className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer"
+              onClick={playRandomFart}
+            >
+              <img src={cheeseDropOrb} alt="CHEESE" className="w-24 h-24 object-contain" />
             </div>
 
             <div className="text-center space-y-2">
