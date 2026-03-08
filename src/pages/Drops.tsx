@@ -13,7 +13,8 @@ import { CartDrawer } from "@/components/drops/CartDrawer";
 import { useNavigate } from "react-router-dom";
 import { getTokenConfig } from "@/lib/tokenRegistry";
 import type { NFTDrop, SelectedPrice } from "@/types/drop";
-import cheeseLogo from "@/assets/cheese-logo.png";
+import cheeseDropOrb from "@/assets/cheesedrop.png";
+import { playRandomFart } from "@/lib/fartSounds";
 
 const Drops = () => {
   const { drops, sales, loading, error } = useDropsLoader();
