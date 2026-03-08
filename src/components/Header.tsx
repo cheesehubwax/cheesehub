@@ -121,7 +121,6 @@ export function Header() {
       {/* Row 2: Secondary Nav */}
       <div className="container hidden md:flex h-10 items-center justify-center border-t border-border/30">
         <nav className="flex items-center gap-1">
-          {/* CHEESEFarm */}
           <Link
             to="/farm"
             className={cn(
@@ -133,6 +132,30 @@ export function Header() {
           >
             <Sprout className="h-4 w-4" />
             CHEESEFarm
+          </Link>
+          <Link
+            to="/cheesenull"
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+              location.pathname === "/cheesenull"
+                ? "bg-cheese/20 text-cheese"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            )}
+          >
+            <Flame className="h-4 w-4" />
+            CHEESENull
+          </Link>
+          <Link
+            to="/drip"
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+              location.pathname === "/drip"
+                ? "bg-cheese/20 text-cheese"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            )}
+          >
+            <Droplets className="h-4 w-4" />
+            CHEESEDrip
           </Link>
         </nav>
       </div>
