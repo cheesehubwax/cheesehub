@@ -76,6 +76,22 @@ const tools = [
     buttonLabel: "Open CHEESEAmp",
     onClick: () => window.dispatchEvent(new CustomEvent('open-cheese-amp')),
   },
+  {
+    emoji: "⛔",
+    title: "CHEESE",
+    titleHighlight: "Null",
+    description: "Null $CHEESE, collateralize xCHEESE and fund CHEESEUp. A dapp for pure CHEESELovers increasing your share of supply, increasing the backing of xCHEESE and funding CHEESEUp CPU rentals",
+    linkTo: "/cheesenull",
+    buttonLabel: "Go to CHEESENull",
+  },
+  {
+    emoji: "💧",
+    title: "CHEESE",
+    titleHighlight: "Drip",
+    description: "Create automated slow-drip token payments. Set up trustless payroll, vesting schedules, or recurring payments on WAX. Powered by the WAXDAOESCROW smart contract",
+    linkTo: "/drip",
+    buttonLabel: "Go to CHEESEDrip",
+  },
 ];
 
 const Index = () => {
