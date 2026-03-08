@@ -12,6 +12,8 @@ import Drops from "./pages/Drops";
 import DropDetail from "./pages/DropDetail";
 import Dao from "./pages/Dao";
 import Farm from "./pages/Farm";
+import CheeseNull from "./pages/CheeseNull";
+import Drip from "./pages/Drip";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
