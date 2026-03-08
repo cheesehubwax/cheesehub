@@ -80,7 +80,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
         transfer: false,
       },
     };
-    const result = await transact(action);
+    const result = await executeTransaction([action]);
     if (result.success) {
       toast({ title: "Staked!", description: `Staked ${stakeAmount} WAX for ${resourceType.toUpperCase()}` });
       setStakeAmount("");
