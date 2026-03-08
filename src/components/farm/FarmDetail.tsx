@@ -70,7 +70,7 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
   const handleUnstake = async () => {
     if (!accountName || selectedStaked.length === 0) return;
     const action = buildUnstakeNftsAction(accountName, farmName, selectedStaked);
-    const result = await transact(action);
+    const result = await executeTransaction(Array.isArray(action) ? action : [action]);
     if (result.success) {
       toast({ title: "NFTs Unstaked!", description: `Unstaked ${selectedStaked.length} NFTs` });
       setSelectedStaked([]);
