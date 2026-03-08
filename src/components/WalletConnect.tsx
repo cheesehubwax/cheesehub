@@ -8,6 +8,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { WalletTransferDialog } from "@/components/wallet/WalletTransferDialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useWax } from "@/context/WaxContext";
 import { Wallet, LogOut, ChevronDown, Send } from "lucide-react";
 import {
