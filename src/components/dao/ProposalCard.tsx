@@ -42,7 +42,7 @@ export function ProposalCard({ proposal, daoName }: ProposalCardProps) {
     setVotingChoice(vote);
 
     const action = buildVoteAction(accountName, daoName, proposal.proposal_id, vote);
-    const result = await transact(action);
+    const result = await executeTransaction(Array.isArray(action) ? action : [action]);
 
     if (result.success) {
       saveVote(accountName, daoName, proposal.proposal_id, {
