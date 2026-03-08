@@ -1,3 +1,4 @@
+// PowerUp page
 import { Layout } from "@/components/Layout";
 import { PowerUpCard } from "@/components/powerup/PowerUpCard";
 import { PowerupStatsBar } from "@/components/powerup/PowerupStatsBar";
