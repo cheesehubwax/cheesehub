@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { useWax } from '@/context/WaxContext';
 import { Loader2, Gift } from 'lucide-react';
@@ -14,6 +14,11 @@ interface VoteRewardsManagerProps {
   onTransactionSuccess?: (title: string, description: string, txId: string | null) => void;
 }
 
+interface GbmGlobalState {
+  pervote_bucket: number;
+  total_producer_vote_weight: number;
+}
+
 export function VoteRewardsManager({ onTransactionComplete, onTransactionSuccess }: VoteRewardsManagerProps) {
   const { session, accountName } = useWax();
   const [isTransacting, setIsTransacting] = useState(false);
@@ -26,18 +31,78 @@ export function VoteRewardsManager({ onTransactionComplete, onTransactionSuccess
   const [stakedAmount, setStakedAmount] = useState(0);
   const [proxyName, setProxyName] = useState('');
   const [producerCount, setProducerCount] = useState(0);
+  const [voterWeight, setVoterWeight] = useState(0);
+  const [globalState, setGlobalState] = useState<GbmGlobalState | null>(null);
+  const [lastClaimTimestamp, setLastClaimTimestamp] = useState(0);
+  const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => { if (accountName) fetchVoterData(); }, [accountName]);
+
+  // Real-time reward ticker — updates every second
+  useEffect(() => {
+    if (tickerRef.current) clearInterval(tickerRef.current);
+
+    if (!hasVoted || !globalState || voterWeight <= 0 || globalState.total_producer_vote_weight <= 0) {
+      setEstimatedRewards(0);
+      return;
+    }
+
+    const calcReward = () => {
+      const now = Date.now() / 1000;
+      const lastClaim = lastClaimTimestamp;
+      // GBM rewards accrue linearly: share of pervote_bucket proportional to vote weight
+      // The bucket refills continuously; we estimate based on current snapshot
+      const voterShare = voterWeight / globalState.total_producer_vote_weight;
+      // pervote_bucket is the total unclaimed pool in WAX (already in token units)
+      // Estimate: your share of the bucket, scaled by time since last claim relative to ~24h cycle
+      const timeSinceClaim = Math.max(0, now - lastClaim);
+      const daySeconds = 86400;
+      // Base estimate: your proportional share of the current bucket
+      const baseReward = voterShare * globalState.pervote_bucket;
+      // Time factor: rewards accrue over time, claimable once per 24h
+      // If more than 24h has passed, you get at least 1 full cycle worth
+      const timeFactor = Math.min(timeSinceClaim / daySeconds, 1);
+      const reward = baseReward * timeFactor;
+      setEstimatedRewards(Math.max(0, reward));
+    };
+
+    calcReward();
+    tickerRef.current = setInterval(calcReward, 1000);
+
+    return () => {
+      if (tickerRef.current) clearInterval(tickerRef.current);
+    };
+  }, [hasVoted, globalState, voterWeight, lastClaimTimestamp]);
 
   const fetchVoterData = async () => {
     if (!accountName) return;
     setIsLoading(true);
     try {
-      const voterResponse = await fetchWithFallback(WAX_ENDPOINTS, '/v1/chain/get_table_rows', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: 'eosio', scope: 'eosio', table: 'voters', lower_bound: accountName, upper_bound: accountName, limit: 1, json: true }),
-      });
-      const voterData = await voterResponse.json();
+      // Fetch voter info and global state in parallel
+      const [voterResponse, globalResponse] = await Promise.all([
+        fetchWithFallback(WAX_ENDPOINTS, '/v1/chain/get_table_rows', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: 'eosio', scope: 'eosio', table: 'voters', lower_bound: accountName, upper_bound: accountName, limit: 1, json: true }),
+        }),
+        fetchWithFallback(WAX_ENDPOINTS, '/v1/chain/get_table_rows', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: 'eosio', scope: 'eosio', table: 'global', limit: 1, json: true }),
+        }),
+      ]);
+
+      const [voterData, globalData] = await Promise.all([
+        voterResponse.json(),
+        globalResponse.json(),
+      ]);
+
+      // Parse global state
+      if (globalData.rows?.length > 0) {
+        const g = globalData.rows[0];
+        setGlobalState({
+          pervote_bucket: g.pervote_bucket / 100000000, // Convert from integer to WAX
+          total_producer_vote_weight: parseFloat(g.total_producer_vote_weight || '0'),
+        });
+      }
 
       if (voterData.rows?.length > 0) {
         const voter = voterData.rows[0];
@@ -46,25 +111,63 @@ export function VoteRewardsManager({ onTransactionComplete, onTransactionSuccess
         setStakedAmount(voter.staked / 100000000);
         setProxyName(voter.proxy || '');
         setProducerCount(voter.producers?.length || 0);
+        setVoterWeight(parseFloat(voter.last_vote_weight || '0'));
 
         let lastUpdatedTime: Date;
-        if (voter.last_claim_time && voter.last_claim_time !== '1970-01-01T00:00:00') lastUpdatedTime = new Date(voter.last_claim_time + 'Z');
-        else lastUpdatedTime = new Date(0);
+        if (voter.last_claim_time && voter.last_claim_time !== '1970-01-01T00:00:00') {
+          lastUpdatedTime = new Date(voter.last_claim_time + 'Z');
+        } else {
+          lastUpdatedTime = new Date(0);
+        }
         setLastClaimTime(lastUpdatedTime);
+        setLastClaimTimestamp(lastUpdatedTime.getTime() / 1000);
 
         const now = new Date();
         const nextClaimDate = new Date(lastUpdatedTime.getTime() + 24 * 60 * 60 * 1000);
-        if (lastUpdatedTime.getTime() === 0) { setNextClaimTime('Now!'); setCanClaim(true); }
-        else if (now >= nextClaimDate) { setNextClaimTime('Now!'); setCanClaim(true); }
-        else {
+        if (lastUpdatedTime.getTime() === 0) {
+          setNextClaimTime('Now!');
+          setCanClaim(true);
+        } else if (now >= nextClaimDate) {
+          setNextClaimTime('Now!');
+          setCanClaim(true);
+        } else {
           const remaining = nextClaimDate.getTime() - now.getTime();
           setNextClaimTime(`${Math.floor(remaining / (1000 * 60 * 60))}h ${Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60))}m`);
           setCanClaim(false);
         }
-      } else { setHasVoted(false); }
-    } catch (error) { toast.error('Failed to load voter info'); }
-    finally { setIsLoading(false); }
+      } else {
+        setHasVoted(false);
+      }
+    } catch (error) {
+      toast.error('Failed to load voter info');
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  // Countdown ticker for next claim time
+  useEffect(() => {
+    if (!lastClaimTime || lastClaimTime.getTime() === 0 || canClaim) return;
+
+    const updateCountdown = () => {
+      const now = new Date();
+      const nextClaimDate = new Date(lastClaimTime.getTime() + 24 * 60 * 60 * 1000);
+      if (now >= nextClaimDate) {
+        setNextClaimTime('Now!');
+        setCanClaim(true);
+        return;
+      }
+      const remaining = nextClaimDate.getTime() - now.getTime();
+      const hours = Math.floor(remaining / (1000 * 60 * 60));
+      const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+      setNextClaimTime(`${hours}h ${minutes}m ${seconds}s`);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [lastClaimTime, canClaim]);
 
   const handleClaimVote = async () => {
     if (!session || !accountName) return;
@@ -73,7 +176,7 @@ export function VoteRewardsManager({ onTransactionComplete, onTransactionSuccess
       const actions = [{ account: 'eosio', name: 'claimgbmvote', authorization: [session.permissionLevel], data: { owner: accountName } }];
       const result = await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       const txId = result.resolved?.transaction.id?.toString() || null;
-      onTransactionSuccess?.('Vote Rewards Claimed!', 'Claimed voting rewards.', txId);
+      onTransactionSuccess?.('Vote Rewards Claimed!', `Claimed ~${estimatedRewards.toFixed(8)} WAX in voting rewards.`, txId);
       await fetchVoterData();
       onTransactionComplete?.();
     } catch (error: any) {
@@ -81,7 +184,11 @@ export function VoteRewardsManager({ onTransactionComplete, onTransactionSuccess
       const errorMsg = error?.message || 'Failed to claim';
       if (errorMsg.includes('nothing to claim')) toast.error('No vote rewards available');
       else toast.error(errorMsg);
-    } finally { setIsTransacting(false); closeWharfkitModals(); setTimeout(() => closeWharfkitModals(), 300); }
+    } finally {
+      setIsTransacting(false);
+      closeWharfkitModals();
+      setTimeout(() => closeWharfkitModals(), 300);
+    }
   };
 
   const formatDate = (date: Date | null): string => {
@@ -93,23 +200,78 @@ export function VoteRewardsManager({ onTransactionComplete, onTransactionSuccess
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-4"><Gift className="h-5 w-5 text-primary" /><h3 className="font-semibold">Voting Rewards</h3></div>
-      {!hasVoted && <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg"><p className="text-sm text-destructive">You must vote or set a proxy to earn rewards.</p></div>}
+      <div className="flex items-center gap-2 mb-4">
+        <Gift className="h-5 w-5 text-primary" />
+        <h3 className="font-semibold">Voting Rewards</h3>
+      </div>
+
+      {!hasVoted && (
+        <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
+          <p className="text-sm text-destructive">You must vote or set a proxy to earn rewards.</p>
+        </div>
+      )}
+
       {hasVoted && (
         <>
-          <div className="p-4 bg-muted/50 rounded-lg space-y-3">
-            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Last Voter Claim:</span><span className="font-medium">{formatDate(lastClaimTime)}</span></div>
-            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Next Voter Claim:</span><span className={`font-medium ${nextClaimTime === 'Now!' ? 'text-green-500' : ''}`}>{nextClaimTime}</span></div>
-            {proxyName && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Voting Proxy:</span><span className="font-medium">{proxyName}</span></div>}
-            {producerCount > 0 && <div className="text-sm"><span className="text-muted-foreground">Voting for:</span><span className="font-medium ml-2">{producerCount} producers</span></div>}
+          {/* Estimated Claimable Reward - prominent display */}
+          <div className="p-4 rounded-lg border border-primary/30 bg-primary/5 text-center space-y-1">
+            <div className="text-xs text-muted-foreground uppercase tracking-wider">Estimated Claimable</div>
+            <div className="text-2xl font-bold text-primary tabular-nums">
+              {estimatedRewards.toFixed(8)} <span className="text-base font-medium">WAX</span>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {canClaim ? 'Ready to claim!' : 'Accruing...'}
+            </div>
           </div>
-          <div className="p-3 bg-muted/30 rounded-lg text-sm"><div className="flex justify-between"><span className="text-muted-foreground">Staked for Voting:</span><span className="font-medium">{stakedAmount.toFixed(8)} WAX</span></div></div>
-          <Button onClick={handleClaimVote} disabled={isTransacting || !hasVoted || !canClaim} className={cn("w-full text-primary-foreground", canClaim ? "bg-primary hover:bg-primary/90" : "bg-primary/50 cursor-not-allowed")}>
-            {isTransacting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Claiming...</> : <><Gift className="mr-2 h-4 w-4" />Claim Vote Rewards</>}
+
+          <div className="p-4 bg-muted/50 rounded-lg space-y-3">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Last Voter Claim:</span>
+              <span className="font-medium">{formatDate(lastClaimTime)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Next Voter Claim:</span>
+              <span className={cn("font-medium tabular-nums", nextClaimTime === 'Now!' ? 'text-green-500' : '')}>{nextClaimTime}</span>
+            </div>
+            {proxyName && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Voting Proxy:</span>
+                <span className="font-medium">{proxyName}</span>
+              </div>
+            )}
+            {producerCount > 0 && (
+              <div className="text-sm">
+                <span className="text-muted-foreground">Voting for:</span>
+                <span className="font-medium ml-2">{producerCount} producers</span>
+              </div>
+            )}
+          </div>
+
+          <div className="p-3 bg-muted/30 rounded-lg text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Staked for Voting:</span>
+              <span className="font-medium">{stakedAmount.toFixed(8)} WAX</span>
+            </div>
+          </div>
+
+          <Button
+            onClick={handleClaimVote}
+            disabled={isTransacting || !hasVoted || !canClaim}
+            className={cn(
+              "w-full text-primary-foreground",
+              canClaim ? "bg-primary hover:bg-primary/90" : "bg-primary/50 cursor-not-allowed"
+            )}
+          >
+            {isTransacting ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Claiming...</>
+            ) : (
+              <><Gift className="mr-2 h-4 w-4" />Claim Vote Rewards {canClaim && estimatedRewards > 0 ? `(~${estimatedRewards.toFixed(4)} WAX)` : ''}</>
+            )}
           </Button>
           <p className="text-xs text-muted-foreground text-center">Rewards are added to your liquid WAX balance.</p>
         </>
       )}
+
       <Button variant="outline" onClick={fetchVoterData} disabled={isLoading} className="w-full">
         {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Refreshing...</> : 'Refresh Rewards'}
       </Button>
