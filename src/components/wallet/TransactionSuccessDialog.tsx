@@ -1,56 +1,44 @@
-import { CheckCircle, ExternalLink } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { CheckCircle, ExternalLink, Copy } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface TransactionSuccessDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  title?: string;
-  description?: string;
+  title: string;
+  description: string;
   txId?: string | null;
 }
 
-export function TransactionSuccessDialog({
-  open,
-  onOpenChange,
-  title = "Transaction Successful!",
-  description = "Your transaction has been completed successfully.",
-  txId,
-}: TransactionSuccessDialogProps) {
-  const explorerUrl = txId ? `https://waxblock.io/transaction/${txId}` : null;
-
+export function TransactionSuccessDialog({ open, onOpenChange, title, description, txId }: TransactionSuccessDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-card border-border">
-        <DialogHeader>
-          <DialogTitle className="text-foreground flex items-center gap-2">
-            <CheckCircle className="w-6 h-6 text-green-500" />
-            {title}
-          </DialogTitle>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader className="text-center">
+          <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-green-500/20 flex items-center justify-center">
+            <CheckCircle className="h-10 w-10 text-green-500" />
+          </div>
+          <DialogTitle className="text-xl text-center">{title}</DialogTitle>
+          <DialogDescription className="text-center text-base">{description}</DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 py-4">
-          <p className="text-muted-foreground">{description}</p>
-          {explorerUrl && (
-            <a
-              href={explorerUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-cheese hover:underline text-sm"
-            >
-              <ExternalLink className="w-4 h-4" />
-              View on WAX Block Explorer
-            </a>
-          )}
-        </div>
-        <DialogFooter>
-          <Button onClick={() => onOpenChange(false)}>Close</Button>
-        </DialogFooter>
+        {txId && (
+          <div className="mt-4 space-y-3">
+            <div className="p-3 bg-muted/50 rounded-lg">
+              <p className="text-xs text-muted-foreground mb-1">Transaction ID</p>
+              <p className="text-xs font-mono break-all">{txId}</p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(txId); toast.success('Transaction ID copied!'); }} className="flex-1">
+                <Copy className="h-4 w-4 mr-2" />Copy TX ID
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => window.open(`https://wax.bloks.io/transaction/${txId}`, '_blank')} className="flex-1">
+                <ExternalLink className="h-4 w-4 mr-2" />View on Explorer
+              </Button>
+            </div>
+          </div>
+        )}
+        <Button onClick={() => onOpenChange(false)} className="w-full mt-4 bg-cheese hover:bg-cheese-dark text-primary-foreground">Done</Button>
       </DialogContent>
     </Dialog>
   );
