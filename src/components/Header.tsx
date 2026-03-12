@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { WalletConnect } from "./WalletConnect";
-import { Lock, Home, ShoppingBag, ShoppingCart, Droplets, Users, Zap, Sprout, Flame, Megaphone } from "lucide-react";
+import { Lock, Home, ShoppingBag, ShoppingCart, Users, Zap, Sprout, Flame, Droplets } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/context/CartContext";
