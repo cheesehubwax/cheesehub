@@ -2,6 +2,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ShoppingCart } from "lucide-react";
+import { TokenLogo } from "@/components/TokenLogo";
+import { getTokenConfig } from "@/lib/tokenRegistry";
 import type { NFTDrop } from "@/types/drop";
 
 interface DropCardProps {
