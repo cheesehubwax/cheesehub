@@ -49,6 +49,7 @@ export function WaxProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [cheeseBalance, setCheeseBalance] = useState(0);
+  const [allSessions, setAllSessions] = useState<SerializedSession[]>([]);
   const { toast } = useToast();
 
   const accountName = session?.actor?.toString() || null;
