@@ -18,7 +18,7 @@ export default function Drip() {
               className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer"
               onClick={playRandomFart}
             >
-              <img src={cheeseDropOrb} alt="CHEESE" className="w-24 h-24 object-contain" />
+              <img src={cheeseDripOrb} alt="CHEESE Drip" className="w-24 h-24 object-contain" />
             </div>
 
             <div className="text-center space-y-2">

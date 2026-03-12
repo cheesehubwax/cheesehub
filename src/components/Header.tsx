@@ -68,7 +68,7 @@ export function Header() {
               )}
             >
               <ShoppingBag className="h-4 w-4" />
-              CHEESEDrop
+              CHEESEShip
             </Link>
             <Link
               to="/dao"
