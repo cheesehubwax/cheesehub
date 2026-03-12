@@ -6,7 +6,7 @@ import { CreateLock } from "@/components/locker/CreateLock";
 import { MyLocks } from "@/components/locker/MyLocks";
 import { CreateLiquidityLock } from "@/components/locker/CreateLiquidityLock";
 import { MyLiquidityLocks } from "@/components/locker/MyLiquidityLocks";
-import cheeseDropOrb from "@/assets/cheesedrop.png";
+import cheeseLockOrb from "@/assets/cheeselock.png";
 import { playRandomFart } from "@/lib/fartSounds";
 
 const Locker = () => {
