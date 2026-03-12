@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { useBannerSlots } from "@/hooks/useBannerSlots";
-import { getIpfsUrl } from "@/lib/ipfsGateways";
-import { sanitizeUrl } from "@/lib/sanitizeUrl";
 import { Megaphone } from "lucide-react";
+import { useBannerSlots, BannerSlotGroup } from "@/hooks/useBannerSlots";
+import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
+import { sanitizeUrl } from "@/lib/sanitizeUrl";
 
 interface ActiveBanner {
   ipfsHash: string;
@@ -11,55 +11,76 @@ interface ActiveBanner {
   user: string;
 }
 
+function extractActiveBanners(group: BannerSlotGroup): ActiveBanner[] {
+  const banners: ActiveBanner[] = [];
+
+  for (const slot of group.slots) {
+    if (slot.isAvailable || slot.suspended) continue;
+
+    if (slot.ipfsHash) {
+      banners.push({
+        ipfsHash: slot.ipfsHash,
+        websiteUrl: slot.websiteUrl,
+        user: slot.user,
+      });
+    }
+
+    if (slot.rentalType === "shared" && slot.sharedUser && slot.sharedIpfsHash) {
+      banners.push({
+        ipfsHash: slot.sharedIpfsHash,
+        websiteUrl: slot.sharedWebsiteUrl || "#",
+        user: slot.sharedUser,
+      });
+    }
+  }
+
+  return banners;
+}
+
 export function BannerDisplay() {
   const { slotGroups } = useBannerSlots();
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [gatewayIndex, setGatewayIndex] = useState(0);
 
   const activeBanners = useMemo(() => {
-    const now = new Date();
-    const todayStart = Math.floor(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 1000
-    );
+    const nowSec = Math.floor(Date.now() / 1000);
 
-    const todayGroup = slotGroups.find((g) => g.time === todayStart);
-    if (!todayGroup) return [];
+    const pastGroups = slotGroups
+      .filter((group) => group.time <= nowSec)
+      .sort((a, b) => b.time - a.time);
 
-    const banners: ActiveBanner[] = [];
-    for (const slot of todayGroup.slots) {
-      if (slot.isAvailable || slot.suspended) continue;
+    const futureGroups = slotGroups
+      .filter((group) => group.time > nowSec)
+      .sort((a, b) => a.time - b.time);
 
-      if (slot.ipfsHash) {
-        banners.push({
-          ipfsHash: slot.ipfsHash,
-          websiteUrl: slot.websiteUrl,
-          user: slot.user,
-        });
-      }
+    const candidateGroups = [...pastGroups, ...futureGroups];
 
-      if (
-        slot.rentalType === "shared" &&
-        slot.sharedUser &&
-        slot.sharedIpfsHash
-      ) {
-        banners.push({
-          ipfsHash: slot.sharedIpfsHash,
-          websiteUrl: slot.sharedWebsiteUrl || "#",
-          user: slot.sharedUser,
-        });
-      }
+    for (const group of candidateGroups) {
+      const banners = extractActiveBanners(group);
+      if (banners.length > 0) return banners;
     }
-    return banners;
+
+    return [];
   }, [slotGroups]);
+
+  useEffect(() => {
+    if (currentIndex >= activeBanners.length) setCurrentIndex(0);
+  }, [activeBanners.length, currentIndex]);
+
+  useEffect(() => {
+    setGatewayIndex(0);
+  }, [currentIndex, activeBanners.length]);
 
   useEffect(() => {
     if (activeBanners.length <= 1) return;
     const interval = setInterval(() => {
-      setCurrentIndex((i) => (i + 1) % activeBanners.length);
+      setCurrentIndex((index) => (index + 1) % activeBanners.length);
     }, 8000);
     return () => clearInterval(interval);
   }, [activeBanners.length]);
 
   const current = activeBanners[currentIndex];
+  const currentGateway = IPFS_GATEWAYS[gatewayIndex] ?? IPFS_GATEWAYS[0];
 
   return (
     <div className="w-full flex flex-col items-center gap-1 py-2">
@@ -71,10 +92,15 @@ export function BannerDisplay() {
           className="block max-w-[580px] w-full"
         >
           <img
-            src={getIpfsUrl(current.ipfsHash)}
+            src={`${currentGateway}${current.ipfsHash}`}
             alt="Banner Ad"
             className="w-full h-auto max-h-[150px] object-contain rounded-lg"
             loading="lazy"
+            onError={() => {
+              if (gatewayIndex < IPFS_GATEWAYS.length - 1) {
+                setGatewayIndex((index) => index + 1);
+              }
+            }}
           />
         </a>
       )}
