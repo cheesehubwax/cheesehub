@@ -106,6 +106,7 @@ export function MyLocks() {
         <div className="grid gap-4 md:grid-cols-2">
           {locks.map((lock) => {
             const { amount, symbol } = parseAsset(lock.amount);
+            const tokenContract = lock.token_contract || '';
             const claimable = isClaimable(lock);
             const timeRemaining = getTimeRemaining(lock.unlock_time);
             const isWithdrawn = lock.status === LOCK_STATUS.WITHDRAWN;
