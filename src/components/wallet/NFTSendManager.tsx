@@ -25,7 +25,7 @@ function isValidWaxAccount(account: string): boolean {
 
 export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
   const { accountName, transferNFTs } = useWax();
-  const { nfts, isLoading } = useUserNFTs(accountName || undefined);
+  const { nfts, loading: isLoading } = useUserNFTs(accountName || undefined);
   const [recipient, setRecipient] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
