@@ -187,7 +187,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                         {waxBalance && (
                           <span className="text-sm">
                             <span className="font-medium text-primary">
-                              {waxBalance.amount.toFixed(4)} WAX
+                              {waxBalance.balance.toFixed(4)} WAX
                             </span>
                             {waxPrice > 0 && (
                               <span className="text-muted-foreground ml-1.5">
