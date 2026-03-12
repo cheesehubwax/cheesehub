@@ -177,6 +177,21 @@
   .text-cheese {
     color: hsl(var(--cheese));
   }
+
+  .cheese-bubble {
+    background: radial-gradient(
+      circle at 30% 30%,
+      hsl(var(--cheese) / 0.25) 0%,
+      hsl(var(--cheese) / 0.10) 40%,
+      hsl(var(--cheese-dark) / 0.08) 70%,
+      transparent 100%
+    );
+    box-shadow:
+      0 0 30px hsl(var(--cheese) / 0.2),
+      0 0 60px hsl(var(--cheese) / 0.1),
+      inset 0 0 30px hsl(var(--cheese) / 0.08);
+    border: 1px solid hsl(var(--cheese) / 0.2);
+  }
 }
 
 /* Ensure WharfKit/Anchor wallet modals appear above all other UI */
