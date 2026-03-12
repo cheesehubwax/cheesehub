@@ -120,7 +120,7 @@ export function MyLocks() {
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg flex items-center gap-2">
-                      <img src={cheeseLogo} alt={symbol} className="h-5 w-5" />
+                      <TokenLogo contract={tokenContract} symbol={symbol} size="sm" />
                       <span className="text-cheese">{symbol}</span>
                     </CardTitle>
                     <Badge

@@ -165,7 +165,10 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                 <SelectContent>
                   {balances.map(b => (
                     <SelectItem key={`${b.contract}:${b.symbol}`} value={b.symbol}>
-                      {b.symbol} ({b.amount.toLocaleString()})
+                      <span className="flex items-center gap-2">
+                        <TokenLogo contract={b.contract} symbol={b.symbol} size="sm" />
+                        {b.symbol} ({b.amount.toLocaleString()})
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
