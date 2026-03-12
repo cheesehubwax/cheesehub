@@ -1,4 +1,6 @@
 import { XLogo, TelegramLogo } from "@phosphor-icons/react";
+import { Link } from "react-router-dom";
+import { Megaphone } from "lucide-react";
 
 export function Footer() {
   return (
@@ -22,6 +24,13 @@ export function Footer() {
             <TelegramLogo size={24} weight="fill" />
           </a>
         </div>
+        <Link
+          to="/bannerads"
+          className="inline-flex items-center gap-1 text-muted-foreground hover:text-cheese transition-colors mb-3"
+        >
+          <Megaphone className="h-3.5 w-3.5" />
+          Advertise with CHEESEHub
+        </Link>
         <p>
           <span className="text-cheese">CHEESE</span>
           <span className="text-foreground">Hub</span> • Built on WAX • Powered by $CHEESE, WaxDAO and NFTHive Smart Contracts

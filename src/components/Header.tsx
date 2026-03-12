@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { WalletConnect } from "./WalletConnect";
-import { Lock, Home, ShoppingBag, ShoppingCart, Droplets, Users, Zap, Sprout, Flame, Megaphone } from "lucide-react";
+import { Lock, Home, ShoppingBag, ShoppingCart, Users, Zap, Sprout, Flame, Droplets } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/context/CartContext";
@@ -12,7 +12,6 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/60 backdrop-blur-xl">
-      {/* Row 1: Logo + Primary Nav + Wallet/Cart */}
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-8">
           <Link to="/" className="flex items-center gap-2">
@@ -23,7 +22,6 @@ export function Header() {
             </span>
           </Link>
           <nav className="hidden md:flex items-center gap-1">
-            {/* Home */}
             <Link
               to="/"
               className={cn(
@@ -36,7 +34,6 @@ export function Header() {
               <Home className="h-4 w-4" />
               Home
             </Link>
-            {/* CHEESEUp */}
             <Link
               to="/powerup"
               className={cn(
@@ -49,17 +46,6 @@ export function Header() {
               <Zap className="h-4 w-4" />
               CHEESEUp
             </Link>
-            {/* CHEESEFaucet (external) */}
-            <a
-              href="https://cheeseonwax.github.io/tools/cheesefaucet.html"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors text-muted-foreground hover:text-foreground hover:bg-muted"
-            >
-              <Droplets className="h-4 w-4" />
-              CHEESEFaucet
-            </a>
-            {/* CHEESELock */}
             <Link
               to="/locker"
               className={cn(
@@ -72,7 +58,6 @@ export function Header() {
               <Lock className="h-4 w-4" />
               CHEESELock
             </Link>
-            {/* CHEESEDrop */}
             <Link
               to="/drops"
               className={cn(
@@ -85,7 +70,6 @@ export function Header() {
               <ShoppingBag className="h-4 w-4" />
               CHEESEDrop
             </Link>
-            {/* CHEESEDao */}
             <Link
               to="/dao"
               className={cn(
@@ -156,18 +140,6 @@ export function Header() {
           >
             <Droplets className="h-4 w-4" />
             CHEESEDrip
-          </Link>
-          <Link
-            to="/bannerads"
-            className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
-              location.pathname === "/bannerads"
-                ? "bg-cheese/20 text-cheese"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-            )}
-          >
-            <Megaphone className="h-4 w-4" />
-            CHEESEAds
           </Link>
         </nav>
       </div>
