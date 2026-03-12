@@ -54,7 +54,7 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
       result = result.filter(nft => nft.name.toLowerCase().includes(query) || nft.collectionName.toLowerCase().includes(query));
     }
     switch (sortBy) {
-      case 'collection': result.sort((a, b) => a.collection.localeCompare(b.collection)); break;
+      case 'collection': result.sort((a, b) => a.collectionName.localeCompare(b.collectionName)); break;
       case 'name': result.sort((a, b) => a.name.localeCompare(b.name)); break;
       case 'newest': result.sort((a, b) => parseInt(b.assetId) - parseInt(a.assetId)); break;
       case 'oldest': result.sort((a, b) => parseInt(a.assetId) - parseInt(b.assetId)); break;
