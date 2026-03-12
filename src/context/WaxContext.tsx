@@ -233,8 +233,6 @@ export function WaxProvider({ children }: { children: ReactNode }) {
       toast({ title: 'Remove Failed', description: error instanceof Error ? error.message : 'Failed to remove account', variant: 'destructive' });
     }
   };
-    }
-  };
 
   const transferCheese = async (amount: number, memo: string): Promise<string | null> => {
     if (!session) {
