@@ -93,16 +93,25 @@ export function getTokenContract(symbol: string): string | undefined {
 /**
  * Get the logo URL for a token using Alcor's logo repository
  * Uses format: {contract}/{symbol_lowercase}.png
+ * 
+ * @param contractOrSymbol - Token contract (if both params given) or symbol (if only one param)
+ * @param symbol - Token symbol (optional, if not given first param is treated as symbol)
  */
-export function getTokenLogoUrl(symbol: string, contract?: string): string {
-  const upperSymbol = symbol.toUpperCase();
-  const lowerSymbol = symbol.toLowerCase();
+export function getTokenLogoUrl(contractOrSymbol: string, symbol?: string): string {
+  let tokenContract: string | undefined;
+  let lowerSymbol: string;
 
-  // Use provided contract or look up from cache
-  const tokenContract = contract || getTokenContract(upperSymbol);
+  if (symbol) {
+    // Called as getTokenLogoUrl(contract, symbol)
+    tokenContract = contractOrSymbol;
+    lowerSymbol = symbol.toLowerCase();
+  } else {
+    // Called as getTokenLogoUrl(symbol) - lookup contract from cache
+    lowerSymbol = contractOrSymbol.toLowerCase();
+    tokenContract = getTokenContract(contractOrSymbol.toUpperCase());
+  }
 
   if (!tokenContract) {
-    // Fallback to a generic placeholder
     return '/placeholder.svg';
   }
 
