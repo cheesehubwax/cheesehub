@@ -4,6 +4,7 @@ import { useCheeseTVL } from '@/hooks/useCheeseTVL';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RefreshCw } from 'lucide-react';
 import waxToken from '@/assets/wax-token.png';
+import cheeseLogo2 from '@/assets/cheese-logo-2.png';
 
 function formatPrice(price: number, decimals: number = 8): string {
   return price.toFixed(decimals);
