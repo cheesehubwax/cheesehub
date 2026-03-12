@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Loader2, ShoppingCart, Info } from "lucide-react";
+import { TokenLogo } from "@/components/TokenLogo";
 import { fetchDropById } from "@/services/atomicApi";
 import { useWax } from "@/context/WaxContext";
 import { useCart } from "@/context/CartContext";
