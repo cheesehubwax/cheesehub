@@ -91,7 +91,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
 
   // Token balances summary for Account page
   const waxBalance = balances.find((b) => b.symbol === "WAX");
-  const totalWaxUsd = waxBalance ? waxBalance.amount * waxPrice : 0;
+  const totalWaxUsd = waxBalance ? waxBalance.balance * waxPrice : 0;
 
   const topItems = SIDEBAR_ITEMS.filter((i) => !i.bottom);
   const bottomItems = SIDEBAR_ITEMS.filter((i) => i.bottom);

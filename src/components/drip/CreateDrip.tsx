@@ -34,7 +34,7 @@ export function CreateDrip() {
   const { session, accountName, isConnected } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const { toast } = useToast();
-  const { balances: allTokens, loading } = useAllTokenBalances(accountName || undefined);
+  const { tokens: allTokens, isLoading: loading } = useAllTokenBalances(accountName || undefined);
   const [creating, setCreating] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
 
