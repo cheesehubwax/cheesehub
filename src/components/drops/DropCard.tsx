@@ -2,6 +2,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ShoppingCart } from "lucide-react";
+import { TokenLogo } from "@/components/TokenLogo";
+import { getTokenConfig } from "@/lib/tokenRegistry";
 import type { NFTDrop } from "@/types/drop";
 
 interface DropCardProps {
@@ -37,7 +39,12 @@ export function DropCard({ drop, onAddToCart, onClick }: DropCardProps) {
             {isFree ? (
               <Badge className="bg-green-500/20 text-green-400 border-green-500/30">FREE</Badge>
             ) : (
-              <span className="text-sm font-semibold text-primary">
+              <span className="text-sm font-semibold text-primary flex items-center gap-1">
+                <TokenLogo
+                  contract={getTokenConfig(drop.currency || "CHEESE")?.contract || "cheeseburger"}
+                  symbol={drop.currency || "CHEESE"}
+                  size="sm"
+                />
                 {drop.price.toLocaleString()} {drop.currency || "CHEESE"}
               </span>
             )}

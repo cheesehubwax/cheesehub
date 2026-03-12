@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Sprout } from "lucide-react";
+import { TokenLogo } from "@/components/TokenLogo";
 import { FarmInfo, getIpfsUrl } from "@/lib/farm";
 
 interface FarmCardProps {
@@ -43,7 +44,14 @@ export function FarmCard({ farm, onClick }: FarmCardProps) {
             <p className="text-sm text-muted-foreground">by {farm.creator}</p>
             <div className="flex flex-wrap gap-3 mt-2 text-xs text-muted-foreground">
               <span>🎯 {farm.staked_count} staked</span>
-              {rewardSymbols && <span>💰 {rewardSymbols}</span>}
+              {rewardSymbols && (
+                <span className="flex items-center gap-1">
+                  {farm.reward_pools.map((p, i) => (
+                    <TokenLogo key={i} contract={p.contract || ''} symbol={p.symbol || ''} size="sm" />
+                  ))}
+                  {rewardSymbols}
+                </span>
+              )}
             </div>
           </div>
         </div>

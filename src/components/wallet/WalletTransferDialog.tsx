@@ -12,6 +12,7 @@ import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useAllTokenBalances } from "@/hooks/useAllTokenBalances";
 import { useUserNFTs } from "@/hooks/useUserNFTs";
 import { useToast } from "@/hooks/use-toast";
+import { TokenLogo } from "@/components/TokenLogo";
 import cheeseLogo from "@/assets/cheese-logo.png";
 
 interface WalletTransferDialogProps {
@@ -164,7 +165,10 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                 <SelectContent>
                   {balances.map(b => (
                     <SelectItem key={`${b.contract}:${b.symbol}`} value={b.symbol}>
-                      {b.symbol} ({b.amount.toLocaleString()})
+                      <span className="flex items-center gap-2">
+                        <TokenLogo contract={b.contract} symbol={b.symbol} size="sm" />
+                        {b.symbol} ({b.amount.toLocaleString()})
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>

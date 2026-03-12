@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Lock, Unlock, RefreshCw, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import cheeseLogo from "@/assets/cheese-logo.png";
+import { TokenLogo } from "@/components/TokenLogo";
 
 export function MyLocks() {
   const { session, accountName } = useWax();
@@ -96,7 +96,7 @@ export function MyLocks() {
       ) : locks.length === 0 ? (
         <Card className="border-dashed border-muted-foreground/30">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <img src={cheeseLogo} alt="Cheese" className="h-12 w-12 mb-4 opacity-50" />
+            <Lock className="h-12 w-12 text-muted-foreground/50 mb-4" />
             <p className="text-muted-foreground text-center">
               You don't have any locked tokens yet
             </p>
@@ -106,6 +106,7 @@ export function MyLocks() {
         <div className="grid gap-4 md:grid-cols-2">
           {locks.map((lock) => {
             const { amount, symbol } = parseAsset(lock.amount);
+            const tokenContract = lock.token_contract || '';
             const claimable = isClaimable(lock);
             const timeRemaining = getTimeRemaining(lock.unlock_time);
             const isWithdrawn = lock.status === LOCK_STATUS.WITHDRAWN;
@@ -119,7 +120,7 @@ export function MyLocks() {
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg flex items-center gap-2">
-                      <img src={cheeseLogo} alt={symbol} className="h-5 w-5" />
+                      <TokenLogo contract={tokenContract} symbol={symbol} size="sm" />
                       <span className="text-cheese">{symbol}</span>
                     </CardTitle>
                     <Badge

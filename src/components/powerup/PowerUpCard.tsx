@@ -16,6 +16,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import cheeseLogo from "@/assets/cheese-logo.png";
+import { TokenLogo } from "@/components/TokenLogo";
 
 interface SuccessDetails {
   cpuMs: number;
@@ -270,7 +271,8 @@ export const PowerUpCard = ({
               )}
             </div>
             <p className="text-muted-foreground text-sm">
-              {successDetails?.totalCheese.toLocaleString()} CHEESE spent • Resources active for 24 hours
+              <TokenLogo contract="cheeseburger" symbol="CHEESE" size="sm" className="inline" />
+              {' '}{successDetails?.totalCheese.toLocaleString()} CHEESE spent • Resources active for 24 hours
             </p>
             <p className="text-xs text-muted-foreground">
               Actual resources may vary based on network conditions at transaction time.
