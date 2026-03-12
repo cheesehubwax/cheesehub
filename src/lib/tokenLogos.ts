@@ -1,6 +1,6 @@
 // Token logo URL utilities using Alcor Exchange's token logo repository
 
-const ALCOR_LOGO_BASE = 'https://cdn.jsdelivr.net/gh/alcorexchange/alcor-ui@master/assets/tokens/wax';
+const ALCOR_LOGO_BASE = 'https://wax.alcor.exchange/api/v2/tokens';
 const ALCOR_TOKENS_API = 'https://wax.alcor.exchange/api/v2/tokens';
 
 // Cache for token contracts fetched from Alcor API
@@ -115,7 +115,7 @@ export function getTokenLogoUrl(contractOrSymbol: string, symbol?: string): stri
     return '/placeholder.svg';
   }
 
-  return `${ALCOR_LOGO_BASE}/${tokenContract}/${lowerSymbol}.png`;
+  return `${ALCOR_LOGO_BASE}/${lowerSymbol}-${tokenContract}/logo`;
 }
 
 /**
