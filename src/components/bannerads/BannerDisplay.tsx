@@ -83,7 +83,7 @@ export function BannerDisplay() {
   const currentGateway = IPFS_GATEWAYS[gatewayIndex] ?? IPFS_GATEWAYS[0];
 
   return (
-    <div className="w-full flex flex-col items-center gap-1 py-2">
+    <div className="w-full flex flex-col items-center gap-1 pt-4 pb-2">
       {current && (
         <a
           href={sanitizeUrl(current.websiteUrl)}
