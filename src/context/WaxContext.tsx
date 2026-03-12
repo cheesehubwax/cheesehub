@@ -150,6 +150,7 @@ export function WaxProvider({ children }: { children: ReactNode }) {
     try {
       const response = await sessionKit.login();
       setSession(response.session);
+      await refreshSessions();
       toast({
         title: 'Wallet Connected',
         description: `Connected as ${response.session.actor}`,
@@ -169,17 +170,69 @@ export function WaxProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     if (session) {
-      try {
-        await sessionKit.logout(session);
-        setSession(null);
-        setCheeseBalance(0);
-        toast({
-          title: 'Wallet Disconnected',
-          description: 'You have been logged out',
-        });
-      } catch (error) {
-        console.error('Logout failed:', error);
+      setSession(null);
+      setCheeseBalance(0);
+      toast({
+        title: 'Wallet Disconnected',
+        description: 'Your account is saved for quick switching.',
+      });
+    }
+  };
+
+  // Switch to a different stored session
+  const switchAccount = async (serializedSession: SerializedSession) => {
+    try {
+      setIsLoading(true);
+      const restored = await sessionKit.restore(serializedSession);
+      if (restored) {
+        setSession(restored);
+        toast({ title: 'Account Switched', description: `Now using ${restored.actor}` });
       }
+    } catch (error) {
+      console.error('Switch account failed:', error);
+      toast({ title: 'Switch Failed', description: error instanceof Error ? error.message : 'Failed to switch account', variant: 'destructive' });
+      await refreshSessions();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Add another account without logging out current one
+  const addAccount = async () => {
+    setIsLoading(true);
+    setLoginInProgress(true);
+    try {
+      const response = await sessionKit.login();
+      setSession(response.session);
+      await refreshSessions();
+      toast({ title: 'Account Added', description: `Added and switched to ${response.session.actor}` });
+    } catch (error) {
+      console.error('Add account failed:', error);
+      toast({ title: 'Add Account Failed', description: error instanceof Error ? error.message : 'Failed to add account', variant: 'destructive' });
+    } finally {
+      setLoginInProgress(false);
+      setIsLoading(false);
+    }
+  };
+
+  // Remove a specific session without affecting others
+  const removeAccount = async (serializedSession: SerializedSession) => {
+    try {
+      const sessionToRemove = await sessionKit.restore(serializedSession);
+      if (sessionToRemove) {
+        await sessionKit.logout(sessionToRemove);
+        if (session?.actor?.toString() === serializedSession.actor) {
+          setSession(null);
+          setCheeseBalance(0);
+        }
+        await refreshSessions();
+        toast({ title: 'Account Removed', description: `Removed ${serializedSession.actor}` });
+      }
+    } catch (error) {
+      console.error('Remove account failed:', error);
+      toast({ title: 'Remove Failed', description: error instanceof Error ? error.message : 'Failed to remove account', variant: 'destructive' });
+    }
+  };
     }
   };
 
