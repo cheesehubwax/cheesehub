@@ -12,6 +12,7 @@ import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useAllTokenBalances } from "@/hooks/useAllTokenBalances";
 import { useUserNFTs } from "@/hooks/useUserNFTs";
 import { useToast } from "@/hooks/use-toast";
+import { TokenLogo } from "@/components/TokenLogo";
 import cheeseLogo from "@/assets/cheese-logo.png";
 
 interface WalletTransferDialogProps {
