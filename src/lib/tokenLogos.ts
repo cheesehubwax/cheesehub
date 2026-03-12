@@ -115,7 +115,7 @@ export function getTokenLogoUrl(contractOrSymbol: string, symbol?: string): stri
     return '/placeholder.svg';
   }
 
-  return `${ALCOR_LOGO_BASE}/${tokenContract}/${lowerSymbol}.png`;
+  return `${ALCOR_LOGO_BASE}/${lowerSymbol}-${tokenContract}/logo`;
 }
 
 /**
