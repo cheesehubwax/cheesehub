@@ -44,6 +44,7 @@ const App = () => {
                 <Route path="/farm/:farmName" element={<Farm />} />
                 <Route path="/cheesenull" element={<CheeseNull />} />
                 <Route path="/drip" element={<Drip />} />
+                <Route path="/bannerads" element={<BannerAds />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

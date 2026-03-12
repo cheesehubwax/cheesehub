@@ -157,6 +157,18 @@ export function Header() {
             <Droplets className="h-4 w-4" />
             CHEESEDrip
           </Link>
+          <Link
+            to="/bannerads"
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+              location.pathname === "/bannerads"
+                ? "bg-cheese/20 text-cheese"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            )}
+          >
+            <Megaphone className="h-4 w-4" />
+            CHEESEAds
+          </Link>
         </nav>
       </div>
     </header>
