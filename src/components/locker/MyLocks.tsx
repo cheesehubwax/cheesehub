@@ -96,7 +96,7 @@ export function MyLocks() {
       ) : locks.length === 0 ? (
         <Card className="border-dashed border-muted-foreground/30">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <img src={cheeseLogo} alt="Cheese" className="h-12 w-12 mb-4 opacity-50" />
+            <Lock className="h-12 w-12 text-muted-foreground/50 mb-4" />
             <p className="text-muted-foreground text-center">
               You don't have any locked tokens yet
             </p>
