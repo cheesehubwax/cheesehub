@@ -42,7 +42,7 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
   // Get unique collections
   const collections = useMemo(() => {
     const colMap = new Map<string, number>();
-    nfts.forEach(nft => colMap.set(nft.collection, (colMap.get(nft.collection) || 0) + 1));
+    nfts.forEach(nft => colMap.set(nft.collectionName, (colMap.get(nft.collectionName) || 0) + 1));
     return Array.from(colMap.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
   }, [nfts]);
 
