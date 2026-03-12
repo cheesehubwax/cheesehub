@@ -214,7 +214,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                                   {b.symbol}
                                 </div>
                                 <div className="text-xs text-muted-foreground truncate">
-                                  {b.amount.toLocaleString()}
+                                  {b.balance.toLocaleString()}
                                 </div>
                               </div>
                             </div>

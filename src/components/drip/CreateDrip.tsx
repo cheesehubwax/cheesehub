@@ -281,7 +281,7 @@ export function CreateDrip() {
                       className="h-4 w-4 rounded-full"
                       onError={e => { e.currentTarget.src = TOKEN_LOGO_PLACEHOLDER; }}
                     />
-                    {token.symbol} - {token.amount.toFixed(token.precision)}
+                    {token.symbol} - {token.balance.toFixed(token.precision)}
                   </span>
                 </SelectItem>
               ))}
