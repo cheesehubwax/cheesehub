@@ -108,7 +108,12 @@ const DropDetail = () => {
                   {isFree ? (
                     <Badge className="bg-green-500/20 text-green-400 border-green-500/30">FREE</Badge>
                   ) : (
-                    <span className="text-lg font-bold text-primary">
+                    <span className="text-lg font-bold text-primary flex items-center gap-2">
+                      <TokenLogo
+                        contract={getTokenConfig(drop.currency || "CHEESE")?.contract || "cheeseburger"}
+                        symbol={drop.currency || "CHEESE"}
+                        size="md"
+                      />
                       {drop.price.toLocaleString()} {drop.currency || "CHEESE"}
                     </span>
                   )}
