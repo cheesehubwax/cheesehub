@@ -34,7 +34,7 @@ const PowerUp = () => {
               className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer"
               onClick={playRandomFart}
             >
-              <img src={cheeseLogo2} alt="CHEESE" className="w-24 h-24 object-contain" />
+              <img src={cheeseUpOrb} alt="CHEESE Up" className="w-24 h-24 object-contain" />
             </div>
 
             <div className="text-center space-y-2">

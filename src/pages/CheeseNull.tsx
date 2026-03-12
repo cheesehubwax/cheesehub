@@ -5,7 +5,7 @@ import { NullButton } from '@/components/cheesenull/NullButton';
 import { NullTotalStats } from '@/components/cheesenull/NullTotalStats';
 import { NullerLeaderboard } from '@/components/cheesenull/NullerLeaderboard';
 import { useNullerLeaderboard } from '@/hooks/useNullerLeaderboard';
-import cheeseNullLogo from '@/assets/cheesenull.png';
+import cheeseNullLogo from '@/assets/cheesenull-orb.png';
 import { playRandomFart } from '@/lib/fartSounds';
 
 export default function CheeseNull() {
