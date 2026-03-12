@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreateDrip } from "@/components/drip/CreateDrip";
 import { MyDrips } from "@/components/drip/MyDrips";
 import { Droplets, List } from "lucide-react";
-import cheeseDropOrb from "@/assets/cheesedrop.png";
+import cheeseDripOrb from "@/assets/cheeseship.png";
 import { playRandomFart } from "@/lib/fartSounds";
 
 export default function Drip() {
@@ -18,7 +18,7 @@ export default function Drip() {
               className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer"
               onClick={playRandomFart}
             >
-              <img src={cheeseDropOrb} alt="CHEESE" className="w-24 h-24 object-contain" />
+              <img src={cheeseDripOrb} alt="CHEESE Drip" className="w-24 h-24 object-contain" />
             </div>
 
             <div className="text-center space-y-2">

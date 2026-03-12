@@ -13,7 +13,7 @@ import { CartDrawer } from "@/components/drops/CartDrawer";
 import { useNavigate } from "react-router-dom";
 import { getTokenConfig } from "@/lib/tokenRegistry";
 import type { NFTDrop, SelectedPrice } from "@/types/drop";
-import cheeseDropOrb from "@/assets/cheesedrop.png";
+import cheeseShipOrb from "@/assets/cheeseship.png";
 import { playRandomFart } from "@/lib/fartSounds";
 
 const Drops = () => {
@@ -69,12 +69,12 @@ const Drops = () => {
               className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer"
               onClick={playRandomFart}
             >
-              <img src={cheeseDropOrb} alt="CHEESE" className="w-24 h-24 object-contain" />
+              <img src={cheeseShipOrb} alt="CHEESE" className="w-24 h-24 object-contain" />
             </div>
             <div className="text-center space-y-2">
               <h1 className="text-3xl md:text-4xl font-bold">
                 <span className="text-cheese">CHEESE</span>
-                <span className="text-foreground">Drop</span>
+                <span className="text-foreground">Ship</span>
               </h1>
               <p className="text-muted-foreground max-w-2xl mx-auto">
                 Browse and purchase NFT drops, or create your own drops using the NFTHive smart contract.

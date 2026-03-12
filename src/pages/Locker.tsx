@@ -6,7 +6,7 @@ import { CreateLock } from "@/components/locker/CreateLock";
 import { MyLocks } from "@/components/locker/MyLocks";
 import { CreateLiquidityLock } from "@/components/locker/CreateLiquidityLock";
 import { MyLiquidityLocks } from "@/components/locker/MyLiquidityLocks";
-import cheeseDropOrb from "@/assets/cheesedrop.png";
+import cheeseLockOrb from "@/assets/cheeselock.png";
 import { playRandomFart } from "@/lib/fartSounds";
 
 const Locker = () => {
@@ -21,7 +21,7 @@ const Locker = () => {
               className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer"
               onClick={playRandomFart}
             >
-              <img src={cheeseDropOrb} alt="CHEESE" className="w-24 h-24 object-contain" />
+              <img src={cheeseLockOrb} alt="CHEESE Lock" className="w-24 h-24 object-contain" />
             </div>
             <div className="text-center space-y-2">
               <h1 className="text-3xl md:text-4xl font-bold">
