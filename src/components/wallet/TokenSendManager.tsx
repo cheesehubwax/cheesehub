@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useWax } from '@/context/WaxContext';
-import { useAllTokenBalances, TokenBalance } from '@/hooks/useAllTokenBalances';
+import { useAllTokenBalances, TokenWithBalance } from '@/hooks/useAllTokenBalances';
 import { TokenLogo } from '@/components/TokenLogo';
 import { Loader2, Send, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -20,7 +20,7 @@ function isValidWaxAccount(account: string): boolean {
 
 export function TokenSendManager({ onTransactionSuccess }: TokenSendManagerProps) {
   const { accountName, transferToken } = useWax();
-  const { balances, loading: balancesLoading } = useAllTokenBalances(accountName || undefined);
+  const { tokens: balances, isLoading: balancesLoading } = useAllTokenBalances(accountName || undefined);
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   const [selectedTokenKey, setSelectedTokenKey] = useState('');
@@ -62,7 +62,7 @@ export function TokenSendManager({ onTransactionSuccess }: TokenSendManagerProps
 
   const setPercentage = (percent: number) => {
     if (!selectedBalance) return;
-    setAmount((selectedBalance.amount * percent / 100).toFixed(selectedBalance.precision));
+    setAmount((selectedBalance.balance * percent / 100).toFixed(selectedBalance.precision));
   };
 
   return (
@@ -83,7 +83,7 @@ export function TokenSendManager({ onTransactionSuccess }: TokenSendManagerProps
               <SelectItem key={`${b.contract}:${b.symbol}`} value={`${b.contract}:${b.symbol}`}>
                 <span className="flex items-center gap-2">
                   <TokenLogo contract={b.contract} symbol={b.symbol} size="sm" />
-                  {b.symbol} — {b.amount.toLocaleString()}
+                  {b.symbol} — {b.balance.toLocaleString()}
                 </span>
               </SelectItem>
             ))}

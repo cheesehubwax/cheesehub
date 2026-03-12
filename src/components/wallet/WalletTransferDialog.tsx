@@ -66,7 +66,7 @@ const SIDEBAR_ITEMS: { id: WalletSection; label: string; icon: React.ElementType
 export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialogProps) {
   const { accountName } = useWax();
   const { waxPrice } = useWaxPrice();
-  const { balances } = useAllTokenBalances(accountName || undefined);
+  const { tokens: balances } = useAllTokenBalances(accountName || undefined);
   const [activeSection, setActiveSection] = useState<WalletSection>("account");
   const [resources, setResources] = useState<AccountResources | null>(null);
 
@@ -91,7 +91,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
 
   // Token balances summary for Account page
   const waxBalance = balances.find((b) => b.symbol === "WAX");
-  const totalWaxUsd = waxBalance ? waxBalance.amount * waxPrice : 0;
+  const totalWaxUsd = waxBalance ? waxBalance.balance * waxPrice : 0;
 
   const topItems = SIDEBAR_ITEMS.filter((i) => !i.bottom);
   const bottomItems = SIDEBAR_ITEMS.filter((i) => i.bottom);
@@ -187,7 +187,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                         {waxBalance && (
                           <span className="text-sm">
                             <span className="font-medium text-primary">
-                              {waxBalance.amount.toFixed(4)} WAX
+                              {waxBalance.balance.toFixed(4)} WAX
                             </span>
                             {waxPrice > 0 && (
                               <span className="text-muted-foreground ml-1.5">
@@ -214,7 +214,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                                   {b.symbol}
                                 </div>
                                 <div className="text-xs text-muted-foreground truncate">
-                                  {b.amount.toLocaleString()}
+                                  {b.balance.toLocaleString()}
                                 </div>
                               </div>
                             </div>

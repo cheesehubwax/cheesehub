@@ -203,17 +203,17 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
                 <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-48 overflow-y-auto">
                   {nfts.slice(0, 24).map(nft => (
                     <div
-                      key={nft.assetId}
+                      key={nft.asset_id}
                       className={`relative rounded-lg border p-1 cursor-pointer transition-all ${
-                        selectedNFTs.includes(nft.assetId)
+                        selectedNFTs.includes(nft.asset_id)
                           ? "border-primary bg-primary/10"
                           : "border-border/50 hover:border-primary/30"
                       }`}
                       onClick={() =>
                         setSelectedNFTs(prev =>
-                          prev.includes(nft.assetId)
-                            ? prev.filter(id => id !== nft.assetId)
-                            : [...prev, nft.assetId]
+                          prev.includes(nft.asset_id)
+                            ? prev.filter(id => id !== nft.asset_id)
+                            : [...prev, nft.asset_id]
                         )
                       }
                     >

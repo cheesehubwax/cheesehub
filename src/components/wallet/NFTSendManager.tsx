@@ -25,7 +25,7 @@ function isValidWaxAccount(account: string): boolean {
 
 export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
   const { accountName, transferNFTs } = useWax();
-  const { nfts, loading: isLoading } = useUserNFTs(accountName || undefined);
+  const { nfts, isLoading } = useUserNFTs(accountName || undefined);
   const [recipient, setRecipient] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
@@ -42,22 +42,22 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
   // Get unique collections
   const collections = useMemo(() => {
     const colMap = new Map<string, number>();
-    nfts.forEach(nft => colMap.set(nft.collectionName, (colMap.get(nft.collectionName) || 0) + 1));
+    nfts.forEach(nft => colMap.set(nft.collection, (colMap.get(nft.collection) || 0) + 1));
     return Array.from(colMap.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
   }, [nfts]);
 
   const filteredNFTs = useMemo(() => {
     let result = [...nfts];
-    if (collectionFilter !== 'all') result = result.filter(nft => nft.collectionName === collectionFilter);
+    if (collectionFilter !== 'all') result = result.filter(nft => nft.collection === collectionFilter);
     if (debouncedSearch) {
       const query = debouncedSearch.toLowerCase();
-      result = result.filter(nft => nft.name.toLowerCase().includes(query) || nft.collectionName.toLowerCase().includes(query));
+      result = result.filter(nft => nft.name.toLowerCase().includes(query) || nft.collection.toLowerCase().includes(query));
     }
     switch (sortBy) {
-      case 'collection': result.sort((a, b) => a.collectionName.localeCompare(b.collectionName)); break;
+      case 'collection': result.sort((a, b) => a.collection.localeCompare(b.collection)); break;
       case 'name': result.sort((a, b) => a.name.localeCompare(b.name)); break;
-      case 'newest': result.sort((a, b) => parseInt(b.assetId) - parseInt(a.assetId)); break;
-      case 'oldest': result.sort((a, b) => parseInt(a.assetId) - parseInt(b.assetId)); break;
+      case 'newest': result.sort((a, b) => parseInt(b.asset_id) - parseInt(a.asset_id)); break;
+      case 'oldest': result.sort((a, b) => parseInt(a.asset_id) - parseInt(b.asset_id)); break;
     }
     return result;
   }, [nfts, collectionFilter, debouncedSearch, sortBy]);
@@ -125,7 +125,7 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
       <div className="flex items-center justify-between text-sm">
         <span className="text-muted-foreground">{selectedNFTs.size} selected {selectedNFTs.size >= 50 && '(max 50)'}</span>
         <div className="flex gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setSelectedNFTs(new Set(filteredNFTs.slice(0, 50).map(n => n.assetId)))} disabled={filteredNFTs.length === 0}>Select All</Button>
+          <Button variant="ghost" size="sm" onClick={() => setSelectedNFTs(new Set(filteredNFTs.slice(0, 50).map(n => n.asset_id)))} disabled={filteredNFTs.length === 0}>Select All</Button>
           <Button variant="ghost" size="sm" onClick={() => setSelectedNFTs(new Set())} disabled={selectedNFTs.size === 0}>Clear</Button>
         </div>
       </div>
@@ -142,15 +142,15 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
               return (
                 <div key={virtualRow.key} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${virtualRow.size}px`, transform: `translateY(${virtualRow.start}px)` }} className="grid grid-cols-4 gap-2 p-1">
                   {rowNFTs.map(nft => (
-                    <button key={nft.assetId} onClick={() => toggleNFTSelection(nft.assetId)}
-                      className={cn('group relative rounded-md overflow-hidden border-2 transition-all hover:opacity-90 h-[130px]', selectedNFTs.has(nft.assetId) ? 'border-primary ring-1 ring-primary' : 'border-transparent hover:border-muted-foreground/30')}>
-                      {selectedNFTs.has(nft.assetId) && <div className="absolute top-1 right-1 z-10 bg-primary rounded-full p-0.5"><Check className="h-3 w-3 text-primary-foreground" /></div>}
+                    <button key={nft.asset_id} onClick={() => toggleNFTSelection(nft.asset_id)}
+                      className={cn('group relative rounded-md overflow-hidden border-2 transition-all hover:opacity-90 h-[130px]', selectedNFTs.has(nft.asset_id) ? 'border-primary ring-1 ring-primary' : 'border-transparent hover:border-muted-foreground/30')}>
+                      {selectedNFTs.has(nft.asset_id) && <div className="absolute top-1 right-1 z-10 bg-primary rounded-full p-0.5"><Check className="h-3 w-3 text-primary-foreground" /></div>}
                       <div className="aspect-square bg-muted h-[90px] flex items-center justify-center">
                         <img src={nft.image} alt={nft.name} className="w-full h-full object-cover" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }} />
                       </div>
                       <div className="p-1 bg-background/80 absolute bottom-0 left-0 right-0">
                         <p className="text-[10px] font-medium truncate">{nft.name}</p>
-                        <span className="text-[9px] text-muted-foreground truncate block">{nft.collectionName}</span>
+                        <span className="text-[9px] text-muted-foreground truncate block">{nft.collection}</span>
                       </div>
                     </button>
                   ))}

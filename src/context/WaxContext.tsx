@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Session } from '@wharfkit/session';
+import { Session, SerializedSession } from '@wharfkit/session';
 import { sessionKit, closeWharfkitModals, setLoginInProgress, getTransactPlugins } from '@/lib/wharfKit';
 import { CHEESE_CONFIG, WAX_CHAIN, NFTHIVE_CONFIG } from '@/lib/waxConfig';
 import { useToast } from '@/hooks/use-toast';
@@ -23,6 +23,7 @@ interface WaxContextType {
     memo: string
   ) => Promise<string | null>;
   transferNFTs: (to: string, assetIds: string[], memo: string) => Promise<string | null>;
+  burnNFTs: (assetIds: string[]) => Promise<string | null>;
   claimDrop: (
     dropId: string,
     quantity: number,
@@ -34,6 +35,12 @@ interface WaxContextType {
   claimFreeDrop: (dropId: string, quantity: number) => Promise<string | null>;
   joinDao: (daoName: string) => Promise<string | null>;
   leaveDao: (daoName: string) => Promise<string | null>;
+  // Multi-account support
+  allSessions: SerializedSession[];
+  switchAccount: (session: SerializedSession) => Promise<void>;
+  addAccount: () => Promise<void>;
+  removeAccount: (session: SerializedSession) => Promise<void>;
+  refreshSessions: () => Promise<void>;
 }
 
 const WaxContext = createContext<WaxContextType | undefined>(undefined);
@@ -42,6 +49,7 @@ export function WaxProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [cheeseBalance, setCheeseBalance] = useState(0);
+  const [allSessions, setAllSessions] = useState<SerializedSession[]>([]);
   const { toast } = useToast();
 
   const accountName = session?.actor?.toString() || null;
@@ -94,6 +102,17 @@ export function WaxProvider({ children }: { children: ReactNode }) {
     setCheeseBalance(0);
   }, [session]);
 
+  // Refresh all stored sessions
+  const refreshSessions = useCallback(async () => {
+    try {
+      const sessions = await sessionKit.getSessions();
+      setAllSessions(sessions);
+    } catch (error) {
+      console.error('Failed to get sessions:', error);
+      setAllSessions([]);
+    }
+  }, []);
+
   useEffect(() => {
     const restoreSession = async () => {
       try {
@@ -101,12 +120,13 @@ export function WaxProvider({ children }: { children: ReactNode }) {
         if (restored) {
           setSession(restored);
         }
+        await refreshSessions();
       } catch (error) {
         console.error('Failed to restore session:', error);
       }
     };
     restoreSession();
-  }, []);
+  }, [refreshSessions]);
 
   // Initial balance refresh on session change
   useEffect(() => {
@@ -130,6 +150,7 @@ export function WaxProvider({ children }: { children: ReactNode }) {
     try {
       const response = await sessionKit.login();
       setSession(response.session);
+      await refreshSessions();
       toast({
         title: 'Wallet Connected',
         description: `Connected as ${response.session.actor}`,
@@ -149,17 +170,67 @@ export function WaxProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     if (session) {
-      try {
-        await sessionKit.logout(session);
-        setSession(null);
-        setCheeseBalance(0);
-        toast({
-          title: 'Wallet Disconnected',
-          description: 'You have been logged out',
-        });
-      } catch (error) {
-        console.error('Logout failed:', error);
+      setSession(null);
+      setCheeseBalance(0);
+      toast({
+        title: 'Wallet Disconnected',
+        description: 'Your account is saved for quick switching.',
+      });
+    }
+  };
+
+  // Switch to a different stored session
+  const switchAccount = async (serializedSession: SerializedSession) => {
+    try {
+      setIsLoading(true);
+      const restored = await sessionKit.restore(serializedSession);
+      if (restored) {
+        setSession(restored);
+        toast({ title: 'Account Switched', description: `Now using ${restored.actor}` });
       }
+    } catch (error) {
+      console.error('Switch account failed:', error);
+      toast({ title: 'Switch Failed', description: error instanceof Error ? error.message : 'Failed to switch account', variant: 'destructive' });
+      await refreshSessions();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Add another account without logging out current one
+  const addAccount = async () => {
+    setIsLoading(true);
+    setLoginInProgress(true);
+    try {
+      const response = await sessionKit.login();
+      setSession(response.session);
+      await refreshSessions();
+      toast({ title: 'Account Added', description: `Added and switched to ${response.session.actor}` });
+    } catch (error) {
+      console.error('Add account failed:', error);
+      toast({ title: 'Add Account Failed', description: error instanceof Error ? error.message : 'Failed to add account', variant: 'destructive' });
+    } finally {
+      setLoginInProgress(false);
+      setIsLoading(false);
+    }
+  };
+
+  // Remove a specific session without affecting others
+  const removeAccount = async (serializedSession: SerializedSession) => {
+    try {
+      const sessionToRemove = await sessionKit.restore(serializedSession);
+      if (sessionToRemove) {
+        await sessionKit.logout(sessionToRemove);
+        if (session?.actor?.toString() === serializedSession.actor) {
+          setSession(null);
+          setCheeseBalance(0);
+        }
+        await refreshSessions();
+        toast({ title: 'Account Removed', description: `Removed ${serializedSession.actor}` });
+      }
+    } catch (error) {
+      console.error('Remove account failed:', error);
+      toast({ title: 'Remove Failed', description: error instanceof Error ? error.message : 'Failed to remove account', variant: 'destructive' });
     }
   };
 
@@ -531,6 +602,30 @@ export function WaxProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const burnNFTs = async (assetIds: string[]): Promise<string | null> => {
+    if (!session) {
+      toast({ title: 'Wallet Not Connected', description: 'Please connect your wallet first', variant: 'destructive' });
+      return null;
+    }
+    try {
+      const actions = assetIds.map((asset_id) => ({
+        account: 'atomicassets',
+        name: 'burnasset',
+        authorization: [session.permissionLevel],
+        data: { asset_owner: session.actor.toString(), asset_id },
+      }));
+      const result = await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
+      return result.resolved?.transaction.id?.toString() || null;
+    } catch (error) {
+      console.error('NFT burn failed:', error);
+      closeWharfkitModals();
+      toast({ title: 'Burn Failed', description: error instanceof Error ? error.message : 'Failed to burn NFTs', variant: 'destructive' });
+      return null;
+    } finally {
+      setTimeout(() => closeWharfkitModals(), 100);
+    }
+  };
+
   return (
     <WaxContext.Provider
       value={{
@@ -545,10 +640,16 @@ export function WaxProvider({ children }: { children: ReactNode }) {
         transferCheese,
         transferToken,
         transferNFTs,
+        burnNFTs,
         claimDrop,
         claimFreeDrop,
         joinDao,
         leaveDao,
+        allSessions,
+        switchAccount,
+        addAccount,
+        removeAccount,
+        refreshSessions,
       }}
     >
       {children}
