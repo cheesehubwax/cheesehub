@@ -150,7 +150,7 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
                       </div>
                       <div className="p-1 bg-background/80 absolute bottom-0 left-0 right-0">
                         <p className="text-[10px] font-medium truncate">{nft.name}</p>
-                        <span className="text-[9px] text-muted-foreground truncate block">{nft.collection}</span>
+                        <span className="text-[9px] text-muted-foreground truncate block">{nft.collectionName}</span>
                       </div>
                     </button>
                   ))}
