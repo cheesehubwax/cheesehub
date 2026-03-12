@@ -4,6 +4,7 @@ import { Megaphone } from "lucide-react";
 import { useBannerSlots, BannerSlotGroup } from "@/hooks/useBannerSlots";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 import { sanitizeUrl } from "@/lib/sanitizeUrl";
+import { logger } from "@/lib/logger";
 
 interface ActiveBanner {
   ipfsHash: string;
@@ -15,9 +16,11 @@ function extractActiveBanners(group: BannerSlotGroup): ActiveBanner[] {
   const banners: ActiveBanner[] = [];
 
   for (const slot of group.slots) {
-    if (slot.isAvailable || slot.suspended) continue;
+    // Skip only if truly available (no renter) or suspended
+    if (slot.suspended) continue;
 
-    if (slot.ipfsHash) {
+    // Primary renter banner
+    if (!slot.isAvailable && slot.ipfsHash) {
       banners.push({
         ipfsHash: slot.ipfsHash,
         websiteUrl: slot.websiteUrl,
@@ -25,6 +28,7 @@ function extractActiveBanners(group: BannerSlotGroup): ActiveBanner[] {
       });
     }
 
+    // Shared renter banner
     if (slot.rentalType === "shared" && slot.sharedUser && slot.sharedIpfsHash) {
       banners.push({
         ipfsHash: slot.sharedIpfsHash,
@@ -45,6 +49,7 @@ export function BannerDisplay() {
   const activeBanners = useMemo(() => {
     const nowSec = Math.floor(Date.now() / 1000);
 
+    // Prefer the most recent live group, fall back to nearest future
     const pastGroups = slotGroups
       .filter((group) => group.time <= nowSec)
       .sort((a, b) => b.time - a.time);
@@ -57,7 +62,22 @@ export function BannerDisplay() {
 
     for (const group of candidateGroups) {
       const banners = extractActiveBanners(group);
-      if (banners.length > 0) return banners;
+      if (banners.length > 0) {
+        logger.info(`[BannerDisplay] Showing ${banners.length} banner(s) from group time=${group.time}`, banners);
+        return banners;
+      }
+    }
+
+    // Log all slots for debugging if nothing matched
+    if (slotGroups.length > 0) {
+      logger.info("[BannerDisplay] No active banners found. All slot groups:", slotGroups.map(g => ({
+        time: g.time,
+        slots: g.slots.map(s => ({
+          pos: s.position, user: s.user, ipfsHash: s.ipfsHash?.slice(0, 12),
+          sharedUser: s.sharedUser, sharedIpfsHash: s.sharedIpfsHash?.slice(0, 12),
+          isAvailable: s.isAvailable, suspended: s.suspended, rentalType: s.rentalType,
+        })),
+      })));
     }
 
     return [];
@@ -89,7 +109,7 @@ export function BannerDisplay() {
           href={sanitizeUrl(current.websiteUrl)}
           target="_blank"
           rel="noopener noreferrer"
-          className="block max-w-[580px] w-full"
+          className="relative block max-w-[580px] w-full"
         >
           <img
             src={`${currentGateway}${current.ipfsHash}`}
@@ -102,6 +122,9 @@ export function BannerDisplay() {
               }
             }}
           />
+          <span className="absolute top-1 right-1 text-[10px] font-bold text-foreground/30 bg-background/40 rounded px-1 py-0.5 leading-none pointer-events-none select-none">
+            AD
+          </span>
         </a>
       )}
       <Link
