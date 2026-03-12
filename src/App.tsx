@@ -14,6 +14,7 @@ import Dao from "./pages/Dao";
 import Farm from "./pages/Farm";
 import CheeseNull from "./pages/CheeseNull";
 import Drip from "./pages/Drip";
+import BannerAds from "./pages/BannerAds";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,6 +44,7 @@ const App = () => {
                 <Route path="/farm/:farmName" element={<Farm />} />
                 <Route path="/cheesenull" element={<CheeseNull />} />
                 <Route path="/drip" element={<Drip />} />
+                <Route path="/bannerads" element={<BannerAds />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

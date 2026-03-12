@@ -1,60 +1,140 @@
-import { useWaxPrice } from '@/hooks/useWaxPrice';
 import { useCheesePriceData } from '@/hooks/useCheesePriceData';
+import { useCheeseStats } from '@/hooks/useCheeseStats';
+import { useCheeseTVL } from '@/hooks/useCheeseTVL';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TrendUp, TrendDown } from '@phosphor-icons/react';
+import { RefreshCw } from 'lucide-react';
+import waxToken from '@/assets/wax-token.png';
+
+function formatPrice(price: number, decimals: number = 8): string {
+  return price.toFixed(decimals);
+}
+
+function formatUsdPrice(price: number): string {
+  if (price < 0.0001) {
+    return price.toFixed(8);
+  } else if (price < 0.01) {
+    return price.toFixed(6);
+  } else if (price < 1) {
+    return price.toFixed(4);
+  }
+  return price.toFixed(2);
+}
+
+function formatLargeValue(value: number): string {
+  if (value >= 1_000_000) {
+    return `$${(value / 1_000_000).toFixed(2)}M`;
+  } else if (value >= 1_000) {
+    return `$${(value / 1_000).toFixed(2)}K`;
+  }
+  return `$${value.toFixed(2)}`;
+}
+
+function formatWaxValue(value: number): string {
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(2)}M WAX`;
+  } else if (value >= 1_000) {
+    return `${(value / 1_000).toFixed(2)}K WAX`;
+  }
+  return `${value.toFixed(2)} WAX`;
+}
 
 export function CheesePriceBar() {
-  const { waxPrice, loading: waxLoading } = useWaxPrice();
-  const { priceData, loading: cheeseLoading } = useCheesePriceData(waxPrice);
+  const { data: priceData, isLoading: priceLoading, error: priceError } = useCheesePriceData();
+  const { data: stats, isLoading: statsLoading } = useCheeseStats();
 
-  const loading = waxLoading || cheeseLoading;
-  const change24h = priceData.change24h;
-  const isPositive = change24h >= 0;
+  // Need WAX/USD price for TVL calculation - derive from CHEESE prices
+  const waxUsdPrice = priceData && priceData.waxPrice > 0
+    ? priceData.usdPrice / priceData.waxPrice
+    : undefined;
+  const cheeseUsdPrice = priceData?.usdPrice;
+  const { data: tvlData, isLoading: tvlLoading, refetch: refetchTvl, isFetching: tvlFetching } = useCheeseTVL(waxUsdPrice, cheeseUsdPrice);
 
-  const formatPrice = (price: number, decimals: number = 6) => {
-    if (price < 0.000001) return price.toExponential(2);
-    return price.toFixed(decimals);
-  };
+  const isLoading = priceLoading || statsLoading;
 
-  const formatPercent = (value: number) => {
-    const sign = value >= 0 ? '+' : '';
-    return `${sign}${value.toFixed(2)}%`;
-  };
+  const marketCap = priceData && stats
+    ? stats.circulatingSupply * priceData.usdPrice
+    : 0;
 
-  if (loading) {
-    return (
-      <div className="flex flex-wrap justify-center gap-4 text-sm text-muted-foreground">
-        <Skeleton className="h-10 w-40" />
-        <Skeleton className="h-10 w-40" />
-        <Skeleton className="h-10 w-32" />
-      </div>
-    );
+  if (priceError) {
+    return null;
   }
 
   return (
-    <div className="flex flex-wrap justify-center gap-3 text-sm">
-      {/* CHEESE Price */}
-      <div className="px-4 py-2 bg-card/50 rounded-lg border border-cheese/30 flex items-center gap-2">
-        <span className="text-muted-foreground">CHEESE:</span>
-        <span className="text-cheese font-semibold">${formatPrice(priceData.priceInUsd)}</span>
+    <>
+      <div className="flex flex-wrap justify-center gap-4 md:gap-8 mt-6 mb-2">
+        {/* CHEESE/WAX Price */}
+        <div className="flex items-center gap-2 bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border border-cheese/20 rounded-lg px-4 py-2">
+          <img src={waxToken} alt="WAX" className="w-6 h-6 rounded-full" />
+          <div className="flex flex-col items-start">
+            <span className="text-xs text-muted-foreground">CHEESE/WAX</span>
+            {isLoading ? (
+              <Skeleton className="h-5 w-24" />
+            ) : (
+              <span className="font-semibold text-foreground">
+                {formatPrice(priceData?.waxPrice ?? 0, 4)} WAX
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* CHEESE/USD Price */}
+        <div className="flex items-center gap-2 bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border border-cheese/20 rounded-lg px-4 py-2">
+          <span className="text-lg font-bold text-green-500">$</span>
+          <div className="flex flex-col items-start">
+            <span className="text-xs text-muted-foreground">CHEESE/USD</span>
+            {isLoading ? (
+              <Skeleton className="h-5 w-20" />
+            ) : (
+              <span className="font-semibold text-foreground">
+                ${formatUsdPrice(priceData?.usdPrice ?? 0)}
+              </span>
+            )}
+          </div>
+        </div>
+
+      {/* Market Cap */}
+      <div className="flex items-center gap-2 bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border border-cheese/20 rounded-lg px-4 py-2">
+        <span className="text-lg">📊</span>
+        <div className="flex flex-col">
+          <span className="text-xs text-muted-foreground">Market Cap</span>
+          {isLoading ? (
+            <Skeleton className="h-5 w-20" />
+          ) : (
+            <span className="font-semibold text-foreground">
+              {formatLargeValue(marketCap)}
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* WAX Price */}
-      <div className="px-4 py-2 bg-card/50 rounded-lg border border-border/50 flex items-center gap-2">
-        <span className="text-muted-foreground">WAX:</span>
-        <span className="text-foreground font-semibold">${waxPrice.toFixed(4)}</span>
-      </div>
-
-      {/* 24h Change */}
-      <div className={`px-4 py-2 rounded-lg border flex items-center gap-1 ${
-        isPositive 
-          ? 'bg-green-500/10 border-green-500/30 text-green-400' 
-          : 'bg-red-500/10 border-red-500/30 text-red-400'
-      }`}>
-        {isPositive ? <TrendUp weight="bold" size={16} /> : <TrendDown weight="bold" size={16} />}
-        <span className="font-semibold">{formatPercent(change24h)}</span>
-        <span className="text-muted-foreground text-xs">24h</span>
+      {/* TVL */}
+      <div className="flex items-center gap-2 bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border border-cheese/20 rounded-lg px-4 py-2">
+        <span className="text-lg">💰</span>
+        <div className="flex flex-col">
+          <span className="text-xs text-muted-foreground">TVL (All DEXs)</span>
+          {tvlLoading || !tvlData ? (
+            <Skeleton className="h-5 w-24" />
+          ) : (
+            <div className="flex flex-col">
+              <span className="font-semibold text-foreground">
+                {formatLargeValue(tvlData.totalUSD)}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {formatWaxValue(tvlData.totalWAX)}
+              </span>
+            </div>
+          )}
+        </div>
+        <button
+          onClick={() => refetchTvl()}
+          disabled={tvlFetching}
+          className="p-1 rounded hover:bg-cheese/20 transition-colors disabled:opacity-50"
+          title="Refresh TVL"
+        >
+          <RefreshCw className={`w-3 h-3 text-muted-foreground ${tvlFetching ? 'animate-spin' : ''}`} />
+        </button>
       </div>
     </div>
+    </>
   );
 }

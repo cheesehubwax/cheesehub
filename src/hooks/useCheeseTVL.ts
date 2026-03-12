@@ -1,42 +1,15 @@
-import { useState, useEffect } from 'react';
-import { fetchCheeseTotalTVL, type TVLData } from '@/lib/tvl';
+import { useQuery } from '@tanstack/react-query';
+import { fetchCheeseTotalTVL, TVLData } from '@/lib/tvl';
 
-export function useCheeseTVL(waxUsdPrice: number = 0, cheeseUsdPrice: number = 0) {
-  const [tvlData, setTvlData] = useState<TVLData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function loadTVL() {
-      if (waxUsdPrice <= 0) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const data = await fetchCheeseTotalTVL(waxUsdPrice, cheeseUsdPrice);
-        if (mounted) {
-          setTvlData(data);
-        }
-      } catch (err) {
-        if (mounted) {
-          setError(err instanceof Error ? err.message : 'Failed to fetch TVL');
-        }
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    }
-
-    loadTVL();
-    const interval = setInterval(loadTVL, 120000); // Refresh every 2 minutes
-
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, [waxUsdPrice, cheeseUsdPrice]);
-
-  return { tvlData, loading, error };
+export function useCheeseTVL(waxUsdPrice: number | undefined, cheeseUsdPrice: number | undefined) {
+  return useQuery<TVLData>({
+    queryKey: ['cheese-tvl'],
+    queryFn: () => fetchCheeseTotalTVL(waxUsdPrice || 0, cheeseUsdPrice || 0),
+    enabled: !!waxUsdPrice && waxUsdPrice > 0 && !!cheeseUsdPrice && cheeseUsdPrice > 0,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    staleTime: 60 * 60 * 1000, // 1 hour - manual refresh only
+    retry: 2,
+  });
 }
