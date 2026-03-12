@@ -15,6 +15,7 @@ export function Layout({ children, showFooter = true }: LayoutProps) {
     <div className="min-h-screen bg-background relative flex flex-col">
       <BackgroundDecorations />
       <Header />
+      <BannerDisplay />
       <main className="flex-1">
         {children}
       </main>
