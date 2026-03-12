@@ -6,7 +6,7 @@ import { useWax } from "@/context/WaxContext";
 import { usePowerupStats } from "@/hooks/usePowerupStats";
 import { usePowerupLeaderboard } from "@/hooks/usePowerupLeaderboard";
 import { PowerupLeaderboard } from "@/components/powerup/PowerupLeaderboard";
-import cheeseLogo2 from "@/assets/cheese-logo-2.png";
+import cheeseUpOrb from "@/assets/cheeseup.png";
 import { playRandomFart } from "@/lib/fartSounds";
 
 const PowerUp = () => {
