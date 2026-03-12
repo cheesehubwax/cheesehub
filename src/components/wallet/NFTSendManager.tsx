@@ -51,7 +51,7 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
     if (collectionFilter !== 'all') result = result.filter(nft => nft.collectionName === collectionFilter);
     if (debouncedSearch) {
       const query = debouncedSearch.toLowerCase();
-      result = result.filter(nft => nft.name.toLowerCase().includes(query) || nft.collection.toLowerCase().includes(query));
+      result = result.filter(nft => nft.name.toLowerCase().includes(query) || nft.collectionName.toLowerCase().includes(query));
     }
     switch (sortBy) {
       case 'collection': result.sort((a, b) => a.collection.localeCompare(b.collection)); break;
