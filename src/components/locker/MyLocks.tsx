@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Lock, Unlock, RefreshCw, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import cheeseLogo from "@/assets/cheese-logo.png";
+import { TokenLogo } from "@/components/TokenLogo";
 
 export function MyLocks() {
   const { session, accountName } = useWax();
