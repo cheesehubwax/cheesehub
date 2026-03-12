@@ -7,7 +7,7 @@ import { BrowseDaos } from "@/components/dao/BrowseDaos";
 import { CreateDao } from "@/components/dao/CreateDao";
 import { MyDaos } from "@/components/dao/MyDaos";
 import { DaoDetail } from "@/components/dao/DaoDetail";
-import cheeseLogo2 from "@/assets/cheese-logo-2.png";
+import cheeseDaoOrb from "@/assets/cheesedao.png";
 import { playRandomFart } from "@/lib/fartSounds";
 
 const Dao = () => {
