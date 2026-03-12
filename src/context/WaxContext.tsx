@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Session } from '@wharfkit/session';
+import { Session, SerializedSession } from '@wharfkit/session';
 import { sessionKit, closeWharfkitModals, setLoginInProgress, getTransactPlugins } from '@/lib/wharfKit';
 import { CHEESE_CONFIG, WAX_CHAIN, NFTHIVE_CONFIG } from '@/lib/waxConfig';
 import { useToast } from '@/hooks/use-toast';
@@ -23,6 +23,7 @@ interface WaxContextType {
     memo: string
   ) => Promise<string | null>;
   transferNFTs: (to: string, assetIds: string[], memo: string) => Promise<string | null>;
+  burnNFTs: (assetIds: string[]) => Promise<string | null>;
   claimDrop: (
     dropId: string,
     quantity: number,
@@ -34,6 +35,12 @@ interface WaxContextType {
   claimFreeDrop: (dropId: string, quantity: number) => Promise<string | null>;
   joinDao: (daoName: string) => Promise<string | null>;
   leaveDao: (daoName: string) => Promise<string | null>;
+  // Multi-account support
+  allSessions: SerializedSession[];
+  switchAccount: (session: SerializedSession) => Promise<void>;
+  addAccount: () => Promise<void>;
+  removeAccount: (session: SerializedSession) => Promise<void>;
+  refreshSessions: () => Promise<void>;
 }
 
 const WaxContext = createContext<WaxContextType | undefined>(undefined);
