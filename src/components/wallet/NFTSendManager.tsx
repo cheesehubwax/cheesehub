@@ -25,7 +25,7 @@ function isValidWaxAccount(account: string): boolean {
 
 export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
   const { accountName, transferNFTs } = useWax();
-  const { nfts, isLoading } = useUserNFTs(accountName || undefined);
+  const { nfts, loading: isLoading } = useUserNFTs(accountName || undefined);
   const [recipient, setRecipient] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
@@ -42,19 +42,19 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
   // Get unique collections
   const collections = useMemo(() => {
     const colMap = new Map<string, number>();
-    nfts.forEach(nft => colMap.set(nft.collection, (colMap.get(nft.collection) || 0) + 1));
+    nfts.forEach(nft => colMap.set(nft.collectionName, (colMap.get(nft.collectionName) || 0) + 1));
     return Array.from(colMap.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
   }, [nfts]);
 
   const filteredNFTs = useMemo(() => {
     let result = [...nfts];
-    if (collectionFilter !== 'all') result = result.filter(nft => nft.collection === collectionFilter);
+    if (collectionFilter !== 'all') result = result.filter(nft => nft.collectionName === collectionFilter);
     if (debouncedSearch) {
       const query = debouncedSearch.toLowerCase();
-      result = result.filter(nft => nft.name.toLowerCase().includes(query) || nft.collection.toLowerCase().includes(query));
+      result = result.filter(nft => nft.name.toLowerCase().includes(query) || nft.collectionName.toLowerCase().includes(query));
     }
     switch (sortBy) {
-      case 'collection': result.sort((a, b) => a.collection.localeCompare(b.collection)); break;
+      case 'collection': result.sort((a, b) => a.collectionName.localeCompare(b.collectionName)); break;
       case 'name': result.sort((a, b) => a.name.localeCompare(b.name)); break;
       case 'newest': result.sort((a, b) => parseInt(b.assetId) - parseInt(a.assetId)); break;
       case 'oldest': result.sort((a, b) => parseInt(a.assetId) - parseInt(b.assetId)); break;
@@ -150,7 +150,7 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
                       </div>
                       <div className="p-1 bg-background/80 absolute bottom-0 left-0 right-0">
                         <p className="text-[10px] font-medium truncate">{nft.name}</p>
-                        <span className="text-[9px] text-muted-foreground truncate block">{nft.collection}</span>
+                        <span className="text-[9px] text-muted-foreground truncate block">{nft.collectionName}</span>
                       </div>
                     </button>
                   ))}
