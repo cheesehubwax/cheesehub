@@ -48,7 +48,7 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
 
   const filteredNFTs = useMemo(() => {
     let result = [...nfts];
-    if (collectionFilter !== 'all') result = result.filter(nft => nft.collection === collectionFilter);
+    if (collectionFilter !== 'all') result = result.filter(nft => nft.collectionName === collectionFilter);
     if (debouncedSearch) {
       const query = debouncedSearch.toLowerCase();
       result = result.filter(nft => nft.name.toLowerCase().includes(query) || nft.collection.toLowerCase().includes(query));
