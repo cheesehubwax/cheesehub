@@ -102,6 +102,17 @@ export function WaxProvider({ children }: { children: ReactNode }) {
     setCheeseBalance(0);
   }, [session]);
 
+  // Refresh all stored sessions
+  const refreshSessions = useCallback(async () => {
+    try {
+      const sessions = await sessionKit.getSessions();
+      setAllSessions(sessions);
+    } catch (error) {
+      console.error('Failed to get sessions:', error);
+      setAllSessions([]);
+    }
+  }, []);
+
   useEffect(() => {
     const restoreSession = async () => {
       try {
@@ -109,12 +120,13 @@ export function WaxProvider({ children }: { children: ReactNode }) {
         if (restored) {
           setSession(restored);
         }
+        await refreshSessions();
       } catch (error) {
         console.error('Failed to restore session:', error);
       }
     };
     restoreSession();
-  }, []);
+  }, [refreshSessions]);
 
   // Initial balance refresh on session change
   useEffect(() => {
