@@ -1,268 +1,309 @@
-import { useState } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
+import { useState, useCallback } from "react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, Send, Cpu, HardDrive, Vote, Image } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useWax } from "@/context/WaxContext";
-import { useWaxTransaction } from "@/hooks/useWaxTransaction";
+import { useWaxPrice } from "@/hooks/useWaxPrice";
 import { useAllTokenBalances } from "@/hooks/useAllTokenBalances";
-import { useUserNFTs } from "@/hooks/useUserNFTs";
-import { useToast } from "@/hooks/use-toast";
+import { WalletResources, AccountDetailsSection, StakedResourcesSection, AccountResources } from "./WalletResources";
+import { TokenSendManager } from "./TokenSendManager";
+import { NFTSendManager } from "./NFTSendManager";
+import { StakeManager } from "./StakeManager";
+import { RentResourcesManager } from "./RentResourcesManager";
+import { RamManager } from "./RamManager";
+import { VoteManager } from "./VoteManager";
+import { VoteRewardsManager } from "./VoteRewardsManager";
+import { CreateAccountManager } from "./CreateAccountManager";
+import { AlcorFarmManager } from "./AlcorFarmManager";
+import { TransactionSuccessDialog } from "./TransactionSuccessDialog";
 import { TokenLogo } from "@/components/TokenLogo";
 import cheeseLogo from "@/assets/cheese-logo.png";
+import {
+  Wallet,
+  Send,
+  Image,
+  Landmark,
+  Zap,
+  HardDrive,
+  Vote,
+  Gift,
+  UserPlus,
+  Sprout,
+  X,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface WalletTransferDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
+type WalletSection =
+  | "account"
+  | "send-tokens"
+  | "send-nfts"
+  | "stake"
+  | "rent"
+  | "ram"
+  | "governance"
+  | "vote-rewards"
+  | "create-account"
+  | "alcor-farms";
+
+const SIDEBAR_ITEMS: { id: WalletSection; label: string; icon: React.ElementType; bottom?: boolean }[] = [
+  { id: "account", label: "Account", icon: Wallet },
+  { id: "send-tokens", label: "Send Tokens", icon: Send },
+  { id: "send-nfts", label: "Send NFTs", icon: Image },
+  { id: "stake", label: "Stake CPU/NET", icon: Landmark },
+  { id: "rent", label: "Rent CPU/NET", icon: Zap },
+  { id: "ram", label: "Trade RAM", icon: HardDrive },
+  { id: "governance", label: "Governance", icon: Vote },
+  { id: "vote-rewards", label: "Vote Rewards", icon: Gift },
+  { id: "create-account", label: "Create Account", icon: UserPlus },
+  { id: "alcor-farms", label: "Manage Alcor Farms", icon: Sprout, bottom: true },
+];
+
 export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialogProps) {
-  const { accountName, isConnected, session, cheeseBalance, transferToken, transferNFTs } = useWax();
-  const { executeTransaction } = useWaxTransaction(session);
-  const [txLoading, setTxLoading] = useState(false);
+  const { accountName } = useWax();
+  const { waxPrice } = useWaxPrice();
   const { balances } = useAllTokenBalances(accountName || undefined);
-  const { nfts } = useUserNFTs(accountName || undefined);
-  const { toast } = useToast();
+  const [activeSection, setActiveSection] = useState<WalletSection>("account");
+  const [resources, setResources] = useState<AccountResources | null>(null);
 
-  // Transfer state
-  const [recipient, setRecipient] = useState("");
-  const [amount, setAmount] = useState("");
-  const [selectedToken, setSelectedToken] = useState("CHEESE");
-  const [memo, setMemo] = useState("");
+  // Transaction success dialog
+  const [txSuccess, setTxSuccess] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    txId: string | null;
+  }>({ open: false, title: "", description: "", txId: null });
 
-  // Resource state
-  const [stakeAmount, setStakeAmount] = useState("");
-  const [resourceType, setResourceType] = useState<"cpu" | "net">("cpu");
-  const [ramAmount, setRamAmount] = useState("");
+  const handleTransactionSuccess = useCallback(
+    (title: string, description: string, txId: string | null) => {
+      setTxSuccess({ open: true, title, description, txId });
+    },
+    []
+  );
 
-  // NFT state
-  const [selectedNFTs, setSelectedNFTs] = useState<string[]>([]);
-  const [nftRecipient, setNftRecipient] = useState("");
+  const handleTransactionComplete = useCallback(() => {
+    // Could trigger balance refresh here
+  }, []);
 
-  // Vote state
-  const [proxyAccount, setProxyAccount] = useState("");
+  // Token balances summary for Account page
+  const waxBalance = balances.find((b) => b.symbol === "WAX");
+  const totalWaxUsd = waxBalance ? waxBalance.amount * waxPrice : 0;
 
-  const selectedBalance = balances.find(b => b.symbol === selectedToken);
-
-  const handleTransfer = async () => {
-    if (!recipient || !amount || !selectedBalance) return;
-    const result = await transferToken(
-      selectedBalance.contract,
-      selectedBalance.symbol,
-      selectedBalance.precision,
-      recipient,
-      parseFloat(amount),
-      memo
-    );
-    if (result) {
-      toast({ title: "Transfer Successful! 🧀", description: `Sent ${amount} ${selectedToken} to ${recipient}` });
-      setAmount("");
-      setRecipient("");
-      setMemo("");
-    }
-  };
-
-  const handleStake = async () => {
-    if (!accountName || !stakeAmount) return;
-    const formatted = `${parseFloat(stakeAmount).toFixed(8)} WAX`;
-    const action = {
-      account: "eosio",
-      name: "delegatebw",
-      authorization: [{ actor: accountName, permission: "active" }],
-      data: {
-        from: accountName,
-        receiver: accountName,
-        stake_net_quantity: resourceType === "net" ? formatted : "0.00000000 WAX",
-        stake_cpu_quantity: resourceType === "cpu" ? formatted : "0.00000000 WAX",
-        transfer: false,
-      },
-    };
-    const result = await executeTransaction([action]);
-    if (result.success) {
-      toast({ title: "Staked!", description: `Staked ${stakeAmount} WAX for ${resourceType.toUpperCase()}` });
-      setStakeAmount("");
-    }
-  };
-
-  const handleBuyRam = async () => {
-    if (!accountName || !ramAmount) return;
-    const action = {
-      account: "eosio",
-      name: "buyram",
-      authorization: [{ actor: accountName, permission: "active" }],
-      data: {
-        payer: accountName,
-        receiver: accountName,
-        quant: `${parseFloat(ramAmount).toFixed(8)} WAX`,
-      },
-    };
-    const result = await executeTransaction([action]);
-    if (result.success) {
-      toast({ title: "RAM Purchased!", description: `Bought RAM with ${ramAmount} WAX` });
-      setRamAmount("");
-    }
-  };
-
-  const handleSendNFTs = async () => {
-    if (!nftRecipient || selectedNFTs.length === 0) return;
-    const result = await transferNFTs(nftRecipient, selectedNFTs, "CHEESEHub transfer");
-    if (result) {
-      toast({ title: "NFTs Sent!", description: `Sent ${selectedNFTs.length} NFTs to ${nftRecipient}` });
-      setSelectedNFTs([]);
-      setNftRecipient("");
-    }
-  };
-
-  const handleVoteProxy = async () => {
-    if (!accountName || !proxyAccount) return;
-    const action = {
-      account: "eosio",
-      name: "voteproducer",
-      authorization: [{ actor: accountName, permission: "active" }],
-      data: {
-        voter: accountName,
-        proxy: proxyAccount,
-        producers: [],
-      },
-    };
-    const result = await executeTransaction([action]);
-    if (result.success) {
-      toast({ title: "Vote Proxy Set!", description: `Voting through ${proxyAccount}` });
-    }
-  };
+  const topItems = SIDEBAR_ITEMS.filter((i) => !i.bottom);
+  const bottomItems = SIDEBAR_ITEMS.filter((i) => i.bottom);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <img src={cheeseLogo} alt="CHEESE" className="h-5 w-5" />
-            CHEESEWallet
-          </DialogTitle>
-          <DialogDescription>
-            {accountName ? `${accountName} • ${cheeseBalance.toLocaleString()} CHEESE` : "Connect wallet to continue"}
-          </DialogDescription>
-        </DialogHeader>
-
-        <Tabs defaultValue="transfer" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="transfer"><Send className="h-3 w-3 mr-1" /> Send</TabsTrigger>
-            <TabsTrigger value="resources"><Cpu className="h-3 w-3 mr-1" /> Resources</TabsTrigger>
-            <TabsTrigger value="nfts"><Image className="h-3 w-3 mr-1" /> NFTs</TabsTrigger>
-            <TabsTrigger value="vote"><Vote className="h-3 w-3 mr-1" /> Vote</TabsTrigger>
-          </TabsList>
-
-          {/* Send Tokens Tab */}
-          <TabsContent value="transfer" className="space-y-4 mt-4">
-            <div>
-              <Label>Token</Label>
-              <Select value={selectedToken} onValueChange={setSelectedToken}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {balances.map(b => (
-                    <SelectItem key={`${b.contract}:${b.symbol}`} value={b.symbol}>
-                      <span className="flex items-center gap-2">
-                        <TokenLogo contract={b.contract} symbol={b.symbol} size="sm" />
-                        {b.symbol} ({b.amount.toLocaleString()})
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[900px] max-h-[85vh] p-0 gap-0 overflow-hidden bg-card border-border">
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+            <div className="flex items-center gap-2">
+              <img src={cheeseLogo} alt="CHEESE" className="h-5 w-5" />
+              <span className="font-bold text-foreground">
+                CHEESE<span className="text-primary">Wallet</span>
+              </span>
             </div>
-            <div>
-              <Label>Recipient</Label>
-              <Input value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="waxaccount" />
-            </div>
-            <div>
-              <Label>Amount</Label>
-              <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.0000" />
-            </div>
-            <div>
-              <Label>Memo (optional)</Label>
-              <Input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="memo" />
-            </div>
-            <Button onClick={handleTransfer} disabled={txLoading || !recipient || !amount} className="w-full bg-primary text-primary-foreground">
-              {txLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
-              Send {selectedToken}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => onOpenChange(false)}
+            >
+              <X className="h-4 w-4" />
             </Button>
-          </TabsContent>
+          </div>
 
-          {/* Resources Tab */}
-          <TabsContent value="resources" className="space-y-4 mt-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-3">
-                <h4 className="font-medium flex items-center gap-2"><Cpu className="h-4 w-4" /> Stake CPU/NET</h4>
-                <Select value={resourceType} onValueChange={(v) => setResourceType(v as "cpu" | "net")}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cpu">CPU</SelectItem>
-                    <SelectItem value="net">NET</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input type="number" value={stakeAmount} onChange={(e) => setStakeAmount(e.target.value)} placeholder="WAX amount" />
-                <Button onClick={handleStake} disabled={txLoading || !stakeAmount} className="w-full" variant="outline">
-                  Stake WAX
-                </Button>
-              </div>
-              <div className="space-y-3">
-                <h4 className="font-medium flex items-center gap-2"><HardDrive className="h-4 w-4" /> Buy RAM</h4>
-                <Input type="number" value={ramAmount} onChange={(e) => setRamAmount(e.target.value)} placeholder="WAX amount" />
-                <Button onClick={handleBuyRam} disabled={txLoading || !ramAmount} className="w-full" variant="outline">
-                  Buy RAM
-                </Button>
-              </div>
+          <div className="flex h-[calc(85vh-52px)] min-h-[500px]">
+            {/* Sidebar */}
+            <div className="w-[180px] shrink-0 border-r border-border flex flex-col">
+              <nav className="flex-1 py-2 space-y-0.5">
+                {topItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeSection === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveSection(item.id)}
+                      className={cn(
+                        "w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors text-left",
+                        isActive
+                          ? "bg-primary/20 text-primary border-r-2 border-primary font-medium"
+                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                      )}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+              {bottomItems.length > 0 && (
+                <div className="border-t border-border py-2">
+                  {bottomItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeSection === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => setActiveSection(item.id)}
+                        className={cn(
+                          "w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors text-left",
+                          isActive
+                            ? "bg-primary/20 text-primary border-r-2 border-primary font-medium"
+                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                        )}
+                      >
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </TabsContent>
 
-          {/* NFTs Tab */}
-          <TabsContent value="nfts" className="space-y-4 mt-4">
-            <div>
-              <Label>Recipient</Label>
-              <Input value={nftRecipient} onChange={(e) => setNftRecipient(e.target.value)} placeholder="waxaccount" />
-            </div>
-            <div>
-              <Label>Select NFTs ({selectedNFTs.length} selected)</Label>
-              <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto mt-2">
-                {nfts.slice(0, 40).map(nft => (
-                  <div
-                    key={nft.assetId}
-                    className={`relative rounded-lg border p-1 cursor-pointer transition-all ${
-                      selectedNFTs.includes(nft.assetId) ? "border-primary bg-primary/10" : "border-border/50 hover:border-primary/30"
-                    }`}
-                    onClick={() => setSelectedNFTs(prev =>
-                      prev.includes(nft.assetId) ? prev.filter(id => id !== nft.assetId) : [...prev, nft.assetId]
-                    )}
-                  >
-                    <img src={nft.image} alt={nft.name} className="w-full aspect-square object-cover rounded" />
-                    <p className="text-[9px] text-center truncate mt-0.5">{nft.name}</p>
+            {/* Main Content */}
+            <ScrollArea className="flex-1">
+              <div className="p-5">
+                {activeSection === "account" && (
+                  <div className="space-y-6">
+                    <WalletResources
+                      onResourcesUpdate={setResources}
+                      showTotalWaxBalance
+                      waxUsdPrice={waxPrice}
+                    />
+                    <AccountDetailsSection resources={resources} />
+                    <StakedResourcesSection resources={resources} />
+
+                    {/* Token Balances */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-medium">Token Balances</h3>
+                        {waxBalance && (
+                          <span className="text-sm">
+                            <span className="font-medium text-primary">
+                              {waxBalance.amount.toFixed(4)} WAX
+                            </span>
+                            {waxPrice > 0 && (
+                              <span className="text-muted-foreground ml-1.5">
+                                (${totalWaxUsd.toFixed(2)})
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </div>
+                      {balances.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-2">
+                          {balances.map((b) => (
+                            <div
+                              key={`${b.contract}:${b.symbol}`}
+                              className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 text-sm"
+                            >
+                              <TokenLogo
+                                contract={b.contract}
+                                symbol={b.symbol}
+                                size="sm"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium truncate">
+                                  {b.symbol}
+                                </div>
+                                <div className="text-xs text-muted-foreground truncate">
+                                  {b.amount.toLocaleString()}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg text-sm text-primary/70">
+                          Using backup data source. Some tokens may not appear.
+                        </div>
+                      )}
+                    </div>
                   </div>
-                ))}
-                {nfts.length === 0 && <p className="col-span-4 text-center text-muted-foreground py-4 text-sm">No NFTs found</p>}
-              </div>
-            </div>
-            <Button onClick={handleSendNFTs} disabled={txLoading || selectedNFTs.length === 0 || !nftRecipient} className="w-full bg-primary text-primary-foreground">
-              Send {selectedNFTs.length} NFT(s)
-            </Button>
-          </TabsContent>
+                )}
 
-          {/* Vote Tab */}
-          <TabsContent value="vote" className="space-y-4 mt-4">
-            <div>
-              <Label>Vote Proxy</Label>
-              <Input value={proxyAccount} onChange={(e) => setProxyAccount(e.target.value)} placeholder="proxy account" />
-              <p className="text-xs text-muted-foreground mt-1">Delegate your vote to a proxy account</p>
-            </div>
-            <Button onClick={handleVoteProxy} disabled={txLoading || !proxyAccount} className="w-full" variant="outline">
-              Set Vote Proxy
-            </Button>
-          </TabsContent>
-        </Tabs>
-      </DialogContent>
-    </Dialog>
+                {activeSection === "send-tokens" && (
+                  <TokenSendManager
+                    onTransactionSuccess={handleTransactionSuccess}
+                  />
+                )}
+
+                {activeSection === "send-nfts" && (
+                  <NFTSendManager
+                    onTransactionSuccess={handleTransactionSuccess}
+                  />
+                )}
+
+                {activeSection === "stake" && (
+                  <StakeManager
+                    resources={resources}
+                    onTransactionComplete={handleTransactionComplete}
+                    onTransactionSuccess={handleTransactionSuccess}
+                  />
+                )}
+
+                {activeSection === "rent" && (
+                  <RentResourcesManager
+                    onTransactionComplete={handleTransactionComplete}
+                    onTransactionSuccess={handleTransactionSuccess}
+                  />
+                )}
+
+                {activeSection === "ram" && (
+                  <RamManager
+                    resources={resources}
+                    onTransactionComplete={handleTransactionComplete}
+                    onTransactionSuccess={handleTransactionSuccess}
+                  />
+                )}
+
+                {activeSection === "governance" && (
+                  <VoteManager
+                    onTransactionComplete={handleTransactionComplete}
+                    onTransactionSuccess={handleTransactionSuccess}
+                  />
+                )}
+
+                {activeSection === "vote-rewards" && (
+                  <VoteRewardsManager
+                    onTransactionComplete={handleTransactionComplete}
+                    onTransactionSuccess={handleTransactionSuccess}
+                  />
+                )}
+
+                {activeSection === "create-account" && (
+                  <CreateAccountManager
+                    onTransactionComplete={handleTransactionComplete}
+                    onTransactionSuccess={handleTransactionSuccess}
+                  />
+                )}
+
+                {activeSection === "alcor-farms" && (
+                  <AlcorFarmManager
+                    onTransactionComplete={handleTransactionComplete}
+                    onTransactionSuccess={handleTransactionSuccess}
+                  />
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <TransactionSuccessDialog
+        open={txSuccess.open}
+        onOpenChange={(open) => setTxSuccess((prev) => ({ ...prev, open }))}
+        title={txSuccess.title}
+        description={txSuccess.description}
+        txId={txSuccess.txId}
+      />
+    </>
   );
 }
