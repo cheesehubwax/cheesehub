@@ -66,7 +66,7 @@ const SIDEBAR_ITEMS: { id: WalletSection; label: string; icon: React.ElementType
 export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialogProps) {
   const { accountName } = useWax();
   const { waxPrice } = useWaxPrice();
-  const { balances } = useAllTokenBalances(accountName || undefined);
+  const { tokens: balances } = useAllTokenBalances(accountName || undefined);
   const [activeSection, setActiveSection] = useState<WalletSection>("account");
   const [resources, setResources] = useState<AccountResources | null>(null);
 
