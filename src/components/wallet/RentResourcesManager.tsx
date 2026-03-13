@@ -261,64 +261,67 @@ export function RentResourcesManager({ onTransactionComplete, onTransactionSucce
             Rent resources using WAX PowerUp. Resources are rented for 24 hours and are non-refundable.
           </div>
 
-          <Tabs defaultValue="cpu" className="w-full">
-            <TabsList className="w-full">
-              <TabsTrigger value="cpu" className="flex-1">Rent CPU</TabsTrigger>
-              <TabsTrigger value="net" className="flex-1">Rent NET</TabsTrigger>
-            </TabsList>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5 text-sm">
+                <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
+                CPU (WAX)
+              </Label>
+              <Input
+                type="number"
+                placeholder="0.00"
+                value={waxCpu}
+                onChange={(e) => setWaxCpu(e.target.value)}
+                min={0}
+                step={0.00000001}
+              />
+              {estimate && waxCpuNum > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  ≈ {estimate.estimatedCpuMs.toFixed(2)} ms
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5 text-sm">
+                <Wifi className="h-3.5 w-3.5 text-muted-foreground" />
+                NET (WAX)
+              </Label>
+              <Input
+                type="number"
+                placeholder="0.00"
+                value={waxNet}
+                onChange={(e) => setWaxNet(e.target.value)}
+                min={0}
+                step={0.00000001}
+              />
+              {estimate && waxNetNum > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  ≈ {formatBytes(estimate.estimatedNetBytes)}
+                </p>
+              )}
+            </div>
+          </div>
 
-            <TabsContent value="cpu" className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label>WAX to spend on CPU</Label>
-                <Input
-                  type="number"
-                  placeholder="Amount in WAX"
-                  value={waxCpu}
-                  onChange={(e) => setWaxCpu(e.target.value)}
-                  min={0}
-                  step={0.00000001}
-                />
-                {estimate && waxCpuNum > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    ≈ {estimate.estimatedCpuMs.toFixed(2)} ms CPU
-                  </p>
-                )}
+          {(waxCpuNum > 0 || waxNetNum > 0) && (
+            <div className="p-3 rounded-lg bg-muted/30 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Total</span>
+                <span className="font-medium">{(waxCpuNum + waxNetNum).toFixed(8)} WAX</span>
               </div>
-              <Button
-                onClick={() => handleWaxPowerup('cpu')}
-                disabled={!isValidReceiver || !waxCpu || isTransacting}
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-              >
-                {isTransacting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Renting CPU...</> : 'Rent CPU'}
-              </Button>
-            </TabsContent>
+            </div>
+          )}
 
-            <TabsContent value="net" className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label>WAX to spend on NET</Label>
-                <Input
-                  type="number"
-                  placeholder="Amount in WAX"
-                  value={waxNet}
-                  onChange={(e) => setWaxNet(e.target.value)}
-                  min={0}
-                  step={0.00000001}
-                />
-                {estimate && waxNetNum > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    ≈ {formatBytes(estimate.estimatedNetBytes)} NET
-                  </p>
-                )}
-              </div>
-              <Button
-                onClick={() => handleWaxPowerup('net')}
-                disabled={!isValidReceiver || !waxNet || isTransacting}
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-              >
-                {isTransacting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Renting NET...</> : 'Rent NET'}
-              </Button>
-            </TabsContent>
-          </Tabs>
+          <Button
+            onClick={() => handleWaxPowerup(waxCpuNum > 0 ? 'cpu' : 'net')}
+            disabled={!isValidReceiver || (waxCpuNum <= 0 && waxNetNum <= 0) || isTransacting}
+            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+          >
+            {isTransacting ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</>
+            ) : (
+              <><Zap className="mr-2 h-4 w-4" />PowerUp</>
+            )}
+          </Button>
         </TabsContent>
       </Tabs>
     </div>
