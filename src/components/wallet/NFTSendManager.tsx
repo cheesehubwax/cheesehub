@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useWax } from '@/context/WaxContext';
 import { useUserNFTs } from '@/hooks/useUserNFTs';
 import { useDebounce } from '@/hooks/useDebounce';
-import { Check, X, Loader2, Search, Image, Send, RefreshCw } from 'lucide-react';
+import { Check, X, Loader2, Search, Image, Send, RefreshCw, Flame } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { closeWharfkitModals } from '@/lib/wharfKit';
 import { toast } from 'sonner';
