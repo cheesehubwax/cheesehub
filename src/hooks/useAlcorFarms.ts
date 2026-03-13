@@ -128,13 +128,14 @@ export function useAlcorFarms() {
       if (fetchId !== fetchIdRef.current) return;
       setUnstakedIncentives(incentivesMap);
 
-      // Update unstaked positions with their available incentives
-      setUnstakedPositions(prev =>
-        prev.map(pos => ({
+      // Only keep unstaked positions that have available incentives (a farm exists for that pair)
+      const enrichedUnstaked = unstaked
+        .map(pos => ({
           ...pos,
           availableIncentives: incentivesMap.get(pos.positionId) || [],
         }))
-      );
+        .filter(pos => pos.availableIncentives.length > 0);
+      setUnstakedPositions(enrichedUnstaked);
     } catch (err) {
       if (fetchId !== fetchIdRef.current) return;
       setError(err instanceof Error ? err.message : 'Failed to load farm data');
