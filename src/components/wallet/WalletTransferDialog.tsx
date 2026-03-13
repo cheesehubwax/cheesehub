@@ -287,20 +287,6 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
               <div className="p-5">
                 {activeSection === "account" && (
                   <div className="space-y-6">
-                    {/* Portfolio Value */}
-                    <div className="rounded-lg bg-muted/30 border border-border/50 p-4">
-                      <p className="text-xs text-muted-foreground mb-1">Portfolio Value</p>
-                      <div className="flex items-baseline gap-3">
-                        <span className="text-2xl font-bold text-foreground">
-                          {portfolioValue.totalWax.toLocaleString(undefined, { maximumFractionDigits: 2 })} WAX
-                        </span>
-                        {waxPrice > 0 && (
-                          <span className="text-sm text-muted-foreground">
-                            ≈ ${portfolioValue.totalUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })} USD
-                          </span>
-                        )}
-                      </div>
-                    </div>
 
                     <WalletResources
                       key={resourcesKey}
