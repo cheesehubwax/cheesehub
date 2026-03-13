@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useWax } from '@/context/WaxContext';
 import { useUserNFTs } from '@/hooks/useUserNFTs';
 import { useDebounce } from '@/hooks/useDebounce';
-import { Check, X, Loader2, Search, Image, Send, RefreshCw } from 'lucide-react';
+import { Check, X, Loader2, Search, Image, Send, RefreshCw, Flame } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { closeWharfkitModals } from '@/lib/wharfKit';
 import { toast } from 'sonner';
@@ -24,7 +24,7 @@ function isValidWaxAccount(account: string): boolean {
 }
 
 export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
-  const { accountName, transferNFTs } = useWax();
+  const { accountName, transferNFTs, burnNFTs } = useWax();
   const { nfts, isLoading } = useUserNFTs(accountName || undefined);
   const [recipient, setRecipient] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -33,6 +33,8 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
   const [selectedNFTs, setSelectedNFTs] = useState<Set<string>>(new Set());
   const [memo, setMemo] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [isBurning, setIsBurning] = useState(false);
+  const [confirmBurn, setConfirmBurn] = useState(false);
 
   const isValidRecipient = recipient.length > 0 && isValidWaxAccount(recipient);
   const debouncedSearch = useDebounce(searchQuery, 300);
@@ -161,9 +163,48 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
         )}
       </div>
       <div className="space-y-2"><Label htmlFor="nft-memo">Memo (optional)</Label><Input id="nft-memo" placeholder="Enter memo" value={memo} onChange={(e) => setMemo(e.target.value)} /></div>
-      <Button onClick={handleSend} disabled={!canSend} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-        {isSending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</> : <><Send className="mr-2 h-4 w-4" />Send {selectedNFTs.size > 0 ? `${selectedNFTs.size} NFT(s)` : 'NFTs'}</>}
-      </Button>
+      <div className="flex gap-2">
+        <Button onClick={handleSend} disabled={!canSend} className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground">
+          {isSending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</> : <><Send className="mr-2 h-4 w-4" />Send {selectedNFTs.size > 0 ? `${selectedNFTs.size} NFT(s)` : 'NFTs'}</>}
+        </Button>
+        {!confirmBurn ? (
+          <Button
+            variant="outline"
+            onClick={() => setConfirmBurn(true)}
+            disabled={selectedNFTs.size === 0 || isSending || isBurning}
+            className="border-destructive/30 text-destructive hover:bg-destructive/10"
+          >
+            <Flame className="mr-2 h-4 w-4" />
+            Burn {selectedNFTs.size > 0 ? `(${selectedNFTs.size})` : ''}
+          </Button>
+        ) : (
+          <Button
+            variant="destructive"
+            onClick={async () => {
+              setIsBurning(true);
+              setConfirmBurn(false);
+              try {
+                const assetIds = Array.from(selectedNFTs);
+                const txId = await burnNFTs(assetIds);
+                if (txId) {
+                  onTransactionSuccess('NFTs Burned! 🔥', `Burned ${assetIds.length} NFT(s)`, txId);
+                  setSelectedNFTs(new Set());
+                }
+              } catch (error) {
+                closeWharfkitModals();
+                const msg = error instanceof Error ? error.message : 'Burn failed';
+                if (!msg.toLowerCase().includes('cancel')) toast.error('NFT burn failed', { description: msg });
+              } finally {
+                setIsBurning(false);
+                setTimeout(() => closeWharfkitModals(), 100);
+              }
+            }}
+            disabled={isBurning}
+          >
+            {isBurning ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Burning...</> : <><Flame className="mr-2 h-4 w-4" />Confirm Burn</>}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
