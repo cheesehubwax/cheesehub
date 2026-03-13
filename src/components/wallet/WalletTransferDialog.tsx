@@ -125,13 +125,14 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
     [onOpenChange]
   );
 
-  // Portfolio value calculation
+  // Portfolio value calculation (non-WAX tokens only, valued in WAX)
   const portfolioValue = useMemo(() => {
     let totalWax = 0;
     balances.forEach((b) => {
       if (b.symbol === "WAX" && (b.contract === "eosio.token" || !b.contract)) {
-        totalWax += b.balance;
-      } else if (tokenPrices) {
+        return; // Skip WAX itself
+      }
+      if (tokenPrices) {
         const key = `${b.contract}:${b.symbol}`;
         const priceInWax = tokenPrices.get(key);
         if (priceInWax) totalWax += b.balance * priceInWax;
