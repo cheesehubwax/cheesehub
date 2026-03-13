@@ -98,9 +98,28 @@ export function CreateAccountManager({ onTransactionComplete, onTransactionSucce
         <Checkbox id="transfer-stake" checked={transfer} onCheckedChange={(checked) => setTransfer(checked === true)} />
         <Label htmlFor="transfer-stake" className="cursor-pointer text-sm">Transfer staked resources to new account</Label>
       </div>
-      <Button onClick={handleCreate} disabled={!canSubmit} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+      <Button onClick={() => setShowKeyWarning(true)} disabled={!canSubmit} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
         {isCreating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating Account...</> : 'Create Account'}
       </Button>
+
+      <AlertDialog open={showKeyWarning} onOpenChange={setShowKeyWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-destructive" />
+              Save Your Private Keys!
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <span className="block">Have you saved your <strong>private keys</strong> in a safe place? Once the account is created, you will need these keys to access it.</span>
+              <span className="block text-destructive font-medium">Lost keys cannot be recovered. Make sure they are backed up before proceeding.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go Back</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCreate}>Yes, I've Saved Them</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
