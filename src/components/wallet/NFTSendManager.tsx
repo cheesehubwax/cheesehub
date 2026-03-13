@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useWax } from '@/context/WaxContext';
 import { useUserNFTs } from '@/hooks/useUserNFTs';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -167,44 +168,54 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
         <Button onClick={handleSend} disabled={!canSend} className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground">
           {isSending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</> : <><Send className="mr-2 h-4 w-4" />Send {selectedNFTs.size > 0 ? `${selectedNFTs.size} NFT(s)` : 'NFTs'}</>}
         </Button>
-        {!confirmBurn ? (
-          <Button
-            variant="outline"
-            onClick={() => setConfirmBurn(true)}
-            disabled={selectedNFTs.size === 0 || isSending || isBurning}
-            className="border-destructive/30 text-destructive hover:bg-destructive/10"
-          >
-            <Flame className="mr-2 h-4 w-4" />
-            Burn {selectedNFTs.size > 0 ? `(${selectedNFTs.size})` : ''}
-          </Button>
-        ) : (
-          <Button
-            variant="destructive"
-            onClick={async () => {
-              setIsBurning(true);
-              setConfirmBurn(false);
-              try {
-                const assetIds = Array.from(selectedNFTs);
-                const txId = await burnNFTs(assetIds);
-                if (txId) {
-                  onTransactionSuccess('NFTs Burned! 🔥', `Burned ${assetIds.length} NFT(s)`, txId);
-                  setSelectedNFTs(new Set());
-                }
-              } catch (error) {
-                closeWharfkitModals();
-                const msg = error instanceof Error ? error.message : 'Burn failed';
-                if (!msg.toLowerCase().includes('cancel')) toast.error('NFT burn failed', { description: msg });
-              } finally {
-                setIsBurning(false);
-                setTimeout(() => closeWharfkitModals(), 100);
-              }
-            }}
-            disabled={isBurning}
-          >
-            {isBurning ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Burning...</> : <><Flame className="mr-2 h-4 w-4" />Confirm Burn</>}
-          </Button>
-        )}
+        <Button
+          variant="outline"
+          onClick={() => setConfirmBurn(true)}
+          disabled={selectedNFTs.size === 0 || isSending || isBurning}
+          className="border-destructive/30 text-destructive hover:bg-destructive/10"
+        >
+          {isBurning ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Burning...</> : <><Flame className="mr-2 h-4 w-4" />Burn {selectedNFTs.size > 0 ? `(${selectedNFTs.size})` : ''}</>}
+        </Button>
       </div>
+
+      <AlertDialog open={confirmBurn} onOpenChange={setConfirmBurn}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>🔥 Burn {selectedNFTs.size} NFT{selectedNFTs.size !== 1 ? 's' : ''}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action is <strong>permanent and irreversible</strong>. The selected NFT{selectedNFTs.size !== 1 ? 's' : ''} will be destroyed forever and cannot be recovered. Are you sure you want to continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                setIsBurning(true);
+                setConfirmBurn(false);
+                try {
+                  const assetIds = Array.from(selectedNFTs);
+                  const txId = await burnNFTs(assetIds);
+                  if (txId) {
+                    onTransactionSuccess('NFTs Burned! 🔥', `Burned ${assetIds.length} NFT(s)`, txId);
+                    setSelectedNFTs(new Set());
+                  }
+                } catch (error) {
+                  closeWharfkitModals();
+                  const msg = error instanceof Error ? error.message : 'Burn failed';
+                  if (!msg.toLowerCase().includes('cancel')) toast.error('NFT burn failed', { description: msg });
+                } finally {
+                  setIsBurning(false);
+                  setTimeout(() => closeWharfkitModals(), 100);
+                }
+              }}
+            >
+              <Flame className="mr-2 h-4 w-4" />
+              Yes, Burn Forever
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
