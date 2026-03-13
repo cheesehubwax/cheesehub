@@ -1,12 +1,14 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useWax } from "@/context/WaxContext";
 import { useWaxPrice } from "@/hooks/useWaxPrice";
-import { useAllTokenBalances } from "@/hooks/useAllTokenBalances";
+import { useAllTokenBalances, TokenWithBalance } from "@/hooks/useAllTokenBalances";
+import { useAlcorTokenPrices } from "@/hooks/useAlcorTokenPrices";
 import { WalletResources, AccountDetailsSection, StakedResourcesSection, AccountResources } from "./WalletResources";
-import { TokenSendManager } from "./TokenSendManager";
 import { NFTSendManager } from "./NFTSendManager";
 import { StakeManager } from "./StakeManager";
 import { RentResourcesManager } from "./RentResourcesManager";
@@ -17,6 +19,7 @@ import { CreateAccountManager } from "./CreateAccountManager";
 import { AlcorFarmManager } from "./AlcorFarmManager";
 import { TransactionSuccessDialog } from "./TransactionSuccessDialog";
 import { TokenLogo } from "@/components/TokenLogo";
+import { closeWharfkitModals } from "@/lib/wharfKit";
 import cheeseLogo from "@/assets/cheese-logo.png";
 import {
   Wallet,
@@ -30,8 +33,13 @@ import {
   UserPlus,
   Sprout,
   X,
+  Search,
+  ExternalLink,
+  Loader2,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface WalletTransferDialogProps {
   open: boolean;
@@ -63,12 +71,27 @@ const SIDEBAR_ITEMS: { id: WalletSection; label: string; icon: React.ElementType
   { id: "alcor-farms", label: "Manage Alcor Farms", icon: Sprout, bottom: true },
 ];
 
+function isValidWaxAccount(account: string): boolean {
+  if (!account || account.length < 1 || account.length > 12) return false;
+  return /^[a-z1-5.]+$/.test(account);
+}
+
 export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialogProps) {
-  const { accountName } = useWax();
-  const { waxPrice } = useWaxPrice();
-  const { tokens: balances } = useAllTokenBalances(accountName || undefined);
+  const { accountName, transferToken } = useWax();
+  const { data: waxPrice = 0 } = useWaxPrice();
+  const { tokens: balances, isUsingFallback, refetch: refetchBalances } = useAllTokenBalances(accountName || undefined);
+  const { data: tokenPrices } = useAlcorTokenPrices();
   const [activeSection, setActiveSection] = useState<WalletSection>("account");
   const [resources, setResources] = useState<AccountResources | null>(null);
+  const [resourcesKey, setResourcesKey] = useState(0);
+
+  // Inline send tokens state
+  const [tokenSearch, setTokenSearch] = useState("");
+  const [selectedToken, setSelectedToken] = useState<TokenWithBalance | null>(null);
+  const [recipient, setRecipient] = useState("");
+  const [amount, setAmount] = useState("");
+  const [memo, setMemo] = useState("");
+  const [isSending, setIsSending] = useState(false);
 
   // Transaction success dialog
   const [txSuccess, setTxSuccess] = useState<{
@@ -81,25 +104,111 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
   const handleTransactionSuccess = useCallback(
     (title: string, description: string, txId: string | null) => {
       setTxSuccess({ open: true, title, description, txId });
+      setResourcesKey((k) => k + 1);
+      refetchBalances();
     },
-    []
+    [refetchBalances]
   );
 
   const handleTransactionComplete = useCallback(() => {
-    // Could trigger balance refresh here
-  }, []);
+    setResourcesKey((k) => k + 1);
+    refetchBalances();
+  }, [refetchBalances]);
 
-  // Token balances summary for Account page
+  const handleClose = useCallback(
+    (newOpen: boolean) => {
+      if (!newOpen) {
+        closeWharfkitModals();
+      }
+      onOpenChange(newOpen);
+    },
+    [onOpenChange]
+  );
+
+  // Portfolio value calculation
+  const portfolioValue = useMemo(() => {
+    let totalWax = 0;
+    balances.forEach((b) => {
+      if (b.symbol === "WAX" && (b.contract === "eosio.token" || !b.contract)) {
+        totalWax += b.balance;
+      } else if (tokenPrices) {
+        const key = `${b.contract}:${b.symbol}`;
+        const priceInWax = tokenPrices.get(key);
+        if (priceInWax) totalWax += b.balance * priceInWax;
+      }
+    });
+    return { totalWax, totalUsd: totalWax * waxPrice };
+  }, [balances, tokenPrices, waxPrice]);
+
+  // Token balances for account page
   const waxBalance = balances.find((b) => b.symbol === "WAX");
   const totalWaxUsd = waxBalance ? waxBalance.balance * waxPrice : 0;
+
+  // Send tokens: filtered token list
+  const filteredTokens = useMemo(() => {
+    if (!tokenSearch) return balances;
+    const q = tokenSearch.toLowerCase();
+    return balances.filter(
+      (b) =>
+        b.symbol.toLowerCase().includes(q) ||
+        b.contract.toLowerCase().includes(q)
+    );
+  }, [balances, tokenSearch]);
+
+  const isValidRecipient = recipient.length > 0 && isValidWaxAccount(recipient);
+  const canSend =
+    isValidRecipient &&
+    parseFloat(amount) > 0 &&
+    selectedToken &&
+    parseFloat(amount) <= selectedToken.balance &&
+    !isSending;
+
+  const handleSend = async () => {
+    if (!canSend || !selectedToken) return;
+    setIsSending(true);
+    try {
+      const txId = await transferToken(
+        selectedToken.contract,
+        selectedToken.symbol,
+        selectedToken.precision,
+        recipient,
+        parseFloat(amount),
+        memo
+      );
+      if (txId) {
+        handleTransactionSuccess(
+          "Transfer Successful! 🧀",
+          `Sent ${amount} ${selectedToken.symbol} to ${recipient}`,
+          txId
+        );
+        setAmount("");
+        setRecipient("");
+        setMemo("");
+        setSelectedToken(null);
+      }
+    } catch (error: any) {
+      closeWharfkitModals();
+      const msg = error?.message || "Transfer failed";
+      if (!msg.toLowerCase().includes("cancel")) {
+        toast.error(msg);
+      }
+    } finally {
+      setIsSending(false);
+      setTimeout(() => closeWharfkitModals(), 100);
+    }
+  };
 
   const topItems = SIDEBAR_ITEMS.filter((i) => !i.bottom);
   const bottomItems = SIDEBAR_ITEMS.filter((i) => i.bottom);
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[900px] max-h-[85vh] p-0 gap-0 overflow-hidden bg-card border-border">
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogContent
+          className="sm:max-w-[900px] max-h-[85vh] p-0 gap-0 overflow-hidden bg-card border-border"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-3 border-b border-border">
             <div className="flex items-center gap-2">
@@ -107,12 +216,17 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
               <span className="font-bold text-foreground">
                 CHEESE<span className="text-primary">Wallet</span>
               </span>
+              {accountName && (
+                <span className="text-xs text-muted-foreground ml-2">
+                  {accountName}
+                </span>
+              )}
             </div>
             <Button
               variant="ghost"
               size="icon"
               className="h-7 w-7"
-              onClick={() => onOpenChange(false)}
+              onClick={() => handleClose(false)}
             >
               <X className="h-4 w-4" />
             </Button>
@@ -172,7 +286,23 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
               <div className="p-5">
                 {activeSection === "account" && (
                   <div className="space-y-6">
+                    {/* Portfolio Value */}
+                    <div className="rounded-lg bg-muted/30 border border-border/50 p-4">
+                      <p className="text-xs text-muted-foreground mb-1">Portfolio Value</p>
+                      <div className="flex items-baseline gap-3">
+                        <span className="text-2xl font-bold text-foreground">
+                          {portfolioValue.totalWax.toLocaleString(undefined, { maximumFractionDigits: 2 })} WAX
+                        </span>
+                        {waxPrice > 0 && (
+                          <span className="text-sm text-muted-foreground">
+                            ≈ ${portfolioValue.totalUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })} USD
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
                     <WalletResources
+                      key={resourcesKey}
                       onResourcesUpdate={setResources}
                       showTotalWaxBalance
                       waxUsdPrice={waxPrice}
@@ -197,48 +327,196 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                           </span>
                         )}
                       </div>
+                      {isUsingFallback && (
+                        <div className="p-2 bg-primary/5 border border-primary/20 rounded-lg text-xs text-primary/70">
+                          Using backup data source. Some tokens may not appear.
+                        </div>
+                      )}
                       {balances.length > 0 ? (
                         <div className="grid grid-cols-2 gap-2">
                           {balances.map((b) => (
-                            <div
+                            <a
                               key={`${b.contract}:${b.symbol}`}
-                              className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 text-sm"
+                              href={`https://waxblock.io/account/${b.contract}?action=tables&table=accounts&scope=${accountName}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 text-sm hover:bg-muted/50 transition-colors group"
                             >
-                              <TokenLogo
-                                contract={b.contract}
-                                symbol={b.symbol}
-                                size="sm"
-                              />
+                              <TokenLogo contract={b.contract} symbol={b.symbol} size="sm" />
                               <div className="flex-1 min-w-0">
-                                <div className="font-medium truncate">
+                                <div className="font-medium truncate flex items-center gap-1">
                                   {b.symbol}
+                                  <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </div>
                                 <div className="text-xs text-muted-foreground truncate">
                                   {b.balance.toLocaleString()}
                                 </div>
                               </div>
-                            </div>
+                            </a>
                           ))}
                         </div>
                       ) : (
-                        <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg text-sm text-primary/70">
-                          Using backup data source. Some tokens may not appear.
-                        </div>
+                        <p className="text-sm text-muted-foreground">No token balances found.</p>
                       )}
                     </div>
                   </div>
                 )}
 
                 {activeSection === "send-tokens" && (
-                  <TokenSendManager
-                    onTransactionSuccess={handleTransactionSuccess}
-                  />
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Send className="h-5 w-5 text-primary" />
+                      <h3 className="font-semibold">Send Tokens</h3>
+                    </div>
+
+                    {/* Token Search & Selection */}
+                    <div className="space-y-2">
+                      <Label>Token</Label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search tokens..."
+                          value={tokenSearch}
+                          onChange={(e) => setTokenSearch(e.target.value)}
+                          className="pl-9"
+                        />
+                      </div>
+                      <ScrollArea className="max-h-[200px]">
+                        <div className="space-y-1">
+                          {filteredTokens.map((b) => {
+                            const isSelected =
+                              selectedToken?.contract === b.contract &&
+                              selectedToken?.symbol === b.symbol;
+                            return (
+                              <button
+                                key={`${b.contract}:${b.symbol}`}
+                                onClick={() => {
+                                  setSelectedToken(b);
+                                  setTokenSearch("");
+                                }}
+                                className={cn(
+                                  "w-full flex items-center gap-2 p-2 rounded-lg text-sm text-left transition-colors",
+                                  isSelected
+                                    ? "bg-primary/20 border border-primary/30"
+                                    : "hover:bg-muted/50"
+                                )}
+                              >
+                                <TokenLogo contract={b.contract} symbol={b.symbol} size="sm" />
+                                <div className="flex-1 min-w-0">
+                                  <span className="font-medium">{b.symbol}</span>
+                                  <span className="text-xs text-muted-foreground ml-2">
+                                    {b.contract}
+                                  </span>
+                                </div>
+                                <span className="text-xs text-muted-foreground">
+                                  {b.balance.toLocaleString()}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </ScrollArea>
+                    </div>
+
+                    {/* Recipient */}
+                    <div className="space-y-2">
+                      <Label>Recipient</Label>
+                      <div className="relative">
+                        <Input
+                          placeholder="Enter WAX account"
+                          value={recipient}
+                          onChange={(e) => setRecipient(e.target.value.toLowerCase())}
+                          className="pr-10"
+                        />
+                        {recipient.length > 0 && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                            {isValidRecipient ? (
+                              <Check className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <X className="h-4 w-4 text-destructive" />
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Amount */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Amount</Label>
+                        {selectedToken && (
+                          <button
+                            onClick={() =>
+                              setAmount(selectedToken.balance.toFixed(selectedToken.precision))
+                            }
+                            className="text-xs text-primary hover:underline"
+                          >
+                            Max: {selectedToken.balance.toLocaleString()}
+                          </button>
+                        )}
+                      </div>
+                      <Input
+                        type="number"
+                        placeholder="0.0000"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        min={0}
+                      />
+                      <div className="flex gap-2">
+                        {[25, 50, 75, 100].map((p) => (
+                          <Button
+                            key={p}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              if (!selectedToken) return;
+                              setAmount(
+                                ((selectedToken.balance * p) / 100).toFixed(
+                                  selectedToken.precision
+                                )
+                              );
+                            }}
+                            className="flex-1 text-xs border-primary/30 hover:bg-primary/10 text-primary"
+                          >
+                            {p}%
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Memo */}
+                    <div className="space-y-2">
+                      <Label>Memo (optional)</Label>
+                      <Input
+                        placeholder="Enter memo"
+                        value={memo}
+                        onChange={(e) => setMemo(e.target.value)}
+                      />
+                    </div>
+
+                    <Button
+                      onClick={handleSend}
+                      disabled={!canSend}
+                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                    >
+                      {isSending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="mr-2 h-4 w-4" />
+                          Send {selectedToken?.symbol || "Tokens"}
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 )}
 
                 {activeSection === "send-nfts" && (
-                  <NFTSendManager
-                    onTransactionSuccess={handleTransactionSuccess}
-                  />
+                  <NFTSendManager onTransactionSuccess={handleTransactionSuccess} />
                 )}
 
                 {activeSection === "stake" && (
@@ -299,7 +577,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
 
       <TransactionSuccessDialog
         open={txSuccess.open}
-        onOpenChange={(open) => setTxSuccess((prev) => ({ ...prev, open }))}
+        onOpenChange={(o) => setTxSuccess((prev) => ({ ...prev, open: o }))}
         title={txSuccess.title}
         description={txSuccess.description}
         txId={txSuccess.txId}
