@@ -109,7 +109,7 @@ export function VoteManager({ onTransactionComplete, onTransactionSuccess }: Vot
       }
     } catch (error) { console.error('Failed to fetch vote data:', error); toast.error('Failed to load voting data'); }
     finally { setIsLoading(false); }
-  }, [accountName]);
+  }, [accountName, fetchAllProducers, fetchAllProxies]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
