@@ -100,8 +100,7 @@ export function IncreaseLiquidityDialog({
     const balanceA = tokenABalance.balance;
     const balanceB = tokenBBalance?.balance || 0;
 
-    let maxAFromB = positionRatio > 0 ? balanceB / positionRatio : Infinity;
-    maxAFromB = maxAFromB * 0.9999;
+    const maxAFromB = positionRatio > 0 ? balanceB / positionRatio : Infinity;
 
     const maxA = Math.min(balanceA, maxAFromB);
 
