@@ -315,14 +315,14 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <h3 className="text-sm font-medium">Token Balances</h3>
-                        {waxBalance && (
+                        {portfolioValue.totalWax > 0 && (
                           <span className="text-sm">
                             <span className="font-medium text-primary">
-                              {waxBalance.balance.toFixed(4)} WAX
+                              {portfolioValue.totalWax.toLocaleString(undefined, { maximumFractionDigits: 4 })} WAX
                             </span>
                             {waxPrice > 0 && (
                               <span className="text-muted-foreground ml-1.5">
-                                (${totalWaxUsd.toFixed(2)})
+                                (${portfolioValue.totalUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })})
                               </span>
                             )}
                           </span>
