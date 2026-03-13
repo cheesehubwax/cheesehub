@@ -56,28 +56,49 @@ export function VoteManager({ onTransactionComplete, onTransactionSuccess }: Vot
   const [voteStrength, setVoteStrength] = useState(0);
   const [totalVoteWeight, setTotalVoteWeight] = useState(0);
 
+  const fetchAllProducers = useCallback(async (): Promise<Producer[]> => {
+    const allProducers: Producer[] = [];
+    let lowerBound = '';
+    let hasMore = true;
+    while (hasMore) {
+      const rows = await fetchTable<Producer>('eosio', 'eosio', 'producers', { lower_bound: lowerBound, limit: 500 });
+      if (rows.length === 0) break;
+      // Skip duplicate from previous page
+      const startIdx = lowerBound && rows.length > 0 && rows[0].owner === lowerBound ? 1 : 0;
+      allProducers.push(...rows.slice(startIdx));
+      if (rows.length < 500) { hasMore = false; } else { lowerBound = rows[rows.length - 1].owner; }
+    }
+    return allProducers;
+  }, []);
+
+  const fetchAllProxies = useCallback(async (): Promise<ProxyVoter[]> => {
+    const allProxies: ProxyVoter[] = [];
+    let lowerBound = '';
+    let hasMore = true;
+    while (hasMore) {
+      const rows = await fetchTable<ProxyVoter>('eosio', 'eosio', 'voters', { lower_bound: lowerBound, limit: 500 });
+      if (rows.length === 0) break;
+      const startIdx = lowerBound && rows.length > 0 && rows[0].owner === lowerBound ? 1 : 0;
+      for (let i = startIdx; i < rows.length; i++) {
+        if (rows[i].is_proxy === 1) allProxies.push(rows[i]);
+      }
+      if (rows.length < 500) { hasMore = false; } else { lowerBound = rows[rows.length - 1].owner; }
+    }
+    return allProxies;
+  }, []);
+
   const fetchData = useCallback(async () => {
     if (!accountName) return;
     setIsLoading(true);
     try {
-      const producerData = await fetchTable<Producer>('eosio', 'eosio', 'producers', { limit: 100 });
-      const sortedProducers = producerData.filter(p => p.is_active === 1).sort((a, b) => parseFloat(b.total_votes) - parseFloat(a.total_votes));
+      const [allProducers, allProxies] = await Promise.all([fetchAllProducers(), fetchAllProxies()]);
+
+      const sortedProducers = allProducers.filter(p => p.is_active === 1).sort((a, b) => parseFloat(b.total_votes) - parseFloat(a.total_votes));
       setProducers(sortedProducers);
       setTotalVoteWeight(sortedProducers.reduce((sum, p) => sum + parseFloat(p.total_votes), 0));
 
-      const knownProxyAccounts = ['top21.oig', 'waxgoodproxy', 'kaefersproxy', 'bloksioproxy', 'waxcommunity', 'hodlwaxiopro', 'bigmikeproxy', 'alienhelpers'];
-      try {
-        const proxyPromises = knownProxyAccounts.map(async (account) => {
-          try {
-            const rows = await fetchTable<ProxyVoter>('eosio', 'eosio', 'voters', { lower_bound: account, upper_bound: account, limit: 1 });
-            return rows.length > 0 && rows[0].is_proxy === 1 ? rows[0] : null;
-          } catch { return null; }
-        });
-        const proxyResults = await Promise.all(proxyPromises);
-        const validProxies = proxyResults.filter((p): p is ProxyVoter => p !== null);
-        validProxies.sort((a, b) => parseFloat(b.proxied_vote_weight || '0') - parseFloat(a.proxied_vote_weight || '0'));
-        setProxies(validProxies);
-      } catch { setProxies([]); }
+      allProxies.sort((a, b) => parseFloat(b.proxied_vote_weight || '0') - parseFloat(a.proxied_vote_weight || '0'));
+      setProxies(allProxies);
 
       const voterData = await fetchTable<VoterInfo>('eosio', 'eosio', 'voters', { lower_bound: accountName, upper_bound: accountName, limit: 1 });
       if (voterData.length > 0) {
@@ -88,7 +109,7 @@ export function VoteManager({ onTransactionComplete, onTransactionSuccess }: Vot
       }
     } catch (error) { console.error('Failed to fetch vote data:', error); toast.error('Failed to load voting data'); }
     finally { setIsLoading(false); }
-  }, [accountName]);
+  }, [accountName, fetchAllProducers, fetchAllProxies]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
