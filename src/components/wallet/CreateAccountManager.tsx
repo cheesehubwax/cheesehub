@@ -38,7 +38,7 @@ export function CreateAccountManager({ onTransactionComplete, onTransactionSucce
   const [ramBytes, setRamBytes] = useState('3000');
   const [transfer, setTransfer] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-
+  const [showKeyWarning, setShowKeyWarning] = useState(false);
   const nameValid = isValidWaxAccountName(newAccountName);
   const ownerKeyValid = isValidPublicKey(ownerKey);
   const activeKeyValid = isValidPublicKey(activeKey);
