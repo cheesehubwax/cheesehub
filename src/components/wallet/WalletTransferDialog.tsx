@@ -285,16 +285,19 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
             {/* Main Content */}
             <ScrollArea className="flex-1">
               <div className="p-5">
+                {/* Persistent header across all tabs */}
+                <div className="space-y-6 mb-6">
+                  <WalletResources
+                    key={resourcesKey}
+                    onResourcesUpdate={setResources}
+                    showTotalWaxBalance
+                    waxUsdPrice={waxPrice}
+                  />
+                  <AccountDetailsSection resources={resources} />
+                </div>
+
                 {activeSection === "account" && (
                   <div className="space-y-6">
-
-                    <WalletResources
-                      key={resourcesKey}
-                      onResourcesUpdate={setResources}
-                      showTotalWaxBalance
-                      waxUsdPrice={waxPrice}
-                    />
-                    <AccountDetailsSection resources={resources} />
                     <StakedResourcesSection resources={resources} />
 
                     {/* Token Balances */}
