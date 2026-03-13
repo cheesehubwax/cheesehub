@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useWax } from "@/context/WaxContext";
 import { useWaxPrice } from "@/hooks/useWaxPrice";
 import { useAllTokenBalances, TokenWithBalance } from "@/hooks/useAllTokenBalances";
