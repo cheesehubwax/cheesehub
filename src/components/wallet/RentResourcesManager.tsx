@@ -315,7 +315,7 @@ export function RentResourcesManager({ onTransactionComplete, onTransactionSucce
           )}
 
           <Button
-            onClick={() => handleWaxPowerup(waxCpuNum > 0 ? 'cpu' : 'net')}
+            onClick={() => handleWaxPowerup()}
             disabled={!isValidReceiver || (waxCpuNum <= 0 && waxNetNum <= 0) || isTransacting}
             className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
           >
