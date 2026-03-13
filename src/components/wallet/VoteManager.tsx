@@ -72,10 +72,17 @@ export function VoteManager({ onTransactionComplete, onTransactionSuccess }: Vot
 
   const fetchKnownProxies = useCallback(async (): Promise<ProxyVoter[]> => {
     const knownProxyAccounts = [
-      'top21.oig', 'waxgoodproxy', 'kaefersproxy', 'bloksioproxy', 'waxcommunity',
-      'hodlwaxiopro', 'bigmikeproxy', 'alienhelpers', 'liquidcheese', 'proxy4nation',
-      'waxiogreyman', 'investingwax', 'eosproxyfish', 'scottishprox', 'elninoproxy1',
-      'waxdaoproxy1', 'nftgamingprx', 'waxproxy.gm', 'stakingproxy', 'greenproxyoo',
+      // Top 50 WAX proxies by proxied vote weight (from alohaeos.com/vote/proxy/waxmain)
+      'top21.oig', 'waxgoodproxy', 'bloksioproxy', 'kaefersproxy', 'waxcommunity',
+      'hodlwaxiopro', 'alienhelpers', 'blklotusprxy', 'bigmikeproxy', 'delphioracle',
+      'waxcoreproxy', 'sxah4.wam', 'scetrov', 'opskinsproxy', 'cpuauthority',
+      'qttguildewax', 'rentcpuonwax', '3dkrenderbuy', 'jyora.wam', 'waxunderdogs',
+      'binjteamwax1', 'swedencornet', 'ebeneezerwax', 'waxproxyvote', 'bihutproxyvt',
+      '2wab.wam', 'vw5qw.wam', 'ranchersland', 'ovdb.wam', 'massadoption',
+      'coins4vincea', 'acidteaproxy', 'waxerscn.cc', 'danishcrypto', '.vub2.wam',
+      'liquidcheese', 'gamerproxybr', 'decentralize', 'masterxtoken', 'dablabsdotio',
+      'kolobokgame1', 'atomchudbrop', 'ftbay.wam', 'cr5qi.waa', 'wfloi.waa',
+      'cquau.wam', 'f3.ag.waa', 'csrhm.wam', 'dvbqi.waa', 'btybe.wam',
     ];
     const proxyPromises = knownProxyAccounts.map(async (account) => {
       try {
