@@ -33,6 +33,8 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
   const [selectedNFTs, setSelectedNFTs] = useState<Set<string>>(new Set());
   const [memo, setMemo] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [isBurning, setIsBurning] = useState(false);
+  const [confirmBurn, setConfirmBurn] = useState(false);
 
   const isValidRecipient = recipient.length > 0 && isValidWaxAccount(recipient);
   const debouncedSearch = useDebounce(searchQuery, 300);
