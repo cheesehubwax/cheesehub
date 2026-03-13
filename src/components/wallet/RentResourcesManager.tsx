@@ -110,9 +110,8 @@ export function RentResourcesManager({ onTransactionComplete, onTransactionSucce
     }
   };
 
-  const handleWaxPowerup = async (type: 'cpu' | 'net') => {
-    const amount = type === 'cpu' ? waxCpu : waxNet;
-    if (!session || !isValidReceiver || !amount) return;
+  const handleWaxPowerup = async () => {
+    if (!session || !isValidReceiver || (waxCpuNum <= 0 && waxNetNum <= 0)) return;
     setIsTransacting(true);
     try {
       const actions = [{
@@ -123,19 +122,23 @@ export function RentResourcesManager({ onTransactionComplete, onTransactionSucce
           payer: accountName,
           receiver: receiver,
           days: 1,
-          net_frac: type === 'net' ? Math.floor(parseFloat(amount) * 10000) : 0,
-          cpu_frac: type === 'cpu' ? Math.floor(parseFloat(amount) * 10000) : 0,
-          max_payment: `${parseFloat(amount).toFixed(8)} WAX`,
+          net_frac: waxNetNum > 0 ? Math.floor(waxNetNum * 10000) : 0,
+          cpu_frac: waxCpuNum > 0 ? Math.floor(waxCpuNum * 10000) : 0,
+          max_payment: `${(waxCpuNum + waxNetNum).toFixed(8)} WAX`,
         },
       }];
       const result = await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       const txId = result.resolved?.transaction.id?.toString() || null;
-      onTransactionSuccess?.(`${type.toUpperCase()} Rented!`, `Rented ${type.toUpperCase()} for ${receiver} with ${amount} WAX`, txId);
-      if (type === 'cpu') setWaxCpu(''); else setWaxNet('');
+      const parts = [];
+      if (waxCpuNum > 0) parts.push(`CPU: ${waxCpu} WAX`);
+      if (waxNetNum > 0) parts.push(`NET: ${waxNet} WAX`);
+      onTransactionSuccess?.('PowerUp Successful!', `Rented ${parts.join(', ')} for ${receiver}`, txId);
+      setWaxCpu('');
+      setWaxNet('');
       onTransactionComplete?.();
     } catch (error: any) {
       closeWharfkitModals();
-      toast.error(error?.message || `Failed to rent ${type.toUpperCase()}`);
+      toast.error(error?.message || 'Failed to PowerUp');
     } finally {
       setIsTransacting(false);
       closeWharfkitModals();
