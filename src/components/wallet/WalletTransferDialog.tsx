@@ -353,131 +353,91 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                 )}
 
                 {activeSection === "send-tokens" && (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Send className="h-5 w-5 text-primary" />
-                      <h3 className="font-semibold">Send Tokens</h3>
-                    </div>
-
-                    {/* Token Search & Selection */}
-                    <div className="space-y-2">
-                      <Label>Token</Label>
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Search tokens..."
-                          value={tokenSearch}
-                          onChange={(e) => setTokenSearch(e.target.value)}
-                          className="pl-9"
-                        />
-                      </div>
-                      <ScrollArea className="max-h-[200px]">
-                        <div className="space-y-1">
-                          {filteredTokens.map((b) => {
-                            const isSelected =
-                              selectedToken?.contract === b.contract &&
-                              selectedToken?.symbol === b.symbol;
-                            return (
-                              <button
-                                key={`${b.contract}:${b.symbol}`}
-                                onClick={() => {
-                                  setSelectedToken(b);
-                                  setTokenSearch("");
-                                }}
-                                className={cn(
-                                  "w-full flex items-center gap-2 p-2 rounded-lg text-sm text-left transition-colors",
-                                  isSelected
-                                    ? "bg-primary/20 border border-primary/30"
-                                    : "hover:bg-muted/50"
-                                )}
-                              >
-                                <TokenLogo contract={b.contract} symbol={b.symbol} size="sm" />
-                                <div className="flex-1 min-w-0">
-                                  <span className="font-medium">{b.symbol}</span>
-                                  <span className="text-xs text-muted-foreground ml-2">
-                                    {b.contract}
-                                  </span>
-                                </div>
-                                <span className="text-xs text-muted-foreground">
-                                  {b.balance.toLocaleString()}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </ScrollArea>
-                    </div>
-
+                  <div className="space-y-5">
                     {/* Recipient */}
                     <div className="space-y-2">
-                      <Label>Recipient</Label>
-                      <div className="relative">
-                        <Input
-                          placeholder="Enter WAX account"
-                          value={recipient}
-                          onChange={(e) => setRecipient(e.target.value.toLowerCase())}
-                          className="pr-10"
-                        />
-                        {recipient.length > 0 && (
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                            {isValidRecipient ? (
-                              <Check className="h-4 w-4 text-green-500" />
-                            ) : (
-                              <X className="h-4 w-4 text-destructive" />
+                      <Label className="text-sm font-semibold">Recipient</Label>
+                      <Input
+                        placeholder="Enter WAX account"
+                        value={recipient}
+                        onChange={(e) => setRecipient(e.target.value.toLowerCase())}
+                      />
+                    </div>
+
+                    {/* Token Select */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">Token</Label>
+                      <Select
+                        value={selectedToken ? `${selectedToken.contract}:${selectedToken.symbol}` : ""}
+                        onValueChange={(val) => {
+                          const token = balances.find(b => `${b.contract}:${b.symbol}` === val);
+                          if (token) setSelectedToken(token);
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose a token">
+                            {selectedToken && (
+                              <span className="flex items-center gap-2">
+                                <TokenLogo contract={selectedToken.contract} symbol={selectedToken.symbol} size="sm" />
+                                <span className="font-medium">{selectedToken.symbol}</span>
+                                <span className="text-muted-foreground">({selectedToken.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: selectedToken.precision })})</span>
+                              </span>
                             )}
-                          </div>
-                        )}
-                      </div>
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {balances.map((b) => (
+                            <SelectItem key={`${b.contract}:${b.symbol}`} value={`${b.contract}:${b.symbol}`}>
+                              <span className="flex items-center gap-2">
+                                <TokenLogo contract={b.contract} symbol={b.symbol} size="sm" />
+                                <span className="font-medium">{b.symbol}</span>
+                                <span className="text-muted-foreground ml-1">({b.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: b.precision })})</span>
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     {/* Amount */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <Label>Amount</Label>
+                        <Label className="text-sm font-semibold">Amount</Label>
                         {selectedToken && (
-                          <button
-                            onClick={() =>
-                              setAmount(selectedToken.balance.toFixed(selectedToken.precision))
-                            }
-                            className="text-xs text-primary hover:underline"
-                          >
-                            Max: {selectedToken.balance.toLocaleString()}
-                          </button>
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            Balance: <TokenLogo contract={selectedToken.contract} symbol={selectedToken.symbol} size="sm" />
+                            <span>{selectedToken.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: selectedToken.precision })} {selectedToken.symbol}</span>
+                          </span>
                         )}
                       </div>
-                      <Input
-                        type="number"
-                        placeholder="0.0000"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        min={0}
-                      />
                       <div className="flex gap-2">
-                        {[25, 50, 75, 100].map((p) => (
-                          <Button
-                            key={p}
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              if (!selectedToken) return;
-                              setAmount(
-                                ((selectedToken.balance * p) / 100).toFixed(
-                                  selectedToken.precision
-                                )
-                              );
-                            }}
-                            className="flex-1 text-xs border-primary/30 hover:bg-primary/10 text-primary"
-                          >
-                            {p}%
-                          </Button>
-                        ))}
+                        <Input
+                          type="number"
+                          placeholder="0.00"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                          min={0}
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            if (selectedToken) {
+                              setAmount(selectedToken.balance.toFixed(selectedToken.precision));
+                            }
+                          }}
+                          disabled={!selectedToken}
+                          className="shrink-0 font-semibold"
+                        >
+                          Max
+                        </Button>
                       </div>
                     </div>
 
                     {/* Memo */}
                     <div className="space-y-2">
-                      <Label>Memo (optional)</Label>
+                      <Label className="text-sm font-semibold">Memo (optional)</Label>
                       <Input
                         placeholder="Enter memo"
                         value={memo}
