@@ -216,9 +216,7 @@ const NFTCard = React.memo(function NFTCard({ nft, isSelected, onToggle, stakedI
     return (
       <TooltipProvider>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="block">{card}</span>
-          </TooltipTrigger>
+          <TooltipTrigger asChild>{card}</TooltipTrigger>
           <TooltipContent side="top" className="max-w-[200px]">
             <p className="text-xs">
               <AlertTriangle className="h-3 w-3 inline mr-1 text-amber-500" />
