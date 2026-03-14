@@ -205,7 +205,7 @@ const NFTCard = React.memo(function NFTCard({ nft, isSelected, onToggle, stakedI
       <div className="absolute bottom-0 left-0 right-0 px-0.5 py-0.5 bg-background/90">
         <p className="text-[8px] font-medium truncate leading-tight">{nft.name}</p>
         {isStakedElsewhere ? (
-          <p className="text-[7px] text-amber-500 truncate leading-tight">in: {stakedInFarm}</p>
+          <Link to={`/farm/${stakedInFarm}`} className="text-[7px] text-amber-500 truncate leading-tight hover:underline block" onClick={(e) => e.stopPropagation()}>in: {stakedInFarm}</Link>
         ) : (
           <p className="text-[7px] text-muted-foreground truncate leading-tight">#{nft.asset_id}</p>
         )}
