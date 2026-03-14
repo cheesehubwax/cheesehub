@@ -22,7 +22,9 @@ import { useToast } from "@/hooks/use-toast";
 import { TokenLogo } from "@/components/TokenLogo";
 import { batchGetOrFetch } from "@/lib/templateCache";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { getTokenLogoUrl, TOKEN_LOGO_PLACEHOLDER } from "@/lib/tokenLogos";
+import { getTokenLogoUrl } from "@/lib/tokenLogos";
+
+const TOKEN_LOGO_PLACEHOLDER = "/placeholder.svg";
 
 interface NFTStakingProps {
   farm: FarmInfo;
