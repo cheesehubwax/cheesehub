@@ -33,9 +33,10 @@ export function useSwapRoute(
     queryKey: ["swap-route", tokenIn?.ticker, tokenIn?.contract, tokenOut?.ticker, tokenOut?.contract, debouncedAmount, slippage, receiver, debouncedTradeType],
     queryFn: ({ signal }) => fetchSwapRoute(tokenIn!, tokenOut!, debouncedAmount, slippage, receiver, signal, debouncedTradeType),
     enabled,
-    staleTime: 10_000,
+    staleTime: 15_000,
     gcTime: 30_000,
     retry: 1,
+    retryDelay: 3000,
   });
 
   const noRoute = enabled && !isLoading && !isFetching && !error && route === null;

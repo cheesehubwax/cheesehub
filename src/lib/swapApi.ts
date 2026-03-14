@@ -83,6 +83,9 @@ export async function fetchSwapRoute(
 
   const res = await fetch(`${ALCOR_API}/swapRouter/getRoute?${params}`, { signal });
   if (!res.ok) {
+    if (res.status === 429) {
+      throw new Error("Rate limited — please wait a moment and try again");
+    }
     const text = await res.text().catch(() => "");
     throw new Error(text || "Failed to fetch swap route");
   }
