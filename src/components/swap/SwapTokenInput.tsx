@@ -26,7 +26,9 @@ export function SwapTokenInput({
   balance,
   readOnly = false,
   loading = false,
+  precision,
 }: SwapTokenInputProps) {
+  const decimals = precision ?? token?.precision ?? 8;
   const [imgError, setImgError] = useState(false);
 
   const handlePercentClick = (pct: number) => {
