@@ -46,7 +46,7 @@ export function SwapTokenInput({
           <span className="text-xs text-muted-foreground">
             Balance:{" "}
             <span className="text-foreground font-medium">
-              {parseFloat(balance).toLocaleString(undefined, { maximumFractionDigits: 4 })}
+              {parseFloat(balance).toLocaleString(undefined, { maximumFractionDigits: decimals })}
             </span>
           </span>
         )}
