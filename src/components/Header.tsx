@@ -9,14 +9,14 @@ import cheeseLogo from "@/assets/cheese-logo.png";
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Home", icon: Home },
-  { to: "/powerup", label: "CHEESEUp", icon: Zap },
-  { to: "/locker", label: "CHEESELock", icon: Lock },
-  { to: "/drops", label: "CHEESEShip", icon: ShoppingBag },
-  { to: "/dao", label: "CHEESEDao", icon: Users },
-  { to: "/farm", label: "CHEESEFarm", icon: Sprout },
-  { to: "/cheesenull", label: "CHEESENull", icon: Flame },
-  { to: "/drip", label: "CHEESEDrip", icon: Droplets },
+  { to: "/", label: "Home", emoji: "🏠" },
+  { to: "/powerup", label: "CHEESEUp", emoji: "⚡" },
+  { to: "/locker", label: "CHEESELock", emoji: "🔐" },
+  { to: "/drops", label: "CHEESEShip", emoji: "🛒" },
+  { to: "/dao", label: "CHEESEDao", emoji: "🏛️" },
+  { to: "/farm", label: "CHEESEFarm", emoji: "🌱" },
+  { to: "/cheesenull", label: "CHEESENull", emoji: "⛔" },
+  { to: "/drip", label: "CHEESEDrip", emoji: "💧" },
 ];
 
 const PRIMARY_NAV = NAV_ITEMS.slice(0, 5);
