@@ -32,7 +32,7 @@ export function Header() {
       "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
       location.pathname === path
         ? "bg-cheese/20 text-cheese"
-        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+        : "text-foreground hover:text-cheese hover:bg-muted"
     );
 
   return (
