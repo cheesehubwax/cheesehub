@@ -36,7 +36,6 @@ export function SwapTokenInput({
     const val = parseFloat(balance) * (pct / 100);
     onAmountChange(formatTokenAmount(val, decimals));
   };
-  };
 
   return (
     <div className="rounded-xl bg-secondary/50 p-4 space-y-2">
