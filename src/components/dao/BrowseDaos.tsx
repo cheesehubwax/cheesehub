@@ -1,19 +1,18 @@
 import { useState, useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Loader2, Search, Users } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { fetchAllDaos, DaoInfo } from "@/lib/dao";
 import { DaoCard } from "./DaoCard";
+import { DaoDetail } from "./DaoDetail";
 
 export function BrowseDaos() {
-  const navigate = useNavigate();
   const [daos, setDaos] = useState<DaoInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedDao, setSelectedDao] = useState<DaoInfo | null>(null);
 
   useEffect(() => {
     fetchAllDaos().then(data => {
-      // Show Type 4 and 5 DAOs (most common governance types)
       setDaos(data);
       setLoading(false);
     });
@@ -57,7 +56,7 @@ export function BrowseDaos() {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map(dao => (
-            <DaoCard key={dao.dao_name} dao={dao} onClick={(name) => navigate(`/dao/${name}`)} />
+            <DaoCard key={dao.dao_name} dao={dao} onClick={() => setSelectedDao(dao)} />
           ))}
         </div>
       )}
@@ -65,6 +64,12 @@ export function BrowseDaos() {
       <p className="text-xs text-muted-foreground text-center">
         {daos.length} DAOs loaded from WaxDAO
       </p>
+
+      <DaoDetail
+        dao={selectedDao}
+        open={!!selectedDao}
+        onClose={() => setSelectedDao(null)}
+      />
     </div>
   );
 }

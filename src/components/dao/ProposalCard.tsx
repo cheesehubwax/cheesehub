@@ -10,12 +10,12 @@ import {
 import {
   Proposal, DaoInfo,
   buildVoteAction, buildMultiOptionVoteAction, buildRankedChoiceVoteAction,
-  buildFinalizeProposalAction, buildRecountProposalAction, buildClaimVoteRamAction,
-  fetchUserVote, fetchUserStakedTokens,
+  buildFinalizeProposalAction, buildRecountProposalAction,
+  fetchUserStakedTokens,
   VOTING_TYPE_LABELS, PROPOSAL_VOTING_TYPES,
-  UserVote, StakedToken,
+  StakedToken,
 } from "@/lib/dao";
-import { saveVote, getVote } from "@/lib/voteStorage";
+import type { UserVote } from "@/lib/voteStorage";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { NFTVotePicker } from "./NFTVotePicker";
@@ -24,6 +24,9 @@ interface ProposalCardProps {
   proposal: Proposal;
   daoName: string;
   dao: DaoInfo;
+  hasVoted?: boolean;
+  userVote?: UserVote | null;
+  onVote?: (proposalId: number, vote: UserVote) => void;
 }
 
 const statusColors: Record<string, string> = {
@@ -36,31 +39,22 @@ const statusColors: Record<string, string> = {
   inconclusive: "bg-orange-500/20 text-orange-400 border-orange-500/30",
 };
 
-export function ProposalCard({ proposal, daoName, dao }: ProposalCardProps) {
+export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: parentVote, onVote }: ProposalCardProps) {
   const { accountName, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const [txLoading, setTxLoading] = useState(false);
   const [votingChoice, setVotingChoice] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
-  const [userVote, setUserVote] = useState<UserVote | null>(null);
   const [stakedWeight, setStakedWeight] = useState<StakedToken | null>(null);
   const [selectedNFTs, setSelectedNFTs] = useState<string[]>([]);
   const [showNFTPicker, setShowNFTPicker] = useState(false);
 
-  // Load user vote from blockchain + localStorage
+  const userVote = parentVote || null;
+
   useEffect(() => {
-    if (!accountName) return;
-    const localVote = getVote(accountName, daoName, proposal.proposal_id);
-    if (localVote) setUserVote(localVote);
-
-    fetchUserVote(daoName, proposal.proposal_id, accountName).then(v => {
-      if (v) setUserVote(v);
-    });
-
-    if (dao.dao_type === 4) {
-      fetchUserStakedTokens(daoName, accountName).then(setStakedWeight);
-    }
-  }, [accountName, daoName, proposal.proposal_id, dao.dao_type]);
+    if (!accountName || dao.dao_type !== 4) return;
+    fetchUserStakedTokens(daoName, accountName).then(setStakedWeight);
+  }, [accountName, daoName, dao.dao_type]);
 
   const endDate = proposal.end_time_ts ? new Date(proposal.end_time_ts * 1000) : null;
   const isExpired = endDate ? endDate < new Date() : false;
@@ -77,7 +71,6 @@ export function ProposalCard({ proposal, daoName, dao }: ProposalCardProps) {
     return sum + (typeof c.total_votes === "string" ? parseInt(c.total_votes) || 0 : c.total_votes || 0);
   }, 0);
 
-  // Yes/No/Abstain vote handler
   const handleYNAVote = async (vote: "yes" | "no" | "abstain") => {
     if (!session || !accountName) return;
     setVotingChoice(vote);
@@ -92,14 +85,12 @@ export function ProposalCard({ proposal, daoName, dao }: ProposalCardProps) {
     if (result.success) {
       const choiceMap: Record<string, number> = { yes: 0, no: 1, abstain: 2 };
       const voteData: UserVote = { choice_index: choiceMap[vote], weight: stakedWeight?.weight || 1 };
-      saveVote(accountName, daoName, proposal.proposal_id, voteData);
-      setUserVote(voteData);
+      onVote?.(proposal.proposal_id, voteData);
     }
     setVotingChoice(null);
     setTxLoading(false);
   };
 
-  // Multi-option vote handler
   const handleMultiVote = async (choiceIndex: number) => {
     if (!session || !accountName) return;
     setTxLoading(true);
@@ -119,8 +110,7 @@ export function ProposalCard({ proposal, daoName, dao }: ProposalCardProps) {
     const result = await executeTransaction([action]);
     if (result.success) {
       const voteData: UserVote = { choice_index: choiceIndex, weight: stakedWeight?.weight || 1 };
-      saveVote(accountName, daoName, proposal.proposal_id, voteData);
-      setUserVote(voteData);
+      onVote?.(proposal.proposal_id, voteData);
     }
     setTxLoading(false);
   };
@@ -141,7 +131,7 @@ export function ProposalCard({ proposal, daoName, dao }: ProposalCardProps) {
     setTxLoading(false);
   };
 
-  const canVote = isActive && accountName && !userVote && !isExpired;
+  const canVote = isActive && accountName && !hasVoted && !userVote && !isExpired;
 
   return (
     <Card className="bg-card/60 border-border/40">
@@ -322,16 +312,16 @@ export function ProposalCard({ proposal, daoName, dao }: ProposalCardProps) {
         )}
 
         {/* User Vote Display */}
-        {userVote && (
+        {(hasVoted || userVote) && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <CheckCircle className="h-4 w-4 text-primary" />
             <span>
               You voted: {
                 isYesNoAbstain || isTokenTransfer || isNFTTransfer
-                  ? (userVote.choice_index === 0 ? "Yes" : userVote.choice_index === 1 ? "No" : "Abstain")
-                  : proposal.choices[userVote.choice_index]?.description || `Choice ${userVote.choice_index}`
+                  ? (userVote?.choice_index === 0 ? "Yes" : userVote?.choice_index === 1 ? "No" : "Abstain")
+                  : proposal.choices[userVote?.choice_index ?? 0]?.description || `Choice ${userVote?.choice_index}`
               }
-              {userVote.weight > 0 && ` (weight: ${userVote.weight})`}
+              {userVote && userVote.weight > 0 && ` (weight: ${userVote.weight})`}
             </span>
           </div>
         )}
