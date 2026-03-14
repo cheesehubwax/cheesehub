@@ -317,7 +317,7 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
       {/* Reward Pools */}
       <Card className="bg-card/80 border-border/50">
         <CardHeader>
-          <CardTitle className="text-lg">Reward Pools</CardTitle>
+          <CardTitle className="text-lg text-foreground">Reward Pools</CardTitle>
         </CardHeader>
         <CardContent>
           {farm.reward_pools.length === 0 ? (
