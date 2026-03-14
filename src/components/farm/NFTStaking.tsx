@@ -881,62 +881,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
     }
   };
 
-  // ── Virtualized grid ──
-  const COLS = 6;
-  const ROW_HEIGHT = 120;
 
-  function VirtualGrid({
-    items,
-    selected,
-    onToggle,
-    parentRef,
-    type,
-  }: {
-    items: NFTAsset[];
-    selected: Set<string>;
-    onToggle: (id: string) => void;
-    parentRef: React.RefObject<HTMLDivElement>;
-    type: "stake" | "unstake";
-  }) {
-    const rowCount = Math.ceil(items.length / COLS);
-    const virtualizer = useVirtualizer({
-      count: rowCount,
-      getScrollElement: () => parentRef.current,
-      estimateSize: () => ROW_HEIGHT,
-      overscan: 3,
-    });
-
-    return (
-      <div ref={parentRef} className="h-[420px] overflow-auto">
-        <div style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}>
-          {virtualizer.getVirtualItems().map((vRow) => {
-            const start = vRow.index * COLS;
-            const rowItems = items.slice(start, start + COLS);
-            return (
-              <div
-                key={vRow.key}
-                className="absolute top-0 left-0 w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-1.5 px-1"
-                style={{
-                  height: `${vRow.size}px`,
-                  transform: `translateY(${vRow.start}px)`,
-                }}
-              >
-                {rowItems.map((nft) => (
-                  <NFTCard
-                    key={nft.asset_id}
-                    nft={nft}
-                    isSelected={selected.has(nft.asset_id)}
-                    onToggle={() => onToggle(nft.asset_id)}
-                    stakedInFarm={type === "stake" ? globallyStakedMap.get(nft.asset_id) : undefined}
-                  />
-                ))}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
 
   const now = Math.floor(Date.now() / 1000);
   const isExpired = farm.expiration > 1 && now > farm.expiration;
