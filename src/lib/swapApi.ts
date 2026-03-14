@@ -23,6 +23,7 @@ export interface SwapRoute {
   memo: string;
   route: number[];
   executionPrice: { numerator: string; denominator: string };
+  input?: number;
 }
 
 const ALCOR_API = "https://wax.alcor.exchange/api/v2";
@@ -58,18 +59,20 @@ export async function fetchSwapTokenList(signal?: AbortSignal): Promise<SwapToke
 export async function fetchSwapRoute(
   tokenIn: SwapToken,
   tokenOut: SwapToken,
-  amountIn: string,
+  amount: string,
   slippage: number,
   receiver: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  tradeType: "EXACT_INPUT" | "EXACT_OUTPUT" = "EXACT_INPUT"
 ): Promise<SwapRoute | null> {
-  const formattedAmount = formatTokenAmount(amountIn, tokenIn.precision);
+  const precision = tradeType === "EXACT_INPUT" ? tokenIn.precision : tokenOut.precision;
+  const formattedAmount = formatTokenAmount(amount, precision);
 
   const inputId = `${tokenIn.ticker.toLowerCase()}-${tokenIn.contract}`;
   const outputId = `${tokenOut.ticker.toLowerCase()}-${tokenOut.contract}`;
 
   const params = new URLSearchParams({
-    trade_type: "EXACT_INPUT",
+    trade_type: tradeType,
     input: inputId,
     output: outputId,
     amount: formattedAmount,
@@ -101,6 +104,7 @@ export async function fetchSwapRoute(
     memo: data.memo,
     route: data.route,
     executionPrice: data.executionPrice,
+    input: data.input ? parseFloat(data.input) : undefined,
   };
 }
 
