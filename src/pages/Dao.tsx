@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users } from "lucide-react";
@@ -13,13 +12,12 @@ import { playRandomFart } from "@/lib/fartSounds";
 
 const Dao = () => {
   const { daoName } = useParams<{ daoName?: string }>();
-  const navigate = useNavigate();
 
   if (daoName) {
     return (
       <Layout>
         <div className="container py-8">
-          <DaoDetail daoName={daoName} onBack={() => navigate("/dao")} />
+          <DaoDetail pageMode daoName={daoName} />
         </div>
       </Layout>
     );

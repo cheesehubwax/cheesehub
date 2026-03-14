@@ -1,15 +1,15 @@
 import { useState, useEffect } from "react";
 import { Loader2, Users } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { fetchUserDaos, DaoInfo } from "@/lib/dao";
 import { useWax } from "@/context/WaxContext";
 import { DaoCard } from "./DaoCard";
+import { DaoDetail } from "./DaoDetail";
 
 export function MyDaos() {
-  const navigate = useNavigate();
   const { accountName, isConnected } = useWax();
   const [daos, setDaos] = useState<DaoInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedDao, setSelectedDao] = useState<DaoInfo | null>(null);
 
   useEffect(() => {
     if (!accountName) {
@@ -17,7 +17,6 @@ export function MyDaos() {
       setLoading(false);
       return;
     }
-
     fetchUserDaos(accountName).then(data => {
       setDaos(data);
       setLoading(false);
@@ -55,12 +54,18 @@ export function MyDaos() {
     <div className="space-y-4">
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {daos.map(dao => (
-          <DaoCard key={dao.dao_name} dao={dao} onClick={(name) => navigate(`/dao/${name}`)} />
+          <DaoCard key={dao.dao_name} dao={dao} onClick={() => setSelectedDao(dao)} />
         ))}
       </div>
       <p className="text-xs text-muted-foreground text-center">
         {daos.length} DAO{daos.length !== 1 ? "s" : ""} where you have staked tokens/NFTs or hold eligible assets
       </p>
+
+      <DaoDetail
+        dao={selectedDao}
+        open={!!selectedDao}
+        onClose={() => setSelectedDao(null)}
+      />
     </div>
   );
 }
