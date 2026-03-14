@@ -12,6 +12,7 @@ interface SwapTokenInputProps {
   balance?: string;
   readOnly?: boolean;
   loading?: boolean;
+  precision?: number;
 }
 
 const PERCENT_BUTTONS = [25, 50, 75, 100] as const;
