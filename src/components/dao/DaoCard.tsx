@@ -29,7 +29,7 @@ export function DaoCard({ dao, onClick }: DaoCardProps) {
   }, []);
 
   return (
-    <Card className="bg-card/80 border-border/50 hover:border-primary/30 hover:shadow-lg transition-all group">
+    <Card className="bg-card/80 border-primary/30 shadow-lg transition-all group">
       <CardContent className="p-4 space-y-3">
         <div className="flex items-start gap-4">
           <div className="h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden shrink-0">
