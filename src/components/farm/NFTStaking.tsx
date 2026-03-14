@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -204,7 +205,7 @@ const NFTCard = React.memo(function NFTCard({ nft, isSelected, onToggle, stakedI
       <div className="absolute bottom-0 left-0 right-0 px-0.5 py-0.5 bg-background/90">
         <p className="text-[8px] font-medium truncate leading-tight">{nft.name}</p>
         {isStakedElsewhere ? (
-          <p className="text-[7px] text-amber-500 truncate leading-tight">in: {stakedInFarm}</p>
+          <Link to={`/farm/${stakedInFarm}`} className="text-[7px] text-amber-500 truncate leading-tight hover:underline block" onClick={(e) => e.stopPropagation()}>in: {stakedInFarm}</Link>
         ) : (
           <p className="text-[7px] text-muted-foreground truncate leading-tight">#{nft.asset_id}</p>
         )}
@@ -216,11 +217,16 @@ const NFTCard = React.memo(function NFTCard({ nft, isSelected, onToggle, stakedI
     return (
       <TooltipProvider>
         <Tooltip>
-          <TooltipTrigger asChild>{card}</TooltipTrigger>
-          <TooltipContent side="top" className="max-w-[200px]">
+          <TooltipTrigger asChild>
+            <span className="inline-block w-full">{card}</span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-[220px]">
             <p className="text-xs">
               <AlertTriangle className="h-3 w-3 inline mr-1 text-amber-500" />
-              Already staked in <span className="font-semibold">{stakedInFarm}</span>.
+              Already staked in{" "}
+              <Link to={`/farm/${stakedInFarm}`} className="font-semibold text-cheese underline hover:text-cheese/80">
+                {stakedInFarm}
+              </Link>.
               Unstake there first.
             </p>
           </TooltipContent>
