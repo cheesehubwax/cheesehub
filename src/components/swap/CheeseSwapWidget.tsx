@@ -80,7 +80,7 @@ export function CheeseSwapWidget({
   // Derive the non-active field from route
   const displayAmountIn = activeField === "in"
     ? amountIn
-    : (route?.input ? formatTokenAmount(route.input, tokenIn?.precision ?? 4) : "");
+    : (route?.input ? formatTokenAmount(route.input, tokenIn?.precision ?? 8) : "");
   const displayAmountOut = activeField === "out"
     ? amountOut
     : (route?.output ? formatTokenAmount(route.output, tokenOut?.precision ?? 4) : "");
