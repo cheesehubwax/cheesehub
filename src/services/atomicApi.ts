@@ -75,13 +75,17 @@ export async function fetchTemplateDetails(collectionName: string, templateId: s
       const immData = data.data.immutable_data || {};
       return {
         template_id: data.data.template_id,
+        contract: data.data.contract || '',
         name: immData.name || `Template #${templateId}`,
-        image: getImageUrl(immData.img || immData.image || immData.video),
-        collection: { collection_name: collectionName },
+        collection: { collection_name: collectionName, name: immData.name || '', img: getImageUrl(immData.img || '') },
         max_supply: data.data.max_supply || '0',
         issued_supply: data.data.issued_supply || '0',
+        is_transferable: data.data.is_transferable ?? true,
+        is_burnable: data.data.is_burnable ?? true,
         schema: data.data.schema || { schema_name: '' },
         immutable_data: immData,
+        created_at_time: data.data.created_at_time || '',
+        created_at_block: data.data.created_at_block || '',
       };
     }
     return null;
@@ -203,6 +207,56 @@ export async function fetchUserNFTsBySchema(
   }
 
   return eligibleNFTs;
+}
+
+// Fetch user assets from a specific collection
+export async function fetchUserAssets(account: string, collectionName: string): Promise<any[]> {
+  for (const baseUrl of ATOMIC_AA_ENDPOINTS) {
+    try {
+      const response = await fetch(
+        `${baseUrl}/atomicassets/v1/assets?owner=${account}&collection_name=${collectionName}&limit=1000`
+      );
+      if (!response.ok) continue;
+      const data = await response.json();
+      if (data.success && data.data) return data.data;
+    } catch {
+      continue;
+    }
+  }
+  return [];
+}
+
+// Fetch sales for a collection
+export async function fetchCollectionSales(collectionName: string, limit = 50): Promise<AtomicSale[]> {
+  try {
+    const response = await fetchWithFallback(
+      ATOMIC_API.baseUrls,
+      `${ATOMIC_API.paths.sales}?collection_name=${collectionName}&state=1&limit=${limit}&order=desc&sort=created`
+    );
+    const data = await response.json();
+    return data.data || [];
+  } catch (error) {
+    console.error('[fetchCollectionSales] Failed:', error);
+    return [];
+  }
+}
+
+// Alias for fetchTemplateDetails used by useEnrichDrops
+export const fetchTemplateById = fetchTemplateDetails;
+
+// Fetch a single drop by ID from NftHive
+export async function fetchDropById(dropId: string): Promise<NFTDrop | null> {
+  try {
+    const response = await fetch(
+      `${NFTHIVE_CONFIG.apiUrl}/drops/${dropId}`
+    );
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data || null;
+  } catch (error) {
+    console.error('[fetchDropById] Failed:', error);
+    return null;
+  }
 }
 
 export { getImageUrl, getIpfsUrl };
