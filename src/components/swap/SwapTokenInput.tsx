@@ -89,7 +89,7 @@ export function SwapTokenInput({
               value={amount}
               onChange={(e) => onAmountChange?.(e.target.value)}
               readOnly={readOnly}
-              className="bg-transparent border-none text-right text-2xl font-mono font-semibold text-foreground placeholder:text-muted-foreground focus-visible:ring-0 p-0 h-auto"
+              className="bg-transparent border-none text-right text-2xl font-mono font-semibold text-foreground placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:outline-none focus:outline-none p-0 h-auto [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
           )}
         </div>
