@@ -19,7 +19,7 @@ export function useSwapRoute(
     const timer = setTimeout(() => {
       setDebouncedAmount(amount);
       setDebouncedTradeType(tradeType);
-    }, 500);
+    }, 800);
     return () => clearTimeout(timer);
   }, [amount, tradeType]);
 
