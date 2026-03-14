@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users } from "lucide-react";
@@ -11,13 +12,14 @@ import cheeseDaoOrb from "@/assets/cheesedao.png";
 import { playRandomFart } from "@/lib/fartSounds";
 
 const Dao = () => {
-  const [selectedDao, setSelectedDao] = useState<string | null>(null);
+  const { daoName } = useParams<{ daoName?: string }>();
+  const navigate = useNavigate();
 
-  if (selectedDao) {
+  if (daoName) {
     return (
       <Layout>
         <div className="container py-8">
-          <DaoDetail daoName={selectedDao} onBack={() => setSelectedDao(null)} />
+          <DaoDetail daoName={daoName} onBack={() => navigate("/dao")} />
         </div>
       </Layout>
     );
@@ -65,13 +67,13 @@ const Dao = () => {
                 <TabsTrigger value="my-daos">My DAOs</TabsTrigger>
               </TabsList>
               <TabsContent value="browse" className="mt-6">
-                <BrowseDaos onSelectDao={setSelectedDao} />
+                <BrowseDaos />
               </TabsContent>
               <TabsContent value="create" className="mt-6">
                 <CreateDao />
               </TabsContent>
               <TabsContent value="my-daos" className="mt-6">
-                <MyDaos onSelectDao={setSelectedDao} />
+                <MyDaos />
               </TabsContent>
             </Tabs>
           </CardContent>
