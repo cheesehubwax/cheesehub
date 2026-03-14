@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, Sprout } from "lucide-react";
-import { fetchAllFarms, FarmInfo } from "@/lib/farm";
+import { fetchAllFarms, FarmInfo, fetchUserGlobalStakes } from "@/lib/farm";
 import { useWax } from "@/context/WaxContext";
 import { useQuery } from "@tanstack/react-query";
 import { FarmCard } from "./FarmCard";
@@ -26,6 +26,13 @@ export function BrowseFarms() {
     staleTime: 60_000,
   });
 
+  const { data: userStakes = [] } = useQuery({
+    queryKey: ["userGlobalStakes", accountName],
+    queryFn: () => fetchUserGlobalStakes(accountName!),
+    enabled: !!accountName && stakedOnly,
+    staleTime: 30_000,
+  });
+
   const filtered = useMemo(() => {
     let result = [...farms];
     const now = Math.floor(Date.now() / 1000);
@@ -35,7 +42,8 @@ export function BrowseFarms() {
     }
 
     if (stakedOnly && accountName) {
-      result = result.filter(f => f.staked_count > 0);
+      const stakedFarmNames = new Set(userStakes.map(s => s.farmName));
+      result = result.filter(f => stakedFarmNames.has(f.farm_name));
     }
 
     if (search.trim()) {
@@ -60,7 +68,7 @@ export function BrowseFarms() {
     }
 
     return result;
-  }, [farms, search, activeOnly, stakedOnly, sortBy, accountName]);
+  }, [farms, search, activeOnly, stakedOnly, sortBy, accountName, userStakes]);
 
   return (
     <div className="space-y-4">
