@@ -135,4 +135,46 @@ export async function fetchUserAssets(account: string, collectionName?: string):
   }
 }
 
+export async function fetchTemplatesBatch(
+  requests: { templateId: string; collectionName: string }[]
+): Promise<Map<string, { name: string; image: string; isVideo?: boolean }>> {
+  const results = new Map<string, { name: string; image: string; isVideo?: boolean }>();
+
+  // Batch by collection to reduce API calls
+  const byCollection = new Map<string, string[]>();
+  for (const req of requests) {
+    const list = byCollection.get(req.collectionName) || [];
+    list.push(req.templateId);
+    byCollection.set(req.collectionName, list);
+  }
+
+  for (const [collectionName, templateIds] of byCollection) {
+    try {
+      const ids = templateIds.join(',');
+      const response = await fetchWithFallback(
+        ATOMIC_API.baseUrls,
+        `${ATOMIC_API.paths.templates}?collection_name=${collectionName}&ids=${ids}&limit=100`
+      );
+      const data = await response.json();
+      if (data.success && data.data) {
+        for (const template of data.data) {
+          const key = `${collectionName}:${template.template_id}`;
+          const immData = template.immutable_data || {};
+          const img = immData.img || immData.image || immData.video || '';
+          const isVideo = !!(immData.video && !immData.img && !immData.image);
+          results.set(key, {
+            name: immData.name || `#${template.template_id}`,
+            image: getImageUrl(img),
+            isVideo,
+          });
+        }
+      }
+    } catch (error) {
+      console.error(`[fetchTemplatesBatch] Failed for ${collectionName}:`, error);
+    }
+  }
+
+  return results;
+}
+
 export { getImageUrl, getIpfsUrl };
