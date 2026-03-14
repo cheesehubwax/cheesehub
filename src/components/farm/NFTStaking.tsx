@@ -92,7 +92,7 @@ interface NFTCardProps {
   stakedInFarm?: string;
 }
 
-function NFTCard({ nft, isSelected, onToggle, stakedInFarm }: NFTCardProps) {
+const NFTCard = React.memo(function NFTCard({ nft, isSelected, onToggle, stakedInFarm }: NFTCardProps) {
   const [gatewayIndex, setGatewayIndex] = useState(0);
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
