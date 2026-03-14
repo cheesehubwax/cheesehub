@@ -45,11 +45,6 @@ export function QuickLinksSection() {
           {/* Trading Links */}
           <div className="flex flex-wrap justify-center gap-3">
             <QuickLink
-              icon={<Swap size={18} weight="bold" />}
-              label="Trade on Alcor"
-              href="https://alcor.exchange/swap?output=CHEESE-cheeseburger&input=WAX-eosio.token"
-            />
-            <QuickLink
               icon={<ChartLine size={18} weight="bold" />}
               label="View Chart"
               href="https://www.dextools.io/app/en/wax/pair-explorer/0xcheeseburger"
