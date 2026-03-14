@@ -2,7 +2,7 @@ import { Layout } from "@/components/Layout";
 import { SlotCalendar } from "@/components/bannerads/SlotCalendar";
 import { BannerAdStatsBar } from "@/components/bannerads/BannerAdStatsBar";
 import { playRandomFart } from "@/lib/fartSounds";
-import cheeseBikini from "@/assets/cheese-bikini.png";
+import cheeseBikini from "@/assets/cheeseads.png";
 
 const BannerAds = () => {
   return (
