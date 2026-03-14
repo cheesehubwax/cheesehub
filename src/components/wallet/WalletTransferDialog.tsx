@@ -272,7 +272,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                           "w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors text-left",
                           isActive
                             ? "bg-primary/20 text-primary border-r-2 border-primary font-medium"
-                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                            : "text-foreground hover:bg-muted/50"
                         )}
                       >
                         <Icon className="h-4 w-4 shrink-0" />
