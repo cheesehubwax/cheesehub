@@ -109,12 +109,12 @@ export function BannerDisplay() {
           </span>
         </a>
       ) : (
-        <div className="flex gap-3 max-w-[580px] w-full" style={{ height: 150 }}>
+        <div className="flex flex-col gap-3 w-[580px] max-w-full">
           {[1, 2].map((slot) => (
             <Link
               key={slot}
               to="/bannerads"
-              className="flex-1 h-full rounded-lg border border-dashed border-border/60 bg-card/40 flex items-center justify-center gap-2 text-muted-foreground/50 hover:border-cheese/40 hover:text-cheese/60 transition-colors"
+              className="w-full h-[150px] rounded-lg border border-dashed border-border/60 bg-card/40 flex items-center justify-center gap-2 text-muted-foreground/50 hover:border-cheese/40 hover:text-cheese/60 transition-colors"
             >
               <Megaphone className="h-4 w-4" />
               <span className="text-xs font-medium">Slot {slot} — Available</span>
