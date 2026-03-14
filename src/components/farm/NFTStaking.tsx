@@ -289,8 +289,8 @@ const VirtualGrid = React.memo(function VirtualGrid({
     <div ref={parentRef} className="h-[420px] overflow-auto">
       <div style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}>
         {virtualizer.getVirtualItems().map((vRow) => {
-          const start = vRow.index * GRID_COLS;
-          const rowItems = items.slice(start, start + GRID_COLS);
+          const start = vRow.index * cols;
+          const rowItems = items.slice(start, start + cols);
           return (
             <div
               key={vRow.key}
