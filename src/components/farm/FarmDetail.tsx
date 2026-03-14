@@ -144,7 +144,7 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
           <div className="flex flex-col sm:flex-row items-start gap-6">
             <div className="h-20 w-20 rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden shrink-0">
               {logoUrl ? (
-                <img src={logoUrl} alt={farm.farm_name} className="h-full w-full object-cover" />
+                <img src={logoUrl} alt={farm.farm_name} className="h-full w-full object-contain" />
               ) : (
                 <Sprout className="h-10 w-10 text-primary" />
               )}
