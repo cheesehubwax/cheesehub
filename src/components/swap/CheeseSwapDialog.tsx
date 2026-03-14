@@ -23,6 +23,8 @@ export function CheeseSwapDialog({ open, onOpenChange, inputToken = 'WAX' }: Che
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="sm:max-w-[480px] p-0 overflow-hidden bg-background border-cheese/30"
+        onInteractOutside={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => e.preventDefault()}
       >
         <DialogHeader className="p-4 pb-0 pr-10">
           <div className="flex items-center gap-3">
