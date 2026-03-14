@@ -155,5 +155,5 @@ export async function fetchTokenBalance(
 export const PREFERRED_CONTRACTS: Record<string, string> = {
   WAX: "eosio.token",
   CHEESE: "cheeseburger",
-  WAXUSDC: "alien.worlds",
+  WAXUSDC: "eth.token",
 };
