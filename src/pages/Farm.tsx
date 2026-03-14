@@ -1,48 +1,58 @@
 import { useState } from "react";
 import { Layout } from "@/components/Layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sprout } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { BrowseFarms } from "@/components/farm/BrowseFarms";
 import { CreateFarm } from "@/components/farm/CreateFarm";
 import { MyFarms } from "@/components/farm/MyFarms";
 import { FarmDetail } from "@/components/farm/FarmDetail";
-import cheeseLogo2 from "@/assets/cheesefarm.png";
+import cheeseFarmLogo from "@/assets/cheesefarm.png";
 import { playRandomFart } from "@/lib/fartSounds";
+import { Search, FolderOpen, Plus } from "lucide-react";
 
 const Farm = () => {
-  const { farmName: routeFarmName } = useParams<{ farmName?: string }>();
-  const [selectedFarm, setSelectedFarm] = useState<string | null>(routeFarmName || null);
+  const { farmName } = useParams<{ farmName?: string }>();
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("browse");
 
-  if (selectedFarm) {
+  if (farmName) {
     return (
       <Layout>
         <div className="container py-8">
-          <FarmDetail farmName={selectedFarm} onBack={() => setSelectedFarm(null)} />
+          <FarmDetail farmName={farmName} onBack={() => navigate("/farm")} />
         </div>
       </Layout>
     );
   }
 
+  const handleCreateFarm = () => {
+    setActiveTab("create");
+  };
+
   return (
     <Layout>
       {/* Hero */}
-      <section className="relative py-16 overflow-hidden">
+      <section className="relative py-12 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
         <div className="container relative z-10">
-          <div className="flex flex-col items-center gap-6">
+          <div className="flex flex-col items-center gap-4">
             <div
-              className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer"
+              className="h-28 w-28 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer"
               onClick={playRandomFart}
             >
-              <img src={cheeseLogo2} alt="CHEESE" className="w-32 h-32 object-contain" />
+              <img src={cheeseFarmLogo} alt="CHEESEFarm" className="w-28 h-28 object-contain" />
             </div>
             <div className="text-center space-y-2">
-              <h1 className="text-3xl md:text-4xl font-bold">
-                <span className="text-cheese">CHEESE</span>
-                <span className="text-foreground">Farm</span>
-              </h1>
+              <div className="flex items-center justify-center gap-2">
+                <h1 className="text-3xl md:text-4xl font-bold">
+                  <span className="text-cheese">CHEESE</span>
+                  <span className="text-foreground">Farm</span>
+                </h1>
+                <Badge variant="outline" className="text-xs border-primary/50 text-primary">
+                  BETA
+                </Badge>
+              </div>
               <p className="text-muted-foreground max-w-2xl mx-auto">
                 Create and participate in non-custodial NFT staking farms using the WaxDAO V2 smart contracts.
               </p>
@@ -52,32 +62,31 @@ const Farm = () => {
       </section>
 
       <div className="container pb-12">
-        <Card className="bg-card/80 border-border/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sprout className="h-5 w-5 text-primary" />
-              NFT Staking Farms
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="browse" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="browse">Browse Farms</TabsTrigger>
-                <TabsTrigger value="create">Create Farm</TabsTrigger>
-                <TabsTrigger value="my-farms">My Farms</TabsTrigger>
-              </TabsList>
-              <TabsContent value="browse" className="mt-6">
-                <BrowseFarms onSelectFarm={setSelectedFarm} />
-              </TabsContent>
-              <TabsContent value="create" className="mt-6">
-                <CreateFarm />
-              </TabsContent>
-              <TabsContent value="my-farms" className="mt-6">
-                <MyFarms onSelectFarm={setSelectedFarm} />
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="browse" className="flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              Browse Farms
+            </TabsTrigger>
+            <TabsTrigger value="my-farms" className="flex items-center gap-2">
+              <FolderOpen className="h-4 w-4" />
+              My Farms
+            </TabsTrigger>
+            <TabsTrigger value="create" className="flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Create Farm
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="browse" className="mt-6">
+            <BrowseFarms />
+          </TabsContent>
+          <TabsContent value="my-farms" className="mt-6">
+            <MyFarms onCreateFarm={handleCreateFarm} />
+          </TabsContent>
+          <TabsContent value="create" className="mt-6">
+            <CreateFarm />
+          </TabsContent>
+        </Tabs>
 
         <div className="text-center text-sm text-muted-foreground mt-8">
           <p>

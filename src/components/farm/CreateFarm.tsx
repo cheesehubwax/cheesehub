@@ -3,60 +3,133 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Plus, Sprout } from "lucide-react";
-import { FARM_CREATION_FEES, validateFarmName, buildFarmCreationFeeWaxAction, buildAssertPointAction, PAYOUT_INTERVALS } from "@/lib/farm";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  Accordion, AccordionContent, AccordionItem, AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
+  Collapsible, CollapsibleContent, CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Loader2, Plus, Sprout, Trash2, ChevronDown, AlertTriangle } from "lucide-react";
+import {
+  FARM_CREATION_FEES, validateFarmName, FARM_TYPE_LABELS, FarmType,
+  buildCreateFarmAction, buildAssertPointAction, buildFarmCreationFeeWaxAction,
+  RewardToken,
+} from "@/lib/farm";
+import {
+  buildCheesePaymentAction, buildWaxPaymentAction, buildWaxdaoFeeAction,
+  WAX_FEE_AMOUNT,
+} from "@/lib/cheeseFees";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
+import { useCheeseFeePricing } from "@/hooks/useCheeseFeePricing";
+import { useWaxdaoFeePricing } from "@/hooks/useWaxdaoFeePricing";
 import { useToast } from "@/hooks/use-toast";
 import { FeePaymentSelector } from "@/components/shared/FeePaymentSelector";
+
+const FARM_TYPE_OPTIONS: { value: FarmType; label: string }[] = [
+  { value: "collections", label: "Collections" },
+  { value: "schemas", label: "Schemas" },
+  { value: "templates", label: "Templates" },
+  { value: "attributes", label: "Attributes" },
+];
+
+const CONFIRMATION_PHRASE = "I understand how the new farms work";
 
 export function CreateFarm() {
   const { accountName, isConnected, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
+  const cheesePricing = useCheeseFeePricing();
+  const waxdaoPricing = useWaxdaoFeePricing();
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+  const [confirmed, setConfirmed] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+
   const [farmName, setFarmName] = useState("");
-  const [rewardContract, setRewardContract] = useState("cheeseburger");
-  const [rewardSymbol, setRewardSymbol] = useState("4,CHEESE");
-  const [payoutInterval, setPayoutInterval] = useState("86400");
+  const [farmType, setFarmType] = useState<FarmType>("templates");
+  const [hoursBetween, setHoursBetween] = useState("24");
+
+  const [rewardTokens, setRewardTokens] = useState<RewardToken[]>([
+    { contract: "cheeseburger", symbol: "CHEESE", precision: 4 },
+  ]);
+
+  const [avatar, setAvatar] = useState("");
+  const [coverImage, setCoverImage] = useState("");
+  const [description, setDescription] = useState("");
+  const [socialsOpen, setSocialsOpen] = useState(false);
+  const [socials, setSocials] = useState({
+    twitter: "", discord: "", telegram: "", website: "", youtube: "", medium: "",
+  });
+
   const [paymentMethod, setPaymentMethod] = useState<"wax" | "cheese">("wax");
 
   const validation = validateFarmName(farmName);
 
+  const handleConfirm = () => {
+    if (confirmText.toLowerCase().trim() === CONFIRMATION_PHRASE.toLowerCase()) {
+      setConfirmed(true);
+    }
+  };
+
+  const addRewardToken = () => {
+    if (rewardTokens.length >= 3) return;
+    setRewardTokens([...rewardTokens, { contract: "", symbol: "", precision: 4 }]);
+  };
+
+  const removeRewardToken = (index: number) => {
+    setRewardTokens(rewardTokens.filter((_, i) => i !== index));
+  };
+
+  const updateRewardToken = (index: number, field: keyof RewardToken, value: string | number) => {
+    setRewardTokens(rewardTokens.map((t, i) => i === index ? { ...t, [field]: value } : t));
+  };
+
   const handleCreate = async () => {
-    if (!accountName) return;
-    if (!validation.valid) {
-      toast({ title: "Invalid farm name", description: validation.error, variant: "destructive" });
-      return;
-    }
+    if (!accountName || !validation.valid) return;
 
-    const actions = [];
+    setLoading(true);
+    try {
+      const hours = parseInt(hoursBetween) || 24;
+      const actions: any[] = [];
 
-    if (paymentMethod === "wax") {
-      actions.push(buildAssertPointAction(accountName));
-      actions.push(buildFarmCreationFeeWaxAction(accountName));
-    }
+      if (paymentMethod === "cheese" && cheesePricing.isAvailable) {
+        actions.push(buildCheesePaymentAction(accountName, cheesePricing.formattedForTx, "farm", farmName));
+      } else {
+        actions.push(buildAssertPointAction(accountName));
+        actions.push(buildFarmCreationFeeWaxAction(accountName));
+      }
 
-    actions.push({
-      account: "farms.waxdao",
-      name: "createfarm",
-      authorization: [{ actor: accountName, permission: "active" }],
-      data: {
-        user: accountName,
-        farmname: farmName,
-        reward_token: {
-          contract: rewardContract,
-          sym: rewardSymbol,
-        },
-        hours_between_payouts: parseInt(payoutInterval) / 3600,
-      },
-    });
+      actions.push(buildCreateFarmAction(
+        accountName,
+        farmName,
+        farmType,
+        hours,
+        rewardTokens.filter(t => t.contract && t.symbol),
+        { avatar, cover_image: coverImage, description },
+        {
+          ...socials,
+          atomichub: "",
+          waxdao: "",
+        }
+      ));
 
-    const result = await executeTransaction(actions);
-    if (result.success) {
-      toast({ title: "Farm Created! 🌱", description: `${farmName} has been created` });
+      const result = await executeTransaction(actions, {
+        successTitle: "Farm Created! 🌱",
+        successDescription: `${farmName} has been created successfully`,
+      });
+
+      if (result.success) {
+        setFarmName("");
+        setDescription("");
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -65,6 +138,93 @@ export function CreateFarm() {
       <div className="text-center py-12">
         <Sprout className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
         <p className="text-muted-foreground">Connect your wallet to create a farm</p>
+      </div>
+    );
+  }
+
+  if (!confirmed) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6">
+        <Card className="bg-card/60 border-border/40">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-primary" />
+              Before You Create a Farm
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="rounded-lg overflow-hidden aspect-video bg-black">
+              <iframe
+                width="100%"
+                height="100%"
+                src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+                title="How to create a CHEESEFarm"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="what">
+                <AccordionTrigger>What is a CHEESEFarm?</AccordionTrigger>
+                <AccordionContent>
+                  A non-custodial NFT staking farm built on WaxDAO V2 smart contracts. Users can stake their NFTs to earn token rewards.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="cost">
+                <AccordionTrigger>How much does it cost?</AccordionTrigger>
+                <AccordionContent>
+                  Creating a farm costs {WAX_FEE_AMOUNT} WAX, or you can pay with CHEESE at a 20% discount.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="types">
+                <AccordionTrigger>What are the farm types?</AccordionTrigger>
+                <AccordionContent>
+                  <strong>Collections:</strong> All NFTs from specified collections can be staked.<br/>
+                  <strong>Schemas:</strong> Only NFTs matching specific schemas.<br/>
+                  <strong>Templates:</strong> Only NFTs matching specific templates.<br/>
+                  <strong>Attributes:</strong> Only NFTs with specific attribute values.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="rewards">
+                <AccordionTrigger>How do rewards work?</AccordionTrigger>
+                <AccordionContent>
+                  You deposit reward tokens into the farm's pools. Stakers earn rewards proportionally based on the hourly rate configured for their staked assets.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="manage">
+                <AccordionTrigger>Can I manage my farm after creation?</AccordionTrigger>
+                <AccordionContent>
+                  Yes! You can add/remove stakable assets, deposit more rewards, extend the farm, update the profile, and more.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="anchor">
+                <AccordionTrigger className="text-orange-400">⚠️ Important: Anchor Wallet Users</AccordionTrigger>
+                <AccordionContent>
+                  If using Anchor wallet, make sure you have the latest version. Some older versions may have issues with complex multi-action transactions.
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+
+            <div className="space-y-2">
+              <Label>Type the following to continue:</Label>
+              <p className="text-sm text-primary font-mono">"{CONFIRMATION_PHRASE}"</p>
+              <Input
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder="Type the phrase above..."
+              />
+              <Button
+                onClick={handleConfirm}
+                disabled={confirmText.toLowerCase().trim() !== CONFIRMATION_PHRASE.toLowerCase()}
+                className="w-full bg-primary text-primary-foreground"
+              >
+                I Understand, Let Me Create
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -78,7 +238,8 @@ export function CreateFarm() {
             Create New Farm
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-5">
+          {/* Farm Name */}
           <div>
             <Label>Farm Name (1-12 chars, a-z, 1-5, .)</Label>
             <Input
@@ -92,39 +253,143 @@ export function CreateFarm() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Reward Token Contract</Label>
-              <Input value={rewardContract} onChange={(e) => setRewardContract(e.target.value)} placeholder="cheeseburger" />
-            </div>
-            <div>
-              <Label>Reward Token (precision,SYMBOL)</Label>
-              <Input value={rewardSymbol} onChange={(e) => setRewardSymbol(e.target.value)} placeholder="4,CHEESE" />
-            </div>
-          </div>
-
+          {/* Farm Type */}
           <div>
-            <Label>Payout Interval</Label>
-            <Select value={payoutInterval} onValueChange={setPayoutInterval}>
+            <Label>Farm Type</Label>
+            <Select value={farmType} onValueChange={(v) => setFarmType(v as FarmType)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {PAYOUT_INTERVALS.map(interval => (
-                  <SelectItem key={interval.value} value={String(interval.value)}>
-                    {interval.label}
-                  </SelectItem>
+                {FARM_TYPE_OPTIONS.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
+          {/* Reward Tokens */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Reward Tokens (up to 3)</Label>
+              {rewardTokens.length < 3 && (
+                <Button variant="ghost" size="sm" onClick={addRewardToken}>
+                  <Plus className="h-4 w-4 mr-1" /> Add Token
+                </Button>
+              )}
+            </div>
+            {rewardTokens.map((token, i) => (
+              <div key={i} className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <Label className="text-xs">Contract</Label>
+                  <Input
+                    value={token.contract}
+                    onChange={(e) => updateRewardToken(i, "contract", e.target.value)}
+                    placeholder="cheeseburger"
+                  />
+                </div>
+                <div className="w-24">
+                  <Label className="text-xs">Symbol</Label>
+                  <Input
+                    value={token.symbol}
+                    onChange={(e) => updateRewardToken(i, "symbol", e.target.value.toUpperCase())}
+                    placeholder="CHEESE"
+                  />
+                </div>
+                <div className="w-20">
+                  <Label className="text-xs">Precision</Label>
+                  <Input
+                    type="number"
+                    value={token.precision}
+                    onChange={(e) => updateRewardToken(i, "precision", parseInt(e.target.value) || 0)}
+                    min={0}
+                    max={8}
+                  />
+                </div>
+                {rewardTokens.length > 1 && (
+                  <Button variant="ghost" size="sm" onClick={() => removeRewardToken(i)} className="text-destructive">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Hours between payouts */}
+          <div>
+            <Label>Hours Between Payouts (1-720)</Label>
+            <Input
+              type="number"
+              value={hoursBetween}
+              onChange={(e) => setHoursBetween(e.target.value)}
+              min={1}
+              max={720}
+              placeholder="24"
+            />
+          </div>
+
+          {/* Avatar / Cover */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Avatar (IPFS hash)</Label>
+              <Input value={avatar} onChange={(e) => setAvatar(e.target.value)} placeholder="Qm..." />
+            </div>
+            <div>
+              <Label>Cover Image (IPFS hash)</Label>
+              <Input value={coverImage} onChange={(e) => setCoverImage(e.target.value)} placeholder="Qm..." />
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <Label>Description</Label>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Describe your farm..."
+              rows={3}
+            />
+          </div>
+
+          {/* Social Links */}
+          <Collapsible open={socialsOpen} onOpenChange={setSocialsOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" className="w-full justify-between">
+                Social Links
+                <ChevronDown className={`h-4 w-4 transition-transform ${socialsOpen ? "rotate-180" : ""}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-3 pt-2">
+              {(Object.keys(socials) as Array<keyof typeof socials>).map(key => (
+                <div key={key}>
+                  <Label className="capitalize text-xs">{key}</Label>
+                  <Input
+                    value={socials[key]}
+                    onChange={(e) => setSocials({ ...socials, [key]: e.target.value })}
+                    placeholder={`https://${key}.com/...`}
+                  />
+                </div>
+              ))}
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* Payment */}
           <FeePaymentSelector
             selectedMethod={paymentMethod}
             onMethodChange={setPaymentMethod}
             onCheeseAmountChange={() => {}}
           />
 
-          <Button onClick={handleCreate} disabled={loading || !validation.valid} className="w-full bg-primary text-primary-foreground" size="lg">
-            {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Creating Farm...</> : "Create Farm (250 WAX)"}
+          {/* Submit */}
+          <Button
+            onClick={handleCreate}
+            disabled={loading || !validation.valid || rewardTokens.filter(t => t.contract && t.symbol).length === 0}
+            className="w-full bg-primary text-primary-foreground"
+            size="lg"
+          >
+            {loading ? (
+              <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Creating Farm...</>
+            ) : (
+              `Create Farm (${paymentMethod === "cheese" && cheesePricing.isAvailable ? cheesePricing.displayAmount : `${WAX_FEE_AMOUNT} WAX`})`
+            )}
           </Button>
         </CardContent>
       </Card>
