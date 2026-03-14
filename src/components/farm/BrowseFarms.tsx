@@ -26,6 +26,13 @@ export function BrowseFarms() {
     staleTime: 60_000,
   });
 
+  const { data: userStakes = [] } = useQuery({
+    queryKey: ["userGlobalStakes", accountName],
+    queryFn: () => fetchUserGlobalStakes(accountName!),
+    enabled: !!accountName && stakedOnly,
+    staleTime: 30_000,
+  });
+
   const filtered = useMemo(() => {
     let result = [...farms];
     const now = Math.floor(Date.now() / 1000);
