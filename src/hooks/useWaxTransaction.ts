@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { Session } from '@wharfkit/session';
 import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
 import { useToast } from '@/hooks/use-toast';
+import { useTransactionSuccess } from '@/context/TransactionSuccessContext';
 
 interface TransactionOptions {
   successTitle?: string;
@@ -27,6 +28,7 @@ interface TransactionResult {
  */
 export function useWaxTransaction(session: Session | null) {
   const { toast } = useToast();
+  const { showSuccess } = useTransactionSuccess();
 
   const executeTransaction = useCallback(async (
     actions: any[],
@@ -54,10 +56,7 @@ export function useWaxTransaction(session: Session | null) {
       const txId = result.resolved?.transaction.id?.toString() || null;
 
       if (showSuccessToast) {
-        toast({
-          title: successTitle,
-          description: successDescription,
-        });
+        showSuccess(successTitle, successDescription || 'Your transaction has been confirmed on the WAX blockchain.', txId);
       }
 
       return { success: true, txId };
