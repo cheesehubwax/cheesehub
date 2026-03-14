@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { WalletConnect } from "./WalletConnect";
-import { Lock, Home, ShoppingBag, ShoppingCart, Users, Zap, Sprout, Flame, Droplets, Menu, X } from "lucide-react";
+import { ShoppingCart, Menu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/context/CartContext";
@@ -9,14 +9,14 @@ import cheeseLogo from "@/assets/cheese-logo.png";
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Home", icon: Home },
-  { to: "/powerup", label: "CHEESEUp", icon: Zap },
-  { to: "/locker", label: "CHEESELock", icon: Lock },
-  { to: "/drops", label: "CHEESEShip", icon: ShoppingBag },
-  { to: "/dao", label: "CHEESEDao", icon: Users },
-  { to: "/farm", label: "CHEESEFarm", icon: Sprout },
-  { to: "/cheesenull", label: "CHEESENull", icon: Flame },
-  { to: "/drip", label: "CHEESEDrip", icon: Droplets },
+  { to: "/", label: "Home", emoji: "🏠" },
+  { to: "/powerup", label: "CHEESEUp", emoji: "⚡" },
+  { to: "/locker", label: "CHEESELock", emoji: "🔐" },
+  { to: "/drops", label: "CHEESEShip", emoji: "🛒" },
+  { to: "/dao", label: "CHEESEDao", emoji: "🏛️" },
+  { to: "/farm", label: "CHEESEFarm", emoji: "🌱" },
+  { to: "/cheesenull", label: "CHEESENull", emoji: "⛔" },
+  { to: "/drip", label: "CHEESEDrip", emoji: "💧" },
 ];
 
 const PRIMARY_NAV = NAV_ITEMS.slice(0, 5);
@@ -58,7 +58,7 @@ export function Header() {
                 {NAV_ITEMS.map((item) => (
                   <SheetClose key={item.to} asChild>
                     <Link to={item.to} className={navLinkClass(item.to)}>
-                      <item.icon className="h-4 w-4" />
+                      <span>{item.emoji}</span>
                       {item.label}
                     </Link>
                   </SheetClose>
@@ -79,7 +79,7 @@ export function Header() {
           <nav className="hidden md:flex items-center gap-1">
             {PRIMARY_NAV.map((item) => (
               <Link key={item.to} to={item.to} className={navLinkClass(item.to)}>
-                <item.icon className="h-4 w-4" />
+                <span>{item.emoji}</span>
                 {item.label}
               </Link>
             ))}
@@ -109,7 +109,7 @@ export function Header() {
         <nav className="flex items-center gap-1">
           {SECONDARY_NAV.map((item) => (
             <Link key={item.to} to={item.to} className={navLinkClass(item.to)}>
-              <item.icon className="h-4 w-4" />
+              <span>{item.emoji}</span>
               {item.label}
             </Link>
           ))}
