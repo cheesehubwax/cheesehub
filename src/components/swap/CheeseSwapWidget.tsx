@@ -36,7 +36,7 @@ export function CheeseSwapWidget({
   });
   const [customSlippage, setCustomSlippage] = useState("");
   const [selectorSide, setSelectorSide] = useState<"in" | "out" | null>(null);
-  const [showRouteDetails, setShowRouteDetails] = useState(false);
+  const [showRouteDetails, setShowRouteDetails] = useState(true);
   const [isSwapping, setIsSwapping] = useState(false);
 
   // Set defaults when tokens load
