@@ -1044,7 +1044,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
       {stakedNfts.length > 0 && (
         <Card className="bg-card/80 border-border/50">
           <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
+            <CardTitle className="text-lg flex items-center gap-2 text-foreground">
               <Coins className="h-5 w-5 text-primary" />
               Rewards
             </CardTitle>
@@ -1061,7 +1061,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div className="rounded-lg border border-border/50 bg-background/50 p-3">
-                <p className="text-xs text-muted-foreground mb-2 font-medium">
+                <p className="text-xs text-foreground mb-2 font-medium">
                   Pending
                   {nextPayoutIn > 0 && (
                     <span className="text-muted-foreground/70 ml-1">
@@ -1081,19 +1081,19 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
                             (e.target as HTMLImageElement).src = TOKEN_LOGO_PLACEHOLDER;
                           }}
                         />
-                        <Badge variant="outline" className="text-muted-foreground border-border/50 text-xs">
+                        <Badge variant="outline" className="text-foreground border-border/50 text-xs">
                           +{reward.amount.toFixed(reward.precision)} {reward.symbol}
                         </Badge>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-muted-foreground text-sm">—</p>
+                  <p className="text-foreground text-sm">—</p>
                 )}
               </div>
 
               <div className="rounded-lg border border-border/50 bg-background/50 p-3">
-                <p className="text-xs text-muted-foreground mb-2 font-medium">Claimable Now</p>
+                <p className="text-xs text-foreground mb-2 font-medium">Claimable Now</p>
                 {pendingRewards.length > 0 && hasRewards ? (
                   <div className="space-y-1.5">
                     {pendingRewards.map((reward, i) => (
@@ -1106,7 +1106,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
                             (e.target as HTMLImageElement).src = TOKEN_LOGO_PLACEHOLDER;
                           }}
                         />
-                        <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
+                        <Badge variant="secondary" className="bg-primary/10 text-foreground border-primary/20">
                           {reward.amount.toFixed(reward.precision)} {reward.symbol}
                         </Badge>
                       </div>
