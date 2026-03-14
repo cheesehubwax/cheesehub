@@ -46,11 +46,11 @@ const Locker = () => {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="create" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="create">Create Lock</TabsTrigger>
-                <TabsTrigger value="my-locks">My Locks</TabsTrigger>
-                <TabsTrigger value="lp-lock">LP Lock</TabsTrigger>
-                <TabsTrigger value="my-lp">My LP Locks</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto">
+                <TabsTrigger value="create" className="text-xs sm:text-sm">Create Lock</TabsTrigger>
+                <TabsTrigger value="my-locks" className="text-xs sm:text-sm">My Locks</TabsTrigger>
+                <TabsTrigger value="lp-lock" className="text-xs sm:text-sm">LP Lock</TabsTrigger>
+                <TabsTrigger value="my-lp" className="text-xs sm:text-sm">My LP Locks</TabsTrigger>
               </TabsList>
               <TabsContent value="create" className="mt-6">
                 <CreateLock />

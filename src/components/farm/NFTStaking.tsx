@@ -251,7 +251,14 @@ interface VirtualGridProps {
   globallyStakedMap?: Map<string, string>;
 }
 
-const GRID_COLS = 6;
+// Responsive: matches grid-cols-3 sm:grid-cols-4 md:grid-cols-6
+function getGridCols(): number {
+  if (typeof window === "undefined") return 6;
+  if (window.innerWidth < 640) return 3;
+  if (window.innerWidth < 768) return 4;
+  return 6;
+}
+
 const GRID_ROW_HEIGHT = 120;
 
 const VirtualGrid = React.memo(function VirtualGrid({
@@ -262,7 +269,15 @@ const VirtualGrid = React.memo(function VirtualGrid({
   type,
   globallyStakedMap,
 }: VirtualGridProps) {
-  const rowCount = Math.ceil(items.length / GRID_COLS);
+  const [cols, setCols] = useState(getGridCols);
+
+  useEffect(() => {
+    const handleResize = () => setCols(getGridCols());
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const rowCount = Math.ceil(items.length / cols);
   const virtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => parentRef.current,
@@ -274,8 +289,8 @@ const VirtualGrid = React.memo(function VirtualGrid({
     <div ref={parentRef} className="h-[420px] overflow-auto">
       <div style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}>
         {virtualizer.getVirtualItems().map((vRow) => {
-          const start = vRow.index * GRID_COLS;
-          const rowItems = items.slice(start, start + GRID_COLS);
+          const start = vRow.index * cols;
+          const rowItems = items.slice(start, start + cols);
           return (
             <div
               key={vRow.key}
@@ -903,7 +918,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
     return (
       <Card className="bg-card/80 border-border/50">
         <CardContent className="p-6">
-          <div className="grid grid-cols-6 gap-2">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
             {Array.from({ length: 12 }).map((_, i) => (
               <Skeleton key={i} className="aspect-square rounded-lg" />
             ))}
@@ -977,7 +992,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
               </div>
 
               {isLoadingEligible ? (
-                <div className="grid grid-cols-6 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
                   {Array.from({ length: 6 }).map((_, i) => (
                     <Skeleton key={i} className="aspect-square rounded-lg" />
                   ))}
@@ -1017,7 +1032,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
               </div>
 
               {isLoadingStakedDetails ? (
-                <div className="grid grid-cols-6 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
                   {Array.from({ length: 6 }).map((_, i) => (
                     <Skeleton key={i} className="aspect-square rounded-lg" />
                   ))}

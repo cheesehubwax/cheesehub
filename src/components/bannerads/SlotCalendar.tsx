@@ -174,16 +174,13 @@ export function SlotCalendar() {
 
   return (
     <TooltipProvider>
-      <div className="flex flex-col items-center text-center mb-4 gap-3">
-        <div className="flex items-start gap-4 text-sm w-full justify-center pl-16">
-          <span className="text-foreground font-medium whitespace-nowrap pt-0.5">Exclusive Slot: {pricing.waxPerDay} WAX/day</span>
-          <span className="text-muted-foreground pt-0.5">|</span>
-          <div className="flex flex-col items-start">
-            <span className="text-foreground font-medium">Shared Slot: {(pricing.waxPerDay * 0.7).toFixed(0)} WAX/day</span>
+      <div className="flex flex-col items-center text-center mb-4 gap-3 px-2">
+        <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 text-sm w-full justify-center">
+          <span className="text-foreground font-medium whitespace-nowrap">Exclusive: {pricing.waxPerDay} WAX/day</span>
+          <span className="text-muted-foreground hidden sm:inline">|</span>
+          <div className="flex flex-col items-center sm:items-start">
+            <span className="text-foreground font-medium">Shared: {(pricing.waxPerDay * 0.7).toFixed(0)} WAX/day</span>
             <span className="text-xs text-muted-foreground">30% off, 50% display time</span>
-            <span className="text-xs text-muted-foreground">OR</span>
-            <span className="text-foreground font-medium">Shared Slot: {(pricing.waxPerDay * 0.7 * 2).toFixed(0)} WAX/day</span>
-            <span className="text-xs text-muted-foreground">and show 2 banners for less than 2 exclusive slots</span>
           </div>
         </div>
         <Button variant="ghost" size="sm" onClick={refetch} className="text-cheese"><RefreshCw className="h-4 w-4 mr-1" />Refresh</Button>
@@ -218,13 +215,13 @@ export function SlotCalendar() {
                     const { selectable, isJoining } = isSlotSelectable(slot);
                     const selected = isSlotSelected(slot.time, slot.position);
                     return (
-                      <div key={slot.position} className={`flex items-center justify-between rounded-lg border p-3 bg-background/50 transition-colors ${selected ? "border-cheese/60 bg-cheese/5" : "border-border/30"}`}>
-                        <div className="flex items-center gap-3">
+                      <div key={slot.position} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border p-3 bg-background/50 transition-colors ${selected ? "border-cheese/60 bg-cheese/5" : "border-border/30"}`}>
+                        <div className="flex items-center gap-2 sm:gap-3">
                           {selectable && <Checkbox checked={selected} onCheckedChange={() => toggleSlotSelection(slot.time, slot.position, isJoining)} className="data-[state=checked]:bg-cheese data-[state=checked]:border-cheese" />}
                           <span className="text-sm font-medium text-muted-foreground">Pos {slot.position}</span>
                           <SlotBadge slot={slot} accountName={accountName} />
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                           {selectable && !selected && <Button size="sm" className="bg-cheese hover:bg-cheese-dark text-primary-foreground text-xs h-7" onClick={() => setRentTarget({ time: slot.time, position: slot.position, isJoining })}>{isJoining ? "Join" : "Rent"}</Button>}
                           {isAdmin && slot.isOnChain && !slot.suspended && <Button size="sm" variant="outline" className="border-cheese/30 text-cheese text-xs h-7" onClick={() => setEditTarget(slot)}>Edit</Button>}
                           {isAdmin && slot.isOnChain && slot.user !== BANNER_CONTRACT && <Button size="sm" variant="outline" className="border-green-500/50 text-green-600 text-xs h-7 hover:bg-green-500/10" onClick={() => setPreviewTarget(slot)}><Eye className="h-3 w-3 mr-1" />Preview</Button>}
