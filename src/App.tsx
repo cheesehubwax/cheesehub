@@ -52,6 +52,7 @@ const App = () => {
               </Routes>
             </BrowserRouter>
           </CartProvider>
+          </TransactionSuccessProvider>
         </WaxProvider>
       </TooltipProvider>
     </QueryClientProvider>

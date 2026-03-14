@@ -56,10 +56,7 @@ export function useWaxTransaction(session: Session | null) {
       const txId = result.resolved?.transaction.id?.toString() || null;
 
       if (showSuccessToast) {
-        toast({
-          title: successTitle,
-          description: successDescription,
-        });
+        showSuccess(successTitle, successDescription || 'Your transaction has been confirmed on the WAX blockchain.', txId);
       }
 
       return { success: true, txId };
