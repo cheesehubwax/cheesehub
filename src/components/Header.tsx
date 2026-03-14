@@ -58,7 +58,7 @@ export function Header() {
                 {NAV_ITEMS.map((item) => (
                   <SheetClose key={item.to} asChild>
                     <Link to={item.to} className={navLinkClass(item.to)}>
-                      <item.icon className="h-4 w-4" />
+                      <span>{item.emoji}</span>
                       {item.label}
                     </Link>
                   </SheetClose>
