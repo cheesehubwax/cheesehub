@@ -356,8 +356,8 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
         </CardContent>
       </Card>
 
-      {/* NFT Staking */}
-      {isConnected && farm.is_active && !isExpired && (
+      {/* NFT Staking - show when connected (even if expired, so users can claim + unstake) */}
+      {isConnected && (
         <NFTStaking farm={farm} onRefresh={refetch} />
       )}
 
