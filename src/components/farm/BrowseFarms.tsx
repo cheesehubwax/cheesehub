@@ -68,7 +68,7 @@ export function BrowseFarms() {
     }
 
     return result;
-  }, [farms, search, activeOnly, stakedOnly, sortBy, accountName]);
+  }, [farms, search, activeOnly, stakedOnly, sortBy, accountName, userStakes]);
 
   return (
     <div className="space-y-4">
