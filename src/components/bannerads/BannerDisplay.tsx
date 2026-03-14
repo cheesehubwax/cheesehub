@@ -49,35 +49,17 @@ export function BannerDisplay() {
   const activeBanners = useMemo(() => {
     const nowSec = Math.floor(Date.now() / 1000);
 
-    // Prefer the most recent live group, fall back to nearest future
-    const pastGroups = slotGroups
+    // Only use the most recent group that has started (today's group)
+    const currentGroup = slotGroups
       .filter((group) => group.time <= nowSec)
-      .sort((a, b) => b.time - a.time);
+      .sort((a, b) => b.time - a.time)[0];
 
-    const futureGroups = slotGroups
-      .filter((group) => group.time > nowSec)
-      .sort((a, b) => a.time - b.time);
-
-    const candidateGroups = [...pastGroups, ...futureGroups];
-
-    for (const group of candidateGroups) {
-      const banners = extractActiveBanners(group);
+    if (currentGroup) {
+      const banners = extractActiveBanners(currentGroup);
       if (banners.length > 0) {
-        logger.info(`[BannerDisplay] Showing ${banners.length} banner(s) from group time=${group.time}`, banners);
+        logger.info(`[BannerDisplay] Showing ${banners.length} banner(s) from group time=${currentGroup.time}`, banners);
         return banners;
       }
-    }
-
-    // Log all slots for debugging if nothing matched
-    if (slotGroups.length > 0) {
-      logger.info("[BannerDisplay] No active banners found. All slot groups:", slotGroups.map(g => ({
-        time: g.time,
-        slots: g.slots.map(s => ({
-          pos: s.position, user: s.user, ipfsHash: s.ipfsHash?.slice(0, 12),
-          sharedUser: s.sharedUser, sharedIpfsHash: s.sharedIpfsHash?.slice(0, 12),
-          isAvailable: s.isAvailable, suspended: s.suspended, rentalType: s.rentalType,
-        })),
-      })));
     }
 
     return [];
