@@ -131,7 +131,7 @@ export function WalletConnect() {
           <Button variant="outline" className="gap-2 border-cheese/30 hover:bg-cheese/10">
             <img src={cheeseLogo} alt="CHEESE" className="h-4 w-4" />
             <span className="text-cheese font-semibold">{formatBalance(cheeseBalance)}</span>
-            <span className="text-muted-foreground hidden sm:inline">{accountName}</span>
+            <span className="text-foreground hidden sm:inline">{accountName}</span>
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
           </Button>
         </DropdownMenuTrigger>
