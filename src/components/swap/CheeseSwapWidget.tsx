@@ -121,7 +121,7 @@ export function CheeseSwapWidget({
   // For swap action, we always need the input amount
   const swapAmountIn = activeField === "in"
     ? amountIn
-    : (route?.input ? formatTokenAmount(route.input, tokenIn?.precision ?? 4) : "");
+    : (route?.input ? formatTokenAmount(route.input, tokenIn?.precision ?? 8) : "");
 
   const handleSwap = async () => {
     if (!route || !session || !accountName || !tokenIn) return;
