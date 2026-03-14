@@ -13,7 +13,7 @@ import { CartDrawer } from "@/components/drops/CartDrawer";
 import { useNavigate } from "react-router-dom";
 import { getTokenConfig } from "@/lib/tokenRegistry";
 import type { NFTDrop, SelectedPrice } from "@/types/drop";
-import cheeseShipOrb from "@/assets/cheeseship.png";
+import cheeseShipOrb from "@/assets/cheeseshoppe.png";
 import { playRandomFart } from "@/lib/fartSounds";
 
 const Drops = () => {
