@@ -210,9 +210,9 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
       )}
 
       {/* Stats cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
         <Card className="bg-card/60 border-border/40">
-          <CardContent className="p-4 text-center">
+          <CardContent className="p-3 sm:p-4 text-center">
             <Users className="h-5 w-5 text-primary mx-auto mb-1" />
             <p className="text-2xl font-bold">{farm.staked_count}</p>
             <p className="text-xs text-muted-foreground">NFTs Staked</p>
