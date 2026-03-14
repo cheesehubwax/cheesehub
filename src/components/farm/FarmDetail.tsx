@@ -317,7 +317,7 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
       {/* Reward Pools */}
       <Card className="bg-card/80 border-border/50">
         <CardHeader>
-          <CardTitle className="text-lg">Reward Pools</CardTitle>
+          <CardTitle className="text-lg text-foreground">Reward Pools</CardTitle>
         </CardHeader>
         <CardContent>
           {farm.reward_pools.length === 0 ? (
@@ -331,19 +331,19 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
                     <div className="flex items-center gap-3">
                       <TokenLogo contract={pool.contract} symbol={pool.symbol} size="md" />
                       <div>
-                        <p className="font-semibold">{pool.symbol}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{pool.contract}</p>
+                        <p className="font-semibold text-foreground">{pool.symbol}</p>
+                        <p className="text-xs text-foreground/70 font-mono">{pool.contract}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-mono font-semibold">{formatAmount(effective.effectiveBalance)}</p>
+                      <p className="font-mono font-semibold text-foreground">{formatAmount(effective.effectiveBalance)}</p>
                       {pool.total_hourly_reward && (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-foreground/70">
                           {pool.total_hourly_reward}/hr
                         </p>
                       )}
                       {effective.hoursRemaining !== null && (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-foreground/70">
                           ~{Math.floor(effective.hoursRemaining / 24)}d remaining
                         </p>
                       )}
