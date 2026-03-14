@@ -174,16 +174,13 @@ export function SlotCalendar() {
 
   return (
     <TooltipProvider>
-      <div className="flex flex-col items-center text-center mb-4 gap-3">
-        <div className="flex items-start gap-4 text-sm w-full justify-center pl-16">
-          <span className="text-foreground font-medium whitespace-nowrap pt-0.5">Exclusive Slot: {pricing.waxPerDay} WAX/day</span>
-          <span className="text-muted-foreground pt-0.5">|</span>
-          <div className="flex flex-col items-start">
-            <span className="text-foreground font-medium">Shared Slot: {(pricing.waxPerDay * 0.7).toFixed(0)} WAX/day</span>
+      <div className="flex flex-col items-center text-center mb-4 gap-3 px-2">
+        <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 text-sm w-full justify-center">
+          <span className="text-foreground font-medium whitespace-nowrap">Exclusive: {pricing.waxPerDay} WAX/day</span>
+          <span className="text-muted-foreground hidden sm:inline">|</span>
+          <div className="flex flex-col items-center sm:items-start">
+            <span className="text-foreground font-medium">Shared: {(pricing.waxPerDay * 0.7).toFixed(0)} WAX/day</span>
             <span className="text-xs text-muted-foreground">30% off, 50% display time</span>
-            <span className="text-xs text-muted-foreground">OR</span>
-            <span className="text-foreground font-medium">Shared Slot: {(pricing.waxPerDay * 0.7 * 2).toFixed(0)} WAX/day</span>
-            <span className="text-xs text-muted-foreground">and show 2 banners for less than 2 exclusive slots</span>
           </div>
         </div>
         <Button variant="ghost" size="sm" onClick={refetch} className="text-cheese"><RefreshCw className="h-4 w-4 mr-1" />Refresh</Button>
