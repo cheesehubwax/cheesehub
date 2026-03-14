@@ -26,16 +26,15 @@ export function CheeseSwapDialog({ open, onOpenChange, inputToken = 'WAX' }: Che
       >
         <DialogHeader className="p-4 pb-0 pr-10">
           <div className="flex items-center gap-3">
-            <DialogTitle className="text-lg font-bold">
-              <span className="text-cheese">CHEESE</span>
-              <span className="text-foreground">Swap</span>
+            <DialogTitle className="text-lg font-bold text-foreground">
+              Alcor Swap
             </DialogTitle>
             <span className="text-xs text-muted-foreground">
               powered by <a href="https://alcor.exchange" target="_blank" rel="noopener noreferrer" className="text-cheese hover:underline">Alcor Exchange</a>
             </span>
           </div>
           <DialogDescription className="text-muted-foreground text-sm">
-            Swap tokens with best rates across all WAX DEXs
+            Swap tokens using Alcor's smart contracts
           </DialogDescription>
         </DialogHeader>
         <div className="p-4">
