@@ -1,7 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
-  Swap, 
   ChartLine, 
   TwitterLogo, 
   TelegramLogo,
@@ -44,11 +43,6 @@ export function QuickLinksSection() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Trading Links */}
           <div className="flex flex-wrap justify-center gap-3">
-            <QuickLink
-              icon={<Swap size={18} weight="bold" />}
-              label="Trade on Alcor"
-              href="https://alcor.exchange/swap?output=CHEESE-cheeseburger&input=WAX-eosio.token"
-            />
             <QuickLink
               icon={<ChartLine size={18} weight="bold" />}
               label="View Chart"

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useCheesePriceData } from '@/hooks/useCheesePriceData';
 import { useCheeseStats } from '@/hooks/useCheeseStats';
 import { useCheeseTVL } from '@/hooks/useCheeseTVL';
@@ -5,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { RefreshCw } from 'lucide-react';
 import waxToken from '@/assets/wax-token.png';
 import cheeseLogo2 from '@/assets/cheese-logo-2.png';
+import { CheeseSwapDialog } from '@/components/swap/CheeseSwapDialog';
 
 function formatPrice(price: number, decimals: number = 8): string {
   return price.toFixed(decimals);
@@ -42,6 +44,8 @@ function formatWaxValue(value: number): string {
 export function CheesePriceBar() {
   const { data: priceData, isLoading: priceLoading, error: priceError } = useCheesePriceData();
   const { data: stats, isLoading: statsLoading } = useCheeseStats();
+  const [swapOpen, setSwapOpen] = useState(false);
+  const [swapInputToken, setSwapInputToken] = useState<'WAX' | 'WAXUSDC'>('WAX');
 
   // Need WAX/USD price for TVL calculation - derive from CHEESE prices
   const waxUsdPrice = priceData && priceData.waxPrice > 0
@@ -55,6 +59,11 @@ export function CheesePriceBar() {
   const marketCap = priceData && stats
     ? stats.circulatingSupply * priceData.usdPrice
     : 0;
+
+  const openSwap = (inputToken: 'WAX' | 'WAXUSDC') => {
+    setSwapInputToken(inputToken);
+    setSwapOpen(true);
+  };
 
   if (priceError) {
     return null;
@@ -77,6 +86,12 @@ export function CheesePriceBar() {
               </span>
             )}
           </div>
+          <button
+            onClick={() => openSwap('WAX')}
+            className="ml-1 text-xs text-cheese hover:text-cheese/80 hover:underline transition-colors font-medium"
+          >
+            trade
+          </button>
         </div>
 
         {/* CHEESE/USD Price */}
@@ -92,6 +107,12 @@ export function CheesePriceBar() {
               </span>
             )}
           </div>
+          <button
+            onClick={() => openSwap('WAXUSDC')}
+            className="ml-1 text-xs text-cheese hover:text-cheese/80 hover:underline transition-colors font-medium"
+          >
+            trade
+          </button>
         </div>
 
       {/* Market Cap */}
@@ -137,6 +158,12 @@ export function CheesePriceBar() {
         </button>
       </div>
     </div>
+
+    <CheeseSwapDialog
+      open={swapOpen}
+      onOpenChange={setSwapOpen}
+      inputToken={swapInputToken}
+    />
     </>
   );
 }
