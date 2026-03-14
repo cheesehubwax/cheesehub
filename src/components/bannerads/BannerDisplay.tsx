@@ -109,7 +109,7 @@ export function BannerDisplay() {
           </span>
         </a>
       ) : (
-        <div className="flex gap-3">
+        <div className="flex gap-6">
           {[1, 2].map((slot) => (
             <Link
               key={slot}
