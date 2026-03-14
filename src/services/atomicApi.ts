@@ -77,7 +77,7 @@ export async function fetchTemplateDetails(collectionName: string, templateId: s
         template_id: data.data.template_id,
         name: immData.name || `Template #${templateId}`,
         image: getImageUrl(immData.img || immData.image || immData.video),
-        collection: { collection_name: collectionName },
+        collection: { collection_name: collectionName, name: immData.name || '', img: getImageUrl(immData.img || '') },
         max_supply: data.data.max_supply || '0',
         issued_supply: data.data.issued_supply || '0',
         schema: data.data.schema || { schema_name: '' },
