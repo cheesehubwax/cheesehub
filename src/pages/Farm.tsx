@@ -8,7 +8,7 @@ import { BrowseFarms } from "@/components/farm/BrowseFarms";
 import { CreateFarm } from "@/components/farm/CreateFarm";
 import { MyFarms } from "@/components/farm/MyFarms";
 import { FarmDetail } from "@/components/farm/FarmDetail";
-import cheeseLogo2 from "@/assets/cheese-logo-2.png";
+import cheeseLogo2 from "@/assets/cheesefarm.png";
 import { playRandomFart } from "@/lib/fartSounds";
 
 const Farm = () => {
