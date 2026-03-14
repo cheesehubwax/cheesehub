@@ -7,77 +7,297 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  Loader2, Search, Gift, Layers, CheckSquare, Square, AlertTriangle,
-  RefreshCw, Coins,
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Loader2, Search, Layers, CheckSquare, Square, AlertTriangle,
+  RefreshCw, Coins, Image as ImageIcon, Check,
 } from "lucide-react";
 import {
-  FarmInfo, fetchUserStakes, fetchFarmStakableConfig, fetchPendingRewards,
+  FarmInfo, fetchUserStakes, fetchFarmStakableConfig,
   buildStakeNftsAction, buildUnstakeNftsAction, buildClaimRewardsAction,
   getCollectionNames, getIpfsUrl, UserStake, PendingReward, FarmStakableConfig,
   fetchUserGlobalStakes, GlobalStakeInfo,
 } from "@/lib/farm";
+import { ATOMIC_API } from "@/lib/waxConfig";
+import { fetchWithFallback } from "@/lib/fetchWithFallback";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useToast } from "@/hooks/use-toast";
-import { TokenLogo } from "@/components/TokenLogo";
 import { batchGetOrFetch } from "@/lib/templateCache";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { getTokenLogoUrl } from "@/lib/tokenLogos";
+import { waxRpcCall } from "@/lib/waxRpcFallback";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 
 const TOKEN_LOGO_PLACEHOLDER = "/placeholder.svg";
+const IPFS_GATEWAY = "https://ipfs.io/ipfs/";
+const IPFS_GATEWAYS = [
+  "https://ipfs.io/ipfs/",
+  "https://gateway.pinata.cloud/ipfs/",
+  "https://cloudflare-ipfs.com/ipfs/",
+  "https://dweb.link/ipfs/",
+];
 
 interface NFTStakingProps {
   farm: FarmInfo;
   onRefresh: () => void;
 }
 
-interface DisplayNFT {
+interface NFTAsset {
   asset_id: string;
   name: string;
   image: string;
   collection: string;
-  template_id?: string;
-  isVideo?: boolean;
-  stakedInOtherFarm?: string;
+  schema: string;
+  template_id: string;
 }
+
+// ── IPFS helpers ──
+
+function extractIpfsHash(url: string): string | null {
+  if (!url) return null;
+  if (url.startsWith("ipfs://")) return url.replace("ipfs://", "");
+  const m = url.match(/\/ipfs\/([a-zA-Z0-9]+.*)/);
+  if (m) return m[1];
+  if (/^Qm[a-zA-Z0-9]{44}/.test(url) || /^bafy[a-zA-Z0-9]+/.test(url)) return url;
+  return null;
+}
+
+function getImageUrl(img: string | undefined): string {
+  if (!img) return "/placeholder.svg";
+  if (img.startsWith("http")) return img;
+  if (img.startsWith("ipfs://")) return `${IPFS_GATEWAY}${img.replace("ipfs://", "")}`;
+  if (img.startsWith("Qm") || img.startsWith("bafy") || img.startsWith("bafk"))
+    return `${IPFS_GATEWAY}${img}`;
+  return img || "/placeholder.svg";
+}
+
+function getMediaUrl(data: Record<string, string | undefined> | undefined): { url: string; isVideo: boolean } {
+  if (!data) return { url: "/placeholder.svg", isVideo: false };
+  const imageField = data.img || data.image;
+  if (imageField) return { url: getImageUrl(imageField), isVideo: false };
+  const videoField = data.video;
+  if (videoField) return { url: getImageUrl(videoField), isVideo: true };
+  return { url: "/placeholder.svg", isVideo: false };
+}
+
+// ── NFT Card with IPFS gateway fallback ──
+
+interface NFTCardProps {
+  nft: NFTAsset;
+  isSelected: boolean;
+  onToggle: () => void;
+  stakedInFarm?: string;
+}
+
+function NFTCard({ nft, isSelected, onToggle, stakedInFarm }: NFTCardProps) {
+  const [gatewayIndex, setGatewayIndex] = useState(0);
+  const [imgError, setImgError] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const ipfsHash = extractIpfsHash(nft.image);
+  const hasValidImage = Boolean(nft.image && nft.image !== "/placeholder.svg");
+  const isStakedElsewhere = Boolean(stakedInFarm);
+
+  const currentImageUrl = useMemo(() => {
+    if (!nft.image || nft.image === "/placeholder.svg") return "/placeholder.svg";
+    if (ipfsHash) {
+      const baseUrl = `${IPFS_GATEWAYS[gatewayIndex]}${ipfsHash}`;
+      return retryCount > 0 ? `${baseUrl}?retry=${retryCount}` : baseUrl;
+    }
+    const sep = nft.image.includes("?") ? "&" : "?";
+    return retryCount > 0 ? `${nft.image}${sep}retry=${retryCount}` : nft.image;
+  }, [nft.image, ipfsHash, gatewayIndex, retryCount]);
+
+  const handleImageError = useCallback(() => {
+    if (ipfsHash && gatewayIndex < IPFS_GATEWAYS.length - 1) {
+      setGatewayIndex((p) => p + 1);
+      setImgLoaded(false);
+    } else {
+      setImgError(true);
+    }
+  }, [ipfsHash, gatewayIndex]);
+
+  // Timeout fallback - try next gateway after 10s
+  useEffect(() => {
+    if (!hasValidImage || imgError || imgLoaded) return;
+    const t = setTimeout(() => {
+      if (!imgLoaded && !imgError) handleImageError();
+    }, 10000);
+    return () => clearTimeout(t);
+  }, [hasValidImage, imgError, imgLoaded, currentImageUrl, handleImageError]);
+
+  const handleRetry = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setImgError(false);
+    setImgLoaded(false);
+    setGatewayIndex(0);
+    setRetryCount((p) => p + 1);
+  };
+
+  const showErrorState = !hasValidImage || imgError;
+
+  const card = (
+    <button
+      onClick={onToggle}
+      className={cn(
+        "group relative rounded-md overflow-hidden border-2 transition-all aspect-square",
+        isStakedElsewhere && "opacity-70",
+        isSelected
+          ? "border-primary ring-1 ring-primary"
+          : isStakedElsewhere
+          ? "border-amber-500/50"
+          : "border-transparent hover:border-muted-foreground/30"
+      )}
+    >
+      {isStakedElsewhere && (
+        <div className="absolute top-1 left-1 z-10">
+          <AlertTriangle className="h-3 w-3 text-amber-500" />
+        </div>
+      )}
+      {isSelected && (
+        <div className="absolute top-1 right-1 z-10 rounded-full p-0.5 bg-primary">
+          <Check className="h-3 w-3 text-primary-foreground" />
+        </div>
+      )}
+      <div className="absolute inset-0 bg-muted flex items-center justify-center">
+        {showErrorState ? (
+          <button
+            type="button"
+            className="w-full h-full flex flex-col items-center justify-center bg-muted/50 cursor-pointer hover:bg-muted/80 transition-colors z-20"
+            onClick={handleRetry}
+            title="Click to retry loading image"
+          >
+            <ImageIcon className="h-5 w-5 text-primary mb-1" />
+            <span className="text-[9px] text-primary font-medium">Retry</span>
+            <span className="text-[8px] text-muted-foreground mt-0.5">#{nft.asset_id}</span>
+          </button>
+        ) : (
+          <>
+            {!imgLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
+              </div>
+            )}
+            <img
+              src={currentImageUrl}
+              alt={nft.name}
+              className={cn(
+                "w-full h-full object-contain transition-opacity",
+                imgLoaded ? "opacity-100" : "opacity-0"
+              )}
+              loading="lazy"
+              onError={handleImageError}
+              onLoad={(e) => {
+                const t = e.target as HTMLImageElement;
+                if (t.naturalWidth === 0) handleImageError();
+                else setImgLoaded(true);
+              }}
+            />
+          </>
+        )}
+      </div>
+      <div className="absolute bottom-0 left-0 right-0 px-0.5 py-0.5 bg-background/90">
+        <p className="text-[8px] font-medium truncate leading-tight">{nft.name}</p>
+        {isStakedElsewhere ? (
+          <p className="text-[7px] text-amber-500 truncate leading-tight">in: {stakedInFarm}</p>
+        ) : (
+          <p className="text-[7px] text-muted-foreground truncate leading-tight">#{nft.asset_id}</p>
+        )}
+      </div>
+    </button>
+  );
+
+  if (isStakedElsewhere) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>{card}</TooltipTrigger>
+          <TooltipContent side="top" className="max-w-[200px]">
+            <p className="text-xs">
+              <AlertTriangle className="h-3 w-3 inline mr-1 text-amber-500" />
+              Already staked in <span className="font-semibold">{stakedInFarm}</span>.
+              Unstake there first.
+            </p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+  return card;
+}
+
+// ── Main Component ──
 
 export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
   const { accountName, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState("unstaked");
-  const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [txLoading, setTxLoading] = useState(false);
+  const [selectedToStake, setSelectedToStake] = useState<Set<string>>(new Set());
+  const [selectedToUnstake, setSelectedToUnstake] = useState<Set<string>>(new Set());
+  const [isStaking, setIsStaking] = useState(false);
+  const [isUnstaking, setIsUnstaking] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const [stakedNFTs, setStakedNFTs] = useState<DisplayNFT[]>([]);
-  const [rawStakes, setRawStakes] = useState<UserStake[]>([]);
-  const [unstakedNFTs, setUnstakedNFTs] = useState<DisplayNFT[]>([]);
-  const [selectedUnstaked, setSelectedUnstaked] = useState<Set<string>>(new Set());
-  const [selectedStaked, setSelectedStaked] = useState<Set<string>>(new Set());
-  const [globalStakes, setGlobalStakes] = useState<GlobalStakeInfo[]>([]);
+  const stakeParentRef = useRef<HTMLDivElement>(null);
+  const unstakeParentRef = useRef<HTMLDivElement>(null);
 
-  // Live reward state
+  // ── Stakable config ──
+  const { data: stakableConfig } = useQuery({
+    queryKey: ["farmStakableConfig", farm.farm_name],
+    queryFn: () => fetchFarmStakableConfig(farm.farm_name),
+    staleTime: 60000,
+  });
+
+  // ── Global stakes (cross-farm conflict detection) ──
+  const { data: globalStakes = [], refetch: refetchGlobalStakes } = useQuery({
+    queryKey: ["userGlobalStakes", accountName],
+    queryFn: () => fetchUserGlobalStakes(accountName!),
+    enabled: !!accountName,
+    staleTime: 30000,
+  });
+
+  const globallyStakedMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const stake of globalStakes) {
+      if (stake.farmName !== farm.farm_name) {
+        for (const assetId of stake.assetIds) {
+          map.set(assetId, stake.farmName);
+        }
+      }
+    }
+    return map;
+  }, [globalStakes, farm.farm_name]);
+
+  // ── Staked NFTs ──
+  const { data: stakedNfts = [], isLoading: isLoadingStaked, refetch: refetchStaked } = useQuery({
+    queryKey: ["userStakes", accountName, farm.farm_name],
+    queryFn: () => fetchUserStakes(accountName!, farm.farm_name),
+    enabled: !!accountName,
+    staleTime: 30000,
+  });
+
+  // ── Live reward calculation ──
   const [liveRewards, setLiveRewards] = useState<PendingReward[]>([]);
   const [pendingNextPayout, setPendingNextPayout] = useState<PendingReward[]>([]);
   const [nextPayoutIn, setNextPayoutIn] = useState<number>(0);
 
-  const parentRef = useRef<HTMLDivElement>(null);
-
-  // Extract staker data for live reward calculation
   const stakerData = useMemo(() => {
-    if (!rawStakes.length) return null;
-    const firstStake = rawStakes[0];
+    if (!stakedNfts.length) return null;
+    const first = stakedNfts[0] as UserStake;
     return {
-      claimableBalances: firstStake.claimable_balances || [],
-      ratesPerHour: firstStake.rates_per_hour || [],
-      lastStateChange: firstStake.last_state_change || 0,
+      claimableBalances: first.claimable_balances || [],
+      ratesPerHour: first.rates_per_hour || [],
+      lastStateChange: first.last_state_change || 0,
     };
-  }, [rawStakes]);
+  }, [stakedNfts]);
 
-  // Dynamic reward calculation based on completed payout periods
   useEffect(() => {
     if (!stakerData || !stakerData.claimableBalances.length) {
       setLiveRewards([]);
@@ -86,242 +306,466 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
       return;
     }
 
-    const calculateLiveRewards = () => {
+    const calc = () => {
       const now = Math.floor(Date.now() / 1000);
-      const payoutInterval = farm.payout_interval || 3600;
-
-      // Cap at farm expiration
+      const interval = farm.payout_interval || 3600;
       const isExpired = farm.expiration > 1 && now > farm.expiration;
       const effectiveNow = isExpired ? farm.expiration : now;
 
-      const userLastStateChange = stakerData.lastStateChange || effectiveNow;
-      const timeSinceUserStateChange = Math.max(0, effectiveNow - userLastStateChange);
-      const completedPeriods = Math.floor(timeSinceUserStateChange / payoutInterval);
-      const claimableHours = (completedPeriods * payoutInterval) / 3600;
+      const userLast = stakerData.lastStateChange || effectiveNow;
+      const elapsed = Math.max(0, effectiveNow - userLast);
+      const periods = Math.floor(elapsed / interval);
+      const claimableHours = (periods * interval) / 3600;
 
       if (isExpired) {
         setNextPayoutIn(0);
       } else {
-        const elapsedInCurrentPeriod = timeSinceUserStateChange % payoutInterval;
-        const secondsUntilNextPayout = payoutInterval - elapsedInCurrentPeriod;
-        setNextPayoutIn(secondsUntilNextPayout);
+        const inPeriod = elapsed % interval;
+        setNextPayoutIn(interval - inPeriod);
       }
 
-      // Calculate claimable rewards
-      const claimable = stakerData.claimableBalances.map((balance) => {
-        const balanceParts = balance.quantity.split(" ");
-        const baseAmount = parseFloat(balanceParts[0]) || 0;
-        const symbol = balanceParts[1] || "";
-        const precision = balanceParts[0].includes(".") ? balanceParts[0].split(".")[1]?.length || 0 : 0;
-        const contract = balance.contract || "";
-
-        const rate = stakerData.ratesPerHour.find(r => r.quantity.includes(symbol));
-        const rateAmount = rate ? parseFloat(rate.quantity.split(" ")[0]) : 0;
-        const claimableAmount = baseAmount + (rateAmount * claimableHours);
-
-        return { symbol, amount: claimableAmount, precision, contract };
+      const claimable = stakerData.claimableBalances.map((b) => {
+        const [amtStr, symbol] = b.quantity.split(" ");
+        const base = parseFloat(amtStr) || 0;
+        const prec = amtStr.includes(".") ? amtStr.split(".")[1]?.length || 0 : 0;
+        const rate = stakerData.ratesPerHour.find((r) => r.quantity.includes(symbol));
+        const rateAmt = rate ? parseFloat(rate.quantity.split(" ")[0]) : 0;
+        return { symbol, amount: base + rateAmt * claimableHours, precision: prec, contract: b.contract };
       });
 
-      // Calculate pending rewards (one full payout period worth)
-      const pending = stakerData.ratesPerHour.map((rate) => {
-        const rateParts = rate.quantity.split(" ");
-        const rateAmount = parseFloat(rateParts[0]) || 0;
-        const symbol = rateParts[1] || "";
-        const precision = rateParts[0].includes(".") ? rateParts[0].split(".")[1]?.length || 0 : 0;
-        const contract = rate.contract || "";
-        const hoursPerPeriod = payoutInterval / 3600;
-        const pendingAmount = rateAmount * hoursPerPeriod;
-
-        return { symbol, amount: pendingAmount, precision, contract };
+      const pending = stakerData.ratesPerHour.map((r) => {
+        const [amtStr, symbol] = r.quantity.split(" ");
+        const rateAmt = parseFloat(amtStr) || 0;
+        const prec = amtStr.includes(".") ? amtStr.split(".")[1]?.length || 0 : 0;
+        const hrsPerPeriod = interval / 3600;
+        return { symbol, amount: rateAmt * hrsPerPeriod, precision: prec, contract: r.contract };
       });
 
       setLiveRewards(claimable);
       setPendingNextPayout(pending);
     };
 
-    calculateLiveRewards();
-    const interval = setInterval(calculateLiveRewards, 1000);
-    return () => clearInterval(interval);
+    calc();
+    const id = setInterval(calc, 1000);
+    return () => clearInterval(id);
   }, [stakerData, farm.payout_interval, farm.expiration]);
 
-  // Fallback to static rewards if live calculation not available
   const pendingRewards: PendingReward[] = useMemo(() => {
     if (liveRewards.length > 0) return liveRewards;
-    if (!rawStakes.length) return [];
-
-    const claimableBalances = rawStakes[0]?.claimable_balances;
-    if (!claimableBalances || !Array.isArray(claimableBalances)) return [];
-
-    return claimableBalances.map((b) => {
-      const parts = b.quantity.split(" ");
-      const amount = parseFloat(parts[0]) || 0;
-      const symbol = parts[1] || "";
-      const precision = parts[0].includes(".") ? parts[0].split(".")[1]?.length || 0 : 0;
-      return { symbol, amount, precision };
+    if (!stakedNfts.length) return [];
+    const cb = (stakedNfts[0] as UserStake).claimable_balances;
+    if (!cb?.length) return [];
+    return cb.map((b) => {
+      const [amtStr, symbol] = b.quantity.split(" ");
+      return {
+        symbol,
+        amount: parseFloat(amtStr) || 0,
+        precision: amtStr.includes(".") ? amtStr.split(".")[1]?.length || 0 : 0,
+      };
     });
-  }, [rawStakes, liveRewards]);
+  }, [stakedNfts, liveRewards]);
 
-  const totalPendingRewards = pendingRewards.reduce((acc, r) => acc + r.amount, 0);
-  const hasRewards = totalPendingRewards > 0;
+  const totalPending = pendingRewards.reduce((a, r) => a + r.amount, 0);
+  const hasRewards = totalPending > 0;
 
-  const loadData = useCallback(async () => {
-    if (!accountName) return;
-    setLoading(true);
+  // ── Eligible NFTs (blockchain-first with AtomicAssets API + template cache fallback) ──
+  const { data: eligibleNfts = [], isLoading: isLoadingEligible, refetch: refetchEligible } = useQuery({
+    queryKey: ["eligibleNfts", accountName, farm.farm_name, stakableConfig, stakedNfts],
+    queryFn: async () => {
+      if (!accountName || !stakableConfig) return [];
 
-    try {
-      const [userStakes, config, globals] = await Promise.all([
-        fetchUserStakes(accountName, farm.farm_name),
-        fetchFarmStakableConfig(farm.farm_name),
-        fetchUserGlobalStakes(accountName),
-      ]);
+      const stakedAssetIds = new Set(stakedNfts.map((s) => s.asset_id));
 
-      setRawStakes(userStakes);
-      setGlobalStakes(globals);
+      // Build eligible sets from config
+      const eligibleCollections = new Set<string>();
+      stakableConfig.collections.forEach((c) => c.collection && eligibleCollections.add(c.collection));
+      stakableConfig.schemas.forEach((s) => s.collection && eligibleCollections.add(s.collection));
+      stakableConfig.templates.forEach((t) => t.collection && eligibleCollections.add(t.collection));
+      const templateIds = new Set(stakableConfig.templates.map((t) => t.template_id).filter(Boolean));
 
-      const stakedAssetIds = new Set(userStakes.map(s => s.asset_id));
+      // STRATEGY 1: Blockchain-first – query user's on-chain assets
+      const eligibleAssetIds: string[] = [];
+      const assetMetadataMap = new Map<string, { collection: string; schema: string; template_id: number }>();
 
-      const staked: DisplayNFT[] = userStakes.map(s => ({
-        asset_id: s.asset_id,
-        name: `NFT #${s.asset_id}`,
-        image: "/placeholder.svg",
-        collection: farm.farm_name,
-        template_id: s.asset_id,
-      }));
-      setStakedNFTs(staked);
+      try {
+        let lowerBound = "";
+        let hasMore = true;
+        let iterations = 0;
 
-      // Fetch unstaked NFTs from user's wallet filtered by farm collections
-      const collections = getCollectionNames(config);
-      if (collections.length > 0) {
-        try {
-          const collectionQuery = collections.join(",");
-          const response = await fetch(
-            `https://wax.api.atomicassets.io/atomicassets/v1/assets?owner=${accountName}&collection_name=${collectionQuery}&limit=500&order=desc&sort=asset_id`
-          );
-          const data = await response.json();
+        while (hasMore && iterations < 10) {
+          const response = await waxRpcCall<{
+            rows: Array<{ asset_id: string; collection_name: string; schema_name: string; template_id: number }>;
+            more: boolean;
+            next_key: string;
+          }>("/v1/chain/get_table_rows", {
+            json: true,
+            code: "atomicassets",
+            scope: accountName,
+            table: "assets",
+            limit: 1000,
+            lower_bound: lowerBound || undefined,
+          });
 
-          if (data.success && data.data) {
-            const stakedFarmMap = new Map<string, string>();
-            for (const g of globals) {
-              for (const id of g.assetIds) {
-                if (!stakedAssetIds.has(id)) {
-                  stakedFarmMap.set(id, g.farmName);
-                }
+          if (response.rows?.length > 0) {
+            for (const asset of response.rows) {
+              const id = String(asset.asset_id);
+              if (stakedAssetIds.has(id)) continue;
+
+              let isEligible = false;
+              if (eligibleCollections.has(asset.collection_name)) isEligible = true;
+              if (stakableConfig.schemas.some((s) => s.collection === asset.collection_name && s.schema === asset.schema_name)) isEligible = true;
+              if (templateIds.has(asset.template_id)) isEligible = true;
+
+              if (isEligible) {
+                eligibleAssetIds.push(id);
+                assetMetadataMap.set(id, {
+                  collection: asset.collection_name,
+                  schema: asset.schema_name,
+                  template_id: asset.template_id,
+                });
               }
             }
 
-            const unstaked: DisplayNFT[] = data.data
-              .filter((asset: any) => !stakedAssetIds.has(String(asset.asset_id)))
-              .map((asset: any) => {
-                const immData = asset.data || asset.immutable_data || {};
-                const img = immData.img || immData.image || immData.video || "";
-                const isVideo = !!(immData.video && !immData.img);
-
-                return {
-                  asset_id: String(asset.asset_id),
-                  name: immData.name || asset.name || `#${asset.asset_id}`,
-                  image: img.startsWith("Qm") || img.startsWith("bafy") ? getIpfsUrl(img) : (img || "/placeholder.svg"),
-                  collection: asset.collection?.collection_name || "",
-                  template_id: asset.template?.template_id ? String(asset.template.template_id) : undefined,
-                  isVideo,
-                  stakedInOtherFarm: stakedFarmMap.get(String(asset.asset_id)),
-                };
-              });
-
-            setUnstakedNFTs(unstaked);
+            if (response.more && response.rows.length === 1000) {
+              const last = response.rows[response.rows.length - 1];
+              lowerBound = String(BigInt(last.asset_id) + 1n);
+            } else {
+              hasMore = false;
+            }
+          } else {
+            hasMore = false;
           }
-        } catch (e) {
-          console.error("Failed to fetch user NFTs:", e);
+          iterations++;
+        }
+
+        console.log("[NFTStaking] Found", eligibleAssetIds.length, "eligible assets on-chain");
+      } catch (err) {
+        console.error("[NFTStaking] Blockchain query failed:", err);
+      }
+
+      if (eligibleAssetIds.length === 0) return [];
+
+      // STRATEGY 2: Fetch metadata from AtomicAssets API (with multi-endpoint fallback)
+      const assets: NFTAsset[] = [];
+      const cacheBuster = `_ts=${Date.now()}`;
+      const batchSize = 50;
+
+      for (let i = 0; i < eligibleAssetIds.length; i += batchSize) {
+        const batch = eligibleAssetIds.slice(i, i + batchSize);
+        try {
+          const path = `${ATOMIC_API.paths.assets}?ids=${batch.join(",")}&${cacheBuster}`;
+          const response = await fetchWithFallback(ATOMIC_API.baseUrls, path);
+          const json = await response.json();
+
+          if (json.success && json.data) {
+            for (const asset of json.data) {
+              const media = getMediaUrl(asset.data);
+              assets.push({
+                asset_id: asset.asset_id,
+                name: asset.data?.name || asset.name || `NFT #${asset.asset_id}`,
+                image: media.url,
+                collection: asset.collection?.collection_name || "",
+                schema: asset.schema?.schema_name || "",
+                template_id: asset.template?.template_id || "",
+              });
+            }
+          }
+        } catch (err) {
+          console.error("[NFTStaking] Error fetching asset metadata:", err);
         }
       }
-    } catch (error) {
-      console.error("Error loading staking data:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [accountName, farm.farm_name]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+      // STRATEGY 3: Template cache fallback for unindexed assets
+      const fetchedIds = new Set(assets.map((a) => a.asset_id));
+      const missingIds = eligibleAssetIds.filter((id) => !fetchedIds.has(id));
 
-  const filteredUnstaked = useMemo(() => {
-    if (!search.trim()) return unstakedNFTs;
-    const q = search.toLowerCase();
-    return unstakedNFTs.filter(n =>
-      n.name.toLowerCase().includes(q) ||
-      n.collection.toLowerCase().includes(q) ||
-      n.asset_id.includes(q) ||
-      (n.template_id && n.template_id.includes(q))
+      if (missingIds.length > 0) {
+        console.log("[NFTStaking] Fetching template metadata for", missingIds.length, "unindexed assets");
+
+        const templateGroups = new Map<number, string[]>();
+        for (const id of missingIds) {
+          const meta = assetMetadataMap.get(id);
+          if (meta?.template_id) {
+            const arr = templateGroups.get(meta.template_id) || [];
+            arr.push(id);
+            templateGroups.set(meta.template_id, arr);
+          }
+        }
+
+        const templateRequests = Array.from(templateGroups.entries()).map(([tid, ids]) => ({
+          templateId: String(tid),
+          collectionName: assetMetadataMap.get(ids[0])?.collection || "",
+        }));
+
+        const templateDataMap = await batchGetOrFetch(templateRequests);
+
+        for (const [tid, ids] of templateGroups) {
+          const meta = assetMetadataMap.get(ids[0]);
+          const key = `${meta?.collection}:${tid}`;
+          const tpl = templateDataMap.get(key);
+
+          for (const id of ids) {
+            assets.push({
+              asset_id: id,
+              name: tpl?.name || `NFT #${id}`,
+              image: tpl?.image || "/placeholder.svg",
+              collection: meta?.collection || "Unknown",
+              schema: meta?.schema || "",
+              template_id: String(tid),
+            });
+          }
+        }
+
+        // Handle templateless assets
+        for (const id of missingIds) {
+          if (fetchedIds.has(id) || assets.some((a) => a.asset_id === id)) continue;
+          const meta = assetMetadataMap.get(id);
+          assets.push({
+            asset_id: id,
+            name: `NFT #${id}`,
+            image: "",
+            collection: meta?.collection || "Unknown",
+            schema: meta?.schema || "",
+            template_id: meta?.template_id ? String(meta.template_id) : "",
+          });
+        }
+      }
+
+      return assets;
+    },
+    enabled: !!accountName && !!stakableConfig,
+    staleTime: 0,
+    gcTime: 0,
+  });
+
+  // ── Staked NFT details (AtomicAssets API + blockchain RPC + template cache fallback) ──
+  const { data: stakedNftDetails = [], isLoading: isLoadingStakedDetails, refetch: refetchStakedDetails } = useQuery({
+    queryKey: ["stakedNftDetails", stakedNfts.map((s) => s.asset_id).join(","), accountName],
+    queryFn: async () => {
+      if (!stakedNfts.length || !accountName) return [];
+
+      const stakedAssetIds = stakedNfts.map((s) => s.asset_id);
+      const assets: NFTAsset[] = [];
+
+      // Try AtomicAssets API first (with fallback)
+      const params = new URLSearchParams({ ids: stakedAssetIds.join(","), limit: "100" });
+      const path = `${ATOMIC_API.paths.assets}?${params.toString()}`;
+
+      try {
+        const response = await fetchWithFallback(ATOMIC_API.baseUrls, path);
+        const json = await response.json();
+
+        if (json.success && json.data) {
+          for (const asset of json.data) {
+            const media = getMediaUrl(asset.data);
+            assets.push({
+              asset_id: asset.asset_id,
+              name: asset.data?.name || asset.name || `NFT #${asset.asset_id}`,
+              image: media.url,
+              collection: asset.collection?.collection_name || "",
+              schema: asset.schema?.schema_name || "",
+              template_id: asset.template?.template_id || "",
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching staked NFT details:", err);
+      }
+
+      // Fallback: fetch missing assets from blockchain RPC + template cache
+      const fetchedIds = new Set(assets.map((a) => a.asset_id));
+      const missingIds = stakedAssetIds.filter((id) => !fetchedIds.has(id));
+
+      if (missingIds.length > 0) {
+        console.log("[NFTStaking] Missing staked assets from API:", missingIds.length);
+
+        const metaMap = new Map<string, { template_id: number; collection: string; schema: string }>();
+
+        // Query user's on-chain assets for metadata
+        try {
+          const result = await waxRpcCall<{
+            rows: Array<{ asset_id: string; collection_name: string; schema_name: string; template_id: number }>;
+          }>("/v1/chain/get_table_rows", {
+            json: true,
+            code: "atomicassets",
+            scope: accountName,
+            table: "assets",
+            limit: 1000,
+          });
+
+          if (result.rows?.length > 0) {
+            for (const row of result.rows) {
+              const id = String(row.asset_id);
+              if (missingIds.includes(id)) {
+                metaMap.set(id, {
+                  template_id: row.template_id || 0,
+                  collection: row.collection_name || "",
+                  schema: row.schema_name || "",
+                });
+              }
+            }
+          }
+        } catch {
+          console.error("[NFTStaking] Blockchain RPC fallback failed for staked assets");
+        }
+
+        // Template cache batch fetch
+        const templateGroups = new Map<number, string[]>();
+        for (const id of missingIds) {
+          const meta = metaMap.get(id);
+          if (meta?.template_id && meta.template_id > 0) {
+            const arr = templateGroups.get(meta.template_id) || [];
+            arr.push(id);
+            templateGroups.set(meta.template_id, arr);
+          }
+        }
+
+        const templateRequests = Array.from(templateGroups.entries()).map(([tid, ids]) => ({
+          templateId: String(tid),
+          collectionName: metaMap.get(ids[0])?.collection || "",
+        }));
+
+        const templateDataMap = await batchGetOrFetch(templateRequests);
+
+        for (const [tid, ids] of templateGroups) {
+          const meta = metaMap.get(ids[0]);
+          const key = `${meta?.collection}:${tid}`;
+          const tpl = templateDataMap.get(key);
+          for (const id of ids) {
+            assets.push({
+              asset_id: id,
+              name: tpl?.name || `NFT #${id}`,
+              image: tpl?.image || "/placeholder.svg",
+              collection: meta?.collection || "Unknown",
+              schema: meta?.schema || "",
+              template_id: String(tid),
+            });
+          }
+        }
+
+        // Remaining assets without template data
+        const processedIds = new Set(assets.map((a) => a.asset_id));
+        for (const id of missingIds) {
+          if (processedIds.has(id)) continue;
+          const meta = metaMap.get(id);
+          assets.push({
+            asset_id: id,
+            name: `NFT #${id}`,
+            image: "",
+            collection: meta?.collection || "Unknown",
+            schema: meta?.schema || "",
+            template_id: meta?.template_id ? String(meta.template_id) : "",
+          });
+        }
+      }
+
+      return assets;
+    },
+    enabled: stakedNfts.length > 0 && !!accountName,
+    staleTime: 0,
+    gcTime: 0,
+  });
+
+  // ── Filter by search ──
+  const filteredEligible = useMemo(() => {
+    if (!searchQuery.trim()) return eligibleNfts;
+    const q = searchQuery.toLowerCase();
+    return eligibleNfts.filter(
+      (n) =>
+        n.name.toLowerCase().includes(q) ||
+        n.collection.toLowerCase().includes(q) ||
+        n.asset_id.includes(q) ||
+        n.template_id.includes(q)
     );
-  }, [unstakedNFTs, search]);
+  }, [eligibleNfts, searchQuery]);
 
   const filteredStaked = useMemo(() => {
-    if (!search.trim()) return stakedNFTs;
-    const q = search.toLowerCase();
-    return stakedNFTs.filter(n =>
-      n.name.toLowerCase().includes(q) ||
-      n.asset_id.includes(q)
+    if (!searchQuery.trim()) return stakedNftDetails;
+    const q = searchQuery.toLowerCase();
+    return stakedNftDetails.filter(
+      (n) =>
+        n.name.toLowerCase().includes(q) ||
+        n.collection.toLowerCase().includes(q) ||
+        n.asset_id.includes(q)
     );
-  }, [stakedNFTs, search]);
+  }, [stakedNftDetails, searchQuery]);
 
-  const toggleUnstaked = (id: string) => {
-    setSelectedUnstaked(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-
-  const toggleStaked = (id: string) => {
-    setSelectedStaked(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-
-  const selectAllUnstaked = () => {
-    if (selectedUnstaked.size === filteredUnstaked.filter(n => !n.stakedInOtherFarm).length && filteredUnstaked.length > 0) {
-      setSelectedUnstaked(new Set());
+  // ── Bulk select ──
+  const selectAllEligible = () => {
+    const stakeable = filteredEligible.filter((n) => !globallyStakedMap.has(n.asset_id));
+    if (selectedToStake.size === stakeable.length && stakeable.length > 0) {
+      setSelectedToStake(new Set());
     } else {
-      setSelectedUnstaked(new Set(filteredUnstaked.filter(n => !n.stakedInOtherFarm).map(n => n.asset_id)));
+      setSelectedToStake(new Set(stakeable.map((n) => n.asset_id)));
     }
   };
 
   const selectAllStaked = () => {
-    if (selectedStaked.size === filteredStaked.length && filteredStaked.length > 0) {
-      setSelectedStaked(new Set());
+    if (selectedToUnstake.size === filteredStaked.length && filteredStaked.length > 0) {
+      setSelectedToUnstake(new Set());
     } else {
-      setSelectedStaked(new Set(filteredStaked.map(n => n.asset_id)));
+      setSelectedToUnstake(new Set(filteredStaked.map((n) => n.asset_id)));
     }
   };
 
+  const toggleStake = (id: string) =>
+    setSelectedToStake((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const toggleUnstake = (id: string) =>
+    setSelectedToUnstake((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  // ── Actions ──
+  const refetchAll = async () => {
+    await new Promise((r) => setTimeout(r, 1000));
+    await Promise.all([refetchStaked(), refetchEligible(), refetchStakedDetails(), refetchGlobalStakes()]);
+  };
+
   const handleStake = async () => {
-    if (!accountName || selectedUnstaked.size === 0) return;
-    setTxLoading(true);
+    if (!accountName || selectedToStake.size === 0) return;
+    setIsStaking(true);
     try {
-      const ids = Array.from(selectedUnstaked);
+      const ids = Array.from(selectedToStake).filter((id) => !globallyStakedMap.has(id));
+      if (ids.length === 0) return;
       const action = buildStakeNftsAction(accountName, farm.farm_name, ids);
       const result = await executeTransaction([action], {
         successTitle: "NFTs Staked! 🌱",
         successDescription: `Staked ${ids.length} NFT(s)`,
       });
       if (result.success) {
-        setSelectedUnstaked(new Set());
-        await loadData();
+        setSelectedToStake(new Set());
+        queryClient.invalidateQueries({ queryKey: ["farmDetail", farm.farm_name] });
+        await refetchAll();
         onRefresh();
       }
+    } catch (err) {
+      console.error("Stake failed:", err);
+      const errMsg = err instanceof Error ? err.message : "Failed to stake NFTs";
+      const isInsufficient = /needs\s+\d+.*but\s+has\s+\d+/i.test(errMsg);
+      toast({
+        title: "Staking Failed",
+        description: isInsufficient
+          ? "Not enough rewards in the pool to support this NFT's earning power."
+          : errMsg,
+        variant: "destructive",
+      });
     } finally {
-      setTxLoading(false);
+      setIsStaking(false);
     }
   };
 
   const handleUnstake = async () => {
-    if (!accountName || selectedStaked.size === 0) return;
-    setTxLoading(true);
+    if (!accountName || selectedToUnstake.size === 0) return;
+    setIsUnstaking(true);
     try {
-      const ids = Array.from(selectedStaked);
-      // Claim rewards before unstaking (like the reference)
+      const ids = Array.from(selectedToUnstake);
       const claimAction = buildClaimRewardsAction(accountName, farm.farm_name);
       const unstakeAction = buildUnstakeNftsAction(accountName, farm.farm_name, ids);
       const result = await executeTransaction([claimAction, unstakeAction], {
@@ -329,12 +773,20 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
         successDescription: `Claimed rewards and unstaked ${ids.length} NFT(s)`,
       });
       if (result.success) {
-        setSelectedStaked(new Set());
-        await loadData();
+        setSelectedToUnstake(new Set());
+        queryClient.invalidateQueries({ queryKey: ["farmDetail", farm.farm_name] });
+        await refetchAll();
         onRefresh();
       }
+    } catch (err) {
+      console.error("Unstake failed:", err);
+      toast({
+        title: "Unstaking Failed",
+        description: err instanceof Error ? err.message : "Failed to unstake NFTs",
+        variant: "destructive",
+      });
     } finally {
-      setTxLoading(false);
+      setIsUnstaking(false);
     }
   };
 
@@ -345,21 +797,21 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
       const action = buildClaimRewardsAction(accountName, farm.farm_name);
       const result = await executeTransaction([action], {
         successTitle: "Rewards Claimed! 💰",
-        successDescription: `Successfully claimed rewards from ${farm.farm_name}`,
+        successDescription: `Successfully claimed from ${farm.farm_name}`,
       });
       if (result.success) {
-        await loadData();
+        await refetchStaked();
         onRefresh();
       }
-    } catch (error) {
-      console.error("Claim failed:", error);
-      const errorMsg = error instanceof Error ? error.message : "Failed to claim rewards";
-      const isOverdrawn = errorMsg.toLowerCase().includes("overdrawn");
+    } catch (err) {
+      console.error("Claim failed:", err);
+      const errMsg = err instanceof Error ? err.message : "Failed to claim rewards";
+      const isOverdrawn = errMsg.toLowerCase().includes("overdrawn");
       toast({
         title: isOverdrawn ? "Insufficient Reward Pool" : "Claim Failed",
         description: isOverdrawn
-          ? "The reward pool does not have enough tokens to cover your claim. Please ask the farm owner to deposit more rewards."
-          : errorMsg,
+          ? "The reward pool doesn't have enough tokens. Ask the farm owner to deposit more."
+          : errMsg,
         variant: "destructive",
       });
     } finally {
@@ -367,12 +819,25 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
     }
   };
 
-  const NFTGrid = ({ items, selected, onToggle }: { items: DisplayNFT[]; selected: Set<string>; onToggle: (id: string) => void }) => {
-    const COLS = 6;
-    const ROW_HEIGHT = 180;
-    const rowCount = Math.ceil(items.length / COLS);
+  // ── Virtualized grid ──
+  const COLS = 6;
+  const ROW_HEIGHT = 120;
 
-    const rowVirtualizer = useVirtualizer({
+  function VirtualGrid({
+    items,
+    selected,
+    onToggle,
+    parentRef,
+    type,
+  }: {
+    items: NFTAsset[];
+    selected: Set<string>;
+    onToggle: (id: string) => void;
+    parentRef: React.RefObject<HTMLDivElement>;
+    type: "stake" | "unstake";
+  }) {
+    const rowCount = Math.ceil(items.length / COLS);
+    const virtualizer = useVirtualizer({
       count: rowCount,
       getScrollElement: () => parentRef.current,
       estimateSize: () => ROW_HEIGHT,
@@ -380,58 +845,28 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
     });
 
     return (
-      <div ref={parentRef} className="h-[500px] overflow-auto">
-        <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: "relative" }}>
-          {rowVirtualizer.getVirtualItems().map(virtualRow => {
-            const startIdx = virtualRow.index * COLS;
-            const rowItems = items.slice(startIdx, startIdx + COLS);
-
+      <div ref={parentRef} className="h-[420px] overflow-auto">
+        <div style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}>
+          {virtualizer.getVirtualItems().map((vRow) => {
+            const start = vRow.index * COLS;
+            const rowItems = items.slice(start, start + COLS);
             return (
               <div
-                key={virtualRow.key}
-                className="absolute top-0 left-0 w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 px-1"
+                key={vRow.key}
+                className="absolute top-0 left-0 w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-1.5 px-1"
                 style={{
-                  height: `${virtualRow.size}px`,
-                  transform: `translateY(${virtualRow.start}px)`,
+                  height: `${vRow.size}px`,
+                  transform: `translateY(${vRow.start}px)`,
                 }}
               >
-                {rowItems.map(nft => (
-                  <div
+                {rowItems.map((nft) => (
+                  <NFTCard
                     key={nft.asset_id}
-                    className={`relative rounded-lg border p-1.5 cursor-pointer transition-all ${
-                      selected.has(nft.asset_id)
-                        ? "border-primary bg-primary/10 ring-1 ring-primary/30"
-                        : nft.stakedInOtherFarm
-                        ? "border-orange-500/30 bg-orange-500/5 opacity-60"
-                        : "border-border/50 hover:border-primary/30"
-                    }`}
-                    onClick={() => !nft.stakedInOtherFarm && onToggle(nft.asset_id)}
-                  >
-                    {nft.stakedInOtherFarm && (
-                      <div className="absolute top-0 left-0 right-0 bg-orange-500/80 text-[8px] text-foreground text-center px-1 rounded-t-md z-10">
-                        In {nft.stakedInOtherFarm}
-                      </div>
-                    )}
-                    <div className="absolute top-1 right-1 z-10">
-                      {selected.has(nft.asset_id) ? (
-                        <CheckSquare className="h-4 w-4 text-primary" />
-                      ) : (
-                        <Square className="h-4 w-4 text-muted-foreground/30" />
-                      )}
-                    </div>
-                    {nft.isVideo ? (
-                      <video src={nft.image} className="w-full aspect-square object-contain rounded bg-muted/30" muted autoPlay loop />
-                    ) : (
-                      <img
-                        src={nft.image}
-                        alt={nft.name}
-                        className="w-full aspect-square object-contain rounded bg-muted/30"
-                        loading="lazy"
-                        onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
-                      />
-                    )}
-                    <p className="text-[10px] text-center truncate mt-1">{nft.name}</p>
-                  </div>
+                    nft={nft}
+                    isSelected={selected.has(nft.asset_id)}
+                    onToggle={() => onToggle(nft.asset_id)}
+                    stakedInFarm={type === "stake" ? globallyStakedMap.get(nft.asset_id) : undefined}
+                  />
                 ))}
               </div>
             );
@@ -439,12 +874,13 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
         </div>
       </div>
     );
-  };
+  }
 
   const now = Math.floor(Date.now() / 1000);
   const isExpired = farm.expiration > 1 && now > farm.expiration;
+  const isLoadingAny = isLoadingStaked || isLoadingEligible || isLoadingStakedDetails;
 
-  if (loading) {
+  if (isLoadingAny && !eligibleNfts.length && !stakedNftDetails.length) {
     return (
       <Card className="bg-card/80 border-border/50">
         <CardContent className="p-6">
@@ -463,109 +899,129 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
       {/* NFT Staking Card */}
       <Card className="bg-card/80 border-border/50">
         <CardHeader>
-          <div className="flex items-center justify-between flex-wrap gap-3">
+          <CardTitle className="text-lg flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-2">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Layers className="h-5 w-5 text-primary" />
-                NFT Staking
-              </CardTitle>
-              {stakedNFTs.length > 0 && (
-                <Badge variant="outline" className="text-xs font-normal">
-                  {stakedNFTs.length} NFT{stakedNFTs.length !== 1 ? 's' : ''} staked
+              <Layers className="h-5 w-5 text-primary" />
+              NFT Staking
+              {stakedNfts.length > 0 && (
+                <Badge variant="outline" className="text-xs font-normal ml-1">
+                  {stakedNfts.length} NFT{stakedNfts.length !== 1 ? "s" : ""} staked
                 </Badge>
               )}
             </div>
             <Button
               size="sm"
               variant="outline"
-              onClick={() => loadData()}
-              disabled={loading}
+              onClick={() => refetchAll()}
+              disabled={isLoadingAny}
               className="gap-2"
             >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              {loading ? "Refreshing..." : "Refresh"}
+              <RefreshCw className={`h-4 w-4 ${isLoadingAny ? "animate-spin" : ""}`} />
+              {isLoadingAny ? "Refreshing..." : "Refresh"}
             </Button>
-          </div>
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search by name, collection, or template ID..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
             />
           </div>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs defaultValue="unstaked">
             <TabsList className="grid grid-cols-2 w-full max-w-xs">
-              <TabsTrigger value="unstaked">
-                Unstaked ({unstakedNFTs.length})
-              </TabsTrigger>
-              <TabsTrigger value="staked">
-                Staked ({stakedNFTs.length})
-              </TabsTrigger>
+              <TabsTrigger value="unstaked">Unstaked ({eligibleNfts.length})</TabsTrigger>
+              <TabsTrigger value="staked">Staked ({stakedNfts.length})</TabsTrigger>
             </TabsList>
 
             <TabsContent value="unstaked" className="mt-4 space-y-3">
               <div className="flex items-center justify-between">
-                <Button variant="ghost" size="sm" onClick={selectAllUnstaked}>
-                  {selectedUnstaked.size === filteredUnstaked.filter(n => !n.stakedInOtherFarm).length && filteredUnstaked.length > 0
+                <Button variant="ghost" size="sm" onClick={selectAllEligible}>
+                  {selectedToStake.size === filteredEligible.filter((n) => !globallyStakedMap.has(n.asset_id)).length &&
+                  filteredEligible.length > 0
                     ? "Deselect All"
                     : "Select All"}
                 </Button>
                 <Button
                   onClick={handleStake}
-                  disabled={txLoading || selectedUnstaked.size === 0 || isExpired}
+                  disabled={isStaking || selectedToStake.size === 0 || isExpired}
                   size="sm"
                   className="bg-primary text-primary-foreground"
                 >
-                  {txLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                  Stake Selected ({selectedUnstaked.size})
+                  {isStaking && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                  Stake Selected ({selectedToStake.size})
                 </Button>
               </div>
 
-              {filteredUnstaked.length === 0 ? (
+              {isLoadingEligible ? (
+                <div className="grid grid-cols-6 gap-2">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="aspect-square rounded-lg" />
+                  ))}
+                </div>
+              ) : filteredEligible.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-muted-foreground text-sm">No eligible NFTs found in your wallet</p>
                 </div>
               ) : (
-                <NFTGrid items={filteredUnstaked} selected={selectedUnstaked} onToggle={toggleUnstaked} />
+                <VirtualGrid
+                  items={filteredEligible}
+                  selected={selectedToStake}
+                  onToggle={toggleStake}
+                  parentRef={stakeParentRef as React.RefObject<HTMLDivElement>}
+                  type="stake"
+                />
               )}
             </TabsContent>
 
             <TabsContent value="staked" className="mt-4 space-y-3">
               <div className="flex items-center justify-between">
                 <Button variant="ghost" size="sm" onClick={selectAllStaked}>
-                  {selectedStaked.size === filteredStaked.length && filteredStaked.length > 0 ? "Deselect All" : "Select All"}
+                  {selectedToUnstake.size === filteredStaked.length && filteredStaked.length > 0
+                    ? "Deselect All"
+                    : "Select All"}
                 </Button>
                 <Button
                   onClick={handleUnstake}
-                  disabled={txLoading || selectedStaked.size === 0}
+                  disabled={isUnstaking || selectedToUnstake.size === 0}
                   size="sm"
                   variant="outline"
                 >
-                  {txLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                  Unstake Selected ({selectedStaked.size})
+                  {isUnstaking && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+                  Unstake Selected ({selectedToUnstake.size})
                 </Button>
               </div>
 
-              {filteredStaked.length === 0 ? (
+              {isLoadingStakedDetails ? (
+                <div className="grid grid-cols-6 gap-2">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Skeleton key={i} className="aspect-square rounded-lg" />
+                  ))}
+                </div>
+              ) : filteredStaked.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-muted-foreground text-sm">You have no NFTs staked in this farm</p>
                 </div>
               ) : (
-                <NFTGrid items={filteredStaked} selected={selectedStaked} onToggle={toggleStaked} />
+                <VirtualGrid
+                  items={filteredStaked}
+                  selected={selectedToUnstake}
+                  onToggle={toggleUnstake}
+                  parentRef={unstakeParentRef as React.RefObject<HTMLDivElement>}
+                  type="unstake"
+                />
               )}
             </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
 
-      {/* Rewards Card - shown when user has staked NFTs */}
-      {stakedNFTs.length > 0 && (
+      {/* Rewards Card */}
+      {stakedNfts.length > 0 && (
         <Card className="bg-card/80 border-border/50">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
@@ -574,29 +1030,26 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {/* Expiration warning */}
             {isExpired && (
               <Alert className="mb-4 border-destructive/50 bg-destructive/10">
                 <AlertTriangle className="h-4 w-4 text-destructive" />
                 <AlertDescription className="text-sm text-destructive">
-                  This farm has expired. Rewards are no longer accruing. Speak to the farm owner about opening it again and claim any remaining rewards.
+                  This farm has expired. Rewards are no longer accruing. Claim any remaining rewards.
                 </AlertDescription>
               </Alert>
             )}
 
-            {/* 2-column rewards grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-              {/* Pending */}
               <div className="rounded-lg border border-border/50 bg-background/50 p-3">
                 <p className="text-xs text-muted-foreground mb-2 font-medium">
                   Pending
                   {nextPayoutIn > 0 && (
                     <span className="text-muted-foreground/70 ml-1">
-                      (in {Math.floor(nextPayoutIn / 60)}:{(nextPayoutIn % 60).toString().padStart(2, '0')})
+                      (in {Math.floor(nextPayoutIn / 60)}:{(nextPayoutIn % 60).toString().padStart(2, "0")})
                     </span>
                   )}
                 </p>
-                {pendingNextPayout.length > 0 && pendingNextPayout.some(r => r.amount > 0) ? (
+                {pendingNextPayout.length > 0 && pendingNextPayout.some((r) => r.amount > 0) ? (
                   <div className="space-y-1.5">
                     {pendingNextPayout.map((reward, i) => (
                       <div key={i} className="flex items-center gap-2">
@@ -619,7 +1072,6 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
                 )}
               </div>
 
-              {/* Claimable Now */}
               <div className="rounded-lg border border-border/50 bg-background/50 p-3">
                 <p className="text-xs text-muted-foreground mb-2 font-medium">Claimable Now</p>
                 {pendingRewards.length > 0 && hasRewards ? (
@@ -646,18 +1098,13 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
               </div>
             </div>
 
-            {/* Claim button */}
             <div className="flex justify-center">
               <Button
                 onClick={handleClaim}
                 disabled={isClaiming || !hasRewards}
                 className="w-full sm:w-1/2 bg-primary hover:bg-primary/90 text-primary-foreground"
               >
-                {isClaiming ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Coins className="h-4 w-4 mr-2" />
-                )}
+                {isClaiming ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Coins className="h-4 w-4 mr-2" />}
                 Claim Rewards
               </Button>
             </div>
