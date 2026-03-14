@@ -238,7 +238,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
           <div className="flex h-[calc(85vh-52px)] min-h-[500px]">
             {/* Sidebar */}
             <div className="w-[180px] shrink-0 border-r border-border flex flex-col">
-              <nav className="flex-1 py-2 space-y-0.5">
+              <nav className="flex-1 py-2 space-y-1.5">
                 {topItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = activeSection === item.id;
