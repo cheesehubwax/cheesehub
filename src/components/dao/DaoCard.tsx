@@ -72,7 +72,7 @@ export function DaoCard({ dao, onClick }: DaoCardProps) {
           {dao.token_symbol && <Badge variant="outline" className="text-xs">{dao.token_symbol}</Badge>}
         </div>
 
-        <Button size="sm" variant="outline" className="w-full" onClick={onClick}>
+        <Button size="sm" className="w-full bg-primary text-primary-foreground hover:bg-primary/90" onClick={onClick}>
           View DAO
         </Button>
       </CardContent>
