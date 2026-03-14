@@ -124,7 +124,7 @@ export function BannerDisplay() {
       )}
       <Link
         to="/bannerads"
-        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-cheese transition-colors"
+        className="flex items-center gap-1 text-xs text-cheese hover:text-cheese transition-colors"
       >
         <Megaphone className="h-3 w-3" />
         Advertise with CHEESEHub
