@@ -251,7 +251,14 @@ interface VirtualGridProps {
   globallyStakedMap?: Map<string, string>;
 }
 
-const GRID_COLS = 6;
+// Responsive: matches grid-cols-3 sm:grid-cols-4 md:grid-cols-6
+function getGridCols(): number {
+  if (typeof window === "undefined") return 6;
+  if (window.innerWidth < 640) return 3;
+  if (window.innerWidth < 768) return 4;
+  return 6;
+}
+
 const GRID_ROW_HEIGHT = 120;
 
 const VirtualGrid = React.memo(function VirtualGrid({
