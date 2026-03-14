@@ -249,7 +249,7 @@ export function CheeseSwapWidget({
                 {route.output && swapAmountIn && parseFloat(swapAmountIn) > 0
                   ? formatTokenAmount(
                       route.output / parseFloat(swapAmountIn),
-                      tokenOut?.precision ?? 4
+                      tokenOut?.precision ?? 8
                     )
                   : "—"}{" "}
                 {tokenOut?.ticker}
