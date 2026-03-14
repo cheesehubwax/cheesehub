@@ -199,7 +199,7 @@ export function TokenStatsBanner() {
                   </div>
                 </div>
               </PopoverTrigger>
-              <PopoverContent className="w-[620px] p-0" align="end">
+              <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[620px] max-w-[620px] p-0" align="end">
                 <div className="p-3 border-b border-border">
                   <p className="text-sm font-semibold text-foreground">Null Breakdown by Contract</p>
                 </div>

@@ -63,18 +63,18 @@ const Farm = () => {
 
       <div className="container pb-12">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="browse" className="flex items-center gap-2">
-              <Search className="h-4 w-4" />
-              Browse Farms
+          <TabsList className="grid w-full grid-cols-3 h-auto">
+            <TabsTrigger value="browse" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4">
+              <Search className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Browse</span> Farms
             </TabsTrigger>
-            <TabsTrigger value="my-farms" className="flex items-center gap-2">
-              <FolderOpen className="h-4 w-4" />
-              My Farms
+            <TabsTrigger value="my-farms" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4">
+              <FolderOpen className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">My</span> Farms
             </TabsTrigger>
-            <TabsTrigger value="create" className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Create Farm
+            <TabsTrigger value="create" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4">
+              <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
+              Create
             </TabsTrigger>
           </TabsList>
           <TabsContent value="browse" className="mt-6">

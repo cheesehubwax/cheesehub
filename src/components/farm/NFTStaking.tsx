@@ -1032,7 +1032,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
               </div>
 
               {isLoadingStakedDetails ? (
-                <div className="grid grid-cols-6 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
                   {Array.from({ length: 6 }).map((_, i) => (
                     <Skeleton key={i} className="aspect-square rounded-lg" />
                   ))}

@@ -247,7 +247,7 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
           <CardTitle className="text-lg">Farm Information</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 text-sm">
             <div>
               <p className="text-muted-foreground">Status</p>
               <Badge className={`text-xs ${status.className}`}>{status.label}</Badge>

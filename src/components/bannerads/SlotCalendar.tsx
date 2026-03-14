@@ -215,13 +215,13 @@ export function SlotCalendar() {
                     const { selectable, isJoining } = isSlotSelectable(slot);
                     const selected = isSlotSelected(slot.time, slot.position);
                     return (
-                      <div key={slot.position} className={`flex items-center justify-between rounded-lg border p-3 bg-background/50 transition-colors ${selected ? "border-cheese/60 bg-cheese/5" : "border-border/30"}`}>
-                        <div className="flex items-center gap-3">
+                      <div key={slot.position} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border p-3 bg-background/50 transition-colors ${selected ? "border-cheese/60 bg-cheese/5" : "border-border/30"}`}>
+                        <div className="flex items-center gap-2 sm:gap-3">
                           {selectable && <Checkbox checked={selected} onCheckedChange={() => toggleSlotSelection(slot.time, slot.position, isJoining)} className="data-[state=checked]:bg-cheese data-[state=checked]:border-cheese" />}
                           <span className="text-sm font-medium text-muted-foreground">Pos {slot.position}</span>
                           <SlotBadge slot={slot} accountName={accountName} />
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                           {selectable && !selected && <Button size="sm" className="bg-cheese hover:bg-cheese-dark text-primary-foreground text-xs h-7" onClick={() => setRentTarget({ time: slot.time, position: slot.position, isJoining })}>{isJoining ? "Join" : "Rent"}</Button>}
                           {isAdmin && slot.isOnChain && !slot.suspended && <Button size="sm" variant="outline" className="border-cheese/30 text-cheese text-xs h-7" onClick={() => setEditTarget(slot)}>Edit</Button>}
                           {isAdmin && slot.isOnChain && slot.user !== BANNER_CONTRACT && <Button size="sm" variant="outline" className="border-green-500/50 text-green-600 text-xs h-7 hover:bg-green-500/10" onClick={() => setPreviewTarget(slot)}><Eye className="h-3 w-3 mr-1" />Preview</Button>}
