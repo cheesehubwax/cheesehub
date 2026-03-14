@@ -1088,7 +1088,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-muted-foreground text-sm">—</p>
+                  <p className="text-foreground text-sm">—</p>
                 )}
               </div>
 
