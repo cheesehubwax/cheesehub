@@ -142,10 +142,11 @@ const NFTCard = React.memo(function NFTCard({ nft, isSelected, onToggle, stakedI
 
   const card = (
     <button
-      onClick={onToggle}
+      onClick={isStakedElsewhere ? undefined : onToggle}
+      disabled={isStakedElsewhere}
       className={cn(
         "group relative rounded-md overflow-hidden border-2 transition-all aspect-square",
-        isStakedElsewhere && "opacity-70",
+        isStakedElsewhere && "opacity-50 cursor-not-allowed grayscale-[30%]",
         isSelected
           ? "border-primary ring-1 ring-primary"
           : isStakedElsewhere
@@ -770,12 +771,14 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
     }
   };
 
-  const toggleStake = (id: string) =>
+  const toggleStake = (id: string) => {
+    if (globallyStakedMap.has(id)) return; // NFT staked elsewhere, not selectable
     setSelectedToStake((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
+  };
 
   const toggleUnstake = (id: string) =>
     setSelectedToUnstake((prev) => {
