@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreateDrip } from "@/components/drip/CreateDrip";
 import { MyDrips } from "@/components/drip/MyDrips";
 import { Droplets, List } from "lucide-react";
-import cheeseDripOrb from "@/assets/cheeseshoppe.png";
+import cheeseDripOrb from "@/assets/cheesedrop2.png";
 import { playRandomFart } from "@/lib/fartSounds";
 
 export default function Drip() {
