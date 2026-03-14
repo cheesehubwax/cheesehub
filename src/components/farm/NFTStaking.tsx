@@ -1081,7 +1081,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
                             (e.target as HTMLImageElement).src = TOKEN_LOGO_PLACEHOLDER;
                           }}
                         />
-                        <Badge variant="outline" className="text-muted-foreground border-border/50 text-xs">
+                        <Badge variant="outline" className="text-foreground border-border/50 text-xs">
                           +{reward.amount.toFixed(reward.precision)} {reward.symbol}
                         </Badge>
                       </div>
