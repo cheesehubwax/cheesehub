@@ -1061,7 +1061,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div className="rounded-lg border border-border/50 bg-background/50 p-3">
-                <p className="text-xs text-muted-foreground mb-2 font-medium">
+                <p className="text-xs text-foreground mb-2 font-medium">
                   Pending
                   {nextPayoutIn > 0 && (
                     <span className="text-muted-foreground/70 ml-1">
