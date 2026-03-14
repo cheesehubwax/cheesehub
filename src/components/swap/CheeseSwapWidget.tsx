@@ -83,7 +83,7 @@ export function CheeseSwapWidget({
     : (route?.input ? formatTokenAmount(route.input, tokenIn?.precision ?? 8) : "");
   const displayAmountOut = activeField === "out"
     ? amountOut
-    : (route?.output ? formatTokenAmount(route.output, tokenOut?.precision ?? 4) : "");
+    : (route?.output ? formatTokenAmount(route.output, tokenOut?.precision ?? 8) : "");
 
   const handleAmountInChange = (val: string) => {
     setAmountIn(val);
