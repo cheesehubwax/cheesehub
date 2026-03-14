@@ -228,7 +228,69 @@ const NFTCard = React.memo(function NFTCard({ nft, isSelected, onToggle, stakedI
     );
   }
   return card;
+});
+
+// ── Virtualized Grid (defined outside main component to avoid re-creation) ──
+
+interface VirtualGridProps {
+  items: NFTAsset[];
+  selected: Set<string>;
+  onToggle: (id: string) => void;
+  parentRef: React.RefObject<HTMLDivElement>;
+  type: "stake" | "unstake";
+  globallyStakedMap?: Map<string, string>;
 }
+
+const GRID_COLS = 6;
+const GRID_ROW_HEIGHT = 120;
+
+const VirtualGrid = React.memo(function VirtualGrid({
+  items,
+  selected,
+  onToggle,
+  parentRef,
+  type,
+  globallyStakedMap,
+}: VirtualGridProps) {
+  const rowCount = Math.ceil(items.length / GRID_COLS);
+  const virtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => GRID_ROW_HEIGHT,
+    overscan: 3,
+  });
+
+  return (
+    <div ref={parentRef} className="h-[420px] overflow-auto">
+      <div style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}>
+        {virtualizer.getVirtualItems().map((vRow) => {
+          const start = vRow.index * GRID_COLS;
+          const rowItems = items.slice(start, start + GRID_COLS);
+          return (
+            <div
+              key={vRow.key}
+              className="absolute top-0 left-0 w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-1.5 px-1"
+              style={{
+                height: `${vRow.size}px`,
+                transform: `translateY(${vRow.start}px)`,
+              }}
+            >
+              {rowItems.map((nft) => (
+                <NFTCard
+                  key={nft.asset_id}
+                  nft={nft}
+                  isSelected={selected.has(nft.asset_id)}
+                  onToggle={() => onToggle(nft.asset_id)}
+                  stakedInFarm={type === "stake" ? globallyStakedMap?.get(nft.asset_id) : undefined}
+                />
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+});
 
 // ── Main Component ──
 
