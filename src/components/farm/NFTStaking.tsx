@@ -217,11 +217,16 @@ const NFTCard = React.memo(function NFTCard({ nft, isSelected, onToggle, stakedI
     return (
       <TooltipProvider>
         <Tooltip>
-          <TooltipTrigger asChild>{card}</TooltipTrigger>
-          <TooltipContent side="top" className="max-w-[200px]">
+          <TooltipTrigger asChild>
+            <span className="inline-block w-full">{card}</span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-[220px]">
             <p className="text-xs">
               <AlertTriangle className="h-3 w-3 inline mr-1 text-amber-500" />
-              Already staked in <span className="font-semibold">{stakedInFarm}</span>.
+              Already staked in{" "}
+              <Link to={`/farm/${stakedInFarm}`} className="font-semibold text-cheese underline hover:text-cheese/80">
+                {stakedInFarm}
+              </Link>.
               Unstake there first.
             </p>
           </TooltipContent>
