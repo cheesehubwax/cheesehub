@@ -34,7 +34,8 @@ export function SwapTokenInput({
   const handlePercentClick = (pct: number) => {
     if (!balance || !onAmountChange) return;
     const val = parseFloat(balance) * (pct / 100);
-    onAmountChange(formatTokenAmount(val, token?.precision ?? 4));
+    onAmountChange(formatTokenAmount(val, decimals));
+  };
   };
 
   return (
