@@ -2,19 +2,15 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
 import {
   ArrowLeft, Loader2, Users, Vote, Plus, Settings, Coins, Image as ImageIcon,
-  ExternalLink, ChevronRight, Info, Layers, Archive, HardDrive, X,
+  ExternalLink, ChevronRight, Info, Layers, Archive, Clock, BarChart3, Tag,
 } from "lucide-react";
 import {
   fetchDaoDetails, fetchProposals, fetchDaoTreasury, fetchDaoTreasuryNFTs,
   checkDaoMembership, fetchUserStakedTokens,
   DaoInfo, Proposal, TreasuryBalance, TreasuryNFT,
-  DAO_TYPES, PROPOSER_TYPES, getIpfsUrl, StakedToken,
+  DAO_TYPES, PROPOSER_TYPES, StakedToken,
 } from "@/lib/dao";
 import { getVotesForDao, saveVote } from "@/lib/voteStorage";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
@@ -32,14 +28,10 @@ import type { UserVote } from "@/lib/voteStorage";
 type Section = "info" | "stake" | "new-proposal" | "active" | "past" | "treasury";
 
 interface DaoDetailProps {
-  dao?: DaoInfo | null;
-  daoName?: string;
-  open?: boolean;
-  onClose?: () => void;
-  pageMode?: boolean;
+  daoName: string;
+  onBack: () => void;
 }
 
-// IPFS fallback with index tracking
 function useIpfsImageSrc(hash: string | undefined) {
   const [gatewayIdx, setGatewayIdx] = useState(0);
   const src = useMemo(() => {
@@ -58,23 +50,20 @@ function useIpfsImageSrc(hash: string | undefined) {
   return { src, onError };
 }
 
-export function DaoDetail({ dao: initialDao, daoName: propDaoName, open, onClose, pageMode }: DaoDetailProps) {
+export function DaoDetail({ daoName, onBack }: DaoDetailProps) {
   const { isConnected, accountName } = useWax();
-  const resolvedDaoName = initialDao?.dao_name || propDaoName || "";
 
-  const [dao, setDao] = useState<DaoInfo | null>(initialDao || null);
+  const [dao, setDao] = useState<DaoInfo | null>(null);
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [treasury, setTreasury] = useState<TreasuryBalance[]>([]);
   const [treasuryNFTs, setTreasuryNFTs] = useState<TreasuryNFT[]>([]);
-  const [loading, setLoading] = useState(!initialDao);
+  const [loading, setLoading] = useState(true);
   const [treasuryLoaded, setTreasuryLoaded] = useState(false);
   const [isMember, setIsMember] = useState(false);
   const [stakedWeight, setStakedWeight] = useState<StakedToken | null>(null);
   const [activeSection, setActiveSection] = useState<Section>("info");
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [editCostOpen, setEditCostOpen] = useState(false);
-
-  // Vote tracking from localStorage
   const [votedProposals, setVotedProposals] = useState<Record<number, UserVote>>({});
 
   const isCreator = dao?.creator === accountName;
@@ -82,79 +71,72 @@ export function DaoDetail({ dao: initialDao, daoName: propDaoName, open, onClose
   const canEditProfile = isCreator || isAuthor;
 
   const logo = useIpfsImageSrc(dao?.logo);
+  const cover = useIpfsImageSrc(dao?.cover_image);
 
-  // Load DAO data
   const loadDao = useCallback(async () => {
-    if (!resolvedDaoName) return;
+    if (!daoName) return;
     setLoading(true);
     const [daoData, proposalData] = await Promise.all([
-      initialDao ? Promise.resolve(initialDao) : fetchDaoDetails(resolvedDaoName),
-      fetchProposals(resolvedDaoName),
+      fetchDaoDetails(daoName),
+      fetchProposals(daoName),
     ]);
     if (daoData) setDao(daoData);
     setProposals(proposalData);
     setLoading(false);
-  }, [resolvedDaoName, initialDao]);
+  }, [daoName]);
 
   useEffect(() => { loadDao(); }, [loadDao]);
 
-  // Load vote state from localStorage
   useEffect(() => {
-    if (accountName && resolvedDaoName) {
-      const localVotes = getVotesForDao(accountName, resolvedDaoName);
+    if (accountName && daoName) {
+      const localVotes = getVotesForDao(accountName, daoName);
       setVotedProposals(localVotes);
     }
-  }, [accountName, resolvedDaoName]);
+  }, [accountName, daoName]);
 
-  // Check membership
   useEffect(() => {
-    if (accountName && resolvedDaoName) {
-      checkDaoMembership(resolvedDaoName, accountName).then(setIsMember);
+    if (accountName && daoName) {
+      checkDaoMembership(daoName, accountName).then(setIsMember);
       if (dao?.dao_type === 4) {
-        fetchUserStakedTokens(resolvedDaoName, accountName).then(setStakedWeight);
+        fetchUserStakedTokens(daoName, accountName).then(setStakedWeight);
       }
     }
-  }, [accountName, resolvedDaoName, dao?.dao_type]);
+  }, [accountName, daoName, dao?.dao_type]);
 
-  // Lazy treasury loading
   useEffect(() => {
-    if (activeSection === "treasury" && !treasuryLoaded && resolvedDaoName) {
+    if (activeSection === "treasury" && !treasuryLoaded && daoName) {
       Promise.all([
-        fetchDaoTreasury(resolvedDaoName),
-        fetchDaoTreasuryNFTs(resolvedDaoName),
+        fetchDaoTreasury(daoName),
+        fetchDaoTreasuryNFTs(daoName),
       ]).then(([tokens, nfts]) => {
         setTreasury(tokens);
         setTreasuryNFTs(nfts);
         setTreasuryLoaded(true);
       });
     }
-  }, [activeSection, treasuryLoaded, resolvedDaoName]);
+  }, [activeSection, treasuryLoaded, daoName]);
 
   const refreshProposals = useCallback(() => {
-    fetchProposals(resolvedDaoName).then(setProposals);
-  }, [resolvedDaoName]);
+    fetchProposals(daoName).then(setProposals);
+  }, [daoName]);
 
   const refreshTreasury = useCallback(() => {
-    fetchDaoTreasury(resolvedDaoName).then(setTreasury);
-    fetchDaoTreasuryNFTs(resolvedDaoName).then(setTreasuryNFTs);
-  }, [resolvedDaoName]);
+    fetchDaoTreasury(daoName).then(setTreasury);
+    fetchDaoTreasuryNFTs(daoName).then(setTreasuryNFTs);
+  }, [daoName]);
 
-  // Vote handler - optimistic update + delayed refresh
   const handleVote = useCallback((proposalId: number, voteData: UserVote) => {
     if (!accountName) return;
-    saveVote(accountName, resolvedDaoName, proposalId, voteData);
+    saveVote(accountName, daoName, proposalId, voteData);
     setVotedProposals(prev => ({ ...prev, [proposalId]: voteData }));
-
-    // Delayed refresh to let blockchain settle
     setTimeout(() => {
-      fetchProposals(resolvedDaoName).then(setProposals);
+      fetchProposals(daoName).then(setProposals);
     }, 3000);
-  }, [accountName, resolvedDaoName]);
+  }, [accountName, daoName]);
 
   const activeProposals = useMemo(() => proposals.filter(p => p.status === "active"), [proposals]);
   const pastProposals = useMemo(() => proposals.filter(p => p.status !== "active"), [proposals]);
 
-  // Count unvoted active proposals
   const unvotedCount = useMemo(() => {
     if (!accountName) return 0;
     return activeProposals.filter(p => !votedProposals[p.proposal_id]).length;
@@ -166,39 +148,221 @@ export function DaoDetail({ dao: initialDao, daoName: propDaoName, open, onClose
     isMember
   );
 
-  // Sidebar menu items
   const menuItems: { key: Section; label: string; icon: React.ReactNode; badge?: number; pulse?: boolean; hidden?: boolean }[] = [
     { key: "info", label: "DAO Info", icon: <Info className="h-4 w-4" /> },
     { key: "stake", label: "Stake", icon: <Layers className="h-4 w-4" />, hidden: dao?.dao_type === 5 },
     { key: "new-proposal", label: "New Proposal", icon: <Plus className="h-4 w-4" />, hidden: !canPropose },
-    { key: "active", label: "Active", icon: <Vote className="h-4 w-4" />, badge: activeProposals.length, pulse: unvotedCount > 0 },
-    { key: "past", label: "Past", icon: <Archive className="h-4 w-4" />, badge: pastProposals.length },
+    { key: "active", label: "Active Proposals", icon: <Vote className="h-4 w-4" />, badge: activeProposals.length, pulse: unvotedCount > 0 },
+    { key: "past", label: "Past Proposals", icon: <Archive className="h-4 w-4" />, badge: pastProposals.length },
     { key: "treasury", label: "Treasury", icon: <Coins className="h-4 w-4" /> },
   ];
 
-  // Social links
-  const socialLinks = useMemo(() => [
-    { key: "twitter", icon: "𝕏", url: dao?.socials?.twitter },
-    { key: "discord", icon: "💬", url: dao?.socials?.discord },
-    { key: "telegram", icon: "✈️", url: dao?.socials?.telegram },
-    { key: "website", icon: "🌐", url: dao?.socials?.website },
-    { key: "youtube", icon: "▶️", url: dao?.socials?.youtube },
-    { key: "medium", icon: "📝", url: dao?.socials?.medium },
-  ].filter(s => s.url), [dao?.socials]);
+  const socialEntries = useMemo(() => {
+    if (!dao?.socials) return [];
+    const entries: { key: string; label: string; url: string }[] = [];
+    const s = dao.socials;
+    if (s.twitter) entries.push({ key: "twitter", label: "Twitter", url: s.twitter });
+    if (s.discord) entries.push({ key: "discord", label: "Discord", url: s.discord });
+    if (s.telegram) entries.push({ key: "telegram", label: "Telegram", url: s.telegram });
+    if (s.website) entries.push({ key: "website", label: "Website", url: s.website });
+    if ((s as any).atomichub) entries.push({ key: "atomichub", label: "AtomicHub", url: (s as any).atomichub });
+    if ((s as any).waxdao) entries.push({ key: "waxdao", label: "WaxDAO", url: (s as any).waxdao });
+    if (s.youtube) entries.push({ key: "youtube", label: "YouTube", url: s.youtube });
+    if (s.medium) entries.push({ key: "medium", label: "Medium", url: s.medium });
+    return entries;
+  }, [dao?.socials]);
 
-  // --- Content renderer ---
+  const createdDate = dao?.time_created
+    ? new Date(dao.time_created * 1000).toLocaleDateString()
+    : "Unknown";
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!dao) {
+    return (
+      <div className="text-center py-16">
+        <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+        <p className="text-muted-foreground">DAO not found</p>
+        <Button variant="ghost" onClick={onBack} className="mt-4">
+          <ArrowLeft className="h-4 w-4 mr-2" /> Back to DAOs
+        </Button>
+      </div>
+    );
+  }
+
+  const daoTypeLabel = DAO_TYPES[dao.dao_type] || "Unknown";
+
   const renderContent = () => {
-    if (!dao) return null;
-
     switch (activeSection) {
       case "info":
-        return <DaoInfoSection dao={dao} socialLinks={socialLinks} />;
+        return (
+          <div className="space-y-6">
+            {/* DAO Information header */}
+            <h3 className="text-base font-semibold flex items-center gap-2 text-foreground">
+              <Info className="h-4 w-4 text-primary" /> DAO Information
+            </h3>
+
+            {/* Stat cards row */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <Card className="bg-card/60 border-border/40">
+                <CardContent className="p-3 text-center">
+                  <BarChart3 className="h-4 w-4 text-primary mx-auto mb-1" />
+                  <p className="text-lg font-bold text-foreground">{dao.threshold}%</p>
+                  <p className="text-[11px] text-muted-foreground">Vote Threshold</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-card/60 border-border/40">
+                <CardContent className="p-3 text-center">
+                  <Clock className="h-4 w-4 text-primary mx-auto mb-1" />
+                  <p className="text-lg font-bold text-foreground">{dao.hours_per_proposal}h</p>
+                  <p className="text-[11px] text-muted-foreground">Vote Duration</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-card/60 border-border/40">
+                <CardContent className="p-3 text-center">
+                  <Vote className="h-4 w-4 text-primary mx-auto mb-1" />
+                  <p className="text-lg font-bold text-foreground">{proposals.length}</p>
+                  <p className="text-[11px] text-muted-foreground">Total Proposals</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-card/60 border-border/40">
+                <CardContent className="p-3 text-center">
+                  <Tag className="h-4 w-4 text-primary mx-auto mb-1" />
+                  <p className="text-lg font-bold text-foreground">
+                    {dao.proposal_cost && dao.proposal_cost !== "0" ? dao.proposal_cost : "Free"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">Proposal Cost</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Governance Settings */}
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold text-foreground">Governance Settings</h4>
+              <Card className="bg-card/60 border-border/40">
+                <CardContent className="p-0">
+                  <table className="w-full text-sm">
+                    <tbody>
+                      <tr className="border-b border-border/30">
+                        <td className="px-4 py-2.5 text-muted-foreground">DAO Type</td>
+                        <td className="px-4 py-2.5 text-right font-medium text-foreground">{daoTypeLabel}</td>
+                        <td className="px-4 py-2.5 text-muted-foreground">Who can propose</td>
+                        <td className="px-4 py-2.5 text-right font-medium text-foreground">{PROPOSER_TYPES[dao.proposer_type] || "Unknown"}</td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-2.5 text-muted-foreground">Token</td>
+                        <td className="px-4 py-2.5 text-right font-medium text-foreground">
+                          {dao.token_symbol ? `${dao.token_symbol} (${dao.token_contract})` : "N/A"}
+                        </td>
+                        <td className="px-4 py-2.5 text-muted-foreground">Min votes required</td>
+                        <td className="px-4 py-2.5 text-right font-medium text-foreground">
+                          {dao.minimum_votes > 0 ? dao.minimum_votes.toLocaleString() : "0"}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Description */}
+            {dao.description && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold text-foreground">Description</h4>
+                <Card className="bg-card/60 border-border/40">
+                  <CardContent className="p-4">
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{dao.description}</p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Social Links */}
+            {socialEntries.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold text-foreground">Social Links</h4>
+                <Card className="bg-card/60 border-border/40">
+                  <CardContent className="p-4">
+                    <div className="flex flex-wrap gap-2">
+                      {socialEntries.map(s => (
+                        <Button key={s.key} variant="outline" size="sm" asChild>
+                          <a
+                            href={s.url.startsWith("http") ? s.url : `https://${s.url}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            <span className="text-xs">{s.label}</span>
+                          </a>
+                        </Button>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Cover Image */}
+            {cover.src && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
+                  <ImageIcon className="h-4 w-4 text-primary" /> Cover Image
+                </h4>
+                <Card className="bg-card/60 border-border/40 overflow-hidden">
+                  <CardContent className="p-0">
+                    <img
+                      src={cover.src}
+                      alt={`${dao.dao_name} cover`}
+                      className="w-full h-auto max-h-[500px] object-contain"
+                      onError={cover.onError}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Authors */}
+            {dao.authors && dao.authors.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold text-foreground">Authors</h4>
+                <div className="flex flex-wrap gap-1">
+                  {dao.authors.map(a => (
+                    <Badge key={a} variant="outline" className="text-xs">{a}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Governance Schemas */}
+            {dao.gov_schemas && dao.gov_schemas.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold text-foreground">Governance Schemas</h4>
+                <div className="flex flex-wrap gap-1">
+                  {dao.gov_schemas.map((s, i) => (
+                    <Badge key={i} variant="outline" className="text-xs">
+                      {s.collection_name} / {s.schema_name}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
       case "stake":
-        return <DaoStaking daoName={resolvedDaoName} dao={dao} />;
+        return <DaoStaking daoName={daoName} dao={dao} />;
+
       case "new-proposal":
         return (
           <CreateProposal
-            daoName={resolvedDaoName}
+            daoName={daoName}
             dao={dao}
             treasuryNFTs={treasuryNFTs}
             onClose={() => setActiveSection("active")}
@@ -208,6 +372,7 @@ export function DaoDetail({ dao: initialDao, daoName: propDaoName, open, onClose
             }}
           />
         );
+
       case "active":
         return (
           <div className="space-y-4">
@@ -218,7 +383,7 @@ export function DaoDetail({ dao: initialDao, daoName: propDaoName, open, onClose
                 <ProposalCard
                   key={p.proposal_id}
                   proposal={p}
-                  daoName={resolvedDaoName}
+                  daoName={daoName}
                   dao={dao}
                   hasVoted={!!votedProposals[p.proposal_id]}
                   userVote={votedProposals[p.proposal_id] || null}
@@ -228,6 +393,7 @@ export function DaoDetail({ dao: initialDao, daoName: propDaoName, open, onClose
             )}
           </div>
         );
+
       case "past":
         return (
           <div className="space-y-4">
@@ -238,7 +404,7 @@ export function DaoDetail({ dao: initialDao, daoName: propDaoName, open, onClose
                 <ProposalCard
                   key={p.proposal_id}
                   proposal={p}
-                  daoName={resolvedDaoName}
+                  daoName={daoName}
                   dao={dao}
                   hasVoted={!!votedProposals[p.proposal_id]}
                   userVote={votedProposals[p.proposal_id] || null}
@@ -248,6 +414,7 @@ export function DaoDetail({ dao: initialDao, daoName: propDaoName, open, onClose
             )}
           </div>
         );
+
       case "treasury":
         return (
           <div className="space-y-4">
@@ -274,7 +441,6 @@ export function DaoDetail({ dao: initialDao, daoName: propDaoName, open, onClose
                     </CardContent>
                   </Card>
                 )}
-
                 {treasuryNFTs.length > 0 && (
                   <Card className="bg-card/60 border-border/40">
                     <CardContent className="p-4">
@@ -298,81 +464,33 @@ export function DaoDetail({ dao: initialDao, daoName: propDaoName, open, onClose
                     </CardContent>
                   </Card>
                 )}
-
                 {treasury.length === 0 && treasuryNFTs.length === 0 && (
                   <div className="text-center py-8 text-muted-foreground text-sm">Treasury is empty</div>
                 )}
-
                 {isConnected && (
                   <div className="grid md:grid-cols-2 gap-4">
-                    <TreasuryDeposit daoName={resolvedDaoName} onDeposited={refreshTreasury} />
-                    <TreasuryNFTDeposit daoName={resolvedDaoName} onDeposited={refreshTreasury} />
+                    <TreasuryDeposit daoName={daoName} onDeposited={refreshTreasury} />
+                    <TreasuryNFTDeposit daoName={daoName} onDeposited={refreshTreasury} />
                   </div>
                 )}
               </>
             )}
           </div>
         );
+
       default:
         return null;
     }
   };
 
-  // --- Sidebar ---
-  const renderSidebar = () => (
-    <div className="w-48 shrink-0 space-y-1">
-      {menuItems.filter(m => !m.hidden).map(item => (
-        <button
-          key={item.key}
-          onClick={() => setActiveSection(item.key)}
-          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-            activeSection === item.key
-              ? "bg-primary/10 text-primary font-medium"
-              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-          }`}
-        >
-          {item.icon}
-          <span className="flex-1 text-left">{item.label}</span>
-          {item.badge !== undefined && item.badge > 0 && (
-            <Badge
-              variant="secondary"
-              className={`text-[10px] px-1.5 py-0 h-5 ${item.pulse ? "animate-pulse bg-primary/20 text-primary" : ""}`}
-            >
-              {item.badge}
-            </Badge>
-          )}
-          {activeSection === item.key && <ChevronRight className="h-3 w-3" />}
-        </button>
-      ))}
+  return (
+    <div className="space-y-4">
+      {/* Back button */}
+      <Button variant="ghost" size="sm" onClick={onBack} className="gap-1.5 text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="h-4 w-4" /> Back to DAOs
+      </Button>
 
-      {/* Creator/Author actions in sidebar */}
-      {canEditProfile && (
-        <div className="pt-4 space-y-1 border-t border-border/30 mt-4">
-          <button
-            onClick={() => setEditProfileOpen(true)}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-          >
-            <Settings className="h-4 w-4" />
-            <span>Edit Profile</span>
-          </button>
-          {isCreator && (
-            <button
-              onClick={() => setEditCostOpen(true)}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-            >
-              <Coins className="h-4 w-4" />
-              <span>Prop Cost</span>
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-
-  // --- Header ---
-  const renderHeader = () => {
-    if (!dao) return null;
-    return (
+      {/* Header: logo + name + badge + created date */}
       <div className="flex items-center gap-4">
         <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden shrink-0">
           {logo.src ? (
@@ -384,212 +502,79 @@ export function DaoDetail({ dao: initialDao, daoName: propDaoName, open, onClose
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-lg font-bold text-foreground">{dao.dao_name}</h2>
-            <Badge variant="secondary" className="text-xs">{DAO_TYPES[dao.dao_type] || "Unknown"}</Badge>
-            {isMember && <Badge className="bg-primary/20 text-primary border-primary/30 text-xs">Member</Badge>}
+            <Badge className="bg-primary/20 text-primary border-primary/30 text-xs">{daoTypeLabel}</Badge>
+            {isMember && <Badge variant="secondary" className="text-xs">Member</Badge>}
           </div>
-          <p className="text-sm text-muted-foreground">by {dao.creator}</p>
+          <p className="text-sm text-muted-foreground">
+            Created by {dao.creator} on {createdDate}
+          </p>
         </div>
       </div>
-    );
-  };
 
-  // --- Loading ---
-  if (loading) {
-    const spinner = (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-    if (pageMode) return spinner;
-    return (
-      <Dialog open={open} onOpenChange={() => onClose?.()}>
-        <DialogContent className="max-w-4xl max-h-[85vh] p-0" hideClose>
-          {spinner}
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  if (!dao) {
-    const notFound = (
-      <div className="text-center py-16">
-        <p className="text-muted-foreground">DAO not found</p>
-      </div>
-    );
-    if (pageMode) return notFound;
-    return null;
-  }
-
-  // --- Main layout: sidebar + content ---
-  const mainLayout = (
-    <div className="flex gap-6 min-h-[400px]">
-      {renderSidebar()}
-      <div className="flex-1 min-w-0">
-        {renderContent()}
-      </div>
-    </div>
-  );
-
-  // --- Dialogs (shared) ---
-  const dialogs = dao && (
-    <>
-      <EditDaoProfile
-        open={editProfileOpen}
-        onOpenChange={setEditProfileOpen}
-        dao={dao}
-        onUpdated={loadDao}
-      />
-      <EditProposalCost
-        open={editCostOpen}
-        onOpenChange={setEditCostOpen}
-        daoName={dao.dao_name}
-        currentCost={dao.proposal_cost || "0"}
-        onUpdated={loadDao}
-      />
-    </>
-  );
-
-  // --- Page mode ---
-  if (pageMode) {
-    return (
-      <div className="space-y-6">
-        {renderHeader()}
-        {mainLayout}
-        {dialogs}
-      </div>
-    );
-  }
-
-  // --- Dialog mode ---
-  return (
-    <>
-      <Dialog open={open} onOpenChange={() => onClose?.()}>
-        <DialogContent
-          className="max-w-4xl max-h-[85vh] p-0 overflow-hidden"
-          hideClose
-          onInteractOutside={(e) => e.preventDefault()}
-        >
-          <div className="flex flex-col h-full max-h-[85vh]">
-            {/* Dialog header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border/50">
-              {renderHeader()}
-              <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0 ml-4">
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* Scrollable body */}
-            <ScrollArea className="flex-1 px-6 py-4">
-              {mainLayout}
-            </ScrollArea>
-          </div>
-        </DialogContent>
-      </Dialog>
-      {dialogs}
-    </>
-  );
-}
-
-// --- DAO Info sub-section ---
-function DaoInfoSection({ dao, socialLinks }: { dao: DaoInfo; socialLinks: { key: string; icon: string; url?: string }[] }) {
-  return (
-    <Card className="bg-card/60 border-border/40">
-      <CardContent className="p-4 space-y-4">
-        {dao.description && (
-          <p className="text-sm text-muted-foreground">{dao.description}</p>
-        )}
-
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <p className="text-muted-foreground">DAO Type</p>
-            <p className="font-medium">{DAO_TYPES[dao.dao_type]}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Who Can Propose</p>
-            <p className="font-medium">{PROPOSER_TYPES[dao.proposer_type]}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Token</p>
-            <p className="font-medium">{dao.token_symbol || "N/A"}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Token Contract</p>
-            <p className="font-medium">{dao.token_contract || "N/A"}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Threshold</p>
-            <p className="font-medium">{dao.threshold}%</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Vote Duration</p>
-            <p className="font-medium">{dao.hours_per_proposal}h</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Min Votes</p>
-            <p className="font-medium">{dao.minimum_votes}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Min Weight</p>
-            <p className="font-medium">{dao.minimum_weight}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Proposal Cost</p>
-            <p className="font-medium">{dao.proposal_cost && dao.proposal_cost !== "0" ? dao.proposal_cost : "Free"}</p>
-          </div>
-        </div>
-
-        {dao.authors && dao.authors.length > 0 && (
-          <div>
-            <p className="text-sm text-muted-foreground mb-1">Authors</p>
-            <div className="flex flex-wrap gap-1">
-              {dao.authors.map(a => (
-                <Badge key={a} variant="outline" className="text-xs">{a}</Badge>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {dao.gov_schemas && dao.gov_schemas.length > 0 && (
-          <div>
-            <p className="text-sm text-muted-foreground mb-1">Governance Schemas</p>
-            <div className="flex flex-wrap gap-1">
-              {dao.gov_schemas.map((s, i) => (
-                <Badge key={i} variant="outline" className="text-xs">
-                  {s.collection_name} / {s.schema_name}
+      {/* Main layout: sidebar + content */}
+      <div className="flex gap-0 min-h-[400px]">
+        {/* Left sidebar */}
+        <div className="w-44 shrink-0 space-y-0.5 pr-4 border-r border-border/30">
+          {menuItems.filter(m => !m.hidden).map(item => (
+            <button
+              key={item.key}
+              onClick={() => setActiveSection(item.key)}
+              className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                activeSection === item.key
+                  ? "bg-primary/10 text-primary font-medium"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
+              {item.icon}
+              <span className="flex-1 text-left">{item.label}</span>
+              {item.badge !== undefined && item.badge > 0 && (
+                <Badge
+                  variant="secondary"
+                  className={`text-[10px] px-1.5 py-0 h-5 ${item.pulse ? "animate-pulse bg-primary/20 text-primary" : ""}`}
+                >
+                  {item.badge}
                 </Badge>
-              ))}
-            </div>
-          </div>
-        )}
+              )}
+              {activeSection === item.key && <ChevronRight className="h-3 w-3 shrink-0" />}
+            </button>
+          ))}
 
-        {socialLinks.length > 0 && (
-          <div className="flex gap-3 pt-2">
-            {socialLinks.map(s => (
-              <a
-                key={s.key}
-                href={s.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm hover:text-primary transition-colors"
-                title={s.key}
+          {/* Creator/Author actions */}
+          {canEditProfile && (
+            <div className="pt-3 mt-3 space-y-0.5 border-t border-border/30">
+              <button
+                onClick={() => setEditProfileOpen(true)}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
               >
-                {s.icon}
-              </a>
-            ))}
-          </div>
-        )}
-
-        <div className="pt-2">
-          <a
-            href={`https://waxblock.io/account/dao.waxdao?action=createdao&search=${dao.dao_name}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-primary hover:underline flex items-center gap-1"
-          >
-            <ExternalLink className="h-3 w-3" /> View on WaxBlock
-          </a>
+                <Settings className="h-4 w-4" />
+                <span>Edit Profile</span>
+              </button>
+              {isCreator && (
+                <button
+                  onClick={() => setEditCostOpen(true)}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                >
+                  <Coins className="h-4 w-4" />
+                  <span>Prop Cost</span>
+                </button>
+              )}
+            </div>
+          )}
         </div>
-      </CardContent>
-    </Card>
+
+        {/* Right content area */}
+        <div className="flex-1 min-w-0 pl-6">
+          {renderContent()}
+        </div>
+      </div>
+
+      {/* Dialogs */}
+      {dao && (
+        <>
+          <EditDaoProfile open={editProfileOpen} onOpenChange={setEditProfileOpen} dao={dao} onUpdated={loadDao} />
+          <EditProposalCost open={editCostOpen} onOpenChange={setEditCostOpen} daoName={dao.dao_name} currentCost={dao.proposal_cost || "0"} onUpdated={loadDao} />
+        </>
+      )}
+    </div>
   );
 }
