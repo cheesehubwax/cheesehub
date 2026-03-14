@@ -280,7 +280,7 @@ export function CheeseSwapWidget({
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Min. Received</span>
                 <span className="text-foreground">
-                  {formatTokenAmount(route.minReceived, tokenOut?.precision ?? 4)} {tokenOut?.ticker}
+                  {formatTokenAmount(route.minReceived, tokenOut?.precision ?? 8)} {tokenOut?.ticker}
                 </span>
               </div>
             </div>
