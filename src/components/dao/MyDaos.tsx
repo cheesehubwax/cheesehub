@@ -1,14 +1,12 @@
 import { useState, useEffect } from "react";
 import { Loader2, Users } from "lucide-react";
-import { fetchAllDaos, DaoInfo } from "@/lib/dao";
+import { useNavigate } from "react-router-dom";
+import { fetchUserDaos, DaoInfo } from "@/lib/dao";
 import { useWax } from "@/context/WaxContext";
 import { DaoCard } from "./DaoCard";
 
-interface MyDaosProps {
-  onSelectDao: (daoName: string) => void;
-}
-
-export function MyDaos({ onSelectDao }: MyDaosProps) {
+export function MyDaos() {
+  const navigate = useNavigate();
   const { accountName, isConnected } = useWax();
   const [daos, setDaos] = useState<DaoInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,9 +18,8 @@ export function MyDaos({ onSelectDao }: MyDaosProps) {
       return;
     }
 
-    fetchAllDaos().then(all => {
-      const mine = all.filter(d => d.creator === accountName || d.authors?.includes(accountName));
-      setDaos(mine);
+    fetchUserDaos(accountName).then(data => {
+      setDaos(data);
       setLoading(false);
     });
   }, [accountName]);
@@ -48,16 +45,22 @@ export function MyDaos({ onSelectDao }: MyDaosProps) {
     return (
       <div className="text-center py-12">
         <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-        <p className="text-muted-foreground">You haven't created any DAOs yet</p>
+        <p className="text-muted-foreground">You're not a member of any DAOs yet</p>
+        <p className="text-xs text-muted-foreground mt-1">Stake tokens or hold eligible NFTs to join a DAO</p>
       </div>
     );
   }
 
   return (
-    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {daos.map(dao => (
-        <DaoCard key={dao.dao_name} dao={dao} onClick={onSelectDao} />
-      ))}
+    <div className="space-y-4">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {daos.map(dao => (
+          <DaoCard key={dao.dao_name} dao={dao} onClick={(name) => navigate(`/dao/${name}`)} />
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground text-center">
+        {daos.length} DAO{daos.length !== 1 ? "s" : ""} where you have staked tokens/NFTs or hold eligible assets
+      </p>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Users } from "lucide-react";
 import { DaoInfo, DAO_TYPES, getIpfsUrl } from "@/lib/dao";
+import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 
 interface DaoCardProps {
   dao: DaoInfo;
@@ -21,7 +22,23 @@ export function DaoCard({ dao, onClick }: DaoCardProps) {
         <div className="flex items-start gap-4">
           <div className="h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden shrink-0">
             {logoUrl ? (
-              <img src={logoUrl} alt={dao.dao_name} className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+              <img
+                src={logoUrl}
+                alt={dao.dao_name}
+                className="h-full w-full object-cover"
+                onError={(e) => {
+                  const img = e.target as HTMLImageElement;
+                  const currentSrc = img.src;
+                  // Try next IPFS gateway
+                  const nextGateway = IPFS_GATEWAYS.find(g => !currentSrc.includes(g));
+                  if (nextGateway && dao.logo) {
+                    const hash = dao.logo.replace(/^https?:\/\/[^/]+\/ipfs\//, "");
+                    img.src = `${nextGateway}${hash}`;
+                  } else {
+                    img.style.display = "none";
+                  }
+                }}
+              />
             ) : (
               <Users className="h-7 w-7 text-primary" />
             )}
@@ -33,6 +50,9 @@ export function DaoCard({ dao, onClick }: DaoCardProps) {
             <p className="text-sm text-muted-foreground truncate">
               by {dao.creator}
             </p>
+            {dao.description && (
+              <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{dao.description}</p>
+            )}
             <div className="flex flex-wrap gap-1.5 mt-2">
               <Badge variant="secondary" className="text-xs">{daoType}</Badge>
               {dao.token_symbol && (

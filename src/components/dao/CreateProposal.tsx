@@ -5,8 +5,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, X } from "lucide-react";
-import { DaoInfo, buildAnnounceDepoAction, buildProposalCostAction, VOTING_TYPE_LABELS, PROPOSAL_VOTING_TYPES } from "@/lib/dao";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Loader2, X, Plus, Trash2, Info } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  DaoInfo, TreasuryNFT,
+  buildCreateProposalAction, buildMultiOptionProposalAction,
+  buildRankedChoiceProposalAction, buildTokenTransferProposalAction,
+  buildNFTTransferProposalAction,
+  buildAnnounceDepoAction, buildProposalCostAction,
+  VOTING_TYPE_LABELS,
+} from "@/lib/dao";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useToast } from "@/hooks/use-toast";
@@ -14,11 +23,19 @@ import { useToast } from "@/hooks/use-toast";
 interface CreateProposalProps {
   daoName: string;
   dao: DaoInfo;
+  treasuryNFTs?: TreasuryNFT[];
   onClose: () => void;
   onCreated: () => void;
 }
 
-export function CreateProposal({ daoName, dao, onClose, onCreated }: CreateProposalProps) {
+const WAX_TOKENS = [
+  { symbol: "WAX", contract: "eosio.token", precision: 8 },
+  { symbol: "CHEESE", contract: "cheese4token", precision: 4 },
+  { symbol: "WAXDAO", contract: "token.waxdao", precision: 8 },
+  { symbol: "TLM", contract: "alien.worlds", precision: 4 },
+];
+
+export function CreateProposal({ daoName, dao, treasuryNFTs = [], onClose, onCreated }: CreateProposalProps) {
   const { accountName, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const [loading, setLoading] = useState(false);
@@ -26,9 +43,28 @@ export function CreateProposal({ daoName, dao, onClose, onCreated }: CreatePropo
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [votingType, setVotingType] = useState("1");
-  const [choices, setChoices] = useState(["Yes", "No", "Abstain"]);
-  const [hoursToVote, setHoursToVote] = useState(dao.hours_per_proposal || 72);
+  const [proposalType, setProposalType] = useState("1"); // 1=YNA, 2=MostVotes, 3=Ranked, 4=TokenTransfer, 5=NFTTransfer
+
+  // Multi-option / Ranked Choice
+  const [choices, setChoices] = useState(["Option A", "Option B"]);
+
+  // Token Transfer
+  const [tokenRecipient, setTokenRecipient] = useState("");
+  const [tokenAmount, setTokenAmount] = useState("");
+  const [selectedTokenIdx, setSelectedTokenIdx] = useState(0);
+
+  // NFT Transfer
+  const [nftRecipient, setNftRecipient] = useState("");
+  const [selectedNftIds, setSelectedNftIds] = useState<string[]>([]);
+
+  const addChoice = () => setChoices(prev => [...prev, `Option ${String.fromCharCode(65 + prev.length)}`]);
+  const removeChoice = (idx: number) => setChoices(prev => prev.filter((_, i) => i !== idx));
+
+  const toggleNft = (id: string) => {
+    setSelectedNftIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
 
   const handleSubmit = async () => {
     if (!session || !accountName) return;
@@ -37,37 +73,53 @@ export function CreateProposal({ daoName, dao, onClose, onCreated }: CreatePropo
       return;
     }
 
+    setLoading(true);
     const actions = [];
 
-    // Announce deposit if there's a proposal cost
-    if (dao.proposal_cost && dao.proposal_cost !== "0") {
+    // Pay proposal cost if required
+    if (dao.proposal_cost && dao.proposal_cost !== "0" && parseFloat(dao.proposal_cost) > 0) {
       actions.push(buildAnnounceDepoAction(accountName));
       actions.push(buildProposalCostAction(accountName, dao.proposal_cost));
     }
 
-    // Create proposal action
-    actions.push({
-      account: "dao.waxdao",
-      name: "createprop",
-      authorization: [{ actor: accountName, permission: "active" }],
-      data: {
-        author: accountName,
-        dao: daoName,
-        title,
-        description,
-        proposal_type: parseInt(votingType),
-        choices: choices.map((c, i) => ({ choice: i, description: c, total_votes: 0 })),
-        hours: hoursToVote,
-        token_receivers: [],
-        nft_receivers: [],
-      },
-    });
-
-    const result = await executeTransaction(actions);
-    if (result.success) {
-      toast({ title: "Proposal Created! 🧀", description: `"${title}" has been submitted` });
-      onCreated();
+    const type = parseInt(proposalType);
+    switch (type) {
+      case 1: // Yes/No/Abstain
+        actions.push(buildCreateProposalAction(accountName, daoName, { title, description, proposalType: "4" }));
+        break;
+      case 2: // Most Votes Wins
+        actions.push(buildMultiOptionProposalAction(accountName, daoName, { title, description, options: choices }));
+        break;
+      case 3: // Ranked Choice
+        actions.push(buildRankedChoiceProposalAction(accountName, daoName, { title, description, options: choices }));
+        break;
+      case 4: { // Token Transfer
+        const token = WAX_TOKENS[selectedTokenIdx];
+        actions.push(buildTokenTransferProposalAction(accountName, daoName, {
+          title, description,
+          transfer: {
+            recipient: tokenRecipient,
+            amount: tokenAmount,
+            tokenSymbol: token.symbol,
+            tokenContract: token.contract,
+          },
+        }));
+        break;
+      }
+      case 5: // NFT Transfer
+        actions.push(buildNFTTransferProposalAction(accountName, daoName, {
+          title, description,
+          transfer: { recipient: nftRecipient, assetIds: selectedNftIds },
+        }));
+        break;
     }
+
+    const result = await executeTransaction(actions, {
+      successTitle: "Proposal Created! 🧀",
+      successDescription: `"${title}" has been submitted`,
+    });
+    if (result.success) onCreated();
+    setLoading(false);
   };
 
   return (
@@ -83,31 +135,139 @@ export function CreateProposal({ daoName, dao, onClose, onCreated }: CreatePropo
       <CardContent className="space-y-4">
         <div>
           <Label>Title</Label>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Proposal title" />
+          <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Proposal title" />
         </div>
         <div>
           <Label>Description</Label>
-          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe your proposal..." rows={4} />
+          <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe your proposal..." rows={4} />
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label>Voting Type</Label>
-            <Select value={votingType} onValueChange={setVotingType}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(VOTING_TYPE_LABELS).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Voting Duration (hours)</Label>
-            <Input type="number" value={hoursToVote} onChange={(e) => setHoursToVote(parseInt(e.target.value) || 72)} min={1} />
-          </div>
+
+        {/* Proposal Type Selector */}
+        <div>
+          <Label>Proposal Type</Label>
+          <RadioGroup value={proposalType} onValueChange={setProposalType} className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+            {[
+              { value: "1", label: "Yes/No/Abstain", desc: "Standard voting" },
+              { value: "2", label: "Most Votes Wins", desc: "Custom options" },
+              { value: "3", label: "Ranked Choice", desc: "Rank options" },
+              { value: "4", label: "Token Transfer", desc: "Send tokens from treasury" },
+              { value: "5", label: "NFT Transfer", desc: "Send NFTs from treasury" },
+            ].map(opt => (
+              <Label
+                key={opt.value}
+                htmlFor={`pt-${opt.value}`}
+                className={`flex items-start gap-2 p-3 rounded-lg border cursor-pointer transition-all ${
+                  proposalType === opt.value ? "border-primary/50 bg-primary/5" : "border-border/40 hover:border-border"
+                }`}
+              >
+                <RadioGroupItem value={opt.value} id={`pt-${opt.value}`} className="mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium">{opt.label}</p>
+                  <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                </div>
+              </Label>
+            ))}
+          </RadioGroup>
         </div>
+
+        {/* Multi-option choices */}
+        {(proposalType === "2" || proposalType === "3") && (
+          <div className="space-y-2">
+            <Label>Choices</Label>
+            {choices.map((c, idx) => (
+              <div key={idx} className="flex gap-2">
+                <Input
+                  value={c}
+                  onChange={e => {
+                    const next = [...choices];
+                    next[idx] = e.target.value;
+                    setChoices(next);
+                  }}
+                  placeholder={`Choice ${idx + 1}`}
+                />
+                {choices.length > 2 && (
+                  <Button variant="ghost" size="icon" onClick={() => removeChoice(idx)}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                )}
+              </div>
+            ))}
+            {choices.length < 10 && (
+              <Button variant="outline" size="sm" onClick={addChoice}>
+                <Plus className="h-4 w-4 mr-1" /> Add Choice
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Token Transfer fields */}
+        {proposalType === "4" && (
+          <div className="space-y-3 bg-muted/20 p-3 rounded-lg">
+            <div>
+              <Label>Recipient Account</Label>
+              <Input value={tokenRecipient} onChange={e => setTokenRecipient(e.target.value)} placeholder="waxaccount" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Token</Label>
+                <Select value={String(selectedTokenIdx)} onValueChange={v => setSelectedTokenIdx(parseInt(v))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {WAX_TOKENS.map((t, i) => (
+                      <SelectItem key={t.symbol} value={String(i)}>{t.symbol}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Amount</Label>
+                <Input type="number" value={tokenAmount} onChange={e => setTokenAmount(e.target.value)} placeholder="0.0" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* NFT Transfer fields */}
+        {proposalType === "5" && (
+          <div className="space-y-3 bg-muted/20 p-3 rounded-lg">
+            <div>
+              <Label>Recipient Account</Label>
+              <Input value={nftRecipient} onChange={e => setNftRecipient(e.target.value)} placeholder="waxaccount" />
+            </div>
+            <div>
+              <Label>Select NFTs from Treasury ({selectedNftIds.length} selected)</Label>
+              {treasuryNFTs.length === 0 ? (
+                <p className="text-xs text-muted-foreground mt-1">No NFTs in treasury</p>
+              ) : (
+                <div className="grid grid-cols-4 gap-2 mt-2 max-h-48 overflow-y-auto">
+                  {treasuryNFTs.map(nft => (
+                    <div
+                      key={nft.asset_id}
+                      className={`rounded border-2 cursor-pointer overflow-hidden transition-all ${
+                        selectedNftIds.includes(nft.asset_id) ? "border-primary" : "border-border/40"
+                      }`}
+                      onClick={() => toggleNft(nft.asset_id)}
+                    >
+                      <div className="aspect-square bg-muted/30">
+                        {nft.image && <img src={nft.image} alt={nft.name} className="w-full h-full object-cover" />}
+                      </div>
+                      <p className="text-[9px] truncate px-1">{nft.name}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Proposal Cost */}
+        {dao.proposal_cost && dao.proposal_cost !== "0" && parseFloat(dao.proposal_cost) > 0 && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/20 p-2 rounded">
+            <Info className="h-4 w-4 text-primary shrink-0" />
+            Proposal cost: {dao.proposal_cost}
+          </div>
+        )}
+
         <Button onClick={handleSubmit} disabled={loading} className="w-full bg-primary text-primary-foreground">
           {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Submitting...</> : "Submit Proposal"}
         </Button>

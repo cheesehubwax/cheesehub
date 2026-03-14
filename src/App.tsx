@@ -42,6 +42,7 @@ const App = () => {
                 <Route path="/drops" element={<Drops />} />
                 <Route path="/drops/:id" element={<DropDetail />} />
                 <Route path="/dao" element={<Dao />} />
+                <Route path="/dao/:daoName" element={<Dao />} />
                 <Route path="/farm" element={<Farm />} />
                 <Route path="/farm/:farmName" element={<Farm />} />
                 <Route path="/cheesenull" element={<CheeseNull />} />
