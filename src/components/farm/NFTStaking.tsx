@@ -269,7 +269,15 @@ const VirtualGrid = React.memo(function VirtualGrid({
   type,
   globallyStakedMap,
 }: VirtualGridProps) {
-  const rowCount = Math.ceil(items.length / GRID_COLS);
+  const [cols, setCols] = useState(getGridCols);
+
+  useEffect(() => {
+    const handleResize = () => setCols(getGridCols());
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const rowCount = Math.ceil(items.length / cols);
   const virtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => parentRef.current,
