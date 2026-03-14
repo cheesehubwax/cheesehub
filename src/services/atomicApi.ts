@@ -29,114 +29,75 @@ export async function fetchCheeseDrops(): Promise<NFTDrop[]> {
     const response = await fetch(
       `${NFTHIVE_CONFIG.apiUrl}/drops?currency=${CHEESE_CONFIG.tokenSymbol}&collection=${CHEESE_CONFIG.collectionName}&limit=50`
     );
-
-    if (!response.ok) throw new Error(`NFT Hive API error: ${response.status}`);
-
-    const drops: NFTHiveDrop[] = await response.json();
-
-    return drops.map((drop): NFTDrop => {
-      const templateData = drop.templatesToMint?.[0];
-      const immutableData: Record<string, string> = {};
-      templateData?.immutableData?.forEach(item => {
-        immutableData[item.key] = item.value[1];
-      });
-
-      return {
-        id: String(drop.dropId),
-        name: drop.displayData?.name || templateData?.name || `Drop #${drop.dropId}`,
-        description: drop.displayData?.description || '',
-        image: getImageUrl(immutableData.img || immutableData.image),
-        collectionName: drop.collection?.collectionName || '',
-        price: drop.price || 0,
-        totalSupply: drop.maxClaimable,
-        remaining: drop.maxClaimable - (drop.numClaimed || 0),
-        attributes: [],
-        dropSource: 'nfthive',
-        dropId: String(drop.dropId),
-        currency: drop.currency,
-      };
-    });
+    const data = await response.json();
+    return data || [];
   } catch (error) {
-    console.error('Failed to fetch CHEESE drops:', error);
+    console.error('[fetchCheeseDrops] Failed:', error);
     return [];
   }
 }
 
-export async function fetchDropById(dropId: string): Promise<NFTDrop | null> {
+export async function fetchCheeseSales(): Promise<AtomicSale[]> {
   try {
-    const response = await fetch(`${NFTHIVE_CONFIG.apiUrl}/drops/${dropId}`);
-    if (!response.ok) throw new Error(`NFT Hive API error: ${response.status}`);
-
-    const drop: NFTHiveDrop = await response.json();
-    const templateData = drop.templatesToMint?.[0];
-    const immutableData: Record<string, string> = {};
-    templateData?.immutableData?.forEach(item => {
-      immutableData[item.key] = item.value[1];
-    });
-
-    return {
-      id: String(drop.dropId),
-      name: drop.displayData?.name || templateData?.name || `Drop #${drop.dropId}`,
-      description: drop.displayData?.description || '',
-      image: getImageUrl(immutableData.img || immutableData.image),
-      collectionName: drop.collection?.collectionName || '',
-      price: drop.price || 0,
-      totalSupply: drop.maxClaimable,
-      remaining: drop.maxClaimable - (drop.numClaimed || 0),
-      attributes: [],
-      dropSource: 'nfthive',
-      dropId: String(drop.dropId),
-      currency: drop.currency,
-    };
+    const response = await fetchWithFallback(
+      ATOMIC_API.baseUrls,
+      `${ATOMIC_API.paths.sales}?collection_name=${CHEESE_CONFIG.collectionName}&state=1&limit=50&order=desc&sort=created`
+    );
+    const data = await response.json();
+    return data.data || [];
   } catch (error) {
-    console.error(`Failed to fetch drop ${dropId}:`, error);
-    return null;
+    console.error('[fetchCheeseSales] Failed:', error);
+    return [];
   }
 }
 
-export async function fetchTemplateById(collectionName: string, templateId: string): Promise<AtomicTemplate | null> {
+export async function fetchNFTHiveDrops(): Promise<NFTHiveDrop[]> {
+  try {
+    const response = await fetch(
+      `${NFTHIVE_CONFIG.apiUrl}/drops?collection=${CHEESE_CONFIG.collectionName}&limit=50`
+    );
+    const data = await response.json();
+    return data || [];
+  } catch (error) {
+    console.error('[fetchNFTHiveDrops] Failed:', error);
+    return [];
+  }
+}
+
+export async function fetchTemplateDetails(collectionName: string, templateId: string): Promise<AtomicTemplate | null> {
   try {
     const response = await fetchWithFallback(
       ATOMIC_API.baseUrls,
       `${ATOMIC_API.paths.templates}/${collectionName}/${templateId}`
     );
     const data = await response.json();
-    return data.success && data.data ? data.data : null;
+    if (data.success && data.data) {
+      const immData = data.data.immutable_data || {};
+      return {
+        template_id: data.data.template_id,
+        name: immData.name || `Template #${templateId}`,
+        image: getImageUrl(immData.img || immData.image || immData.video),
+        collection: { collection_name: collectionName },
+        max_supply: data.data.max_supply || '0',
+        issued_supply: data.data.issued_supply || '0',
+        schema: data.data.schema || { schema_name: '' },
+        immutable_data: immData,
+      };
+    }
+    return null;
   } catch (error) {
-    console.error(`Failed to fetch template ${templateId}:`, error);
+    console.error('[fetchTemplateDetails] Failed:', error);
     return null;
   }
 }
 
-export async function fetchCollectionSales(collectionName: string, limit = 20): Promise<AtomicSale[]> {
-  try {
-    const response = await fetchWithFallback(
-      ATOMIC_API.baseUrls,
-      `${ATOMIC_API.paths.sales}?collection_name=${collectionName}&state=1&order=desc&sort=created&limit=${limit}`
-    );
-    const data = await response.json();
-    return data.success && data.data ? data.data : [];
-  } catch (error) {
-    console.error(`Failed to fetch sales for ${collectionName}:`, error);
-    return [];
-  }
-}
-
-export async function fetchUserAssets(account: string, collectionName?: string): Promise<unknown[]> {
-  try {
-    let url = `${ATOMIC_API.paths.assets}?owner=${account}&limit=100`;
-    if (collectionName) url += `&collection_name=${collectionName}`;
-    const response = await fetchWithFallback(ATOMIC_API.baseUrls, url);
-    const data = await response.json();
-    return data.success && data.data ? data.data : [];
-  } catch (error) {
-    console.error(`Failed to fetch assets for ${account}:`, error);
-    return [];
-  }
+interface TemplateRequest {
+  collectionName: string;
+  templateId: string;
 }
 
 export async function fetchTemplatesBatch(
-  requests: { templateId: string; collectionName: string }[]
+  requests: TemplateRequest[]
 ): Promise<Map<string, { name: string; image: string; isVideo?: boolean }>> {
   const results = new Map<string, { name: string; image: string; isVideo?: boolean }>();
 
@@ -175,6 +136,73 @@ export async function fetchTemplatesBatch(
   }
 
   return results;
+}
+
+// Fetch user's NFTs filtered by specific collections and schemas (for DAO voting/staking)
+export interface EligibleNFT {
+  asset_id: string;
+  name: string;
+  image: string;
+  collection: string;
+  schema: string;
+}
+
+const ATOMIC_AA_ENDPOINTS = [
+  'https://aa.wax.blacklusion.io',
+  'https://wax-aa.eu.eosamsterdam.net',
+  'https://wax.api.atomicassets.io',
+];
+
+export async function fetchUserNFTsBySchema(
+  userAccount: string,
+  collections: string[],
+  schemas: string[]
+): Promise<EligibleNFT[]> {
+  const eligibleNFTs: EligibleNFT[] = [];
+
+  // Build query params for each collection/schema pair
+  for (let i = 0; i < collections.length; i++) {
+    const collection = collections[i];
+    const schema = schemas[i];
+    if (!collection || !schema) continue;
+
+    let fetched = false;
+    for (const baseUrl of ATOMIC_AA_ENDPOINTS) {
+      if (fetched) break;
+      try {
+        const response = await fetch(
+          `${baseUrl}/atomicassets/v1/assets?owner=${userAccount}&collection_name=${collection}&schema_name=${schema}&limit=1000`
+        );
+        if (!response.ok) continue;
+
+        const data = await response.json();
+        if (data.success && data.data) {
+          for (const asset of data.data) {
+            const assetData = asset.data || {};
+            let image = assetData.img || assetData.image || "";
+            if (image && !image.startsWith("http")) {
+              if (image.startsWith("Qm") || image.startsWith("bafy")) {
+                image = `https://ipfs.io/ipfs/${image}`;
+              }
+            }
+
+            eligibleNFTs.push({
+              asset_id: asset.asset_id,
+              name: assetData.name || asset.name || `NFT #${asset.asset_id}`,
+              image,
+              collection: asset.collection?.collection_name || collection,
+              schema: asset.schema?.schema_name || schema,
+            });
+          }
+          fetched = true;
+        }
+      } catch (error) {
+        console.log(`[fetchUserNFTsBySchema] ${baseUrl} failed, trying next...`);
+      }
+    }
+  }
+
+  return eligibleNFTs;
 }
 
 export { getImageUrl, getIpfsUrl };
