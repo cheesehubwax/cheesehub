@@ -23,6 +23,7 @@ export interface SwapRoute {
   memo: string;
   route: number[];
   executionPrice: { numerator: string; denominator: string };
+  input?: number;
 }
 
 const ALCOR_API = "https://wax.alcor.exchange/api/v2";
