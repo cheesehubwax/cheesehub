@@ -42,7 +42,8 @@ export function BrowseFarms() {
     }
 
     if (stakedOnly && accountName) {
-      result = result.filter(f => f.staked_count > 0);
+      const stakedFarmNames = new Set(userStakes.map(s => s.farmName));
+      result = result.filter(f => stakedFarmNames.has(f.farm_name));
     }
 
     if (search.trim()) {
