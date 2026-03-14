@@ -29,7 +29,7 @@ export function DaoCard({ dao, onClick }: DaoCardProps) {
   }, []);
 
   return (
-    <Card className="bg-card/80 border-border/50 hover:border-primary/30 hover:shadow-lg transition-all group">
+    <Card className="bg-card/80 border-primary/30 shadow-lg transition-all group">
       <CardContent className="p-4 space-y-3">
         <div className="flex items-start gap-4">
           <div className="h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden shrink-0">
@@ -40,7 +40,7 @@ export function DaoCard({ dao, onClick }: DaoCardProps) {
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors truncate">
+            <h3 className="font-semibold text-primary transition-colors truncate">
               {dao.dao_name}
             </h3>
             <p className="text-sm text-muted-foreground truncate">by {dao.creator}</p>
@@ -72,7 +72,7 @@ export function DaoCard({ dao, onClick }: DaoCardProps) {
           {dao.token_symbol && <Badge variant="outline" className="text-xs">{dao.token_symbol}</Badge>}
         </div>
 
-        <Button size="sm" variant="outline" className="w-full" onClick={onClick}>
+        <Button size="sm" className="w-full bg-primary text-primary-foreground hover:bg-primary/90" onClick={onClick}>
           View DAO
         </Button>
       </CardContent>
