@@ -1093,7 +1093,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
               </div>
 
               <div className="rounded-lg border border-border/50 bg-background/50 p-3">
-                <p className="text-xs text-muted-foreground mb-2 font-medium">Claimable Now</p>
+                <p className="text-xs text-foreground mb-2 font-medium">Claimable Now</p>
                 {pendingRewards.length > 0 && hasRewards ? (
                   <div className="space-y-1.5">
                     {pendingRewards.map((reward, i) => (
