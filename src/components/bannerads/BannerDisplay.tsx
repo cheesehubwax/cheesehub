@@ -114,7 +114,7 @@ export function BannerDisplay() {
             <Link
               key={slot}
               to="/bannerads"
-              className="w-[580px] h-[150px] rounded-lg border border-dashed border-border/60 bg-card/40 flex items-center justify-center gap-2 text-muted-foreground/50 hover:border-cheese/40 hover:text-cheese/60 transition-colors"
+              className="w-[580px] h-[150px] rounded-lg border border-dashed border-cheese/40 bg-card/40 flex items-center justify-center gap-2 text-cheese/60 hover:border-cheese hover:text-cheese transition-colors"
             >
               <Megaphone className="h-4 w-4" />
               <span className="text-xs font-medium">Slot {slot} — Available</span>
@@ -124,7 +124,7 @@ export function BannerDisplay() {
       )}
       <Link
         to="/bannerads"
-        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-cheese transition-colors"
+        className="flex items-center gap-1 text-xs text-cheese hover:text-cheese transition-colors"
       >
         <Megaphone className="h-3 w-3" />
         Advertise with CHEESEHub
