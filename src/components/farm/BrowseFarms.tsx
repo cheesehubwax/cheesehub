@@ -1,61 +1,115 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
-import { Loader2, Search, Sprout } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Search, Sprout } from "lucide-react";
 import { fetchAllFarms, FarmInfo } from "@/lib/farm";
+import { useWax } from "@/context/WaxContext";
+import { useQuery } from "@tanstack/react-query";
 import { FarmCard } from "./FarmCard";
 
-interface BrowseFarmsProps {
-  onSelectFarm: (farmName: string) => void;
-}
+type SortOption = "newest" | "staked" | "name";
 
-export function BrowseFarms({ onSelectFarm }: BrowseFarmsProps) {
-  const [farms, setFarms] = useState<FarmInfo[]>([]);
-  const [loading, setLoading] = useState(true);
+export function BrowseFarms() {
+  const { accountName } = useWax();
   const [search, setSearch] = useState("");
+  const [activeOnly, setActiveOnly] = useState(true);
+  const [stakedOnly, setStakedOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOption>("staked");
 
-  useEffect(() => {
-    fetchAllFarms().then(data => {
-      setFarms(data);
-      setLoading(false);
-    });
-  }, []);
+  const { data: farms = [], isLoading } = useQuery({
+    queryKey: ["farms"],
+    queryFn: fetchAllFarms,
+    staleTime: 60_000,
+  });
 
   const filtered = useMemo(() => {
-    const sorted = [...farms].sort((a, b) => {
-      if (a.is_active && !b.is_active) return -1;
-      if (!a.is_active && b.is_active) return 1;
-      return b.staked_count - a.staked_count;
-    });
+    let result = [...farms];
+    const now = Math.floor(Date.now() / 1000);
 
-    if (!search.trim()) return sorted;
-    const q = search.toLowerCase();
-    return sorted.filter(f =>
-      f.farm_name.toLowerCase().includes(q) ||
-      f.creator.toLowerCase().includes(q)
-    );
-  }, [farms, search]);
+    if (activeOnly) {
+      result = result.filter(f => f.is_active && (f.expiration === 0 || f.expiration > now));
+    }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+    if (stakedOnly && accountName) {
+      result = result.filter(f => f.staked_count > 0);
+    }
+
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(f =>
+        f.farm_name.toLowerCase().includes(q) ||
+        f.creator.toLowerCase().includes(q) ||
+        f.reward_pools.some(p => p.symbol.toLowerCase().includes(q))
+      );
+    }
+
+    switch (sortBy) {
+      case "newest":
+        result.sort((a, b) => b.time_created - a.time_created);
+        break;
+      case "staked":
+        result.sort((a, b) => b.staked_count - a.staked_count);
+        break;
+      case "name":
+        result.sort((a, b) => a.farm_name.localeCompare(b.farm_name));
+        break;
+    }
+
+    return result;
+  }, [farms, search, activeOnly, stakedOnly, sortBy, accountName]);
 
   return (
     <div className="space-y-4">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search farms by name or creator..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-10"
-        />
+      {/* Filters row */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search farms by name, creator, or reward token..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Switch id="active-only" checked={activeOnly} onCheckedChange={setActiveOnly} />
+            <Label htmlFor="active-only" className="text-sm cursor-pointer">Active only</Label>
+          </div>
+
+          {accountName && (
+            <div className="flex items-center gap-2">
+              <Checkbox id="staked-only" checked={stakedOnly} onCheckedChange={(v) => setStakedOnly(!!v)} />
+              <Label htmlFor="staked-only" className="text-sm cursor-pointer">Staked only</Label>
+            </div>
+          )}
+
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="staked">Most Staked</SelectItem>
+              <SelectItem value="newest">Newest</SelectItem>
+              <SelectItem value="name">Name A-Z</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {/* Results */}
+      {isLoading ? (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-48 rounded-xl" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="text-center py-12">
           <Sprout className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <p className="text-muted-foreground">No farms found</p>
@@ -63,7 +117,7 @@ export function BrowseFarms({ onSelectFarm }: BrowseFarmsProps) {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map(farm => (
-            <FarmCard key={farm.farm_name} farm={farm} onClick={onSelectFarm} />
+            <FarmCard key={farm.farm_name} farm={farm} />
           ))}
         </div>
       )}
