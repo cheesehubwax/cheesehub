@@ -28,6 +28,7 @@ interface TransactionResult {
  */
 export function useWaxTransaction(session: Session | null) {
   const { toast } = useToast();
+  const { showSuccess } = useTransactionSuccess();
 
   const executeTransaction = useCallback(async (
     actions: any[],
