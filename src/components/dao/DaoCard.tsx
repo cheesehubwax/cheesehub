@@ -40,7 +40,7 @@ export function DaoCard({ dao, onClick }: DaoCardProps) {
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors truncate">
+            <h3 className="font-semibold text-primary transition-colors truncate">
               {dao.dao_name}
             </h3>
             <p className="text-sm text-muted-foreground truncate">by {dao.creator}</p>
