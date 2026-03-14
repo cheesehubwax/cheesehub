@@ -86,7 +86,7 @@ export function BannerDisplay() {
 
   return (
     <div className="w-full flex flex-col items-center gap-1 pt-8 pb-2">
-      {current && (
+      {activeBanners.length > 0 && current ? (
         <a
           href={sanitizeUrl(current.websiteUrl)}
           target="_blank"
@@ -108,6 +108,19 @@ export function BannerDisplay() {
             AD
           </span>
         </a>
+      ) : (
+        <div className="flex gap-3 max-w-[580px] w-full">
+          {[1, 2].map((slot) => (
+            <Link
+              key={slot}
+              to="/bannerads"
+              className="flex-1 h-[75px] rounded-lg border border-dashed border-border/60 bg-card/40 flex items-center justify-center gap-2 text-muted-foreground/50 hover:border-cheese/40 hover:text-cheese/60 transition-colors"
+            >
+              <Megaphone className="h-4 w-4" />
+              <span className="text-xs font-medium">Slot {slot} — Available</span>
+            </Link>
+          ))}
+        </div>
       )}
       <Link
         to="/bannerads"
