@@ -238,7 +238,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
           <div className="flex h-[calc(85vh-52px)] min-h-[500px]">
             {/* Sidebar */}
             <div className="w-[180px] shrink-0 border-r border-border flex flex-col">
-              <nav className="flex-1 py-2 space-y-0.5">
+              <nav className="flex-1 py-2 space-y-1.5">
                 {topItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = activeSection === item.id;
@@ -250,7 +250,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                         "w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors text-left",
                         isActive
                           ? "bg-primary/20 text-primary border-r-2 border-primary font-medium"
-                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                          : "text-foreground hover:bg-muted/50"
                       )}
                     >
                       <Icon className="h-4 w-4 shrink-0" />
@@ -272,7 +272,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                           "w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors text-left",
                           isActive
                             ? "bg-primary/20 text-primary border-r-2 border-primary font-medium"
-                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                            : "text-foreground hover:bg-muted/50"
                         )}
                       >
                         <Icon className="h-4 w-4 shrink-0" />
