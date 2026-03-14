@@ -49,35 +49,17 @@ export function BannerDisplay() {
   const activeBanners = useMemo(() => {
     const nowSec = Math.floor(Date.now() / 1000);
 
-    // Prefer the most recent live group, fall back to nearest future
-    const pastGroups = slotGroups
+    // Only use the most recent group that has started (today's group)
+    const currentGroup = slotGroups
       .filter((group) => group.time <= nowSec)
-      .sort((a, b) => b.time - a.time);
+      .sort((a, b) => b.time - a.time)[0];
 
-    const futureGroups = slotGroups
-      .filter((group) => group.time > nowSec)
-      .sort((a, b) => a.time - b.time);
-
-    const candidateGroups = [...pastGroups, ...futureGroups];
-
-    for (const group of candidateGroups) {
-      const banners = extractActiveBanners(group);
+    if (currentGroup) {
+      const banners = extractActiveBanners(currentGroup);
       if (banners.length > 0) {
-        logger.info(`[BannerDisplay] Showing ${banners.length} banner(s) from group time=${group.time}`, banners);
+        logger.info(`[BannerDisplay] Showing ${banners.length} banner(s) from group time=${currentGroup.time}`, banners);
         return banners;
       }
-    }
-
-    // Log all slots for debugging if nothing matched
-    if (slotGroups.length > 0) {
-      logger.info("[BannerDisplay] No active banners found. All slot groups:", slotGroups.map(g => ({
-        time: g.time,
-        slots: g.slots.map(s => ({
-          pos: s.position, user: s.user, ipfsHash: s.ipfsHash?.slice(0, 12),
-          sharedUser: s.sharedUser, sharedIpfsHash: s.sharedIpfsHash?.slice(0, 12),
-          isAvailable: s.isAvailable, suspended: s.suspended, rentalType: s.rentalType,
-        })),
-      })));
     }
 
     return [];
@@ -104,7 +86,7 @@ export function BannerDisplay() {
 
   return (
     <div className="w-full flex flex-col items-center gap-1 pt-8 pb-2">
-      {current && (
+      {activeBanners.length > 0 && current ? (
         <a
           href={sanitizeUrl(current.websiteUrl)}
           target="_blank"
@@ -126,6 +108,19 @@ export function BannerDisplay() {
             AD
           </span>
         </a>
+      ) : (
+        <div className="flex gap-3 max-w-[580px] w-full">
+          {[1, 2].map((slot) => (
+            <Link
+              key={slot}
+              to="/bannerads"
+              className="flex-1 h-[75px] rounded-lg border border-dashed border-border/60 bg-card/40 flex items-center justify-center gap-2 text-muted-foreground/50 hover:border-cheese/40 hover:text-cheese/60 transition-colors"
+            >
+              <Megaphone className="h-4 w-4" />
+              <span className="text-xs font-medium">Slot {slot} — Available</span>
+            </Link>
+          ))}
+        </div>
       )}
       <Link
         to="/bannerads"
