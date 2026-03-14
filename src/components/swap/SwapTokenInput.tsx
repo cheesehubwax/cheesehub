@@ -12,6 +12,7 @@ interface SwapTokenInputProps {
   balance?: string;
   readOnly?: boolean;
   loading?: boolean;
+  precision?: number;
 }
 
 const PERCENT_BUTTONS = [25, 50, 75, 100] as const;
@@ -25,13 +26,15 @@ export function SwapTokenInput({
   balance,
   readOnly = false,
   loading = false,
+  precision,
 }: SwapTokenInputProps) {
+  const decimals = precision ?? token?.precision ?? 8;
   const [imgError, setImgError] = useState(false);
 
   const handlePercentClick = (pct: number) => {
     if (!balance || !onAmountChange) return;
     const val = parseFloat(balance) * (pct / 100);
-    onAmountChange(formatTokenAmount(val, token?.precision ?? 4));
+    onAmountChange(formatTokenAmount(val, decimals));
   };
 
   return (
@@ -42,7 +45,7 @@ export function SwapTokenInput({
           <span className="text-xs text-muted-foreground">
             Balance:{" "}
             <span className="text-foreground font-medium">
-              {parseFloat(balance).toLocaleString(undefined, { maximumFractionDigits: 4 })}
+              {parseFloat(balance).toLocaleString(undefined, { maximumFractionDigits: decimals })}
             </span>
           </span>
         )}

@@ -80,10 +80,10 @@ export function CheeseSwapWidget({
   // Derive the non-active field from route
   const displayAmountIn = activeField === "in"
     ? amountIn
-    : (route?.input ? formatTokenAmount(route.input, tokenIn?.precision ?? 4) : "");
+    : (route?.input ? formatTokenAmount(route.input, tokenIn?.precision ?? 8) : "");
   const displayAmountOut = activeField === "out"
     ? amountOut
-    : (route?.output ? formatTokenAmount(route.output, tokenOut?.precision ?? 4) : "");
+    : (route?.output ? formatTokenAmount(route.output, tokenOut?.precision ?? 8) : "");
 
   const handleAmountInChange = (val: string) => {
     setAmountIn(val);
@@ -121,7 +121,7 @@ export function CheeseSwapWidget({
   // For swap action, we always need the input amount
   const swapAmountIn = activeField === "in"
     ? amountIn
-    : (route?.input ? formatTokenAmount(route.input, tokenIn?.precision ?? 4) : "");
+    : (route?.input ? formatTokenAmount(route.input, tokenIn?.precision ?? 8) : "");
 
   const handleSwap = async () => {
     if (!route || !session || !accountName || !tokenIn) return;
@@ -249,7 +249,7 @@ export function CheeseSwapWidget({
                 {route.output && swapAmountIn && parseFloat(swapAmountIn) > 0
                   ? formatTokenAmount(
                       route.output / parseFloat(swapAmountIn),
-                      tokenOut?.precision ?? 4
+                      tokenOut?.precision ?? 8
                     )
                   : "—"}{" "}
                 {tokenOut?.ticker}
@@ -280,7 +280,7 @@ export function CheeseSwapWidget({
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Min. Received</span>
                 <span className="text-foreground">
-                  {formatTokenAmount(route.minReceived, tokenOut?.precision ?? 4)} {tokenOut?.ticker}
+                  {formatTokenAmount(route.minReceived, tokenOut?.precision ?? 8)} {tokenOut?.ticker}
                 </span>
               </div>
             </div>
