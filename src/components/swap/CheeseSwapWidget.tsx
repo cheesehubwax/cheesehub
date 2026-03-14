@@ -4,7 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { SwapTokenInput } from "./SwapTokenInput";
 import { TokenSelector } from "./TokenSelector";
 import { useSwapTokens } from "@/hooks/useSwapTokens";
-import { useSwapRoute } from "@/hooks/useSwapRoute";
+import { useSwapRoute, type TradeType } from "@/hooks/useSwapRoute";
 import { useSwapTokenBalance } from "@/hooks/useSwapTokenBalance";
 import { useWax } from "@/context/WaxContext";
 import { type SwapToken, formatTokenAmount, normalizeRouteActions, PREFERRED_CONTRACTS } from "@/lib/swapApi";
@@ -28,6 +28,8 @@ export function CheeseSwapWidget({
   const [tokenIn, setTokenIn] = useState<SwapToken | null>(null);
   const [tokenOut, setTokenOut] = useState<SwapToken | null>(null);
   const [amountIn, setAmountIn] = useState("");
+  const [amountOut, setAmountOut] = useState("");
+  const [activeField, setActiveField] = useState<"in" | "out">("in");
   const [slippage, setSlippage] = useState(() => {
     const saved = localStorage.getItem("cheese-swap-slippage");
     return saved ? parseFloat(saved) : 1;
@@ -63,18 +65,44 @@ export function CheeseSwapWidget({
   const balanceIn = useSwapTokenBalance(accountName, tokenIn?.contract, tokenIn?.ticker);
   const balanceOut = useSwapTokenBalance(accountName, tokenOut?.contract, tokenOut?.ticker);
 
+  const tradeType: TradeType = activeField === "in" ? "EXACT_INPUT" : "EXACT_OUTPUT";
+  const routeAmount = activeField === "in" ? amountIn : amountOut;
+
   const { route, isFetching: routeLoading, error: routeError, noRoute } = useSwapRoute(
     tokenIn,
     tokenOut,
-    amountIn,
+    routeAmount,
     slippage,
-    accountName || "placeholder111"
+    accountName || "placeholder111",
+    tradeType
   );
+
+  // Derive the non-active field from route
+  const displayAmountIn = activeField === "in"
+    ? amountIn
+    : (route?.input ? formatTokenAmount(route.input, tokenIn?.precision ?? 4) : "");
+  const displayAmountOut = activeField === "out"
+    ? amountOut
+    : (route?.output ? formatTokenAmount(route.output, tokenOut?.precision ?? 4) : "");
+
+  const handleAmountInChange = (val: string) => {
+    setAmountIn(val);
+    setActiveField("in");
+    if (!val || parseFloat(val) <= 0) setAmountOut("");
+  };
+
+  const handleAmountOutChange = (val: string) => {
+    setAmountOut(val);
+    setActiveField("out");
+    if (!val || parseFloat(val) <= 0) setAmountIn("");
+  };
 
   const handleFlip = useCallback(() => {
     setTokenIn(tokenOut);
     setTokenOut(tokenIn);
     setAmountIn("");
+    setAmountOut("");
+    setActiveField("in");
   }, [tokenIn, tokenOut]);
 
   const handleSlippageChange = (val: number) => {
@@ -90,20 +118,23 @@ export function CheeseSwapWidget({
     }
   };
 
-  const estimatedOutput = route?.output
-    ? formatTokenAmount(route.output, tokenOut?.precision ?? 4)
-    : "";
+  // For swap action, we always need the input amount
+  const swapAmountIn = activeField === "in"
+    ? amountIn
+    : (route?.input ? formatTokenAmount(route.input, tokenIn?.precision ?? 4) : "");
 
   const handleSwap = async () => {
     if (!route || !session || !accountName || !tokenIn) return;
     setIsSwapping(true);
     try {
-      const actions = normalizeRouteActions(route, accountName, tokenIn.contract, amountIn, tokenIn);
+      const actions = normalizeRouteActions(route, accountName, tokenIn.contract, swapAmountIn, tokenIn);
       await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       toast.success("Swap successful!", {
-        description: `Swapped ${amountIn} ${tokenIn?.ticker} → ${estimatedOutput} ${tokenOut?.ticker}`,
+        description: `Swapped ${swapAmountIn} ${tokenIn?.ticker} → ${displayAmountOut} ${tokenOut?.ticker}`,
       });
       setAmountIn("");
+      setAmountOut("");
+      setActiveField("in");
     } catch (e: any) {
       const msg = e?.message || "Swap failed";
       if (!msg.includes("cancel") && !msg.includes("reject")) {
@@ -114,12 +145,15 @@ export function CheeseSwapWidget({
     }
   };
 
-  const canSwap = !!route && !!route.memo && !!accountName && parseFloat(amountIn) > 0 && !routeLoading;
+  const hasAmount = parseFloat(routeAmount) > 0;
+  const canSwap = !!route && !!route.memo && !!accountName && hasAmount && !routeLoading;
 
   const handleTokenSelect = useCallback((token: SwapToken) => {
     if (selectorSide === "in") setTokenIn(token);
     else if (selectorSide === "out") setTokenOut(token);
   }, [selectorSide]);
+
+  const isLoading = routeLoading && hasAmount;
 
   return (
     <div className="space-y-3">
@@ -166,10 +200,11 @@ export function CheeseSwapWidget({
         <SwapTokenInput
           label="You pay"
           token={tokenIn}
-          amount={amountIn}
-          onAmountChange={setAmountIn}
+          amount={displayAmountIn}
+          onAmountChange={handleAmountInChange}
           onTokenClick={() => setSelectorSide("in")}
           balance={balanceIn ?? undefined}
+          loading={activeField === "out" && isLoading}
         />
 
         {/* Flip button */}
@@ -185,16 +220,16 @@ export function CheeseSwapWidget({
         <SwapTokenInput
           label="You receive"
           token={tokenOut}
-          amount={estimatedOutput}
+          amount={displayAmountOut}
+          onAmountChange={handleAmountOutChange}
           onTokenClick={() => setSelectorSide("out")}
-          readOnly
-          loading={routeLoading && parseFloat(amountIn) > 0}
           balance={balanceOut ?? undefined}
+          loading={activeField === "in" && isLoading}
         />
       </div>
 
       {/* Route error */}
-      {routeError && parseFloat(amountIn) > 0 && (
+      {routeError && hasAmount && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-destructive/10 text-destructive text-sm">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{(routeError as Error)?.message || "Unable to find a route for this swap"}</span>
@@ -211,9 +246,9 @@ export function CheeseSwapWidget({
             <span className="text-muted-foreground">
               1 {tokenIn?.ticker} ≈{" "}
               <span className="text-foreground font-medium">
-                {route.output && amountIn
+                {route.output && swapAmountIn && parseFloat(swapAmountIn) > 0
                   ? formatTokenAmount(
-                      route.output / parseFloat(amountIn),
+                      route.output / parseFloat(swapAmountIn),
                       tokenOut?.precision ?? 4
                     )
                   : "—"}{" "}
@@ -274,7 +309,7 @@ export function CheeseSwapWidget({
           "Connect Wallet"
         ) : !tokenIn || !tokenOut ? (
           "Select tokens"
-        ) : !amountIn || parseFloat(amountIn) <= 0 ? (
+        ) : !hasAmount ? (
           "Enter amount"
         ) : routeLoading ? (
           "Finding best route..."
