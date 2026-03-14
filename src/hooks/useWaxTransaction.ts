@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { Session } from '@wharfkit/session';
 import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
 import { useToast } from '@/hooks/use-toast';
+import { useTransactionSuccess } from '@/context/TransactionSuccessContext';
 
 interface TransactionOptions {
   successTitle?: string;
