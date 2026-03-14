@@ -75,13 +75,17 @@ export async function fetchTemplateDetails(collectionName: string, templateId: s
       const immData = data.data.immutable_data || {};
       return {
         template_id: data.data.template_id,
+        contract: data.data.contract || '',
         name: immData.name || `Template #${templateId}`,
-        image: getImageUrl(immData.img || immData.image || immData.video),
         collection: { collection_name: collectionName, name: immData.name || '', img: getImageUrl(immData.img || '') },
         max_supply: data.data.max_supply || '0',
         issued_supply: data.data.issued_supply || '0',
+        is_transferable: data.data.is_transferable ?? true,
+        is_burnable: data.data.is_burnable ?? true,
         schema: data.data.schema || { schema_name: '' },
         immutable_data: immData,
+        created_at_time: data.data.created_at_time || '',
+        created_at_block: data.data.created_at_block || '',
       };
     }
     return null;
