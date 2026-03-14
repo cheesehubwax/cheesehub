@@ -336,14 +336,14 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-mono font-semibold">{formatAmount(effective.effectiveBalance)}</p>
+                      <p className="font-mono font-semibold text-foreground">{formatAmount(effective.effectiveBalance)}</p>
                       {pool.total_hourly_reward && (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-foreground/70">
                           {pool.total_hourly_reward}/hr
                         </p>
                       )}
                       {effective.hoursRemaining !== null && (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-foreground/70">
                           ~{Math.floor(effective.hoursRemaining / 24)}d remaining
                         </p>
                       )}
