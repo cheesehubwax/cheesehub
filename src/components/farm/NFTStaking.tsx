@@ -312,12 +312,12 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
                       )}
                     </div>
                     {nft.isVideo ? (
-                      <video src={nft.image} className="w-full aspect-square object-cover rounded" muted autoPlay loop />
+                      <video src={nft.image} className="w-full aspect-square object-contain rounded bg-muted/30" muted autoPlay loop />
                     ) : (
                       <img
                         src={nft.image}
                         alt={nft.name}
-                        className="w-full aspect-square object-cover rounded"
+                        className="w-full aspect-square object-contain rounded bg-muted/30"
                         loading="lazy"
                         onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
                       />
