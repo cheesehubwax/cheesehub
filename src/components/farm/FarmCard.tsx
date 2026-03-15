@@ -66,18 +66,18 @@ export function FarmCard({ farm }: { farm: FarmInfo }) {
             <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors truncate text-sm">
               {farm.farm_name}
             </h3>
-            <p className="text-xs text-muted-foreground">by {farm.creator}</p>
+            <p className="text-xs text-foreground/70">by {farm.creator}</p>
           </div>
         </div>
 
         {/* Badges */}
         <div className="flex flex-wrap gap-1.5 mt-3">
           <Badge className={`text-[10px] ${status.className}`}>{status.label}</Badge>
-          <Badge variant="outline" className="text-[10px] border-border/50">{getFarmTypeLabel(farm.farm_type)}</Badge>
+          <Badge variant="outline" className="text-[10px] border-border/50 text-foreground">{getFarmTypeLabel(farm.farm_type)}</Badge>
         </div>
 
         {/* Stats */}
-        <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
+        <div className="flex items-center justify-between mt-3 text-xs text-foreground">
           <span>🎯 {farm.staked_count} staked</span>
           <span className="flex items-center gap-1">
             <Clock className="h-3 w-3" />
@@ -85,10 +85,15 @@ export function FarmCard({ farm }: { farm: FarmInfo }) {
           </span>
         </div>
 
+        {/* Payout Interval */}
+        <div className="mt-2 text-xs text-foreground flex items-center gap-1">
+          <span>⏱️ Payout every {formatPayoutInterval(farm.payout_interval)}</span>
+        </div>
+
         {/* Reward pools */}
         {farm.reward_pools.length > 0 && (
           <div className="mt-3 pt-3 border-t border-border/30 space-y-1">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Reward Pool</p>
+            <p className="text-[10px] text-foreground/70 uppercase tracking-wider">Reward Pool</p>
             {farm.reward_pools.map((pool, i) => (
               <div key={i} className="flex items-center gap-1.5 text-xs">
                 <TokenLogo contract={pool.contract} symbol={pool.symbol} size="sm" />
