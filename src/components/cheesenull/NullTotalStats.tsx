@@ -46,7 +46,7 @@ export function NullTotalStats() {
           <div className="flex items-center justify-center gap-4 pt-1">
             <div className="text-center space-y-0.5">
               <div className="flex items-center justify-center gap-1 text-muted-foreground">
-                <span className="text-xs">💧</span>
+                <span className="text-xs">✖️</span>
                 <span className="text-[10px] font-medium">xCHEESE</span>
               </div>
               <p className="text-sm font-semibold text-cheese">{formatCheeseAmount(totalCheeseLiquidity)} <span className="text-[11px] text-muted-foreground">CHEESE</span></p>
