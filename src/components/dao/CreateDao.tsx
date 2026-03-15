@@ -584,7 +584,7 @@ export function CreateDao() {
 
         {/* Submit */}
         <Button onClick={handleCreate} disabled={loading} className="w-full bg-primary text-primary-foreground" size="lg">
-          {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Creating DAO...</> : "🏛️ Create DAO (265 WAX)"}
+          {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Creating DAO...</> : paymentMethod === "cheese" ? "🏛️ Create DAO (Pay with CHEESE)" : "🏛️ Create DAO (265 WAX)"}
         </Button>
 
         {/* Footer */}
