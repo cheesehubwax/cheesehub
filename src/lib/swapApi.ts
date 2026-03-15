@@ -7,6 +7,8 @@ export interface SwapToken {
   precision: number;
   logo?: string;
   id?: string;
+  system_price?: number;
+  usd_price?: number;
 }
 
 export interface SwapAction {
@@ -36,7 +38,12 @@ export function getTokenLogoUrl(contract: string, ticker: string): string {
 
 export async function fetchSwapTokenList(signal?: AbortSignal): Promise<SwapToken[]> {
   const res = await fetch(`${ALCOR_API}/tokens`, { signal });
-  if (!res.ok) throw new Error("Failed to fetch token list");
+  if (!res.ok) {
+    if (res.status === 429) {
+      throw new Error("Rate limited — please wait a moment and try again");
+    }
+    throw new Error("Failed to fetch token list");
+  }
   const data = await res.json();
   const seen = new Set<string>();
   return (data as Array<{ contract: string; decimals: number; symbol: string; id: string; is_scam?: boolean }>)
@@ -47,12 +54,14 @@ export async function fetchSwapTokenList(signal?: AbortSignal): Promise<SwapToke
       seen.add(key);
       return true;
     })
-    .map((t) => ({
+    .map((t: any) => ({
       contract: t.contract,
       ticker: t.symbol,
       precision: t.decimals,
       id: t.id,
       logo: getTokenLogoUrl(t.contract, t.symbol),
+      system_price: t.system_price ?? 0,
+      usd_price: t.usd_price ?? 0,
     }));
 }
 

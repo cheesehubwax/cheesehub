@@ -1,43 +1,30 @@
-import { useQuery } from '@tanstack/react-query';
-
-interface AlcorToken {
-  id: string;
-  contract: string;
-  symbol: string;
-  system_price: number; // Price in WAX
-  usd_price: number;
-}
+import { useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useSwapTokens } from './useSwapTokens';
 
 // Map of contract:symbol -> price in WAX
 export type TokenPriceMap = Map<string, number>;
 
-async function fetchAlcorTokenPrices(): Promise<TokenPriceMap> {
-  const response = await fetch('https://wax.alcor.exchange/api/v2/tokens');
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch Alcor token prices');
-  }
-
-  const tokens: AlcorToken[] = await response.json();
-  const priceMap = new Map<string, number>();
-
-  tokens.forEach(token => {
-    if (token.system_price > 0) {
-      // Create key as contract:symbol
-      const key = `${token.contract}:${token.symbol}`;
-      priceMap.set(key, token.system_price);
-    }
-  });
-
-  return priceMap;
-}
-
+/**
+ * Derives token price data from the shared swap-tokens query
+ * instead of making a separate fetch to the same Alcor /tokens endpoint.
+ */
 export function useAlcorTokenPrices() {
-  return useQuery<TokenPriceMap>({
-    queryKey: ['alcor-token-prices'],
-    queryFn: fetchAlcorTokenPrices,
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    refetchInterval: 60 * 1000, // 1 minute
-    retry: 2,
-  });
+  const { tokens, isLoading, error } = useSwapTokens();
+  const queryClient = useQueryClient();
+
+  const data = useMemo(() => {
+    if (!tokens.length) return undefined;
+    const priceMap = new Map<string, number>();
+    tokens.forEach(token => {
+      if (token.system_price && token.system_price > 0) {
+        priceMap.set(`${token.contract}:${token.ticker}`, token.system_price);
+      }
+    });
+    return priceMap;
+  }, [tokens]);
+
+  const refetch = () => queryClient.invalidateQueries({ queryKey: ['swap-tokens'] });
+
+  return { data, isLoading, error, refetch };
 }
