@@ -105,7 +105,7 @@ export function TreasuryDeposit({ daoName, onDeposited }: TreasuryDepositProps) 
 
     const formattedAmount = `${parseFloat(amount).toFixed(activeToken.precision)} ${activeToken.symbol}`;
 
-    const actions = [
+    const actions: any[] = [
       buildAnnounceDepoAction(accountName),
     ];
 
