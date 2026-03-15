@@ -119,6 +119,17 @@ export function CreateFarm() {
   const [paymentMethod, setPaymentMethod] = useState<"wax" | "cheese" | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [helpAccordionValue, setHelpAccordionValue] = useState<string | undefined>(undefined);
+  const [scrollToAnchor, setScrollToAnchor] = useState(false);
+  const anchorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollToAnchor && helpOpen && anchorRef.current) {
+      setTimeout(() => {
+        anchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        setScrollToAnchor(false);
+      }, 150);
+    }
+  }, [scrollToAnchor, helpOpen]);
 
   const validation = validateFarmName(farmName);
 
