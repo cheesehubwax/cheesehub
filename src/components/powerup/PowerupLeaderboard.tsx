@@ -40,7 +40,7 @@ export function PowerupLeaderboard({ rawActions, isLoading, isError, onRefresh }
 
   const getSecondaryText = (entry: PowerupLeaderStats) => {
     return sortBy === 'powerups'
-      ? `${formatCheeseAmount(entry.cheeseBurned)} burned`
+      ? `${formatCheeseAmount(entry.cheeseBurned)} nulled`
       : `${entry.powerups} powerups`;
   };
 
