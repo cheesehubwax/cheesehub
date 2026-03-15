@@ -144,8 +144,13 @@ export function WalletConnect() {
           <DropdownMenuSeparator />
 
           <DropdownMenuItem onClick={() => setWalletOpen(true)}>
-            <Send className="h-4 w-4 mr-2" />
-            Open Wallet
+            <img src={walletIcon} alt="Wallet" className="h-4 w-4 mr-2 object-contain" />
+            <span><span className="text-cheese">CHEESE</span>Wallet</span>
+          </DropdownMenuItem>
+
+          <DropdownMenuItem onClick={() => window.dispatchEvent(new CustomEvent('open-cheese-amp'))}>
+            <span className="mr-2">🎧</span>
+            <span><span className="text-cheese">CHEESE</span>Amp</span>
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />
