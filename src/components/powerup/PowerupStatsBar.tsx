@@ -1,4 +1,5 @@
 import { PowerupStats } from "@/hooks/usePowerupStats";
+import cheesenullIcon from "@/assets/cheesenull.png";
 
 interface PowerupStatsBarProps {
   stats: PowerupStats | null;
@@ -24,13 +25,15 @@ export const PowerupStatsBar = ({ stats, isLoading }: PowerupStatsBarProps) => {
       label: "WAX Burnt",
       value: isLoading ? "-" : (stats ? formatNumber(stats.waxBurnt, 4) : "-"),
       emoji: "🔥",
-      color: "text-amber-500"
+      color: "text-amber-500",
+      isNull: false
     },
     {
       label: "CHEESE Nulled",
       value: isLoading ? "-" : (stats ? formatNumber(stats.cheeseNulled, 4) : "-"),
-      emoji: "🔥",
-      color: "text-accent"
+      emoji: "",
+      color: "text-accent",
+      isNull: true
     },
   ];
 
@@ -40,7 +43,11 @@ export const PowerupStatsBar = ({ stats, isLoading }: PowerupStatsBarProps) => {
         {statItems.map((stat) => (
           <div key={stat.label} className="text-center">
             <div className="flex items-center justify-center gap-2 mb-1">
-              <span className="text-base">{stat.emoji}</span>
+              {stat.isNull ? (
+                <img src={cheesenullIcon} alt="CHEESE Null" className="w-5 h-5" />
+              ) : (
+                <span className="text-base">{stat.emoji}</span>
+              )}
               <span className="text-lg font-bold font-mono text-foreground">{stat.value}</span>
             </div>
             <p className="text-xs text-muted-foreground">{stat.label}</p>

@@ -1,3 +1,4 @@
+import { RefreshCw } from "lucide-react";
 import { PowerUpEstimate } from "@/hooks/usePowerupEstimate";
 
 interface ResourceEstimateProps {
@@ -45,7 +46,7 @@ export const ResourceEstimate = ({
             onClick={onRefresh}
             className="p-2 hover:bg-red-500/20 rounded-lg transition-colors"
           >
-            <span>🔄</span>
+            <RefreshCw className="w-4 h-4 text-red-400" />
           </button>
         </div>
       </div>
@@ -75,7 +76,7 @@ export const ResourceEstimate = ({
             className="p-1.5 hover:bg-muted rounded-lg transition-colors"
             title="Refresh rates"
           >
-            <span className="text-sm">🔄</span>
+            <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
           </button>
         </div>
       </div>

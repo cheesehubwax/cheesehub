@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Flame, Zap, Trophy, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -13,6 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import { type NullerStats, type SortMode, type LogburnAction, aggregateNullerStats } from '@/lib/fetchLeaderboard';
 import { formatCheeseAmount } from '@/lib/cheeseNullApi';
+import cheesenullIcon from '@/assets/cheesenull.png';
 
 interface NullerLeaderboardProps {
   rawActions: LogburnAction[];
@@ -21,9 +22,9 @@ interface NullerLeaderboardProps {
   onRefresh?: () => void;
 }
 
-const SORT_OPTIONS: { mode: SortMode; label: string; icon: React.ReactNode }[] = [
-  { mode: 'cheese', label: 'CHEESE Nulled', icon: <Flame className="w-3.5 h-3.5" /> },
-  { mode: 'burns', label: 'Burns', icon: <Zap className="w-3.5 h-3.5" /> },
+const SORT_OPTIONS: { mode: SortMode; label: string; emoji?: string; icon?: string }[] = [
+  { mode: 'cheese', label: 'CHEESE Nulled', icon: 'cheesenull' },
+  { mode: 'burns', label: 'Burns', emoji: '⚡' },
 ];
 
 export function NullerLeaderboard({ rawActions, isLoading, isError, onRefresh }: NullerLeaderboardProps) {
@@ -61,11 +62,11 @@ export function NullerLeaderboard({ rawActions, isLoading, isError, onRefresh }:
         {/* Header */}
         <div className="text-center space-y-1">
           <div className="flex items-center justify-center gap-2">
-            <Trophy className="w-4 h-4 text-cheese" />
+            <span>🏆</span>
             <h3 className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
               CHEESEBoard
             </h3>
-            <Trophy className="w-4 h-4 text-cheese" />
+            <span>🏆</span>
             {onRefresh && (
               <button
                 onClick={onRefresh}
@@ -92,7 +93,11 @@ export function NullerLeaderboard({ rawActions, isLoading, isError, onRefresh }:
                   : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent'
               )}
             >
-              {opt.icon}
+              {opt.icon === 'cheesenull' ? (
+                <img src={cheesenullIcon} alt="null" className="w-3.5 h-3.5" />
+              ) : (
+                <span>{opt.emoji}</span>
+              )}
               {opt.label}
             </button>
           ))}

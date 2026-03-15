@@ -1,4 +1,6 @@
 import { useState, useMemo } from 'react';
+import { RefreshCw } from 'lucide-react';
+import cheesenullIcon from '@/assets/cheesenull.png';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -15,8 +17,8 @@ interface PowerupLeaderboardProps {
   onRefresh?: () => void;
 }
 
-const SORT_OPTIONS: { mode: PowerupSortMode; label: string; emoji: string }[] = [
-  { mode: 'cheese', label: 'CHEESE Burned', emoji: '🔥' },
+const SORT_OPTIONS: { mode: PowerupSortMode; label: string; emoji?: string; icon?: string }[] = [
+  { mode: 'cheese', label: 'CHEESE Burned', icon: 'cheesenull' },
   { mode: 'powerups', label: 'Powerups', emoji: '⚡' },
 ];
 
@@ -59,7 +61,7 @@ export function PowerupLeaderboard({ rawActions, isLoading, isError, onRefresh }
                 className="ml-1 p-1 rounded-md text-muted-foreground hover:text-cheese hover:bg-cheese/10 transition-colors disabled:opacity-50"
                 title="Refresh leaderboard"
               >
-                🔄
+                <RefreshCw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} />
               </button>
             )}
           </div>
@@ -77,7 +79,11 @@ export function PowerupLeaderboard({ rawActions, isLoading, isError, onRefresh }
                   : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent'
               )}
             >
-              <span>{opt.emoji}</span>
+              {opt.icon === 'cheesenull' ? (
+                <img src={cheesenullIcon} alt="null" className="w-3.5 h-3.5" />
+              ) : (
+                <span>{opt.emoji}</span>
+              )}
               {opt.label}
             </button>
           ))}
