@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSwapTokens } from './useSwapTokens';
 
 // Map of contract:symbol -> price in WAX
@@ -10,6 +11,7 @@ export type TokenPriceMap = Map<string, number>;
  */
 export function useAlcorTokenPrices() {
   const { tokens, isLoading, error } = useSwapTokens();
+  const queryClient = useQueryClient();
 
   const data = useMemo(() => {
     if (!tokens.length) return undefined;
@@ -22,5 +24,7 @@ export function useAlcorTokenPrices() {
     return priceMap;
   }, [tokens]);
 
-  return { data, isLoading, error };
+  const refetch = () => queryClient.invalidateQueries({ queryKey: ['swap-tokens'] });
+
+  return { data, isLoading, error, refetch };
 }
