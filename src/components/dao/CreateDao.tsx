@@ -251,8 +251,8 @@ export function CreateDao() {
                       </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="modify">
-                      <AccordionTriggerUI>Modifying Settings Later</AccordionTriggerUI>
-                      <AccordionContent className="text-sm text-muted-foreground">
+                      <AccordionTriggerUI className="text-primary">Modifying Settings Later</AccordionTriggerUI>
+                      <AccordionContent className="text-sm text-foreground">
                         <p>Once created, DAO settings <strong>cannot be changed</strong>. Please review all configuration options carefully before submitting. Choose wisely!</p>
                       </AccordionContent>
                     </AccordionItem>
