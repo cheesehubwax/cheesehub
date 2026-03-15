@@ -108,6 +108,12 @@ export const DAO_TYPES: Record<number, string> = {
   5: "Hold NFTs (Non-Custodial)",
 };
 
+// Only these DAO types are available for creation on CHEESEHub
+export const CREATABLE_DAO_TYPES: Record<number, string> = {
+  4: "Stake Tokens (Custodial)",
+  5: "Hold NFTs (Non-Custodial)",
+};
+
 export const PROPOSER_TYPES: Record<number, string> = {
   0: "Authors Only",
   1: "Anyone",

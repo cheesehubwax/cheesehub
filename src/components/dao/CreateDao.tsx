@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger as AccordionTriggerUI } from "@/components/ui/accordion";
 import {
-  DAO_TYPES, PROPOSER_TYPES,
+  DAO_TYPES, CREATABLE_DAO_TYPES, PROPOSER_TYPES,
   buildAssertPointAction, buildDaoCreationFeeAction, buildCreateDaoAction,
   buildSetProfileActionWithSocials, DaoSocials,
 } from "@/lib/dao";
@@ -59,7 +59,7 @@ export function CreateDao() {
   const [minimumVotes, setMinimumVotes] = useState(1);
   const [minimumWeight, setMinimumWeight] = useState(0);
   const [proposalCost, setProposalCost] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState<"wax" | "cheese">("wax");
+  const [paymentMethod, setPaymentMethod] = useState<"wax" | "cheese">("cheese");
 
   // Profile fields
   const [description, setDescription] = useState("");
@@ -79,9 +79,6 @@ export function CreateDao() {
   };
 
   const daoTypeDescriptions: Record<number, string> = {
-    1: "Users stake NFTs to the DAO contract to gain voting power.",
-    2: "Users stake tokens to a WaxDAO pool for voting.",
-    3: "Uses an existing WaxDAO staking pool for governance.",
     4: "Members stake governance tokens directly to the DAO contract. Tokens are held custodially, and unstaking lets you reclaim them immediately. The token's precision must match.",
     5: "NFTs stay in user's wallets — no staking required! Simply hold eligible NFTs to cast. Hold NFT = 1 vote — best suited for fair NFT communities.",
   };
@@ -162,8 +159,8 @@ export function CreateDao() {
                     <AccordionItem value="cheese-payment">
                       <AccordionTriggerUI>Paying with CHEESE Tokens</AccordionTriggerUI>
                       <AccordionContent className="text-sm text-muted-foreground space-y-2">
-                        <p>You can <strong>pay with CHEESE tokens</strong> and receive a <strong>20% discount</strong> on the 265 WAX creation fee.</p>
-                        <p>Simply select the CHEESE payment option and the transaction will handle everything automatically in a single step - no prepayment required!</p>
+                       <p><strong>CHEESE is the standard payment method</strong> and gives you a <strong>20% discount</strong> on the 265 WAX creation fee.</p>
+                        <p>Simply select the CHEESE payment option (selected by default) and the transaction will handle everything automatically in a single step - no prepayment required!</p>
                       </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="dao-name">
@@ -271,7 +268,7 @@ export function CreateDao() {
           <p className="text-sm text-muted-foreground">
             Set up your decentralized autonomous organization on the WAX blockchain.
           </p>
-          <p className="text-xs text-muted-foreground">It costs 265 WAX to create a DAO.</p>
+          <p className="text-xs text-muted-foreground">Pay with CHEESE (20% discount) or 265 WAX to create a DAO.</p>
         </div>
 
         {/* DAO TYPE */}
@@ -282,7 +279,7 @@ export function CreateDao() {
             onValueChange={v => setDaoType(parseInt(v))}
             className="space-y-2"
           >
-            {Object.entries(DAO_TYPES).map(([key, label]) => {
+            {Object.entries(CREATABLE_DAO_TYPES).map(([key, label]) => {
               const isSelected = daoType === parseInt(key);
               return (
                 <Label
@@ -587,7 +584,7 @@ export function CreateDao() {
 
         {/* Submit */}
         <Button onClick={handleCreate} disabled={loading} className="w-full bg-primary text-primary-foreground" size="lg">
-          {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Creating DAO...</> : "🏛️ Create DAO (265 WAX)"}
+          {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Creating DAO...</> : paymentMethod === "cheese" ? "🏛️ Create DAO (Pay with CHEESE)" : "🏛️ Create DAO (265 WAX)"}
         </Button>
 
         {/* Footer */}
