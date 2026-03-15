@@ -50,6 +50,8 @@ const App = () => {
                 <Route path="/cheesenull" element={<CheeseNull />} />
                 <Route path="/drip" element={<Drip />} />
                 <Route path="/bannerads" element={<BannerAds />} />
+                <Route path="/disclaimer" element={<Disclaimer />} />
+                <Route path="/terms" element={<Terms />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
