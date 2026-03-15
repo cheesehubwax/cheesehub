@@ -18,7 +18,7 @@ interface QuickLinkProps {
 function QuickLink({ icon, label, href, variant = 'default' }: QuickLinkProps) {
   const baseStyles = "flex items-center gap-2 transition-all duration-200";
   const variantStyles = variant === 'social' 
-    ? "hover:text-cheese" 
+    ? "text-primary hover:text-primary/80" 
     : "bg-card hover:bg-cheese/10 border border-border/50 hover:border-cheese/30";
 
   return (
