@@ -49,7 +49,7 @@ export function FarmCard({ farm }: { farm: FarmInfo }) {
 
   return (
     <Card
-      className="bg-card/80 border-border/50 hover:border-primary/30 hover:shadow-lg transition-all cursor-pointer group flex flex-col"
+      className="bg-card/80 border-primary/30 shadow-lg transition-all cursor-pointer group flex flex-col"
       onClick={() => navigate(`/farm/${farm.farm_name}`)}
     >
       <CardContent className="p-4 flex flex-col flex-1">
@@ -102,7 +102,7 @@ export function FarmCard({ farm }: { farm: FarmInfo }) {
 
         {/* View Details */}
         <div className="mt-auto pt-3">
-          <Button variant="outline" size="sm" className="w-full text-xs group-hover:border-primary/50 group-hover:text-primary">
+          <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 gap-2">
             View Details
           </Button>
         </div>
