@@ -22,6 +22,7 @@ import {
   DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import cheeseLogo from "@/assets/cheese-logo.png";
+import walletIcon from "@/assets/wallet-icon.png";
 import { SerializedSession } from "@wharfkit/session";
 
 export function WalletConnect() {
