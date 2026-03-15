@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Users, BarChart3, Clock, Coins, Tag, ExternalLink } from "lucide-react";
 import { DaoInfo, DAO_TYPES, PROPOSER_TYPES } from "@/lib/dao";
+import { TokenLogo } from "@/components/TokenLogo";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 
 interface DaoCardProps {
@@ -82,9 +83,16 @@ export function DaoCard({ dao, onClick }: DaoCardProps) {
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <Coins className="h-3.5 w-3.5 text-primary shrink-0" />
+              <TokenLogo
+                contract={dao.token_contract}
+                symbol={dao.token_symbol?.includes(",") ? dao.token_symbol.split(",")[1] : dao.token_symbol}
+                size="sm"
+                className="h-4 w-4 shrink-0"
+              />
               <span className="text-muted-foreground">Gov Token:</span>
-              <span className="font-medium text-foreground">{dao.token_symbol || "N/A"}</span>
+              <span className="font-medium text-foreground">
+                {dao.token_symbol ? (dao.token_symbol.includes(",") ? dao.token_symbol.split(",")[1] : dao.token_symbol) : "N/A"}
+              </span>
             </div>
           )}
           <div className="flex items-center gap-2">
