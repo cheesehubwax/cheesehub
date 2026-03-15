@@ -13,7 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import { type NullerStats, type SortMode, type LogburnAction, aggregateNullerStats } from '@/lib/fetchLeaderboard';
 import { formatCheeseAmount } from '@/lib/cheeseNullApi';
-import cheesenullIcon from '@/assets/cheesenull.png';
+
 
 interface NullerLeaderboardProps {
   rawActions: LogburnAction[];
