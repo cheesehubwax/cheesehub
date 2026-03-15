@@ -31,9 +31,9 @@ export const PowerupStatsBar = ({ stats, isLoading }: PowerupStatsBarProps) => {
     {
       label: "CHEESE Nulled",
       value: isLoading ? "-" : (stats ? formatNumber(stats.cheeseNulled, 4) : "-"),
-      emoji: "",
+      emoji: "⛔",
       color: "text-accent",
-      isNull: true
+      isNull: false
     },
   ];
 
