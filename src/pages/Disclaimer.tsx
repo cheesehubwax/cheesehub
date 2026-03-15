@@ -138,6 +138,13 @@ export default function Disclaimer() {
                 CHEESEWallet is a client-side wallet management interface. It does not have its own smart contract and does not custody, store, or transmit private keys. All transactions are constructed in the browser and signed by the user's own wallet provider (Anchor Greymass or WAX Cloud Wallet). CHEESEWallet is a convenience interface — all actions it provides are also available directly through the user's wallet application.
               </p>
             </div>
+
+            <div>
+              <h3 className="text-base font-semibold text-cheese">7.10 CHEESESwap (Alcor Swap Widget)</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed mt-1">
+                CHEESESwap provides an embedded interface for token swaps powered entirely by Alcor Exchange's smart contracts (including <code className="text-foreground bg-muted px-1 rounded">swap.alcor</code>) deployed on the WAX blockchain. Alcor Exchange is a third-party decentralised exchange not affiliated with, owned by, or controlled by CHEESEHub or the CHEESE DAO. CHEESEHub does not custody, hold, pool, or have access to any user funds at any point during a swap. All swap transactions are constructed in the user's browser, signed by the user's own wallet provider, and executed directly against Alcor's on-chain smart contracts. CHEESEHub does not execute, intermediate, settle, match, or arrange any swap on behalf of any user. Swap routing, price calculations, and minimum received amounts are determined by Alcor's public API and on-chain pool liquidity — CHEESEHub merely displays this information for convenience. Price quotes, price impact estimates, and output amounts shown in the interface are indicative only and may differ from the final on-chain execution due to slippage, pool depth changes, or concurrent transactions. CHEESEHub makes no guarantee regarding swap execution, pricing accuracy, or availability of the Alcor API. Users are solely responsible for reviewing and confirming all transaction details before signing.
+              </p>
+            </div>
           </div>
 
           <p className="text-sm text-muted-foreground leading-relaxed">
