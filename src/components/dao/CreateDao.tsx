@@ -61,7 +61,9 @@ export function CreateDao() {
   const [proposalCost, setProposalCost] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<"wax" | "cheese" | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [helpAccordionValue, setHelpAccordionValue] = useState<string[]>(["cheese-payment", "dao-types", "settings"]);
+  const [helpAccordionValue, setHelpAccordionValue] = useState<string[]>([]);
+  const [scrollToAnchor, setScrollToAnchor] = useState(false);
+  const anchorRef = useRef<HTMLDivElement>(null);
 
   // Profile fields
   const [description, setDescription] = useState("");
