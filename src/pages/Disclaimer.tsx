@@ -91,9 +91,17 @@ export default function Disclaimer() {
             </div>
 
             <div>
-              <h3 className="text-base font-semibold text-cheese">7.3 CHEESEAds</h3>
+              <h3 className="text-base font-semibold text-cheese">7.3 CHEESEAds (Banner Advertising)</h3>
               <p className="text-sm text-muted-foreground leading-relaxed mt-1">
-                CHEESEAds is powered by the <code className="text-foreground bg-muted px-1 rounded">cheesebannad</code> smart contract. Users may rent banner advertisement slots on CHEESEHub by paying a fee in WAX. Revenue collected by the contract is distributed via fixed, immutable contract logic across ecosystem functions including burning, powerups, and liquidity provision. CHEESEHub does not guarantee ad visibility, impressions, or any commercial outcome from renting a banner slot.
+                CHEESEAds is powered by the <code className="text-foreground bg-muted px-1 rounded">cheesebannad</code> smart contract. Users may rent banner advertisement slots on CHEESEHub by paying a fee in WAX. Ad content is user-submitted and displayed via IPFS. Revenue collected by the contract is distributed via fixed, immutable contract logic across ecosystem functions including burning, powerups, and liquidity provision. CHEESEHub does not create, endorse, or control the content of any advertisement displayed through CHEESEAds. CHEESEHub does not guarantee ad visibility, impressions, or any commercial outcome from renting a banner slot.
+              </p>
+              <p className="text-sm text-muted-foreground leading-relaxed mt-2">
+                <strong className="text-foreground">Content Policy:</strong> CHEESEHub reserves the right to moderate and remove any advertisement from the frontend display that violates the following content guidelines. Prohibited content includes, but is not limited to: racism, hate speech, discrimination, pornography, sexually explicit material, graphic violence, illegal goods or services, scams, phishing, impersonation, or any content that violates applicable law. Moderation decisions are made at the sole discretion of CHEESEHub moderators. Removal of an ad from the frontend display does not affect on-chain slot data or the underlying smart contract state.
+              </p>
+              <p className="text-sm text-muted-foreground leading-relaxed mt-2">
+                <strong className="text-foreground">Appeal Process:</strong> If you believe your advertisement was removed in error, you may appeal the decision by joining the official CHEESE Telegram group at{" "}
+                <a href="https://t.me/cheeseonwaxofficial" target="_blank" rel="noopener noreferrer" className="text-cheese underline hover:text-cheese/80">t.me/cheeseonwaxofficial</a>{" "}
+                and contacting the moderation team directly. Appeals will be reviewed on a case-by-case basis.
               </p>
             </div>
 
