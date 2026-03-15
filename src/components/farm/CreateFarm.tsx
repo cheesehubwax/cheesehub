@@ -202,59 +202,28 @@ export function CreateFarm() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
+            <p className="text-sm text-muted-foreground">
+              Be aware that in order for you to add stakable assets to this farm, you must be authorized on the NFT collection(s).
+            </p>
+
+            <p className="text-sm text-muted-foreground">
+              VERY IMPORTANT!!!!! You must confirm that you understand how these new farms work before you are allowed to create one.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Watch the following video and then enter "{CONFIRMATION_PHRASE}" (without quotes) into the box below. Once you do that, the farm creation form will magically appear.
+            </p>
+
             <div className="rounded-lg overflow-hidden aspect-video bg-black">
               <iframe
                 width="100%"
                 height="100%"
-                src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+                src="https://www.youtube.com/embed/PIV_ojHzkS8"
                 title="How to create a CHEESEFarm"
                 frameBorder="0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
               />
             </div>
-
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="what">
-                <AccordionTrigger>What is a CHEESEFarm?</AccordionTrigger>
-                <AccordionContent>
-                  A non-custodial NFT staking farm built on WaxDAO V2 smart contracts. Users can stake their NFTs to earn token rewards.
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="cost">
-                <AccordionTrigger>How much does it cost?</AccordionTrigger>
-                <AccordionContent>
-                  Creating a farm costs {WAX_FEE_AMOUNT} WAX, or you can pay with CHEESE at a 20% discount.
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="types">
-                <AccordionTrigger>What are the farm types?</AccordionTrigger>
-                <AccordionContent>
-                  <strong>Collections:</strong> All NFTs from specified collections can be staked.<br/>
-                  <strong>Schemas:</strong> Only NFTs matching specific schemas.<br/>
-                  <strong>Templates:</strong> Only NFTs matching specific templates.<br/>
-                  <strong>Attributes:</strong> Only NFTs with specific attribute values.
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="rewards">
-                <AccordionTrigger>How do rewards work?</AccordionTrigger>
-                <AccordionContent>
-                  You deposit reward tokens into the farm's pools. Stakers earn rewards proportionally based on the hourly rate configured for their staked assets.
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="manage">
-                <AccordionTrigger>Can I manage my farm after creation?</AccordionTrigger>
-                <AccordionContent>
-                  Yes! You can add/remove stakable assets, deposit more rewards, extend the farm, update the profile, and more.
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="anchor">
-                <AccordionTrigger className="text-orange-400">⚠️ Important: Anchor Wallet Users</AccordionTrigger>
-                <AccordionContent>
-                  If using Anchor wallet, make sure you have the latest version. Some older versions may have issues with complex multi-action transactions.
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
 
             <div className="space-y-2">
               <Label>Type the following to continue:</Label>
