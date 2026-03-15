@@ -271,8 +271,8 @@ export function CreateFarm() {
                   <Accordion type="single" collapsible value={helpAccordionValue} onValueChange={setHelpAccordionValue} className="w-full">
                     {FAQ_ITEMS.map((item, index) => (
                       <AccordionItem key={index} value={`faq-${index}`}>
-                        <AccordionTrigger>{item.question}</AccordionTrigger>
-                        <AccordionContent className="text-sm text-muted-foreground whitespace-pre-line">
+                        <AccordionTrigger className="text-primary">{item.question}</AccordionTrigger>
+                        <AccordionContent className="text-sm text-foreground whitespace-pre-line">
                           {item.answer}
                         </AccordionContent>
                       </AccordionItem>
