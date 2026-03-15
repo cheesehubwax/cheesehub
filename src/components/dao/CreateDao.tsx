@@ -202,8 +202,8 @@ export function CreateDao() {
                       </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="settings">
-                      <AccordionTriggerUI>Configuration Settings</AccordionTriggerUI>
-                      <AccordionContent className="text-sm text-muted-foreground space-y-3">
+                      <AccordionTriggerUI className="text-primary">Configuration Settings</AccordionTriggerUI>
+                      <AccordionContent className="text-sm text-foreground space-y-3">
                         <div>
                           <p className="font-semibold text-foreground">Threshold</p>
                           <p>The percentage of "Yes" votes required for a proposal to pass. A 51% threshold means a simple majority is needed. Higher thresholds require broader consensus but can make it harder to pass proposals.</p>
