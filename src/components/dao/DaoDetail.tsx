@@ -467,9 +467,7 @@ export function DaoDetail({ daoName, onBack }: DaoDetailProps) {
                     className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Coins className="h-5 w-5 text-primary" />
-                      </div>
+                      <TokenLogo contract={balance.contract} symbol={balance.symbol} size="lg" className="h-10 w-10" />
                       <div>
                         <p className="font-medium">{balance.symbol}</p>
                         <p className="text-xs text-muted-foreground">{balance.contract}</p>
