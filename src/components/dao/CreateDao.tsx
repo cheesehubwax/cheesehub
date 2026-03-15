@@ -279,7 +279,7 @@ export function CreateDao() {
             onValueChange={v => setDaoType(parseInt(v))}
             className="space-y-2"
           >
-            {Object.entries(DAO_TYPES).map(([key, label]) => {
+            {Object.entries(CREATABLE_DAO_TYPES).map(([key, label]) => {
               const isSelected = daoType === parseInt(key);
               return (
                 <Label
