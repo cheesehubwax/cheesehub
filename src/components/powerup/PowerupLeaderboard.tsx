@@ -61,7 +61,7 @@ export function PowerupLeaderboard({ rawActions, isLoading, isError, onRefresh }
                 className="ml-1 p-1 rounded-md text-muted-foreground hover:text-cheese hover:bg-cheese/10 transition-colors disabled:opacity-50"
                 title="Refresh leaderboard"
               >
-                🔄
+                <RefreshCw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} />
               </button>
             )}
           </div>
