@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react';
-import { Flame, Zap, Trophy, RefreshCw } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -16,9 +15,9 @@ interface PowerupLeaderboardProps {
   onRefresh?: () => void;
 }
 
-const SORT_OPTIONS: { mode: PowerupSortMode; label: string; icon: React.ReactNode }[] = [
-  { mode: 'cheese', label: 'CHEESE Burned', icon: <Flame className="w-3.5 h-3.5" /> },
-  { mode: 'powerups', label: 'Powerups', icon: <Zap className="w-3.5 h-3.5" /> },
+const SORT_OPTIONS: { mode: PowerupSortMode; label: string; emoji: string }[] = [
+  { mode: 'cheese', label: 'CHEESE Burned', emoji: '🔥' },
+  { mode: 'powerups', label: 'Powerups', emoji: '⚡' },
 ];
 
 export function PowerupLeaderboard({ rawActions, isLoading, isError, onRefresh }: PowerupLeaderboardProps) {
@@ -48,11 +47,11 @@ export function PowerupLeaderboard({ rawActions, isLoading, isError, onRefresh }
       <CardContent className="p-5 space-y-4">
         <div className="text-center space-y-1">
           <div className="flex items-center justify-center gap-2">
-            <Trophy className="w-4 h-4 text-cheese" />
+            <span>🏆</span>
             <h3 className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
               CHEESEBoard
             </h3>
-            <Trophy className="w-4 h-4 text-cheese" />
+            <span>🏆</span>
             {onRefresh && (
               <button
                 onClick={onRefresh}
@@ -60,7 +59,7 @@ export function PowerupLeaderboard({ rawActions, isLoading, isError, onRefresh }
                 className="ml-1 p-1 rounded-md text-muted-foreground hover:text-cheese hover:bg-cheese/10 transition-colors disabled:opacity-50"
                 title="Refresh leaderboard"
               >
-                <RefreshCw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} />
+                🔄
               </button>
             )}
           </div>
@@ -78,7 +77,7 @@ export function PowerupLeaderboard({ rawActions, isLoading, isError, onRefresh }
                   : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent'
               )}
             >
-              {opt.icon}
+              <span>{opt.emoji}</span>
               {opt.label}
             </button>
           ))}
