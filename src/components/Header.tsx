@@ -11,16 +11,16 @@ import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/s
 const NAV_ITEMS = [
   { to: "/", label: "Home", emoji: "🏠" },
   { to: "/powerup", label: "CHEESEUp", emoji: "⚡" },
+  { to: "/cheesenull", label: "CHEESENull", emoji: "⛔" },
+  { to: "/farm", label: "CHEESEFarm", emoji: "🌱" },
+  { to: "/dao", label: "CHEESEDao", emoji: "🏛️" },
+  { to: "/drip", label: "CHEESEDrip", emoji: "💧" },
   { to: "/locker", label: "CHEESELock", emoji: "🔐" },
   { to: "/drops", label: "CHEESEShip", emoji: "🛒" },
-  { to: "/dao", label: "CHEESEDao", emoji: "🏛️" },
-  { to: "/farm", label: "CHEESEFarm", emoji: "🌱" },
-  { to: "/cheesenull", label: "CHEESENull", emoji: "⛔" },
-  { to: "/drip", label: "CHEESEDrip", emoji: "💧" },
 ];
 
-const PRIMARY_NAV = NAV_ITEMS.slice(0, 5);
-const SECONDARY_NAV = NAV_ITEMS.slice(5);
+const PRIMARY_NAV = NAV_ITEMS.slice(0, 6);
+const SECONDARY_NAV = NAV_ITEMS.slice(6);
 
 export function Header() {
   const location = useLocation();
