@@ -595,7 +595,8 @@ export function CreateDao() {
             <button
               type="button"
               onClick={() => {
-                setHelpAccordionValue(prev => prev.includes("anchor") ? prev : [...prev, "anchor"]);
+                setHelpAccordionValue(["anchor"]);
+                setScrollToAnchor(true);
                 setHelpOpen(true);
               }}
               className="text-primary hover:underline inline"
