@@ -14,6 +14,17 @@ function formatAmount(val: string | number): string {
   return num.toFixed(num < 1 ? 4 : 2);
 }
 
+function formatPayoutInterval(seconds: number): string {
+  if (seconds <= 0) return "N/A";
+  const hours = seconds / 3600;
+  if (hours < 1) return `${Math.round(seconds / 60)}m`;
+  if (hours % 24 === 0) {
+    const days = hours / 24;
+    return days === 1 ? "1 day" : `${days} days`;
+  }
+  return hours === 1 ? "1 hour" : `${hours}h`;
+}
+
 function getFarmTypeLabel(farmType: number): string {
   const types: Record<number, FarmType> = { 0: "collections", 1: "schemas", 2: "templates", 3: "attributes" };
   return FARM_TYPE_LABELS[types[farmType] || "collections"];
