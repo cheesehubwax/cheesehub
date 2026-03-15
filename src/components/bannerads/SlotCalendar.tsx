@@ -181,6 +181,9 @@ export function SlotCalendar() {
           <div className="flex flex-col items-center sm:items-start">
             <span className="text-foreground font-medium">Shared: {(pricing.waxPerDay * 0.7).toFixed(0)} WAX/day</span>
             <span className="text-xs text-muted-foreground">30% off, 50% display time</span>
+            <span className="text-xs text-muted-foreground mt-0.5">OR</span>
+            <span className="text-foreground font-medium">Shared: {(pricing.waxPerDay * 0.7 * 2).toFixed(0)} WAX/day</span>
+            <span className="text-xs text-muted-foreground">and show 2 banners for less than 2 exclusive slots</span>
           </div>
         </div>
         <Button variant="ghost" size="sm" onClick={refetch} className="text-cheese"><RefreshCw className="h-4 w-4 mr-1" />Refresh</Button>
