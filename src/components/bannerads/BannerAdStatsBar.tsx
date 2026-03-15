@@ -1,4 +1,4 @@
-import { Megaphone, Flame, Lightning, TrendUp } from "@phosphor-icons/react";
+import { Megaphone, Lightning, TrendUp } from "@phosphor-icons/react";
 import { useBannerAdStats } from "@/hooks/useBannerAdStats";
 
 const formatNumber = (num: number, decimals: number = 2) =>
