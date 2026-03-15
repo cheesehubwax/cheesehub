@@ -1,4 +1,3 @@
-import { Zap, Flame } from "lucide-react";
 import { PowerupStats } from "@/hooks/usePowerupStats";
 
 interface PowerupStatsBarProps {
@@ -18,19 +17,19 @@ export const PowerupStatsBar = ({ stats, isLoading }: PowerupStatsBarProps) => {
     {
       label: "Total Powerups",
       value: isLoading ? "-" : (stats?.totalPowerups.toLocaleString() ?? "-"),
-      icon: Zap,
+      emoji: "⚡",
       color: "text-primary"
     },
     {
       label: "WAX Burnt",
       value: isLoading ? "-" : (stats ? formatNumber(stats.waxBurnt, 4) : "-"),
-      icon: Flame,
+      emoji: "🔥",
       color: "text-amber-500"
     },
     {
       label: "CHEESE Nulled",
       value: isLoading ? "-" : (stats ? formatNumber(stats.cheeseNulled, 4) : "-"),
-      icon: Flame,
+      emoji: "🔥",
       color: "text-accent"
     },
   ];
@@ -41,7 +40,7 @@ export const PowerupStatsBar = ({ stats, isLoading }: PowerupStatsBarProps) => {
         {statItems.map((stat) => (
           <div key={stat.label} className="text-center">
             <div className="flex items-center justify-center gap-2 mb-1">
-              <stat.icon className={`w-4 h-4 ${stat.color}`} />
+              <span className="text-base">{stat.emoji}</span>
               <span className="text-lg font-bold font-mono text-foreground">{stat.value}</span>
             </div>
             <p className="text-xs text-muted-foreground">{stat.label}</p>

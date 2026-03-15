@@ -1,4 +1,3 @@
-import { Cpu, Wifi, Clock, TrendingUp, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { PowerUpEstimate } from "@/hooks/usePowerupEstimate";
 
 interface ResourceEstimateProps {
@@ -28,7 +27,7 @@ export const ResourceEstimate = ({
   if (isLoading) {
     return (
       <div className="rounded-xl p-6 bg-card border border-border/50 flex items-center justify-center gap-3">
-        <Loader2 className="w-5 h-5 text-amber-500 animate-spin" />
+        <span className="text-xl animate-spin inline-block">⏳</span>
         <span className="text-muted-foreground">Fetching current rates...</span>
       </div>
     );
@@ -39,14 +38,14 @@ export const ResourceEstimate = ({
       <div className="rounded-xl p-4 border border-red-500/30 bg-red-500/10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-red-400" />
+            <span>⚠️</span>
             <span className="text-red-300 text-sm">Failed to fetch rates</span>
           </div>
           <button
             onClick={onRefresh}
             className="p-2 hover:bg-red-500/20 rounded-lg transition-colors"
           >
-            <RefreshCw className="w-4 h-4 text-red-400" />
+            <span>🔄</span>
           </button>
         </div>
       </div>
@@ -68,7 +67,7 @@ export const ResourceEstimate = ({
         </h3>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Clock className="w-3.5 h-3.5" />
+            <span>⏰</span>
             <span>{estimate.powerupDays} day rental</span>
           </div>
           <button
@@ -76,7 +75,7 @@ export const ResourceEstimate = ({
             className="p-1.5 hover:bg-muted rounded-lg transition-colors"
             title="Refresh rates"
           >
-            <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-sm">🔄</span>
           </button>
         </div>
       </div>
@@ -87,7 +86,7 @@ export const ResourceEstimate = ({
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
-                  <Cpu className="w-5 h-5 text-primary-foreground" />
+                  <span className="text-xl">🖥️</span>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">CPU Time</p>
@@ -98,7 +97,7 @@ export const ResourceEstimate = ({
               </div>
               <div className="text-right">
                 <div className="flex items-center gap-1 text-amber-500 text-sm font-semibold">
-                  <TrendingUp className="w-4 h-4" />
+                  <span>📈</span>
                   <span>{estimate.cpuWaxAmount.toFixed(4)} WAX</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -114,7 +113,7 @@ export const ResourceEstimate = ({
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center">
-                  <Wifi className="w-5 h-5 text-foreground" />
+                  <span className="text-xl">📡</span>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">NET Bandwidth</p>
@@ -125,7 +124,7 @@ export const ResourceEstimate = ({
               </div>
               <div className="text-right">
                 <div className="flex items-center gap-1 text-orange-400 text-sm font-semibold">
-                  <TrendingUp className="w-4 h-4" />
+                  <span>📈</span>
                   <span>{estimate.netWaxAmount.toFixed(4)} WAX</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">

@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { CheeseInput } from "./CheeseInput";
 import { ResourceEstimate } from "./ResourceEstimate";
 import { RecipientInput } from "./RecipientInput";
-import { Zap, Cpu, Wifi, Loader2, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { usePowerupEstimate } from "@/hooks/usePowerupEstimate";
 import { closeWharfkitModals, getTransactPlugins } from "@/lib/wharfKit";
@@ -15,7 +14,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import cheeseLogo from "@/assets/cheese-logo.png";
 import { TokenLogo } from "@/components/TokenLogo";
 
 interface SuccessDetails {
@@ -200,7 +198,7 @@ export const PowerUpCard = ({
           onChange={setCpuAmount}
           balance={walletConnected ? cheeseBalance : 0}
           label="CPU Power"
-          icon={<Cpu className="w-5 h-5 text-amber-500" />}
+          icon={<span className="text-lg">🖥️</span>}
           accentColor="cpu"
         />
 
@@ -209,7 +207,7 @@ export const PowerUpCard = ({
           onChange={setNetAmount}
           balance={walletConnected ? cheeseBalance : 0}
           label="NET Bandwidth"
-          icon={<Wifi className="w-5 h-5 text-orange-400" />}
+          icon={<span className="text-lg">📡</span>}
           accentColor="net"
         />
       </div>
@@ -228,12 +226,12 @@ export const PowerUpCard = ({
       >
         {isTransacting ? (
           <>
-            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="animate-spin inline-block">⏳</span>
             Processing...
           </>
         ) : (
           <>
-            <Zap className="w-5 h-5" />
+            <span>⚡</span>
             {!walletConnected ? "Connect Wallet" : canPowerUp ? "Power Up Now" : "Enter Amount"}
           </>
         )}
@@ -247,7 +245,7 @@ export const PowerUpCard = ({
         <DialogContent className="bg-card border-border">
           <DialogHeader>
             <DialogTitle className="text-foreground flex items-center gap-2">
-              <CheckCircle className="w-6 h-6 text-green-500" />
+              <span>✅</span>
               Transaction Successful!
             </DialogTitle>
           </DialogHeader>
@@ -259,13 +257,13 @@ export const PowerUpCard = ({
             <div className="space-y-3">
               {successDetails && successDetails.cpuMs > 0 && (
                 <div className="flex items-center gap-3 text-foreground bg-amber-500/10 p-3 rounded-lg">
-                  <Cpu className="w-5 h-5 text-amber-500" />
+                  <span className="text-xl">🖥️</span>
                   <span>~{successDetails.cpuMs.toFixed(2)} ms CPU (estimate)</span>
                 </div>
               )}
               {successDetails && successDetails.netBytes > 0 && (
                 <div className="flex items-center gap-3 text-foreground bg-orange-400/10 p-3 rounded-lg">
-                  <Wifi className="w-5 h-5 text-orange-400" />
+                  <span className="text-xl">📡</span>
                   <span>~{formatBytes(successDetails.netBytes)} NET (estimate)</span>
                 </div>
               )}
