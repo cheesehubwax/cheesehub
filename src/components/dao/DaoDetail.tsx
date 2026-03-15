@@ -66,6 +66,13 @@ export function DaoDetail({ daoName, onBack }: DaoDetailProps) {
   const [editCostOpen, setEditCostOpen] = useState(false);
   const [votedProposals, setVotedProposals] = useState<Record<number, UserVote>>({});
 
+  // Reset treasury when switching DAOs
+  useEffect(() => {
+    setTreasury([]);
+    setTreasuryNFTs([]);
+    setTreasuryLoaded(false);
+  }, [daoName]);
+
   const isCreator = dao?.creator === accountName;
   const isAuthor = dao?.authors?.includes(accountName || "") || false;
   const canEditProfile = isCreator || isAuthor;
