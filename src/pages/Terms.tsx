@@ -59,6 +59,7 @@ export default function Terms() {
             <li>You acknowledge that token burning or supply-reduction mechanisms (such as CHEESENull) do not constitute, imply, or guarantee an increase in price, value, or financial return. You accept that participation in such features is voluntary and carries no expectation of profit.</li>
             <li>You acknowledge that certain platform actions involve deterministic on-chain fee routing via smart contracts (such as <code className="text-foreground bg-muted px-1 rounded">cheesefeefee</code>), which may automatically convert tokens as part of a single atomic transaction. These conversions are executed by fixed contract logic and do not constitute dealing or financial intermediation.</li>
             <li>You acknowledge that the CHEESESwap feature is solely a frontend interface to Alcor Exchange's smart contracts. CHEESEHub does not custody funds, execute swaps, or act as a counterparty. All swaps are direct on-chain interactions between you and the <code className="text-foreground bg-muted px-1 rounded">swap.alcor</code> contract. You are responsible for reviewing swap details — including output amounts, price impact, and slippage — before signing any transaction.</li>
+            <li>You acknowledge that if you use CHEESEAds to rent banner ad slots, you are solely responsible for the content of your advertisements. You agree not to submit content that is racist, discriminatory, hateful, pornographic, sexually explicit, violent, defamatory, fraudulent, or otherwise illegal. CHEESEHub moderators may remove any ad from the frontend display at their sole discretion if it is deemed to violate these guidelines. Removal from the frontend does not affect on-chain slot data. If you wish to appeal a moderation decision, you may do so by joining the official CHEESE Telegram group at <a href="https://t.me/cheeseonwaxofficial" target="_blank" rel="noopener noreferrer" className="text-cheese underline hover:text-cheese/80">t.me/cheeseonwaxofficial</a> and contacting the moderation team.</li>
           </ul>
         </section>
 
@@ -79,6 +80,7 @@ export default function Terms() {
             <li>Maliciously exploiting smart contracts, vulnerabilities, or bugs for personal gain or to cause harm to others.</li>
             <li>Attempting to disrupt, interfere with, or compromise the security or integrity of the platform or its underlying infrastructure.</li>
             <li>Using automated systems, bots, or scripts to interact with the platform in a manner that could degrade performance or availability for other users.</li>
+            <li>Submitting banner advertisements through CHEESEAds that contain racist, discriminatory, hateful, pornographic, sexually explicit, violent, defamatory, fraudulent, or otherwise illegal content.</li>
           </ul>
         </section>
 
