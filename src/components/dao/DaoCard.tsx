@@ -77,26 +77,27 @@ export function DaoCard({ dao, onClick }: DaoCardProps) {
         <div className="space-y-1.5 text-sm">
           {isNftType ? (
             <div className="flex items-center gap-2">
-              <Coins className="h-3.5 w-3.5 text-primary shrink-0" />
+              <span className="text-sm shrink-0">🖼️</span>
               <span className="text-muted-foreground">NFT Collections:</span>
               <span className="font-medium text-foreground">{dao.gov_schemas?.length || 0}</span>
             </div>
           ) : (
             <div className="flex items-center gap-2">
+              <span className="text-sm shrink-0">🪙</span>
+              <span className="text-muted-foreground">Gov Token:</span>
               <TokenLogo
                 contract={dao.token_contract}
                 symbol={dao.token_symbol?.includes(",") ? dao.token_symbol.split(",")[1] : dao.token_symbol}
                 size="sm"
                 className="h-4 w-4 shrink-0"
               />
-              <span className="text-muted-foreground">Gov Token:</span>
               <span className="font-medium text-foreground">
                 {dao.token_symbol ? (dao.token_symbol.includes(",") ? dao.token_symbol.split(",")[1] : dao.token_symbol) : "N/A"}
               </span>
             </div>
           )}
           <div className="flex items-center gap-2">
-            <Tag className="h-3.5 w-3.5 text-primary shrink-0" />
+            <span className="text-sm shrink-0">📜</span>
             <span className="text-muted-foreground">Proposal Cost:</span>
             <span className="font-medium text-foreground">
               {dao.proposal_cost && dao.proposal_cost !== "0" ? dao.proposal_cost : "Free"}
