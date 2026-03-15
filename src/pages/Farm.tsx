@@ -63,27 +63,26 @@ const Farm = () => {
 
       <div className="container pb-12">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 h-auto">
-            <TabsTrigger value="browse" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4">
-              <Search className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">Browse</span> Farms
-            </TabsTrigger>
-            <TabsTrigger value="my-farms" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4">
-              <FolderOpen className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">My</span> Farms
-            </TabsTrigger>
-            <TabsTrigger value="create" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4">
-              <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
-              Create
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="browse" className="mt-6">
+          <div className="flex justify-center mb-6">
+            <TabsList className="bg-card/80 border border-border/50 h-10">
+              <TabsTrigger value="browse" className="gap-1.5 text-sm px-4">
+                <Search className="h-4 w-4" /> Browse Farms
+              </TabsTrigger>
+              <TabsTrigger value="create" className="gap-1.5 text-sm px-4">
+                <Plus className="h-4 w-4" /> Create Farm
+              </TabsTrigger>
+              <TabsTrigger value="my-farms" className="gap-1.5 text-sm px-4">
+                <FolderOpen className="h-4 w-4" /> My Farms
+              </TabsTrigger>
+            </TabsList>
+          </div>
+          <TabsContent value="browse">
             <BrowseFarms />
           </TabsContent>
-          <TabsContent value="my-farms" className="mt-6">
+          <TabsContent value="my-farms">
             <MyFarms onCreateFarm={handleCreateFarm} />
           </TabsContent>
-          <TabsContent value="create" className="mt-6">
+          <TabsContent value="create">
             <CreateFarm />
           </TabsContent>
         </Tabs>
