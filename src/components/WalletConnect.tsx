@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { WalletTransferDialog } from "@/components/wallet/WalletTransferDialog";
 import { useWax } from "@/context/WaxContext";
-import { Wallet, LogOut, ChevronDown, Send, UserPlus, ArrowRightLeft } from "lucide-react";
+import { Wallet, LogOut, ChevronDown, UserPlus, ArrowRightLeft } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +22,7 @@ import {
   DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import cheeseLogo from "@/assets/cheese-logo.png";
+import walletIcon from "@/assets/wallet-icon.png";
 import { SerializedSession } from "@wharfkit/session";
 
 export function WalletConnect() {
@@ -143,8 +144,13 @@ export function WalletConnect() {
           <DropdownMenuSeparator />
 
           <DropdownMenuItem onClick={() => setWalletOpen(true)}>
-            <Send className="h-4 w-4 mr-2" />
-            Open Wallet
+            <img src={walletIcon} alt="Wallet" className="h-4 w-4 mr-2 object-contain" />
+            <span><span className="text-cheese">CHEESE</span>Wallet</span>
+          </DropdownMenuItem>
+
+          <DropdownMenuItem onClick={() => window.dispatchEvent(new CustomEvent('open-cheese-amp'))}>
+            <span className="mr-2">🎧</span>
+            <span><span className="text-cheese">CHEESE</span>Amp</span>
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />
