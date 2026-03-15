@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { RefreshCw } from 'lucide-react';
-import cheesenullIcon from '@/assets/cheesenull.png';
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -17,8 +17,8 @@ interface PowerupLeaderboardProps {
   onRefresh?: () => void;
 }
 
-const SORT_OPTIONS: { mode: PowerupSortMode; label: string; emoji?: string; icon?: string }[] = [
-  { mode: 'cheese', label: 'CHEESE Burned', icon: 'cheesenull' },
+const SORT_OPTIONS: { mode: PowerupSortMode; label: string; emoji: string }[] = [
+  { mode: 'cheese', label: 'CHEESE Burned', emoji: '⛔' },
   { mode: 'powerups', label: 'Powerups', emoji: '⚡' },
 ];
 
@@ -79,11 +79,7 @@ export function PowerupLeaderboard({ rawActions, isLoading, isError, onRefresh }
                   : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent'
               )}
             >
-              {opt.icon === 'cheesenull' ? (
-                <img src={cheesenullIcon} alt="null" className="w-3.5 h-3.5" />
-              ) : (
-                <span>{opt.emoji}</span>
-              )}
+              <span>{opt.emoji}</span>
               {opt.label}
             </button>
           ))}

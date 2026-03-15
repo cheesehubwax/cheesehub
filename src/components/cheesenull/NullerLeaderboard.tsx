@@ -13,7 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import { type NullerStats, type SortMode, type LogburnAction, aggregateNullerStats } from '@/lib/fetchLeaderboard';
 import { formatCheeseAmount } from '@/lib/cheeseNullApi';
-import cheesenullIcon from '@/assets/cheesenull.png';
+
 
 interface NullerLeaderboardProps {
   rawActions: LogburnAction[];
@@ -22,8 +22,8 @@ interface NullerLeaderboardProps {
   onRefresh?: () => void;
 }
 
-const SORT_OPTIONS: { mode: SortMode; label: string; emoji?: string; icon?: string }[] = [
-  { mode: 'cheese', label: 'CHEESE Nulled', icon: 'cheesenull' },
+const SORT_OPTIONS: { mode: SortMode; label: string; emoji: string }[] = [
+  { mode: 'cheese', label: 'CHEESE Nulled', emoji: '⛔' },
   { mode: 'burns', label: 'Burns', emoji: '⚡' },
 ];
 
@@ -93,11 +93,7 @@ export function NullerLeaderboard({ rawActions, isLoading, isError, onRefresh }:
                   : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent'
               )}
             >
-              {opt.icon === 'cheesenull' ? (
-                <img src={cheesenullIcon} alt="null" className="w-3.5 h-3.5" />
-              ) : (
-                <span>{opt.emoji}</span>
-              )}
+              <span>{opt.emoji}</span>
               {opt.label}
             </button>
           ))}
