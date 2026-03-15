@@ -1,3 +1,4 @@
+import { RefreshCw } from "lucide-react";
 import { PowerUpEstimate } from "@/hooks/usePowerupEstimate";
 
 interface ResourceEstimateProps {
