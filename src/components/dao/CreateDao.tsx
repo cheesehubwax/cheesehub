@@ -157,7 +157,10 @@ export function CreateDao() {
             <span className="text-primary">🏛️</span> Create a New DAO
             <Dialog open={helpOpen} onOpenChange={(open) => {
               setHelpOpen(open);
-              if (!open) setHelpAccordionValue(["cheese-payment", "dao-types", "settings"]);
+              if (!open) {
+                setHelpAccordionValue([]);
+                setScrollToAnchor(false);
+              }
             }}>
               <DialogTrigger asChild>
                 <button className="text-xs text-primary hover:underline ml-2">click me for help</button>
