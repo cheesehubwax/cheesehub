@@ -9,6 +9,9 @@ import { Slider } from "@/components/ui/slider";
 import { Loader2, Plus, Users, Trash2, AlertTriangle, HelpCircle, ChevronDown } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger as AccordionTriggerUI } from "@/components/ui/accordion";
 import {
   DAO_TYPES, PROPOSER_TYPES,
   buildAssertPointAction, buildDaoCreationFeeAction, buildCreateDaoAction,
