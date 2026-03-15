@@ -168,7 +168,7 @@ export function CreateDao() {
                   <Accordion type="multiple" value={helpAccordionValue} onValueChange={setHelpAccordionValue} className="w-full">
                     <AccordionItem value="cheese-payment">
                       <AccordionTriggerUI className="text-primary">Paying with CHEESE Tokens</AccordionTriggerUI>
-                      <AccordionContent className="text-sm text-muted-foreground space-y-2">
+                      <AccordionContent className="text-sm text-foreground space-y-2">
                        <p><strong>CHEESE is the standard payment method</strong> and gives you a <strong>20% discount</strong> on the 265 WAX creation fee.</p>
                         <p>Simply select the CHEESE payment option (selected by default) and the transaction will handle everything automatically in a single step - no prepayment required!</p>
                       </AccordionContent>
