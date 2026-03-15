@@ -261,7 +261,7 @@ export function CreateDao() {
                         <p>Once created, DAO settings <strong>cannot be changed</strong>. Please review all configuration options carefully before submitting. Choose wisely!</p>
                       </AccordionContent>
                     </AccordionItem>
-                    <AccordionItem value="anchor">
+                    <AccordionItem value="anchor" ref={anchorRef}>
                       <AccordionTriggerUI className="text-primary">Why does Anchor show a "Dangerous Transaction" warning?</AccordionTriggerUI>
                       <AccordionContent className="text-sm text-foreground space-y-2">
                         <p>This transaction includes <strong>inline actions</strong> from the <code className="bg-muted px-1 rounded">cheesefeefee</code> smart contract — it sends WAXDAO tokens to your wallet and burns fees automatically. These are standard, safe operations and the contract is open source.</p>
