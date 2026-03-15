@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { WalletTransferDialog } from "@/components/wallet/WalletTransferDialog";
 import { useWax } from "@/context/WaxContext";
-import { Wallet, LogOut, ChevronDown, Send, UserPlus, UserMinus, ArrowRightLeft } from "lucide-react";
+import { Wallet, LogOut, ChevronDown, Send, UserPlus, ArrowRightLeft } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
