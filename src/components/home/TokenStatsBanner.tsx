@@ -47,7 +47,7 @@ export function TokenStatsBanner() {
             {/* Total and Max Supply */}
             <div className="flex items-center gap-4 justify-center md:justify-start">
               <div className="h-12 w-12 rounded-full bg-cheese/20 flex items-center justify-center shrink-0">
-                <img src={cheeseToken} alt="CHEESE" className="h-8 w-8 object-contain" />
+                <img src={cheeseLogo} alt="CHEESE" className="h-8 w-8 object-contain" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground font-medium">Total and Max Supply</p>
