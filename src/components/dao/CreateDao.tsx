@@ -59,7 +59,7 @@ export function CreateDao() {
   const [minimumVotes, setMinimumVotes] = useState(1);
   const [minimumWeight, setMinimumWeight] = useState(0);
   const [proposalCost, setProposalCost] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState<"wax" | "cheese">("cheese");
+  const [paymentMethod, setPaymentMethod] = useState<"wax" | "cheese" | null>(null);
 
   // Profile fields
   const [description, setDescription] = useState("");
@@ -88,6 +88,11 @@ export function CreateDao() {
 
   const handleCreate = async () => {
     if (!session || !accountName) return;
+
+    if (!paymentMethod) {
+      toast({ title: "Select payment method", description: "Choose CHEESE or WAX to pay the creation fee.", variant: "destructive" });
+      return;
+    }
 
     if (!daoName.trim() || !/^[a-z1-5.]{1,12}$/.test(daoName)) {
       toast({ title: "Invalid DAO name", description: "Must be 1-12 chars, a-z, 1-5, and .", variant: "destructive" });
@@ -583,8 +588,8 @@ export function CreateDao() {
         </div>
 
         {/* Submit */}
-        <Button onClick={handleCreate} disabled={loading} className="w-full bg-primary text-primary-foreground" size="lg">
-          {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Creating DAO...</> : paymentMethod === "cheese" ? "🏛️ Create DAO (Pay with CHEESE)" : "🏛️ Create DAO (265 WAX)"}
+        <Button onClick={handleCreate} disabled={loading || !paymentMethod} className="w-full bg-primary text-primary-foreground" size="lg">
+          {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Creating DAO...</> : paymentMethod === "cheese" ? "🏛️ Create DAO (Pay with CHEESE)" : paymentMethod === "wax" ? "🏛️ Create DAO (265 WAX)" : "🏛️ Select Payment Method"}
         </Button>
 
         {/* Footer */}

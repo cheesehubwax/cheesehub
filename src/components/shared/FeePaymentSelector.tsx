@@ -4,13 +4,14 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
-import { Coins, Info } from "lucide-react";
+import { Coins, Info, Loader2 } from "lucide-react";
 import { useWax } from "@/context/WaxContext";
 import {
   CHEESE_FEE_ENABLED,
   PaymentMethod,
   WAX_FEE_AMOUNT,
 } from "@/lib/cheeseFees";
+import { useCheeseFeePricing } from "@/hooks/useCheeseFeePricing";
 import cheeseLogo from "@/assets/cheese-logo.png";
 
 interface FeePaymentSelectorProps {
@@ -33,6 +34,24 @@ export function FeePaymentSelector({
   hideCheeseOption = false,
 }: FeePaymentSelectorProps) {
   const { session } = useWax();
+  const [priceFetched, setPriceFetched] = useState(false);
+  const cheesePricing = useCheeseFeePricing(waxFee);
+
+  const handleMethodChange = (method: PaymentMethod) => {
+    onMethodChange(method);
+    if (method === "cheese" && !priceFetched) {
+      setPriceFetched(true);
+      cheesePricing.refetch();
+    }
+    if (method === "cheese" && cheesePricing.isAvailable) {
+      onCheeseAmountChange(cheesePricing.formattedForTx);
+    }
+  };
+
+  // Update parent when pricing loads after selection
+  if (selectedMethod === "cheese" && cheesePricing.isAvailable && priceFetched) {
+    onCheeseAmountChange(cheesePricing.formattedForTx);
+  }
 
   return (
     <TooltipProvider>
@@ -56,7 +75,7 @@ export function FeePaymentSelector({
 
         <RadioGroup
           value={selectedMethod ?? ""}
-          onValueChange={(v) => onMethodChange(v as PaymentMethod)}
+          onValueChange={(v) => handleMethodChange(v as PaymentMethod)}
           className="space-y-3"
           disabled={disabled}
         >
@@ -75,7 +94,7 @@ export function FeePaymentSelector({
                     <img src={cheeseLogo} alt="CHEESE" className="w-5 h-5" />
                     <span className="font-medium">Pay with CHEESE</span>
                   </div>
-                   <div className="flex gap-1.5">
+                  <div className="flex gap-1.5">
                     <Badge className="bg-green-500/20 text-green-500 border-green-500/30 text-xs">
                       Save 20%
                     </Badge>
@@ -84,6 +103,21 @@ export function FeePaymentSelector({
                     </Badge>
                   </div>
                 </div>
+                {selectedMethod === "cheese" && (
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    {cheesePricing.isLoading ? (
+                      <span className="flex items-center gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Fetching CHEESE price...
+                      </span>
+                    ) : cheesePricing.isAvailable ? (
+                      <span className="text-foreground font-medium">
+                        ≈ {cheesePricing.displayAmount}
+                      </span>
+                    ) : (
+                      <span className="text-destructive">Price unavailable — try again</span>
+                    )}
+                  </div>
+                )}
               </Label>
             </div>
           )}
