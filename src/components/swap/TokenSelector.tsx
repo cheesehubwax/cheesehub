@@ -20,6 +20,7 @@ export function TokenSelector({ open, onClose, onSelect, selectedToken }: TokenS
   const { accountName } = useWax();
   const [balanceFetchEnabled, setBalanceFetchEnabled] = useState(false);
   const balances = useSwapTokenBalances(accountName, tokens, balanceFetchEnabled);
+  const { data: tokenPrices } = useAlcorTokenPrices();
   const [imgErrors, setImgErrors] = useState<Set<string>>(new Set());
 
   const tokenKey = (t: SwapToken) => `${t.ticker}_${t.contract}`;
