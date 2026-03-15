@@ -15,8 +15,8 @@ interface VoteRewardsManagerProps {
 }
 
 interface GbmGlobalState {
-  pervote_bucket: number;
-  total_producer_vote_weight: number;
+  voters_bucket: number;
+  total_unpaid_voteshare: number;
 }
 
 export function VoteRewardsManager({ onTransactionComplete, onTransactionSuccess }: VoteRewardsManagerProps) {
