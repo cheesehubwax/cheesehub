@@ -217,7 +217,7 @@ export function CreateDao() {
                           <p>How long voting stays open for each proposal. Common durations are 24 hours (quick decisions), 72 hours (standard), or 168 hours (1 week for major decisions).</p>
                         </div>
                         <div>
-                          <p className="font-semibold text-foreground">Proposer Types</p>
+                          <p className="font-semibold text-primary">Proposer Types</p>
                           <p>Control who can create proposals in your DAO:</p>
                           <ul className="list-disc list-inside space-y-1 mt-1">
                             <li><strong>Anyone</strong> — Any WAX wallet can create proposals. Most democratic but may require proposal fees to prevent spam.</li>
