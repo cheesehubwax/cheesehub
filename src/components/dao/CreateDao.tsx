@@ -235,7 +235,7 @@ export function CreateDao() {
                           <p>Set to 0 for free proposals. Common values range from 1-100 WAX depending on how exclusive you want proposal creation to be.</p>
                         </div>
                         <div>
-                          <p className="font-semibold text-foreground">Treasury & Deposits</p>
+                          <p className="font-semibold text-primary">Treasury & Deposits</p>
                           <p>After creating your DAO, you can deposit WAX, tokens, and NFTs to the treasury. These assets can then be distributed through governance proposals.</p>
                           <p>Treasury deposits are managed separately from the creation process. Visit your DAO's detail page after creation to make deposits.</p>
                         </div>
