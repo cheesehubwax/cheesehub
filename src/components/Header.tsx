@@ -115,7 +115,7 @@ export function Header() {
           {SECONDARY_NAV.map((item) => (
             <Link key={item.to} to={item.to} className={navLinkClass(item.to)}>
               <span>{item.emoji}</span>
-              {item.label}
+              <NavLabel item={item} />
             </Link>
           ))}
         </nav>
