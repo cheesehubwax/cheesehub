@@ -91,9 +91,17 @@ export default function Disclaimer() {
             </div>
 
             <div>
-              <h3 className="text-base font-semibold text-cheese">7.3 CHEESEAds</h3>
+              <h3 className="text-base font-semibold text-cheese">7.3 CHEESEAds (Banner Advertising)</h3>
               <p className="text-sm text-muted-foreground leading-relaxed mt-1">
-                CHEESEAds is powered by the <code className="text-foreground bg-muted px-1 rounded">cheesebannad</code> smart contract. Users may rent banner advertisement slots on CHEESEHub by paying a fee in WAX. Revenue collected by the contract is distributed via fixed, immutable contract logic across ecosystem functions including burning, powerups, and liquidity provision. CHEESEHub does not guarantee ad visibility, impressions, or any commercial outcome from renting a banner slot.
+                CHEESEAds is powered by the <code className="text-foreground bg-muted px-1 rounded">cheesebannad</code> smart contract. Users may rent banner advertisement slots on CHEESEHub by paying a fee in WAX. Ad content is user-submitted and displayed via IPFS. Revenue collected by the contract is distributed via fixed, immutable contract logic across ecosystem functions including burning, powerups, and liquidity provision. CHEESEHub does not create, endorse, or control the content of any advertisement displayed through CHEESEAds. CHEESEHub does not guarantee ad visibility, impressions, or any commercial outcome from renting a banner slot.
+              </p>
+              <p className="text-sm text-muted-foreground leading-relaxed mt-2">
+                <strong className="text-foreground">Content Policy:</strong> CHEESEHub reserves the right to moderate and remove any advertisement from the frontend display that violates the following content guidelines. Prohibited content includes, but is not limited to: racism, hate speech, discrimination, pornography, sexually explicit material, graphic violence, illegal goods or services, scams, phishing, impersonation, or any content that violates applicable law. Moderation decisions are made at the sole discretion of CHEESEHub moderators. Removal of an ad from the frontend display does not affect on-chain slot data or the underlying smart contract state.
+              </p>
+              <p className="text-sm text-muted-foreground leading-relaxed mt-2">
+                <strong className="text-foreground">Appeal Process:</strong> If you believe your advertisement was removed in error, you may appeal the decision by joining the official CHEESE Telegram group at{" "}
+                <a href="https://t.me/cheeseonwaxofficial" target="_blank" rel="noopener noreferrer" className="text-cheese underline hover:text-cheese/80">t.me/cheeseonwaxofficial</a>{" "}
+                and contacting the moderation team directly. Appeals will be reviewed on a case-by-case basis.
               </p>
             </div>
 
@@ -143,21 +151,6 @@ export default function Disclaimer() {
               <h3 className="text-base font-semibold text-cheese">7.10 CHEESESwap (Alcor Swap Widget)</h3>
               <p className="text-sm text-muted-foreground leading-relaxed mt-1">
                 CHEESESwap provides an embedded interface for token swaps powered entirely by Alcor Exchange's smart contracts (including <code className="text-foreground bg-muted px-1 rounded">swap.alcor</code>) deployed on the WAX blockchain. Alcor Exchange is a third-party decentralised exchange not affiliated with, owned by, or controlled by CHEESEHub or the CHEESE DAO. CHEESEHub does not custody, hold, pool, or have access to any user funds at any point during a swap. All swap transactions are constructed in the user's browser, signed by the user's own wallet provider, and executed directly against Alcor's on-chain smart contracts. CHEESEHub does not execute, intermediate, settle, match, or arrange any swap on behalf of any user. Swap routing, price calculations, and minimum received amounts are determined by Alcor's public API and on-chain pool liquidity — CHEESEHub merely displays this information for convenience. Price quotes, price impact estimates, and output amounts shown in the interface are indicative only and may differ from the final on-chain execution due to slippage, pool depth changes, or concurrent transactions. CHEESEHub makes no guarantee regarding swap execution, pricing accuracy, or availability of the Alcor API. Users are solely responsible for reviewing and confirming all transaction details before signing.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="text-base font-semibold text-cheese">7.11 CHEESEAds (Banner Advertising)</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed mt-1">
-                CHEESEAds allows users to rent on-chain banner ad slots via the <code className="text-foreground bg-muted px-1 rounded">cheeseadsss</code> smart contract deployed on the WAX blockchain. Ad content is user-submitted and displayed via IPFS. CHEESEHub does not create, endorse, or control the content of any advertisement displayed through CHEESEAds.
-              </p>
-              <p className="text-sm text-muted-foreground leading-relaxed mt-2">
-                <strong className="text-foreground">Content Policy:</strong> CHEESEHub reserves the right to moderate and remove any advertisement from the frontend display that violates the following content guidelines. Prohibited content includes, but is not limited to: racism, hate speech, discrimination, pornography, sexually explicit material, graphic violence, illegal goods or services, scams, phishing, impersonation, or any content that violates applicable law. Moderation decisions are made at the sole discretion of CHEESEHub moderators. Removal of an ad from the frontend display does not affect on-chain slot data or the underlying smart contract state.
-              </p>
-              <p className="text-sm text-muted-foreground leading-relaxed mt-2">
-                <strong className="text-foreground">Appeal Process:</strong> If you believe your advertisement was removed in error, you may appeal the decision by joining the official CHEESE Telegram group at{" "}
-                <a href="https://t.me/cheeseonwaxofficial" target="_blank" rel="noopener noreferrer" className="text-cheese underline hover:text-cheese/80">t.me/cheeseonwaxofficial</a>{" "}
-                and contacting the moderation team directly. Appeals will be reviewed on a case-by-case basis.
               </p>
             </div>
           </div>
