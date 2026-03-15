@@ -269,7 +269,10 @@ export function CreateFarm() {
             Create New Farm
             <Dialog open={helpOpen} onOpenChange={(open) => {
               setHelpOpen(open);
-              if (!open) setHelpAccordionValue(undefined);
+              if (!open) {
+                setHelpAccordionValue(undefined);
+                setScrollToAnchor(false);
+              }
             }}>
               <DialogTrigger asChild>
                 <button className="text-xs text-primary hover:underline ml-2 font-normal">click me for help</button>
