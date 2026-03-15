@@ -242,8 +242,8 @@ export function CreateDao() {
                       </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="ipfs">
-                      <AccordionTriggerUI>IPFS Hash (Avatar & Cover Image)</AccordionTriggerUI>
-                      <AccordionContent className="text-sm text-muted-foreground space-y-2">
+                      <AccordionTriggerUI className="text-primary">IPFS Hash (Avatar & Cover Image)</AccordionTriggerUI>
+                      <AccordionContent className="text-sm text-foreground space-y-2">
                         <p>These are your DAO's logos - the <strong>cover image</strong> is a large background pic, and the <strong>avatar</strong> should be a small (e.g. 300 x 300) pic.</p>
                         <p>Both should be <strong>IPFS hash only</strong>, do NOT put the full URL.</p>
                         <p>Example hash: <code className="bg-muted px-1 rounded">QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco</code></p>
