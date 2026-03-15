@@ -18,7 +18,7 @@ interface PowerupLeaderboardProps {
 }
 
 const SORT_OPTIONS: { mode: PowerupSortMode; label: string; emoji: string }[] = [
-  { mode: 'cheese', label: 'CHEESE Burned', emoji: '⛔' },
+  { mode: 'cheese', label: 'CHEESE Nulled', emoji: '⛔' },
   { mode: 'powerups', label: 'Powerups', emoji: '⚡' },
 ];
 
@@ -40,7 +40,7 @@ export function PowerupLeaderboard({ rawActions, isLoading, isError, onRefresh }
 
   const getSecondaryText = (entry: PowerupLeaderStats) => {
     return sortBy === 'powerups'
-      ? `${formatCheeseAmount(entry.cheeseBurned)} burned`
+      ? `${formatCheeseAmount(entry.cheeseBurned)} nulled`
       : `${entry.powerups} powerups`;
   };
 
@@ -102,7 +102,7 @@ export function PowerupLeaderboard({ rawActions, isLoading, isError, onRefresh }
                 <TableHead className="h-8 text-xs text-muted-foreground w-10">#</TableHead>
                 <TableHead className="h-8 text-xs text-muted-foreground">Account</TableHead>
                 <TableHead className="h-8 text-xs text-muted-foreground text-right">
-                  {sortBy === 'powerups' ? 'Powerups' : 'Burned'}
+                  {sortBy === 'powerups' ? 'Powerups' : 'Nulled'}
                 </TableHead>
               </TableRow>
             </TableHeader>
