@@ -80,6 +80,7 @@ export default function Terms() {
             <li>Maliciously exploiting smart contracts, vulnerabilities, or bugs for personal gain or to cause harm to others.</li>
             <li>Attempting to disrupt, interfere with, or compromise the security or integrity of the platform or its underlying infrastructure.</li>
             <li>Using automated systems, bots, or scripts to interact with the platform in a manner that could degrade performance or availability for other users.</li>
+            <li>Submitting banner advertisements through CHEESEAds that contain racist, discriminatory, hateful, pornographic, sexually explicit, violent, defamatory, fraudulent, or otherwise illegal content.</li>
           </ul>
         </section>
 
