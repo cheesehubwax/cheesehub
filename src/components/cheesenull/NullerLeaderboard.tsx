@@ -22,8 +22,8 @@ interface NullerLeaderboardProps {
   onRefresh?: () => void;
 }
 
-const SORT_OPTIONS: { mode: SortMode; label: string; emoji?: string; icon?: string }[] = [
-  { mode: 'cheese', label: 'CHEESE Nulled', icon: 'cheesenull' },
+const SORT_OPTIONS: { mode: SortMode; label: string; emoji: string }[] = [
+  { mode: 'cheese', label: 'CHEESE Nulled', emoji: '⛔' },
   { mode: 'burns', label: 'Burns', emoji: '⚡' },
 ];
 
