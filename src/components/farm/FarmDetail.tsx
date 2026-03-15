@@ -199,7 +199,7 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
       {socialLinks.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {socialLinks.map(([key, url]) => (
-            <Button key={key} variant="outline" size="sm" asChild>
+            <Button key={key} variant="outline" size="sm" asChild className="border-primary/50 text-primary hover:bg-primary/10 hover:text-primary">
               <a href={url!.startsWith("http") ? url! : `https://${url}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5">
                 {SOCIAL_ICONS[key] || <Globe className="h-4 w-4" />}
                 <span className="capitalize text-xs">{key}</span>

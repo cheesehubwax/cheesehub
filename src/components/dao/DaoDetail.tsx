@@ -299,7 +299,7 @@ export function DaoDetail({ daoName, onBack }: DaoDetailProps) {
                   <CardContent className="p-4">
                     <div className="flex flex-wrap gap-2">
                       {socialEntries.map(s => (
-                        <Button key={s.key} variant="outline" size="sm" asChild>
+                        <Button key={s.key} variant="outline" size="sm" asChild className="border-primary/50 text-primary hover:bg-primary/10 hover:text-primary">
                           <a
                             href={s.url.startsWith("http") ? s.url : `https://${s.url}`}
                             target="_blank"
