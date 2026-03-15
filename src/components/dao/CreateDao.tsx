@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -61,7 +61,9 @@ export function CreateDao() {
   const [proposalCost, setProposalCost] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<"wax" | "cheese" | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [helpAccordionValue, setHelpAccordionValue] = useState<string[]>(["cheese-payment", "dao-types", "settings"]);
+  const [helpAccordionValue, setHelpAccordionValue] = useState<string[]>([]);
+  const [scrollToAnchor, setScrollToAnchor] = useState(false);
+  const anchorRef = useRef<HTMLDivElement>(null);
 
   // Profile fields
   const [description, setDescription] = useState("");
@@ -73,6 +75,15 @@ export function CreateDao() {
   const [govSchemas, setGovSchemas] = useState<{ collection_name: string; schema_name: string }[]>([
     { collection_name: "", schema_name: "" },
   ]);
+
+  useEffect(() => {
+    if (scrollToAnchor && helpOpen && anchorRef.current) {
+      setTimeout(() => {
+        anchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        setScrollToAnchor(false);
+      }, 150);
+    }
+  }, [scrollToAnchor, helpOpen]);
 
   const addSchema = () => setGovSchemas(prev => [...prev, { collection_name: "", schema_name: "" }]);
   const removeSchema = (idx: number) => setGovSchemas(prev => prev.filter((_, i) => i !== idx));
@@ -155,7 +166,10 @@ export function CreateDao() {
             <span className="text-primary">🏛️</span> Create a New DAO
             <Dialog open={helpOpen} onOpenChange={(open) => {
               setHelpOpen(open);
-              if (!open) setHelpAccordionValue(["cheese-payment", "dao-types", "settings"]);
+              if (!open) {
+                setHelpAccordionValue([]);
+                setScrollToAnchor(false);
+              }
             }}>
               <DialogTrigger asChild>
                 <button className="text-xs text-primary hover:underline ml-2">click me for help</button>
@@ -256,7 +270,7 @@ export function CreateDao() {
                         <p>Once created, DAO settings <strong>cannot be changed</strong>. Please review all configuration options carefully before submitting. Choose wisely!</p>
                       </AccordionContent>
                     </AccordionItem>
-                    <AccordionItem value="anchor">
+                    <AccordionItem value="anchor" ref={anchorRef}>
                       <AccordionTriggerUI className="text-primary">Why does Anchor show a "Dangerous Transaction" warning?</AccordionTriggerUI>
                       <AccordionContent className="text-sm text-foreground space-y-2">
                         <p>This transaction includes <strong>inline actions</strong> from the <code className="bg-muted px-1 rounded">cheesefeefee</code> smart contract — it sends WAXDAO tokens to your wallet and burns fees automatically. These are standard, safe operations and the contract is open source.</p>
@@ -590,7 +604,8 @@ export function CreateDao() {
             <button
               type="button"
               onClick={() => {
-                setHelpAccordionValue(prev => prev.includes("anchor") ? prev : [...prev, "anchor"]);
+                setHelpAccordionValue(["anchor"]);
+                setScrollToAnchor(true);
                 setHelpOpen(true);
               }}
               className="text-primary hover:underline inline"

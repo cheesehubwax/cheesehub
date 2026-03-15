@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -119,6 +119,17 @@ export function CreateFarm() {
   const [paymentMethod, setPaymentMethod] = useState<"wax" | "cheese" | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [helpAccordionValue, setHelpAccordionValue] = useState<string | undefined>(undefined);
+  const [scrollToAnchor, setScrollToAnchor] = useState(false);
+  const anchorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollToAnchor && helpOpen && anchorRef.current) {
+      setTimeout(() => {
+        anchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        setScrollToAnchor(false);
+      }, 150);
+    }
+  }, [scrollToAnchor, helpOpen]);
 
   const validation = validateFarmName(farmName);
 
@@ -258,7 +269,10 @@ export function CreateFarm() {
             Create New Farm
             <Dialog open={helpOpen} onOpenChange={(open) => {
               setHelpOpen(open);
-              if (!open) setHelpAccordionValue(undefined);
+              if (!open) {
+                setHelpAccordionValue(undefined);
+                setScrollToAnchor(false);
+              }
             }}>
               <DialogTrigger asChild>
                 <button className="text-xs text-primary hover:underline ml-2 font-normal">click me for help</button>
@@ -270,7 +284,7 @@ export function CreateFarm() {
                 <ScrollArea className="max-h-[60vh] pr-4">
                   <Accordion type="single" collapsible value={helpAccordionValue} onValueChange={setHelpAccordionValue} className="w-full">
                     {FAQ_ITEMS.map((item, index) => (
-                      <AccordionItem key={index} value={`faq-${index}`}>
+                      <AccordionItem key={index} value={`faq-${index}`} ref={index === FAQ_ITEMS.length - 1 ? anchorRef : undefined}>
                         <AccordionTrigger className="text-primary">{item.question}</AccordionTrigger>
                         <AccordionContent className="text-sm text-foreground whitespace-pre-line">
                           {item.answer}
@@ -432,6 +446,7 @@ export function CreateFarm() {
                 type="button"
                 onClick={() => {
                   setHelpAccordionValue("faq-10");
+                  setScrollToAnchor(true);
                   setHelpOpen(true);
                 }}
                 className="text-primary hover:underline inline"
