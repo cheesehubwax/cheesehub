@@ -14,6 +14,8 @@ import {
 import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Plus, Sprout, Trash2, ChevronDown, AlertTriangle } from "lucide-react";
 import {
   FARM_CREATION_FEES, validateFarmName, FARM_TYPE_LABELS, FarmType,
@@ -36,6 +38,53 @@ const FARM_TYPE_OPTIONS: { value: FarmType; label: string }[] = [
   { value: "schemas", label: "Schemas" },
   { value: "templates", label: "Templates" },
   { value: "attributes", label: "Attributes" },
+];
+
+const FAQ_ITEMS = [
+  {
+    question: "Can I pay with CHEESE tokens?",
+    answer: "Yes! You can pay with CHEESE tokens and receive a 20% discount on the creation fee. Simply select the CHEESE option and the transaction will handle the conversion automatically in a single step.",
+  },
+  {
+    question: "What is the correct format for my farm name?",
+    answer: "Farm names must be 12 characters or less and can only contain lowercase letters (a-z), numbers (1-5), and periods. Names cannot start or end with a period, and cannot contain consecutive periods.",
+  },
+  {
+    question: "How much does it cost to create a farm?",
+    answer: "You can create a farm by paying 265 WAX, 25,000 WAXDAO tokens, or by using 1 NFT from the Wojak collection (ourwojaksart). These payment options help support the WaxDAO ecosystem.",
+  },
+  {
+    question: "What are the different farm types?",
+    answer: "Collections: stake any NFT from specified collections. Schemas: stake NFTs from specific schemas within collections. Templates: stake specific template IDs. Attributes: stake NFTs with matching attribute key/value pairs.",
+  },
+  {
+    question: "How do I add stakable assets after creation?",
+    answer: "After creating your farm, you need to add stakable assets (collections, schemas, templates, or attributes) using separate actions. Visit your farm's detail page to configure which NFTs can be staked.",
+  },
+  {
+    question: "Is there a limit to how many NFTs can be staked?",
+    answer: "There is no hard limit on the number of NFTs that can be staked in a V2 farm. However, you should ensure you have enough reward tokens deposited to cover payouts for all stakers.",
+  },
+  {
+    question: "Can I have multiple reward tokens?",
+    answer: "Yes! V2 farms support up to 3 different reward tokens. You can configure different tokens when creating the farm, allowing you to reward stakers with multiple tokens simultaneously.",
+  },
+  {
+    question: "How often are rewards paid out?",
+    answer: "Rewards accumulate continuously based on the hourly rate you set. The 'Hours Between Payouts' setting determines the minimum interval between claim transactions. Enter a number between 1 and 720 hours.",
+  },
+  {
+    question: "Are staked NFTs safe?",
+    answer: "V2 farms are non-custodial - NFTs remain in your wallet while staked. The smart contract only tracks which NFTs are registered for rewards. WaxDAO has been audited and running since 2021.",
+  },
+  {
+    question: "What are the IPFS hash fields for?",
+    answer: "Avatar Image is a small profile picture (e.g. 300x300px). Cover Image is a large background banner. Both should be IPFS hashes only (e.g. QmXxx...), not full URLs. Supported formats: JPEG and PNG.",
+  },
+  {
+    question: "Why does Anchor show a 'Dangerous Transaction' warning?",
+    answer: "This transaction includes inline actions from the cheesefeefee smart contract — it sends WAXDAO tokens to your wallet and burns fees automatically. These are standard, safe operations and the contract is open source.\n\nTo proceed in Anchor Wallet:\n1. Tap the gear/settings icon\n2. Toggle 'Allow Dangerous Transactions' ON\n3. Sign the transaction\n4. Optionally toggle it back OFF afterward\n\nSome versions of Anchor also show an 'Allow for this transaction only' checkbox you can use instead.",
+  },
 ];
 
 const CONFIRMATION_PHRASE = "I understand how the new farms work";
@@ -153,59 +202,28 @@ export function CreateFarm() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
+            <p className="text-sm text-muted-foreground">
+              Be aware that in order for you to add stakable assets to this farm, you must be authorized on the NFT collection(s).
+            </p>
+
+            <p className="text-sm text-muted-foreground">
+              VERY IMPORTANT!!!!! You must confirm that you understand how these new farms work before you are allowed to create one.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Watch the following video and then enter "{CONFIRMATION_PHRASE}" (without quotes) into the box below. Once you do that, the farm creation form will magically appear.
+            </p>
+
             <div className="rounded-lg overflow-hidden aspect-video bg-black">
               <iframe
                 width="100%"
                 height="100%"
-                src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+                src="https://www.youtube.com/embed/PIV_ojHzkS8"
                 title="How to create a CHEESEFarm"
                 frameBorder="0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
               />
             </div>
-
-            <Accordion type="single" collapsible className="w-full">
-              <AccordionItem value="what">
-                <AccordionTrigger>What is a CHEESEFarm?</AccordionTrigger>
-                <AccordionContent>
-                  A non-custodial NFT staking farm built on WaxDAO V2 smart contracts. Users can stake their NFTs to earn token rewards.
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="cost">
-                <AccordionTrigger>How much does it cost?</AccordionTrigger>
-                <AccordionContent>
-                  Creating a farm costs {WAX_FEE_AMOUNT} WAX, or you can pay with CHEESE at a 20% discount.
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="types">
-                <AccordionTrigger>What are the farm types?</AccordionTrigger>
-                <AccordionContent>
-                  <strong>Collections:</strong> All NFTs from specified collections can be staked.<br/>
-                  <strong>Schemas:</strong> Only NFTs matching specific schemas.<br/>
-                  <strong>Templates:</strong> Only NFTs matching specific templates.<br/>
-                  <strong>Attributes:</strong> Only NFTs with specific attribute values.
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="rewards">
-                <AccordionTrigger>How do rewards work?</AccordionTrigger>
-                <AccordionContent>
-                  You deposit reward tokens into the farm's pools. Stakers earn rewards proportionally based on the hourly rate configured for their staked assets.
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="manage">
-                <AccordionTrigger>Can I manage my farm after creation?</AccordionTrigger>
-                <AccordionContent>
-                  Yes! You can add/remove stakable assets, deposit more rewards, extend the farm, update the profile, and more.
-                </AccordionContent>
-              </AccordionItem>
-              <AccordionItem value="anchor">
-                <AccordionTrigger className="text-orange-400">⚠️ Important: Anchor Wallet Users</AccordionTrigger>
-                <AccordionContent>
-                  If using Anchor wallet, make sure you have the latest version. Some older versions may have issues with complex multi-action transactions.
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
 
             <div className="space-y-2">
               <Label>Type the following to continue:</Label>
@@ -236,6 +254,28 @@ export function CreateFarm() {
           <CardTitle className="flex items-center gap-2">
             <Plus className="h-5 w-5 text-primary" />
             Create New Farm
+            <Dialog>
+              <DialogTrigger asChild>
+                <button className="text-xs text-primary hover:underline ml-2 font-normal">click me for help</button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Farm Creation Guide</DialogTitle>
+                </DialogHeader>
+                <ScrollArea className="max-h-[60vh] pr-4">
+                  <Accordion type="single" collapsible className="w-full">
+                    {FAQ_ITEMS.map((item, index) => (
+                      <AccordionItem key={index} value={`faq-${index}`}>
+                        <AccordionTrigger>{item.question}</AccordionTrigger>
+                        <AccordionContent className="text-sm text-muted-foreground whitespace-pre-line">
+                          {item.answer}
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                </ScrollArea>
+              </DialogContent>
+            </Dialog>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">

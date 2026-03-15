@@ -31,6 +31,15 @@ export function Footer() {
           <Megaphone className="h-3.5 w-3.5" />
           Advertise with CHEESEHub
         </Link>
+        <div className="flex justify-center gap-4 mb-3">
+          <Link to="/disclaimer" className="text-muted-foreground hover:text-cheese transition-colors">
+            Disclaimer
+          </Link>
+          <span className="text-muted-foreground">•</span>
+          <Link to="/terms" className="text-muted-foreground hover:text-cheese transition-colors">
+            Terms of Use
+          </Link>
+        </div>
         <p>
           <span className="text-cheese">CHEESE</span>
           <span className="text-foreground">Hub</span> • Built on WAX • Powered by $CHEESE, WaxDAO and NFTHive Smart Contracts
