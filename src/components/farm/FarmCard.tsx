@@ -103,10 +103,9 @@ export function FarmCard({ farm }: { farm: FarmInfo }) {
 
         {/* Reward pools */}
         {farm.reward_pools.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-border/30 space-y-1">
-            <p className="text-[10px] text-foreground/70 uppercase tracking-wider">Reward Pool</p>
+          <div className="mt-3 pt-3 border-t border-border/30 flex flex-wrap gap-2">
             {farm.reward_pools.map((pool, i) => (
-              <div key={i} className="flex items-center gap-1.5 text-xs">
+              <div key={i} className="flex items-center gap-1 text-xs">
                 <TokenLogo contract={pool.contract} symbol={pool.symbol} size="sm" />
                 <span className="font-mono text-foreground">
                   {formatAmount(pool.balance)} {pool.symbol}
