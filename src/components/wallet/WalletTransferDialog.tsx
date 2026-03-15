@@ -208,7 +208,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
       <Dialog open={open} onOpenChange={handleClose}>
         <DialogContent
           hideClose
-          className="sm:max-w-[1050px] max-h-[85vh] p-0 gap-0 overflow-hidden bg-card border-border"
+          className="sm:max-w-[1050px] h-[680px] max-h-[85vh] p-0 gap-0 overflow-hidden bg-card border-border flex flex-col"
           onInteractOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
         >
@@ -235,7 +235,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
             </Button>
           </div>
 
-          <div className="flex h-[calc(85vh-52px)] min-h-[500px]">
+          <div className="flex flex-1 min-h-0">
             {/* Sidebar */}
             <div className="w-[180px] shrink-0 border-r border-border flex flex-col">
               <nav className="flex-1 py-2 space-y-1.5">
