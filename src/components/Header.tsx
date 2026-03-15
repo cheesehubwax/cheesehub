@@ -20,8 +20,8 @@ const NAV_ITEMS = [
 ];
 
 function NavLabel({ item }: { item: typeof NAV_ITEMS[number] }) {
-  if (!item.prefix) return <>{item.suffix}</>;
-  return <><span className="text-cheese">{item.prefix}</span><span className="text-foreground">{item.suffix}</span></>;
+  if (!item.prefix) return <span>{item.suffix}</span>;
+  return <span><span className="text-cheese">{item.prefix}</span><span className="text-foreground">{item.suffix}</span></span>;
 }
 
 const PRIMARY_NAV = NAV_ITEMS.slice(0, 6);
