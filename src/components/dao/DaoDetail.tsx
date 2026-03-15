@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft, Loader2, Users, Vote, Plus, Settings, Coins, Image as ImageIcon,
-  ExternalLink, ChevronRight, Info, Layers, Archive, Clock, BarChart3, Tag,
+  ExternalLink, ChevronRight, Info, Layers, Archive, Clock, BarChart3, Tag, RefreshCw, Wallet,
 } from "lucide-react";
 import {
   fetchDaoDetails, fetchProposals, fetchDaoTreasury, fetchDaoTreasuryNFTs,
