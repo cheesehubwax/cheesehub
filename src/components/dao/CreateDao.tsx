@@ -89,6 +89,11 @@ export function CreateDao() {
   const handleCreate = async () => {
     if (!session || !accountName) return;
 
+    if (!paymentMethod) {
+      toast({ title: "Select payment method", description: "Choose CHEESE or WAX to pay the creation fee.", variant: "destructive" });
+      return;
+    }
+
     if (!daoName.trim() || !/^[a-z1-5.]{1,12}$/.test(daoName)) {
       toast({ title: "Invalid DAO name", description: "Must be 1-12 chars, a-z, 1-5, and .", variant: "destructive" });
       return;
