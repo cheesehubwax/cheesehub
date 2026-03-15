@@ -192,11 +192,11 @@ export function CreateDao() {
                       <AccordionContent className="text-sm text-foreground space-y-3">
                         <p>CHEESEDao supports 2 DAO types:</p>
                         <div>
-                          <p className="font-semibold text-foreground">Stake Tokens (Custodial)</p>
+                          <p className="font-semibold text-primary">Stake Tokens (Custodial)</p>
                           <p>Members stake governance tokens directly to the DAO. <strong>No external farm needed.</strong> Tokens are held by the DAO contract until unstaked. Voting power equals staked balance.</p>
                         </div>
                         <div>
-                          <p className="font-semibold text-foreground">Hold NFTs (Non-Custodial)</p>
+                          <p className="font-semibold text-primary">Hold NFTs (Non-Custodial)</p>
                           <p><strong>No staking required!</strong> NFTs stay in user's wallet. Simply hold eligible NFTs to vote. Each NFT = 1 vote. Best for NFT communities.</p>
                         </div>
                       </AccordionContent>
@@ -205,19 +205,19 @@ export function CreateDao() {
                       <AccordionTriggerUI className="text-primary">Configuration Settings</AccordionTriggerUI>
                       <AccordionContent className="text-sm text-foreground space-y-3">
                         <div>
-                          <p className="font-semibold text-foreground">Threshold</p>
+                          <p className="font-semibold text-primary">Threshold</p>
                           <p>The percentage of "Yes" votes required for a proposal to pass. A 51% threshold means a simple majority is needed. Higher thresholds require broader consensus but can make it harder to pass proposals.</p>
                         </div>
                         <div>
-                          <p className="font-semibold text-foreground">Minimum Votes</p>
+                          <p className="font-semibold text-primary">Minimum Votes</p>
                           <p>The minimum total vote weight needed for a proposal to be valid. This prevents proposals from passing with very few participants. Vote weight equals token balance in wallets. For example, if set to 1000, at least 1000 tokens worth of votes must be cast before the result counts.</p>
                         </div>
                         <div>
-                          <p className="font-semibold text-foreground">Voting Duration</p>
+                          <p className="font-semibold text-primary">Voting Duration</p>
                           <p>How long voting stays open for each proposal. Common durations are 24 hours (quick decisions), 72 hours (standard), or 168 hours (1 week for major decisions).</p>
                         </div>
                         <div>
-                          <p className="font-semibold text-foreground">Proposer Types</p>
+                          <p className="font-semibold text-primary">Proposer Types</p>
                           <p>Control who can create proposals in your DAO:</p>
                           <ul className="list-disc list-inside space-y-1 mt-1">
                             <li><strong>Anyone</strong> — Any WAX wallet can create proposals. Most democratic but may require proposal fees to prevent spam.</li>
@@ -226,7 +226,7 @@ export function CreateDao() {
                           </ul>
                         </div>
                         <div>
-                          <p className="font-semibold text-foreground">Proposal Cost</p>
+                          <p className="font-semibold text-primary">Proposal Cost</p>
                           <p>An optional WAX fee required to submit a proposal. This fee goes directly to your DAO's treasury and serves two purposes:</p>
                           <ul className="list-disc list-inside space-y-1 mt-1">
                             <li>Prevents spam proposals</li>
@@ -235,7 +235,7 @@ export function CreateDao() {
                           <p>Set to 0 for free proposals. Common values range from 1-100 WAX depending on how exclusive you want proposal creation to be.</p>
                         </div>
                         <div>
-                          <p className="font-semibold text-foreground">Treasury & Deposits</p>
+                          <p className="font-semibold text-primary">Treasury & Deposits</p>
                           <p>After creating your DAO, you can deposit WAX, tokens, and NFTs to the treasury. These assets can then be distributed through governance proposals.</p>
                           <p>Treasury deposits are managed separately from the creation process. Visit your DAO's detail page after creation to make deposits.</p>
                         </div>
