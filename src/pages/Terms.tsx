@@ -58,6 +58,7 @@ export default function Terms() {
             <li>You acknowledge that CHEESEHub does not hold a financial services licence in any jurisdiction and does not provide financial product advice, deal in financial products, or operate as a financial services provider.</li>
             <li>You acknowledge that token burning or supply-reduction mechanisms (such as CHEESENull) do not constitute, imply, or guarantee an increase in price, value, or financial return. You accept that participation in such features is voluntary and carries no expectation of profit.</li>
             <li>You acknowledge that certain platform actions involve deterministic on-chain fee routing via smart contracts (such as <code className="text-foreground bg-muted px-1 rounded">cheesefeefee</code>), which may automatically convert tokens as part of a single atomic transaction. These conversions are executed by fixed contract logic and do not constitute dealing or financial intermediation.</li>
+            <li>You acknowledge that the CHEESESwap feature is solely a frontend interface to Alcor Exchange's smart contracts. CHEESEHub does not custody funds, execute swaps, or act as a counterparty. All swaps are direct on-chain interactions between you and the <code className="text-foreground bg-muted px-1 rounded">swap.alcor</code> contract. You are responsible for reviewing swap details — including output amounts, price impact, and slippage — before signing any transaction.</li>
           </ul>
         </section>
 
