@@ -11,7 +11,7 @@ export function Footer() {
             href="https://x.com/cheesetoken"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-muted-foreground hover:text-cheese transition-colors"
+            className="text-primary hover:text-primary/80 transition-colors"
           >
             <XLogo size={24} weight="fill" />
           </a>
