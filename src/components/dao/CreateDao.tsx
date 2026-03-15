@@ -257,8 +257,8 @@ export function CreateDao() {
                       </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="anchor">
-                      <AccordionTriggerUI>Why does Anchor show a "Dangerous Transaction" warning?</AccordionTriggerUI>
-                      <AccordionContent className="text-sm text-muted-foreground space-y-2">
+                      <AccordionTriggerUI className="text-primary">Why does Anchor show a "Dangerous Transaction" warning?</AccordionTriggerUI>
+                      <AccordionContent className="text-sm text-foreground space-y-2">
                         <p>This transaction includes <strong>inline actions</strong> from the <code className="bg-muted px-1 rounded">cheesefeefee</code> smart contract — it sends WAXDAO tokens to your wallet and burns fees automatically. These are standard, safe operations and the contract is open source.</p>
                         <p>To proceed in Anchor Wallet:</p>
                         <ol className="list-decimal list-inside space-y-1">
