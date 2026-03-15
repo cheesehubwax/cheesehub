@@ -40,7 +40,7 @@ export default function CheeseNull() {
               <span className="text-2xl">⛔</span>
             </div>
             <p className="text-muted-foreground max-w-lg mx-auto">
-              Null $CHEESE, collateralize xCHEESE and fund CHEESEUp. A dapp for pure CHEESELovers increasing your share of supply, increasing the backing of xCHEESE and funding CHEESEUp CPU rentals
+              Null $CHEESE and fund CHEESEUp and xCHEESE. A dapp for pure CHEESELovers
             </p>
           </div>
 
