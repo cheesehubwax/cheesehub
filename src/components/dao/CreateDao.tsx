@@ -174,8 +174,8 @@ export function CreateDao() {
                       </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="dao-name">
-                      <AccordionTriggerUI>DAO Name Format</AccordionTriggerUI>
-                      <AccordionContent className="text-sm text-muted-foreground space-y-2">
+                      <AccordionTriggerUI className="text-primary">DAO Name Format</AccordionTriggerUI>
+                      <AccordionContent className="text-sm text-foreground space-y-2">
                         <p>Your DAO name must follow the WAX account name format:</p>
                         <ul className="list-disc list-inside space-y-1">
                           <li>Maximum 12 characters</li>
