@@ -226,7 +226,7 @@ export function CreateDao() {
                           </ul>
                         </div>
                         <div>
-                          <p className="font-semibold text-foreground">Proposal Cost</p>
+                          <p className="font-semibold text-primary">Proposal Cost</p>
                           <p>An optional WAX fee required to submit a proposal. This fee goes directly to your DAO's treasury and serves two purposes:</p>
                           <ul className="list-disc list-inside space-y-1 mt-1">
                             <li>Prevents spam proposals</li>
