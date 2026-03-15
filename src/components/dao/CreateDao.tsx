@@ -79,9 +79,6 @@ export function CreateDao() {
   };
 
   const daoTypeDescriptions: Record<number, string> = {
-    1: "Users stake NFTs to the DAO contract to gain voting power.",
-    2: "Users stake tokens to a WaxDAO pool for voting.",
-    3: "Uses an existing WaxDAO staking pool for governance.",
     4: "Members stake governance tokens directly to the DAO contract. Tokens are held custodially, and unstaking lets you reclaim them immediately. The token's precision must match.",
     5: "NFTs stay in user's wallets — no staking required! Simply hold eligible NFTs to cast. Hold NFT = 1 vote — best suited for fair NFT communities.",
   };
