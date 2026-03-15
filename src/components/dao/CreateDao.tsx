@@ -268,7 +268,7 @@ export function CreateDao() {
           <p className="text-sm text-muted-foreground">
             Set up your decentralized autonomous organization on the WAX blockchain.
           </p>
-          <p className="text-xs text-muted-foreground">It costs 265 WAX to create a DAO.</p>
+          <p className="text-xs text-muted-foreground">Pay with CHEESE (20% discount) or 265 WAX to create a DAO.</p>
         </div>
 
         {/* DAO TYPE */}
