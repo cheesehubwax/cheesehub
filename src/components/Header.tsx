@@ -9,15 +9,20 @@ import cheeseLogo from "@/assets/cheese-logo.png";
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 
 const NAV_ITEMS = [
-  { to: "/", label: "Home", emoji: "🏠" },
-  { to: "/powerup", label: "CHEESEUp", emoji: "⚡" },
-  { to: "/cheesenull", label: "CHEESENull", emoji: "⛔" },
-  { to: "/farm", label: "CHEESEFarm", emoji: "🌱" },
-  { to: "/dao", label: "CHEESEDao", emoji: "🏛️" },
-  { to: "/drip", label: "CHEESEDrip", emoji: "💧" },
-  { to: "/locker", label: "CHEESELock", emoji: "🔐" },
-  { to: "/drops", label: "CHEESEShip", emoji: "🛒" },
+  { to: "/", label: "Home", emoji: "🏠", prefix: "", suffix: "Home" },
+  { to: "/powerup", label: "CHEESEUp", emoji: "⚡", prefix: "CHEESE", suffix: "Up" },
+  { to: "/cheesenull", label: "CHEESENull", emoji: "⛔", prefix: "CHEESE", suffix: "Null" },
+  { to: "/farm", label: "CHEESEFarm", emoji: "🌱", prefix: "CHEESE", suffix: "Farm" },
+  { to: "/dao", label: "CHEESEDao", emoji: "🏛️", prefix: "CHEESE", suffix: "Dao" },
+  { to: "/drip", label: "CHEESEDrip", emoji: "💧", prefix: "CHEESE", suffix: "Drip" },
+  { to: "/locker", label: "CHEESELock", emoji: "🔐", prefix: "CHEESE", suffix: "Lock" },
+  { to: "/drops", label: "CHEESEShip", emoji: "🛒", prefix: "CHEESE", suffix: "Ship" },
 ];
+
+function NavLabel({ item }: { item: typeof NAV_ITEMS[number] }) {
+  if (!item.prefix) return <>{item.suffix}</>;
+  return <><span className="text-cheese">{item.prefix}</span><span className="text-foreground">{item.suffix}</span></>;
+}
 
 const PRIMARY_NAV = NAV_ITEMS.slice(0, 6);
 const SECONDARY_NAV = NAV_ITEMS.slice(6);
@@ -59,7 +64,7 @@ export function Header() {
                   <SheetClose key={item.to} asChild>
                     <Link to={item.to} className={navLinkClass(item.to)}>
                       <span>{item.emoji}</span>
-                      {item.label}
+                      <NavLabel item={item} />
                     </Link>
                   </SheetClose>
                 ))}
@@ -80,7 +85,7 @@ export function Header() {
             {PRIMARY_NAV.map((item) => (
               <Link key={item.to} to={item.to} className={navLinkClass(item.to)}>
                 <span>{item.emoji}</span>
-                {item.label}
+                <NavLabel item={item} />
               </Link>
             ))}
           </nav>
@@ -110,7 +115,7 @@ export function Header() {
           {SECONDARY_NAV.map((item) => (
             <Link key={item.to} to={item.to} className={navLinkClass(item.to)}>
               <span>{item.emoji}</span>
-              {item.label}
+              <NavLabel item={item} />
             </Link>
           ))}
         </nav>
