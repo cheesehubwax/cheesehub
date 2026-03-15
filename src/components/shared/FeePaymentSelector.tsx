@@ -99,7 +99,7 @@ export function FeePaymentSelector({
             <Label htmlFor="payment-wax" className="flex-1 cursor-pointer">
               <div className="flex items-center justify-between">
                 <span className="font-medium">{waxFee} WAX</span>
-                <Badge variant="outline" className="text-xs">Standard</Badge>
+                <Badge variant="outline" className="text-xs">Alternative</Badge>
               </div>
             </Label>
           </div>
