@@ -93,8 +93,8 @@ export function VoteRewardsManager({ onTransactionComplete, onTransactionSuccess
       if (globalData.rows?.length > 0) {
         const g = globalData.rows[0];
         setGlobalState({
-          pervote_bucket: g.pervote_bucket / 100000000, // Convert from integer to WAX
-          total_producer_vote_weight: parseFloat(g.total_producer_vote_weight || '0'),
+          voters_bucket: parseInt(g.voters_bucket || '0') / 100000000, // Convert from integer to WAX
+          total_unpaid_voteshare: parseFloat(g.total_unpaid_voteshare || '0'),
         });
       }
 
@@ -105,7 +105,12 @@ export function VoteRewardsManager({ onTransactionComplete, onTransactionSuccess
         setStakedAmount(voter.staked / 100000000);
         setProxyName(voter.proxy || '');
         setProducerCount(voter.producers?.length || 0);
-        setVoterWeight(parseFloat(voter.last_vote_weight || '0'));
+        setVoterUnpaidVoteshare(parseFloat(voter.unpaid_voteshare || '0'));
+        setVoterVoteshareChangeRate(parseFloat(voter.unpaid_voteshare_change_rate || '0'));
+        const vsLastUpdated = voter.unpaid_voteshare_last_updated;
+        if (vsLastUpdated && vsLastUpdated !== '2000-01-01T00:00:00.000') {
+          setVoterVoteshareLastUpdated(new Date(vsLastUpdated + (vsLastUpdated.endsWith('Z') ? '' : 'Z')).getTime() / 1000);
+        }
 
         let lastUpdatedTime: Date;
         if (voter.last_claim_time && voter.last_claim_time !== '1970-01-01T00:00:00') {
