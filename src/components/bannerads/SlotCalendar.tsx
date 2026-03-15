@@ -195,7 +195,7 @@ export function SlotCalendar() {
         and have it reviewed and possibly reinstated.
       </div>
 
-      {futureGroups.length > 0 && <div className="mb-4 text-sm text-foreground text-center">💡 Use the checkboxes to select multiple slots and rent them all in one transaction</div>}
+      {futureGroups.length > 0 && <div className="mb-4 text-sm text-foreground text-center flex items-center justify-center gap-2"><Checkbox disabled className="pointer-events-none" /> Use the checkboxes to select multiple slots and rent them all in one transaction</div>}
 
       <div className="space-y-3">
         {futureGroups.length === 0 && (
