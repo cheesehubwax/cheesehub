@@ -49,7 +49,7 @@ export function FarmCard({ farm }: { farm: FarmInfo }) {
 
   return (
     <Card
-      className="bg-card/80 border-border/50 hover:border-primary/30 hover:shadow-lg transition-all cursor-pointer group flex flex-col"
+      className="bg-card/80 border-primary/30 shadow-lg transition-all cursor-pointer group flex flex-col"
       onClick={() => navigate(`/farm/${farm.farm_name}`)}
     >
       <CardContent className="p-4 flex flex-col flex-1">
