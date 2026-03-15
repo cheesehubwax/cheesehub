@@ -9,7 +9,7 @@ export function BannerAdStatsBar() {
 
   const statItems = [
     { label: "Ads Rented", value: isLoading ? "-" : (data?.totalAdsRented.toLocaleString() ?? "-"), Icon: Megaphone, color: "text-cheese" },
-    { label: "CHEESE Nulled", value: isLoading ? "-" : (data ? formatNumber(data.cheeseBurnt, 4) : "-"), Icon: Flame, color: "text-destructive" },
+    { label: "CHEESE Nulled", value: isLoading ? "-" : (data ? formatNumber(data.cheeseBurnt, 4) : "-"), emoji: "⛔", color: "text-destructive" },
     { label: "WAX → CheesePowerz", value: isLoading ? "-" : (data ? formatNumber(data.waxToCheesepowerz, 4) : "-"), Icon: Lightning, color: "text-primary" },
     { label: "WAX → CheeseBurner", value: isLoading ? "-" : (data ? formatNumber(data.waxToCheeseburner, 4) : "-"), Icon: TrendUp, color: "text-amber-500" },
   ];
