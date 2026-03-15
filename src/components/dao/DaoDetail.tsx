@@ -487,7 +487,7 @@ export function DaoDetail({ daoName, onBack }: DaoDetailProps) {
                   <h4 className="font-medium text-sm">NFTs in Treasury</h4>
                   <Badge variant="secondary" className="text-xs">{treasuryNFTs.length}</Badge>
                 </div>
-                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2 max-h-40 overflow-y-auto">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
                   {treasuryNFTs.map(nft => (
                     <div
                       key={nft.asset_id}
