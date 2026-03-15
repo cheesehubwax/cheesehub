@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSwapTokens } from "@/hooks/useSwapTokens";
 import { useSwapTokenBalances } from "@/hooks/useSwapTokenBalances";
+import { useAlcorTokenPrices } from "@/hooks/useAlcorTokenPrices";
 import { useWax } from "@/context/WaxContext";
 import { type SwapToken, getTokenLogoUrl } from "@/lib/swapApi";
 
