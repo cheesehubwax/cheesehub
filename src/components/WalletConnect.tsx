@@ -58,8 +58,8 @@ export function WalletConnect() {
 
   const formatBalance = (balance: number) => {
     return balance.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
+      minimumFractionDigits: 4,
+      maximumFractionDigits: 4,
     });
   };
 
