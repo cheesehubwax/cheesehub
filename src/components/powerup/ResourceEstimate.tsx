@@ -46,7 +46,7 @@ export const ResourceEstimate = ({
             onClick={onRefresh}
             className="p-2 hover:bg-red-500/20 rounded-lg transition-colors"
           >
-            <span>🔄</span>
+            <RefreshCw className="w-4 h-4 text-red-400" />
           </button>
         </div>
       </div>
