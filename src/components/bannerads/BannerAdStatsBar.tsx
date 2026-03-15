@@ -20,7 +20,11 @@ export function BannerAdStatsBar() {
         {statItems.map((stat) => (
           <div key={stat.label} className="text-center">
             <div className="flex items-center justify-center gap-2 mb-1">
-              <stat.Icon className={`w-4 h-4 ${stat.color}`} weight="bold" />
+              {'emoji' in stat ? (
+                <span className="text-base">{stat.emoji}</span>
+              ) : (
+                <stat.Icon className={`w-4 h-4 ${stat.color}`} weight="bold" />
+              )}
               <span className="text-lg font-bold font-mono text-foreground">{stat.value}</span>
             </div>
             <p className="text-xs text-muted-foreground">{stat.label}</p>
