@@ -116,7 +116,7 @@ export function CreateFarm() {
     twitter: "", discord: "", telegram: "", website: "", youtube: "", medium: "",
   });
 
-  const [paymentMethod, setPaymentMethod] = useState<"wax" | "cheese">("wax");
+  const [paymentMethod, setPaymentMethod] = useState<"wax" | "cheese" | null>(null);
 
   const validation = validateFarmName(farmName);
 
