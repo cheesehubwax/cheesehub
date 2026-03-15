@@ -54,12 +54,14 @@ export async function fetchSwapTokenList(signal?: AbortSignal): Promise<SwapToke
       seen.add(key);
       return true;
     })
-    .map((t) => ({
+    .map((t: any) => ({
       contract: t.contract,
       ticker: t.symbol,
       precision: t.decimals,
       id: t.id,
       logo: getTokenLogoUrl(t.contract, t.symbol),
+      system_price: t.system_price ?? 0,
+      usd_price: t.usd_price ?? 0,
     }));
 }
 
