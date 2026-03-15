@@ -284,7 +284,7 @@ export function CreateFarm() {
                 <ScrollArea className="max-h-[60vh] pr-4">
                   <Accordion type="single" collapsible value={helpAccordionValue} onValueChange={setHelpAccordionValue} className="w-full">
                     {FAQ_ITEMS.map((item, index) => (
-                      <AccordionItem key={index} value={`faq-${index}`}>
+                      <AccordionItem key={index} value={`faq-${index}`} ref={index === FAQ_ITEMS.length - 1 ? anchorRef : undefined}>
                         <AccordionTrigger className="text-primary">{item.question}</AccordionTrigger>
                         <AccordionContent className="text-sm text-foreground whitespace-pre-line">
                           {item.answer}
