@@ -188,8 +188,8 @@ export function CreateDao() {
                       </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="dao-types">
-                      <AccordionTriggerUI>DAO Types Explained</AccordionTriggerUI>
-                      <AccordionContent className="text-sm text-muted-foreground space-y-3">
+                      <AccordionTriggerUI className="text-primary">DAO Types Explained</AccordionTriggerUI>
+                      <AccordionContent className="text-sm text-foreground space-y-3">
                         <p>CHEESEDao supports 2 DAO types:</p>
                         <div>
                           <p className="font-semibold text-foreground">Stake Tokens (Custodial)</p>
