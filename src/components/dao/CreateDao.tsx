@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger as AccordionTriggerUI } from "@/components/ui/accordion";
 import {
-  DAO_TYPES, PROPOSER_TYPES,
+  DAO_TYPES, CREATABLE_DAO_TYPES, PROPOSER_TYPES,
   buildAssertPointAction, buildDaoCreationFeeAction, buildCreateDaoAction,
   buildSetProfileActionWithSocials, DaoSocials,
 } from "@/lib/dao";
