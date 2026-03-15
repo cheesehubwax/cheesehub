@@ -446,6 +446,7 @@ export function CreateFarm() {
                 type="button"
                 onClick={() => {
                   setHelpAccordionValue("faq-10");
+                  setScrollToAnchor(true);
                   setHelpOpen(true);
                 }}
                 className="text-primary hover:underline inline"
