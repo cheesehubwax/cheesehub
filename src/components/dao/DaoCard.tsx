@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Users, BarChart3, Clock, Coins, Tag, ExternalLink } from "lucide-react";
 import { DaoInfo, DAO_TYPES, PROPOSER_TYPES } from "@/lib/dao";
+import { TokenLogo } from "@/components/TokenLogo";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 
 interface DaoCardProps {
