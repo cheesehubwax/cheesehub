@@ -7,6 +7,8 @@ export interface SwapToken {
   precision: number;
   logo?: string;
   id?: string;
+  system_price?: number;
+  usd_price?: number;
 }
 
 export interface SwapAction {
