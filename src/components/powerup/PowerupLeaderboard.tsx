@@ -102,7 +102,7 @@ export function PowerupLeaderboard({ rawActions, isLoading, isError, onRefresh }
                 <TableHead className="h-8 text-xs text-muted-foreground w-10">#</TableHead>
                 <TableHead className="h-8 text-xs text-muted-foreground">Account</TableHead>
                 <TableHead className="h-8 text-xs text-muted-foreground text-right">
-                  {sortBy === 'powerups' ? 'Powerups' : 'Burned'}
+                  {sortBy === 'powerups' ? 'Powerups' : 'Nulled'}
                 </TableHead>
               </TableRow>
             </TableHeader>
