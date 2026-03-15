@@ -16,6 +16,8 @@ import Farm from "./pages/Farm";
 import CheeseNull from "./pages/CheeseNull";
 import Drip from "./pages/Drip";
 import BannerAds from "./pages/BannerAds";
+import Disclaimer from "./pages/Disclaimer";
+import Terms from "./pages/Terms";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
