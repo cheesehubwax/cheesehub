@@ -254,6 +254,28 @@ export function CreateFarm() {
           <CardTitle className="flex items-center gap-2">
             <Plus className="h-5 w-5 text-primary" />
             Create New Farm
+            <Dialog>
+              <DialogTrigger asChild>
+                <button className="text-xs text-primary hover:underline ml-2 font-normal">click me for help</button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Farm Creation Guide</DialogTitle>
+                </DialogHeader>
+                <ScrollArea className="max-h-[60vh] pr-4">
+                  <Accordion type="single" collapsible className="w-full">
+                    {FAQ_ITEMS.map((item, index) => (
+                      <AccordionItem key={index} value={`faq-${index}`}>
+                        <AccordionTrigger>{item.question}</AccordionTrigger>
+                        <AccordionContent className="text-sm text-muted-foreground whitespace-pre-line">
+                          {item.answer}
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                </ScrollArea>
+              </DialogContent>
+            </Dialog>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
