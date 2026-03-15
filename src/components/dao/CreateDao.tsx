@@ -209,7 +209,7 @@ export function CreateDao() {
                           <p>The percentage of "Yes" votes required for a proposal to pass. A 51% threshold means a simple majority is needed. Higher thresholds require broader consensus but can make it harder to pass proposals.</p>
                         </div>
                         <div>
-                          <p className="font-semibold text-foreground">Minimum Votes</p>
+                          <p className="font-semibold text-primary">Minimum Votes</p>
                           <p>The minimum total vote weight needed for a proposal to be valid. This prevents proposals from passing with very few participants. Vote weight equals token balance in wallets. For example, if set to 1000, at least 1000 tokens worth of votes must be cast before the result counts.</p>
                         </div>
                         <div>
