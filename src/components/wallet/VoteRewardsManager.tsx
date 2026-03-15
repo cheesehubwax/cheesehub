@@ -15,8 +15,8 @@ interface VoteRewardsManagerProps {
 }
 
 interface GbmGlobalState {
-  pervote_bucket: number;
-  total_producer_vote_weight: number;
+  voters_bucket: number;
+  total_unpaid_voteshare: number;
 }
 
 export function VoteRewardsManager({ onTransactionComplete, onTransactionSuccess }: VoteRewardsManagerProps) {
@@ -31,38 +31,32 @@ export function VoteRewardsManager({ onTransactionComplete, onTransactionSuccess
   const [stakedAmount, setStakedAmount] = useState(0);
   const [proxyName, setProxyName] = useState('');
   const [producerCount, setProducerCount] = useState(0);
-  const [voterWeight, setVoterWeight] = useState(0);
+  const [voterUnpaidVoteshare, setVoterUnpaidVoteshare] = useState(0);
+  const [voterVoteshareChangeRate, setVoterVoteshareChangeRate] = useState(0);
+  const [voterVoteshareLastUpdated, setVoterVoteshareLastUpdated] = useState(0);
   const [globalState, setGlobalState] = useState<GbmGlobalState | null>(null);
   const [lastClaimTimestamp, setLastClaimTimestamp] = useState(0);
   const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => { if (accountName) fetchVoterData(); }, [accountName]);
 
-  // Real-time reward ticker — updates every second
+  // Real-time reward ticker — updates every second using GBM voteshare formula
   useEffect(() => {
     if (tickerRef.current) clearInterval(tickerRef.current);
 
-    if (!hasVoted || !globalState || voterWeight <= 0 || globalState.total_producer_vote_weight <= 0) {
+    if (!hasVoted || !globalState || voterUnpaidVoteshare <= 0 || globalState.total_unpaid_voteshare <= 0) {
       setEstimatedRewards(0);
       return;
     }
 
     const calcReward = () => {
+      // GBM voter rewards: (voter_unpaid_voteshare / total_unpaid_voteshare) * voters_bucket
+      // Voteshare accrues over time based on change_rate since last update
       const now = Date.now() / 1000;
-      const lastClaim = lastClaimTimestamp;
-      // GBM rewards accrue linearly: share of pervote_bucket proportional to vote weight
-      // The bucket refills continuously; we estimate based on current snapshot
-      const voterShare = voterWeight / globalState.total_producer_vote_weight;
-      // pervote_bucket is the total unclaimed pool in WAX (already in token units)
-      // Estimate: your share of the bucket, scaled by time since last claim relative to ~24h cycle
-      const timeSinceClaim = Math.max(0, now - lastClaim);
-      const daySeconds = 86400;
-      // Base estimate: your proportional share of the current bucket
-      const baseReward = voterShare * globalState.pervote_bucket;
-      // Time factor: rewards accrue over time, claimable once per 24h
-      // If more than 24h has passed, you get at least 1 full cycle worth
-      const timeFactor = Math.min(timeSinceClaim / daySeconds, 1);
-      const reward = baseReward * timeFactor;
+      const elapsed = Math.max(0, now - voterVoteshareLastUpdated);
+      const currentVoteshare = voterUnpaidVoteshare + (voterVoteshareChangeRate * elapsed);
+      const voterShare = currentVoteshare / globalState.total_unpaid_voteshare;
+      const reward = voterShare * globalState.voters_bucket;
       setEstimatedRewards(Math.max(0, reward));
     };
 
@@ -72,7 +66,7 @@ export function VoteRewardsManager({ onTransactionComplete, onTransactionSuccess
     return () => {
       if (tickerRef.current) clearInterval(tickerRef.current);
     };
-  }, [hasVoted, globalState, voterWeight, lastClaimTimestamp]);
+  }, [hasVoted, globalState, voterUnpaidVoteshare, voterVoteshareChangeRate, voterVoteshareLastUpdated]);
 
   const fetchVoterData = async () => {
     if (!accountName) return;
@@ -99,8 +93,8 @@ export function VoteRewardsManager({ onTransactionComplete, onTransactionSuccess
       if (globalData.rows?.length > 0) {
         const g = globalData.rows[0];
         setGlobalState({
-          pervote_bucket: g.pervote_bucket / 100000000, // Convert from integer to WAX
-          total_producer_vote_weight: parseFloat(g.total_producer_vote_weight || '0'),
+          voters_bucket: parseInt(g.voters_bucket || '0') / 100000000, // Convert from integer to WAX
+          total_unpaid_voteshare: parseFloat(g.total_unpaid_voteshare || '0'),
         });
       }
 
@@ -111,7 +105,12 @@ export function VoteRewardsManager({ onTransactionComplete, onTransactionSuccess
         setStakedAmount(voter.staked / 100000000);
         setProxyName(voter.proxy || '');
         setProducerCount(voter.producers?.length || 0);
-        setVoterWeight(parseFloat(voter.last_vote_weight || '0'));
+        setVoterUnpaidVoteshare(parseFloat(voter.unpaid_voteshare || '0'));
+        setVoterVoteshareChangeRate(parseFloat(voter.unpaid_voteshare_change_rate || '0'));
+        const vsLastUpdated = voter.unpaid_voteshare_last_updated;
+        if (vsLastUpdated && vsLastUpdated !== '2000-01-01T00:00:00.000') {
+          setVoterVoteshareLastUpdated(new Date(vsLastUpdated + (vsLastUpdated.endsWith('Z') ? '' : 'Z')).getTime() / 1000);
+        }
 
         let lastUpdatedTime: Date;
         if (voter.last_claim_time && voter.last_claim_time !== '1970-01-01T00:00:00') {
