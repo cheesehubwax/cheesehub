@@ -44,6 +44,9 @@ export default function Disclaimer() {
           <p className="text-sm text-muted-foreground leading-relaxed">
             While open-source transparency allows for public scrutiny and community-driven security review, it does not constitute a formal security audit. Open-source software is provided without warranty, and no guarantee is made that the code is free from bugs, vulnerabilities, or exploits. Users interact with all smart contracts and this interface entirely at their own risk, and are encouraged to conduct their own independent review of both the frontend code and any on-chain contracts before use.
           </p>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            CHEESEHub is hosted and served directly via GitHub Pages, a static site hosting service provided by GitHub, Inc. The platform does not operate its own web servers, backend infrastructure, or databases. All content is delivered as static files from GitHub's infrastructure. This means there is no server-side processing, no user data collection or storage by CHEESEHub, and no proprietary hosting arrangement. GitHub Pages is subject to GitHub's own Terms of Service and acceptable use policies. CHEESEHub has no control over GitHub's infrastructure, uptime, availability, or content delivery — any interruption, suspension, or modification of service by GitHub is beyond the control of the CHEESEHub community.
+          </p>
         </section>
 
         <section className="space-y-4">
