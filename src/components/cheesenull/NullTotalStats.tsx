@@ -2,7 +2,7 @@ import { useCheeseNullStats } from '@/hooks/useCheeseNullStats';
 import { formatWaxAmount, formatCheeseAmount } from '@/lib/cheeseNullApi';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import cheesenullIcon from '@/assets/cheesenull.png';
+
 
 export function NullTotalStats() {
   const {
