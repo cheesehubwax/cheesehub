@@ -1,5 +1,5 @@
 import { PowerupStats } from "@/hooks/usePowerupStats";
-import cheesenullIcon from "@/assets/cheesenull.png";
+
 
 interface PowerupStatsBarProps {
   stats: PowerupStats | null;
