@@ -93,11 +93,7 @@ export function NullerLeaderboard({ rawActions, isLoading, isError, onRefresh }:
                   : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent'
               )}
             >
-              {opt.icon === 'cheesenull' ? (
-                <img src={cheesenullIcon} alt="null" className="w-3.5 h-3.5" />
-              ) : (
-                <span>{opt.emoji}</span>
-              )}
+              <span>{opt.emoji}</span>
               {opt.label}
             </button>
           ))}
