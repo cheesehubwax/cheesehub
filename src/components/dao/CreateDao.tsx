@@ -586,9 +586,18 @@ export function CreateDao() {
         <div className="flex items-start gap-3 p-3 rounded-lg border border-primary/30 bg-primary/5 text-xs text-muted-foreground">
           <AlertTriangle className="h-4 w-4 text-primary shrink-0 mt-0.5" />
           <p>
-            <span className="font-semibold text-foreground">Another Wallet Store:</span> This transaction includes inline actions and may trigger a "Dangerous Transaction" warning. This is normal and safe — see the{" "}
-            <a href="https://docs.waxdao.io" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">help guide</a>
-            {" "}page for instructions on how to allow it.
+            <span className="font-semibold text-foreground">Anchor Wallet Users:</span> This transaction includes inline actions and may trigger a "Dangerous Transaction" warning. This is normal and safe — see the{" "}
+            <button
+              type="button"
+              onClick={() => {
+                setHelpAccordionValue(prev => prev.includes("anchor") ? prev : [...prev, "anchor"]);
+                setHelpOpen(true);
+              }}
+              className="text-primary hover:underline inline"
+            >
+              help guide
+            </button>
+            {" "}for instructions on how to allow it.
           </p>
         </div>
 
