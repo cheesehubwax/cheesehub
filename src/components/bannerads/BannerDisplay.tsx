@@ -109,7 +109,7 @@ export function BannerDisplay() {
           </span>
         </a>
       ) : (
-        <div className="flex gap-6">
+        <div className="flex gap-12">
           {[1, 2].map((slot) => (
             <Link
               key={slot}
@@ -124,7 +124,7 @@ export function BannerDisplay() {
       )}
       <Link
         to="/bannerads"
-        className="flex items-center gap-1 text-xs text-cheese hover:text-cheese transition-colors"
+        className="flex items-center gap-1 text-xs text-cheese hover:text-cheese transition-colors mt-3"
       >
         <Megaphone className="h-3 w-3" />
         Advertise with CHEESEHub
