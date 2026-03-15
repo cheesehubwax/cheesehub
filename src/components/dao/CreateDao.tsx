@@ -213,7 +213,7 @@ export function CreateDao() {
                           <p>The minimum total vote weight needed for a proposal to be valid. This prevents proposals from passing with very few participants. Vote weight equals token balance in wallets. For example, if set to 1000, at least 1000 tokens worth of votes must be cast before the result counts.</p>
                         </div>
                         <div>
-                          <p className="font-semibold text-foreground">Voting Duration</p>
+                          <p className="font-semibold text-primary">Voting Duration</p>
                           <p>How long voting stays open for each proposal. Common durations are 24 hours (quick decisions), 72 hours (standard), or 168 hours (1 week for major decisions).</p>
                         </div>
                         <div>
