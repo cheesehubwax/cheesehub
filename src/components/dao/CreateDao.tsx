@@ -196,7 +196,7 @@ export function CreateDao() {
                           <p>Members stake governance tokens directly to the DAO. <strong>No external farm needed.</strong> Tokens are held by the DAO contract until unstaked. Voting power equals staked balance.</p>
                         </div>
                         <div>
-                          <p className="font-semibold text-foreground">Hold NFTs (Non-Custodial)</p>
+                          <p className="font-semibold text-primary">Hold NFTs (Non-Custodial)</p>
                           <p><strong>No staking required!</strong> NFTs stay in user's wallet. Simply hold eligible NFTs to vote. Each NFT = 1 vote. Best for NFT communities.</p>
                         </div>
                       </AccordionContent>
