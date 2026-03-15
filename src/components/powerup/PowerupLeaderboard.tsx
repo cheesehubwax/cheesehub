@@ -18,7 +18,7 @@ interface PowerupLeaderboardProps {
 }
 
 const SORT_OPTIONS: { mode: PowerupSortMode; label: string; emoji: string }[] = [
-  { mode: 'cheese', label: 'CHEESE Burned', emoji: '⛔' },
+  { mode: 'cheese', label: 'CHEESE Nulled', emoji: '⛔' },
   { mode: 'powerups', label: 'Powerups', emoji: '⚡' },
 ];
 
