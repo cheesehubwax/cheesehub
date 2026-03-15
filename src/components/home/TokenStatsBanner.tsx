@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ExternalLink } from 'lucide-react';
 import { CHEESE_CONFIG } from '@/lib/waxConfig';
-import cheeseToken from '@/assets/cheese-token.png';
+import cheeseLogo from '@/assets/cheese-logo.png';
 
 // Format large numbers with abbreviations
 function formatLargeNumber(num: number, decimals: number = 1): string {
