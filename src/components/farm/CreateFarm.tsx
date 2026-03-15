@@ -44,7 +44,7 @@ const FAQ_ITEMS = [
   },
   {
     question: "How much does it cost to create a farm?",
-    answer: "You can create a farm by paying 265 WAX, 25,000 WAXDAO tokens, or by using 1 NFT from the Wojak collection (ourwojaksart). These payment options help support the WaxDAO ecosystem.",
+    answer: "You can create a farm by paying 265 WAX or by paying with CHEESE tokens at a 20% discount. Simply select your preferred payment method before submitting.",
   },
   {
     question: "What are the different farm types?",
