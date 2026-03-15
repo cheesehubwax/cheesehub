@@ -4,8 +4,7 @@ import { useCheeseStats } from '@/hooks/useCheeseStats';
 import { useCheeseTVL } from '@/hooks/useCheeseTVL';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RefreshCw } from 'lucide-react';
-import waxToken from '@/assets/wax-token.png';
-import cheeseLogo2 from '@/assets/cheese-logo-2.png';
+import waxCoin from '@/assets/wax-coin.png';
 import { CheeseSwapDialog } from '@/components/swap/CheeseSwapDialog';
 
 function formatPrice(price: number, decimals: number = 8): string {
@@ -74,8 +73,7 @@ export function CheesePriceBar() {
       <div className="flex flex-wrap justify-center gap-4 md:gap-8 mt-6 mb-2">
         {/* CHEESE/WAX Price */}
         <div className="flex items-center gap-2 bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border border-cheese/20 rounded-lg px-4 py-2">
-          <img src={cheeseLogo2} alt="CHEESE" className="w-6 h-6 rounded-full" />
-          <img src={waxToken} alt="WAX" className="w-6 h-6 rounded-full" />
+          <img src={waxCoin} alt="WAX" className="w-6 h-6 rounded-full" />
           <div className="flex flex-col items-start">
             <span className="text-xs text-muted-foreground">CHEESE/WAX</span>
             {isLoading ? (
@@ -96,7 +94,7 @@ export function CheesePriceBar() {
 
         {/* CHEESE/USD Price */}
         <div className="flex items-center gap-2 bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border border-cheese/20 rounded-lg px-4 py-2">
-          <img src={cheeseLogo2} alt="CHEESE" className="w-6 h-6 rounded-full" />
+          <span className="text-lg">💲</span>
           <div className="flex flex-col items-start">
             <span className="text-xs text-muted-foreground">CHEESE/USD</span>
             {isLoading ? (
