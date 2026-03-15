@@ -167,15 +167,15 @@ export function CreateDao() {
                 <ScrollArea className="max-h-[60vh] pr-4">
                   <Accordion type="multiple" value={helpAccordionValue} onValueChange={setHelpAccordionValue} className="w-full">
                     <AccordionItem value="cheese-payment">
-                      <AccordionTriggerUI>Paying with CHEESE Tokens</AccordionTriggerUI>
-                      <AccordionContent className="text-sm text-muted-foreground space-y-2">
+                      <AccordionTriggerUI className="text-primary">Paying with CHEESE Tokens</AccordionTriggerUI>
+                      <AccordionContent className="text-sm text-foreground space-y-2">
                        <p><strong>CHEESE is the standard payment method</strong> and gives you a <strong>20% discount</strong> on the 265 WAX creation fee.</p>
                         <p>Simply select the CHEESE payment option (selected by default) and the transaction will handle everything automatically in a single step - no prepayment required!</p>
                       </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="dao-name">
-                      <AccordionTriggerUI>DAO Name Format</AccordionTriggerUI>
-                      <AccordionContent className="text-sm text-muted-foreground space-y-2">
+                      <AccordionTriggerUI className="text-primary">DAO Name Format</AccordionTriggerUI>
+                      <AccordionContent className="text-sm text-foreground space-y-2">
                         <p>Your DAO name must follow the WAX account name format:</p>
                         <ul className="list-disc list-inside space-y-1">
                           <li>Maximum 12 characters</li>
@@ -188,8 +188,8 @@ export function CreateDao() {
                       </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="dao-types">
-                      <AccordionTriggerUI>DAO Types Explained</AccordionTriggerUI>
-                      <AccordionContent className="text-sm text-muted-foreground space-y-3">
+                      <AccordionTriggerUI className="text-primary">DAO Types Explained</AccordionTriggerUI>
+                      <AccordionContent className="text-sm text-foreground space-y-3">
                         <p>CHEESEDao supports 2 DAO types:</p>
                         <div>
                           <p className="font-semibold text-foreground">Stake Tokens (Custodial)</p>
@@ -202,8 +202,8 @@ export function CreateDao() {
                       </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="settings">
-                      <AccordionTriggerUI>Configuration Settings</AccordionTriggerUI>
-                      <AccordionContent className="text-sm text-muted-foreground space-y-3">
+                      <AccordionTriggerUI className="text-primary">Configuration Settings</AccordionTriggerUI>
+                      <AccordionContent className="text-sm text-foreground space-y-3">
                         <div>
                           <p className="font-semibold text-foreground">Threshold</p>
                           <p>The percentage of "Yes" votes required for a proposal to pass. A 51% threshold means a simple majority is needed. Higher thresholds require broader consensus but can make it harder to pass proposals.</p>
@@ -242,8 +242,8 @@ export function CreateDao() {
                       </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="ipfs">
-                      <AccordionTriggerUI>IPFS Hash (Avatar & Cover Image)</AccordionTriggerUI>
-                      <AccordionContent className="text-sm text-muted-foreground space-y-2">
+                      <AccordionTriggerUI className="text-primary">IPFS Hash (Avatar & Cover Image)</AccordionTriggerUI>
+                      <AccordionContent className="text-sm text-foreground space-y-2">
                         <p>These are your DAO's logos - the <strong>cover image</strong> is a large background pic, and the <strong>avatar</strong> should be a small (e.g. 300 x 300) pic.</p>
                         <p>Both should be <strong>IPFS hash only</strong>, do NOT put the full URL.</p>
                         <p>Example hash: <code className="bg-muted px-1 rounded">QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco</code></p>
@@ -251,14 +251,14 @@ export function CreateDao() {
                       </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="modify">
-                      <AccordionTriggerUI>Modifying Settings Later</AccordionTriggerUI>
-                      <AccordionContent className="text-sm text-muted-foreground">
+                      <AccordionTriggerUI className="text-primary">Modifying Settings Later</AccordionTriggerUI>
+                      <AccordionContent className="text-sm text-foreground">
                         <p>Once created, DAO settings <strong>cannot be changed</strong>. Please review all configuration options carefully before submitting. Choose wisely!</p>
                       </AccordionContent>
                     </AccordionItem>
                     <AccordionItem value="anchor">
-                      <AccordionTriggerUI>Why does Anchor show a "Dangerous Transaction" warning?</AccordionTriggerUI>
-                      <AccordionContent className="text-sm text-muted-foreground space-y-2">
+                      <AccordionTriggerUI className="text-primary">Why does Anchor show a "Dangerous Transaction" warning?</AccordionTriggerUI>
+                      <AccordionContent className="text-sm text-foreground space-y-2">
                         <p>This transaction includes <strong>inline actions</strong> from the <code className="bg-muted px-1 rounded">cheesefeefee</code> smart contract — it sends WAXDAO tokens to your wallet and burns fees automatically. These are standard, safe operations and the contract is open source.</p>
                         <p>To proceed in Anchor Wallet:</p>
                         <ol className="list-decimal list-inside space-y-1">
