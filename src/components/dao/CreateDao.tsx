@@ -165,7 +165,7 @@ export function CreateDao() {
                   <DialogTitle>DAO Creation Guide</DialogTitle>
                 </DialogHeader>
                 <ScrollArea className="max-h-[60vh] pr-4">
-                  <Accordion type="multiple" defaultValue={["cheese-payment", "dao-types", "settings"]} className="w-full">
+                  <Accordion type="multiple" value={helpAccordionValue} onValueChange={setHelpAccordionValue} className="w-full">
                     <AccordionItem value="cheese-payment">
                       <AccordionTriggerUI>Paying with CHEESE Tokens</AccordionTriggerUI>
                       <AccordionContent className="text-sm text-muted-foreground space-y-2">
