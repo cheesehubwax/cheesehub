@@ -76,6 +76,15 @@ export function CreateDao() {
     { collection_name: "", schema_name: "" },
   ]);
 
+  useEffect(() => {
+    if (scrollToAnchor && helpOpen && anchorRef.current) {
+      setTimeout(() => {
+        anchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        setScrollToAnchor(false);
+      }, 150);
+    }
+  }, [scrollToAnchor, helpOpen]);
+
   const addSchema = () => setGovSchemas(prev => [...prev, { collection_name: "", schema_name: "" }]);
   const removeSchema = (idx: number) => setGovSchemas(prev => prev.filter((_, i) => i !== idx));
   const updateSchema = (idx: number, field: "collection_name" | "schema_name", value: string) => {
