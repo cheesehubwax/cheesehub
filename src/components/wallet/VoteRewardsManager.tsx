@@ -31,7 +31,9 @@ export function VoteRewardsManager({ onTransactionComplete, onTransactionSuccess
   const [stakedAmount, setStakedAmount] = useState(0);
   const [proxyName, setProxyName] = useState('');
   const [producerCount, setProducerCount] = useState(0);
-  const [voterWeight, setVoterWeight] = useState(0);
+  const [voterUnpaidVoteshare, setVoterUnpaidVoteshare] = useState(0);
+  const [voterVoteshareChangeRate, setVoterVoteshareChangeRate] = useState(0);
+  const [voterVoteshareLastUpdated, setVoterVoteshareLastUpdated] = useState(0);
   const [globalState, setGlobalState] = useState<GbmGlobalState | null>(null);
   const [lastClaimTimestamp, setLastClaimTimestamp] = useState(0);
   const tickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
