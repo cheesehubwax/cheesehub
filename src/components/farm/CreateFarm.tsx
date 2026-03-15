@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -117,6 +117,8 @@ export function CreateFarm() {
   });
 
   const [paymentMethod, setPaymentMethod] = useState<"wax" | "cheese" | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [helpAccordionValue, setHelpAccordionValue] = useState<string | undefined>(undefined);
 
   const validation = validateFarmName(farmName);
 
@@ -254,7 +256,10 @@ export function CreateFarm() {
           <CardTitle className="flex items-center gap-2">
             <Plus className="h-5 w-5 text-primary" />
             Create New Farm
-            <Dialog>
+            <Dialog open={helpOpen} onOpenChange={(open) => {
+              setHelpOpen(open);
+              if (!open) setHelpAccordionValue(undefined);
+            }}>
               <DialogTrigger asChild>
                 <button className="text-xs text-primary hover:underline ml-2 font-normal">click me for help</button>
               </DialogTrigger>
@@ -263,7 +268,7 @@ export function CreateFarm() {
                   <DialogTitle>Farm Creation Guide</DialogTitle>
                 </DialogHeader>
                 <ScrollArea className="max-h-[60vh] pr-4">
-                  <Accordion type="single" collapsible className="w-full">
+                  <Accordion type="single" collapsible value={helpAccordionValue} onValueChange={setHelpAccordionValue} className="w-full">
                     {FAQ_ITEMS.map((item, index) => (
                       <AccordionItem key={index} value={`faq-${index}`}>
                         <AccordionTrigger>{item.question}</AccordionTrigger>
@@ -417,6 +422,25 @@ export function CreateFarm() {
             onMethodChange={setPaymentMethod}
             onCheeseAmountChange={() => {}}
           />
+
+          {/* Warning */}
+          <div className="flex items-start gap-3 p-3 rounded-lg border border-primary/30 bg-primary/5 text-xs text-muted-foreground">
+            <AlertTriangle className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+            <p>
+              <span className="font-semibold text-foreground">Anchor Wallet Users:</span> This transaction includes inline actions and may trigger a "Dangerous Transaction" warning. This is normal and safe — see the{" "}
+              <button
+                type="button"
+                onClick={() => {
+                  setHelpAccordionValue("faq-10");
+                  setHelpOpen(true);
+                }}
+                className="text-primary hover:underline inline"
+              >
+                help guide
+              </button>
+              {" "}for instructions on how to allow it.
+            </p>
+          </div>
 
           {/* Submit */}
           <Button

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -60,6 +60,8 @@ export function CreateDao() {
   const [minimumWeight, setMinimumWeight] = useState(0);
   const [proposalCost, setProposalCost] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<"wax" | "cheese" | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [helpAccordionValue, setHelpAccordionValue] = useState<string[]>(["cheese-payment", "dao-types", "settings"]);
 
   // Profile fields
   const [description, setDescription] = useState("");
@@ -151,7 +153,10 @@ export function CreateDao() {
         <div className="space-y-2">
           <h2 className="text-xl font-bold flex items-center gap-2">
             <span className="text-primary">🏛️</span> Create a New DAO
-            <Dialog>
+            <Dialog open={helpOpen} onOpenChange={(open) => {
+              setHelpOpen(open);
+              if (!open) setHelpAccordionValue(["cheese-payment", "dao-types", "settings"]);
+            }}>
               <DialogTrigger asChild>
                 <button className="text-xs text-primary hover:underline ml-2">click me for help</button>
               </DialogTrigger>
@@ -160,7 +165,7 @@ export function CreateDao() {
                   <DialogTitle>DAO Creation Guide</DialogTitle>
                 </DialogHeader>
                 <ScrollArea className="max-h-[60vh] pr-4">
-                  <Accordion type="multiple" defaultValue={["cheese-payment", "dao-types", "settings"]} className="w-full">
+                  <Accordion type="multiple" value={helpAccordionValue} onValueChange={setHelpAccordionValue} className="w-full">
                     <AccordionItem value="cheese-payment">
                       <AccordionTriggerUI>Paying with CHEESE Tokens</AccordionTriggerUI>
                       <AccordionContent className="text-sm text-muted-foreground space-y-2">
@@ -581,9 +586,18 @@ export function CreateDao() {
         <div className="flex items-start gap-3 p-3 rounded-lg border border-primary/30 bg-primary/5 text-xs text-muted-foreground">
           <AlertTriangle className="h-4 w-4 text-primary shrink-0 mt-0.5" />
           <p>
-            <span className="font-semibold text-foreground">Another Wallet Store:</span> This transaction includes inline actions and may trigger a "Dangerous Transaction" warning. This is normal and safe — see the{" "}
-            <a href="https://docs.waxdao.io" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">help guide</a>
-            {" "}page for instructions on how to allow it.
+            <span className="font-semibold text-foreground">Anchor Wallet Users:</span> This transaction includes inline actions and may trigger a "Dangerous Transaction" warning. This is normal and safe — see the{" "}
+            <button
+              type="button"
+              onClick={() => {
+                setHelpAccordionValue(prev => prev.includes("anchor") ? prev : [...prev, "anchor"]);
+                setHelpOpen(true);
+              }}
+              className="text-primary hover:underline inline"
+            >
+              help guide
+            </button>
+            {" "}for instructions on how to allow it.
           </p>
         </div>
 
