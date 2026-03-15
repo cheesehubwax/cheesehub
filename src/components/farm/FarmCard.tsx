@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Sprout, Clock } from "lucide-react";
+import { Sprout } from "lucide-react";
 import { TokenLogo } from "@/components/TokenLogo";
 import { FarmInfo, getIpfsUrl, FARM_TYPE_LABELS, FarmType } from "@/lib/farm";
 import { useNavigate } from "react-router-dom";
@@ -89,16 +89,15 @@ export function FarmCard({ farm }: { farm: FarmInfo }) {
 
         {/* Stats */}
         <div className="flex items-center justify-between mt-3 text-xs text-foreground">
-          <span>🎯 {farm.staked_count} staked</span>
+          <span>🖼️ {farm.staked_count} NFTs Staked</span>
           <span className="flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            {getDaysRemaining(farm.expiration)}
+            🕐 {getDaysRemaining(farm.expiration)}
           </span>
         </div>
 
         {/* Payout Interval */}
         <div className="mt-2 text-xs text-foreground flex items-center gap-1">
-          <span>⏱️ Payout every {formatPayoutInterval(farm.payout_interval)}</span>
+          <span>💵 Payout every {formatPayoutInterval(farm.payout_interval)}</span>
         </div>
 
         {/* Reward pools */}
