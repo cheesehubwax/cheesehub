@@ -102,7 +102,7 @@ export function FarmCard({ farm }: { farm: FarmInfo }) {
 
         {/* View Details */}
         <div className="mt-auto pt-3">
-          <Button variant="outline" size="sm" className="w-full text-xs group-hover:border-primary/50 group-hover:text-primary">
+          <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 gap-2">
             View Details
           </Button>
         </div>
