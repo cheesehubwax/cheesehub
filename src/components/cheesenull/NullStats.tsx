@@ -105,7 +105,7 @@ export function NullStats({ onCanClaimChange }: NullStatsProps) {
             'disabled:opacity-50 disabled:cursor-not-allowed'
           )}
         >
-          <span>{isLoading ? '⏳' : '🔄'}</span>
+          <RefreshCw className={cn('w-3 h-3', isLoading && 'animate-spin')} />
           {isLoading ? 'Refreshing...' : 'Refresh'}
         </button>
       </CardContent>

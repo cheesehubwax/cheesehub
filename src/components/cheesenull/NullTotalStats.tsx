@@ -27,7 +27,7 @@ export function NullTotalStats() {
         {/* Total CHEESE Nulled */}
         <div className="text-center space-y-1">
           <div className="flex items-center justify-center gap-1.5 text-muted-foreground">
-            <span className="text-sm">🔥</span>
+            <img src={cheesenullIcon} alt="CHEESE Null" className="w-4 h-4" />
             <span className="text-xs font-medium">Total CHEESE Nulled</span>
           </div>
           {isLoading ? (

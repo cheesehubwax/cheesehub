@@ -76,7 +76,7 @@ export const ResourceEstimate = ({
             className="p-1.5 hover:bg-muted rounded-lg transition-colors"
             title="Refresh rates"
           >
-            <span className="text-sm">🔄</span>
+            <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
           </button>
         </div>
       </div>
