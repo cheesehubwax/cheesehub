@@ -25,13 +25,15 @@ export const PowerupStatsBar = ({ stats, isLoading }: PowerupStatsBarProps) => {
       label: "WAX Burnt",
       value: isLoading ? "-" : (stats ? formatNumber(stats.waxBurnt, 4) : "-"),
       emoji: "🔥",
-      color: "text-amber-500"
+      color: "text-amber-500",
+      isNull: false
     },
     {
       label: "CHEESE Nulled",
       value: isLoading ? "-" : (stats ? formatNumber(stats.cheeseNulled, 4) : "-"),
-      emoji: "🔥",
-      color: "text-accent"
+      emoji: "",
+      color: "text-accent",
+      isNull: true
     },
   ];
 
