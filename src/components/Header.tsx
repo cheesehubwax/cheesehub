@@ -64,7 +64,7 @@ export function Header() {
                   <SheetClose key={item.to} asChild>
                     <Link to={item.to} className={navLinkClass(item.to)}>
                       <span>{item.emoji}</span>
-                      {item.label}
+                      <NavLabel item={item} />
                     </Link>
                   </SheetClose>
                 ))}
