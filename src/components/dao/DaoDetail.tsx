@@ -23,6 +23,7 @@ import { EditDaoProfile } from "./EditDaoProfile";
 import { EditProposalCost } from "./EditProposalCost";
 import { TreasuryDeposit } from "./TreasuryDeposit";
 import { TreasuryNFTDeposit } from "./TreasuryNFTDeposit";
+import { TokenLogo } from "@/components/TokenLogo";
 import type { UserVote } from "@/lib/voteStorage";
 
 type Section = "info" | "stake" | "new-proposal" | "active" | "past" | "treasury";
