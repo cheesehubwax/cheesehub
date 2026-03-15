@@ -117,6 +117,8 @@ export function CreateFarm() {
   });
 
   const [paymentMethod, setPaymentMethod] = useState<"wax" | "cheese" | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [helpAccordionValue, setHelpAccordionValue] = useState<string | undefined>(undefined);
 
   const validation = validateFarmName(farmName);
 
