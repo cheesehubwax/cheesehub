@@ -38,7 +38,12 @@ export function getTokenLogoUrl(contract: string, ticker: string): string {
 
 export async function fetchSwapTokenList(signal?: AbortSignal): Promise<SwapToken[]> {
   const res = await fetch(`${ALCOR_API}/tokens`, { signal });
-  if (!res.ok) throw new Error("Failed to fetch token list");
+  if (!res.ok) {
+    if (res.status === 429) {
+      throw new Error("Rate limited — please wait a moment and try again");
+    }
+    throw new Error("Failed to fetch token list");
+  }
   const data = await res.json();
   const seen = new Set<string>();
   return (data as Array<{ contract: string; decimals: number; symbol: string; id: string; is_scam?: boolean }>)
