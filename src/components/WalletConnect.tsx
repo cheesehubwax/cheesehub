@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { WalletTransferDialog } from "@/components/wallet/WalletTransferDialog";
 import { useWax } from "@/context/WaxContext";
-import { Wallet, LogOut, ChevronDown, Send, UserPlus, UserMinus, ArrowRightLeft } from "lucide-react";
+import { Wallet, LogOut, ChevronDown, Send, UserPlus, ArrowRightLeft } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -147,66 +147,37 @@ export function WalletConnect() {
             Open Wallet
           </DropdownMenuItem>
 
-          {/* Multi-account section */}
-          {otherSessions.length > 0 && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>
-                  <ArrowRightLeft className="h-4 w-4 mr-2" />
-                  Switch Account
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  {otherSessions.map((s, i) => {
-                    const actor = getSessionAccount(s);
-                    const wallet = getSessionWallet(s);
-                    return (
-                      <DropdownMenuItem
-                        key={`${actor}-${i}`}
-                        onClick={() => switchAccount(s)}
-                      >
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium">{actor}</span>
-                          {wallet && (
-                            <span className="text-xs text-muted-foreground">{wallet}</span>
-                          )}
-                        </div>
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-            </>
-          )}
-
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={addAccount}>
-            <UserPlus className="h-4 w-4 mr-2" />
-            Add Account
-          </DropdownMenuItem>
-
-          {otherSessions.length > 0 && (
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <UserMinus className="h-4 w-4 mr-2" />
-                Remove Account
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                {otherSessions.map((s, i) => {
-                  const actor = getSessionAccount(s);
-                  return (
-                    <DropdownMenuItem
-                      key={`remove-${actor}-${i}`}
-                      onClick={() => removeAccount(s)}
-                      className="text-destructive"
-                    >
-                      {actor}
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-          )}
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <ArrowRightLeft className="h-4 w-4 mr-2" />
+              Switch Account
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              {otherSessions.map((s, i) => {
+                const actor = getSessionAccount(s);
+                const wallet = getSessionWallet(s);
+                return (
+                  <DropdownMenuItem
+                    key={`${actor}-${i}`}
+                    onClick={() => switchAccount(s)}
+                  >
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">{actor}</span>
+                      {wallet && (
+                        <span className="text-xs text-muted-foreground">{wallet}</span>
+                      )}
+                    </div>
+                  </DropdownMenuItem>
+                );
+              })}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={addAccount}>
+                <UserPlus className="h-4 w-4 mr-2" />
+                Add Account
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
 
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={logout} className="text-destructive">
