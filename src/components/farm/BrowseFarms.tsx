@@ -73,14 +73,14 @@ export function BrowseFarms() {
   return (
     <div className="space-y-4">
       {/* Filters row */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-        <div className="relative flex-1 w-full">
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-center">
+        <div className="relative max-w-md w-full mx-auto sm:mx-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search farms by name, creator, or reward token..."
+            placeholder="Search farms..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
+            className="pl-10 h-9 text-sm"
           />
         </div>
 
