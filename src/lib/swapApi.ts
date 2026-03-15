@@ -28,7 +28,7 @@ export interface SwapRoute {
 
 const ALCOR_API = "https://wax.alcor.exchange/api/v2";
 
-export const POPULAR_TICKERS = ["WAX", "CHEESE", "NEFTY", "TLM", "AETHER", "SKUNKY", "WAXUSDC"];
+export const POPULAR_TICKERS = ["WAX", "CHEESE", "LSWAX", "LSW", "WAXUSDC", "WAXWBTC"];
 
 export function getTokenLogoUrl(contract: string, ticker: string): string {
   return `${ALCOR_API}/tokens/${ticker.toLowerCase()}-${contract}/logo`;

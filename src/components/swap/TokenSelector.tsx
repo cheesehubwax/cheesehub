@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSwapTokens } from "@/hooks/useSwapTokens";
 import { useSwapTokenBalances } from "@/hooks/useSwapTokenBalances";
+import { useAlcorTokenPrices } from "@/hooks/useAlcorTokenPrices";
 import { useWax } from "@/context/WaxContext";
 import { type SwapToken, getTokenLogoUrl } from "@/lib/swapApi";
 
@@ -19,6 +20,7 @@ export function TokenSelector({ open, onClose, onSelect, selectedToken }: TokenS
   const { accountName } = useWax();
   const [balanceFetchEnabled, setBalanceFetchEnabled] = useState(false);
   const balances = useSwapTokenBalances(accountName, tokens, balanceFetchEnabled);
+  const { data: tokenPrices } = useAlcorTokenPrices();
   const [imgErrors, setImgErrors] = useState<Set<string>>(new Set());
 
   const tokenKey = (t: SwapToken) => `${t.ticker}_${t.contract}`;
@@ -35,11 +37,18 @@ export function TokenSelector({ open, onClose, onSelect, selectedToken }: TokenS
     return [...filteredTokens].sort((a, b) => {
       const balA = parseFloat(balances.get(tokenKey(a)) ?? "0");
       const balB = parseFloat(balances.get(tokenKey(b)) ?? "0");
+      // Get WAX-denominated price for each token
+      const priceA = tokenPrices?.get(`${a.contract}:${a.ticker}`) ?? 0;
+      const priceB = tokenPrices?.get(`${b.contract}:${b.ticker}`) ?? 0;
+      const valA = balA * priceA;
+      const valB = balB * priceB;
+      // Tokens with balance first, sorted by USD value descending
+      if (valA > 0 || valB > 0) return valB - valA;
       if (balA > 0 && balB <= 0) return -1;
       if (balB > 0 && balA <= 0) return 1;
       return 0;
     });
-  }, [filteredTokens, balances]);
+  }, [filteredTokens, balances, tokenPrices]);
 
   const handleSelect = (token: SwapToken) => {
     onSelect(token);
