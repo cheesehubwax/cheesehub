@@ -25,6 +25,7 @@ export function CheeseSwapWidget({
 }: CheeseSwapWidgetProps) {
   const { tokens } = useSwapTokens();
   const { session, accountName, login } = useWax();
+  const queryClient = useQueryClient();
 
   const [tokenIn, setTokenIn] = useState<SwapToken | null>(null);
   const [tokenOut, setTokenOut] = useState<SwapToken | null>(null);
