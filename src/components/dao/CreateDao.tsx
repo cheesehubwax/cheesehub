@@ -192,7 +192,7 @@ export function CreateDao() {
                       <AccordionContent className="text-sm text-foreground space-y-3">
                         <p>CHEESEDao supports 2 DAO types:</p>
                         <div>
-                          <p className="font-semibold text-foreground">Stake Tokens (Custodial)</p>
+                          <p className="font-semibold text-primary">Stake Tokens (Custodial)</p>
                           <p>Members stake governance tokens directly to the DAO. <strong>No external farm needed.</strong> Tokens are held by the DAO contract until unstaked. Voting power equals staked balance.</p>
                         </div>
                         <div>
