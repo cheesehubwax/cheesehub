@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { ArrowDownUp, Settings, ChevronDown, Loader2, AlertCircle } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SwapTokenInput } from "./SwapTokenInput";
 import { TokenSelector } from "./TokenSelector";
