@@ -17,8 +17,8 @@ interface PowerupLeaderboardProps {
   onRefresh?: () => void;
 }
 
-const SORT_OPTIONS: { mode: PowerupSortMode; label: string; emoji: string }[] = [
-  { mode: 'cheese', label: 'CHEESE Burned', emoji: '🔥' },
+const SORT_OPTIONS: { mode: PowerupSortMode; label: string; emoji?: string; icon?: string }[] = [
+  { mode: 'cheese', label: 'CHEESE Burned', icon: 'cheesenull' },
   { mode: 'powerups', label: 'Powerups', emoji: '⚡' },
 ];
 
