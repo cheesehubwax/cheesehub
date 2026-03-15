@@ -1,3 +1,4 @@
+import { RefreshCw } from 'lucide-react';
 import { useCheeseNullData } from '@/hooks/useCheeseNullData';
 import { formatWaxAmount, formatCheeseAmount, formatCountdown } from '@/lib/cheeseNullApi';
 import { Card, CardContent } from '@/components/ui/card';
