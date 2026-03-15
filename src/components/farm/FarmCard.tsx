@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Sprout, Clock } from "lucide-react";
+import { Sprout } from "lucide-react";
 import { TokenLogo } from "@/components/TokenLogo";
 import { FarmInfo, getIpfsUrl, FARM_TYPE_LABELS, FarmType } from "@/lib/farm";
 import { useNavigate } from "react-router-dom";
