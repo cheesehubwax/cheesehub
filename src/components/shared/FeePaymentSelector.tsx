@@ -75,9 +75,14 @@ export function FeePaymentSelector({
                     <img src={cheeseLogo} alt="CHEESE" className="w-5 h-5" />
                     <span className="font-medium">Pay with CHEESE</span>
                   </div>
-                  <Badge className="bg-green-500/20 text-green-500 border-green-500/30 text-xs">
-                    Save 20%
-                  </Badge>
+                   <div className="flex gap-1.5">
+                    <Badge className="bg-green-500/20 text-green-500 border-green-500/30 text-xs">
+                      Save 20%
+                    </Badge>
+                    <Badge className="bg-primary/20 text-primary border-primary/30 text-xs">
+                      Standard
+                    </Badge>
+                  </div>
                 </div>
               </Label>
             </div>
