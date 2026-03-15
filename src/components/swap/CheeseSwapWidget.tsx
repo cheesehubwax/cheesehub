@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { ArrowDownUp, Settings, ChevronDown, Loader2, AlertCircle } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SwapTokenInput } from "./SwapTokenInput";
 import { TokenSelector } from "./TokenSelector";
@@ -24,6 +25,7 @@ export function CheeseSwapWidget({
 }: CheeseSwapWidgetProps) {
   const { tokens } = useSwapTokens();
   const { session, accountName, login } = useWax();
+  const queryClient = useQueryClient();
 
   const [tokenIn, setTokenIn] = useState<SwapToken | null>(null);
   const [tokenOut, setTokenOut] = useState<SwapToken | null>(null);
@@ -135,6 +137,11 @@ export function CheeseSwapWidget({
       setAmountIn("");
       setAmountOut("");
       setActiveField("in");
+      // Refresh balances after swap
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["swap-token-balance"] });
+        queryClient.invalidateQueries({ queryKey: ["swap-token-balances"] });
+      }, 1500);
     } catch (e: any) {
       const msg = e?.message || "Swap failed";
       if (!msg.includes("cancel") && !msg.includes("reject")) {
