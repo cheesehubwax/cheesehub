@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft, Loader2, Sprout, Clock, Users, Gift, RefreshCw,
   Copy, ExternalLink, Edit, Globe, MessageCircle, Twitter,
-  Youtube, BookOpen, Layers
+  Youtube, BookOpen, Layers, Download, Upload, Info
 } from "lucide-react";
 import {
   fetchFarmDetails, FarmInfo, getIpfsUrl, FARM_TYPE_LABELS, FarmType,
@@ -25,6 +25,7 @@ import { PermCloseFarmDialog } from "./PermCloseFarmDialog";
 import { KickUsersDialog } from "./KickUsersDialog";
 import { EmptyFarmDialog } from "./EmptyFarmDialog";
 import { DepositRewardsDialog } from "./DepositRewardsDialog";
+import { WithdrawRewardsDialog } from "./WithdrawRewardsDialog";
 import { ManageStakableAssets } from "./ManageStakableAssets";
 import { StakeableAssets } from "./StakeableAssets";
 
@@ -40,12 +41,11 @@ function getFarmTypeLabel(farmType: number): string {
 
 function getStatusInfo(farm: FarmInfo): { label: string; className: string } {
   const now = Math.floor(Date.now() / 1000);
-  if (farm.status === 3) return { label: "Permanently Closed", className: "bg-destructive/20 text-destructive border-destructive/30" };
-  if (farm.status === 2) return { label: "Closed", className: "bg-orange-500/20 text-orange-400 border-orange-500/30" };
+  if (farm.status === 2) return { label: "Permanently Closed", className: "bg-destructive/20 text-destructive border-destructive/30" };
   if (farm.status === 0) return { label: "Under Construction", className: "bg-blue-500/20 text-blue-400 border-blue-500/30" };
+  // status === 1 (active)
   if (farm.expiration > 0 && farm.expiration < now) return { label: "Expired", className: "bg-orange-500/20 text-orange-400 border-orange-500/30" };
-  if (farm.is_active) return { label: "Active", className: "bg-green-500/20 text-green-400 border-green-500/30" };
-  return { label: "Inactive", className: "bg-muted text-muted-foreground border-border" };
+  return { label: "Active", className: "bg-green-500/20 text-green-400 border-green-500/30" };
 }
 
 function formatAmount(val: string | number): string {
@@ -65,6 +65,74 @@ const SOCIAL_ICONS: Record<string, React.ReactNode> = {
   medium: <BookOpen className="h-4 w-4" />,
 };
 
+function CreatorInfoBox({ farm, isUnderConstruction, isPermClosed, isExpired, hasStakers }: {
+  farm: FarmInfo; isUnderConstruction: boolean; isPermClosed: boolean; isExpired: boolean; hasStakers: boolean;
+}) {
+  if (isPermClosed) {
+    return (
+      <Card className="bg-destructive/5 border-destructive/20">
+        <CardContent className="p-4 flex items-start gap-3">
+          <Info className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+          <p className="text-sm text-destructive">
+            <strong>Permanently Closed.</strong> Kick all remaining stakers, then use <strong>Empty Farm</strong> to retrieve any leftover reward tokens.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+  if (isUnderConstruction && hasStakers) {
+    return (
+      <Card className="bg-blue-500/5 border-blue-500/20">
+        <CardContent className="p-4 flex items-start gap-3">
+          <Info className="h-5 w-5 text-blue-400 shrink-0 mt-0.5" />
+          <p className="text-sm text-blue-400">
+            <strong>Farm Closed.</strong> Now kick all remaining stakers, update your stakeable assets and reward pools, then re-open the farm.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+  if (isUnderConstruction && !hasStakers) {
+    return (
+      <Card className="bg-blue-500/5 border-blue-500/20">
+        <CardContent className="p-4 flex items-start gap-3">
+          <Info className="h-5 w-5 text-blue-400 shrink-0 mt-0.5" />
+          <p className="text-sm text-blue-400">
+            <strong>Under Construction.</strong> Add stakeable assets, deposit reward tokens, then press <strong>Open Farm</strong> to start accepting stakers.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+  if (isExpired) {
+    return (
+      <Card className="bg-orange-500/5 border-orange-500/20">
+        <CardContent className="p-4 flex items-start gap-3">
+          <Info className="h-5 w-5 text-orange-400 shrink-0 mt-0.5" />
+          <div className="text-sm text-orange-400">
+            <strong>Farm Expired.</strong> You have 2 choices:
+            <ol className="list-decimal ml-4 mt-1 space-y-1">
+              <li>Close farm → kick stakers → update settings → re-open</li>
+              <li>Perm close → kick stakers → empty farm (irreversible)</li>
+            </ol>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+  // Active, not expired
+  return (
+    <Card className="bg-green-500/5 border-green-500/20">
+      <CardContent className="p-4 flex items-start gap-3">
+        <Info className="h-5 w-5 text-green-400 shrink-0 mt-0.5" />
+        <p className="text-sm text-green-400">
+          <strong>Farm Active.</strong> Extend your farm before it expires to keep rewards flowing. You can also deposit more rewards or withdraw excess tokens.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
   const { accountName, isConnected, session } = useWax();
   const { toast } = useToast();
@@ -76,6 +144,7 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
   const [kickOpen, setKickOpen] = useState(false);
   const [emptyOpen, setEmptyOpen] = useState(false);
   const [depositOpen, setDepositOpen] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [manageAssetsOpen, setManageAssetsOpen] = useState(false);
 
   const { data: farm, isLoading, refetch } = useQuery({
@@ -111,11 +180,16 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
   const status = getStatusInfo(farm);
   const isCreator = accountName === farm.creator;
   const now = Math.floor(Date.now() / 1000);
-  const isExpired = farm.expiration > 0 && farm.expiration < now;
+
+  // Derived state flags matching cheesehub exactly
+  const isUnderConstruction = farm.status === 0;
+  const isPermClosed = farm.status === 2;
+  const isExpired = !isUnderConstruction && !isPermClosed && farm.expiration > 0 && farm.expiration < now;
+  const hasStakers = farm.staked_count > 0;
+
   const expirationDate = farm.expiration > 0 ? new Date(farm.expiration * 1000).toLocaleDateString() : "No expiry";
   const createdDate = farm.time_created > 0 ? new Date(farm.time_created * 1000).toLocaleDateString() : "Unknown";
   const hoursInterval = farm.payout_interval / 3600;
-
   const daysLeft = farm.expiration > 0 ? Math.max(0, Math.floor((farm.expiration - now) / 86400)) : null;
 
   const socials = farm.socials || {};
@@ -166,11 +240,26 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
                 <p className="text-sm text-muted-foreground mt-2">{farm.description}</p>
               )}
             </div>
-            <div className="flex gap-2 shrink-0">
+            <div className="flex gap-2 shrink-0 flex-wrap">
               {isCreator && (
-                <Button variant="outline" size="sm" onClick={() => setEditProfileOpen(true)}>
-                  <Edit className="h-4 w-4 mr-1" /> Edit
-                </Button>
+                <>
+                  <Button variant="outline" size="sm" onClick={() => setEditProfileOpen(true)}>
+                    <Edit className="h-4 w-4 mr-1" /> Edit
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setDepositOpen(true)}>
+                    <Download className="h-4 w-4 mr-1" /> Deposit
+                  </Button>
+                  {isUnderConstruction && (
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => setManageAssetsOpen(true)}>
+                        <Layers className="h-4 w-4 mr-1" /> Manage Assets
+                      </Button>
+                      <Button size="sm" onClick={() => setOpenFarmOpen(true)} className="bg-green-600 hover:bg-green-700 text-white">
+                        Open Farm
+                      </Button>
+                    </>
+                  )}
+                </>
               )}
               <Button variant="outline" size="sm" onClick={() => refetch()}>
                 <RefreshCw className="h-4 w-4" />
@@ -185,15 +274,15 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
         </CardContent>
       </Card>
 
-      {/* Creator management info box */}
-      {isCreator && farm.status === 0 && (
-        <Card className="bg-blue-500/5 border-blue-500/20">
-          <CardContent className="p-4">
-            <p className="text-sm text-blue-400">
-              <strong>Under Construction:</strong> Add stakable assets, deposit rewards, then open your farm to start accepting stakers.
-            </p>
-          </CardContent>
-        </Card>
+      {/* Creator contextual info box */}
+      {isCreator && (
+        <CreatorInfoBox
+          farm={farm}
+          isUnderConstruction={isUnderConstruction}
+          isPermClosed={isPermClosed}
+          isExpired={isExpired}
+          hasStakers={hasStakers}
+        />
       )}
 
       {/* Social links */}
@@ -267,45 +356,38 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
             </div>
             <div>
               <p className="text-muted-foreground">Expiration</p>
-              <p className="font-medium">{expirationDate}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-medium">{expirationDate}</p>
+                {/* Extend button next to expiration when active & not expired */}
+                {isCreator && !isUnderConstruction && !isExpired && !isPermClosed && (
+                  <Button size="sm" variant="outline" onClick={() => setExtendFarmOpen(true)} className="h-6 text-xs px-2">
+                    Extend
+                  </Button>
+                )}
+                {/* Close/Perm Close next to expiration when expired */}
+                {isCreator && isExpired && !isPermClosed && (
+                  <>
+                    <Button size="sm" variant="outline" onClick={() => setCloseFarmOpen(true)} className="h-6 text-xs px-2">
+                      Close
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => setPermCloseOpen(true)} className="h-6 text-xs px-2">
+                      Perm Close
+                    </Button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Creator management buttons */}
+          {/* Kick Stakers and Empty Farm in farm info section */}
           {isCreator && (
             <div className="flex flex-wrap gap-2 pt-4 border-t border-border/30">
-              {farm.status === 0 && (
-                <Button size="sm" onClick={() => setOpenFarmOpen(true)} className="bg-green-600 hover:bg-green-700 text-white">
-                  Open Farm
-                </Button>
-              )}
-              {farm.is_active && !isExpired && (
-                <Button size="sm" variant="outline" onClick={() => setExtendFarmOpen(true)}>
-                  Extend Farm
-                </Button>
-              )}
-              <Button size="sm" variant="outline" onClick={() => setDepositOpen(true)}>
-                Deposit Rewards
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setManageAssetsOpen(true)}>
-                Manage Stakable Assets
-              </Button>
-              {(isExpired || farm.status === 1) && farm.status !== 3 && (
-                <Button size="sm" variant="outline" onClick={() => setCloseFarmOpen(true)}>
-                  Close Farm
-                </Button>
-              )}
-              {farm.status !== 3 && (
-                <Button size="sm" variant="destructive" onClick={() => setPermCloseOpen(true)}>
-                  Perm Close
-                </Button>
-              )}
-              {farm.staked_count > 0 && farm.status >= 2 && (
+              {(isUnderConstruction || isPermClosed) && hasStakers && (
                 <Button size="sm" variant="outline" onClick={() => setKickOpen(true)}>
                   Kick Stakers
                 </Button>
               )}
-              {farm.status === 3 && farm.staked_count === 0 && (
+              {isPermClosed && !hasStakers && (
                 <Button size="sm" variant="outline" onClick={() => setEmptyOpen(true)}>
                   Empty Farm
                 </Button>
@@ -317,8 +399,14 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
 
       {/* Reward Pools */}
       <Card className="bg-card/80 border-border/50">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg text-foreground">Reward Pools</CardTitle>
+          {/* Withdraw button next to Reward Pools header when active */}
+          {isCreator && !isUnderConstruction && !isExpired && !isPermClosed && (
+            <Button size="sm" variant="outline" onClick={() => setWithdrawOpen(true)}>
+              <Upload className="h-4 w-4 mr-1" /> Withdraw
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           {farm.reward_pools.length === 0 ? (
@@ -360,7 +448,7 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
       {/* Stakeable Assets */}
       <StakeableAssets farmName={farm.farm_name} farmType={farm.farm_type} />
 
-      {/* NFT Staking - show when connected (even if expired, so users can claim + unstake) */}
+      {/* NFT Staking - show when connected */}
       {isConnected && (
         <NFTStaking farm={farm} onRefresh={refetch} />
       )}
@@ -376,6 +464,7 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
           <KickUsersDialog farm={farm} open={kickOpen} onOpenChange={setKickOpen} onSuccess={refetch} />
           <EmptyFarmDialog farm={farm} open={emptyOpen} onOpenChange={setEmptyOpen} onSuccess={refetch} />
           <DepositRewardsDialog farm={farm} open={depositOpen} onOpenChange={setDepositOpen} onSuccess={refetch} />
+          <WithdrawRewardsDialog farm={farm} open={withdrawOpen} onOpenChange={setWithdrawOpen} onSuccess={refetch} />
           <ManageStakableAssets farm={farm} open={manageAssetsOpen} onOpenChange={setManageAssetsOpen} onSuccess={refetch} />
         </>
       )}

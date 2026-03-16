@@ -613,6 +613,20 @@ export function buildExtendFarmAction(user: string, farmName: string, newExpirat
   };
 }
 
+// Build action for withdrawing excess rewards from an active farm
+export function buildWithdrawRewardsAction(user: string, farmName: string, tokenContract: string, quantity: string) {
+  return {
+    account: FARM_CONTRACT,
+    name: "withdraw",
+    authorization: [{ actor: user, permission: "active" }],
+    data: {
+      user,
+      farm_name: farmName,
+      amount: { quantity, contract: tokenContract },
+    },
+  };
+}
+
 // Build action for staking NFTs to a farm
 export function buildStakeNftsAction(staker: string, farmName: string, assetIds: string[]) {
   return {
