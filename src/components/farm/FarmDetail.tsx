@@ -26,6 +26,7 @@ import { KickUsersDialog } from "./KickUsersDialog";
 import { EmptyFarmDialog } from "./EmptyFarmDialog";
 import { DepositRewardsDialog } from "./DepositRewardsDialog";
 import { ManageStakableAssets } from "./ManageStakableAssets";
+import { StakeableAssets } from "./StakeableAssets";
 
 interface FarmDetailProps {
   farmName: string;
@@ -355,6 +356,9 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Stakeable Assets */}
+      <StakeableAssets farmName={farm.farm_name} farmType={farm.farm_type} />
 
       {/* NFT Staking - show when connected (even if expired, so users can claim + unstake) */}
       {isConnected && (
