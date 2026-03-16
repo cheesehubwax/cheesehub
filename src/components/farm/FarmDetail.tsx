@@ -26,6 +26,7 @@ import { KickUsersDialog } from "./KickUsersDialog";
 import { EmptyFarmDialog } from "./EmptyFarmDialog";
 import { DepositRewardsDialog } from "./DepositRewardsDialog";
 import { ManageStakableAssets } from "./ManageStakableAssets";
+import { StakeableAssets } from "./StakeableAssets";
 
 interface FarmDetailProps {
   farmName: string;
