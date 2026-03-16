@@ -44,7 +44,7 @@ export function VoteRewardsManager({ onTransactionComplete, onTransactionSuccess
   useEffect(() => {
     if (tickerRef.current) clearInterval(tickerRef.current);
 
-    if (!hasVoted || !globalState || voterUnpaidVoteshare <= 0 || globalState.total_unpaid_voteshare <= 0) {
+    if (!hasVoted || !globalState || (voterUnpaidVoteshare <= 0 && voterVoteshareChangeRate <= 0) || globalState.total_unpaid_voteshare <= 0) {
       setEstimatedRewards(0);
       return;
     }
