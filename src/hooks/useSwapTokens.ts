@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { fetchSwapTokenList, POPULAR_TICKERS, type SwapToken } from "@/lib/swapApi";
+import { initializeTokenCacheFromData } from "@/lib/tokenLogos";
 
 export function useSwapTokens() {
   const [search, setSearch] = useState("");
@@ -11,6 +12,15 @@ export function useSwapTokens() {
     staleTime: 10 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
   });
+
+  // Populate the global token logo cache from the shared query
+  useEffect(() => {
+    if (tokens.length > 0) {
+      initializeTokenCacheFromData(
+        tokens.map((t) => ({ symbol: t.ticker, contract: t.contract }))
+      );
+    }
+  }, [tokens]);
 
   const popularTokens = useMemo(
     () => POPULAR_TICKERS.map((t) => tokens.find((tk) => tk.ticker === t)).filter(Boolean) as SwapToken[],

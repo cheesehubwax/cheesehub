@@ -1,39 +1,34 @@
-import { useQuery } from '@tanstack/react-query';
-
-interface AlcorTokenResponse {
-  id: string;
-  contract: string;
-  symbol: string;
-  system_price: number;
-  usd_price: number;
-}
+import { useMemo } from 'react';
+import { useSwapTokens } from './useSwapTokens';
 
 export interface CheesePriceData {
   waxPrice: number;
   usdPrice: number;
 }
 
-async function fetchCheesePriceData(): Promise<CheesePriceData> {
-  const response = await fetch('https://wax.alcor.exchange/api/v2/tokens/cheese-cheeseburger');
+/**
+ * Derives CHEESE price from the shared swap-tokens query
+ * instead of making a separate API call.
+ */
+export function useCheesePriceData() {
+  const { tokens, isLoading, error } = useSwapTokens();
 
-  if (!response.ok) {
-    throw new Error('Failed to fetch CHEESE price data');
-  }
-
-  const data: AlcorTokenResponse = await response.json();
+  const data = useMemo<CheesePriceData | undefined>(() => {
+    if (!tokens.length) return undefined;
+    const cheese = tokens.find(
+      (t) => t.ticker === 'CHEESE' && t.contract === 'cheeseburger'
+    );
+    if (!cheese) return undefined;
+    return {
+      waxPrice: cheese.system_price ?? 0,
+      usdPrice: cheese.usd_price ?? 0,
+    };
+  }, [tokens]);
 
   return {
-    waxPrice: data.system_price,
-    usdPrice: data.usd_price,
+    data,
+    isLoading,
+    error,
+    isError: !!error,
   };
-}
-
-export function useCheesePriceData() {
-  return useQuery<CheesePriceData>({
-    queryKey: ['cheese-price'],
-    queryFn: fetchCheesePriceData,
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: 60 * 1000,
-    retry: 2,
-  });
 }
