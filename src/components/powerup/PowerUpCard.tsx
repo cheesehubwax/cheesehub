@@ -60,9 +60,12 @@ export const PowerUpCard = ({
   const netNumeric = parseFloat(netAmount) || 0;
   const totalCheese = cpuNumeric + netNumeric;
 
+  const { data: cheesePriceData } = useCheesePriceData();
   const { estimate, isLoading: isEstimateLoading, error: estimateError, refetch } = usePowerupEstimate(
     cpuNumeric,
-    netNumeric
+    netNumeric,
+    false,
+    cheesePriceData ? { priceInWax: cheesePriceData.waxPrice, usdPrice: cheesePriceData.usdPrice } : undefined
   );
 
   useEffect(() => {

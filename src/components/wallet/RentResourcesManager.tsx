@@ -43,10 +43,12 @@ export function RentResourcesManager({ onTransactionComplete, onTransactionSucce
   const waxNetNum = parseFloat(waxNet) || 0;
 
   const isWaxMode = paymentMode === 'wax';
+  const { data: cheesePriceData } = useCheesePriceData();
   const { estimate, isLoading: isEstimating } = usePowerupEstimate(
     isWaxMode ? waxCpuNum : cheeseCpuNum,
     isWaxMode ? waxNetNum : cheeseNetNum,
-    isWaxMode
+    isWaxMode,
+    cheesePriceData ? { priceInWax: cheesePriceData.waxPrice, usdPrice: cheesePriceData.usdPrice } : undefined
   );
 
   const isValidReceiver = receiver.length > 0 && isValidWaxAccount(receiver);
