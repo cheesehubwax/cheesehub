@@ -67,7 +67,6 @@ const WAX_ENDPOINTS = [
 
 const POWERUP_FRAC = 1e15;
 
-// Constants for frac-to-resource conversion (from WAX chain analysis)
 const CPU_MS_PER_FRAC = 78.45 / 3.45e9;
 const NET_BYTES_PER_FRAC = 1.4e9 / 4.2e9;
 
@@ -75,20 +74,6 @@ export const parsePriceWax = (priceStr: string): number => {
   const match = priceStr.match(/^([\d.]+)/);
   return match ? parseFloat(match[1]) * 1e8 : 0;
 };
-
-async function fetchCheesePrice(): Promise<{ priceInWax: number; usdPrice: number; waxUsdPrice: number }> {
-  try {
-    const response = await fetch("https://wax.alcor.exchange/api/v2/tokens/cheese-cheeseburger");
-    const data = await response.json();
-    const cheeseUsdPrice = data.usd_price || 0;
-    const priceInWax = data.system_price || 0;
-    const waxUsdPrice = priceInWax > 0 ? cheeseUsdPrice / priceInWax : 0;
-    return { priceInWax, usdPrice: cheeseUsdPrice, waxUsdPrice };
-  } catch (error) {
-    console.error("Failed to fetch CHEESE price:", error);
-    return { priceInWax: 0.0001, usdPrice: 0, waxUsdPrice: 0 };
-  }
-}
 
 export async function fetchPowerupState(): Promise<PowerUpStateRow | null> {
   for (const baseUrl of WAX_ENDPOINTS) {
@@ -163,10 +148,17 @@ export const findFracForWax = (
   return Math.floor(low * 0.95);
 };
 
+/** Cheese price can be passed in from useCheesePriceData to avoid a separate API call */
+interface CheesePriceInput {
+  priceInWax: number;
+  usdPrice: number;
+}
+
 export const usePowerupEstimate = (
   cpuAmount: number,
   netAmount: number,
-  isWaxMode: boolean = false
+  isWaxMode: boolean = false,
+  cheesePrice?: CheesePriceInput
 ): UsePowerupEstimateResult => {
   const [estimate, setEstimate] = useState<PowerUpEstimate | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -174,6 +166,9 @@ export const usePowerupEstimate = (
 
   const debouncedCpu = useDebounce(cpuAmount, 500);
   const debouncedNet = useDebounce(netAmount, 500);
+
+  const cheesePriceInWax = cheesePrice?.priceInWax ?? 0;
+  const cheeseUsdPrice = cheesePrice?.usdPrice ?? 0;
 
   const fetchEstimate = useCallback(async () => {
     if (debouncedCpu <= 0 && debouncedNet <= 0) {
@@ -186,17 +181,18 @@ export const usePowerupEstimate = (
     setError(null);
 
     try {
-      const [priceData, powerupState] = await Promise.all([
-        isWaxMode ? Promise.resolve({ priceInWax: 1, usdPrice: 0, waxUsdPrice: 0 }) : fetchCheesePrice(),
-        fetchPowerupState(),
-      ]);
+      const priceInWax = isWaxMode ? 1 : cheesePriceInWax;
+      const usdPrice = isWaxMode ? 0 : cheeseUsdPrice;
+      const waxUsdPrice = priceInWax > 0 ? usdPrice / priceInWax : 0;
+
+      const powerupState = await fetchPowerupState();
 
       if (!powerupState) {
         throw new Error("Failed to fetch PowerUp state");
       }
 
-      const cpuWaxAmount = isWaxMode ? (debouncedCpu || 0) : (debouncedCpu || 0) * priceData.priceInWax;
-      const netWaxAmount = isWaxMode ? (debouncedNet || 0) : (debouncedNet || 0) * priceData.priceInWax;
+      const cpuWaxAmount = isWaxMode ? (debouncedCpu || 0) : (debouncedCpu || 0) * priceInWax;
+      const netWaxAmount = isWaxMode ? (debouncedNet || 0) : (debouncedNet || 0) * priceInWax;
 
       const cpuWeight = parseFloat(powerupState.cpu.weight);
       const netWeight = parseFloat(powerupState.net.weight);
@@ -222,9 +218,9 @@ export const usePowerupEstimate = (
       const estimatedNetBytes = netFrac * NET_BYTES_PER_FRAC;
 
       setEstimate({
-        cheesePriceInWax: priceData.priceInWax,
-        cheeseUsdPrice: priceData.usdPrice,
-        waxUsdPrice: priceData.waxUsdPrice,
+        cheesePriceInWax: priceInWax,
+        cheeseUsdPrice: usdPrice,
+        waxUsdPrice,
         cpuWaxAmount,
         netWaxAmount,
         estimatedCpuMs,
@@ -240,7 +236,7 @@ export const usePowerupEstimate = (
     } finally {
       setIsLoading(false);
     }
-  }, [debouncedCpu, debouncedNet, isWaxMode]);
+  }, [debouncedCpu, debouncedNet, isWaxMode, cheesePriceInWax, cheeseUsdPrice]);
 
   useEffect(() => {
     fetchEstimate();

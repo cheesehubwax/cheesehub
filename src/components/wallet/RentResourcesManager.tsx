@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useWax } from '@/context/WaxContext';
 import { usePowerupEstimate } from '@/hooks/usePowerupEstimate';
+import { useCheesePriceData } from '@/hooks/useCheesePriceData';
 import { Loader2, Check, X, Zap, Cpu, Wifi } from 'lucide-react';
 import { toast } from 'sonner';
 import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
@@ -42,10 +43,12 @@ export function RentResourcesManager({ onTransactionComplete, onTransactionSucce
   const waxNetNum = parseFloat(waxNet) || 0;
 
   const isWaxMode = paymentMode === 'wax';
+  const { data: cheesePriceData } = useCheesePriceData();
   const { estimate, isLoading: isEstimating } = usePowerupEstimate(
     isWaxMode ? waxCpuNum : cheeseCpuNum,
     isWaxMode ? waxNetNum : cheeseNetNum,
-    isWaxMode
+    isWaxMode,
+    cheesePriceData ? { priceInWax: cheesePriceData.waxPrice, usdPrice: cheesePriceData.usdPrice } : undefined
   );
 
   const isValidReceiver = receiver.length > 0 && isValidWaxAccount(receiver);

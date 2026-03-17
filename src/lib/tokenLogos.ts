@@ -9,13 +9,31 @@ let cacheInitialized = false;
 let cachePromise: Promise<void> | null = null;
 
 /**
- * Fetch all token contracts from Alcor API and cache them
- * This eliminates the need for manual contract mapping
+ * Populate the token cache from pre-fetched data (e.g. from the shared swap-tokens query).
+ * This avoids a separate fetch to /api/v2/tokens.
+ */
+export function initializeTokenCacheFromData(tokens: Array<{ symbol?: string; contract?: string }>) {
+  if (cacheInitialized && tokenContractCache.size > 0) return;
+
+  tokens.forEach((token) => {
+    if (token.symbol && token.contract) {
+      const key = token.symbol.toUpperCase();
+      if (!tokenContractCache.has(key)) {
+        tokenContractCache.set(key, token.contract);
+      }
+    }
+  });
+
+  cacheInitialized = true;
+}
+
+/**
+ * Fetch all token contracts from Alcor API and cache them.
+ * Only used as a fallback if initializeTokenCacheFromData hasn't been called yet.
  */
 async function initializeTokenCache(): Promise<void> {
   if (cacheInitialized) return;
 
-  // If already fetching, wait for that promise
   if (cachePromise) {
     await cachePromise;
     return;
@@ -32,21 +50,9 @@ async function initializeTokenCache(): Promise<void> {
 
       const tokens = await response.json();
 
-      // Build cache from API response
-      // Alcor tokens API returns array of { id, contract, symbol, ... }
       if (Array.isArray(tokens)) {
-        tokens.forEach((token: { symbol?: string; contract?: string }) => {
-          if (token.symbol && token.contract) {
-            const key = token.symbol.toUpperCase();
-            // Only set if not already set (first occurrence wins, usually the main one)
-            if (!tokenContractCache.has(key)) {
-              tokenContractCache.set(key, token.contract);
-            }
-          }
-        });
+        initializeTokenCacheFromData(tokens);
       }
-
-      cacheInitialized = true;
     } catch (error) {
       console.warn('Error fetching Alcor tokens:', error);
       useFallbackMap();
@@ -92,21 +98,15 @@ export function getTokenContract(symbol: string): string | undefined {
 
 /**
  * Get the logo URL for a token using Alcor's logo repository
- * Uses format: {contract}/{symbol_lowercase}.png
- * 
- * @param contractOrSymbol - Token contract (if both params given) or symbol (if only one param)
- * @param symbol - Token symbol (optional, if not given first param is treated as symbol)
  */
 export function getTokenLogoUrl(contractOrSymbol: string, symbol?: string): string {
   let tokenContract: string | undefined;
   let lowerSymbol: string;
 
   if (symbol) {
-    // Called as getTokenLogoUrl(contract, symbol)
     tokenContract = contractOrSymbol;
     lowerSymbol = symbol.toLowerCase();
   } else {
-    // Called as getTokenLogoUrl(symbol) - lookup contract from cache
     lowerSymbol = contractOrSymbol.toLowerCase();
     tokenContract = getTokenContract(contractOrSymbol.toUpperCase());
   }
@@ -119,22 +119,16 @@ export function getTokenLogoUrl(contractOrSymbol: string, symbol?: string): stri
 }
 
 /**
- * Ensure token cache is loaded - call this early in app lifecycle
+ * Ensure token cache is loaded - fallback only, prefer initializeTokenCacheFromData
  */
 export function ensureTokenCacheLoaded(): Promise<void> {
   return initializeTokenCache();
 }
 
-/**
- * Check if a token is in the cache
- */
 export function isTokenKnown(symbol: string): boolean {
   return tokenContractCache.has(symbol.toUpperCase());
 }
 
-/**
- * Get all cached tokens
- */
 export function getAllCachedTokens(): Map<string, string> {
   return new Map(tokenContractCache);
 }
