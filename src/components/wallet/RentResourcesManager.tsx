@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useWax } from '@/context/WaxContext';
 import { usePowerupEstimate } from '@/hooks/usePowerupEstimate';
+import { useCheesePriceData } from '@/hooks/useCheesePriceData';
 import { Loader2, Check, X, Zap, Cpu, Wifi } from 'lucide-react';
 import { toast } from 'sonner';
 import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';

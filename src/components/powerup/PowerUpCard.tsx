@@ -6,6 +6,7 @@ import { ResourceEstimate } from "./ResourceEstimate";
 import { RecipientInput } from "./RecipientInput";
 import { toast } from "sonner";
 import { usePowerupEstimate } from "@/hooks/usePowerupEstimate";
+import { useCheesePriceData } from "@/hooks/useCheesePriceData";
 import { closeWharfkitModals, getTransactPlugins } from "@/lib/wharfKit";
 import {
   Dialog,
