@@ -41,8 +41,8 @@ function formatWaxValue(value: number): string {
 }
 
 export function CheesePriceBar() {
-  const { data: priceData, isLoading: priceLoading, error: priceError } = useCheesePriceData();
-  const { data: stats, isLoading: statsLoading } = useCheeseStats();
+  const { data: priceData, isLoading: priceLoading, error: priceError, refetch: refetchPrice, isFetching: priceFetching } = useCheesePriceData();
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats, isFetching: statsFetching } = useCheeseStats();
   const [swapOpen, setSwapOpen] = useState(false);
   const [swapInputToken, setSwapInputToken] = useState<'WAX' | 'WAXUSDC'>('WAX');
 
@@ -54,6 +54,13 @@ export function CheesePriceBar() {
   const { data: tvlData, isLoading: tvlLoading, refetch: refetchTvl, isFetching: tvlFetching } = useCheeseTVL(waxUsdPrice, cheeseUsdPrice);
 
   const isLoading = priceLoading || statsLoading;
+  const isAnyFetching = priceFetching || statsFetching || tvlFetching;
+
+  const refreshAll = () => {
+    refetchPrice();
+    refetchStats();
+    refetchTvl();
+  };
 
   const marketCap = priceData && stats
     ? stats.circulatingSupply * priceData.usdPrice
