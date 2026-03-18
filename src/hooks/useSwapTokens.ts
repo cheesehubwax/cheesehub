@@ -11,6 +11,9 @@ export function useSwapTokens() {
     queryFn: ({ signal }) => fetchSwapTokenList(signal),
     staleTime: 10 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 
   // Populate the global token logo cache from the shared query
