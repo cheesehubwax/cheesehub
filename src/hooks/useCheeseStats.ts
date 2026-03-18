@@ -5,8 +5,10 @@ export function useCheeseStats() {
   return useQuery<CheeseStats>({
     queryKey: ['cheese-stats'],
     queryFn: getCheeseStats,
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-    refetchInterval: 60 * 1000, // Refresh every minute
+    staleTime: 5 * 60 * 1000,
     retry: 2,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 }
