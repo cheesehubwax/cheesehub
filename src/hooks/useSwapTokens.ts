@@ -38,5 +38,5 @@ export function useSwapTokens() {
     );
   }, [tokens, search]);
 
-  return { tokens, filteredTokens, popularTokens, isLoading, error, search, setSearch };
+  return { tokens, filteredTokens, popularTokens, isLoading, error, search, setSearch, refetch, isFetching };
 }
