@@ -41,8 +41,8 @@ function formatWaxValue(value: number): string {
 }
 
 export function CheesePriceBar() {
-  const { data: priceData, isLoading: priceLoading, error: priceError } = useCheesePriceData();
-  const { data: stats, isLoading: statsLoading } = useCheeseStats();
+  const { data: priceData, isLoading: priceLoading, error: priceError, refetch: refetchPrice, isFetching: priceFetching } = useCheesePriceData();
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats, isFetching: statsFetching } = useCheeseStats();
   const [swapOpen, setSwapOpen] = useState(false);
   const [swapInputToken, setSwapInputToken] = useState<'WAX' | 'WAXUSDC'>('WAX');
 
@@ -54,6 +54,13 @@ export function CheesePriceBar() {
   const { data: tvlData, isLoading: tvlLoading, refetch: refetchTvl, isFetching: tvlFetching } = useCheeseTVL(waxUsdPrice, cheeseUsdPrice);
 
   const isLoading = priceLoading || statsLoading;
+  const isAnyFetching = priceFetching || statsFetching || tvlFetching;
+
+  const refreshAll = () => {
+    refetchPrice();
+    refetchStats();
+    refetchTvl();
+  };
 
   const marketCap = priceData && stats
     ? stats.circulatingSupply * priceData.usdPrice
@@ -146,15 +153,18 @@ export function CheesePriceBar() {
             </div>
           )}
         </div>
-        <button
-          onClick={() => refetchTvl()}
-          disabled={tvlFetching}
-          className="p-1 rounded hover:bg-cheese/20 transition-colors disabled:opacity-50"
-          title="Refresh TVL"
-        >
-          <RefreshCw className={`w-3 h-3 text-muted-foreground ${tvlFetching ? 'animate-spin' : ''}`} />
-        </button>
       </div>
+
+      {/* Refresh All */}
+      <button
+        onClick={refreshAll}
+        disabled={isAnyFetching}
+        className="flex items-center gap-1.5 bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border border-cheese/20 rounded-lg px-3 py-2 hover:bg-cheese/20 transition-colors disabled:opacity-50"
+        title="Refresh all price data"
+      >
+        <RefreshCw className={`w-4 h-4 text-muted-foreground ${isAnyFetching ? 'animate-spin' : ''}`} />
+        <span className="text-xs text-muted-foreground hidden sm:inline">Refresh</span>
+      </button>
     </div>
 
     <CheeseSwapDialog

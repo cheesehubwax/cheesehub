@@ -11,7 +11,7 @@ export interface CheesePriceData {
  * instead of making a separate API call.
  */
 export function useCheesePriceData() {
-  const { tokens, isLoading, error } = useSwapTokens();
+  const { tokens, isLoading, error, refetch, isFetching } = useSwapTokens();
 
   const data = useMemo<CheesePriceData | undefined>(() => {
     if (!tokens.length) return undefined;
@@ -30,5 +30,7 @@ export function useCheesePriceData() {
     isLoading,
     error,
     isError: !!error,
+    refetch,
+    isFetching,
   };
 }
