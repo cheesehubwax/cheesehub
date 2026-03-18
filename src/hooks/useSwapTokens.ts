@@ -6,7 +6,7 @@ import { initializeTokenCacheFromData } from "@/lib/tokenLogos";
 export function useSwapTokens() {
   const [search, setSearch] = useState("");
 
-  const { data: tokens = [], isLoading, error } = useQuery({
+  const { data: tokens = [], isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ["swap-tokens"],
     queryFn: ({ signal }) => fetchSwapTokenList(signal),
     staleTime: 10 * 60 * 1000,
