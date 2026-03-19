@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -8,9 +8,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { WalletTransferDialog } from "@/components/wallet/WalletTransferDialog";
 import { useWax } from "@/context/WaxContext";
-import { Wallet, LogOut, ChevronDown, UserPlus, ArrowRightLeft } from "lucide-react";
+import { ChevronDown, Check, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,19 +19,26 @@ import {
   DropdownMenuSub,
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
+  DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 import cheeseLogo from "@/assets/cheese-logo.png";
 import walletIcon from "@/assets/wallet-icon.png";
-import { SerializedSession } from "@wharfkit/session";
+import { WalletTransferDialog } from "./wallet/WalletTransferDialog";
+import { CheeseAmpDialog } from "./music/CheeseAmpDialog";
+import { CheeseAmpMiniPlayer } from "./music/CheeseAmpMiniPlayer";
+import { useCheeseAmpAutoAdvance } from "@/hooks/useCheeseAmpAutoAdvance";
+import { getAudioPlayer } from "@/lib/musicPlayer";
+import { useCheeseAmpStore } from "@/stores/cheeseAmpStore";
+import { logPlay, flushPlayBuffer, getBufferedPlayCount } from "@/lib/cheeseAmpRoyalties";
 
 export function WalletConnect() {
-  const {
-    session,
-    isConnected,
-    isLoading,
-    accountName,
-    cheeseBalance,
-    login,
+  const { 
+    session, 
+    isConnected, 
+    isLoading, 
+    accountName, 
+    cheeseBalance, 
+    login, 
     logout,
     allSessions,
     switchAccount,
@@ -41,6 +47,29 @@ export function WalletConnect() {
   } = useWax();
   const [open, setOpen] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
+  const [cheeseAmpOpen, setCheeseAmpOpen] = useState(false);
+  const cheeseAmpMinimized = useCheeseAmpStore((state) => state.isMinimized);
+  const setCheeseAmpMinimized = useCheeseAmpStore((state) => state.setMinimized);
+
+  // Callback for auto-advance play logging (royalties)
+  const handleTrackPlayed = useCallback((templateId: string) => {
+    if (session && accountName) {
+      logPlay(session, accountName, Number(templateId));
+    }
+  }, [session, accountName]);
+
+  // Persistent auto-advance hook - works even when CHEESEAmp dialog is minimized
+  useCheeseAmpAutoAdvance(accountName, handleTrackPlayed);
+
+  // Flush Cloud Wallet play buffer when wallet opens (opportunistic)
+  useEffect(() => {
+    if (walletOpen && session && accountName) {
+      const buffered = getBufferedPlayCount(accountName);
+      if (buffered > 0) {
+        flushPlayBuffer(session, accountName).catch(() => {});
+      }
+    }
+  }, [walletOpen, session, accountName]);
 
   // Listen for custom event to open wallet
   useEffect(() => {
@@ -51,149 +80,202 @@ export function WalletConnect() {
         setOpen(true);
       }
     };
-
-    window.addEventListener("open-cheese-wallet", handleOpenWallet);
-    return () => window.removeEventListener("open-cheese-wallet", handleOpenWallet);
+    window.addEventListener('open-cheese-wallet', handleOpenWallet);
+    return () => window.removeEventListener('open-cheese-wallet', handleOpenWallet);
   }, [isConnected]);
 
-  const formatBalance = (balance: number) => {
-    return balance.toLocaleString(undefined, {
-      minimumFractionDigits: 4,
-      maximumFractionDigits: 4,
-    });
-  };
+  // Listen for custom event to open CHEESEAmp
+  useEffect(() => {
+    const handleOpenCheeseAmp = () => {
+      if (isConnected) {
+        if (cheeseAmpMinimized) {
+          setCheeseAmpMinimized(false);
+          setCheeseAmpOpen(true);
+        } else {
+          setCheeseAmpOpen(true);
+        }
+      } else {
+        setOpen(true);
+      }
+    };
+    window.addEventListener('open-cheese-amp', handleOpenCheeseAmp);
+    return () => window.removeEventListener('open-cheese-amp', handleOpenCheeseAmp);
+  }, [isConnected, cheeseAmpMinimized]);
 
-  const getSessionAccount = (s: SerializedSession): string => {
-    try {
-      return String((s as any).actor || (s as any).auth?.actor || "Unknown");
-    } catch {
-      return "Unknown";
+  // Close mini player when user logs out
+  useEffect(() => {
+    if (!isConnected) {
+      setCheeseAmpMinimized(false);
     }
+  }, [isConnected]);
+
+  const handleLogin = async () => {
+    setOpen(false);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    await login();
   };
 
-  const getSessionWallet = (s: SerializedSession): string => {
-    try {
-      return String((s as any).walletPlugin?.id || (s as any).wallet || "");
-    } catch {
-      return "";
-    }
+  const handleAddAccount = async () => {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    await addAccount();
   };
 
-  const otherSessions = allSessions.filter((s) => {
-    const actor = getSessionAccount(s);
-    return actor !== accountName;
-  });
+  const handleCheeseAmpMinimize = () => {
+    setCheeseAmpOpen(false);
+    setCheeseAmpMinimized(true);
+  };
 
-  // Not connected - show login dialog
-  if (!isConnected) {
+  const handleCheeseAmpExpand = () => {
+    setCheeseAmpMinimized(false);
+    setCheeseAmpOpen(true);
+  };
+
+  const handleMiniPlayerClose = () => {
+    getAudioPlayer().stop();
+    setCheeseAmpMinimized(false);
+  };
+
+  // Filter out the current session from the switch list
+  const otherSessions = allSessions.filter(
+    s => String(s.actor) !== accountName
+  );
+
+  if (isConnected && accountName) {
     return (
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger asChild>
-          <Button
-            className="gap-2 bg-cheese hover:bg-cheese-dark text-primary-foreground"
-            disabled={isLoading}
-          >
-            <Wallet className="h-4 w-4" />
-            {isLoading ? "Connecting..." : "Connect Wallet"}
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Connect Your WAX Wallet</DialogTitle>
-            <DialogDescription>Choose a wallet to connect to CHEESEHub</DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-4 py-4">
-            <Button
-              onClick={async () => {
-                await login();
-                setOpen(false);
-              }}
-              className="w-full bg-cheese hover:bg-cheese-dark text-primary-foreground gap-2"
-              size="lg"
-              disabled={isLoading}
-            >
-              <Wallet className="h-5 w-5" />
-              {isLoading ? "Connecting..." : "Connect with Anchor or Cloud Wallet"}
-            </Button>
-            <p className="text-sm text-muted-foreground text-center">
-              You can use Anchor Wallet or WAX Cloud Wallet to connect
-            </p>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  // Connected - show account dropdown with multi-account support
-  return (
-    <div className="flex items-center gap-2">
+      <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="gap-2 border-cheese/30 hover:bg-cheese/10">
-            <img src={cheeseLogo} alt="CHEESE" className="h-4 w-4" />
-            <span className="text-cheese font-semibold">{formatBalance(cheeseBalance)}</span>
-            <span className="text-foreground hidden sm:inline">{accountName}</span>
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          <Button variant="outline" className="border-cheese/30 hover:border-cheese hover:bg-cheese/10">
+            <img src={walletIcon} alt="Wallet" className="mr-2 h-5 w-5 object-contain" />
+            <span className="max-w-[120px] truncate">{accountName}</span>
+            <span className="ml-2 text-cheese font-semibold flex items-center gap-1">
+              <img src={cheeseLogo} alt="CHEESE" className="h-4 w-4" />
+              {cheeseBalance !== null ? cheeseBalance.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '...'}
+            </span>
+            <ChevronDown className="ml-2 h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64">
-          <div className="px-2 py-2">
-            <p className="text-sm font-medium">{accountName}</p>
-            <p className="text-xs text-muted-foreground">Active WAX Account</p>
-          </div>
-          <DropdownMenuSeparator />
-
-          <DropdownMenuItem onClick={() => setWalletOpen(true)}>
-            <img src={walletIcon} alt="Wallet" className="h-4 w-4 mr-2 object-contain" />
-            <span><span className="text-cheese">CHEESE</span>Wallet</span>
-          </DropdownMenuItem>
-
-          <DropdownMenuItem onClick={() => window.dispatchEvent(new CustomEvent('open-cheese-amp'))}>
-            <span className="mr-2">🎧</span>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuItem 
+            onClick={() => {
+              if (cheeseAmpMinimized) {
+                handleCheeseAmpExpand();
+              } else {
+                setCheeseAmpOpen(true);
+              }
+            }} 
+            className="cursor-pointer"
+          >
+            <span className="mr-2 text-base leading-none">🎧</span>
             <span><span className="text-cheese">CHEESE</span>Amp</span>
           </DropdownMenuItem>
-
-          <DropdownMenuSeparator />
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <ArrowRightLeft className="h-4 w-4 mr-2" />
-              Switch Account
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent>
-              {otherSessions.map((s, i) => {
-                const actor = getSessionAccount(s);
-                const wallet = getSessionWallet(s);
-                return (
-                  <DropdownMenuItem
-                    key={`${actor}-${i}`}
-                    onClick={() => switchAccount(s)}
-                  >
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium">{actor}</span>
-                      {wallet && (
-                        <span className="text-xs text-muted-foreground">{wallet}</span>
-                      )}
-                    </div>
-                  </DropdownMenuItem>
-                );
-              })}
+          <DropdownMenuItem onClick={() => setWalletOpen(true)} className="cursor-pointer">
+            <img src={walletIcon} alt="Wallet" className="mr-2 h-4 w-4 object-contain" />
+            <span><span className="text-cheese">CHEESE</span>Wallet</span>
+          </DropdownMenuItem>
+          
+          {/* Account Switching Submenu */}
+          {allSessions.length > 0 && (
+            <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={addAccount}>
-                <UserPlus className="h-4 w-4 mr-2" />
-                Add Account
-              </DropdownMenuItem>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="cursor-pointer">
+                  <span className="mr-2 text-sm leading-none">👥</span>
+                  Switch Account
+                </DropdownMenuSubTrigger>
+                <DropdownMenuPortal>
+                  <DropdownMenuSubContent className="w-56">
+                    {/* Current account */}
+                    <DropdownMenuItem disabled className="opacity-100">
+                      <Check className="mr-2 h-4 w-4 text-cheese" />
+                      <span className="font-medium">{accountName}</span>
+                      <span className="ml-auto text-xs text-muted-foreground">(active)</span>
+                    </DropdownMenuItem>
+                    
+                    {/* Other accounts */}
+                    {otherSessions.map((s) => (
+                      <DropdownMenuItem 
+                        key={`${String(s.actor)}-${s.permission}`}
+                        className="cursor-pointer group"
+                        onClick={() => switchAccount(s)}
+                      >
+                        <div className="w-4 mr-2" />
+                        <span>{String(s.actor)}</span>
+                        <button
+                          className="ml-auto opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity p-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeAccount(s);
+                          }}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </DropdownMenuItem>
+                    ))}
+                    
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleAddAccount} className="cursor-pointer">
+                      <span className="mr-2 text-sm leading-none">➕</span>
+                      Add Account
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuPortal>
+              </DropdownMenuSub>
+            </>
+          )}
+          
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={logout} className="text-destructive">
-            <LogOut className="h-4 w-4 mr-2" />
+          <DropdownMenuItem onClick={logout} className="cursor-pointer">
+            <span className="mr-2 text-sm leading-none">🔌</span>
             Disconnect
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-
       <WalletTransferDialog open={walletOpen} onOpenChange={setWalletOpen} />
-    </div>
+      <CheeseAmpDialog 
+        open={cheeseAmpOpen} 
+        onOpenChange={setCheeseAmpOpen} 
+        onMinimize={handleCheeseAmpMinimize} 
+      />
+      {cheeseAmpMinimized && (
+        <CheeseAmpMiniPlayer
+          onExpand={handleCheeseAmpExpand}
+          onClose={handleMiniPlayerClose}
+        />
+      )}
+    </>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button className="bg-cheese hover:bg-cheese-dark text-primary-foreground font-semibold">
+          <img src={walletIcon} alt="Wallet" className="mr-2 h-5 w-5 object-contain" />
+          Connect Wallet
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-center text-xl">Connect Your Wallet</DialogTitle>
+          <DialogDescription className="text-center">
+            Connect to Cheese DAO Tools
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-4 py-4">
+          <Button
+            onClick={handleLogin}
+            disabled={isLoading}
+            className="h-14 bg-cheese hover:bg-cheese-dark text-primary-foreground"
+          >
+            <img src={walletIcon} alt="Wallet" className="mr-2 h-6 w-6 object-contain" />
+            {isLoading ? "Connecting..." : "Connect Wallet"}
+          </Button>
+          <p className="text-center text-xs text-muted-foreground">
+            Supports WAX Cloud Wallet and Anchor
+          </p>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
