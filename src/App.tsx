@@ -19,6 +19,7 @@ import BannerAds from "./pages/BannerAds";
 import Disclaimer from "./pages/Disclaimer";
 import Terms from "./pages/Terms";
 import Admin from "./pages/Admin";
+import AdminGuide from "./pages/AdminGuide";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -54,6 +55,7 @@ const App = () => {
                 <Route path="/disclaimer" element={<Disclaimer />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/admin" element={<Admin />} />
+                <Route path="/admin/guide" element={<AdminGuide />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
