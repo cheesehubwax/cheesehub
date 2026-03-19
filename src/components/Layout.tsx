@@ -2,7 +2,6 @@ import { ReactNode } from 'react';
 import { Header } from './Header';
 import { Footer } from './Footer';
 import { BackgroundDecorations } from './drops/BackgroundDecorations';
-import { CheeseAmpPlayer } from './music/CheeseAmpPlayer';
 import { BannerDisplay } from './bannerads/BannerDisplay';
 
 interface LayoutProps {
@@ -20,7 +19,6 @@ export function Layout({ children, showFooter = true }: LayoutProps) {
         {children}
       </main>
       {showFooter && <Footer />}
-      <CheeseAmpPlayer />
     </div>
   );
 }
