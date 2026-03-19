@@ -19,6 +19,7 @@ import BannerAds from "./pages/BannerAds";
 import Disclaimer from "./pages/Disclaimer";
 import Terms from "./pages/Terms";
 import Admin from "./pages/Admin";
+import AdminGuide from "./pages/AdminGuide";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
