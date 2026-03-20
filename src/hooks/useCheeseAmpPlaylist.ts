@@ -41,10 +41,10 @@ function getDefaultState(): CheeseAmpState {
 function loadState(accountName: string): CheeseAmpState {
   try {
     const saved = localStorage.getItem(getStorageKey(accountName));
-    console.log('[CHEESEAmp] Loading state for', accountName, saved ? 'found' : 'not found');
+    console.debug('[CHEESEAmp] Loading state for', accountName, saved ? 'found' : 'not found');
     if (saved) {
       const parsed = JSON.parse(saved);
-      console.log('[CHEESEAmp] Loaded', parsed.playlists?.length || 0, 'playlists');
+      console.debug('[CHEESEAmp] Loaded', parsed.playlists?.length || 0, 'playlists');
       return parsed;
     }
   } catch (e) {
@@ -54,7 +54,7 @@ function loadState(accountName: string): CheeseAmpState {
 }
 
 function saveState(accountName: string, state: CheeseAmpState): void {
-  console.log('[CHEESEAmp] Saving', state.playlists?.length || 0, 'playlists for', accountName);
+  console.debug('[CHEESEAmp] Saving', state.playlists?.length || 0, 'playlists for', accountName);
   try {
     localStorage.setItem(getStorageKey(accountName), JSON.stringify(state));
   } catch (e) {

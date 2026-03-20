@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useWax } from '@/context/WaxContext';
 import { useMusicNFTs, type StackedMusicNFT } from '@/hooks/useMusicNFTs';
 import { useCheeseAmpPlaylist } from '@/hooks/useCheeseAmpPlaylist';
@@ -125,13 +125,16 @@ export function CheeseAmpPlayer() {
   const [displayMode, setDisplayMode] = useState<DisplayMode>('cover');
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
-  const activeTracks = sortAZ
-    ? [...stackedNfts].sort((a, b) => {
-        const nameA = (a.title || a.name || '').toLowerCase();
-        const nameB = (b.title || b.name || '').toLowerCase();
-        return nameA.localeCompare(nameB);
-      })
-    : stackedNfts;
+  const activeTracks = useMemo(() => 
+    sortAZ
+      ? [...stackedNfts].sort((a, b) => {
+          const nameA = (a.title || a.name || '').toLowerCase();
+          const nameB = (b.title || b.name || '').toLowerCase();
+          return nameA.localeCompare(nameB);
+        })
+      : stackedNfts,
+    [stackedNfts, sortAZ]
+  );
   const playlist = useCheeseAmpPlaylist(accountName, activeTracks);
   const [playbackState, setPlaybackState] = useState<PlaybackState>({
     isPlaying: false,
@@ -175,17 +178,22 @@ export function CheeseAmpPlayer() {
   }, [audioPlayer]);
 
   // Sync with currently playing track when player is reopened
+  // Use a ref to avoid depending on `playlist` (which changes on every state update, causing a loop)
+  const playTrackRef = useRef(playlist.playTrack);
+  playTrackRef.current = playlist.playTrack;
+  const currentPlaylistTrackId = playlist.currentTrack?.template_id;
+
   useEffect(() => {
     const currentlyPlayingTrack = audioPlayer.getCurrentTrack();
     if (currentlyPlayingTrack && stackedNfts.length > 0) {
       const matchingTrack = stackedNfts.find(
         t => t.template_id === currentlyPlayingTrack.template_id
       );
-      if (matchingTrack && playlist.currentTrack?.template_id !== matchingTrack.template_id) {
-        playlist.playTrack(matchingTrack);
+      if (matchingTrack && currentPlaylistTrackId !== matchingTrack.template_id) {
+        playTrackRef.current(matchingTrack);
       }
     }
-  }, [audioPlayer, stackedNfts, playlist]);
+  }, [audioPlayer, stackedNfts, currentPlaylistTrackId]);
 
   const handlePlayTrack = useCallback(async (track: StackedMusicNFT) => {
     playlist.playTrack(track);
