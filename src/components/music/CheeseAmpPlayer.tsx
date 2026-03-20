@@ -120,10 +120,9 @@ function CoverArt({ src, alt, isPlaying }: CoverArtProps) {
 export function CheeseAmpPlayer() {
   const { accountName, session } = useWax();
   const { nfts, stackedNfts, isLoading: isLoadingNfts, refetch } = useMusicNFTs();
-  const { stackedNfts: globalStackedNfts, isLoading: isLoadingGlobal, refetch: refetchGlobal } = useMusicNFTs(CHEESEAMP_GLOBAL_ACCOUNT);
-  const [viewMode, setViewMode] = useState<'library' | 'playlists' | 'global'>('library');
+  const [viewMode, setViewMode] = useState<'library' | 'playlists'>('library');
 
-  const activeTracks = viewMode === 'global' ? globalStackedNfts : stackedNfts;
+  const activeTracks = stackedNfts;
   const playlist = useCheeseAmpPlaylist(accountName, activeTracks);
   const [playbackState, setPlaybackState] = useState<PlaybackState>({
     isPlaying: false,
