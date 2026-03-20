@@ -352,13 +352,17 @@ export function CheeseAmpPlayer() {
               <MediaDisplay
                 coverArt={currentTrack.coverArt}
                 videoUrl={currentTrack.videoUrl}
+                frontArt={currentTrack.frontArt}
+                backArt={currentTrack.backArt}
                 alt={currentTrack.name}
                 isPlaying={playbackState.isPlaying}
                 isVideo={playbackState.isVideo}
                 hasVideo={playbackState.hasVideo}
+                displayMode={displayMode}
                 onToggleVideo={handleToggleVideo}
                 isTheaterMode={isTheaterMode}
                 onToggleTheater={handleToggleTheater}
+                onExpandArt={(src) => setLightboxSrc(src)}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
@@ -366,6 +370,25 @@ export function CheeseAmpPlayer() {
               </div>
             )}
           </div>
+
+          {/* Media Selector Buttons */}
+          {currentTrack && (
+            <MediaSelector
+              hasAudio={!!currentTrack.audioUrl}
+              hasVideo={playbackState.hasVideo}
+              hasFrontArt={!!(currentTrack.frontArt || currentTrack.coverArt)}
+              hasBackArt={!!currentTrack.backArt}
+              displayMode={displayMode}
+              onSelect={(mode) => {
+                setDisplayMode(mode);
+                if (mode === 'video' && !playbackState.isVideo) {
+                  handleToggleVideo();
+                } else if (mode !== 'video' && playbackState.isVideo) {
+                  handleToggleVideo();
+                }
+              }}
+            />
+          )}
 
           {/* Track Info */}
           <div className="mb-4 min-h-[48px]">
