@@ -38,7 +38,7 @@ const App = () => {
           <CartProvider>
             <Toaster />
             <Sonner />
-            <BrowserRouter>
+            <BrowserRouter basename="/cheesehub">
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/powerup" element={<PowerUp />} />
