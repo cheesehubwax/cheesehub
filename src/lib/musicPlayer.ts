@@ -2,26 +2,7 @@ import type { MusicNFT } from '@/hooks/useMusicNFTs';
 import { IPFS_GATEWAYS, extractIpfsHash as sharedExtractIpfsHash } from '@/lib/ipfsGateways';
 
 function extractIpfsHash(url: string): string | null {
-  if (!url) return null;
-  
-  if (url.startsWith('Qm') || url.startsWith('bafy')) {
-    return url;
-  }
-  
-  const patterns = [
-    /ipfs:\/\/(.+)/,
-    /\/ipfs\/(.+)/,
-    /gateway\.pinata\.cloud\/ipfs\/(.+)/,
-    /ipfs\.io\/ipfs\/(.+)/,
-    /cloudflare-ipfs\.com\/ipfs\/(.+)/,
-  ];
-  
-  for (const pattern of patterns) {
-    const match = url.match(pattern);
-    if (match) return match[1];
-  }
-  
-  return null;
+  return sharedExtractIpfsHash(url);
 }
 
 export type RepeatMode = 'none' | 'one' | 'all';
