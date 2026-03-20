@@ -116,7 +116,7 @@ function getMediaUrl(field: string | undefined): string {
 function isMusicNFT(data: Record<string, unknown>): boolean {
   if (data.audio) return true;
   if (data.clip) return true;
-  if (data.video && (data.artist || data.title || data.album)) return true;
+  if (data.video) return true;
   return false;
 }
 
