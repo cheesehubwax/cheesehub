@@ -80,14 +80,15 @@ export function CreateDrop() {
   }, []);
 
   useEffect(() => {
-    if (formData.dropType === 'mint-on-demand' && formData.collectionName) {
+    if (formData.collectionName) {
       fetchRamBalanceForCollection(formData.collectionName);
     } else { setRamBalance(null); }
   }, [formData.collectionName, formData.dropType, fetchRamBalanceForCollection]);
 
   const ramShortage = (() => {
-    if (formData.dropType !== 'mint-on-demand' || formData.maxClaimable <= 0) return null;
-    const requiredBytes = formData.maxClaimable * BYTES_PER_NFT;
+    const claimCount = formData.dropType === 'premint' ? formData.assetIds.length : formData.maxClaimable;
+    if (claimCount <= 0) return null;
+    const requiredBytes = claimCount * BYTES_PER_NFT;
     const availableBytes = ramBalance?.bytes || 0;
     if (availableBytes >= requiredBytes) return null;
     const shortageBytes = requiredBytes - availableBytes;
@@ -311,20 +312,20 @@ export function CreateDrop() {
               {formData.dropType === 'premint' && (
                 <p className="text-xs text-muted-foreground">Auto-set based on selected NFTs</p>
               )}
-              {formData.dropType === 'mint-on-demand' && loadingRamBalance && formData.collectionName && (
+              {loadingRamBalance && formData.collectionName && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
                   <Loader2 className="h-3 w-3 animate-spin" />
                   Checking RAM balance...
                 </div>
               )}
-              {formData.dropType === 'mint-on-demand' && ramShortage && !loadingRamBalance && (
+              {ramShortage && !loadingRamBalance && (
                 <div className="mt-2 p-3 rounded-lg border border-destructive/50 bg-destructive/10 space-y-2">
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-destructive">Insufficient RAM</p>
                       <p className="text-xs text-muted-foreground">
-                        Your collection <strong className="text-foreground">{formData.collectionName}</strong> has enough RAM for ~<strong className="text-foreground">{ramShortage.availableNFTs}</strong> NFTs, but you need <strong className="text-foreground">{formData.maxClaimable}</strong>.
+                        Your collection <strong className="text-foreground">{formData.collectionName}</strong> has enough RAM for ~<strong className="text-foreground">{ramShortage.availableNFTs}</strong> NFTs, but you need <strong className="text-foreground">{formData.dropType === 'premint' ? formData.assetIds.length : formData.maxClaimable}</strong>.
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Shortfall: <strong className="text-foreground">{ramShortage.shortageBytes.toLocaleString()}</strong> bytes (~<strong className="text-foreground">{ramShortage.estimatedWax} WAX</strong>)
