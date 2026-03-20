@@ -86,8 +86,9 @@ export function CreateDrop() {
   }, [formData.collectionName, formData.dropType, fetchRamBalanceForCollection]);
 
   const ramShortage = (() => {
-    if (formData.dropType !== 'mint-on-demand' || formData.maxClaimable <= 0) return null;
-    const requiredBytes = formData.maxClaimable * BYTES_PER_NFT;
+    const claimCount = formData.dropType === 'premint' ? formData.assetIds.length : formData.maxClaimable;
+    if (claimCount <= 0) return null;
+    const requiredBytes = claimCount * BYTES_PER_NFT;
     const availableBytes = ramBalance?.bytes || 0;
     if (availableBytes >= requiredBytes) return null;
     const shortageBytes = requiredBytes - availableBytes;
