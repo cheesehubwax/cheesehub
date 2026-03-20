@@ -1,68 +1,58 @@
 
-Goal: make CHEESEAmp show an explicit track selector for NFTs like these Samuel Delgado releases, where the 1-minute sample and the full track are both present but the full track is currently hidden behind confusing toggle behavior.
 
-What I found
-- The current parser only exposes extra tracks from fields like `audio1`, `audio2`, `track1`, etc.
-- These two NFTs do not populate those fields in the actual asset data; they only populate `audio` and `video`.
-- The player currently mixes two different concepts:
-  - visual display selection (`cover`, `video`, `front`, `back`)
-  - playback source selection (sample vs full track)
-- `musicPlayer.play(track)` defaults to preferring `videoUrl`, while the UI buttons in `CheeseAmpPlayer` use toggle-style logic (`switchMediaType`) based on current state, not explicit source selection.
-- Result: users can accidentally bounce between sample/full track by clicking “Audio”/“Video”, but there is no visible selector telling them those are different track sources.
+## On-Chain Playlist Saving (User Pays RAM)
 
-Implementation plan
+### Overview
+Add a "Save to Chain" feature so playlists persist on the WAX blockchain via the `cheeseamphub` contract. Local storage remains the default — on-chain saving is opt-in per playlist. On login, any on-chain playlists are fetched and merged into local state.
 
-1. Normalize hidden full tracks during NFT parsing
-- Update `src/hooks/useMusicNFTs.ts`.
-- Keep existing detection for `audio1`, `audio2`, etc.
-- Add a derived extra-audio entry when an NFT has both `audio` and `video` and they are different URLs.
-- For these cases, expose the `video` URL as a selectable extra track (label like `Full Track`).
-- This ensures those two reported NFTs actually produce a visible second track button.
+### New File: `src/lib/cheeseAmpOnChain.ts`
+- **`savePlaylistOnChain(session, name, trackIds[])`** — builds a `saveplaylist` action on `cheeseamphub` with `ram_payer: user`
+- **`deletePlaylistOnChain(session, name)`** — sends `delplaylist` action (reclaims RAM)
+- **`fetchOnChainPlaylists(accountName)`** — reads `get_table_rows` from `cheeseamphub`, table `playlists`, scope = account, using the existing `fetchTableRows` from `waxRpcFallback.ts`
+- Uses the existing `useWaxTransaction` pattern for signing
+- Includes a `ONCHAIN_PLAYLISTS_ENABLED` flag (like `ROYALTIES_ENABLED`) — set to `false` initially if the contract actions aren't deployed yet
 
-2. Separate playback source from display mode
-- Update `src/components/music/CheeseAmpPlayer.tsx`.
-- Add explicit state for the selected source, instead of inferring it from `displayMode` and `playbackState.isVideo`.
-- Treat these as separate controls:
-  - source buttons: `Sample`, `Full Track`, plus any numbered extras
-  - display buttons: `Cover`, `Video`, `Front Art`, `Back Art`
-- Reset the selected extra source when changing tracks.
+### Update: `src/hooks/useCheeseAmpPlaylist.ts`
+- Add `syncStatus` per playlist: `'local' | 'synced' | 'saving' | 'error'`
+- New state field `syncStatuses: Record<string, SyncStatus>`
+- On account load: call `fetchOnChainPlaylists`, merge on-chain playlists into local state (on-chain data wins for name conflicts)
+- Expose new callbacks:
+  - `saveToChain(playlistId)` — takes the session, builds action, calls transaction
+  - `removeFromChain(playlistId)` — deletes on-chain copy
+- Return `syncStatuses` map and the new callbacks
 
-3. Make the player API explicit instead of toggle-based
-- Update `src/lib/musicPlayer.ts`.
-- Replace the ambiguous `play(track, preferVideo, overrideAudioUrl?)` usage with a clearer approach internally:
-  - play the exact requested media URL
-  - optionally render through video mode when the user actually wants video display
-- Keep `switchMediaType` only for true visual video switching, not for hidden sample/full-track switching.
+### Update: `src/components/music/CheeseAmpPlayer.tsx`
+- Import `Link2` / `Upload` / `Cloud` icons from lucide-react
+- In the playlists list, add a small icon per playlist:
+  - Local-only: faded chain icon + "Save to Chain" on context menu
+  - Synced: green chain icon
+  - Saving: spinner
+- Context menu additions: "Save to Chain" and "Remove from Chain"
+- Access `session` from `useWax()` (already imported) to pass to save/delete callbacks
+- Disable save button with tooltip "Contract not yet live" when `ONCHAIN_PLAYLISTS_ENABLED = false`
 
-4. Update the selector UI labels
-- Update `src/components/music/MediaDisplay.tsx`.
-- Rename the current `Audio` button to `Sample` when an alternate full track exists.
-- Render explicit extra-track buttons such as `Full Track`, `Track 2`, `Track 3`.
-- Keep art/video controls visible, but no longer rely on them to change which song version is playing.
-
-Technical details
+### Contract Action Format (expected)
 ```text
-Current behavior:
-track click -> player may prefer videoUrl
-Audio/Video buttons -> toggle relative state
-Result -> hidden, stateful sample/full switching
+saveplaylist {
+  user: name           // authorization + ram_payer
+  playlist_name: string
+  asset_ids: uint64[]  // NFT asset IDs
+}
 
-Target behavior:
-track click -> default to Sample
-selector shows:
-  [Sample] [Full Track] [Video] [Front Art] [Back Art]
-clicking Sample -> always sample URL
-clicking Full Track -> always full-track URL
-clicking Video -> changes visual/video playback mode explicitly
+delplaylist {
+  user: name
+  playlist_name: string
+}
+
+Table: playlists (scope = user account)
+Row: { playlist_name: string, asset_ids: uint64[] }
 ```
 
-Files to update
-- `src/hooks/useMusicNFTs.ts`
-- `src/components/music/CheeseAmpPlayer.tsx`
-- `src/components/music/MediaDisplay.tsx`
-- `src/lib/musicPlayer.ts`
+### RAM Cost
+~550 bytes for a 50-track playlist ≈ 0.03–0.06 WAX. User pays and reclaims on delete.
 
-Expected outcome
-- The two reported NFTs will show an obvious second track button.
-- Users will no longer need to “click Audio twice” to discover the full version.
-- CHEESEAmp will behave predictably for other collections that hide alternate tracks in `video` or numbered audio fields.
+### Files
+- `src/lib/cheeseAmpOnChain.ts` (new)
+- `src/hooks/useCheeseAmpPlaylist.ts` (update)
+- `src/components/music/CheeseAmpPlayer.tsx` (update)
+
