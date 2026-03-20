@@ -52,7 +52,7 @@ import {
   ArrowDownAZ,
   ArrowUpAZ,
 } from 'lucide-react';
-import { MediaDisplay, VideoIndicator } from './MediaDisplay';
+import { MediaDisplay, MediaSelector, ArtLightbox, VideoIndicator, type DisplayMode } from './MediaDisplay';
 
 const IPFS_GATEWAYS = [
   'https://ipfs.io/ipfs/',
