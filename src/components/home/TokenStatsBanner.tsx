@@ -225,7 +225,7 @@ export function TokenStatsBanner() {
                     <TableBody>
                       {breakdown.map((entry) => (
                         <TableRow key={entry.contract}>
-                          <TableCell className="py-2 text-xs font-mono">{entry.contract}</TableCell>
+                          <TableCell className="py-2 text-xs font-mono">{entry.displayName ?? entry.contract}</TableCell>
                           <TableCell className="py-2 text-xs text-right">
                             {formatFullNumber(entry.amount)} <span className="text-cheese">CHEESE</span>
                           </TableCell>

@@ -110,11 +110,12 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownEntry[]> {
   const after7d = getAgo(7);
 
   const results = await Promise.all(
-    NULL_CONTRACTS.map(async (contract) => ({
-      contract,
-      amount: await fetchContractNulled(contract),
-      amount24h: await fetchContractNulledFromHyperion(contract, after24h),
-      amount7d: await fetchContractNulledFromHyperion(contract, after7d),
+    NULL_CONTRACTS.map(async ({ account, displayName }) => ({
+      contract: account,
+      displayName,
+      amount: await fetchContractNulled(account),
+      amount24h: await fetchContractNulledFromHyperion(account, after24h),
+      amount7d: await fetchContractNulledFromHyperion(account, after7d),
     }))
   );
 
