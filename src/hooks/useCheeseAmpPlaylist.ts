@@ -44,7 +44,7 @@ function loadState(accountName: string): CheeseAmpState {
     console.debug('[CHEESEAmp] Loading state for', accountName, saved ? 'found' : 'not found');
     if (saved) {
       const parsed = JSON.parse(saved);
-      console.log('[CHEESEAmp] Loaded', parsed.playlists?.length || 0, 'playlists');
+      console.debug('[CHEESEAmp] Loaded', parsed.playlists?.length || 0, 'playlists');
       return parsed;
     }
   } catch (e) {
