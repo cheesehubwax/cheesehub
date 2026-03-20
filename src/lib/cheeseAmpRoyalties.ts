@@ -4,10 +4,14 @@
  * Dual-mode play tracking:
  * - Anchor: fire-and-forget single `logplay` via session keys
  * - Cloud Wallet: buffer plays in localStorage, flush as batch `logplays`
+ * DISABLED until cheeseamphub contract is live.
  */
 import type { Session } from '@wharfkit/session';
 import { isAnchorSession, getTransactPlugins } from './wharfKit';
 import { logger } from './logger';
+
+/** Flip to true when the cheeseamphub contract is deployed */
+const ROYALTIES_ENABLED = false;
 
 const CHEESEAMPHUB_CONTRACT = 'cheeseamphub';
 const BUFFER_KEY_PREFIX = 'cheesehub_playbuffer_';
