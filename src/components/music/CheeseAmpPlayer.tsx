@@ -402,7 +402,11 @@ export function CheeseAmpPlayer() {
               hasFrontArt={!!(currentTrack.frontArt || currentTrack.coverArt)}
               hasBackArt={!!currentTrack.backArt}
               displayMode={displayMode}
+              extraAudioUrls={currentTrack.extraAudioUrls}
+              activeExtraAudioKey={activeExtraAudioKey}
+              onSelectExtraAudio={handleSelectExtraAudio}
               onSelect={(mode) => {
+                setActiveExtraAudioKey(null);
                 setDisplayMode(mode);
                 if (mode === 'video' && !playbackState.isVideo) {
                   handleToggleVideo();
