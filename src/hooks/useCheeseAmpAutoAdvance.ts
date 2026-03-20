@@ -178,16 +178,12 @@ export function useCheeseAmpAutoAdvance(accountName: string | null) {
     const unsubscribe = audioPlayer.onTrackEnd(() => {
       const nextTrack = getNextTrack();
       if (nextTrack) {
-        audioPlayer.play(nextTrack).then(() => {
-          if (onTrackPlayed && nextTrack.template_id) {
-            onTrackPlayed(String(nextTrack.template_id));
-          }
-        }).catch(console.error);
+        audioPlayer.play(nextTrack).catch(console.error);
       }
     });
     
     return unsubscribe;
-  }, [accountName, getNextTrack, onTrackPlayed]);
+  }, [accountName, getNextTrack]);
 
   // Listen for skip next/previous events from mini player
   useEffect(() => {
