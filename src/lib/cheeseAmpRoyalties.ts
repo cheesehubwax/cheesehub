@@ -153,6 +153,7 @@ export async function flushPlayBuffer(session: Session, accountName: string): Pr
  * For Cloud Wallet: buffer locally.
  */
 export function logPlay(session: Session, accountName: string, templateId: number): void {
+  if (!ROYALTIES_ENABLED) return;
   if (isAnchorSession(session)) {
     // Fire-and-forget — don't await
     logPlayImmediate(session, templateId).catch(() => {});
