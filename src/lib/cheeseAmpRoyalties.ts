@@ -28,6 +28,7 @@ interface BufferedPlay {
  * Session keys allow auto-signing after initial approval.
  */
 export async function logPlayImmediate(session: Session, templateId: number): Promise<void> {
+  if (!ROYALTIES_ENABLED) return;
   try {
     await session.transact({
       action: {
