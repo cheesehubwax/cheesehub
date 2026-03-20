@@ -49,6 +49,8 @@ import {
   Plus,
   ListMusic,
   Trash2,
+  ArrowDownAZ,
+  ArrowUpAZ,
 } from 'lucide-react';
 import { MediaDisplay, VideoIndicator } from './MediaDisplay';
 
