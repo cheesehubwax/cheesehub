@@ -80,7 +80,7 @@ export function CreateDrop() {
   }, []);
 
   useEffect(() => {
-    if (formData.dropType === 'mint-on-demand' && formData.collectionName) {
+    if (formData.collectionName) {
       fetchRamBalanceForCollection(formData.collectionName);
     } else { setRamBalance(null); }
   }, [formData.collectionName, formData.dropType, fetchRamBalanceForCollection]);
