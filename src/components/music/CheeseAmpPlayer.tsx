@@ -49,7 +49,6 @@ import {
   Plus,
   ListMusic,
   Trash2,
-  Globe,
 } from 'lucide-react';
 import { MediaDisplay, VideoIndicator } from './MediaDisplay';
 
