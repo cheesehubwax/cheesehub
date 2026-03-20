@@ -307,16 +307,18 @@ interface MediaSelectorProps {
 }
 
 export function MediaSelector({ hasAudio, hasVideo, hasFrontArt, hasBackArt, displayMode, onSelect, extraAudioUrls, activeExtraAudioKey, onSelectExtraAudio }: MediaSelectorProps) {
+  const hasExtraAudio = extraAudioUrls && extraAudioUrls.length > 0;
+  const audioLabel = hasExtraAudio ? 'Sample' : 'Audio';
   const buttons: { mode: DisplayMode; label: string; icon: React.ReactNode; available: boolean }[] = [
-    { mode: 'cover', label: 'Audio', icon: <Music2 className="h-3.5 w-3.5" />, available: hasAudio },
+    { mode: 'cover', label: audioLabel, icon: <Music2 className="h-3.5 w-3.5" />, available: hasAudio },
     { mode: 'video', label: 'Video', icon: <Video className="h-3.5 w-3.5" />, available: hasVideo },
     { mode: 'front', label: 'Front Art', icon: <Image className="h-3.5 w-3.5" />, available: hasFrontArt },
     { mode: 'back', label: 'Back Art', icon: <ImageIcon className="h-3.5 w-3.5" />, available: hasBackArt },
   ];
 
   const availableButtons = buttons.filter(b => b.available);
-  const hasExtraAudio = extraAudioUrls && extraAudioUrls.length > 0;
-  if (availableButtons.length <= 1 && !hasExtraAudio) return null;
+  const hasExtraAudioForFilter = extraAudioUrls && extraAudioUrls.length > 0;
+  if (availableButtons.length <= 1 && !hasExtraAudioForFilter) return null;
 
   return (
     <div className="flex items-center gap-1 mt-2 flex-wrap">

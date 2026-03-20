@@ -154,7 +154,7 @@ class CheeseAmpMedia {
     return () => this.trackEndCallbacks.delete(callback);
   }
 
-  async play(track: MusicNFT, preferVideo = true, overrideAudioUrl?: string): Promise<void> {
+  async play(track: MusicNFT, preferVideo = false, overrideAudioUrl?: string): Promise<void> {
     this._error = null;
     this._isLoading = true;
     this.currentTrack = track;
