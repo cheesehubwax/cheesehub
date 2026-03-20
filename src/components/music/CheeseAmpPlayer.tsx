@@ -122,6 +122,8 @@ export function CheeseAmpPlayer() {
   const { nfts, stackedNfts, isLoading: isLoadingNfts, refetch } = useMusicNFTs();
   const [viewMode, setViewMode] = useState<'library' | 'playlists'>('library');
   const [sortAZ, setSortAZ] = useState(false);
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('cover');
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   const activeTracks = sortAZ
     ? [...stackedNfts].sort((a, b) => {
