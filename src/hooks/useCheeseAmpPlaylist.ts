@@ -2,6 +2,16 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { StackedMusicNFT } from '@/hooks/useMusicNFTs';
 import type { RepeatMode } from '@/lib/musicPlayer';
 import { getAudioPlayer } from '@/lib/musicPlayer';
+import type { Session } from '@wharfkit/session';
+import {
+  ONCHAIN_PLAYLISTS_ENABLED,
+  fetchOnChainPlaylists,
+  savePlaylistOnChain,
+  deletePlaylistOnChain,
+} from '@/lib/cheeseAmpOnChain';
+import { closeWharfkitModals } from '@/lib/wharfKit';
+
+export type SyncStatus = 'local' | 'synced' | 'saving' | 'error';
 
 interface SavedPlaylist {
   id: string;
@@ -71,6 +81,7 @@ export function useCheeseAmpPlaylist(accountName: string | null, allTracks: Stac
   
   const [currentIndex, setCurrentIndex] = useState<number>(-1);
   const [shuffleOrder, setShuffleOrder] = useState<number[]>([]);
+  const [syncStatuses, setSyncStatuses] = useState<Record<string, SyncStatus>>({});
 
   // Wrapper that updates state AND immediately saves to localStorage
   const updateState = useCallback((updater: (prev: CheeseAmpState) => CheeseAmpState) => {
@@ -90,8 +101,51 @@ export function useCheeseAmpPlaylist(accountName: string | null, allTracks: Stac
       const loadedState = loadState(accountName);
       setState(loadedState);
       console.log('[CHEESEAmp] Load complete for', accountName, '- playlists:', loadedState.playlists.length);
+
+      // Fetch on-chain playlists and merge
+      if (ONCHAIN_PLAYLISTS_ENABLED) {
+        fetchOnChainPlaylists(accountName).then(onChainPlaylists => {
+          if (onChainPlaylists.length === 0) return;
+
+          setState(prev => {
+            const merged = { ...prev };
+            const newSyncMap: Record<string, SyncStatus> = {};
+
+            for (const ocp of onChainPlaylists) {
+              const existing = merged.playlists.find(
+                p => p.name.toLowerCase() === ocp.playlist_name.toLowerCase()
+              );
+              if (existing) {
+                // On-chain wins: update track IDs
+                existing.trackIds = ocp.asset_ids.map(String);
+                existing.updatedAt = Date.now();
+                newSyncMap[existing.id] = 'synced';
+              } else {
+                // Import new on-chain playlist
+                const id = `playlist_chain_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+                merged.playlists.push({
+                  id,
+                  name: ocp.playlist_name,
+                  trackIds: ocp.asset_ids.map(String),
+                  createdAt: Date.now(),
+                  updatedAt: Date.now(),
+                });
+                newSyncMap[id] = 'synced';
+              }
+            }
+
+            if (accountRef.current) {
+              saveState(accountRef.current, merged);
+            }
+            setSyncStatuses(prev => ({ ...prev, ...newSyncMap }));
+            console.log('[CHEESEAmp] Merged', onChainPlaylists.length, 'on-chain playlists');
+            return merged;
+          });
+        });
+      }
     } else {
       setState(getDefaultState());
+      setSyncStatuses({});
     }
   }, [accountName]);
 
@@ -248,6 +302,11 @@ export function useCheeseAmpPlaylist(accountName: string | null, allTracks: Stac
   }, [updateState]);
 
   const deletePlaylist = useCallback((playlistId: string) => {
+    setSyncStatuses(prev => {
+      const next = { ...prev };
+      delete next[playlistId];
+      return next;
+    });
     updateState(prev => ({
       ...prev,
       playlists: prev.playlists.filter(p => p.id !== playlistId),
@@ -266,6 +325,13 @@ export function useCheeseAmpPlaylist(accountName: string | null, allTracks: Stac
           : p
       ),
     }));
+    // Mark as out of sync if it was synced
+    setSyncStatuses(prev => {
+      if (prev[playlistId] === 'synced') {
+        return { ...prev, [playlistId]: 'local' };
+      }
+      return prev;
+    });
   }, [updateState]);
 
   const removeFromPlaylist = useCallback((playlistId: string, trackId: string) => {
@@ -277,12 +343,55 @@ export function useCheeseAmpPlaylist(accountName: string | null, allTracks: Stac
           : p
       ),
     }));
+    setSyncStatuses(prev => {
+      if (prev[playlistId] === 'synced') {
+        return { ...prev, [playlistId]: 'local' };
+      }
+      return prev;
+    });
   }, [updateState]);
 
   const selectPlaylist = useCallback((playlistId: string) => {
     updateState(prev => ({ ...prev, currentPlaylistId: playlistId }));
     setCurrentIndex(-1);
   }, [updateState]);
+
+  // On-chain save/remove
+  const saveToChain = useCallback(async (playlistId: string, session: Session) => {
+    if (!ONCHAIN_PLAYLISTS_ENABLED) return;
+
+    const pl = state.playlists.find(p => p.id === playlistId);
+    if (!pl) return;
+
+    setSyncStatuses(prev => ({ ...prev, [playlistId]: 'saving' }));
+    try {
+      await savePlaylistOnChain(session, pl.name, pl.trackIds);
+      setSyncStatuses(prev => ({ ...prev, [playlistId]: 'synced' }));
+    } catch (error) {
+      console.error('[CHEESEAmp] Save to chain failed:', error);
+      closeWharfkitModals();
+      setTimeout(() => closeWharfkitModals(), 100);
+      setSyncStatuses(prev => ({ ...prev, [playlistId]: 'error' }));
+    }
+  }, [state.playlists]);
+
+  const removeFromChain = useCallback(async (playlistId: string, session: Session) => {
+    if (!ONCHAIN_PLAYLISTS_ENABLED) return;
+
+    const pl = state.playlists.find(p => p.id === playlistId);
+    if (!pl) return;
+
+    setSyncStatuses(prev => ({ ...prev, [playlistId]: 'saving' }));
+    try {
+      await deletePlaylistOnChain(session, pl.name);
+      setSyncStatuses(prev => ({ ...prev, [playlistId]: 'local' }));
+    } catch (error) {
+      console.error('[CHEESEAmp] Remove from chain failed:', error);
+      closeWharfkitModals();
+      setTimeout(() => closeWharfkitModals(), 100);
+      setSyncStatuses(prev => ({ ...prev, [playlistId]: 'error' }));
+    }
+  }, [state.playlists]);
 
   return {
     currentTrack,
@@ -306,5 +415,8 @@ export function useCheeseAmpPlaylist(accountName: string | null, allTracks: Stac
     removeFromPlaylist,
     selectPlaylist,
     recentlyPlayed: state.recentlyPlayed,
+    syncStatuses,
+    saveToChain,
+    removeFromChain,
   };
 }
