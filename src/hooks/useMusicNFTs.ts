@@ -405,6 +405,8 @@ async function fetchApiPage(owner: string, page: number, limit: number): Promise
           }
         }
 
+        const extraAudioUrls = extractExtraAudioUrls(allData);
+
         musicNfts.push({
           asset_id: asset.asset_id,
           name: asset.name || allData.name || 'Untitled Track',
