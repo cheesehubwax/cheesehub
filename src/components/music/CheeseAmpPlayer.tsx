@@ -189,6 +189,7 @@ export function CheeseAmpPlayer() {
 
   const handlePlayTrack = useCallback(async (track: StackedMusicNFT) => {
     playlist.playTrack(track);
+    setDisplayMode('cover');
     try {
       await audioPlayer.play(track);
     } catch (error) {
