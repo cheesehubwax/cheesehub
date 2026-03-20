@@ -41,7 +41,7 @@ function getDefaultState(): CheeseAmpState {
 function loadState(accountName: string): CheeseAmpState {
   try {
     const saved = localStorage.getItem(getStorageKey(accountName));
-    console.log('[CHEESEAmp] Loading state for', accountName, saved ? 'found' : 'not found');
+    console.debug('[CHEESEAmp] Loading state for', accountName, saved ? 'found' : 'not found');
     if (saved) {
       const parsed = JSON.parse(saved);
       console.log('[CHEESEAmp] Loaded', parsed.playlists?.length || 0, 'playlists');
