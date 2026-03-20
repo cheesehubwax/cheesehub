@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useWax } from '@/context/WaxContext';
 import { useMusicNFTs, type StackedMusicNFT } from '@/hooks/useMusicNFTs';
 import { useCheeseAmpPlaylist } from '@/hooks/useCheeseAmpPlaylist';
-import { useCheeseAmpPlaylist } from '@/hooks/useCheeseAmpPlaylist';
 import { getAudioPlayer, formatTime, type PlaybackState } from '@/lib/musicPlayer';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
