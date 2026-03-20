@@ -17,6 +17,9 @@ export interface MusicNFT {
   hasVideo: boolean;
   coverArt: string;
   backCover?: string;
+  frontArt?: string;
+  backArt?: string;
+  additionalImages?: string[];
   duration?: number;
   collection: string;
   schema: string;
@@ -113,7 +116,7 @@ function getMediaUrl(field: string | undefined): string {
 function isMusicNFT(data: Record<string, unknown>): boolean {
   if (data.audio) return true;
   if (data.clip) return true;
-  if (data.video && (data.artist || data.title || data.album)) return true;
+  if (data.video) return true;
   return false;
 }
 
@@ -257,6 +260,21 @@ async function fetchAssetMetadata(assetIds: string[]): Promise<MusicNFT[]> {
               if (isMusicNFT(allData)) {
                 const videoUrl = allData.video ? getMediaUrl(allData.video as string) : undefined;
                 const clipUrl = allData.clip ? getMediaUrl(allData.clip as string) : undefined;
+                const frontArt = (allData.frontimg || allData.img || allData.image) ? getMediaUrl((allData.frontimg || allData.img || allData.image) as string) : undefined;
+                const backArt = (allData.backimg || allData.backcover) ? getMediaUrl((allData.backimg || allData.backcover) as string) : undefined;
+                
+                // Collect additional images from common NFT art fields
+                const artFields = ['img', 'image', 'frontimg', 'backimg', 'backcover', 'artwork', 'cover'];
+                const additionalImages: string[] = [];
+                for (const field of artFields) {
+                  if (allData[field] && typeof allData[field] === 'string') {
+                    const url = getMediaUrl(allData[field] as string);
+                    if (url && !additionalImages.includes(url)) {
+                      additionalImages.push(url);
+                    }
+                  }
+                }
+
                 musicNfts.push({
                   asset_id: asset.asset_id,
                   name: asset.name || allData.name || 'Untitled Track',
@@ -269,7 +287,10 @@ async function fetchAssetMetadata(assetIds: string[]): Promise<MusicNFT[]> {
                   videoUrl,
                   hasVideo: !!(videoUrl || clipUrl),
                   coverArt: getMediaUrl((allData.img || allData.image) as string | undefined),
-                  backCover: allData.backimg ? getMediaUrl(allData.backimg as string) : undefined,
+                  backCover: backArt,
+                  frontArt,
+                  backArt,
+                  additionalImages: additionalImages.length > 0 ? additionalImages : undefined,
                   duration: allData.duration ? parseInt(String(allData.duration)) : undefined,
                   collection: asset.collection?.collection_name || '',
                   schema: asset.schema?.schema_name || '',
@@ -328,6 +349,20 @@ async function fetchApiPage(owner: string, page: number, limit: number): Promise
       if (isMusicNFT(allData)) {
         const videoUrl = allData.video ? getMediaUrl(allData.video as string) : undefined;
         const clipUrl = allData.clip ? getMediaUrl(allData.clip as string) : undefined;
+        const frontArt = (allData.frontimg || allData.img || allData.image) ? getMediaUrl((allData.frontimg || allData.img || allData.image) as string) : undefined;
+        const backArt = (allData.backimg || allData.backcover) ? getMediaUrl((allData.backimg || allData.backcover) as string) : undefined;
+        
+        const artFields = ['img', 'image', 'frontimg', 'backimg', 'backcover', 'artwork', 'cover'];
+        const additionalImages: string[] = [];
+        for (const field of artFields) {
+          if (allData[field] && typeof allData[field] === 'string') {
+            const url = getMediaUrl(allData[field] as string);
+            if (url && !additionalImages.includes(url)) {
+              additionalImages.push(url);
+            }
+          }
+        }
+
         musicNfts.push({
           asset_id: asset.asset_id,
           name: asset.name || allData.name || 'Untitled Track',
@@ -340,7 +375,10 @@ async function fetchApiPage(owner: string, page: number, limit: number): Promise
           videoUrl,
           hasVideo: !!(videoUrl || clipUrl),
           coverArt: getMediaUrl((allData.img || allData.image) as string | undefined),
-          backCover: allData.backimg ? getMediaUrl(allData.backimg as string) : undefined,
+          backCover: backArt,
+          frontArt,
+          backArt,
+          additionalImages: additionalImages.length > 0 ? additionalImages : undefined,
           duration: allData.duration ? parseInt(String(allData.duration)) : undefined,
           collection: asset.collection?.collection_name || '',
           schema: asset.schema?.schema_name || '',

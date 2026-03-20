@@ -8,7 +8,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { Disc3, Video, Music2, Maximize2, Minimize2 } from 'lucide-react';
+import { Disc3, Video, Music2, Maximize2, Minimize2, X, Image, ImageIcon } from 'lucide-react';
 
 const IPFS_GATEWAYS = [
   'https://ipfs.io/ipfs/',
@@ -24,55 +24,63 @@ function extractIpfsHash(url: string): string | null {
   return match ? match[1] : null;
 }
 
+export type DisplayMode = 'cover' | 'video' | 'front' | 'back';
+
 interface MediaDisplayProps {
   coverArt: string;
   videoUrl?: string;
+  frontArt?: string;
+  backArt?: string;
   alt: string;
   isPlaying: boolean;
   isVideo: boolean;
   hasVideo: boolean;
+  displayMode: DisplayMode;
   onToggleVideo?: () => void;
   isTheaterMode?: boolean;
   onToggleTheater?: () => void;
+  onExpandArt?: (src: string) => void;
 }
 
 export function MediaDisplay({ 
   coverArt, 
   videoUrl,
+  frontArt,
+  backArt,
   alt, 
   isPlaying, 
   isVideo,
   hasVideo,
+  displayMode,
   onToggleVideo,
   isTheaterMode = false,
   onToggleTheater,
+  onExpandArt,
 }: MediaDisplayProps) {
-  const [imgSrc, setImgSrc] = useState(coverArt);
+  const showingArt = displayMode === 'front' || displayMode === 'back';
+  const artSrc = displayMode === 'back' ? backArt : (displayMode === 'front' ? (frontArt || coverArt) : coverArt);
+
+  const [imgSrc, setImgSrc] = useState(artSrc || coverArt);
   const [gatewayIndex, setGatewayIndex] = useState(0);
   const [hasError, setHasError] = useState(false);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const [isHovering, setIsHovering] = useState(false);
 
   useEffect(() => {
-    setImgSrc(coverArt);
+    const newSrc = showingArt ? (artSrc || coverArt) : coverArt;
+    setImgSrc(newSrc);
     setGatewayIndex(0);
     setHasError(false);
-  }, [coverArt]);
+  }, [coverArt, artSrc, showingArt]);
 
-  // Mount video element when in video mode
   useEffect(() => {
     const audioPlayer = getAudioPlayer();
-    
-    if (isVideo && videoContainerRef.current) {
+    if (isVideo && !showingArt && videoContainerRef.current) {
       audioPlayer.mountVideo(videoContainerRef.current);
     }
-    
-    return () => {
-      // Don't unmount on cleanup - let the player manage the video element
-    };
-  }, [isVideo]);
+    return () => {};
+  }, [isVideo, showingArt]);
 
-  // Handle fullscreen
   const handleFullscreen = useCallback(() => {
     if (videoContainerRef.current) {
       if (document.fullscreenElement) {
@@ -84,7 +92,8 @@ export function MediaDisplay({
   }, []);
 
   const handleError = useCallback(() => {
-    const hash = extractIpfsHash(coverArt);
+    const currentSrc = showingArt ? (artSrc || coverArt) : coverArt;
+    const hash = extractIpfsHash(currentSrc);
     if (hash && gatewayIndex < IPFS_GATEWAYS.length - 1) {
       const nextIndex = gatewayIndex + 1;
       setGatewayIndex(nextIndex);
@@ -92,9 +101,14 @@ export function MediaDisplay({
     } else {
       setHasError(true);
     }
-  }, [coverArt, gatewayIndex]);
+  }, [coverArt, artSrc, showingArt, gatewayIndex]);
 
-  // Fallback disc display
+  const handleImageClick = useCallback(() => {
+    if (onExpandArt && imgSrc) {
+      onExpandArt(imgSrc);
+    }
+  }, [onExpandArt, imgSrc]);
+
   const FallbackDisc = () => (
     <div className="w-full h-full bg-muted/50 flex items-center justify-center">
       <Disc3 className={cn(
@@ -103,6 +117,8 @@ export function MediaDisplay({
       )} style={{ animationDuration: '3s' }} />
     </div>
   );
+
+  const showVideo = isVideo && !showingArt;
 
   return (
     <div 
@@ -113,8 +129,7 @@ export function MediaDisplay({
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
-      {/* Video container - shown when in video mode */}
-      {isVideo && (
+      {showVideo && (
         <div 
           ref={videoContainerRef}
           className={cn(
@@ -124,27 +139,28 @@ export function MediaDisplay({
         />
       )}
       
-      {/* Cover art - shown when in audio mode or video is loading */}
-      {!isVideo && (
-        hasError || !coverArt ? (
+      {!showVideo && (
+        hasError || !imgSrc ? (
           <FallbackDisc />
         ) : (
           <img
             src={imgSrc}
             alt={alt}
-            className="w-full h-full object-cover"
+            className={cn(
+              "w-full h-full object-cover",
+              showingArt && onExpandArt && "cursor-zoom-in"
+            )}
             onError={handleError}
+            onClick={showingArt ? handleImageClick : undefined}
           />
         )
       )}
 
-      {/* Control overlay - shown on hover */}
       {(isHovering || isTheaterMode) && (
         <div className={cn(
           "absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 p-2",
           isTheaterMode && "bg-gradient-to-t from-black/60 to-transparent"
         )}>
-          {/* Video toggle button - only show when track has video */}
           {hasVideo && onToggleVideo && (
             <TooltipProvider>
               <Tooltip>
@@ -175,10 +191,8 @@ export function MediaDisplay({
             </TooltipProvider>
           )}
 
-          {/* Theater/Fullscreen button - only show when video is playing */}
-          {isVideo && (
+          {showVideo && (
             <>
-              {/* Theater mode toggle */}
               {onToggleTheater && (
                 <TooltipProvider>
                   <Tooltip>
@@ -207,15 +221,122 @@ export function MediaDisplay({
               )}
             </>
           )}
+
+          {showingArt && onExpandArt && imgSrc && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-background/90"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleImageClick();
+                    }}
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Expand artwork</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
       )}
 
-      {/* ESC hint in theater mode */}
       {isTheaterMode && isHovering && (
         <div className="absolute top-4 left-4 text-white/60 text-xs bg-black/40 px-2 py-1 rounded">
           Press ESC or click ✕ to exit
         </div>
       )}
+    </div>
+  );
+}
+
+// Lightbox overlay for expanded art
+interface ArtLightboxProps {
+  src: string;
+  alt: string;
+  onClose: () => void;
+}
+
+export function ArtLightbox({ src, alt, onClose }: ArtLightboxProps) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div 
+      className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center cursor-zoom-out"
+      onClick={onClose}
+    >
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute top-4 right-4 text-white/70 hover:text-white hover:bg-white/10 z-10"
+        onClick={onClose}
+      >
+        <X className="h-6 w-6" />
+      </Button>
+      <img
+        src={src}
+        alt={alt}
+        className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>
+  );
+}
+
+// Media selector buttons row
+interface MediaSelectorProps {
+  hasAudio: boolean;
+  hasVideo: boolean;
+  hasFrontArt: boolean;
+  hasBackArt: boolean;
+  displayMode: DisplayMode;
+  onSelect: (mode: DisplayMode) => void;
+}
+
+export function MediaSelector({ hasAudio, hasVideo, hasFrontArt, hasBackArt, displayMode, onSelect }: MediaSelectorProps) {
+  const buttons: { mode: DisplayMode; label: string; icon: React.ReactNode; available: boolean }[] = [
+    { mode: 'cover', label: 'Audio', icon: <Music2 className="h-3.5 w-3.5" />, available: hasAudio },
+    { mode: 'video', label: 'Video', icon: <Video className="h-3.5 w-3.5" />, available: hasVideo },
+    { mode: 'front', label: 'Front Art', icon: <Image className="h-3.5 w-3.5" />, available: hasFrontArt },
+    { mode: 'back', label: 'Back Art', icon: <ImageIcon className="h-3.5 w-3.5" />, available: hasBackArt },
+  ];
+
+  const availableButtons = buttons.filter(b => b.available);
+  if (availableButtons.length <= 1) return null;
+
+  return (
+    <div className="flex items-center gap-1 mt-2">
+      {availableButtons.map(({ mode, label, icon }) => (
+        <TooltipProvider key={mode}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={displayMode === mode ? 'secondary' : 'ghost'}
+                size="sm"
+                className={cn(
+                  "h-7 text-xs gap-1 px-2",
+                  displayMode === mode && "text-cheese bg-cheese/10"
+                )}
+                onClick={() => onSelect(mode)}
+              >
+                {icon}
+                {label}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{label}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ))}
     </div>
   );
 }

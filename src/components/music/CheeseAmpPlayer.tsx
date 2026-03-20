@@ -52,7 +52,7 @@ import {
   ArrowDownAZ,
   ArrowUpAZ,
 } from 'lucide-react';
-import { MediaDisplay, VideoIndicator } from './MediaDisplay';
+import { MediaDisplay, MediaSelector, ArtLightbox, VideoIndicator, type DisplayMode } from './MediaDisplay';
 
 const IPFS_GATEWAYS = [
   'https://ipfs.io/ipfs/',
@@ -122,6 +122,8 @@ export function CheeseAmpPlayer() {
   const { nfts, stackedNfts, isLoading: isLoadingNfts, refetch } = useMusicNFTs();
   const [viewMode, setViewMode] = useState<'library' | 'playlists'>('library');
   const [sortAZ, setSortAZ] = useState(false);
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('cover');
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   const activeTracks = sortAZ
     ? [...stackedNfts].sort((a, b) => {
@@ -187,6 +189,7 @@ export function CheeseAmpPlayer() {
 
   const handlePlayTrack = useCallback(async (track: StackedMusicNFT) => {
     playlist.playTrack(track);
+    setDisplayMode('cover');
     try {
       await audioPlayer.play(track);
     } catch (error) {
@@ -350,13 +353,17 @@ export function CheeseAmpPlayer() {
               <MediaDisplay
                 coverArt={currentTrack.coverArt}
                 videoUrl={currentTrack.videoUrl}
+                frontArt={currentTrack.frontArt}
+                backArt={currentTrack.backArt}
                 alt={currentTrack.name}
                 isPlaying={playbackState.isPlaying}
                 isVideo={playbackState.isVideo}
                 hasVideo={playbackState.hasVideo}
+                displayMode={displayMode}
                 onToggleVideo={handleToggleVideo}
                 isTheaterMode={isTheaterMode}
                 onToggleTheater={handleToggleTheater}
+                onExpandArt={(src) => setLightboxSrc(src)}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
@@ -364,6 +371,25 @@ export function CheeseAmpPlayer() {
               </div>
             )}
           </div>
+
+          {/* Media Selector Buttons */}
+          {currentTrack && (
+            <MediaSelector
+              hasAudio={!!currentTrack.audioUrl}
+              hasVideo={playbackState.hasVideo}
+              hasFrontArt={!!(currentTrack.frontArt || currentTrack.coverArt)}
+              hasBackArt={!!currentTrack.backArt}
+              displayMode={displayMode}
+              onSelect={(mode) => {
+                setDisplayMode(mode);
+                if (mode === 'video' && !playbackState.isVideo) {
+                  handleToggleVideo();
+                } else if (mode !== 'video' && playbackState.isVideo) {
+                  handleToggleVideo();
+                }
+              }}
+            />
+          )}
 
           {/* Track Info */}
           <div className="mb-4 min-h-[48px]">
@@ -738,6 +764,15 @@ export function CheeseAmpPlayer() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Art Lightbox */}
+      {lightboxSrc && (
+        <ArtLightbox
+          src={lightboxSrc}
+          alt={currentTrack?.name || 'Artwork'}
+          onClose={() => setLightboxSrc(null)}
+        />
+      )}
     </div>
   );
 }
