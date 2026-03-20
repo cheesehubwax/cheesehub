@@ -51,7 +51,11 @@ import {
   Trash2,
   ArrowDownAZ,
   ArrowUpAZ,
+  Link2,
+  Upload,
+  CloudOff,
 } from 'lucide-react';
+import { ONCHAIN_PLAYLISTS_ENABLED } from '@/lib/cheeseAmpOnChain';
 import { MediaDisplay, MediaSelector, ArtLightbox, VideoIndicator, type DisplayMode } from './MediaDisplay';
 
 const IPFS_GATEWAYS = [
@@ -624,7 +628,9 @@ export function CheeseAmpPlayer() {
                         <p className="text-xs mt-1">Create one to organize your tracks</p>
                       </div>
                     ) : (
-                      playlist.playlists.map((p) => (
+                      playlist.playlists.map((p) => {
+                        const syncStatus = playlist.syncStatuses[p.id];
+                        return (
                         <ContextMenu key={p.id}>
                           <ContextMenuTrigger asChild>
                             <button
@@ -643,6 +649,32 @@ export function CheeseAmpPlayer() {
                                   {p.trackIds.length} track{p.trackIds.length !== 1 ? 's' : ''}
                                 </p>
                               </div>
+                              {/* Chain sync indicator */}
+                              {ONCHAIN_PLAYLISTS_ENABLED && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="shrink-0">
+                                        {syncStatus === 'saving' ? (
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin text-cheese" />
+                                        ) : syncStatus === 'synced' ? (
+                                          <Link2 className="h-3.5 w-3.5 text-green-500" />
+                                        ) : syncStatus === 'error' ? (
+                                          <CloudOff className="h-3.5 w-3.5 text-destructive" />
+                                        ) : (
+                                          <Link2 className="h-3.5 w-3.5 text-muted-foreground/30" />
+                                        )}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="left">
+                                      {syncStatus === 'saving' ? 'Saving to chain…' :
+                                       syncStatus === 'synced' ? 'Saved on-chain' :
+                                       syncStatus === 'error' ? 'Save failed — try again' :
+                                       'Local only'}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
                             </button>
                           </ContextMenuTrigger>
                           <ContextMenuContent>
@@ -652,6 +684,36 @@ export function CheeseAmpPlayer() {
                               <Play className="h-4 w-4 mr-2" />
                               View Playlist
                             </ContextMenuItem>
+                            {/* On-chain save/remove */}
+                            {ONCHAIN_PLAYLISTS_ENABLED && session && syncStatus !== 'synced' && syncStatus !== 'saving' && (
+                              <ContextMenuItem
+                                onClick={() => playlist.saveToChain(p.id, session)}
+                              >
+                                <Upload className="h-4 w-4 mr-2" />
+                                Save to Chain
+                              </ContextMenuItem>
+                            )}
+                            {ONCHAIN_PLAYLISTS_ENABLED && session && syncStatus === 'synced' && (
+                              <ContextMenuItem
+                                onClick={() => playlist.removeFromChain(p.id, session)}
+                              >
+                                <CloudOff className="h-4 w-4 mr-2" />
+                                Remove from Chain
+                              </ContextMenuItem>
+                            )}
+                            {!ONCHAIN_PLAYLISTS_ENABLED && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="relative flex cursor-not-allowed select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none text-muted-foreground/50">
+                                      <Upload className="h-4 w-4 mr-2" />
+                                      Save to Chain
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Coming soon — contract not yet live</TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
                             <ContextMenuItem
                               className="text-destructive focus:text-destructive"
                               onClick={() => playlist.deletePlaylist(p.id)}
@@ -661,7 +723,8 @@ export function CheeseAmpPlayer() {
                             </ContextMenuItem>
                           </ContextMenuContent>
                         </ContextMenu>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </ScrollArea>
