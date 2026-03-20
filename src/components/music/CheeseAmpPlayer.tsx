@@ -272,7 +272,7 @@ export function CheeseAmpPlayer() {
       <div className="flex flex-col items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-cheese mb-3" />
         <p className="text-muted-foreground text-sm">
-          Loading {viewMode === 'global' ? 'global' : 'music'} NFTs...
+          Loading music NFTs...
         </p>
       </div>
     );
