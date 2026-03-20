@@ -332,6 +332,7 @@ async function fetchAssetMetadata(assetIds: string[]): Promise<MusicNFT[]> {
                   frontArt,
                   backArt,
                   additionalImages: additionalImages.length > 0 ? additionalImages : undefined,
+                  extraAudioUrls: extraAudioUrls.length > 0 ? extraAudioUrls : undefined,
                   duration: allData.duration ? parseInt(String(allData.duration)) : undefined,
                   collection: asset.collection?.collection_name || '',
                   schema: asset.schema?.schema_name || '',
