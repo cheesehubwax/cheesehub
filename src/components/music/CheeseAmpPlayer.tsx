@@ -500,7 +500,7 @@ export function CheeseAmpPlayer() {
               >
                 <ListMusic className="h-3 w-3 mr-1" />
                 Playlists
-              
+              </Button>
               
               {playlist.currentPlaylistId !== 'library' && viewMode === 'library' && (
                 <Button
