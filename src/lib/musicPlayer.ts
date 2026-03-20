@@ -1,33 +1,8 @@
 import type { MusicNFT } from '@/hooks/useMusicNFTs';
-
-const IPFS_GATEWAYS = [
-  'https://ipfs.io/ipfs/',
-  'https://gateway.pinata.cloud/ipfs/',
-  'https://cloudflare-ipfs.com/ipfs/',
-  'https://dweb.link/ipfs/',
-];
+import { IPFS_GATEWAYS, extractIpfsHash as sharedExtractIpfsHash } from '@/lib/ipfsGateways';
 
 function extractIpfsHash(url: string): string | null {
-  if (!url) return null;
-  
-  if (url.startsWith('Qm') || url.startsWith('bafy')) {
-    return url;
-  }
-  
-  const patterns = [
-    /ipfs:\/\/(.+)/,
-    /\/ipfs\/(.+)/,
-    /gateway\.pinata\.cloud\/ipfs\/(.+)/,
-    /ipfs\.io\/ipfs\/(.+)/,
-    /cloudflare-ipfs\.com\/ipfs\/(.+)/,
-  ];
-  
-  for (const pattern of patterns) {
-    const match = url.match(pattern);
-    if (match) return match[1];
-  }
-  
-  return null;
+  return sharedExtractIpfsHash(url);
 }
 
 export type RepeatMode = 'none' | 'one' | 'all';
@@ -201,11 +176,31 @@ class CheeseAmpMedia {
     const mediaUrl = useVideo ? track.videoUrl! : track.audioUrl;
     const element = useVideo ? this.getVideoElement() : this.audio;
     
+    try {
+      await this.loadAndPlay(mediaUrl, element);
+    } catch (e) {
+      // If video element failed, try falling back to audio element with same URL
+      if (useVideo && mediaUrl) {
+        console.warn('[musicPlayer] Video element failed, trying audio fallback');
+        this._mediaType = 'audio';
+        try {
+          await this.loadAndPlay(mediaUrl, this.audio);
+          return;
+        } catch {
+          // Fall through to error
+        }
+      }
+      this._error = e instanceof Error ? e.message : 'Failed to load media';
+      this._isLoading = false;
+      this.notifyCallbacks();
+    }
+  }
+
+  private async loadAndPlay(mediaUrl: string, element: HTMLAudioElement | HTMLVideoElement): Promise<void> {
     // Check if it's already a full URL
     if (mediaUrl.startsWith('http://') || mediaUrl.startsWith('https://')) {
       try {
-        element.src = mediaUrl;
-        await element.play();
+        await this.setSrcAndPlay(element, mediaUrl);
         return;
       } catch (e) {
         // If direct URL fails and it's an IPFS gateway URL, try other gateways
@@ -224,6 +219,34 @@ class CheeseAmpMedia {
     }
 
     throw new Error('Invalid media URL');
+  }
+
+  private setSrcAndPlay(element: HTMLAudioElement | HTMLVideoElement, url: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        element.removeEventListener('canplay', onCanPlay);
+        element.removeEventListener('error', onError);
+        // Don't reject — try to play anyway, browser may still be buffering
+        element.play().then(resolve).catch(reject);
+      }, 15000);
+
+      const onCanPlay = () => {
+        clearTimeout(timeout);
+        element.removeEventListener('error', onError);
+        element.play().then(resolve).catch(reject);
+      };
+
+      const onError = () => {
+        clearTimeout(timeout);
+        element.removeEventListener('canplay', onCanPlay);
+        reject(new Error('Failed to load media'));
+      };
+
+      element.addEventListener('canplay', onCanPlay, { once: true });
+      element.addEventListener('error', onError, { once: true });
+      element.src = url;
+      element.load();
+    });
   }
 
   async switchMediaType(preferVideo: boolean): Promise<void> {
@@ -246,8 +269,9 @@ class CheeseAmpMedia {
   }
 
   private async tryGateways(hash: string, element: HTMLAudioElement | HTMLVideoElement): Promise<void> {
-    const TIMEOUT = 5000;
+    const TIMEOUT = 10000;
     
+    // Race first 3 gateways with HEAD check
     const raceGateways = IPFS_GATEWAYS.slice(0, 3);
     let succeeded = false;
     
@@ -281,23 +305,21 @@ class CheeseAmpMedia {
             failCount++;
             if (failCount >= raceGateways.length) reject(new Error('All racing gateways failed'));
           }
-        }, index * 100);
+        }, index * 150);
       });
     });
 
     try {
       const winningUrl = await racePromise;
       console.log(`[musicPlayer] Racing gateway won: ${winningUrl.split('/ipfs/')[0]}`);
-      element.src = winningUrl;
-      await element.play();
+      await this.setSrcAndPlay(element, winningUrl);
       this._isLoading = false;
       this.notifyCallbacks();
     } catch {
-      console.warn('[musicPlayer] All racing gateways failed, trying remaining...');
+      console.warn('[musicPlayer] All racing gateways failed, trying remaining sequentially...');
       for (const gateway of IPFS_GATEWAYS.slice(3)) {
         try {
-          element.src = `${gateway}${hash}`;
-          await element.play();
+          await this.setSrcAndPlay(element, `${gateway}${hash}`);
           this._isLoading = false;
           this.notifyCallbacks();
           return;

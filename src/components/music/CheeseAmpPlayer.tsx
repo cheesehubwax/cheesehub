@@ -452,11 +452,20 @@ export function CheeseAmpPlayer() {
               variant="default"
               size="icon"
               className="h-11 w-11 rounded-full bg-cheese hover:bg-cheese/90 text-primary-foreground"
-              onClick={handlePlayPause}
+              onClick={() => {
+                if (playbackState.error && currentTrack) {
+                  // Retry on error
+                  handlePlayTrack(currentTrack);
+                } else {
+                  handlePlayPause();
+                }
+              }}
               disabled={playbackState.isLoading}
             >
               {playbackState.isLoading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
+              ) : playbackState.error ? (
+                <RefreshCw className="h-5 w-5" />
               ) : playbackState.isPlaying ? (
                 <Pause className="h-5 w-5" />
               ) : (
@@ -488,6 +497,22 @@ export function CheeseAmpPlayer() {
               )}
             </Button>
           </div>
+
+          {/* Error State */}
+          {playbackState.error && (
+            <div className="text-center mb-3">
+              <p className="text-xs text-destructive truncate">{playbackState.error}</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-cheese hover:text-cheese mt-1 h-6"
+                onClick={() => currentTrack && handlePlayTrack(currentTrack)}
+              >
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Retry
+              </Button>
+            </div>
+          )}
 
           {/* Volume Control */}
           <div className="flex items-center gap-2">
