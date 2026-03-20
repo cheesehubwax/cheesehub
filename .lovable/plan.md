@@ -1,41 +1,38 @@
 
 
-## Fix: CHEESEAmp Infinite Re-render Loop (Flashing Videos)
+## Surface Hidden Full-Length Tracks (audio1, audio2, etc.)
 
-### Root Cause
+### Problem
+Some music NFT schemas define additional audio fields like `audio1`, `audio2` beyond the main `audio` field. The `audio` field contains a 1-minute sample, while the numbered fields contain full-length tracks. CHEESEAmp currently ignores these fields entirely.
 
-There's a cascading render loop caused by two issues:
-
-**1. Unstable `playlist` dependency in sync effect (CheeseAmpPlayer.tsx line 188)**
-The "sync with currently playing track" effect depends on `playlist`, but calling `playlist.playTrack()` inside the effect updates state, which creates a new `playlist` object, re-triggering the effect -- infinite loop. This causes the rapid flashing between tracks.
-
-**2. Unstable `activeTracks` array reference (CheeseAmpPlayer.tsx line 128-134)**
-`activeTracks` is computed inline without `useMemo`, so every render creates a new array reference. This flows into `useCheeseAmpPlaylist` as `allTracks`, destabilizing all downstream memos and causing excess re-renders and the "Saving 0 playlists" spam.
+Both reported NFTs (from the `sublimesound` collection, schema `sdelgado.r1`) have this schema:
+- `audio` (ipfs) — 1-min clip
+- `video` (ipfs) — music video
+- `audio1` (ipfs) — additional track
+- `audio2` (ipfs) — additional track
 
 ### Changes
 
-**`src/components/music/CheeseAmpPlayer.tsx`**
-- Wrap `activeTracks` in `useMemo` so the array reference is stable across renders
-- Fix the sync effect (lines 178-188): remove `playlist` from the dependency array, and add a guard using a ref to prevent re-triggering when the track is already synced. This breaks the loop.
+**1. `src/hooks/useMusicNFTs.ts` — Extract extra audio fields**
+- Add `extraAudioUrls?: { label: string; url: string }[]` to the `MusicNFT` interface
+- During asset parsing, scan `allData` for keys matching `audio1`, `audio2`, `audio3`, ... (and also `track`, `track1`, `track2`, `fulltrack`, `full_audio` patterns that other collections might use)
+- Populate `extraAudioUrls` with label + resolved IPFS URL for each found field
+- Do this in both the `fetchAssetMetadata` and `fetchApiPage` parsing paths
 
-**`src/hooks/useCheeseAmpPlaylist.ts`**
-- No structural changes needed, but reduce the noisy `saveState` console.log to prevent log spam (optional cleanup)
+**2. `src/components/music/MediaDisplay.tsx` — Add extra audio display mode**
+- Extend `DisplayMode` type to include `'audio1'`, `'audio2'`, etc. (use a union with string template or just use string)
+- Update `MediaSelector` to accept extra audio entries and render additional buttons for each (e.g., "Track 2", "Track 3")
 
-### Technical Detail
+**3. `src/components/music/CheeseAmpPlayer.tsx` — Wire up extra audio playback**
+- When user selects an extra audio track from the media selector, call `audioPlayer.play()` with a modified track that has the alternate `audioUrl`
+- Pass `extraAudioUrls` from `currentTrack` to `MediaSelector`
 
-The loop path is:
-```text
-sync effect fires (playlist in deps)
-  → playlist.playTrack() called
-    → updateState() → saveState() → setState()
-      → new playlist object reference
-        → sync effect fires again (playlist changed)
-          → infinite loop
-```
-
-Fix: use `playlist.currentTrack` and `playlist.playTrack` as specific stable references (via useRef or extracted deps) instead of the entire `playlist` object.
+**4. `src/lib/musicPlayer.ts` — Support playing alternate audio URL**
+- Add a method or parameter to `play()` that accepts an override audio URL, so the same track can be played with a different source (the full-length version)
 
 ### Files
-- `src/components/music/CheeseAmpPlayer.tsx` — memoize activeTracks, fix sync effect deps
-- `src/hooks/useCheeseAmpPlaylist.ts` — optional: reduce log noise
+- `src/hooks/useMusicNFTs.ts` — extract `audio1`, `audio2`, etc.
+- `src/components/music/MediaDisplay.tsx` — extra audio buttons in MediaSelector
+- `src/components/music/CheeseAmpPlayer.tsx` — wire up alternate audio playback
+- `src/lib/musicPlayer.ts` — support override audio URL
 
