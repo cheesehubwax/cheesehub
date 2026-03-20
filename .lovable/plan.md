@@ -1,27 +1,34 @@
 
 
-## Disable Royalties & Global Account Until Contract Is Live
+## Broaden Music NFT Detection + Add Media Selector Buttons
 
-### Summary
-The `cheeseamphub` account doesn't exist yet, so all royalty logging and global library fetching need to be disabled. CHEESEAmp becomes a personal NFT player only.
+### Problem
+1. Video-only NFTs (with just a `video` IPFS hash) are filtered out by `isMusicNFT()` because it requires `artist`, `title`, or `album` alongside `video`
+2. NFTs with art assets (backimg, img) attached to music/video releases have no way to be viewed in the player
 
 ### Changes
 
-**1. `src/lib/cheeseAmpRoyalties.ts`** — Add `ROYALTIES_ENABLED = false` flag. All exported functions (`logPlay`, `logPlayImmediate`, `bufferPlay`, `flushPlayBuffer`, `getBufferedPlayCount`) early-return as no-ops when disabled.
+**1. `src/hooks/useMusicNFTs.ts` — Broaden detection + capture more media fields**
 
-**2. `src/components/music/CheeseAmpPlayer.tsx`**
-- Remove the `useMusicNFTs(CHEESEAMP_GLOBAL_ACCOUNT)` call (the account doesn't exist)
-- Remove or hide the `'global'` view mode tab/option so users only see their own library and playlists
-- Remove the `logPlay` call on line 189 (inside the `viewMode === 'global'` guard)
-- Remove the "pending" buffered play count badge (lines 335-341)
+- Relax `isMusicNFT()`: accept any NFT that has `audio`, `clip`, or `video` (drop the requirement for artist/title/album alongside video)
+- Add new fields to the `MusicNFT` interface: `frontArt?: string`, `backArt?: string`, `additionalImages?: string[]` to capture all visual assets (img, backimg, frontimg, etc.)
+- Populate these from the merged `allData` during asset parsing
 
-**3. `src/components/WalletConnect.tsx`**
-- Remove `handleTrackPlayed` callback and stop passing it to `useCheeseAmpAutoAdvance`
-- Remove the `flushPlayBuffer` effect that fires when wallet opens
-- Clean up unused imports from `cheeseAmpRoyalties`
+**2. `src/components/music/MediaDisplay.tsx` — Add art viewing mode**
 
-**4. `src/hooks/useCheeseAmpAutoAdvance.ts`** — Remove the `onTrackPlayed` parameter and the royalty callback in the `onTrackEnd` handler. The hook just handles auto-advance, no play logging.
+- Accept new optional props: `frontArt`, `backArt`
+- Add a `displayMode` state: `'cover'` | `'video'` | `'front'` | `'back'`
+- When viewing art, show the selected image in the player area with click-to-expand (lightbox overlay)
 
-### Re-enabling later
-When the contract and global account are live, flip `ROYALTIES_ENABLED` to `true` and restore the global view mode in CheeseAmpPlayer.
+**3. `src/components/music/CheeseAmpPlayer.tsx` — Add media selector buttons below player**
+
+- Below the cover art / video area, add a row of small icon buttons (like AtomicHub): Audio, Video (if available), Front Art, Back Art (if available)
+- Clicking each switches what's displayed in the player area
+- Pass the new art URLs from `currentTrack` down to `MediaDisplay`
+- Add a simple lightbox component (full-screen overlay with close button) for expanding art
+
+### Files
+- `src/hooks/useMusicNFTs.ts` — relax filter, add art fields
+- `src/components/music/MediaDisplay.tsx` — art display mode + lightbox
+- `src/components/music/CheeseAmpPlayer.tsx` — media selector button row
 
