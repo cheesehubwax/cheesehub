@@ -278,7 +278,7 @@ export function CheeseAmpPlayer() {
     );
   }
 
-  if (stackedNfts.length === 0 && viewMode !== 'global') {
+  if (stackedNfts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <Music2 className="h-12 w-12 text-muted-foreground mb-3" />
@@ -286,26 +286,15 @@ export function CheeseAmpPlayer() {
         <p className="text-xs text-muted-foreground mt-1 text-center">
           Collect music NFTs on WAX to play them here
         </p>
-        <div className="flex gap-2 mt-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={refetch}
-            className="text-cheese hover:text-cheese"
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setViewMode('global')}
-            className="text-cheese hover:text-cheese"
-          >
-            <Globe className="h-4 w-4 mr-2" />
-            Browse Global Library
-          </Button>
-        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={refetch}
+          className="text-cheese hover:text-cheese mt-4"
+        >
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
       </div>
     );
   }
