@@ -317,7 +317,7 @@ export function MediaSelector({ hasAudio, hasVideo, hasFrontArt, hasBackArt, dis
   ];
 
   const availableButtons = buttons.filter(b => b.available);
-  const hasExtraAudio = extraAudioUrls && extraAudioUrls.length > 0;
+  const hasExtraAudioForFilter = extraAudioUrls && extraAudioUrls.length > 0;
   if (availableButtons.length <= 1 && !hasExtraAudio) return null;
 
   return (
