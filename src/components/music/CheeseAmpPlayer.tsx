@@ -199,12 +199,24 @@ export function CheeseAmpPlayer() {
   const handlePlayTrack = useCallback(async (track: StackedMusicNFT) => {
     playlist.playTrack(track);
     setDisplayMode('cover');
+    setActiveExtraAudioKey(null);
     try {
       await audioPlayer.play(track);
     } catch (error) {
       console.error('Failed to play track:', error);
     }
   }, [audioPlayer, playlist]);
+
+  const handleSelectExtraAudio = useCallback(async (url: string, key: string) => {
+    if (!currentTrack) return;
+    setActiveExtraAudioKey(key);
+    setDisplayMode('cover');
+    try {
+      await audioPlayer.play(currentTrack, false, url);
+    } catch (error) {
+      console.error('Failed to play extra audio:', error);
+    }
+  }, [audioPlayer, currentTrack]);
 
   const handlePlayPause = useCallback(() => {
     if (playbackState.isPlaying) {
