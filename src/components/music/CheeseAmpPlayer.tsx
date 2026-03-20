@@ -764,6 +764,15 @@ export function CheeseAmpPlayer() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Art Lightbox */}
+      {lightboxSrc && (
+        <ArtLightbox
+          src={lightboxSrc}
+          alt={currentTrack?.name || 'Artwork'}
+          onClose={() => setLightboxSrc(null)}
+        />
+      )}
     </div>
   );
 }
