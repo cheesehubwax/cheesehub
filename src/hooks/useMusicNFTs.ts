@@ -17,6 +17,9 @@ export interface MusicNFT {
   hasVideo: boolean;
   coverArt: string;
   backCover?: string;
+  frontArt?: string;
+  backArt?: string;
+  additionalImages?: string[];
   duration?: number;
   collection: string;
   schema: string;
