@@ -107,13 +107,16 @@ export function WalletConnect() {
     const wasPlaying = player.getState().isPlaying;
     setCheeseAmpOpen(false);
     setCheeseAmpMinimized(true);
-    // Radix Dialog unmount can transiently pause media; resume if needed
+    // Radix Dialog unmount can transiently pause media; retry resume at multiple intervals
     if (wasPlaying) {
-      setTimeout(() => {
+      const tryResume = () => {
         if (!player.getState().isPlaying) {
           player.resume();
         }
-      }, 150);
+      };
+      setTimeout(tryResume, 100);
+      setTimeout(tryResume, 300);
+      setTimeout(tryResume, 600);
     }
   };
 
