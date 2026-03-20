@@ -12,6 +12,7 @@ const WAX_RPC_ENDPOINTS = [
 
 export interface NullBreakdownEntry {
   contract: string;
+  displayName: string;
   amount: number;
   percent: number;
   amount24h: number;
@@ -90,7 +91,13 @@ async function fetchContractNulled(account: string): Promise<number> {
   return fetchContractNulledFromHyperion(account);
 }
 
-const NULL_CONTRACTS = ['cheeseburner', 'cheesefeefee', 'cheesepowerz', 'cheesebannad'] as const;
+const NULL_CONTRACTS = [
+  { account: 'cheeseburner', displayName: 'cheeseburner' },
+  { account: 'cheesefeefee', displayName: 'cheesefeefee' },
+  { account: 'cheesepowerz', displayName: 'cheesepowerz' },
+  { account: 'cheesebannad', displayName: 'cheesebannad' },
+  { account: 'liquidcheese', displayName: 'Liquidity Fees' },
+] as const;
 
 function getAgo(days: number): string {
   const d = new Date();
@@ -103,11 +110,12 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownEntry[]> {
   const after7d = getAgo(7);
 
   const results = await Promise.all(
-    NULL_CONTRACTS.map(async (contract) => ({
-      contract,
-      amount: await fetchContractNulled(contract),
-      amount24h: await fetchContractNulledFromHyperion(contract, after24h),
-      amount7d: await fetchContractNulledFromHyperion(contract, after7d),
+    NULL_CONTRACTS.map(async ({ account, displayName }) => ({
+      contract: account,
+      displayName,
+      amount: await fetchContractNulled(account),
+      amount24h: await fetchContractNulledFromHyperion(account, after24h),
+      amount7d: await fetchContractNulledFromHyperion(account, after7d),
     }))
   );
 
