@@ -176,6 +176,12 @@ export function CheeseAmpPlayer() {
     setViewMode('library');
   }, [playlist]);
 
+  // Keep refs in sync to avoid stale closures in the subscription callback
+  const playTrackRef = useRef(playlist.playTrack);
+  playTrackRef.current = playlist.playTrack;
+  const currentTrackIdRef = useRef<string | undefined>(playlist.currentTrack?.asset_id);
+  currentTrackIdRef.current = playlist.currentTrack?.asset_id;
+
   // Subscribe to playback state updates and detect auto-advance track changes
   const lastSyncedTrackIdRef = useRef<string | null>(null);
 
@@ -188,7 +194,7 @@ export function CheeseAmpPlayer() {
       if (playing && playing.asset_id !== lastSyncedTrackIdRef.current) {
         lastSyncedTrackIdRef.current = playing.asset_id;
         const match = activeTracks.find(t => t.template_id === playing.template_id);
-        if (match && match.asset_id !== playlist.currentTrack?.asset_id) {
+        if (match && match.asset_id !== currentTrackIdRef.current) {
           playTrackRef.current(match);
           // Reset display state for the new track
           setDisplayMode('cover');
@@ -198,10 +204,6 @@ export function CheeseAmpPlayer() {
     });
     return unsubscribe;
   }, [audioPlayer, activeTracks]);
-
-  // Keep ref in sync
-  const playTrackRef = useRef(playlist.playTrack);
-  playTrackRef.current = playlist.playTrack;
 
   const handlePlayTrack = useCallback(async (track: StackedMusicNFT) => {
     playlist.playTrack(track);
