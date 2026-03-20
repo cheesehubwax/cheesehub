@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,6 +82,13 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
   const { data: waxPrice = 0 } = useWaxPrice();
   const { tokens: balances, isUsingFallback, refetch: refetchBalances } = useAllTokenBalances(accountName || undefined);
   const { data: tokenPrices } = useAlcorTokenPrices();
+
+  // Refetch balances whenever the wallet dialog opens
+  useEffect(() => {
+    if (open && accountName) {
+      refetchBalances();
+    }
+  }, [open, accountName, refetchBalances]);
   const [activeSection, setActiveSection] = useState<WalletSection>("account");
   const [resources, setResources] = useState<AccountResources | null>(null);
   const [resourcesKey, setResourcesKey] = useState(0);
