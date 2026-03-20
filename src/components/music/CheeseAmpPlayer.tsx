@@ -314,20 +314,6 @@ export function CheeseAmpPlayer() {
           <span className="text-xs text-muted-foreground">
             {activeTracks.length} track{activeTracks.length !== 1 ? 's' : ''}
           </span>
-          {accountName && session && !isAnchorSession(session) && getBufferedPlayCount(accountName) > 0 && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="text-xs bg-cheese/20 text-cheese px-1.5 py-0.5 rounded-full cursor-help">
-                    {getBufferedPlayCount(accountName)} pending
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Plays waiting to sync on-chain</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
           <Button
             variant="ghost"
             size="icon"
