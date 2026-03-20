@@ -313,7 +313,6 @@ export function CheeseAmpPlayer() {
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">
             {activeTracks.length} track{activeTracks.length !== 1 ? 's' : ''}
-            {viewMode === 'global' && ' (Global)'}
           </span>
           {accountName && session && !isAnchorSession(session) && getBufferedPlayCount(accountName) > 0 && (
             <TooltipProvider>
