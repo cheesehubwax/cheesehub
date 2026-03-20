@@ -1,26 +1,25 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { ShoppingCart, Coins, ImageOff, Lock, RotateCw, Film } from "lucide-react";
+import { ShoppingCart, ImageOff, Lock, RotateCw, Film } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import type { NFTDrop } from "@/types/drop";
+import type { NFTDrop, DropPrice } from "@/types/drop";
 import { useCart } from "@/context/CartContext";
 import { Link } from "react-router-dom";
+import { TokenLogo } from "@/components/TokenLogo";
+import { getTokenConfig } from "@/lib/tokenRegistry";
+import { getTokenContract } from "@/lib/tokenLogos";
 
 import { isImageLoaded, isImagePreloading, waitForPreload } from "@/services/atomicApi";
-import cheeseLogo from "@/assets/cheese-logo.png";
 import { IPFS_GATEWAYS, IMAGE_LOAD_TIMEOUT, extractIpfsHash, isVideoUrl } from "@/lib/ipfsGateways";
 
-const CURRENCY_LOGOS: Record<string, string> = {
-  CHEESE: cheeseLogo,
-};
-
-function getCurrencyDisplay(drop: NFTDrop): { logo: string | null; symbol: string } {
-  const currency = drop.currency || (drop.listingPrice?.split(' ')[1]) || 'WAX';
-  return {
-    logo: CURRENCY_LOGOS[currency] || null,
-    symbol: currency,
-  };
+function getContractForCurrency(currency: string): string {
+  // Try tokenRegistry first (for known WAX tokens), then Alcor cache
+  const config = getTokenConfig(currency);
+  if (config) return config.contract;
+  const alcorContract = getTokenContract(currency);
+  if (alcorContract) return alcorContract;
+  return 'eosio.token';
 }
 
 export interface DropCardProps {
@@ -40,10 +39,17 @@ export function DropCard({ drop, isImageCached, onImageLoaded }: DropCardProps) 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mintedPercent = ((drop.totalSupply - drop.remaining) / drop.totalSupply) * 100;
 
+  // Resolve all prices to display
+  const displayPrices: DropPrice[] = drop.prices && drop.prices.length > 0
+    ? drop.prices
+    : [{ price: drop.price, currency: drop.currency || 'WAX', listingPrice: drop.listingPrice || `${drop.price} ${drop.currency || 'WAX'}` }];
+
+  const isFreeAuthDrop = drop.authRequired && (drop.isFree || drop.price === 0);
+  const primaryPrice = displayPrices[0];
+
   useEffect(() => {
     const isPlaceholder = !drop.image || drop.image === '/placeholder.svg' || drop.image.includes('placeholder');
     if (isPlaceholder) {
-      // placeholder image, skip
       setCurrentImageUrl('/placeholder.svg');
       setImageLoaded(true);
       setImageError(false);
@@ -130,8 +136,6 @@ export function DropCard({ drop, isImageCached, onImageLoaded }: DropCardProps) 
     ? `${currentImageUrl}${currentImageUrl.includes('?') ? '&' : '?'}retry=${retryCount}` 
     : currentImageUrl;
 
-  const isFreeAuthDrop = drop.authRequired && (drop.isFree || drop.price === 0);
-
   return (
     <Card className="group overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:border-primary/50 hover-cheese-glow">
       <Link to={`/drops/${drop.id}`}>
@@ -174,6 +178,7 @@ export function DropCard({ drop, isImageCached, onImageLoaded }: DropCardProps) 
             </div>
           )}
           
+          {/* Price badge on image */}
           <div className={`absolute bottom-2 right-2 flex items-center gap-1 rounded-full backdrop-blur-sm px-2.5 py-1 border shadow-lg ${
             isFreeAuthDrop ? 'bg-green-500/90 border-green-400/50' : 'bg-background/90 border-border/50'
           }`}>
@@ -181,12 +186,9 @@ export function DropCard({ drop, isImageCached, onImageLoaded }: DropCardProps) 
               <span className="font-display text-sm font-bold text-white">FREE</span>
             ) : (
               <>
-                {(() => {
-                  const { logo, symbol } = getCurrencyDisplay(drop);
-                  return logo ? <img src={logo} alt={symbol} className="h-4 w-4" /> : <Coins className="h-4 w-4 text-muted-foreground" />;
-                })()}
-                <span className="font-display text-sm font-bold text-primary">{drop.price.toLocaleString()}</span>
-                <span className="text-xs text-muted-foreground">{getCurrencyDisplay(drop).symbol}</span>
+                <TokenLogo contract={getContractForCurrency(primaryPrice.currency)} symbol={primaryPrice.currency} size="sm" />
+                <span className="font-display text-sm font-bold text-primary">{primaryPrice.price.toLocaleString()}</span>
+                <span className="text-xs text-muted-foreground">{primaryPrice.currency}</span>
               </>
             )}
           </div>
@@ -201,7 +203,21 @@ export function DropCard({ drop, isImageCached, onImageLoaded }: DropCardProps) 
           <h3 className="font-display text-lg font-semibold text-foreground transition-colors hover:text-primary">{drop.name}</h3>
         </Link>
         <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{drop.description}</p>
-        <div className="mt-4 space-y-2">
+
+        {/* All payment options */}
+        {!isFreeAuthDrop && displayPrices.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {displayPrices.map((p, i) => (
+              <div key={i} className="flex items-center gap-1 rounded-full bg-muted/50 border border-border/30 px-2 py-0.5">
+                <TokenLogo contract={getContractForCurrency(p.currency)} symbol={p.currency} size="sm" />
+                <span className="text-xs font-medium text-foreground">{p.price.toLocaleString()}</span>
+                <span className="text-xs text-muted-foreground">{p.currency}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-3 space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Minted</span>
             <span className="font-medium text-foreground">{drop.totalSupply - drop.remaining} / {drop.totalSupply}</span>
@@ -212,25 +228,24 @@ export function DropCard({ drop, isImageCached, onImageLoaded }: DropCardProps) 
 
       <CardFooter className="flex items-center justify-between border-t border-border/50 p-4">
         <div className="flex items-center gap-1.5">
-          {(() => {
-            const { logo, symbol } = getCurrencyDisplay(drop);
-            return logo ? <img src={logo} alt={symbol} className="h-6 w-6" /> : <Coins className="h-5 w-5 text-muted-foreground" />;
-          })()}
-          <span className="font-display text-xl font-bold text-primary">{drop.price.toLocaleString()}</span>
-          <span className="text-sm text-muted-foreground">{getCurrencyDisplay(drop).symbol}</span>
+          <TokenLogo contract={getContractForCurrency(primaryPrice.currency)} symbol={primaryPrice.currency} size="md" />
+          <span className="font-display text-xl font-bold text-primary">{primaryPrice.price.toLocaleString()}</span>
+          <span className="text-sm text-muted-foreground">{primaryPrice.currency}</span>
         </div>
         <Button
           size="sm"
           className="bg-primary text-primary-foreground hover:bg-primary/90"
           onClick={(e) => {
             e.preventDefault();
-            const primaryPrice = drop.prices?.[0];
+            const p = primaryPrice;
+            const contract = p.tokenContract || getContractForCurrency(p.currency);
+            const precision = p.precision || getTokenConfig(p.currency)?.precision || 8;
             const selectedPrice = {
-              price: primaryPrice?.price ?? drop.price,
-              currency: primaryPrice?.currency ?? drop.currency ?? 'WAX',
-              tokenContract: primaryPrice?.tokenContract ?? drop.tokenContract ?? 'eosio.token',
-              precision: primaryPrice?.precision ?? 8,
-              listingPrice: primaryPrice?.listingPrice ?? drop.listingPrice ?? `${drop.price} WAX`,
+              price: p.price,
+              currency: p.currency,
+              tokenContract: contract,
+              precision,
+              listingPrice: p.listingPrice,
             };
             addToCart(drop, selectedPrice);
           }}

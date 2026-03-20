@@ -248,6 +248,49 @@ async function fetchDropPrices(dropId: string | number): Promise<DropPrice[]> {
   }
 }
 
+// Fetch ALL drop prices in bulk (paginated)
+export async function fetchAllDropPrices(): Promise<Map<number, DropPrice[]>> {
+  const priceMap = new Map<number, DropPrice[]>();
+  try {
+    const { fetchTableRows } = await import('@/lib/waxRpcFallback');
+    let hasMore = true;
+    let lowerBound: string | undefined = undefined;
+    const MAX_ITERATIONS = 20;
+    let iterations = 0;
+
+    while (hasMore && iterations < MAX_ITERATIONS) {
+      const result = await fetchTableRows<OnChainDropPrice>({
+        code: 'nfthivedrops',
+        scope: 'nfthivedrops',
+        table: 'dropprices',
+        limit: 1000,
+        ...(lowerBound ? { lower_bound: lowerBound } : {}),
+      });
+
+      for (const row of result.rows) {
+        const prices = row.listing_prices.map((priceStr): DropPrice => {
+          const { price, currency } = parseListingPrice(priceStr);
+          return { price, currency, listingPrice: priceStr };
+        });
+        priceMap.set(row.drop_id, prices);
+      }
+
+      hasMore = result.more || false;
+      if (result.rows.length > 0) {
+        lowerBound = String(result.rows[result.rows.length - 1].drop_id + 1);
+      } else {
+        hasMore = false;
+      }
+      iterations++;
+    }
+
+    console.log(`[NFTHive] Fetched prices for ${priceMap.size} drops`);
+  } catch (error) {
+    console.warn('[NFTHive] Failed to fetch bulk drop prices:', error);
+  }
+  return priceMap;
+}
+
 function rawDropToNFTDrop(drop: OnChainNFTHiveDrop): NFTDrop {
   const templateId = drop.assets_to_mint?.[0]?.template_id;
   const { price, currency } = parseListingPrice(drop.listing_price);
@@ -330,7 +373,24 @@ export async function fetchRawDrops(collection?: string): Promise<NFTDrop[]> {
     
     console.log(`[NFTHive] After filtering hidden: ${drops.length} drops`);
 
-    return drops.map(rawDropToNFTDrop);
+    // Fetch all drop prices in parallel
+    const allPrices = await fetchAllDropPrices();
+
+    return drops.map(d => {
+      const nftDrop = rawDropToNFTDrop(d);
+      const prices = allPrices.get(d.drop_id);
+      if (prices && prices.length > 0) {
+        nftDrop.prices = prices;
+      } else {
+        // Fall back to the primary listing price
+        nftDrop.prices = [{
+          price: nftDrop.price,
+          currency: nftDrop.currency || 'WAX',
+          listingPrice: nftDrop.listingPrice || `${nftDrop.price} ${nftDrop.currency || 'WAX'}`,
+        }];
+      }
+      return nftDrop;
+    });
   } catch (error) {
     console.error('Error fetching raw drops:', error);
     return [];
