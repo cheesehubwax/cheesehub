@@ -123,6 +123,7 @@ export function CheeseAmpPlayer() {
   const [viewMode, setViewMode] = useState<'library' | 'playlists'>('library');
   const [sortAZ, setSortAZ] = useState(false);
   const [displayMode, setDisplayMode] = useState<DisplayMode>('cover');
+  const [activeExtraAudioKey, setActiveExtraAudioKey] = useState<string | null>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   const activeTracks = useMemo(() => 
