@@ -40,7 +40,7 @@ function loadSettings(accountName: string): PlaybackSettings {
  * It should be mounted at a persistent level (e.g., WalletConnect) so it
  * continues working even when the CHEESEAmp dialog is minimized/closed.
  */
-export function useCheeseAmpAutoAdvance(accountName: string | null, onTrackPlayed?: (templateId: string) => void) {
+export function useCheeseAmpAutoAdvance(accountName: string | null) {
   const { stackedNfts } = useMusicNFTs();
   const shuffleOrderRef = useRef<number[]>([]);
   
