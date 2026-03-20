@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import type { NFTDrop } from "@/types/drop";
 import { useCart } from "@/context/CartContext";
 import { Link } from "react-router-dom";
-import { markDropAsFailed } from "@/hooks/useEnrichDrops";
+
 import { isImageLoaded, isImagePreloading, waitForPreload } from "@/services/atomicApi";
 import cheeseLogo from "@/assets/cheese-logo.png";
 import { IPFS_GATEWAYS, IMAGE_LOAD_TIMEOUT, extractIpfsHash, isVideoUrl } from "@/lib/ipfsGateways";
@@ -43,7 +43,7 @@ export function DropCard({ drop, isImageCached, onImageLoaded }: DropCardProps) 
   useEffect(() => {
     const isPlaceholder = !drop.image || drop.image === '/placeholder.svg' || drop.image.includes('placeholder');
     if (isPlaceholder) {
-      markDropAsFailed(drop.id);
+      // placeholder image, skip
       setCurrentImageUrl('/placeholder.svg');
       setImageLoaded(true);
       setImageError(false);
@@ -79,7 +79,7 @@ export function DropCard({ drop, isImageCached, onImageLoaded }: DropCardProps) 
 
   const handleImageError = useCallback(() => {
     const hash = extractIpfsHash(currentImageUrl);
-    if (!hash) { setImageError(true); markDropAsFailed(drop.id); return; }
+    if (!hash) { setImageError(true); return; }
     const nextGateways = IPFS_GATEWAYS.slice(gatewayIndex + 1, gatewayIndex + 3);
     if (nextGateways.length > 0 && !racingRef.current) {
       racingRef.current = true;
@@ -107,12 +107,10 @@ export function DropCard({ drop, isImageCached, onImageLoaded }: DropCardProps) 
           setImageLoaded(false);
         } else {
           setImageError(true);
-          markDropAsFailed(drop.id);
         }
       });
     } else {
       setImageError(true);
-      markDropAsFailed(drop.id);
     }
   }, [currentImageUrl, gatewayIndex, drop.id]);
 
@@ -138,7 +136,7 @@ export function DropCard({ drop, isImageCached, onImageLoaded }: DropCardProps) 
     <Card className="group overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:border-primary/50 hover-cheese-glow">
       <Link to={`/drops/${drop.id}`}>
         <div className="relative aspect-square overflow-hidden bg-muted/50">
-          {imageError && drop.isVideo && isVideoUrl(currentImageUrl) ? (
+          {imageError && isVideoUrl(currentImageUrl) ? (
             <div className="flex h-full w-full flex-col items-center justify-center bg-muted/30">
               <Film className="h-12 w-12 text-muted-foreground/50" />
               <span className="mt-2 text-xs text-muted-foreground">Video NFT</span>

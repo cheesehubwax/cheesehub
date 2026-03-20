@@ -436,7 +436,6 @@ export async function fetchDropById(dropId: string): Promise<NFTDrop | null> {
             ...baseDrop,
             image: templateData.image || baseDrop.image,
             name: templateData.name || baseDrop.name,
-            isVideo: templateData.isVideo,
           };
         }
       }
