@@ -314,6 +314,8 @@ async function fetchAssetMetadata(assetIds: string[]): Promise<MusicNFT[]> {
                   }
                 }
 
+                const extraAudioUrls = extractExtraAudioUrls(allData);
+
                 musicNfts.push({
                   asset_id: asset.asset_id,
                   name: asset.name || allData.name || 'Untitled Track',
