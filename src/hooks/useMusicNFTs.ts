@@ -4,6 +4,12 @@ import { fetchWithFallback } from '@/lib/fetchWithFallback';
 import { ATOMIC_API } from '@/lib/waxConfig';
 import { waxRpcCall } from '@/lib/waxRpcFallback';
 
+export interface ExtraAudioEntry {
+  label: string;
+  url: string;
+  key: string;
+}
+
 export interface MusicNFT {
   asset_id: string;
   name: string;
@@ -20,6 +26,7 @@ export interface MusicNFT {
   frontArt?: string;
   backArt?: string;
   additionalImages?: string[];
+  extraAudioUrls?: ExtraAudioEntry[];
   duration?: number;
   collection: string;
   schema: string;
