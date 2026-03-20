@@ -1,25 +1,41 @@
 
 
-## Fix: Releases Stuck Loading (Spinning Forever)
+## Fix: CHEESEAmp Infinite Re-render Loop (Flashing Videos)
 
 ### Root Cause
-The music player's IPFS gateway racing strategy does HEAD requests with a 5-second timeout, then tries to call `element.play()`. For larger video files, this is too aggressive -- the HEAD may succeed but the actual media load/play fails, or all HEAD requests time out for slower gateways. When all gateways fail, `_isLoading` stays `true` and the spinner never stops because the error state doesn't properly clear the loading indicator in the UI.
 
-Additionally, for video-only NFTs played as audio (fallback), the player tries to use the audio element with a video URL, which may fail if the browser can't extract audio from the format.
+There's a cascading render loop caused by two issues:
+
+**1. Unstable `playlist` dependency in sync effect (CheeseAmpPlayer.tsx line 188)**
+The "sync with currently playing track" effect depends on `playlist`, but calling `playlist.playTrack()` inside the effect updates state, which creates a new `playlist` object, re-triggering the effect -- infinite loop. This causes the rapid flashing between tracks.
+
+**2. Unstable `activeTracks` array reference (CheeseAmpPlayer.tsx line 128-134)**
+`activeTracks` is computed inline without `useMemo`, so every render creates a new array reference. This flows into `useCheeseAmpPlaylist` as `allTracks`, destabilizing all downstream memos and causing excess re-renders and the "Saving 0 playlists" spam.
 
 ### Changes
 
-**1. `src/lib/musicPlayer.ts` -- Improve gateway resilience**
-- Increase the HEAD timeout from 5s to 10s
-- Instead of HEAD-racing then playing, use a "set src and wait for canplay" approach as primary strategy -- this lets the browser handle buffering naturally
-- Add a fallback: if video element fails, try audio element with the same URL (browsers can often play mp4 audio track via `<audio>`)
-- Ensure `_isLoading = false` is always set in the catch path so the spinner stops and shows an error instead of spinning forever
+**`src/components/music/CheeseAmpPlayer.tsx`**
+- Wrap `activeTracks` in `useMemo` so the array reference is stable across renders
+- Fix the sync effect (lines 178-188): remove `playlist` from the dependency array, and add a guard using a ref to prevent re-triggering when the track is already synced. This breaks the loop.
 
-**2. `src/components/music/CheeseAmpPlayer.tsx` -- Show error state instead of infinite spinner**
-- When `playbackState.error` is set, show the error message with a "Retry" button instead of an infinite loading spinner
-- This way users see feedback rather than an endless wheel
+**`src/hooks/useCheeseAmpPlaylist.ts`**
+- No structural changes needed, but reduce the noisy `saveState` console.log to prevent log spam (optional cleanup)
+
+### Technical Detail
+
+The loop path is:
+```text
+sync effect fires (playlist in deps)
+  → playlist.playTrack() called
+    → updateState() → saveState() → setState()
+      → new playlist object reference
+        → sync effect fires again (playlist changed)
+          → infinite loop
+```
+
+Fix: use `playlist.currentTrack` and `playlist.playTrack` as specific stable references (via useRef or extracted deps) instead of the entire `playlist` object.
 
 ### Files
-- `src/lib/musicPlayer.ts`
-- `src/components/music/CheeseAmpPlayer.tsx`
+- `src/components/music/CheeseAmpPlayer.tsx` — memoize activeTracks, fix sync effect deps
+- `src/hooks/useCheeseAmpPlaylist.ts` — optional: reduce log noise
 
