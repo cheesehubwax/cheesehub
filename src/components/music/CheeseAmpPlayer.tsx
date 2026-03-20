@@ -182,13 +182,10 @@ export function CheeseAmpPlayer() {
     playlist.playTrack(track);
     try {
       await audioPlayer.play(track);
-      if (viewMode === 'global' && session && accountName && track.template_id) {
-        logPlay(session, accountName, Number(track.template_id));
-      }
     } catch (error) {
       console.error('Failed to play track:', error);
     }
-  }, [audioPlayer, playlist, viewMode, session, accountName]);
+  }, [audioPlayer, playlist]);
 
   const handlePlayPause = useCallback(() => {
     if (playbackState.isPlaying) {
