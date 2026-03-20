@@ -308,13 +308,30 @@ export function CreateDrop() {
                 value={formData.dropType === 'premint' ? formData.assetIds.length : formData.maxClaimable}
                 disabled={formData.dropType === 'premint'}
                 onChange={(e) => setFormData(prev => ({ ...prev, maxClaimable: parseInt(e.target.value) || 0 }))} />
+              {formData.dropType === 'premint' && (
+                <p className="text-xs text-muted-foreground">Auto-set based on selected NFTs</p>
+              )}
+              {formData.dropType === 'mint-on-demand' && loadingRamBalance && formData.collectionName && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Checking RAM balance...
+                </div>
+              )}
               {formData.dropType === 'mint-on-demand' && ramShortage && !loadingRamBalance && (
                 <div className="mt-2 p-3 rounded-lg border border-destructive/50 bg-destructive/10 space-y-2">
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
                     <div className="space-y-1">
                       <p className="text-sm font-medium text-destructive">Insufficient RAM</p>
-                      <p className="text-xs text-muted-foreground">Use Manage RAM to deposit more.</p>
+                      <p className="text-xs text-muted-foreground">
+                        Your collection <strong className="text-foreground">{formData.collectionName}</strong> has enough RAM for ~<strong className="text-foreground">{ramShortage.availableNFTs}</strong> NFTs, but you need <strong className="text-foreground">{formData.maxClaimable}</strong>.
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Shortfall: <strong className="text-foreground">{ramShortage.shortageBytes.toLocaleString()}</strong> bytes (~<strong className="text-foreground">{ramShortage.estimatedWax} WAX</strong>)
+                      </p>
+                      <p className="text-xs text-primary font-medium mt-1">
+                        Use the <strong>Manage RAM</strong> button at the top of this page to deposit more.
+                      </p>
                     </div>
                   </div>
                 </div>
