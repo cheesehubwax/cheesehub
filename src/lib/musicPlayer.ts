@@ -1,11 +1,5 @@
 import type { MusicNFT } from '@/hooks/useMusicNFTs';
-
-const IPFS_GATEWAYS = [
-  'https://ipfs.io/ipfs/',
-  'https://gateway.pinata.cloud/ipfs/',
-  'https://cloudflare-ipfs.com/ipfs/',
-  'https://dweb.link/ipfs/',
-];
+import { IPFS_GATEWAYS, extractIpfsHash as sharedExtractIpfsHash } from '@/lib/ipfsGateways';
 
 function extractIpfsHash(url: string): string | null {
   if (!url) return null;
