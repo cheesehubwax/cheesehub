@@ -411,7 +411,13 @@ async function fetchApiPage(owner: string, page: number, limit: number): Promise
           }
         }
 
+        const audioUrl = getMediaUrl((allData.audio || allData.clip || allData.video) as string | undefined);
         const extraAudioUrls = extractExtraAudioUrls(allData);
+        
+        // If video and audio are different URLs, expose video as "Full Track"
+        if (videoUrl && audioUrl && videoUrl !== audioUrl && !extraAudioUrls.some(e => e.url === videoUrl)) {
+          extraAudioUrls.unshift({ label: 'Full Track', url: videoUrl, key: 'full_track_video' });
+        }
 
         musicNfts.push({
           asset_id: asset.asset_id,
@@ -420,7 +426,7 @@ async function fetchApiPage(owner: string, page: number, limit: number): Promise
           artist: allData.artist as string | undefined,
           album: allData.album as string | undefined,
           genre: allData.genre as string | undefined,
-          audioUrl: getMediaUrl((allData.audio || allData.clip || allData.video) as string | undefined),
+          audioUrl,
           clipUrl,
           videoUrl,
           hasVideo: !!(videoUrl || clipUrl),
