@@ -121,8 +121,18 @@ export function WalletConnect() {
   };
 
   const handleCheeseAmpMinimize = () => {
+    const player = getAudioPlayer();
+    const wasPlaying = player.getState().isPlaying;
     setCheeseAmpOpen(false);
     setCheeseAmpMinimized(true);
+    // Radix Dialog unmount can transiently pause media; resume if needed
+    if (wasPlaying) {
+      setTimeout(() => {
+        if (!player.getState().isPlaying) {
+          player.resume();
+        }
+      }, 150);
+    }
   };
 
   const handleCheeseAmpExpand = () => {
