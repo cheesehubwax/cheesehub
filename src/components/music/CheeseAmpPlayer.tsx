@@ -121,8 +121,15 @@ export function CheeseAmpPlayer() {
   const { accountName, session } = useWax();
   const { nfts, stackedNfts, isLoading: isLoadingNfts, refetch } = useMusicNFTs();
   const [viewMode, setViewMode] = useState<'library' | 'playlists'>('library');
+  const [sortAZ, setSortAZ] = useState(false);
 
-  const activeTracks = stackedNfts;
+  const activeTracks = sortAZ
+    ? [...stackedNfts].sort((a, b) => {
+        const nameA = (a.title || a.name || '').toLowerCase();
+        const nameB = (b.title || b.name || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+      })
+    : stackedNfts;
   const playlist = useCheeseAmpPlaylist(accountName, activeTracks);
   const [playbackState, setPlaybackState] = useState<PlaybackState>({
     isPlaying: false,
