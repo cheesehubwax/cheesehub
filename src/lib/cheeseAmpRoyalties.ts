@@ -114,6 +114,7 @@ export function getBufferedPlayCount(accountName: string): number {
  * Returns true if a transaction was sent.
  */
 export async function flushPlayBuffer(session: Session, accountName: string): Promise<boolean> {
+  if (!ROYALTIES_ENABLED) return false;
   const plays = loadBuffer(accountName);
   if (plays.length === 0) return false;
 
