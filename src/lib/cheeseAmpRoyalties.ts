@@ -4,10 +4,14 @@
  * Dual-mode play tracking:
  * - Anchor: fire-and-forget single `logplay` via session keys
  * - Cloud Wallet: buffer plays in localStorage, flush as batch `logplays`
+ * DISABLED until cheeseamphub contract is live.
  */
 import type { Session } from '@wharfkit/session';
 import { isAnchorSession, getTransactPlugins } from './wharfKit';
 import { logger } from './logger';
+
+/** Flip to true when the cheeseamphub contract is deployed */
+const ROYALTIES_ENABLED = false;
 
 const CHEESEAMPHUB_CONTRACT = 'cheeseamphub';
 const BUFFER_KEY_PREFIX = 'cheesehub_playbuffer_';
@@ -24,6 +28,7 @@ interface BufferedPlay {
  * Session keys allow auto-signing after initial approval.
  */
 export async function logPlayImmediate(session: Session, templateId: number): Promise<void> {
+  if (!ROYALTIES_ENABLED) return;
   try {
     await session.transact({
       action: {
@@ -77,6 +82,7 @@ function saveBuffer(accountName: string, plays: BufferedPlay[]): void {
  * Applies a client-side 5-minute cooldown per template to avoid wasted entries.
  */
 export function bufferPlay(accountName: string, templateId: number): void {
+  if (!ROYALTIES_ENABLED) return;
   const plays = loadBuffer(accountName);
   const now = Date.now();
 
@@ -98,6 +104,7 @@ export function bufferPlay(accountName: string, templateId: number): void {
  * Get number of buffered plays for UI display.
  */
 export function getBufferedPlayCount(accountName: string): number {
+  if (!ROYALTIES_ENABLED) return 0;
   return loadBuffer(accountName).length;
 }
 
@@ -107,6 +114,7 @@ export function getBufferedPlayCount(accountName: string): number {
  * Returns true if a transaction was sent.
  */
 export async function flushPlayBuffer(session: Session, accountName: string): Promise<boolean> {
+  if (!ROYALTIES_ENABLED) return false;
   const plays = loadBuffer(accountName);
   if (plays.length === 0) return false;
 
@@ -145,6 +153,7 @@ export async function flushPlayBuffer(session: Session, accountName: string): Pr
  * For Cloud Wallet: buffer locally.
  */
 export function logPlay(session: Session, accountName: string, templateId: number): void {
+  if (!ROYALTIES_ENABLED) return;
   if (isAnchorSession(session)) {
     // Fire-and-forget — don't await
     logPlayImmediate(session, templateId).catch(() => {});
