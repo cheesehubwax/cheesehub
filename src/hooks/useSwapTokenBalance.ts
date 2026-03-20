@@ -1,21 +1,32 @@
-import { useQuery } from "@tanstack/react-query";
-import { fetchSingleTokenBalance } from "@/lib/waxRpcFallback";
+import { useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
+import type { TokenWithBalance } from "@/hooks/useAllTokenBalances";
 
+/**
+ * Reads a single token balance from the shared `all-token-balances` cache.
+ * No additional API calls — just a cache lookup.
+ */
 export function useSwapTokenBalance(
   accountName: string | null,
   contract?: string,
   ticker?: string
 ) {
-  const { data: balance } = useQuery({
-    queryKey: ["swap-token-balance", accountName, contract, ticker],
-    queryFn: async () => {
-      const amount = await fetchSingleTokenBalance(accountName!, contract!, ticker!);
-      return amount > 0 ? String(amount) : null;
-    },
-    enabled: !!accountName && !!contract && !!ticker,
-    staleTime: 15_000,
-    gcTime: 60_000,
-  });
+  const queryClient = useQueryClient();
 
-  return balance ?? null;
+  return useMemo(() => {
+    if (!accountName || !contract || !ticker) return null;
+
+    const cached = queryClient.getQueryData<{ tokens: TokenWithBalance[] }>([
+      "all-token-balances",
+      accountName,
+    ]);
+
+    if (!cached?.tokens) return null;
+
+    const match = cached.tokens.find(
+      (t) => t.contract === contract && t.symbol === ticker
+    );
+
+    return match && match.balance > 0 ? String(match.balance) : null;
+  }, [queryClient, accountName, contract, ticker]);
 }
