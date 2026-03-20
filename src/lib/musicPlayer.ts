@@ -269,8 +269,9 @@ class CheeseAmpMedia {
   }
 
   private async tryGateways(hash: string, element: HTMLAudioElement | HTMLVideoElement): Promise<void> {
-    const TIMEOUT = 5000;
+    const TIMEOUT = 10000;
     
+    // Race first 3 gateways with HEAD check
     const raceGateways = IPFS_GATEWAYS.slice(0, 3);
     let succeeded = false;
     
@@ -304,23 +305,21 @@ class CheeseAmpMedia {
             failCount++;
             if (failCount >= raceGateways.length) reject(new Error('All racing gateways failed'));
           }
-        }, index * 100);
+        }, index * 150);
       });
     });
 
     try {
       const winningUrl = await racePromise;
       console.log(`[musicPlayer] Racing gateway won: ${winningUrl.split('/ipfs/')[0]}`);
-      element.src = winningUrl;
-      await element.play();
+      await this.setSrcAndPlay(element, winningUrl);
       this._isLoading = false;
       this.notifyCallbacks();
     } catch {
-      console.warn('[musicPlayer] All racing gateways failed, trying remaining...');
+      console.warn('[musicPlayer] All racing gateways failed, trying remaining sequentially...');
       for (const gateway of IPFS_GATEWAYS.slice(3)) {
         try {
-          element.src = `${gateway}${hash}`;
-          await element.play();
+          await this.setSrcAndPlay(element, `${gateway}${hash}`);
           this._isLoading = false;
           this.notifyCallbacks();
           return;
