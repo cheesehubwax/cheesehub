@@ -104,6 +104,7 @@ export function bufferPlay(accountName: string, templateId: number): void {
  * Get number of buffered plays for UI display.
  */
 export function getBufferedPlayCount(accountName: string): number {
+  if (!ROYALTIES_ENABLED) return 0;
   return loadBuffer(accountName).length;
 }
 
