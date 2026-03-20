@@ -82,6 +82,7 @@ function saveBuffer(accountName: string, plays: BufferedPlay[]): void {
  * Applies a client-side 5-minute cooldown per template to avoid wasted entries.
  */
 export function bufferPlay(accountName: string, templateId: number): void {
+  if (!ROYALTIES_ENABLED) return;
   const plays = loadBuffer(accountName);
   const now = Date.now();
 
