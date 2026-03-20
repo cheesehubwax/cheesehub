@@ -51,7 +51,11 @@ import {
   Trash2,
   ArrowDownAZ,
   ArrowUpAZ,
+  Link2,
+  Upload,
+  CloudOff,
 } from 'lucide-react';
+import { ONCHAIN_PLAYLISTS_ENABLED } from '@/lib/cheeseAmpOnChain';
 import { MediaDisplay, MediaSelector, ArtLightbox, VideoIndicator, type DisplayMode } from './MediaDisplay';
 
 const IPFS_GATEWAYS = [
