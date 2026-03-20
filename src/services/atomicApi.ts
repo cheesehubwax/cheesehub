@@ -373,7 +373,24 @@ export async function fetchRawDrops(collection?: string): Promise<NFTDrop[]> {
     
     console.log(`[NFTHive] After filtering hidden: ${drops.length} drops`);
 
-    return drops.map(rawDropToNFTDrop);
+    // Fetch all drop prices in parallel
+    const allPrices = await fetchAllDropPrices();
+
+    return drops.map(d => {
+      const nftDrop = rawDropToNFTDrop(d);
+      const prices = allPrices.get(d.drop_id);
+      if (prices && prices.length > 0) {
+        nftDrop.prices = prices;
+      } else {
+        // Fall back to the primary listing price
+        nftDrop.prices = [{
+          price: nftDrop.price,
+          currency: nftDrop.currency || 'WAX',
+          listingPrice: nftDrop.listingPrice || `${nftDrop.price} ${nftDrop.currency || 'WAX'}`,
+        }];
+      }
+      return nftDrop;
+    });
   } catch (error) {
     console.error('Error fetching raw drops:', error);
     return [];
