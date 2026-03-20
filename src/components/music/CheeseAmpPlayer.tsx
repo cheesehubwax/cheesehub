@@ -500,16 +500,7 @@ export function CheeseAmpPlayer() {
               >
                 <ListMusic className="h-3 w-3 mr-1" />
                 Playlists
-              </Button>
-              <Button
-                variant={viewMode === 'global' ? 'secondary' : 'ghost'}
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => setViewMode('global')}
-              >
-                <Globe className="h-3 w-3 mr-1" />
-                Global{globalStackedNfts.length > 0 ? ` (${globalStackedNfts.length})` : ''}
-              </Button>
+              
               
               {playlist.currentPlaylistId !== 'library' && viewMode === 'library' && (
                 <Button
