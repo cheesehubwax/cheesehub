@@ -208,15 +208,16 @@ export function CheeseAmpPlayer() {
   }, [audioPlayer, playlist]);
 
   const handleSelectExtraAudio = useCallback(async (url: string, key: string) => {
-    if (!currentTrack) return;
+    const track = playlist.currentTrack;
+    if (!track) return;
     setActiveExtraAudioKey(key);
     setDisplayMode('cover');
     try {
-      await audioPlayer.play(currentTrack, false, url);
+      await audioPlayer.play(track, false, url);
     } catch (error) {
       console.error('Failed to play extra audio:', error);
     }
-  }, [audioPlayer, currentTrack]);
+  }, [audioPlayer, playlist.currentTrack]);
 
   const handlePlayPause = useCallback(() => {
     if (playbackState.isPlaying) {
