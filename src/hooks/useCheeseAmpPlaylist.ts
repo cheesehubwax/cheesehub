@@ -54,7 +54,7 @@ function loadState(accountName: string): CheeseAmpState {
 }
 
 function saveState(accountName: string, state: CheeseAmpState): void {
-  console.log('[CHEESEAmp] Saving', state.playlists?.length || 0, 'playlists for', accountName);
+  console.debug('[CHEESEAmp] Saving', state.playlists?.length || 0, 'playlists for', accountName);
   try {
     localStorage.setItem(getStorageKey(accountName), JSON.stringify(state));
   } catch (e) {
