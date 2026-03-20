@@ -596,6 +596,17 @@ export function CheeseAmpPlayer() {
                   <span className="text-xs text-muted-foreground">
                     {playlist.currentPlaylistTracks.length} track{playlist.currentPlaylistTracks.length !== 1 ? 's' : ''}
                   </span>
+                  {playlist.currentPlaylistId === 'library' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn("h-7 text-xs", sortAZ && "text-cheese")}
+                      onClick={() => setSortAZ(prev => !prev)}
+                    >
+                      {sortAZ ? <ArrowUpAZ className="h-3.5 w-3.5 mr-1" /> : <ArrowDownAZ className="h-3.5 w-3.5 mr-1" />}
+                      A–Z
+                    </Button>
+                  )}
                 </div>
                 <ScrollArea className="h-[460px]">
                   <div className="space-y-1 pr-2">
