@@ -12,6 +12,7 @@ const WAX_RPC_ENDPOINTS = [
 
 export interface NullBreakdownEntry {
   contract: string;
+  displayName: string;
   amount: number;
   percent: number;
   amount24h: number;
