@@ -498,6 +498,22 @@ export function CheeseAmpPlayer() {
             </Button>
           </div>
 
+          {/* Error State */}
+          {playbackState.error && (
+            <div className="text-center mb-3">
+              <p className="text-xs text-destructive truncate">{playbackState.error}</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-cheese hover:text-cheese mt-1 h-6"
+                onClick={() => currentTrack && handlePlayTrack(currentTrack)}
+              >
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Retry
+              </Button>
+            </div>
+          )}
+
           {/* Volume Control */}
           <div className="flex items-center gap-2">
             <Button
