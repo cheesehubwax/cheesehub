@@ -107,6 +107,8 @@ const DropDetail = () => {
                   <span className="text-sm text-muted-foreground">Price</span>
                   {isFree ? (
                     <Badge className="bg-green-500/20 text-green-400 border-green-500/30">FREE</Badge>
+                  ) : drop.prices && drop.prices.length > 1 ? (
+                    <span className="text-sm text-muted-foreground">{drop.prices.length} payment options</span>
                   ) : (
                     <span className="text-lg font-bold text-primary flex items-center gap-2">
                       <TokenLogo
@@ -118,6 +120,25 @@ const DropDetail = () => {
                     </span>
                   )}
                 </div>
+
+                {/* Show all payment options */}
+                {!isFree && drop.prices && drop.prices.length > 0 && (
+                  <div className="space-y-1.5">
+                    {drop.prices.map((p, i) => (
+                      <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-muted/30 border border-border/30">
+                        <div className="flex items-center gap-2">
+                          <TokenLogo
+                            contract={getTokenConfig(p.currency)?.contract || "eosio.token"}
+                            symbol={p.currency}
+                            size="md"
+                          />
+                          <span className="font-medium text-foreground">{p.currency}</span>
+                        </div>
+                        <span className="font-bold text-primary">{p.price.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {drop.totalSupply > 0 && (
                   <div className="flex items-center justify-between">
