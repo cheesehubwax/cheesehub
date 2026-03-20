@@ -301,9 +301,12 @@ interface MediaSelectorProps {
   hasBackArt: boolean;
   displayMode: DisplayMode;
   onSelect: (mode: DisplayMode) => void;
+  extraAudioUrls?: { label: string; url: string; key: string }[];
+  activeExtraAudioKey?: string | null;
+  onSelectExtraAudio?: (url: string, key: string) => void;
 }
 
-export function MediaSelector({ hasAudio, hasVideo, hasFrontArt, hasBackArt, displayMode, onSelect }: MediaSelectorProps) {
+export function MediaSelector({ hasAudio, hasVideo, hasFrontArt, hasBackArt, displayMode, onSelect, extraAudioUrls, activeExtraAudioKey, onSelectExtraAudio }: MediaSelectorProps) {
   const buttons: { mode: DisplayMode; label: string; icon: React.ReactNode; available: boolean }[] = [
     { mode: 'cover', label: 'Audio', icon: <Music2 className="h-3.5 w-3.5" />, available: hasAudio },
     { mode: 'video', label: 'Video', icon: <Video className="h-3.5 w-3.5" />, available: hasVideo },
@@ -312,24 +315,48 @@ export function MediaSelector({ hasAudio, hasVideo, hasFrontArt, hasBackArt, dis
   ];
 
   const availableButtons = buttons.filter(b => b.available);
-  if (availableButtons.length <= 1) return null;
+  const hasExtraAudio = extraAudioUrls && extraAudioUrls.length > 0;
+  if (availableButtons.length <= 1 && !hasExtraAudio) return null;
 
   return (
-    <div className="flex items-center gap-1 mt-2">
+    <div className="flex items-center gap-1 mt-2 flex-wrap">
       {availableButtons.map(({ mode, label, icon }) => (
         <TooltipProvider key={mode}>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                variant={displayMode === mode ? 'secondary' : 'ghost'}
+                variant={displayMode === mode && !activeExtraAudioKey ? 'secondary' : 'ghost'}
                 size="sm"
                 className={cn(
                   "h-7 text-xs gap-1 px-2",
-                  displayMode === mode && "text-cheese bg-cheese/10"
+                  displayMode === mode && !activeExtraAudioKey && "text-cheese bg-cheese/10"
                 )}
-                onClick={() => onSelect(mode)}
+                onClick={() => {
+                  onSelect(mode);
+                }}
               >
                 {icon}
+                {label}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{label}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ))}
+      {hasExtraAudio && extraAudioUrls.map(({ label, url, key }) => (
+        <TooltipProvider key={key}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={activeExtraAudioKey === key ? 'secondary' : 'ghost'}
+                size="sm"
+                className={cn(
+                  "h-7 text-xs gap-1 px-2",
+                  activeExtraAudioKey === key && "text-cheese bg-cheese/10"
+                )}
+                onClick={() => onSelectExtraAudio?.(url, key)}
+              >
+                <Music2 className="h-3.5 w-3.5" />
                 {label}
               </Button>
             </TooltipTrigger>
