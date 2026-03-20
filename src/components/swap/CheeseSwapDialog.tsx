@@ -1,6 +1,7 @@
 // CheeseSwap Dialog - Token swap interface using Alcor DEX aggregator
 
-import { useState } from 'react';
+import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
@@ -9,6 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { CheeseSwapWidget } from './CheeseSwapWidget';
+import { useWax } from '@/context/WaxContext';
 
 type InputToken = 'WAX' | 'WAXUSDC';
 
@@ -19,6 +21,15 @@ interface CheeseSwapDialogProps {
 }
 
 export function CheeseSwapDialog({ open, onOpenChange, inputToken = 'WAX' }: CheeseSwapDialogProps) {
+  const { accountName } = useWax();
+  const queryClient = useQueryClient();
+
+  // Refresh shared balance cache when swap dialog opens
+  useEffect(() => {
+    if (open && accountName) {
+      queryClient.invalidateQueries({ queryKey: ['all-token-balances', accountName] });
+    }
+  }, [open, accountName, queryClient]);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent

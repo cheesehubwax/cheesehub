@@ -137,10 +137,9 @@ export function CheeseSwapWidget({
       setAmountIn("");
       setAmountOut("");
       setActiveField("in");
-      // Refresh balances after swap
+      // Refresh shared balance cache after swap
       setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["swap-token-balance"] });
-        queryClient.invalidateQueries({ queryKey: ["swap-token-balances"] });
+        queryClient.invalidateQueries({ queryKey: ["all-token-balances"] });
       }, 1500);
     } catch (e: any) {
       const msg = e?.message || "Swap failed";
