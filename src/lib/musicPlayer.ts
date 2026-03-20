@@ -176,11 +176,31 @@ class CheeseAmpMedia {
     const mediaUrl = useVideo ? track.videoUrl! : track.audioUrl;
     const element = useVideo ? this.getVideoElement() : this.audio;
     
+    try {
+      await this.loadAndPlay(mediaUrl, element);
+    } catch (e) {
+      // If video element failed, try falling back to audio element with same URL
+      if (useVideo && mediaUrl) {
+        console.warn('[musicPlayer] Video element failed, trying audio fallback');
+        this._mediaType = 'audio';
+        try {
+          await this.loadAndPlay(mediaUrl, this.audio);
+          return;
+        } catch {
+          // Fall through to error
+        }
+      }
+      this._error = e instanceof Error ? e.message : 'Failed to load media';
+      this._isLoading = false;
+      this.notifyCallbacks();
+    }
+  }
+
+  private async loadAndPlay(mediaUrl: string, element: HTMLAudioElement | HTMLVideoElement): Promise<void> {
     // Check if it's already a full URL
     if (mediaUrl.startsWith('http://') || mediaUrl.startsWith('https://')) {
       try {
-        element.src = mediaUrl;
-        await element.play();
+        await this.setSrcAndPlay(element, mediaUrl);
         return;
       } catch (e) {
         // If direct URL fails and it's an IPFS gateway URL, try other gateways
@@ -199,6 +219,34 @@ class CheeseAmpMedia {
     }
 
     throw new Error('Invalid media URL');
+  }
+
+  private setSrcAndPlay(element: HTMLAudioElement | HTMLVideoElement, url: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        element.removeEventListener('canplay', onCanPlay);
+        element.removeEventListener('error', onError);
+        // Don't reject — try to play anyway, browser may still be buffering
+        element.play().then(resolve).catch(reject);
+      }, 15000);
+
+      const onCanPlay = () => {
+        clearTimeout(timeout);
+        element.removeEventListener('error', onError);
+        element.play().then(resolve).catch(reject);
+      };
+
+      const onError = () => {
+        clearTimeout(timeout);
+        element.removeEventListener('canplay', onCanPlay);
+        reject(new Error('Failed to load media'));
+      };
+
+      element.addEventListener('canplay', onCanPlay, { once: true });
+      element.addEventListener('error', onError, { once: true });
+      element.src = url;
+      element.load();
+    });
   }
 
   async switchMediaType(preferVideo: boolean): Promise<void> {
