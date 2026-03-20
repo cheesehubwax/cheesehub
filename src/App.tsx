@@ -38,7 +38,7 @@ const App = () => {
           <CartProvider>
             <Toaster />
             <Sonner />
-            <BrowserRouter basename="/cheesehub">
+            <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '') || '/'}>
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/powerup" element={<PowerUp />} />
