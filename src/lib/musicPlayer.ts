@@ -154,14 +154,14 @@ class CheeseAmpMedia {
     return () => this.trackEndCallbacks.delete(callback);
   }
 
-  async play(track: MusicNFT, preferVideo = true): Promise<void> {
+  async play(track: MusicNFT, preferVideo = true, overrideAudioUrl?: string): Promise<void> {
     this._error = null;
     this._isLoading = true;
     this.currentTrack = track;
     this._hasVideo = !!(track.videoUrl || track.clipUrl);
     
-    // Determine if we should use video
-    const useVideo = preferVideo && !!(track.videoUrl);
+    // If overrideAudioUrl is provided, always use audio mode
+    const useVideo = !overrideAudioUrl && preferVideo && !!(track.videoUrl);
     this._mediaType = useVideo ? 'video' : 'audio';
     
     // Pause the other element
@@ -173,7 +173,7 @@ class CheeseAmpMedia {
     
     this.notifyCallbacks();
 
-    const mediaUrl = useVideo ? track.videoUrl! : track.audioUrl;
+    const mediaUrl = overrideAudioUrl || (useVideo ? track.videoUrl! : track.audioUrl);
     const element = useVideo ? this.getVideoElement() : this.audio;
     
     try {

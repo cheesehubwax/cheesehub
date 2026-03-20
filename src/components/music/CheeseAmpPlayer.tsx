@@ -123,6 +123,7 @@ export function CheeseAmpPlayer() {
   const [viewMode, setViewMode] = useState<'library' | 'playlists'>('library');
   const [sortAZ, setSortAZ] = useState(false);
   const [displayMode, setDisplayMode] = useState<DisplayMode>('cover');
+  const [activeExtraAudioKey, setActiveExtraAudioKey] = useState<string | null>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   const activeTracks = useMemo(() => 
@@ -198,12 +199,25 @@ export function CheeseAmpPlayer() {
   const handlePlayTrack = useCallback(async (track: StackedMusicNFT) => {
     playlist.playTrack(track);
     setDisplayMode('cover');
+    setActiveExtraAudioKey(null);
     try {
       await audioPlayer.play(track);
     } catch (error) {
       console.error('Failed to play track:', error);
     }
   }, [audioPlayer, playlist]);
+
+  const handleSelectExtraAudio = useCallback(async (url: string, key: string) => {
+    const track = playlist.currentTrack;
+    if (!track) return;
+    setActiveExtraAudioKey(key);
+    setDisplayMode('cover');
+    try {
+      await audioPlayer.play(track, false, url);
+    } catch (error) {
+      console.error('Failed to play extra audio:', error);
+    }
+  }, [audioPlayer, playlist.currentTrack]);
 
   const handlePlayPause = useCallback(() => {
     if (playbackState.isPlaying) {
@@ -388,7 +402,11 @@ export function CheeseAmpPlayer() {
               hasFrontArt={!!(currentTrack.frontArt || currentTrack.coverArt)}
               hasBackArt={!!currentTrack.backArt}
               displayMode={displayMode}
+              extraAudioUrls={currentTrack.extraAudioUrls}
+              activeExtraAudioKey={activeExtraAudioKey}
+              onSelectExtraAudio={handleSelectExtraAudio}
               onSelect={(mode) => {
+                setActiveExtraAudioKey(null);
                 setDisplayMode(mode);
                 if (mode === 'video' && !playbackState.isVideo) {
                   handleToggleVideo();

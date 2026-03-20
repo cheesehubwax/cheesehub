@@ -4,6 +4,12 @@ import { fetchWithFallback } from '@/lib/fetchWithFallback';
 import { ATOMIC_API } from '@/lib/waxConfig';
 import { waxRpcCall } from '@/lib/waxRpcFallback';
 
+export interface ExtraAudioEntry {
+  label: string;
+  url: string;
+  key: string;
+}
+
 export interface MusicNFT {
   asset_id: string;
   name: string;
@@ -20,6 +26,7 @@ export interface MusicNFT {
   frontArt?: string;
   backArt?: string;
   additionalImages?: string[];
+  extraAudioUrls?: ExtraAudioEntry[];
   duration?: number;
   collection: string;
   schema: string;
@@ -118,6 +125,38 @@ function isMusicNFT(data: Record<string, unknown>): boolean {
   if (data.clip) return true;
   if (data.video) return true;
   return false;
+}
+
+const EXTRA_AUDIO_PATTERN = /^(audio\d+|track\d+|fulltrack|full_audio|full_song|bonus_track)$/i;
+
+function extractExtraAudioUrls(allData: Record<string, unknown>): ExtraAudioEntry[] {
+  const entries: ExtraAudioEntry[] = [];
+  const keys = Object.keys(allData).filter(k => EXTRA_AUDIO_PATTERN.test(k) && allData[k] && typeof allData[k] === 'string');
+  
+  // Sort so audio1 < audio2 < track1 etc.
+  keys.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  
+  for (const key of keys) {
+    const url = getMediaUrl(allData[key] as string);
+    if (url) {
+      // Generate a friendly label
+      const num = key.match(/\d+/);
+      let label: string;
+      if (key.toLowerCase().startsWith('audio') && num) {
+        label = `Track ${num[0]}`;
+      } else if (key.toLowerCase().startsWith('track') && num) {
+        label = `Track ${num[0]}`;
+      } else if (key.toLowerCase().includes('full')) {
+        label = 'Full Track';
+      } else if (key.toLowerCase().includes('bonus')) {
+        label = 'Bonus Track';
+      } else {
+        label = key;
+      }
+      entries.push({ label, url, key });
+    }
+  }
+  return entries;
 }
 
 function getCachedMusicNFTs(owner: string): CachedMusicData | null {
@@ -275,6 +314,8 @@ async function fetchAssetMetadata(assetIds: string[]): Promise<MusicNFT[]> {
                   }
                 }
 
+                const extraAudioUrls = extractExtraAudioUrls(allData);
+
                 musicNfts.push({
                   asset_id: asset.asset_id,
                   name: asset.name || allData.name || 'Untitled Track',
@@ -291,6 +332,7 @@ async function fetchAssetMetadata(assetIds: string[]): Promise<MusicNFT[]> {
                   frontArt,
                   backArt,
                   additionalImages: additionalImages.length > 0 ? additionalImages : undefined,
+                  extraAudioUrls: extraAudioUrls.length > 0 ? extraAudioUrls : undefined,
                   duration: allData.duration ? parseInt(String(allData.duration)) : undefined,
                   collection: asset.collection?.collection_name || '',
                   schema: asset.schema?.schema_name || '',
@@ -363,6 +405,8 @@ async function fetchApiPage(owner: string, page: number, limit: number): Promise
           }
         }
 
+        const extraAudioUrls = extractExtraAudioUrls(allData);
+
         musicNfts.push({
           asset_id: asset.asset_id,
           name: asset.name || allData.name || 'Untitled Track',
@@ -379,6 +423,7 @@ async function fetchApiPage(owner: string, page: number, limit: number): Promise
           frontArt,
           backArt,
           additionalImages: additionalImages.length > 0 ? additionalImages : undefined,
+          extraAudioUrls: extraAudioUrls.length > 0 ? extraAudioUrls : undefined,
           duration: allData.duration ? parseInt(String(allData.duration)) : undefined,
           collection: asset.collection?.collection_name || '',
           schema: asset.schema?.schema_name || '',
