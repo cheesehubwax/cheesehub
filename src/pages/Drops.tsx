@@ -1,175 +1,139 @@
-import { useState } from "react";
 import { Layout } from "@/components/Layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { ShoppingBag, Search, Loader2 } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useDropsLoader } from "@/hooks/useDropsLoader";
-import { useEnrichDrops } from "@/hooks/useEnrichDrops";
-import { useCart } from "@/context/CartContext";
-import { DropCard } from "@/components/drops/DropCard";
 import { DropsHero } from "@/components/drops/DropsHero";
 import { CartDrawer } from "@/components/drops/CartDrawer";
-import { useNavigate } from "react-router-dom";
-import { getTokenConfig } from "@/lib/tokenRegistry";
-import type { NFTDrop, SelectedPrice } from "@/types/drop";
-import cheeseShipOrb from "@/assets/cheeseshoppe.png";
-import { playRandomFart } from "@/lib/fartSounds";
+import { CreateDrop } from "@/components/drops/CreateDrop";
+import { MyDrops } from "@/components/drops/MyDrops";
+import { SimpleDropGrid } from "@/components/drops/VirtualizedDropGrid";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchCheeseDropStats } from "@/services/atomicApi";
+import { useDropsLoader } from "@/hooks/useDropsLoader";
+import { useEnrichDrops } from "@/hooks/useEnrichDrops";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import type { NFTDrop } from "@/types/drop";
+import { Package, Plus, Sandwich, RefreshCw, Loader2 } from "lucide-react";
+import { CHEESE_CONFIG } from "@/lib/waxConfig";
+import { useMemo } from "react";
 
 const Drops = () => {
-  const { drops, sales, loading, error } = useDropsLoader();
-  const { enrichedDrops } = useEnrichDrops(drops);
-  const { addToCart } = useCart();
-  const navigate = useNavigate();
-  const [search, setSearch] = useState("");
+  const queryClient = useQueryClient();
 
-  const filteredDrops = search.trim()
-    ? enrichedDrops.filter(d =>
-        d.name.toLowerCase().includes(search.toLowerCase()) ||
-        d.collectionName.toLowerCase().includes(search.toLowerCase())
-      )
-    : enrichedDrops;
+  const { drops, isLoading, isRefreshing, error, refresh } = useDropsLoader();
 
-  const filteredSales = search.trim()
-    ? sales.filter(s =>
-        s.name.toLowerCase().includes(search.toLowerCase()) ||
-        s.collectionName.toLowerCase().includes(search.toLowerCase())
-      )
-    : sales;
+  const { data: cheeseStats, isLoading: isLoadingStats } = useQuery({
+    queryKey: ['cheese-drop-stats'],
+    queryFn: fetchCheeseDropStats,
+    staleTime: 1000 * 60 * 2,
+    refetchInterval: 1000 * 60 * 5,
+  });
 
-  const handleAddToCart = (drop: NFTDrop) => {
-    const currency = drop.currency || "CHEESE";
-    const config = getTokenConfig(currency);
-    const selectedPrice: SelectedPrice = {
-      price: drop.price,
-      currency,
-      tokenContract: config?.contract || "cheeseburger",
-      precision: config?.precision || 4,
-      listingPrice: drop.listingPrice || `${drop.price.toFixed(config?.precision || 4)} ${currency}`,
-    };
-    addToCart(drop, selectedPrice);
-  };
+  const displayDrops: NFTDrop[] = drops || [];
 
-  const handleDropClick = (drop: NFTDrop) => {
-    if (drop.dropId) {
-      navigate(`/drops/${drop.dropId}`);
-    }
+  const cheeseDrops = useMemo(() => {
+    const now = Date.now();
+    return displayDrops.filter(drop => {
+      if (drop.collectionName !== CHEESE_CONFIG.collectionName) return false;
+      const isSoldOut = drop.remaining <= 0 && drop.totalSupply > 0;
+      const isEnded = drop.endDate ? new Date(drop.endDate).getTime() < now : false;
+      return !isSoldOut && !isEnded;
+    });
+  }, [displayDrops]);
+
+  const { enrichedDrops: enrichedCheeseDrops, isEnriching: isEnrichingCheese } = useEnrichDrops(cheeseDrops);
+
+  const handleRefresh = async () => {
+    await Promise.all([
+      refresh(),
+      queryClient.invalidateQueries({ queryKey: ['cheese-drop-stats'] }),
+    ]);
   };
 
   return (
     <Layout>
-      <CartDrawer />
+      <DropsHero stats={cheeseStats} isLoading={isLoadingStats} />
 
-      {/* Hero */}
-      <section className="relative py-16 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
-        <div className="container relative z-10">
-          <div className="flex flex-col items-center gap-6">
-            <div
-              className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer"
-              onClick={playRandomFart}
+      <main className="container pb-20">
+        <Tabs defaultValue="cheese" className="w-full">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+            <TabsList className="grid w-full max-w-md grid-cols-3">
+              <TabsTrigger value="cheese" className="flex items-center gap-2">
+                <Sandwich className="h-4 w-4" />
+                <span className="hidden sm:inline">CHEESE</span>
+              </TabsTrigger>
+              <TabsTrigger value="my-drops" className="flex items-center gap-2">
+                <Package className="h-4 w-4" />
+                <span className="hidden sm:inline">My Drops</span>
+              </TabsTrigger>
+              <TabsTrigger value="create" className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Create</span>
+              </TabsTrigger>
+            </TabsList>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleRefresh}
+              disabled={isRefreshing || isLoading}
+              className="shrink-0"
+              title="Refresh drops"
             >
-              <img src={cheeseShipOrb} alt="CHEESE" className="w-24 h-24 object-contain" />
-            </div>
-            <div className="text-center space-y-2">
-              <h1 className="text-3xl md:text-4xl font-bold">
-                <span className="text-cheese">CHEESE</span>
-                <span className="text-foreground">Ship</span>
-              </h1>
-              <p className="text-muted-foreground max-w-2xl mx-auto">
-                Browse and purchase NFT drops, or create your own drops using the NFTHive smart contract.
-              </p>
-            </div>
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
           </div>
-        </div>
-      </section>
 
-      <div className="container pb-12">
-        <DropsHero totalDrops={enrichedDrops.length} totalSales={sales.length} />
-
-        <Card className="bg-card/80 border-border/50">
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <CardTitle className="flex items-center gap-2">
-                <ShoppingBag className="h-5 w-5 text-primary" />
-                NFT Marketplace
-              </CardTitle>
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search drops..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+          <TabsContent value="cheese">
+            <div className="mb-8">
+              <h2 className="font-display text-3xl font-bold text-foreground">$CHEESE Drops</h2>
+              <p className="text-muted-foreground mt-2">Drops purchasable with $CHEESE token</p>
+              {isEnrichingCheese && enrichedCheeseDrops.length > 0 && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Loading images...</span>
+                </div>
+              )}
             </div>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="drops" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="drops">Drops ({filteredDrops.length})</TabsTrigger>
-                <TabsTrigger value="sales">Market Sales ({filteredSales.length})</TabsTrigger>
-              </TabsList>
 
-              <TabsContent value="drops" className="mt-6">
-                {loading ? (
-                  <div className="flex items-center justify-center py-16">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            {isLoading && cheeseDrops.length === 0 ? (
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="space-y-4 rounded-xl border border-border/50 bg-card/50 p-4">
+                    <Skeleton className="aspect-square w-full rounded-lg" />
+                    <Skeleton className="h-6 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
                   </div>
-                ) : error ? (
-                  <p className="text-center text-destructive py-8">{error}</p>
-                ) : filteredDrops.length === 0 ? (
-                  <div className="text-center py-12">
-                    <ShoppingBag className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">No drops found</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                    {filteredDrops.map(drop => (
-                      <DropCard
-                        key={drop.id}
-                        drop={drop}
-                        onAddToCart={handleAddToCart}
-                        onClick={handleDropClick}
-                      />
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
+                ))}
+              </div>
+            ) : cheeseDrops.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-lg text-muted-foreground">No active $CHEESE drops found.</p>
+              </div>
+            ) : (
+              <SimpleDropGrid drops={enrichedCheeseDrops} />
+            )}
+          </TabsContent>
 
-              <TabsContent value="sales" className="mt-6">
-                {loading ? (
-                  <div className="flex items-center justify-center py-16">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
-                ) : filteredSales.length === 0 ? (
-                  <div className="text-center py-12">
-                    <ShoppingBag className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">No market sales found</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                    {filteredSales.map(sale => (
-                      <DropCard key={sale.id} drop={sale} onAddToCart={handleAddToCart} />
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+          <TabsContent value="my-drops">
+            <MyDrops />
+          </TabsContent>
 
-        <div className="text-center text-sm text-muted-foreground mt-8">
-          <p>
-            Powered by{" "}
-            <a href="https://waxblock.io/account/nfthivedrops" target="_blank" rel="noopener noreferrer" className="text-cheese hover:underline">
-              NFTHIVEDROPS
-            </a>{" "}
-            smart contract
-          </p>
-        </div>
+          <TabsContent value="create">
+            <CreateDrop />
+          </TabsContent>
+        </Tabs>
+      </main>
+
+      <div className="container pb-12 text-center text-sm text-muted-foreground">
+        <p>
+          Powered by the{" "}
+          <a href="https://wax.bloks.io/account/nfthivedrop" target="_blank" rel="noopener noreferrer" className="text-cheese hover:underline">
+            NFTHIVEDROP
+          </a>{" "}
+          smart contract.
+        </p>
       </div>
+
+      <CartDrawer />
     </Layout>
   );
 };
