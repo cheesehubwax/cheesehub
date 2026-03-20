@@ -40,7 +40,7 @@ const Drops = () => {
     });
   }, [displayDrops]);
 
-  const { enrichedDrops: enrichedCheeseDrops, isEnriching: isEnrichingCheese } = useEnrichDrops(cheeseDrops);
+  const { enrichedDrops: enrichedCheeseDrops, loading: isEnrichingCheese } = useEnrichDrops(cheeseDrops);
 
   const handleRefresh = async () => {
     await Promise.all([
@@ -51,7 +51,7 @@ const Drops = () => {
 
   return (
     <Layout>
-      <DropsHero stats={cheeseStats} isLoading={isLoadingStats} />
+      <DropsHero totalDrops={cheeseStats?.activeDrops ?? 0} totalSales={cheeseStats?.totalSold ?? 0} />
 
       <main className="container pb-20">
         <Tabs defaultValue="cheese" className="w-full">

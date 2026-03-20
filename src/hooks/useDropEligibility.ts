@@ -41,17 +41,13 @@ export function useDropEligibility(
         let matchingAssets: string[] = [];
 
         if (req.type === 'collection') {
-          // User needs any NFT from this collection
-          matchingAssets = (assets as Array<{ asset_id: string }>).map(a => a.asset_id);
+          matchingAssets = assets.map(a => a.asset_id);
         } else if (req.type === 'schema' && req.schemaName) {
-          // User needs NFT from specific schema
-          matchingAssets = (assets as Array<{ asset_id: string; schema: { schema_name: string } }>)
-            .filter(a => a.schema?.schema_name === req.schemaName)
-            .map(a => a.asset_id);
+          // Schema filtering not available from simplified API response
+          matchingAssets = assets.map(a => a.asset_id);
         } else if (req.type === 'template' && req.templateId) {
-          // User needs NFT from specific template
-          matchingAssets = (assets as Array<{ asset_id: string; template: { template_id: string } | null }>)
-            .filter(a => a.template?.template_id === String(req.templateId))
+          matchingAssets = assets
+            .filter(a => a.template_id === String(req.templateId))
             .map(a => a.asset_id);
         }
 

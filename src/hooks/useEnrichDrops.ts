@@ -25,19 +25,12 @@ export function useEnrichDrops(drops: NFTDrop[]) {
           }
 
           try {
-            const template = await fetchTemplateById(drop.collectionName, drop.templateId);
+            const template = await fetchTemplateById(drop.templateId, drop.collectionName);
             if (template && mounted) {
-              const immutableData = template.immutable_data || {};
               return {
                 ...drop,
-                name: drop.name || immutableData.name || template.name,
-                description: drop.description || immutableData.description || '',
-                templateDescription: immutableData.description,
-                image: drop.image !== '/placeholder.svg' ? drop.image : 
-                  (immutableData.img || immutableData.image || drop.image),
-                attributes: Object.entries(immutableData)
-                  .filter(([key]) => !['name', 'description', 'img', 'image'].includes(key))
-                  .map(([key, value]) => ({ trait: key, value: String(value) })),
+                name: drop.name || template.name,
+                image: drop.image !== '/placeholder.svg' ? drop.image : (template.image || drop.image),
               };
             }
           } catch (err) {
