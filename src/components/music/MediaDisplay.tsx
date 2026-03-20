@@ -318,7 +318,7 @@ export function MediaSelector({ hasAudio, hasVideo, hasFrontArt, hasBackArt, dis
 
   const availableButtons = buttons.filter(b => b.available);
   const hasExtraAudioForFilter = extraAudioUrls && extraAudioUrls.length > 0;
-  if (availableButtons.length <= 1 && !hasExtraAudio) return null;
+  if (availableButtons.length <= 1 && !hasExtraAudioForFilter) return null;
 
   return (
     <div className="flex items-center gap-1 mt-2 flex-wrap">
