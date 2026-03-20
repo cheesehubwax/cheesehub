@@ -29,7 +29,6 @@ import { CheeseAmpMiniPlayer } from "./music/CheeseAmpMiniPlayer";
 import { useCheeseAmpAutoAdvance } from "@/hooks/useCheeseAmpAutoAdvance";
 import { getAudioPlayer } from "@/lib/musicPlayer";
 import { useCheeseAmpStore } from "@/stores/cheeseAmpStore";
-import { logPlay, flushPlayBuffer, getBufferedPlayCount } from "@/lib/cheeseAmpRoyalties";
 
 export function WalletConnect() {
   const { 
