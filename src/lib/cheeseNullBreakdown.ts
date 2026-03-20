@@ -91,7 +91,13 @@ async function fetchContractNulled(account: string): Promise<number> {
   return fetchContractNulledFromHyperion(account);
 }
 
-const NULL_CONTRACTS = ['cheeseburner', 'cheesefeefee', 'cheesepowerz', 'cheesebannad'] as const;
+const NULL_CONTRACTS = [
+  { account: 'cheeseburner', displayName: 'cheeseburner' },
+  { account: 'cheesefeefee', displayName: 'cheesefeefee' },
+  { account: 'cheesepowerz', displayName: 'cheesepowerz' },
+  { account: 'cheesebannad', displayName: 'cheesebannad' },
+  { account: 'liquidcheese', displayName: 'Liquidity Fees' },
+] as const;
 
 function getAgo(days: number): string {
   const d = new Date();
