@@ -176,29 +176,34 @@ export function CheeseAmpPlayer() {
     setViewMode('library');
   }, [playlist]);
 
-  // Subscribe to playback state updates
-  useEffect(() => {
-    const unsubscribe = audioPlayer.subscribe(setPlaybackState);
-    return unsubscribe;
-  }, [audioPlayer]);
-
-  // Sync with currently playing track when player is reopened
-  // Use a ref to avoid depending on `playlist` (which changes on every state update, causing a loop)
+  // Keep refs in sync to avoid stale closures in the subscription callback
   const playTrackRef = useRef(playlist.playTrack);
   playTrackRef.current = playlist.playTrack;
-  const currentPlaylistTrackId = playlist.currentTrack?.template_id;
+  const currentTrackIdRef = useRef<string | undefined>(playlist.currentTrack?.asset_id);
+  currentTrackIdRef.current = playlist.currentTrack?.asset_id;
+
+  // Subscribe to playback state updates and detect auto-advance track changes
+  const lastSyncedTrackIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const currentlyPlayingTrack = audioPlayer.getCurrentTrack();
-    if (currentlyPlayingTrack && stackedNfts.length > 0) {
-      const matchingTrack = stackedNfts.find(
-        t => t.template_id === currentlyPlayingTrack.template_id
-      );
-      if (matchingTrack && currentPlaylistTrackId !== matchingTrack.template_id) {
-        playTrackRef.current(matchingTrack);
+    const unsubscribe = audioPlayer.subscribe((newState) => {
+      setPlaybackState(newState);
+
+      // Detect when the audio player's current track differs from what the UI shows
+      const playing = audioPlayer.getCurrentTrack();
+      if (playing && playing.asset_id !== lastSyncedTrackIdRef.current) {
+        lastSyncedTrackIdRef.current = playing.asset_id;
+        const match = activeTracks.find(t => t.template_id === playing.template_id);
+        if (match && match.asset_id !== currentTrackIdRef.current) {
+          playTrackRef.current(match);
+          // Reset display state for the new track
+          setDisplayMode('cover');
+          setActiveExtraAudioKey(null);
+        }
       }
-    }
-  }, [audioPlayer, stackedNfts, currentPlaylistTrackId]);
+    });
+    return unsubscribe;
+  }, [audioPlayer, activeTracks]);
 
   const handlePlayTrack = useCallback(async (track: StackedMusicNFT) => {
     playlist.playTrack(track);
