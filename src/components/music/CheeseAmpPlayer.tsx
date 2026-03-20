@@ -634,9 +634,6 @@ export function CheeseAmpPlayer() {
                                 </p>
                               </div>
                               <VideoIndicator hasVideo={track.hasVideo} />
-                              {viewMode === 'global' && (
-                                <Globe className="h-3 w-3 text-muted-foreground shrink-0" />
-                              )}
                               {track.copies > 1 && (
                                 <span className="text-xs bg-cheese/20 text-cheese px-1.5 py-0.5 rounded-full shrink-0">
                                   x{track.copies}
