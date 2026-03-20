@@ -265,7 +265,7 @@ export function CheeseAmpPlayer() {
     ? (playbackState.currentTime / playbackState.duration) * 100 
     : 0;
 
-  const isActiveLoading = viewMode === 'global' ? isLoadingGlobal : isLoadingNfts;
+  const isActiveLoading = isLoadingNfts;
 
   if (isActiveLoading && activeTracks.length === 0) {
     return (
