@@ -1,5 +1,6 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
+import { CartDrawer } from "@/components/drops/CartDrawer";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
@@ -38,6 +39,7 @@ const App = () => {
           <CartProvider>
             <Toaster />
             <Sonner />
+            <CartDrawer />
             <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '') || '/'}>
               <Routes>
                 <Route path="/" element={<Index />} />
