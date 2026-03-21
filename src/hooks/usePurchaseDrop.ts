@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useWax } from '@/context/WaxContext';
+import { getTransactPlugins, closeWharfkitModals } from '@/lib/wharfKit';
 import type { NFTDrop, SelectedPrice } from '@/types/drop';
 
 export interface PurchaseResult {
@@ -9,7 +10,7 @@ export interface PurchaseResult {
 }
 
 export function usePurchaseDrop() {
-  const { session, accountName } = useWax();
+  const { session, accountName, refreshBalance } = useWax();
   const [purchasing, setPurchasing] = useState(false);
   const [result, setResult] = useState<PurchaseResult | null>(null);
 
@@ -29,9 +30,9 @@ export function usePurchaseDrop() {
 
     try {
       let transactionId: string | undefined;
+      const transactOptions = { transactPlugins: getTransactPlugins(session) };
 
       if (drop.dropSource === 'nfthive' && drop.dropId) {
-        // Use the context's claimDrop method for NFTHive drops
         const price = selectedPrice || {
           price: drop.price,
           currency: drop.currency || 'CHEESE',
@@ -65,11 +66,10 @@ export function usePurchaseDrop() {
               currency: `${price.precision},${price.currency}`,
             },
           }],
-        });
+        }, transactOptions);
 
         transactionId = txId.resolved?.transaction.id?.toString();
       } else if (drop.dropSource === 'sale' && drop.saleId) {
-        // Purchase from AtomicMarket sale
         const price = selectedPrice || {
           price: drop.price,
           currency: drop.currency || 'WAX',
@@ -90,17 +90,19 @@ export function usePurchaseDrop() {
               taker_marketplace: '',
             },
           }],
-        });
+        }, transactOptions);
 
         transactionId = txId.resolved?.transaction.id?.toString();
       } else {
         throw new Error('Unknown drop source');
       }
 
+      refreshBalance?.();
       const success = { success: true, transactionId };
       setResult(success);
       return success;
     } catch (err) {
+      closeWharfkitModals();
       const error = {
         success: false,
         error: err instanceof Error ? err.message : 'Purchase failed',
@@ -109,8 +111,9 @@ export function usePurchaseDrop() {
       return error;
     } finally {
       setPurchasing(false);
+      closeWharfkitModals();
     }
-  }, [session, accountName]);
+  }, [session, accountName, refreshBalance]);
 
   const clearResult = useCallback(() => {
     setResult(null);
