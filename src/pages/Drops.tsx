@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import type { NFTDrop } from "@/types/drop";
-import { Package, Plus, Sandwich, RefreshCw, Loader2 } from "lucide-react";
+import { Package, Plus, Sandwich, RefreshCw, Loader2, Star } from "lucide-react";
 import { CHEESE_CONFIG } from "@/lib/waxConfig";
 import { useMemo } from "react";
 
@@ -30,7 +30,8 @@ const Drops = () => {
 
   const displayDrops: NFTDrop[] = drops || [];
 
-  const cheeseDrops = useMemo(() => {
+  // Official tab: only cheesenftwax collection, active drops
+  const officialDrops = useMemo(() => {
     const now = Date.now();
     return displayDrops.filter(drop => {
       if (drop.collectionName !== CHEESE_CONFIG.collectionName) return false;
@@ -41,6 +42,22 @@ const Drops = () => {
     });
   }, [displayDrops]);
 
+  // CHEESE tab: ALL drops priced in CHEESE (any collection), active drops
+  const cheeseDrops = useMemo(() => {
+    const now = Date.now();
+    return displayDrops.filter(drop => {
+      const isSoldOut = drop.remaining <= 0 && drop.totalSupply > 0;
+      const isEnded = drop.endDate ? new Date(drop.endDate).getTime() < now : false;
+      const isNotStarted = drop.startDate ? new Date(drop.startDate).getTime() > now : false;
+      if (isSoldOut || isEnded || isNotStarted) return false;
+      // Check if any price option is CHEESE
+      const hasCheese = drop.currency === 'CHEESE' ||
+        (drop.prices && drop.prices.some(p => p.currency === 'CHEESE'));
+      return hasCheese;
+    });
+  }, [displayDrops]);
+
+  const { enrichedDrops: enrichedOfficialDrops, loading: isEnrichingOfficial } = useEnrichDrops(officialDrops);
   const { enrichedDrops: enrichedCheeseDrops, loading: isEnrichingCheese } = useEnrichDrops(cheeseDrops);
 
   const handleRefresh = async () => {
@@ -50,14 +67,30 @@ const Drops = () => {
     ]);
   };
 
+  const renderSkeletonGrid = () => (
+    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="space-y-4 rounded-xl border border-border/50 bg-card/50 p-4">
+          <Skeleton className="aspect-square w-full rounded-lg" />
+          <Skeleton className="h-6 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <Layout>
       <DropsHero totalDrops={cheeseStats?.activeDrops ?? 0} totalSales={cheeseStats?.totalSold ?? 0} />
 
       <main className="container pb-20">
-        <Tabs defaultValue="cheese" className="w-full">
+        <Tabs defaultValue="official" className="w-full">
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-            <TabsList className="grid w-full max-w-md grid-cols-3">
+            <TabsList className="grid w-full max-w-lg grid-cols-4">
+              <TabsTrigger value="official" className="flex items-center gap-2">
+                <Star className="h-4 w-4" />
+                <span className="hidden sm:inline">Official</span>
+              </TabsTrigger>
               <TabsTrigger value="cheese" className="flex items-center gap-2">
                 <Sandwich className="h-4 w-4" />
                 <span className="hidden sm:inline">CHEESE</span>
@@ -83,10 +116,31 @@ const Drops = () => {
             </Button>
           </div>
 
+          <TabsContent value="official">
+            <div className="mb-8">
+              <h2 className="font-display text-3xl font-bold text-foreground">Official CHEESE Drops</h2>
+              <p className="text-muted-foreground mt-2">Drops from the official cheesenftwax collection</p>
+              {isEnrichingOfficial && enrichedOfficialDrops.length > 0 && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Loading images...</span>
+                </div>
+              )}
+            </div>
+
+            {isLoading && officialDrops.length === 0 ? renderSkeletonGrid() : officialDrops.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-lg text-muted-foreground">No active official drops found.</p>
+              </div>
+            ) : (
+              <SimpleDropGrid drops={enrichedOfficialDrops} />
+            )}
+          </TabsContent>
+
           <TabsContent value="cheese">
             <div className="mb-8">
               <h2 className="font-display text-3xl font-bold text-foreground">$CHEESE Drops</h2>
-              <p className="text-muted-foreground mt-2">Drops purchasable with $CHEESE token</p>
+              <p className="text-muted-foreground mt-2">All drops purchasable with $CHEESE token</p>
               {isEnrichingCheese && enrichedCheeseDrops.length > 0 && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -95,17 +149,7 @@ const Drops = () => {
               )}
             </div>
 
-            {isLoading && cheeseDrops.length === 0 ? (
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="space-y-4 rounded-xl border border-border/50 bg-card/50 p-4">
-                    <Skeleton className="aspect-square w-full rounded-lg" />
-                    <Skeleton className="h-6 w-3/4" />
-                    <Skeleton className="h-4 w-1/2" />
-                  </div>
-                ))}
-              </div>
-            ) : cheeseDrops.length === 0 ? (
+            {isLoading && cheeseDrops.length === 0 ? renderSkeletonGrid() : cheeseDrops.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-lg text-muted-foreground">No active $CHEESE drops found.</p>
               </div>
@@ -113,7 +157,6 @@ const Drops = () => {
               <SimpleDropGrid drops={enrichedCheeseDrops} />
             )}
           </TabsContent>
-
 
           <TabsContent value="my-drops">
             <MyDrops />
