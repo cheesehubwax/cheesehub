@@ -78,7 +78,7 @@ export function MyDrops() {
     return (
       <Card key={drop.dropId} className="bg-card/50 border-border/50 overflow-hidden">
         <div className="relative aspect-square">
-          <img src={getImageUrl(drop.image)} alt={drop.name} className="h-full w-full object-cover" />
+          <img src={getImageUrl(drop.image) || '/placeholder.svg'} alt={drop.name} className="h-full w-full object-cover bg-muted" onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }} />
           <div className="absolute top-2 right-2 flex flex-col gap-1">
             {isSoldOut ? <Badge variant="secondary">Sold Out</Badge>
               : isActive ? <Badge className="bg-green-500/90">Active</Badge>
