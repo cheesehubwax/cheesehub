@@ -127,9 +127,9 @@ export function MyDrops() {
       <Tabs defaultValue="active" className="w-full">
         <div className="flex items-center justify-between mb-4">
           <TabsList>
-            <TabsTrigger value="active" className="gap-2">Active {activeDrops.length > 0 && <Badge variant="secondary" className="ml-1 text-xs">{activeDrops.length}</Badge>}</TabsTrigger>
-            <TabsTrigger value="pending" className="gap-2">Pending {pendingDrops.length > 0 && <Badge variant="secondary" className="ml-1 text-xs">{pendingDrops.length}</Badge>}</TabsTrigger>
-            <TabsTrigger value="finished" className="gap-2">Finished {finishedDrops.length > 0 && <Badge variant="secondary" className="ml-1 text-xs">{finishedDrops.length}</Badge>}</TabsTrigger>
+            <TabsTrigger value="active" className="gap-2">Active {activeDrops.length > 0 && <span className="ml-1 text-xs rounded-full bg-secondary px-1.5 py-0.5">{activeDrops.length}</span>}</TabsTrigger>
+            <TabsTrigger value="pending" className="gap-2">Pending {pendingDrops.length > 0 && <span className="ml-1 text-xs rounded-full bg-secondary px-1.5 py-0.5">{pendingDrops.length}</span>}</TabsTrigger>
+            <TabsTrigger value="finished" className="gap-2">Finished {finishedDrops.length > 0 && <span className="ml-1 text-xs rounded-full bg-secondary px-1.5 py-0.5">{finishedDrops.length}</span>}</TabsTrigger>
           </TabsList>
         </div>
         <TabsContent value="active">
