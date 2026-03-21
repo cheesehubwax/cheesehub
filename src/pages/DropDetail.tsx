@@ -140,7 +140,7 @@ const DropDetail = () => {
             </div>
 
             {drop.description && (
-              <p className="text-muted-foreground">{drop.description}</p>
+              <p className="whitespace-pre-line text-muted-foreground">{drop.description}</p>
             )}
 
             <Card className="bg-card/60 border-border/40">

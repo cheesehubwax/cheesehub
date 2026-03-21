@@ -200,7 +200,7 @@ export function DropCard({ drop, isImageCached, onImageLoaded }: DropCardProps) 
         <Link to={`/drops/${drop.id}`}>
           <h3 className="font-display text-lg font-semibold text-foreground transition-colors hover:text-primary">{drop.name}</h3>
         </Link>
-        <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{drop.description}</p>
+        <p className="mt-1 line-clamp-2 whitespace-pre-line text-sm text-muted-foreground">{drop.description}</p>
 
         {/* All payment options */}
         {!isFreeAuthDrop && displayPrices.length > 0 && (
