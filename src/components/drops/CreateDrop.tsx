@@ -254,6 +254,13 @@ export function CreateDrop() {
                 <SelectTrigger><SelectValue placeholder="Select collection" /></SelectTrigger>
                 <SelectContent>{userCollections.map((c: string) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
+            ) : formData.dropType === 'premint' ? (
+              <div className="p-4 border border-dashed border-border/50 rounded-lg text-center">
+                <AlertTriangle className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  You must be an authorized account on a collection to create a pre-mint drop.
+                </p>
+              </div>
             ) : (
               <Input placeholder="e.g. cheesenftwax" value={formData.collectionName} onChange={(e) => setFormData(prev => ({ ...prev, collectionName: e.target.value.toLowerCase(), assetIds: [] }))} />
             )}
