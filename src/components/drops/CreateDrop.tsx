@@ -231,18 +231,19 @@ export function CreateDrop() {
                 {formData.dropType === 'mint-on-demand' && <Check className="h-5 w-5 text-primary" />}
               </button>
 
-              <button type="button" onClick={() => setFormData(prev => ({ ...prev, dropType: 'premint', templateId: '' }))}
-                className={cn("flex items-start gap-3 p-4 rounded-lg border-2 text-left transition-all",
-                  formData.dropType === 'premint' ? "border-primary bg-primary/10" : "border-border/50 hover:border-primary/50")}>
-                <div className={cn("rounded-full p-2", formData.dropType === 'premint' ? "bg-primary/20" : "bg-muted")}>
-                  <Package className={cn("h-5 w-5", formData.dropType === 'premint' ? "text-primary" : "text-muted-foreground")} />
+              <div
+                className="flex items-start gap-3 p-4 rounded-lg border-2 text-left opacity-50 cursor-not-allowed border-border/50 relative">
+                <div className="rounded-full p-2 bg-muted">
+                  <Package className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div className="flex-1">
-                  <span className="font-medium">Pre-mint</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-muted-foreground">Pre-mint</span>
+                    <span className="text-[10px] bg-destructive/20 text-destructive px-1.5 py-0.5 rounded font-semibold">Under Maintenance</span>
+                  </div>
                   <p className="text-xs text-muted-foreground mt-1">Use existing NFTs from your wallet.</p>
                 </div>
-                {formData.dropType === 'premint' && <Check className="h-5 w-5 text-primary" />}
-              </button>
+              </div>
             </div>
           </div>
 
