@@ -207,7 +207,9 @@ export function CheeseAmpPlayer() {
 
   const handlePlayTrack = useCallback(async (track: StackedMusicNFT) => {
     playlist.playTrack(track);
-    setDisplayMode('cover');
+    // For video-only tracks, start in video display mode
+    const isVideoOnly = !!(track.videoUrl && (!track.audioUrl || track.audioUrl === track.videoUrl));
+    setDisplayMode(isVideoOnly ? 'video' : 'cover');
     setActiveExtraAudioKey(null);
     try {
       await audioPlayer.play(track);
