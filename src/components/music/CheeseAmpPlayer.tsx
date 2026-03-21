@@ -196,8 +196,9 @@ export function CheeseAmpPlayer() {
         const match = activeTracks.find(t => t.template_id === playing.template_id);
         if (match && match.asset_id !== currentTrackIdRef.current) {
           playTrackRef.current(match);
-          // Reset display state for the new track
-          setDisplayMode('cover');
+          // Reset display state for the new track — video-only tracks start in video mode
+          const isVideoOnly = !!(match.videoUrl && (!match.audioUrl || match.audioUrl === match.videoUrl));
+          setDisplayMode(isVideoOnly ? 'video' : 'cover');
           setActiveExtraAudioKey(null);
         }
       }
@@ -207,7 +208,9 @@ export function CheeseAmpPlayer() {
 
   const handlePlayTrack = useCallback(async (track: StackedMusicNFT) => {
     playlist.playTrack(track);
-    setDisplayMode('cover');
+    // For video-only tracks, start in video display mode
+    const isVideoOnly = !!(track.videoUrl && (!track.audioUrl || track.audioUrl === track.videoUrl));
+    setDisplayMode(isVideoOnly ? 'video' : 'cover');
     setActiveExtraAudioKey(null);
     try {
       await audioPlayer.play(track);

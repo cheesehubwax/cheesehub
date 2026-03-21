@@ -21,6 +21,7 @@ export interface MusicNFT {
   clipUrl?: string;
   videoUrl?: string;
   hasVideo: boolean;
+  videoOnly: boolean;
   coverArt: string;
   backCover?: string;
   frontArt?: string;
@@ -127,7 +128,7 @@ function isMusicNFT(data: Record<string, unknown>): boolean {
   return false;
 }
 
-const EXTRA_AUDIO_PATTERN = /^(audio\d+|track\d+|fulltrack|full_audio|full_song|bonus_track)$/i;
+const EXTRA_AUDIO_PATTERN = /^(audio\s*\d+|track\s*\d+|fulltrack|full_audio|full_song|bonus_track)$/i;
 
 function extractExtraAudioUrls(allData: Record<string, unknown>): ExtraAudioEntry[] {
   const entries: ExtraAudioEntry[] = [];
@@ -333,6 +334,7 @@ async function fetchAssetMetadata(assetIds: string[]): Promise<MusicNFT[]> {
                   clipUrl,
                   videoUrl,
                   hasVideo: !!(videoUrl || clipUrl),
+                  videoOnly: !!(videoUrl && !allData.audio && !allData.clip),
                   coverArt: getMediaUrl((allData.img || allData.image) as string | undefined),
                   backCover: backArt,
                   frontArt,
@@ -430,6 +432,7 @@ async function fetchApiPage(owner: string, page: number, limit: number): Promise
           clipUrl,
           videoUrl,
           hasVideo: !!(videoUrl || clipUrl),
+          videoOnly: !!(videoUrl && !allData.audio && !allData.clip),
           coverArt: getMediaUrl((allData.img || allData.image) as string | undefined),
           backCover: backArt,
           frontArt,

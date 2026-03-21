@@ -160,8 +160,11 @@ class CheeseAmpMedia {
     this.currentTrack = track;
     this._hasVideo = !!(track.videoUrl || track.clipUrl);
     
+    // Auto-detect video-only tracks: if no separate audio exists, default to video mode
+    const isVideoOnly = !!(track.videoUrl && (!track.audioUrl || track.audioUrl === track.videoUrl));
+    
     // If overrideAudioUrl is provided, always use audio mode
-    const useVideo = !overrideAudioUrl && preferVideo && !!(track.videoUrl);
+    const useVideo = !overrideAudioUrl && (preferVideo || isVideoOnly) && !!(track.videoUrl);
     this._mediaType = useVideo ? 'video' : 'audio';
     
     // Pause the other element
