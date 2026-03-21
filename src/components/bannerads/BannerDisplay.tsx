@@ -5,18 +5,20 @@ import { useBannerSlots, BannerSlotGroup } from "@/hooks/useBannerSlots";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 import { sanitizeUrl } from "@/lib/sanitizeUrl";
 import { logger } from "@/lib/logger";
+import cheeseBanner4 from "@/assets/cheese_banner4.png";
 
 interface ActiveBanner {
-  ipfsHash: string;
+  ipfsHash?: string;
+  localSrc?: string;
   websiteUrl: string;
   user: string;
+  isPlaceholder?: boolean;
 }
 
 function extractActiveBanners(group: BannerSlotGroup): ActiveBanner[] {
   const banners: ActiveBanner[] = [];
 
   for (const slot of group.slots) {
-    // Skip only if truly available (no renter) or suspended
     if (slot.suspended) continue;
 
     // Primary renter banner
@@ -36,6 +38,16 @@ function extractActiveBanners(group: BannerSlotGroup): ActiveBanner[] {
         user: slot.sharedUser,
       });
     }
+
+    // Placeholder for unrented shared half
+    if (slot.rentalType === "shared" && !slot.suspended && !slot.isAvailable && !slot.sharedUser) {
+      banners.push({
+        localSrc: cheeseBanner4,
+        websiteUrl: "/farm",
+        user: "placeholder",
+        isPlaceholder: true,
+      });
+    }
   }
 
   return banners;
@@ -49,7 +61,6 @@ export function BannerDisplay() {
   const activeBanners = useMemo(() => {
     const nowSec = Math.floor(Date.now() / 1000);
 
-    // Only use the most recent group that has started (today's group)
     const currentGroup = slotGroups
       .filter((group) => group.time <= nowSec)
       .sort((a, b) => b.time - a.time)[0];
@@ -87,27 +98,41 @@ export function BannerDisplay() {
   return (
     <div className="w-full flex flex-col items-center gap-1 pt-8 pb-2">
       {activeBanners.length > 0 && current ? (
-        <a
-          href={sanitizeUrl(current.websiteUrl)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="relative block max-w-[580px] w-full"
-        >
-          <img
-            src={`${currentGateway}${current.ipfsHash}`}
-            alt="Banner Ad"
-            className="w-full h-auto max-h-[150px] object-contain rounded-lg"
-            loading="lazy"
-            onError={() => {
-              if (gatewayIndex < IPFS_GATEWAYS.length - 1) {
-                setGatewayIndex((index) => index + 1);
-              }
-            }}
-          />
-          <span className="absolute top-1 right-1 text-[10px] font-bold text-foreground/30 bg-background/40 rounded px-1 py-0.5 leading-none pointer-events-none select-none">
-            AD
-          </span>
-        </a>
+        current.localSrc ? (
+          <Link
+            to={current.websiteUrl}
+            className="relative block max-w-[580px] w-full"
+          >
+            <img
+              src={current.localSrc}
+              alt="CHEESEFarm Banner"
+              className="w-full h-auto max-h-[150px] object-contain rounded-lg"
+              loading="lazy"
+            />
+          </Link>
+        ) : (
+          <a
+            href={sanitizeUrl(current.websiteUrl)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="relative block max-w-[580px] w-full"
+          >
+            <img
+              src={`${currentGateway}${current.ipfsHash}`}
+              alt="Banner Ad"
+              className="w-full h-auto max-h-[150px] object-contain rounded-lg"
+              loading="lazy"
+              onError={() => {
+                if (gatewayIndex < IPFS_GATEWAYS.length - 1) {
+                  setGatewayIndex((index) => index + 1);
+                }
+              }}
+            />
+            <span className="absolute top-1 right-1 text-[10px] font-bold text-foreground/30 bg-background/40 rounded px-1 py-0.5 leading-none pointer-events-none select-none">
+              AD
+            </span>
+          </a>
+        )
       ) : (
         <div className="flex gap-12">
           {[1, 2].map((slot) => (
