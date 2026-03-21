@@ -78,7 +78,7 @@ export function MyDrops() {
     return (
       <Card key={drop.dropId} className="bg-card/50 border-border/50 overflow-hidden">
         <div className="relative aspect-square">
-          <img src={getImageUrl(drop.image)} alt={drop.name} className="h-full w-full object-cover" />
+          <img src={getImageUrl(drop.image) || '/placeholder.svg'} alt={drop.name} className="h-full w-full object-cover bg-muted" onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }} />
           <div className="absolute top-2 right-2 flex flex-col gap-1">
             {isSoldOut ? <Badge variant="secondary">Sold Out</Badge>
               : isActive ? <Badge className="bg-green-500/90">Active</Badge>
@@ -99,11 +99,13 @@ export function MyDrops() {
             <div className="flex justify-between"><span>Start:</span><span>{format(new Date(startTime), "MMM d, yyyy h:mm a")}</span></div>
             <div className="flex justify-between"><span>End:</span><span>{format(new Date(endTime), "MMM d, yyyy h:mm a")}</span></div>
           </div>
-          <Button variant="outline" size="sm" className="w-full" asChild>
-            <a href={`https://nfthive.io/drop/nfthivedrops/${drop.dropId}`} target="_blank" rel="noopener noreferrer">
-              View on NFT Hive<ExternalLink className="ml-2 h-3 w-3" />
-            </a>
-          </Button>
+          {!drop.isPremint && (
+            <Button variant="outline" size="sm" className="w-full" asChild>
+              <a href={`https://nfthive.io/drop/nfthivedrops/${drop.dropId}`} target="_blank" rel="noopener noreferrer">
+                View on NFT Hive<ExternalLink className="ml-2 h-3 w-3" />
+              </a>
+            </Button>
+          )}
         </CardContent>
       </Card>
     );
@@ -125,9 +127,9 @@ export function MyDrops() {
       <Tabs defaultValue="active" className="w-full">
         <div className="flex items-center justify-between mb-4">
           <TabsList>
-            <TabsTrigger value="active" className="gap-2">Active {activeDrops.length > 0 && <Badge variant="secondary" className="ml-1 text-xs">{activeDrops.length}</Badge>}</TabsTrigger>
-            <TabsTrigger value="pending" className="gap-2">Pending {pendingDrops.length > 0 && <Badge variant="secondary" className="ml-1 text-xs">{pendingDrops.length}</Badge>}</TabsTrigger>
-            <TabsTrigger value="finished" className="gap-2">Finished {finishedDrops.length > 0 && <Badge variant="secondary" className="ml-1 text-xs">{finishedDrops.length}</Badge>}</TabsTrigger>
+            <TabsTrigger value="active" className="gap-2">Active {activeDrops.length > 0 && <span className="ml-1 text-xs rounded-full bg-secondary px-1.5 py-0.5">{activeDrops.length}</span>}</TabsTrigger>
+            <TabsTrigger value="pending" className="gap-2">Pending {pendingDrops.length > 0 && <span className="ml-1 text-xs rounded-full bg-secondary px-1.5 py-0.5">{pendingDrops.length}</span>}</TabsTrigger>
+            <TabsTrigger value="finished" className="gap-2">Finished {finishedDrops.length > 0 && <span className="ml-1 text-xs rounded-full bg-secondary px-1.5 py-0.5">{finishedDrops.length}</span>}</TabsTrigger>
           </TabsList>
         </div>
         <TabsContent value="active">
