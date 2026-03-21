@@ -195,6 +195,9 @@ export default function Admin() {
               />
             </div>
 
+            {/* Add Banner Slots Tool */}
+            <AddBannerSlotsCard />
+
             {/* Live Market Prices Summary */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="rounded-lg border border-border/50 p-3 text-center">
