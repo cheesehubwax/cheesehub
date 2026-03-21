@@ -36,11 +36,23 @@ const Drops = () => {
       if (drop.collectionName !== CHEESE_CONFIG.collectionName) return false;
       const isSoldOut = drop.remaining <= 0 && drop.totalSupply > 0;
       const isEnded = drop.endDate ? new Date(drop.endDate).getTime() < now : false;
-      return !isSoldOut && !isEnded;
+      const isNotStarted = drop.startDate ? new Date(drop.startDate).getTime() > now : false;
+      return !isSoldOut && !isEnded && !isNotStarted;
+    });
+  }, [displayDrops]);
+
+  const pendingDrops = useMemo(() => {
+    const now = Date.now();
+    return displayDrops.filter(drop => {
+      if (drop.collectionName !== CHEESE_CONFIG.collectionName) return false;
+      const isNotStarted = drop.startDate ? new Date(drop.startDate).getTime() > now : false;
+      const isEnded = drop.endDate ? new Date(drop.endDate).getTime() < now : false;
+      return isNotStarted && !isEnded;
     });
   }, [displayDrops]);
 
   const { enrichedDrops: enrichedCheeseDrops, loading: isEnrichingCheese } = useEnrichDrops(cheeseDrops);
+  const { enrichedDrops: enrichedPendingDrops, loading: isEnrichingPending } = useEnrichDrops(pendingDrops);
 
   const handleRefresh = async () => {
     await Promise.all([
