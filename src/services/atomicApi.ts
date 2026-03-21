@@ -317,6 +317,7 @@ function rawDropToNFTDrop(drop: OnChainNFTHiveDrop): NFTDrop {
     totalSupply: maxClaimable,
     remaining,
     attributes: [{ trait: 'Rarity', value: 'Common' }],
+    startDate: drop.start_time > 0 ? new Date(drop.start_time * 1000).toISOString() : undefined,
     endDate: drop.end_time > 0 ? new Date(drop.end_time * 1000).toISOString() : undefined,
     dropSource: 'nfthive',
     settlementSymbol: drop.settlement_symbol,
