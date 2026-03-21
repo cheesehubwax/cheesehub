@@ -1,109 +1,50 @@
 
-Issue summary
 
-Your clue is very useful: if NFTHive says the premint drop does not exist when using our button, that strongly suggests CheeseHub is linking to the wrong NFTHive URL format for at least some drops. I also found a likely separate issue in our image fallback path for premint drops.
+## Fix: Premint drop blank images and broken NFTHive link
 
-What I found
+### Root Causes Found
 
-1. Wrong NFTHive link format in My Drops
-- `src/components/drops/MyDrops.tsx` currently links to:
-  `https://nfthive.io/drop/${drop.dropId}`
-- Web results show many NFTHive premint drops use:
-  `https://nfthive.io/drop/nfthivedrops/${dropId}`
-- That matches your symptom exactly: the button can point to a non-existent page even though the on-chain drop exists.
+1. **Image resolution fails because `pools` table lookup is wrong.** The code queries the `pools` table using `drop_id` as lower/upper bound, but `pools` is indexed by its own auto-incrementing `pool_id`, NOT by `drop_id`. So the query always returns nothing or the wrong row, and the image stays as `/placeholder.svg`.
 
-2. Premint image fallback is probably reading the wrong on-chain source
-- `src/services/atomicApi.ts` fetches premint images in `fetchUserDrops()` by:
-  - detecting premint via empty `assets_to_mint` / template `-1`
-  - querying `nfthivedrops` table `pools`
-  - trying to read `rows[0].assets[0]`
-- This is fragile and likely wrong for your created premint drops:
-  - the row shape may not actually expose the deposited asset IDs in `assets`
-  - the lookup may need a different key/scope/path than the current `lower_bound/upper_bound = drop_id`
-- Result: the fallback never finds a real asset image, so the card stays on placeholder/blank.
+2. **Premint detection is correct** for the user's drops (`assets_to_mint: []` triggers `isPremint = true`), but the fallback image path after detection is broken (point 1 above).
 
-3. There is also inconsistent image handling between list views
-- `MyDrops.tsx` uses a simple local `getImageUrl()` with only `http`, `Qm`, and `bafy`
-- The app already has a more complete shared resolver in `src/services/atomicApi.ts` that also supports:
-  - `ipfs://`
-  - `bafk`
-  - `/ipfs/...`
-  - long CID-like values
-- Even if an image is found, My Drops can still fail to render some valid asset URLs.
+3. **NFTHive link shows "An error occurred on client"** for premint drops that haven't been finalized through NFTHive's creator tool. The user wants the button hidden for these drops.
 
-4. Detail-page enrichment likely misses premint too
-- `fetchDropById()` enriches only when `templateId` exists.
-- Premint drops do not have a usable template ID, so the detail page will also remain image-less unless we add an asset-based fallback there too.
+4. **`fetchDropById` has the same broken pools lookup** for the detail page.
 
-Implementation plan
+5. **Badge ref warning** in console from `MyDrops` — `Badge` is a function component used inside `TabsTrigger` which tries to pass a ref.
 
-1. Fix NFTHive links for user-created drops
-- Update My Drops “View on NFT Hive” button to use the contract-qualified path:
-  `https://nfthive.io/drop/nfthivedrops/${drop.dropId}`
-- Review any other NFTHive drop links in the app and normalize them where appropriate.
+### Plan
 
-2. Centralize premint drop URL generation
-- Add a small helper in the drop service or a shared utility to generate NFTHive drop URLs from a drop ID/source.
-- Use that helper in My Drops and anywhere else we expose external drop links, so this doesn’t regress.
+**File: `src/services/atomicApi.ts`**
 
-3. Replace the premint image fallback with a more reliable asset-resolution path
-- Refactor `fetchUserDrops()` in `src/services/atomicApi.ts` so premint drops resolve their preview image from deposited/associated asset data more robustly.
-- Preferred approach:
-  - inspect the actual on-chain row shape used for premint storage
-  - resolve a real deposited asset ID from the correct table/field
-  - fetch AtomicAssets metadata for that asset
-  - extract image from `data.img`, `data.image`, `immutable_data.img`, or `immutable_data.image`
-- Keep the current template-based enrichment for mint-on-demand drops unchanged.
+Replace the broken `pools` table lookup in both `fetchUserDrops` and `fetchDropById` with a reliable AtomicAssets API query:
 
-4. Add the same premint image fallback to single-drop loading
-- Extend `fetchDropById()` so premint drops can resolve an image the same way My Drops does.
-- This keeps `/drops/:id` consistent with My Drops and avoids “blank in details but not in list” behavior.
+- Query: `GET /atomicassets/v1/assets?owner=nfthivedrops&collection_name={collectionName}&limit=1`
+- This finds any asset deposited into the drop contract for that collection
+- Extract image from `data.img` / `data.image` / `immutable_data.img` / `immutable_data.image`
+- Apply `getImageUrl()` to normalize IPFS hashes
 
-5. Reuse the shared image URL resolver in My Drops
-- Remove the limited local `getImageUrl()` in `src/components/drops/MyDrops.tsx`
-- Reuse the shared resolver already used elsewhere so IPFS/image variants render consistently.
+In `fetchUserDrops`:
+- Replace lines 798-831 (the `pools` table block) with the AtomicAssets API query
+- Keep the `isPremint` detection as-is (it works correctly for `assets_to_mint: []`)
 
-6. Tighten fallback behavior so blank images degrade gracefully
-- If no asset image can be found, explicitly show the placeholder SVG rather than ending up with a white/empty render.
-- If the drop is premint and has no external NFTHive page yet, consider disabling or softening the external button state later, but first fix the URL and asset lookup.
+In `fetchDropById`:
+- Replace lines 504-533 (the premint fallback block) with the same AtomicAssets API approach
 
-Files I would update
+**File: `src/components/drops/MyDrops.tsx`**
 
-- `src/components/drops/MyDrops.tsx`
-  - fix NFTHive link
-  - reuse shared image URL helper
-- `src/services/atomicApi.ts`
-  - improve premint asset/image resolution in `fetchUserDrops()`
-  - add matching fallback to `fetchDropById()`
-  - optionally add shared helper for NFTHive drop URLs
+- Add `isPremint` field to the drop data (derived from `assets_to_mint` being empty in `fetchUserDrops`)
+- Conditionally hide the "View on NFT Hive" button when the drop is premint (since NFTHive shows errors for unfinished premint drops)
+- Fix the Badge ref warning by removing `Badge` from inside `TabsTrigger` children (wrap count in a `<span>` instead)
 
-Technical notes
+**File: `src/services/atomicApi.ts` (fetchUserDrops return type)**
 
-```text
-Current failure path
-premint drop created
-  -> fetchUserDrops finds on-chain row
-  -> premint detected
-  -> pools lookup does not produce usable asset id
-  -> image remains placeholder/blank
-  -> My Drops link points to /drop/{id}
-  -> NFTHive says drop does not exist
+- Add `isPremint: boolean` to the return type so `MyDrops` can conditionally hide the button
 
-Proposed path
-premint drop created
-  -> fetchUserDrops finds on-chain row
-  -> resolve correct deposited asset id from on-chain storage
-  -> fetch AtomicAssets metadata for that asset
-  -> normalize image via shared getImageUrl()
-  -> My Drops card renders correctly
-  -> external button uses /drop/nfthivedrops/{id}
-```
+### Summary of changes
+- 2 files modified: `src/services/atomicApi.ts`, `src/components/drops/MyDrops.tsx`
+- Replace broken pools table query with working AtomicAssets API query for premint images
+- Hide NFTHive button for premint drops
+- Fix Badge ref console warning
 
-Expected outcome
-
-- Your premint drop should appear in My Drops with a real image instead of a blank tile.
-- The NFTHive button should open the correct drop page format for premint drops.
-- The drop detail page should also be able to show the premint image consistently.
-
-Open question I do not need blocked on
-- If NFTHive truly has not indexed that premint drop yet, CheeseHub should still be able to show the image from on-chain + AtomicAssets metadata as long as the deposited asset IDs are available. So the NFTHive “does not exist” message does not prevent us from fixing the CheeseHub blank image.
