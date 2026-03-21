@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import type { NFTDrop } from "@/types/drop";
-import { Package, Plus, Sandwich, RefreshCw, Loader2 } from "lucide-react";
+import { Package, Plus, Sandwich, RefreshCw, Loader2, Clock } from "lucide-react";
 import { CHEESE_CONFIG } from "@/lib/waxConfig";
 import { useMemo } from "react";
 
@@ -36,11 +36,23 @@ const Drops = () => {
       if (drop.collectionName !== CHEESE_CONFIG.collectionName) return false;
       const isSoldOut = drop.remaining <= 0 && drop.totalSupply > 0;
       const isEnded = drop.endDate ? new Date(drop.endDate).getTime() < now : false;
-      return !isSoldOut && !isEnded;
+      const isNotStarted = drop.startDate ? new Date(drop.startDate).getTime() > now : false;
+      return !isSoldOut && !isEnded && !isNotStarted;
+    });
+  }, [displayDrops]);
+
+  const pendingDrops = useMemo(() => {
+    const now = Date.now();
+    return displayDrops.filter(drop => {
+      if (drop.collectionName !== CHEESE_CONFIG.collectionName) return false;
+      const isNotStarted = drop.startDate ? new Date(drop.startDate).getTime() > now : false;
+      const isEnded = drop.endDate ? new Date(drop.endDate).getTime() < now : false;
+      return isNotStarted && !isEnded;
     });
   }, [displayDrops]);
 
   const { enrichedDrops: enrichedCheeseDrops, loading: isEnrichingCheese } = useEnrichDrops(cheeseDrops);
+  const { enrichedDrops: enrichedPendingDrops, loading: isEnrichingPending } = useEnrichDrops(pendingDrops);
 
   const handleRefresh = async () => {
     await Promise.all([
@@ -56,10 +68,14 @@ const Drops = () => {
       <main className="container pb-20">
         <Tabs defaultValue="cheese" className="w-full">
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-            <TabsList className="grid w-full max-w-md grid-cols-3">
+            <TabsList className="grid w-full max-w-lg grid-cols-4">
               <TabsTrigger value="cheese" className="flex items-center gap-2">
                 <Sandwich className="h-4 w-4" />
                 <span className="hidden sm:inline">CHEESE</span>
+              </TabsTrigger>
+              <TabsTrigger value="pending" className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                <span className="hidden sm:inline">Pending</span>
               </TabsTrigger>
               <TabsTrigger value="my-drops" className="flex items-center gap-2">
                 <Package className="h-4 w-4" />
@@ -110,6 +126,37 @@ const Drops = () => {
               </div>
             ) : (
               <SimpleDropGrid drops={enrichedCheeseDrops} />
+            )}
+          </TabsContent>
+
+          <TabsContent value="pending">
+            <div className="mb-8">
+              <h2 className="font-display text-3xl font-bold text-foreground">Pending Drops</h2>
+              <p className="text-muted-foreground mt-2">Upcoming drops that haven't started yet</p>
+              {isEnrichingPending && enrichedPendingDrops.length > 0 && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Loading images...</span>
+                </div>
+              )}
+            </div>
+
+            {isLoading && pendingDrops.length === 0 ? (
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="space-y-4 rounded-xl border border-border/50 bg-card/50 p-4">
+                    <Skeleton className="aspect-square w-full rounded-lg" />
+                    <Skeleton className="h-6 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </div>
+                ))}
+              </div>
+            ) : pendingDrops.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-lg text-muted-foreground">No pending drops at the moment.</p>
+              </div>
+            ) : (
+              <SimpleDropGrid drops={enrichedPendingDrops} />
             )}
           </TabsContent>
 

@@ -41,6 +41,7 @@ export interface NFTDrop {
   remaining: number;
   seller?: string;
   attributes: { trait: string; value: string }[];
+  startDate?: string;
   endDate?: string;
   dropSource?: DropSource;
   dropId?: string;
