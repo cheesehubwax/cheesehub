@@ -196,8 +196,9 @@ export function CheeseAmpPlayer() {
         const match = activeTracks.find(t => t.template_id === playing.template_id);
         if (match && match.asset_id !== currentTrackIdRef.current) {
           playTrackRef.current(match);
-          // Reset display state for the new track
-          setDisplayMode('cover');
+          // Reset display state for the new track — video-only tracks start in video mode
+          const isVideoOnly = !!(match.videoUrl && (!match.audioUrl || match.audioUrl === match.videoUrl));
+          setDisplayMode(isVideoOnly ? 'video' : 'cover');
           setActiveExtraAudioKey(null);
         }
       }
