@@ -31,18 +31,22 @@ export function MyDrops() {
 
   const now = Date.now();
   
-  const { activeDrops, finishedDrops } = useMemo(() => {
+  const { activeDrops, pendingDrops, finishedDrops } = useMemo(() => {
     const active: typeof drops = [];
+    const pending: typeof drops = [];
     const finished: typeof drops = [];
     drops.forEach((drop) => {
+      const startTime = drop.startTime * 1000;
       const endTime = drop.endTime * 1000;
       const remaining = drop.maxClaimable - (drop.numClaimed || 0);
       const isSoldOut = remaining <= 0 && drop.maxClaimable > 0;
       const isEnded = now >= endTime;
+      const isNotStarted = now < startTime;
       if (isEnded || isSoldOut) finished.push(drop);
+      else if (isNotStarted) pending.push(drop);
       else active.push(drop);
     });
-    return { activeDrops: active, finishedDrops: finished };
+    return { activeDrops: active, pendingDrops: pending, finishedDrops: finished };
   }, [drops, now]);
 
   if (!isConnected) {
@@ -114,11 +118,13 @@ export function MyDrops() {
     );
   };
 
-  const renderEmptyState = (type: 'active' | 'finished') => (
+  const renderEmptyState = (type: 'active' | 'pending' | 'finished') => (
     <Card className="col-span-full bg-card/50 border-border/50">
       <CardContent className="py-8 text-center">
         <Package className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-        <p className="text-muted-foreground">{type === 'active' ? "No active or upcoming drops." : "No finished drops yet."}</p>
+        <p className="text-muted-foreground">
+          {type === 'active' ? "No active drops." : type === 'pending' ? "No pending drops." : "No finished drops yet."}
+        </p>
       </CardContent>
     </Card>
   );
@@ -129,11 +135,15 @@ export function MyDrops() {
         <div className="flex items-center justify-between mb-4">
           <TabsList>
             <TabsTrigger value="active" className="gap-2">Active {activeDrops.length > 0 && <Badge variant="secondary" className="ml-1 text-xs">{activeDrops.length}</Badge>}</TabsTrigger>
+            <TabsTrigger value="pending" className="gap-2">Pending {pendingDrops.length > 0 && <Badge variant="secondary" className="ml-1 text-xs">{pendingDrops.length}</Badge>}</TabsTrigger>
             <TabsTrigger value="finished" className="gap-2">Finished {finishedDrops.length > 0 && <Badge variant="secondary" className="ml-1 text-xs">{finishedDrops.length}</Badge>}</TabsTrigger>
           </TabsList>
         </div>
         <TabsContent value="active">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{activeDrops.length === 0 ? renderEmptyState('active') : activeDrops.map(renderDropCard)}</div>
+        </TabsContent>
+        <TabsContent value="pending">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{pendingDrops.length === 0 ? renderEmptyState('pending') : pendingDrops.map(renderDropCard)}</div>
         </TabsContent>
         <TabsContent value="finished">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{finishedDrops.length === 0 ? renderEmptyState('finished') : finishedDrops.map(renderDropCard)}</div>
