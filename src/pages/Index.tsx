@@ -92,7 +92,7 @@ const Index = () => {
               </div>
               <h2 className="text-2xl font-bold mb-4 flex items-center justify-center gap-2"><span><span className="text-cheese">CHEESE</span><span className="text-foreground">Null</span></span><span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span></h2>
               <p className="text-muted-foreground max-w-sm mx-auto mb-6">
-                Powered by the CHEESEBURNER smart contract. Perpetually NULLS $CHEESE. Anyone can call the NULL action and earn $CHEESE as a reward
+                Powered by the CHEESEBURNER smart contract. Perpetually NULLS $CHEESE. Anyone can call the NULL action
               </p>
               <Button asChild size="lg" className="bg-cheese hover:bg-cheese-dark text-primary-foreground font-semibold">
                 <Link to="/cheesenull">
