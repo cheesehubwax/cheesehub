@@ -1,37 +1,27 @@
 
 
-## Fix: usePurchaseDrop missing critical transaction infrastructure
+## Show Edit button to slot owners (with 48hr cutoff)
 
-### What happened
+### Changes
 
-The transaction `ea943b8d...` confirms the purchase went through on-chain. The CHEESE was deposited to `nfthivedrops`, but the NFT appears stuck in the contract. This points to the `usePurchaseDrop` hook's broken transaction handling — specifically the missing `transactPlugins` (Greymass Fuel resource provider) which can cause partial or malformed transaction broadcasting.
+**File: `src/components/bannerads/SlotCalendar.tsx`**
 
-### Bugs in `usePurchaseDrop.ts` vs the proven `WaxContext.claimDrop`
+Update the Edit button visibility logic (line 229):
 
-| Issue | `usePurchaseDrop` (Cart) | `WaxContext.claimDrop` (Working) |
-|-------|-------------------------|----------------------------------|
-| Resource provider (Fuel) | Missing | `getTransactPlugins(session)` |
-| Balance refresh after tx | Never called | `refreshBalance()` |
-| Modal cleanup on error | Missing | `closeWharfkitModals()` |
-| Success confirmation | None (silent) | Shows TX ID dialog |
-| Error toast | Generic via CartDrawer | Proper destructive toast |
+- **Slot owners** (primary `slot.user` or `slot.sharedUser` matches `accountName`) can see Edit **only if** the slot's start time is more than 48 hours away (reuse existing `isWithinBuffer` with `MIN_RENT_BUFFER_HOURS`)
+- **Admins** keep unrestricted Edit access (no time limit)
+- Condition: `slot.isOnChain && !slot.suspended && (isAdmin || (isOwnerOrShared && isWithinBuffer(slot.time, MIN_RENT_BUFFER_HOURS)))`
 
-### Fix
+**File: `src/components/bannerads/EditBannerDialog.tsx`**
 
-**File: `src/hooks/usePurchaseDrop.ts`**
+Fix the `user` field in the transaction data (line 35):
 
-- Import `getTransactPlugins`, `closeWharfkitModals` from `@/lib/wharfKit`
-- Pass `{ transactPlugins: getTransactPlugins(session) }` as second arg to both `session.transact()` calls
-- Call `refreshBalance()` from WaxContext after successful purchase
-- Add `closeWharfkitModals()` in catch and finally blocks
-
-**File: `src/components/drops/CartDrawer.tsx`**
-
-- Import and use `useTransactionSuccess` from `@/context/TransactionSuccessContext`
-- After all items purchased successfully, call `showSuccess()` with the last transaction ID so the user gets a confirmation dialog with the TX ID and explorer link
-- Call `refreshBalance()` after purchase loop
+- For primary edit (`editadbanner`): send `user: slot.user` instead of `session.actor.toString()`
+- For shared edit (`editsharedad`): send `user: slot.sharedUser`
+- This lets both owners (signing as themselves) and admins (signing with admin auth on behalf of the owner) submit the transaction correctly
 
 ### Summary
-- 2 files changed
-- Aligns the Cart purchase path with the battle-tested WaxContext transaction pattern
+- 2 files, minimal changes
+- Owners get a 48hr edit window, then it locks for admin review
+- Admins retain full edit access at all times
 
