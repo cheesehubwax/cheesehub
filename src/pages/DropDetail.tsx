@@ -135,7 +135,12 @@ const DropDetail = () => {
           {/* Details */}
           <div className="space-y-6">
             <div>
-              <p className="text-sm text-muted-foreground">{drop.collectionName}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-muted-foreground">{drop.collectionName}</p>
+                <Badge variant={drop.templateId ? "default" : "secondary"} className="text-xs">
+                  {drop.templateId ? 'Mint on Demand' : 'Pre-mint'}
+                </Badge>
+              </div>
               <h1 className="text-2xl md:text-3xl font-bold text-foreground mt-1">{drop.name}</h1>
             </div>
 

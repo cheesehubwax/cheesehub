@@ -169,6 +169,13 @@ export function DropCard({ drop, isImageCached, onImageLoaded }: DropCardProps) 
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
           
+          {/* Drop type badge */}
+          <div className={`absolute top-2 ${drop.authRequired ? 'left-24' : 'left-2'} flex items-center gap-1 rounded-full backdrop-blur-sm px-2 py-1 text-xs font-medium ${
+            drop.templateId ? 'bg-primary/90 text-primary-foreground' : 'bg-accent/90 text-accent-foreground border border-border/30'
+          }`}>
+            {drop.templateId ? 'Mint on Demand' : 'Pre-mint'}
+          </div>
+
           {drop.authRequired && (
             <div className="absolute top-2 left-2 flex items-center gap-1 rounded-full bg-amber-500/90 backdrop-blur-sm px-2 py-1 text-xs font-medium text-black">
               <Lock className="h-3 w-3" />
