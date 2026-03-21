@@ -737,22 +737,22 @@ export async function fetchUserDrops(account: string): Promise<Array<{
           for (const drop of result.rows) {
             if (drop.authorized_account !== account) continue;
             if (drop.collection_name !== collectionName) continue;
-            if (apiDropsMap.has(drop.drop_id)) continue; // Already have from API
-            
-            // This is likely a premint drop missed by the API
+
+            const existingDrop = apiDropsMap.get(drop.drop_id);
             const { price, currency } = parseListingPrice(drop.listing_price);
             let displayData: { name?: string; description?: string } = {};
             try {
               if (drop.display_data) displayData = JSON.parse(drop.display_data);
             } catch { /* ignore */ }
-            
+
             const isPremint = !drop.assets_to_mint || drop.assets_to_mint.length === 0 || 
               (drop.assets_to_mint[0]?.template_id === -1);
-            
-            let image = '/placeholder.svg';
-            
-            // For mint-on-demand, try to fetch template image
-            if (!isPremint && drop.assets_to_mint?.[0]?.template_id > 0) {
+
+            let image = existingDrop?.image || '/placeholder.svg';
+            const needsImageFallback = !existingDrop || !existingDrop.image || existingDrop.image === '/placeholder.svg';
+
+            // For mint-on-demand, try to fetch template image if the API didn't provide one
+            if (!isPremint && needsImageFallback && drop.assets_to_mint?.[0]?.template_id > 0) {
               try {
                 const templateData = await fetchTemplateById(
                   String(drop.assets_to_mint[0].template_id), 
@@ -761,42 +761,51 @@ export async function fetchUserDrops(account: string): Promise<Array<{
                 if (templateData?.image) image = templateData.image;
               } catch { /* ignore */ }
             }
-            
-            // For premint drops, try to fetch from claimable assets table
-            if (isPremint) {
+
+            // For premint drops, fetch the first deposited asset from the pools table
+            if (isPremint && needsImageFallback) {
               try {
-                const assetsResult = await fetchTableRows<{ asset_ids: string[] }>({
+                const poolsResult = await fetchTableRows<{ drop_id: number; assets: string[]; pool_ready: boolean }>({
                   code: 'nfthivedrops',
-                  scope: String(drop.drop_id),
-                  table: 'claimassets',
+                  scope: 'nfthivedrops',
+                  table: 'pools',
+                  lower_bound: String(drop.drop_id),
+                  upper_bound: String(drop.drop_id),
                   limit: 1,
                 });
-                if (assetsResult.rows.length > 0 && assetsResult.rows[0].asset_ids?.length > 0) {
-                  const assetId = assetsResult.rows[0].asset_ids[0];
+
+                if (poolsResult.rows.length > 0 && poolsResult.rows[0].assets?.length > 0) {
+                  const assetId = poolsResult.rows[0].assets[0];
                   try {
                     const path = `${ATOMIC_API.paths.assets}/${assetId}`;
                     const resp = await fetchWithFallback(ATOMIC_API.baseUrls, path);
                     const json = await resp.json();
                     if (json.success && json.data) {
-                      const data = json.data.data || json.data.immutable_data || {};
-                      image = getImageUrl(data.img || data.image);
+                      const data = json.data.data || {};
+                      const immutableData = json.data.immutable_data || {};
+                      image = getImageUrl(
+                        data.img ||
+                        data.image ||
+                        immutableData.img ||
+                        immutableData.image
+                      );
                     }
                   } catch { /* ignore */ }
                 }
               } catch { /* ignore */ }
             }
-            
+
             apiDropsMap.set(drop.drop_id, {
               dropId: drop.drop_id,
-              name: displayData.name || `Drop #${drop.drop_id}`,
+              name: existingDrop?.name || displayData.name || `Drop #${drop.drop_id}`,
               image,
-              price,
-              currency: currency || 'WAX',
-              maxClaimable: drop.max_claimable || 0,
-              numClaimed: drop.current_claimed || 0,
-              startTime: drop.start_time || 0,
-              endTime: drop.end_time || 0,
-              collectionName: drop.collection_name,
+              price: existingDrop?.price ?? price,
+              currency: existingDrop?.currency || currency || 'WAX',
+              maxClaimable: existingDrop?.maxClaimable ?? drop.max_claimable ?? 0,
+              numClaimed: existingDrop?.numClaimed ?? drop.current_claimed ?? 0,
+              startTime: existingDrop?.startTime ?? drop.start_time ?? 0,
+              endTime: existingDrop?.endTime ?? drop.end_time ?? 0,
+              collectionName: existingDrop?.collectionName || drop.collection_name,
             });
           }
           
