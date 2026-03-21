@@ -129,26 +129,6 @@ const Drops = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="my-drops">
-            <MyDrops />
-          </TabsContent>
-
-          <TabsContent value="create">
-            <CreateDrop />
-          </TabsContent>
-        </Tabs>
-      </main>
-
-      <div className="container pb-12 text-center text-sm text-muted-foreground">
-        <p>
-          Powered by the{" "}
-          <a href="https://wax.bloks.io/account/nfthivedrop" target="_blank" rel="noopener noreferrer" className="text-cheese hover:underline">
-            NFTHIVEDROP
-          </a>{" "}
-          smart contract.
-        </p>
-      </div>
-
           <TabsContent value="pending">
             <div className="mb-8">
               <h2 className="font-display text-3xl font-bold text-foreground">Pending Drops</h2>
@@ -180,6 +160,27 @@ const Drops = () => {
             )}
           </TabsContent>
 
+          <TabsContent value="my-drops">
+            <MyDrops />
+          </TabsContent>
+
+          <TabsContent value="create">
+            <CreateDrop />
+          </TabsContent>
+        </Tabs>
+      </main>
+
+      <div className="container pb-12 text-center text-sm text-muted-foreground">
+        <p>
+          Powered by the{" "}
+          <a href="https://wax.bloks.io/account/nfthivedrop" target="_blank" rel="noopener noreferrer" className="text-cheese hover:underline">
+            NFTHIVEDROP
+          </a>{" "}
+          smart contract.
+        </p>
+      </div>
+
+      
     </Layout>
   );
 };
