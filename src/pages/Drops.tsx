@@ -133,7 +133,7 @@ const Drops = () => {
         </p>
       </div>
 
-      <CartDrawer />
+      
     </Layout>
   );
 };
