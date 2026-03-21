@@ -1,37 +1,31 @@
 
 
-## Enhance RAM check warning in CreateDrop
+## Add Banner Slot Creator to Admin Dashboard
 
-The current RAM shortage warning is minimal ("Insufficient RAM / Use Manage RAM to deposit more"). The source repo shows detailed shortage info and a loading state. Two changes needed:
+### Summary
+Add an "Add Banner Slots" card to the `/admin` page that lets admins pick a date range, set positions per day, preview the timestamps, and call the `initbannerad` action on `cheesebannad`.
 
-### 1. Add RAM loading indicator (lines 310-311)
-After the Max Claimable input, add the "Checking RAM balance..." spinner that shows while `loadingRamBalance` is true and a collection is selected.
+### New File: `src/components/admin/AddBannerSlotsCard.tsx`
+- Date range picker (start date + end date) using Shadcn Calendar in Popovers
+- "Positions per day" number input (default 2)
+- Preview table: each date → its 14:00 UTC Unix timestamp × position count
+- "Create Slots" button that batches one `initbannerad` action per day:
+  ```json
+  {
+    "account": "cheesebannad",
+    "name": "initbannerad",
+    "authorization": [{ "actor": accountName, "permission": "active" }],
+    "data": { "time": <14:00 UTC timestamp>, "number_of_slots": <positions> }
+  }
+  ```
+- Uses `useWaxTransaction` for execution with modal cleanup
+- Gets session/account from `useWax` context
+- Styled consistently with existing admin cards (dark border, icon, Megaphone icon)
 
-### 2. Expand the RAM shortage warning (lines 311-321)
-Replace the brief warning with the full source version showing:
-- Available NFTs vs requested amount
-- Byte shortfall with estimated WAX cost
-- Direct reference to "Manage RAM" at top of page
+### Modified: `src/pages/Admin.tsx`
+- Import and render `AddBannerSlotsCard` below the existing contract cards grid (only visible to authenticated admins, which is already gated)
 
-### File: `src/components/drops/CreateDrop.tsx`
-
-**Add after line 310** (after the input, before the ramShortage block):
-```tsx
-{formData.dropType === 'premint' && (
-  <p className="text-xs text-muted-foreground">Auto-set based on selected NFTs</p>
-)}
-{formData.dropType === 'mint-on-demand' && loadingRamBalance && formData.collectionName && (
-  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-    <Loader2 className="h-3 w-3 animate-spin" />
-    Checking RAM balance...
-  </div>
-)}
-```
-
-**Replace the existing ramShortage block** (lines 311-321) with the detailed version from source:
-- Shows `ramShortage.availableNFTs` NFTs worth of RAM vs `formData.maxClaimable`
-- Shows byte shortfall and estimated WAX cost
-- Highlights "Manage RAM" text as actionable guidance
-
-No other files change.
+### Timestamp Logic
+- For each day in range: `new Date(\`\${yyyy}-\${mm}-\${dd}T14:00:00Z\`).getTime() / 1000`
+- Preview table shows human-readable date + calculated Unix timestamp so admin can verify before submitting
 
