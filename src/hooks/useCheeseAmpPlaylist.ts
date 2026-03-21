@@ -353,8 +353,31 @@ export function useCheeseAmpPlaylist(accountName: string | null, allTracks: Stac
 
   const selectPlaylist = useCallback((playlistId: string) => {
     updateState(prev => ({ ...prev, currentPlaylistId: playlistId }));
-    setCurrentIndex(-1);
-  }, [updateState]);
+
+    // Preserve currently-playing track's position instead of resetting
+    const audioPlayer = getAudioPlayer();
+    const playingTrack = audioPlayer.getCurrentTrack();
+
+    if (playingTrack) {
+      // Compute the new playlist's track list
+      let newTracks: StackedMusicNFT[];
+      if (playlistId === DEFAULT_PLAYLIST_ID) {
+        newTracks = allTracks;
+      } else {
+        const pl = state.playlists.find(p => p.id === playlistId);
+        newTracks = pl
+          ? pl.trackIds
+              .map(id => allTracks.find(t => t.asset_id === id))
+              .filter((t): t is StackedMusicNFT => t !== undefined)
+          : allTracks;
+      }
+
+      const idx = newTracks.findIndex(t => t.asset_id === playingTrack.asset_id);
+      setCurrentIndex(idx !== -1 ? idx : -1);
+    } else {
+      setCurrentIndex(-1);
+    }
+  }, [updateState, allTracks, state.playlists]);
 
   // On-chain save/remove
   const saveToChain = useCallback(async (playlistId: string, session: Session) => {
