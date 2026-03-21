@@ -32,7 +32,7 @@ export function EditBannerDialog({ open, onOpenChange, slot, onSuccess }: EditBa
     try {
       const isShared = slot.sharedUser === session.actor.toString();
       const actionName = isShared ? "editsharedad" : "editadbanner";
-      const action = { account: "cheesebannad", name: actionName, authorization: [session.permissionLevel], data: { user: session.actor.toString(), start_time: slot.time, position: slot.position, ipfs_hash: ipfsHash, website_url: websiteUrl } };
+      const action = { account: "cheesebannad", name: actionName, authorization: [session.permissionLevel], data: { user: isShared ? slot.sharedUser : slot.user, start_time: slot.time, position: slot.position, ipfs_hash: ipfsHash, website_url: websiteUrl } };
       const result = await session.transact({ actions: [action] }, { transactPlugins: getTransactPlugins(session) });
       if (result.resolved?.transaction.id) { toast({ title: "Banner Updated! 🧀", description: "Your banner ad has been updated." }); onSuccess(); onOpenChange(false); }
     } catch (error) {
