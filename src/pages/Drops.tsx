@@ -49,6 +49,7 @@ const Drops = () => {
       const isSoldOut = drop.remaining <= 0 && drop.totalSupply > 0;
       const isEnded = drop.endDate ? new Date(drop.endDate).getTime() < now : false;
       const isNotStarted = drop.startDate ? new Date(drop.startDate).getTime() > now : false;
+      if (isSoldOut || isEnded || isNotStarted) return false;
       if (drop.collectionName === CHEESE_CONFIG.collectionName) return false;
       // Check if any price option is CHEESE
       const hasCheese = drop.currency === 'CHEESE' ||
