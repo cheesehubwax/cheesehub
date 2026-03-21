@@ -149,7 +149,37 @@ const Drops = () => {
         </p>
       </div>
 
-      
+          <TabsContent value="pending">
+            <div className="mb-8">
+              <h2 className="font-display text-3xl font-bold text-foreground">Pending Drops</h2>
+              <p className="text-muted-foreground mt-2">Upcoming drops that haven't started yet</p>
+              {isEnrichingPending && enrichedPendingDrops.length > 0 && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Loading images...</span>
+                </div>
+              )}
+            </div>
+
+            {isLoading && pendingDrops.length === 0 ? (
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="space-y-4 rounded-xl border border-border/50 bg-card/50 p-4">
+                    <Skeleton className="aspect-square w-full rounded-lg" />
+                    <Skeleton className="h-6 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </div>
+                ))}
+              </div>
+            ) : pendingDrops.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-lg text-muted-foreground">No pending drops at the moment.</p>
+              </div>
+            ) : (
+              <SimpleDropGrid drops={enrichedPendingDrops} />
+            )}
+          </TabsContent>
+
     </Layout>
   );
 };
