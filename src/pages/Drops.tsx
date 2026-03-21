@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import type { NFTDrop } from "@/types/drop";
-import { Package, Plus, Sandwich, RefreshCw, Loader2, Clock } from "lucide-react";
+import { Package, Plus, Sandwich, RefreshCw, Loader2 } from "lucide-react";
 import { CHEESE_CONFIG } from "@/lib/waxConfig";
 import { useMemo } from "react";
 
@@ -41,18 +41,7 @@ const Drops = () => {
     });
   }, [displayDrops]);
 
-  const pendingDrops = useMemo(() => {
-    const now = Date.now();
-    return displayDrops.filter(drop => {
-      if (drop.collectionName !== CHEESE_CONFIG.collectionName) return false;
-      const isNotStarted = drop.startDate ? new Date(drop.startDate).getTime() > now : false;
-      const isEnded = drop.endDate ? new Date(drop.endDate).getTime() < now : false;
-      return isNotStarted && !isEnded;
-    });
-  }, [displayDrops]);
-
   const { enrichedDrops: enrichedCheeseDrops, loading: isEnrichingCheese } = useEnrichDrops(cheeseDrops);
-  const { enrichedDrops: enrichedPendingDrops, loading: isEnrichingPending } = useEnrichDrops(pendingDrops);
 
   const handleRefresh = async () => {
     await Promise.all([
@@ -68,14 +57,10 @@ const Drops = () => {
       <main className="container pb-20">
         <Tabs defaultValue="cheese" className="w-full">
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-            <TabsList className="grid w-full max-w-lg grid-cols-4">
+            <TabsList className="grid w-full max-w-md grid-cols-3">
               <TabsTrigger value="cheese" className="flex items-center gap-2">
                 <Sandwich className="h-4 w-4" />
                 <span className="hidden sm:inline">CHEESE</span>
-              </TabsTrigger>
-              <TabsTrigger value="pending" className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                <span className="hidden sm:inline">Pending</span>
               </TabsTrigger>
               <TabsTrigger value="my-drops" className="flex items-center gap-2">
                 <Package className="h-4 w-4" />
