@@ -1,26 +1,37 @@
 
 
-## Fix: Playback pauses when switching from Playlists back to Library
+## Fix: usePurchaseDrop missing critical transaction infrastructure
 
-### Root Cause
+### What happened
 
-`selectPlaylist()` in `useCheeseAmpPlaylist.ts` blindly resets `currentIndex` to `-1` every time it's called. When clicking "Library", this makes `currentTrack` null, which unmounts `MediaDisplay`, detaching the `<video>` element from the DOM. The browser then auto-pauses the video — and since audio comes from the video element for video-only tracks, all playback stops.
+The transaction `ea943b8d...` confirms the purchase went through on-chain. The CHEESE was deposited to `nfthivedrops`, but the NFT appears stuck in the contract. This points to the `usePurchaseDrop` hook's broken transaction handling — specifically the missing `transactPlugins` (Greymass Fuel resource provider) which can cause partial or malformed transaction broadcasting.
+
+### Bugs in `usePurchaseDrop.ts` vs the proven `WaxContext.claimDrop`
+
+| Issue | `usePurchaseDrop` (Cart) | `WaxContext.claimDrop` (Working) |
+|-------|-------------------------|----------------------------------|
+| Resource provider (Fuel) | Missing | `getTransactPlugins(session)` |
+| Balance refresh after tx | Never called | `refreshBalance()` |
+| Modal cleanup on error | Missing | `closeWharfkitModals()` |
+| Success confirmation | None (silent) | Shows TX ID dialog |
+| Error toast | Generic via CartDrawer | Proper destructive toast |
 
 ### Fix
 
-**File: `src/hooks/useCheeseAmpPlaylist.ts`** (lines 354-357)
+**File: `src/hooks/usePurchaseDrop.ts`**
 
-Replace the blind `setCurrentIndex(-1)` in `selectPlaylist` with logic that preserves the currently-playing track's position:
+- Import `getTransactPlugins`, `closeWharfkitModals` from `@/lib/wharfKit`
+- Pass `{ transactPlugins: getTransactPlugins(session) }` as second arg to both `session.transact()` calls
+- Call `refreshBalance()` from WaxContext after successful purchase
+- Add `closeWharfkitModals()` in catch and finally blocks
 
-- Get the audio player's current track
-- If something is playing, compute the new playlist's track list and find the playing track's index in it
-- Only reset to `-1` if nothing is playing or the track isn't in the new playlist
+**File: `src/components/drops/CartDrawer.tsx`**
 
-```text
-Before:  selectPlaylist → setCurrentIndex(-1) → currentTrack=null → unmount video → pause
-After:   selectPlaylist → find playing track in new list → keep index → video stays mounted
-```
+- Import and use `useTransactionSuccess` from `@/context/TransactionSuccessContext`
+- After all items purchased successfully, call `showSuccess()` with the last transaction ID so the user gets a confirmation dialog with the TX ID and explorer link
+- Call `refreshBalance()` after purchase loop
 
-### Files changed
-- `src/hooks/useCheeseAmpPlaylist.ts` — one function updated
+### Summary
+- 2 files changed
+- Aligns the Cart purchase path with the battle-tested WaxContext transaction pattern
 
