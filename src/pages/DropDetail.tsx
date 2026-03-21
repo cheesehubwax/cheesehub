@@ -3,6 +3,7 @@ import { Layout } from "@/components/Layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Loader2, ShoppingCart, Info } from "lucide-react";
 import { TokenLogo } from "@/components/TokenLogo";
@@ -11,6 +12,7 @@ import { useWax } from "@/context/WaxContext";
 import { useCart } from "@/context/CartContext";
 import { useDropEligibility } from "@/hooks/useDropEligibility";
 import { getTokenConfig } from "@/lib/tokenRegistry";
+import { getTokenContract } from "@/lib/tokenLogos";
 import type { NFTDrop, SelectedPrice } from "@/types/drop";
 
 const DropDetail = () => {
@@ -19,6 +21,7 @@ const DropDetail = () => {
   const { addToCart } = useCart();
   const [drop, setDrop] = useState<NFTDrop | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedPriceIndex, setSelectedPriceIndex] = useState<number | null>(null);
   const { eligibility } = useDropEligibility(drop, accountName || undefined);
 
   useEffect(() => {
@@ -30,16 +33,55 @@ const DropDetail = () => {
     });
   }, [id]);
 
+  // Auto-select if only one price option
+  useEffect(() => {
+    if (!drop) return;
+    const prices = drop.prices && drop.prices.length > 0 ? drop.prices : [];
+    if (prices.length === 1) {
+      setSelectedPriceIndex(0);
+    } else if (prices.length === 0) {
+      setSelectedPriceIndex(-1); // use legacy single price
+    } else {
+      setSelectedPriceIndex(null);
+    }
+  }, [drop]);
+
+  function getContractForCurrency(currency: string): string {
+    const config = getTokenConfig(currency);
+    if (config) return config.contract;
+    const alcorContract = getTokenContract(currency);
+    if (alcorContract) return alcorContract;
+    return 'eosio.token';
+  }
+
   const handleAddToCart = () => {
     if (!drop) return;
-    const currency = drop.currency || "CHEESE";
+    const prices = drop.prices && drop.prices.length > 0 ? drop.prices : [];
+
+    let currency: string;
+    let price: number;
+    let listingPrice: string | undefined;
+
+    if (selectedPriceIndex !== null && selectedPriceIndex >= 0 && prices[selectedPriceIndex]) {
+      const p = prices[selectedPriceIndex];
+      currency = p.currency;
+      price = p.price;
+      listingPrice = p.listingPrice;
+    } else {
+      currency = drop.currency || "CHEESE";
+      price = drop.price;
+      listingPrice = drop.listingPrice;
+    }
+
     const config = getTokenConfig(currency);
+    const contract = config?.contract || getContractForCurrency(currency);
+    const precision = config?.precision || 8;
     const selectedPrice: SelectedPrice = {
-      price: drop.price,
+      price,
       currency,
-      tokenContract: config?.contract || "cheeseburger",
-      precision: config?.precision || 4,
-      listingPrice: drop.listingPrice || `${drop.price.toFixed(config?.precision || 4)} ${currency}`,
+      tokenContract: contract,
+      precision,
+      listingPrice: listingPrice || `${price.toFixed(precision)} ${currency}`,
     };
     addToCart(drop, selectedPrice);
   };
@@ -121,21 +163,34 @@ const DropDetail = () => {
                   )}
                 </div>
 
-                {/* Show all payment options */}
+                {/* Payment options with checkboxes */}
                 {!isFree && drop.prices && drop.prices.length > 0 && (
                   <div className="space-y-1.5">
+                    <span className="text-sm text-muted-foreground">Select payment method</span>
                     {drop.prices.map((p, i) => (
-                      <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-muted/30 border border-border/30">
+                      <label
+                        key={i}
+                        className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-colors ${
+                          selectedPriceIndex === i
+                            ? 'bg-primary/10 border-primary/50'
+                            : 'bg-muted/30 border-border/30 hover:border-border/60'
+                        }`}
+                        onClick={() => setSelectedPriceIndex(i)}
+                      >
                         <div className="flex items-center gap-2">
+                          <Checkbox
+                            checked={selectedPriceIndex === i}
+                            onCheckedChange={() => setSelectedPriceIndex(i)}
+                          />
                           <TokenLogo
-                            contract={getTokenConfig(p.currency)?.contract || "eosio.token"}
+                            contract={getContractForCurrency(p.currency)}
                             symbol={p.currency}
                             size="md"
                           />
                           <span className="font-medium text-foreground">{p.currency}</span>
                         </div>
                         <span className="font-bold text-primary">{p.price.toLocaleString()}</span>
-                      </div>
+                      </label>
                     ))}
                   </div>
                 )}
@@ -168,10 +223,10 @@ const DropDetail = () => {
                     className="w-full bg-primary text-primary-foreground"
                     size="lg"
                     onClick={handleAddToCart}
-                    disabled={!eligibility.isEligible}
+                    disabled={!eligibility.isEligible || (!isFree && drop.prices && drop.prices.length > 1 && selectedPriceIndex === null)}
                   >
                     <ShoppingCart className="h-4 w-4 mr-2" />
-                    {isFree ? "Claim Free Drop" : "Add to Cart"}
+                    {isFree ? "Claim Free Drop" : selectedPriceIndex === null && drop.prices && drop.prices.length > 1 ? "Select Payment First" : "Add to Cart"}
                   </Button>
                 )}
               </CardContent>
