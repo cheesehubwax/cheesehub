@@ -68,10 +68,14 @@ const Drops = () => {
       <main className="container pb-20">
         <Tabs defaultValue="cheese" className="w-full">
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-            <TabsList className="grid w-full max-w-md grid-cols-3">
+            <TabsList className="grid w-full max-w-lg grid-cols-4">
               <TabsTrigger value="cheese" className="flex items-center gap-2">
                 <Sandwich className="h-4 w-4" />
                 <span className="hidden sm:inline">CHEESE</span>
+              </TabsTrigger>
+              <TabsTrigger value="pending" className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                <span className="hidden sm:inline">Pending</span>
               </TabsTrigger>
               <TabsTrigger value="my-drops" className="flex items-center gap-2">
                 <Package className="h-4 w-4" />
