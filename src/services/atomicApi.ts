@@ -820,6 +820,7 @@ export async function fetchUserDrops(account: string): Promise<Array<{
               startTime: existingDrop?.startTime ?? drop.start_time ?? 0,
               endTime: existingDrop?.endTime ?? drop.end_time ?? 0,
               collectionName: existingDrop?.collectionName || drop.collection_name,
+              isPremint,
             });
           }
           
