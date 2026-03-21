@@ -1,27 +1,20 @@
 
 
-## Show Edit button to slot owners (with 48hr cutoff)
+## Add placeholder banner for unrented shared slots (linking to /farm)
 
 ### Changes
 
-**File: `src/components/bannerads/SlotCalendar.tsx`**
+**1. Copy uploaded image into project**
+- Copy `user-uploads://cheese_banner4.png` → `src/assets/cheese_banner4.png`
 
-Update the Edit button visibility logic (line 229):
+**2. Update `src/components/bannerads/BannerDisplay.tsx`**
 
-- **Slot owners** (primary `slot.user` or `slot.sharedUser` matches `accountName`) can see Edit **only if** the slot's start time is more than 48 hours away (reuse existing `isWithinBuffer` with `MIN_RENT_BUFFER_HOURS`)
-- **Admins** keep unrestricted Edit access (no time limit)
-- Condition: `slot.isOnChain && !slot.suspended && (isAdmin || (isOwnerOrShared && isWithinBuffer(slot.time, MIN_RENT_BUFFER_HOURS)))`
+- Import the local image: `import cheeseBanner4 from "@/assets/cheese_banner4.png"`
+- Extend `ActiveBanner` interface with optional `localSrc?: string` and `isPlaceholder?: boolean`; make `ipfsHash` optional
+- In `extractActiveBanners`: when a shared slot has a primary renter but no `sharedUser` (and isn't suspended), push a placeholder banner: `{ localSrc: cheeseBanner4, websiteUrl: "/farm", user: "placeholder", isPlaceholder: true }`
+- In render: if `current.localSrc` exists, render as `<Link to={current.websiteUrl}>` with `<img src={current.localSrc}>` instead of an external `<a>` with IPFS URL. Omit the "AD" label for placeholders.
 
-**File: `src/components/bannerads/EditBannerDialog.tsx`**
-
-Fix the `user` field in the transaction data (line 35):
-
-- For primary edit (`editadbanner`): send `user: slot.user` instead of `session.actor.toString()`
-- For shared edit (`editsharedad`): send `user: slot.sharedUser`
-- This lets both owners (signing as themselves) and admins (signing with admin auth on behalf of the owner) submit the transaction correctly
-
-### Summary
-- 2 files, minimal changes
-- Owners get a 48hr edit window, then it locks for admin review
-- Admins retain full edit access at all times
+### Files changed
+1. `src/assets/cheese_banner4.png` (new)
+2. `src/components/bannerads/BannerDisplay.tsx`
 
