@@ -1,6 +1,6 @@
 import { Layout } from "@/components/Layout";
 import { DropsHero } from "@/components/drops/DropsHero";
-import { CartDrawer } from "@/components/drops/CartDrawer";
+
 import { CreateDrop } from "@/components/drops/CreateDrop";
 import { MyDrops } from "@/components/drops/MyDrops";
 import { SimpleDropGrid } from "@/components/drops/VirtualizedDropGrid";
@@ -133,7 +133,7 @@ const Drops = () => {
         </p>
       </div>
 
-      <CartDrawer />
+      
     </Layout>
   );
 };
