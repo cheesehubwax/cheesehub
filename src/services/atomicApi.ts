@@ -645,7 +645,7 @@ export async function fetchUserAssets(
   }
 }
 
-// Fetch drops created by a specific user
+// Fetch drops created by a specific user (combines NFTHive API + on-chain data for premint support)
 export async function fetchUserDrops(account: string): Promise<Array<{
   dropId: number;
   name: string;
@@ -658,6 +658,19 @@ export async function fetchUserDrops(account: string): Promise<Array<{
   endTime: number;
   collectionName: string;
 }>> {
+  type UserDrop = {
+    dropId: number;
+    name: string;
+    image: string;
+    price: number;
+    currency: string;
+    maxClaimable: number;
+    numClaimed: number;
+    startTime: number;
+    endTime: number;
+    collectionName: string;
+  };
+
   try {
     const userCollections = await fetchUserCollections(account);
     if (userCollections.length === 0) return [];
@@ -667,18 +680,8 @@ export async function fetchUserDrops(account: string): Promise<Array<{
       return item?.value?.[1] || '';
     };
     
-    const allUserDrops: Array<{
-      dropId: number;
-      name: string;
-      image: string;
-      price: number;
-      currency: string;
-      maxClaimable: number;
-      numClaimed: number;
-      startTime: number;
-      endTime: number;
-      collectionName: string;
-    }> = [];
+    // 1) Fetch from NFTHive API (good for mint-on-demand with template data)
+    const apiDropsMap = new Map<number, UserDrop>();
     
     for (const collectionName of userCollections) {
       try {
@@ -692,7 +695,7 @@ export async function fetchUserDrops(account: string): Promise<Array<{
           const name = drop.displayData?.name || getData(immutableData, 'name') || template?.name || `Drop #${drop.dropId}`;
           const img = getData(immutableData, 'img') || getData(immutableData, 'image');
           
-          allUserDrops.push({
+          apiDropsMap.set(drop.dropId, {
             dropId: drop.dropId,
             name,
             image: getImageUrl(img),
@@ -710,7 +713,107 @@ export async function fetchUserDrops(account: string): Promise<Array<{
       }
     }
     
-    return allUserDrops;
+    // 2) Fetch from chain to catch premint drops the API may miss
+    const { fetchTableRows } = await import('@/lib/waxRpcFallback');
+    
+    for (const collectionName of userCollections) {
+      try {
+        // Scan all drops and filter by authorized_account + collection
+        // We fetch in reverse (newest first) and stop early after gaps
+        let hasMore = true;
+        let upperBound: string | undefined = undefined;
+        let iterations = 0;
+        
+        while (hasMore && iterations < 10) {
+          const result = await fetchTableRows<OnChainNFTHiveDrop>({
+            code: 'nfthivedrops',
+            scope: 'nfthivedrops',
+            table: 'drops',
+            limit: 500,
+            reverse: true,
+            ...(upperBound ? { upper_bound: upperBound } : {}),
+          });
+          
+          for (const drop of result.rows) {
+            if (drop.authorized_account !== account) continue;
+            if (drop.collection_name !== collectionName) continue;
+            if (apiDropsMap.has(drop.drop_id)) continue; // Already have from API
+            
+            // This is likely a premint drop missed by the API
+            const { price, currency } = parseListingPrice(drop.listing_price);
+            let displayData: { name?: string; description?: string } = {};
+            try {
+              if (drop.display_data) displayData = JSON.parse(drop.display_data);
+            } catch { /* ignore */ }
+            
+            const isPremint = !drop.assets_to_mint || drop.assets_to_mint.length === 0 || 
+              (drop.assets_to_mint[0]?.template_id === -1);
+            
+            let image = '/placeholder.svg';
+            
+            // For mint-on-demand, try to fetch template image
+            if (!isPremint && drop.assets_to_mint?.[0]?.template_id > 0) {
+              try {
+                const templateData = await fetchTemplateById(
+                  String(drop.assets_to_mint[0].template_id), 
+                  collectionName
+                );
+                if (templateData?.image) image = templateData.image;
+              } catch { /* ignore */ }
+            }
+            
+            // For premint drops, try to fetch from claimable assets table
+            if (isPremint) {
+              try {
+                const assetsResult = await fetchTableRows<{ asset_ids: string[] }>({
+                  code: 'nfthivedrops',
+                  scope: String(drop.drop_id),
+                  table: 'claimassets',
+                  limit: 1,
+                });
+                if (assetsResult.rows.length > 0 && assetsResult.rows[0].asset_ids?.length > 0) {
+                  const assetId = assetsResult.rows[0].asset_ids[0];
+                  try {
+                    const path = `${ATOMIC_API.paths.assets}/${assetId}`;
+                    const resp = await fetchWithFallback(ATOMIC_API.baseUrls, path);
+                    const json = await resp.json();
+                    if (json.success && json.data) {
+                      const data = json.data.data || json.data.immutable_data || {};
+                      image = getImageUrl(data.img || data.image);
+                    }
+                  } catch { /* ignore */ }
+                }
+              } catch { /* ignore */ }
+            }
+            
+            apiDropsMap.set(drop.drop_id, {
+              dropId: drop.drop_id,
+              name: displayData.name || `Drop #${drop.drop_id}`,
+              image,
+              price,
+              currency: currency || 'WAX',
+              maxClaimable: drop.max_claimable || 0,
+              numClaimed: drop.current_claimed || 0,
+              startTime: drop.start_time || 0,
+              endTime: drop.end_time || 0,
+              collectionName: drop.collection_name,
+            });
+          }
+          
+          hasMore = result.more || false;
+          if (result.rows.length > 0) {
+            upperBound = String(result.rows[result.rows.length - 1].drop_id - 1);
+          } else {
+            hasMore = false;
+          }
+          iterations++;
+        }
+      } catch (error) {
+        console.error(`Error fetching on-chain drops for ${collectionName}:`, error);
+      }
+    }
+    
+    return Array.from(apiDropsMap.values());
   } catch (error) {
     console.error('Error fetching user drops:', error);
     return [];
