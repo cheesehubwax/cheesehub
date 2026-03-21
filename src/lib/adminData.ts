@@ -90,6 +90,7 @@ export async function fetchPowerzStats(): Promise<PowerzStats | null> {
 }
 
 export async function fetchIsAdmin(account: string): Promise<boolean> {
+  if (account === CHEESEBANNAD) return true;
   const rows = await fetchTable<BannadAdmin>(
     CHEESEBANNAD, CHEESEBANNAD, 'admins',
     { lower_bound: account, upper_bound: account, limit: 1 }
