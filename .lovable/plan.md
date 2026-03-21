@@ -1,18 +1,18 @@
 
 
-## Fix: Banner Slot Creation Field Name
+## Fix: Premint drops failing "Max claimable must be greater than 0" validation
 
 ### Problem
-The `initbannerad` action on `cheesebannad` expects a field called `start_time` (type `uint64`), but the code sends `time`. The WharfKit serializer fails because it can't find the required `start_time` field.
+For premint drops, `maxClaimable` stays at its initial value of `0` in form state. The validation in `validateDropFormData()` (line 224 of `src/lib/drops.ts`) checks `data.maxClaimable` directly, which is `0`. The override to `assetIds.length` only happens after validation, on submission (line 128 of `CreateDrop.tsx`).
 
-### Change: `src/components/admin/AddBannerSlotsCard.tsx`
-Line 44-46 — rename the data field:
-```
-data: {
-  start_time: slot.timestamp,
-  number_of_slots: positions,
-},
+### Fix
+Update `validateDropFormData` in `src/lib/drops.ts` to skip the `maxClaimable > 0` check for premint drops (since it's auto-derived from selected NFTs, which are already validated earlier):
+
+```ts
+if (data.dropType !== 'premint' && data.maxClaimable <= 0) {
+  return 'Max claimable must be greater than 0';
+}
 ```
 
-Single line change, no other files affected.
+Single line change in `src/lib/drops.ts`, no other files affected.
 
