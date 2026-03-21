@@ -5,24 +5,32 @@ import { Trash2, ShoppingCart, Loader2 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useWax } from "@/context/WaxContext";
 import { usePurchaseDrop } from "@/hooks/usePurchaseDrop";
+import { useTransactionSuccess } from "@/context/TransactionSuccessContext";
 import { useToast } from "@/hooks/use-toast";
 
 export function CartDrawer() {
   const { items, removeFromCart, clearCart, isOpen, setIsOpen, totalItems } = useCart();
   const { isConnected } = useWax();
   const { purchaseDrop, purchasing } = usePurchaseDrop();
+  const { showSuccess } = useTransactionSuccess();
   const { toast } = useToast();
 
   const handlePurchaseAll = async () => {
+    let lastTxId: string | undefined;
     for (const item of items) {
       const result = await purchaseDrop(item, item.quantity, item.selectedPrice);
       if (!result.success) {
         toast({ title: "Purchase Failed", description: result.error, variant: "destructive" });
         return;
       }
+      lastTxId = result.transactionId;
     }
-    toast({ title: "All items purchased! 🧀", description: `${totalItems} items claimed successfully` });
     clearCart();
+    showSuccess(
+      "All items purchased! 🧀",
+      `${totalItems} item${totalItems !== 1 ? 's' : ''} claimed successfully`,
+      lastTxId ?? null
+    );
   };
 
   return (
