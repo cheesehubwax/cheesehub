@@ -1,50 +1,64 @@
 
 
-## Fix: Premint drop blank images and broken NFTHive link
+## CheeseAmp Video Playback Fix
 
-### Root Causes Found
+### Problem
 
-1. **Image resolution fails because `pools` table lookup is wrong.** The code queries the `pools` table using `drop_id` as lower/upper bound, but `pools` is indexed by its own auto-incrementing `pool_id`, NOT by `drop_id`. So the query always returns nothing or the wrong row, and the image stays as `/placeholder.svg`.
+Looking at the Sonic Calavera NFT (asset 1099874419204), its metadata is:
+```text
+data: {
+  name: "Sonic Calavera - 2000 Souls",
+  video: "Qmf3bJfHWurj7dATFWZ56Se8TsiBfu6ts1A7GgeYJjgFT9",
+  Artist Info: "..."
+}
+schema fields: track 1, track 2, ... track 13 (type: ipfs)
+No img, no image, no audio, no clip fields.
+```
 
-2. **Premint detection is correct** for the user's drops (`assets_to_mint: []` triggers `isPremint = true`), but the fallback image path after detection is broken (point 1 above).
+Three issues found:
 
-3. **NFTHive link shows "An error occurred on client"** for premint drops that haven't been finalized through NFTHive's creator tool. The user wants the button hidden for these drops.
+**1. Video-only NFTs always start in audio mode (main issue)**
 
-4. **`fetchDropById` has the same broken pools lookup** for the detail page.
+When a track is played, `play(track, preferVideo=false)` is called. This means `useVideo = false`, so even though the NFT only has a video file and no audio, it loads the video URL into an `<audio>` element. The user sees a spinning disc with (maybe) audio playing. They'd need to manually click a small "Video" button in the media selector to switch -- not obvious at all.
 
-5. **Badge ref warning** in console from `MyDrops` — `Badge` is a function component used inside `TabsTrigger` which tries to pass a ref.
+**2. Extra tracks with spaces in field names are ignored**
+
+The schema has `track 1`, `track 2`, ... `track 13`. The regex `EXTRA_AUDIO_PATTERN` is `/^(audio\d+|track\d+|...)$/i` -- `track\d+` requires NO space between "track" and the number. So none of these 13 tracks are detected.
+
+**3. No cover art fallback for video-only NFTs**
+
+`coverArt` resolves from `img` or `image` fields, which don't exist on this NFT. Result: empty string, shows spinning disc in track list. Could use a frame from the video or at least show the collection image.
 
 ### Plan
 
-**File: `src/services/atomicApi.ts`**
+**File: `src/hooks/useMusicNFTs.ts`**
 
-Replace the broken `pools` table lookup in both `fetchUserDrops` and `fetchDropById` with a reliable AtomicAssets API query:
+- Update `EXTRA_AUDIO_PATTERN` to allow optional spaces: `/^(audio\s*\d+|track\s*\d+|fulltrack|full_audio|full_song|bonus_track)$/i`
+- Add `videoOnly` boolean to `MusicNFT` interface: `true` when `videoUrl` exists but no separate `audio`/`clip` field
+- When building `coverArt`, if `img`/`image` are missing but `video` exists, leave coverArt empty (no change) but set `videoOnly` so the player knows to auto-start video
 
-- Query: `GET /atomicassets/v1/assets?owner=nfthivedrops&collection_name={collectionName}&limit=1`
-- This finds any asset deposited into the drop contract for that collection
-- Extract image from `data.img` / `data.image` / `immutable_data.img` / `immutable_data.image`
-- Apply `getImageUrl()` to normalize IPFS hashes
+**File: `src/lib/musicPlayer.ts`**
 
-In `fetchUserDrops`:
-- Replace lines 798-831 (the `pools` table block) with the AtomicAssets API query
-- Keep the `isPremint` detection as-is (it works correctly for `assets_to_mint: []`)
+- In `play()`, auto-detect video-only tracks: if `track.videoUrl && !track.audioUrl` (or audioUrl === videoUrl), default to `useVideo = true` even when `preferVideo` is false
+- This makes video-only NFTs start playing as video immediately, showing the actual video in the player
 
-In `fetchDropById`:
-- Replace lines 504-533 (the premint fallback block) with the same AtomicAssets API approach
+**File: `src/components/music/CheeseAmpPlayer.tsx`**
 
-**File: `src/components/drops/MyDrops.tsx`**
+- When `handlePlayTrack` is called for a video-only track, set `displayMode` to `'video'` instead of `'cover'` so MediaDisplay renders the video container immediately
 
-- Add `isPremint` field to the drop data (derived from `assets_to_mint` being empty in `fetchUserDrops`)
-- Conditionally hide the "View on NFT Hive" button when the drop is premint (since NFTHive shows errors for unfinished premint drops)
-- Fix the Badge ref warning by removing `Badge` from inside `TabsTrigger` children (wrap count in a `<span>` instead)
+### Technical detail
 
-**File: `src/services/atomicApi.ts` (fetchUserDrops return type)**
+```text
+Current flow (video-only NFT):
+  click play → audio mode → video file in <audio> element → spinning disc
+  user must find and click "Video" button to see video
 
-- Add `isPremint: boolean` to the return type so `MyDrops` can conditionally hide the button
+Fixed flow:
+  click play → detect video-only → video mode → video in <video> element → video plays
+```
 
-### Summary of changes
-- 2 files modified: `src/services/atomicApi.ts`, `src/components/drops/MyDrops.tsx`
-- Replace broken pools table query with working AtomicAssets API query for premint images
-- Hide NFTHive button for premint drops
-- Fix Badge ref console warning
+### Files changed
+- `src/hooks/useMusicNFTs.ts` -- fix space-in-field-name regex, add videoOnly flag
+- `src/lib/musicPlayer.ts` -- auto-start video for video-only tracks  
+- `src/components/music/CheeseAmpPlayer.tsx` -- set display mode to video for video-only tracks
 
