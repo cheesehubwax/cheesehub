@@ -42,7 +42,7 @@ export function AddBannerSlotsCard() {
         name: 'initbannerad',
         authorization: [{ actor: accountName, permission: 'active' }],
         data: {
-          time: slot.timestamp,
+          start_time: slot.timestamp,
           number_of_slots: positions,
         },
       }));
