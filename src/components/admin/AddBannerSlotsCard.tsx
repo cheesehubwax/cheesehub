@@ -43,7 +43,7 @@ export function AddBannerSlotsCard() {
         authorization: [{ actor: accountName, permission: 'active' }],
         data: {
           start_time: slot.timestamp,
-          number_of_slots: positions,
+          amount_of_slots: positions,
         },
       }));
       await executeTransaction(actions, {
