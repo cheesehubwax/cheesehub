@@ -221,7 +221,7 @@ export function validateDropFormData(data: DropFormData): string | null {
     }
   }
 
-  if (data.maxClaimable <= 0) {
+  if (data.dropType !== 'premint' && data.maxClaimable <= 0) {
     return 'Max claimable must be greater than 0';
   }
 
