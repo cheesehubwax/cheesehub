@@ -5,6 +5,7 @@ import { useFailedTransactions } from '@/hooks/useFailedTransactions';
 import { ContractStatusCard } from '@/components/admin/ContractStatusCard';
 import { PriceDeviationGauge } from '@/components/admin/PriceDeviationGauge';
 import { FailedTransactionLog } from '@/components/admin/FailedTransactionLog';
+import { AddBannerSlotsCard } from '@/components/admin/AddBannerSlotsCard';
 import { parseAssetAmount, getDeviationSeverity } from '@/lib/adminData';
 import { Flame, CurrencyCircleDollar, Megaphone, Lightning, ShieldCheck, ArrowsClockwise, BookOpenText } from '@phosphor-icons/react';
 import { Badge } from '@/components/ui/badge';
@@ -193,6 +194,9 @@ export default function Admin() {
                 ]}
               />
             </div>
+
+            {/* Add Banner Slots Tool */}
+            <AddBannerSlotsCard />
 
             {/* Live Market Prices Summary */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
