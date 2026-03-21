@@ -99,11 +99,13 @@ export function MyDrops() {
             <div className="flex justify-between"><span>Start:</span><span>{format(new Date(startTime), "MMM d, yyyy h:mm a")}</span></div>
             <div className="flex justify-between"><span>End:</span><span>{format(new Date(endTime), "MMM d, yyyy h:mm a")}</span></div>
           </div>
-          <Button variant="outline" size="sm" className="w-full" asChild>
-            <a href={`https://nfthive.io/drop/nfthivedrops/${drop.dropId}`} target="_blank" rel="noopener noreferrer">
-              View on NFT Hive<ExternalLink className="ml-2 h-3 w-3" />
-            </a>
-          </Button>
+          {!drop.isPremint && (
+            <Button variant="outline" size="sm" className="w-full" asChild>
+              <a href={`https://nfthive.io/drop/nfthivedrops/${drop.dropId}`} target="_blank" rel="noopener noreferrer">
+                View on NFT Hive<ExternalLink className="ml-2 h-3 w-3" />
+              </a>
+            </Button>
+          )}
         </CardContent>
       </Card>
     );

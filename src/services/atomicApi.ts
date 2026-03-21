@@ -684,6 +684,7 @@ export async function fetchUserDrops(account: string): Promise<Array<{
   startTime: number;
   endTime: number;
   collectionName: string;
+  isPremint?: boolean;
 }>> {
   type UserDrop = {
     dropId: number;
