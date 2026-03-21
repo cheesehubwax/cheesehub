@@ -5,6 +5,7 @@ import { Wallet, Package, ExternalLink } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchUserDrops, getImageUrl } from "@/services/atomicApi";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { useMemo } from "react";
