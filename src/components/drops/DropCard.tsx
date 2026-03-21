@@ -1,10 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { ShoppingCart, ImageOff, Lock, RotateCw, Film } from "lucide-react";
+import { ImageOff, Lock, RotateCw, Film } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import type { NFTDrop, DropPrice } from "@/types/drop";
-import { useCart } from "@/context/CartContext";
 import { Link } from "react-router-dom";
 import { TokenLogo } from "@/components/TokenLogo";
 import { getTokenConfig } from "@/lib/tokenRegistry";
@@ -29,7 +28,6 @@ export interface DropCardProps {
 }
 
 export function DropCard({ drop, isImageCached, onImageLoaded }: DropCardProps) {
-  const { addToCart } = useCart();
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(isImageCached ?? false);
   const [currentImageUrl, setCurrentImageUrl] = useState(drop.image);
@@ -226,34 +224,11 @@ export function DropCard({ drop, isImageCached, onImageLoaded }: DropCardProps) 
         </div>
       </CardContent>
 
-      <CardFooter className="flex items-center justify-between border-t border-border/50 p-4">
-        <div className="flex items-center gap-1.5">
-          <TokenLogo contract={getContractForCurrency(primaryPrice.currency)} symbol={primaryPrice.currency} size="md" />
-          <span className="font-display text-xl font-bold text-primary">{primaryPrice.price.toLocaleString()}</span>
-          <span className="text-sm text-muted-foreground">{primaryPrice.currency}</span>
+      {drop.remaining === 0 && (
+        <div className="border-t border-border/50 p-4 text-center">
+          <span className="text-sm font-medium text-muted-foreground">Sold Out</span>
         </div>
-        <Button
-          size="sm"
-          className="bg-primary text-primary-foreground hover:bg-primary/90"
-          onClick={(e) => {
-            e.preventDefault();
-            const p = primaryPrice;
-            const contract = p.tokenContract || getContractForCurrency(p.currency);
-            const precision = p.precision || getTokenConfig(p.currency)?.precision || 8;
-            const selectedPrice = {
-              price: p.price,
-              currency: p.currency,
-              tokenContract: contract,
-              precision,
-              listingPrice: p.listingPrice,
-            };
-            addToCart(drop, selectedPrice);
-          }}
-          disabled={drop.remaining === 0}
-        >
-          {drop.remaining === 0 ? "Sold Out" : (<><ShoppingCart className="mr-2 h-4 w-4" />Add</>)}
-        </Button>
-      </CardFooter>
+      )}
     </Card>
   );
 }
