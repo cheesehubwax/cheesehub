@@ -3,21 +3,12 @@ import { Button } from "@/components/ui/button";
 import { useWax } from "@/context/WaxContext";
 import { Wallet, Package, ExternalLink } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchUserDrops } from "@/services/atomicApi";
+import { fetchUserDrops, getImageUrl } from "@/services/atomicApi";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { useMemo } from "react";
-
-const IPFS_GATEWAY = 'https://ipfs.io/ipfs/';
-
-function getImageUrl(img: string | undefined): string {
-  if (!img) return '/placeholder.svg';
-  if (img.startsWith('http')) return img;
-  if (img.startsWith('Qm') || img.startsWith('bafy')) return `${IPFS_GATEWAY}${img}`;
-  return img;
-}
 
 export function MyDrops() {
   const { isConnected, login, accountName } = useWax();
@@ -109,7 +100,7 @@ export function MyDrops() {
             <div className="flex justify-between"><span>End:</span><span>{format(new Date(endTime), "MMM d, yyyy h:mm a")}</span></div>
           </div>
           <Button variant="outline" size="sm" className="w-full" asChild>
-            <a href={`https://nfthive.io/drop/${drop.dropId}`} target="_blank" rel="noopener noreferrer">
+            <a href={`https://nfthive.io/drop/nfthivedrops/${drop.dropId}`} target="_blank" rel="noopener noreferrer">
               View on NFT Hive<ExternalLink className="ml-2 h-3 w-3" />
             </a>
           </Button>

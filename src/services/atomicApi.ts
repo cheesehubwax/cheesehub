@@ -490,7 +490,7 @@ export async function fetchDropById(dropId: string): Promise<NFTDrop | null> {
         baseDrop.prices = [primaryPrice];
       }
       
-      if (baseDrop.templateId && baseDrop.collectionName) {
+      if (baseDrop.templateId && baseDrop.collectionName && baseDrop.templateId !== '-1') {
         const templateData = await fetchTemplateById(baseDrop.templateId, baseDrop.collectionName);
         if (templateData) {
           return {
@@ -498,6 +498,38 @@ export async function fetchDropById(dropId: string): Promise<NFTDrop | null> {
             image: templateData.image || baseDrop.image,
             name: templateData.name || baseDrop.name,
           };
+        }
+      }
+
+      // Premint fallback: resolve image from deposited assets in pools table
+      const isPremint = !onChainDrop.assets_to_mint || onChainDrop.assets_to_mint.length === 0 ||
+        (onChainDrop.assets_to_mint[0]?.template_id === -1);
+      
+      if (isPremint && (!baseDrop.image || baseDrop.image === '/placeholder.svg')) {
+        try {
+          const poolsResult = await fetchTableRows<{ drop_id: number; assets: string[]; pool_ready: number }>({
+            code: 'nfthivedrops',
+            scope: 'nfthivedrops',
+            table: 'pools',
+            lower_bound: nfthiveDropId,
+            upper_bound: nfthiveDropId,
+            limit: 1,
+          });
+          
+          const assets = poolsResult.rows[0]?.assets;
+          if (assets && assets.length > 0) {
+            const assetId = assets[0];
+            const path = `${ATOMIC_API.paths.assets}/${assetId}`;
+            const resp = await fetchWithFallback(ATOMIC_API.baseUrls, path);
+            const json = await resp.json();
+            if (json.success && json.data) {
+              const data = json.data.data || {};
+              const immutableData = json.data.immutable_data || {};
+              baseDrop.image = getImageUrl(data.img || data.image || immutableData.img || immutableData.image);
+            }
+          }
+        } catch (err) {
+          console.warn('[NFTHive] Failed to resolve premint image for drop', nfthiveDropId, err);
         }
       }
       
@@ -765,7 +797,7 @@ export async function fetchUserDrops(account: string): Promise<Array<{
             // For premint drops, fetch the first deposited asset from the pools table
             if (isPremint && needsImageFallback) {
               try {
-                const poolsResult = await fetchTableRows<{ drop_id: number; assets: string[]; pool_ready: boolean }>({
+                const poolsResult = await fetchTableRows<{ drop_id: number; assets: string[]; pool_ready: number }>({
                   code: 'nfthivedrops',
                   scope: 'nfthivedrops',
                   table: 'pools',
@@ -774,8 +806,11 @@ export async function fetchUserDrops(account: string): Promise<Array<{
                   limit: 1,
                 });
 
-                if (poolsResult.rows.length > 0 && poolsResult.rows[0].assets?.length > 0) {
-                  const assetId = poolsResult.rows[0].assets[0];
+                const poolRow = poolsResult.rows[0];
+                console.log(`[NFTHive] Premint drop ${drop.drop_id} pools lookup:`, poolRow ? `found ${poolRow.assets?.length || 0} assets` : 'no pool row');
+
+                if (poolRow && poolRow.assets && poolRow.assets.length > 0) {
+                  const assetId = poolRow.assets[0];
                   try {
                     const path = `${ATOMIC_API.paths.assets}/${assetId}`;
                     const resp = await fetchWithFallback(ATOMIC_API.baseUrls, path);
@@ -783,16 +818,17 @@ export async function fetchUserDrops(account: string): Promise<Array<{
                     if (json.success && json.data) {
                       const data = json.data.data || {};
                       const immutableData = json.data.immutable_data || {};
-                      image = getImageUrl(
-                        data.img ||
-                        data.image ||
-                        immutableData.img ||
-                        immutableData.image
-                      );
+                      const resolvedImg = data.img || data.image || immutableData.img || immutableData.image;
+                      console.log(`[NFTHive] Premint drop ${drop.drop_id} asset ${assetId} image:`, resolvedImg?.substring(0, 60));
+                      image = getImageUrl(resolvedImg);
                     }
-                  } catch { /* ignore */ }
+                  } catch (err) {
+                    console.warn(`[NFTHive] Failed to fetch asset ${assetId} for premint drop ${drop.drop_id}:`, err);
+                  }
                 }
-              } catch { /* ignore */ }
+              } catch (err) {
+                console.warn(`[NFTHive] Failed pools lookup for premint drop ${drop.drop_id}:`, err);
+              }
             }
 
             apiDropsMap.set(drop.drop_id, {
