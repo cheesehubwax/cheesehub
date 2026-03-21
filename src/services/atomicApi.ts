@@ -490,7 +490,7 @@ export async function fetchDropById(dropId: string): Promise<NFTDrop | null> {
         baseDrop.prices = [primaryPrice];
       }
       
-      if (baseDrop.templateId && baseDrop.collectionName) {
+      if (baseDrop.templateId && baseDrop.collectionName && baseDrop.templateId !== '-1') {
         const templateData = await fetchTemplateById(baseDrop.templateId, baseDrop.collectionName);
         if (templateData) {
           return {
@@ -498,6 +498,38 @@ export async function fetchDropById(dropId: string): Promise<NFTDrop | null> {
             image: templateData.image || baseDrop.image,
             name: templateData.name || baseDrop.name,
           };
+        }
+      }
+
+      // Premint fallback: resolve image from deposited assets in pools table
+      const isPremint = !onChainDrop.assets_to_mint || onChainDrop.assets_to_mint.length === 0 ||
+        (onChainDrop.assets_to_mint[0]?.template_id === -1);
+      
+      if (isPremint && (!baseDrop.image || baseDrop.image === '/placeholder.svg')) {
+        try {
+          const poolsResult = await fetchTableRows<{ drop_id: number; assets: string[]; pool_ready: number }>({
+            code: 'nfthivedrops',
+            scope: 'nfthivedrops',
+            table: 'pools',
+            lower_bound: nfthiveDropId,
+            upper_bound: nfthiveDropId,
+            limit: 1,
+          });
+          
+          const assets = poolsResult.rows[0]?.assets;
+          if (assets && assets.length > 0) {
+            const assetId = assets[0];
+            const path = `${ATOMIC_API.paths.assets}/${assetId}`;
+            const resp = await fetchWithFallback(ATOMIC_API.baseUrls, path);
+            const json = await resp.json();
+            if (json.success && json.data) {
+              const data = json.data.data || {};
+              const immutableData = json.data.immutable_data || {};
+              baseDrop.image = getImageUrl(data.img || data.image || immutableData.img || immutableData.image);
+            }
+          }
+        } catch (err) {
+          console.warn('[NFTHive] Failed to resolve premint image for drop', nfthiveDropId, err);
         }
       }
       
