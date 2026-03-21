@@ -35,7 +35,7 @@ export function CartDrawer() {
           </SheetTitle>
         </SheetHeader>
 
-        <div className="flex flex-col h-full mt-4">
+        <div className="flex flex-col mt-4 overflow-hidden" style={{ maxHeight: 'calc(100vh - 8rem)' }}>
           {items.length === 0 ? (
             <div className="flex-1 flex items-center justify-center">
               <p className="text-muted-foreground">Your cart is empty</p>
