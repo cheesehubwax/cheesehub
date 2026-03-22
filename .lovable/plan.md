@@ -1,20 +1,28 @@
 
 
-## Add placeholder banner for unrented shared slots (linking to /farm)
+## Rename CHEESEShip → CHEESEDrop + sort official drops oldest-first
 
 ### Changes
 
-**1. Copy uploaded image into project**
-- Copy `user-uploads://cheese_banner4.png` → `src/assets/cheese_banner4.png`
+**1. `src/components/Header.tsx` (line 19)**
+- Change `label: "CHEESEShip"` → `label: "CHEESEDrop"`, `suffix: "Ship"` → `suffix: "Drop"`
 
-**2. Update `src/components/bannerads/BannerDisplay.tsx`**
+**2. `src/pages/Index.tsx` (lines 182-195)**
+- Replace all "CHEESEShip" / "Ship" text with "CHEESEDrop" / "Drop"
 
-- Import the local image: `import cheeseBanner4 from "@/assets/cheese_banner4.png"`
-- Extend `ActiveBanner` interface with optional `localSrc?: string` and `isPlaceholder?: boolean`; make `ipfsHash` optional
-- In `extractActiveBanners`: when a shared slot has a primary renter but no `sharedUser` (and isn't suspended), push a placeholder banner: `{ localSrc: cheeseBanner4, websiteUrl: "/farm", user: "placeholder", isPlaceholder: true }`
-- In render: if `current.localSrc` exists, render as `<Link to={current.websiteUrl}>` with `<img src={current.localSrc}>` instead of an external `<a>` with IPFS URL. Omit the "AD" label for placeholders.
+**3. `src/pages/Disclaimer.tsx` (lines 130-132)**
+- Replace "CHEESEShip" with "CHEESEDrop"
+
+**4. `src/pages/Terms.tsx` (line 97)**
+- Replace "CHEESEShip" with "CHEESEDrop"
+
+**5. `README.md` (line 8)**
+- Replace "CHEESEShip" with "CHEESEDrop"
+
+**6. `src/pages/Drops.tsx` (lines 34-42)**
+- After filtering official drops, sort ascending by drop ID (oldest first):
+  `.sort((a, b) => Number(a.id) - Number(b.id))`
 
 ### Files changed
-1. `src/assets/cheese_banner4.png` (new)
-2. `src/components/bannerads/BannerDisplay.tsx`
+6 files, all string replacements + one `.sort()` call
 
