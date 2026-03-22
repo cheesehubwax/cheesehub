@@ -1,34 +1,33 @@
 
 
-## Add "Delete Drop" functionality to My Drops
+## Add collection-wide RAM calculation for drops
 
-### Summary
-Add a delete button to each drop card in the My Drops section. Clicking it shows a confirmation dialog, then executes two contract actions: `nft.hive::boost` + `nfthivedrops::erasedrop`, matching the on-chain transaction pattern.
+### Problem
+Currently, the RAM check in CreateDrop only considers the **new drop's** `maxClaimable` when calculating required RAM. It doesn't account for other active mint-on-demand drops in the same collection that also consume RAM when claimed. If you have 6 drops with 9 NFTs each, the RAM needs to cover all 54 potential mints, not just 9.
+
+### Solution
+Fetch all active drops for the collection from the `nfthivedrops` table, sum up remaining claimable NFTs across all mint-on-demand drops, then add the new drop's count to get the true total RAM requirement.
 
 ### Changes
 
-**1. `src/lib/drops.ts`** — Add `buildEraseDropActions` helper
-- Two actions: `nft.hive::boost` (booster: account) + `nfthivedrops::erasedrop` (authorized_account: account, drop_id: dropId)
+**1. `src/lib/drops.ts`** — New function `fetchCollectionActiveDropsClaims`
+- Query the `nfthivedrops::drops` table filtered by collection
+- For each active mint-on-demand drop (has `assets_to_mint`, not ended, not fully claimed), calculate `max_claimable - current_claimed`
+- Return the total remaining claimable count across all existing drops
 
-**2. New file: `src/components/drops/DeleteDropDialog.tsx`**
-- Confirmation dialog (AlertDialog) that warns the action is irreversible
-- Shows the drop name and ID
-- On confirm: calls `useWaxTransaction` with `buildEraseDropActions`, then invalidates the `userDrops` query to refresh the list
-- Props: `dropId: number`, `dropName: string`, `open: boolean`, `onOpenChange`
-
-**3. `src/components/drops/MyDrops.tsx`**
-- Import `DeleteDropDialog` and `Trash2` icon
-- Add state for selected drop to delete
-- Add a red trash icon button to each drop card (bottom of CardContent, next to the NFT Hive link)
-- Render `DeleteDropDialog` at component level, controlled by state
+**2. `src/components/drops/CreateDrop.tsx`** — Update RAM shortage calculation
+- Import and call the new function when collection name changes
+- Store existing drops' total remaining claims in state
+- Update `ramShortage` to use `existingClaims + newDropClaimCount` instead of just `newDropClaimCount`
+- Show the breakdown in the RAM warning (e.g., "9 from this drop + 54 from 6 existing drops = 63 total NFTs")
 
 ### Technical details
-- Contract: `nfthivedrops`, action: `erasedrop`, params: `{ authorized_account, drop_id }`
-- Preceded by `nft.hive::boost` action (same pattern as drop creation)
-- After successful deletion, invalidate `['userDrops', accountName]` query
+- Uses `fetchTableRows` from `waxRpcFallback` (same pattern as `fetchRawDrops`)
+- Filters: `collection_name` match, `assets_to_mint.length > 0` (mint-on-demand only), `end_time` not passed or 0, `current_claimed < max_claimable`
+- RAM formula: `totalRemainingClaims * BYTES_PER_NFT` vs `ramBalance.bytes`
+- The table can be scoped to the contract and filtered client-side (same as existing pattern)
 
 ### Files changed
-1. `src/lib/drops.ts` — new `buildEraseDropActions` function
-2. `src/components/drops/DeleteDropDialog.tsx` — new confirmation dialog
-3. `src/components/drops/MyDrops.tsx` — add delete button + dialog integration
+1. `src/lib/drops.ts` — add `fetchCollectionActiveDropsClaims`
+2. `src/components/drops/CreateDrop.tsx` — integrate collection-wide RAM check
 
