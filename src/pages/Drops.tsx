@@ -85,7 +85,7 @@ const Drops = () => {
 
   return (
     <Layout>
-      <DropsHero totalDrops={cheeseStats?.activeDrops ?? 0} totalSales={cheeseStats?.totalSold ?? 0} />
+      <DropsHero totalDrops={enrichedOfficialDrops.length} />
 
       <main className="container pb-20">
         <Tabs defaultValue="official" className="w-full">
