@@ -1,12 +1,10 @@
 // Token logo URL utilities using Alcor Exchange's token logo repository
 
 const ALCOR_LOGO_BASE = 'https://wax.alcor.exchange/api/v2/tokens';
-const ALCOR_TOKENS_API = 'https://wax.alcor.exchange/api/v2/tokens';
 
 // Cache for token contracts fetched from Alcor API
 let tokenContractCache: Map<string, string> = new Map();
 let cacheInitialized = false;
-let cachePromise: Promise<void> | null = null;
 
 /**
  * Populate the token cache from pre-fetched data (e.g. from the shared swap-tokens query).
@@ -28,38 +26,12 @@ export function initializeTokenCacheFromData(tokens: Array<{ symbol?: string; co
 }
 
 /**
- * Fetch all token contracts from Alcor API and cache them.
- * Only used as a fallback if initializeTokenCacheFromData hasn't been called yet.
+ * Initialize token cache — uses only the fallback map (no Alcor API call).
+ * The shared swap-tokens query populates the full cache via initializeTokenCacheFromData.
  */
 async function initializeTokenCache(): Promise<void> {
   if (cacheInitialized) return;
-
-  if (cachePromise) {
-    await cachePromise;
-    return;
-  }
-
-  cachePromise = (async () => {
-    try {
-      const response = await fetch(ALCOR_TOKENS_API);
-      if (!response.ok) {
-        console.warn('Failed to fetch Alcor tokens, using fallback map');
-        useFallbackMap();
-        return;
-      }
-
-      const tokens = await response.json();
-
-      if (Array.isArray(tokens)) {
-        initializeTokenCacheFromData(tokens);
-      }
-    } catch (error) {
-      console.warn('Error fetching Alcor tokens:', error);
-      useFallbackMap();
-    }
-  })();
-
-  await cachePromise;
+  useFallbackMap();
 }
 
 // Fallback mapping for common tokens if API fails
