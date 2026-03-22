@@ -2,7 +2,7 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ShoppingCart } from "lucide-react";
 import cheeseCoin from "@/assets/cheese-coin.png";
 import walletIcon from "@/assets/wallet-icon.png";
 import { TokenStatsBanner } from "@/components/home/TokenStatsBanner";
