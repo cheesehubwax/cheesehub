@@ -93,8 +93,8 @@ export async function fetchAlcorPoolPrice(poolId: number): Promise<AlcorPoolData
       code: 'swap.alcor',
       scope: 'swap.alcor',
       table: 'pools',
-      lower_bound: poolId,
-      upper_bound: poolId,
+      lower_bound: String(poolId),
+      upper_bound: String(poolId),
       limit: 1,
     });
     if (!result.rows || result.rows.length === 0) return null;
