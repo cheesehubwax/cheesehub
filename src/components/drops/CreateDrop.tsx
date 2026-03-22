@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useWax } from "@/context/WaxContext";
-import { buildDropCreationActions, validateDropFormData, fetchCollectionRamBalance, type DropFormData, type RamBalance } from "@/lib/drops";
+import { buildDropCreationActions, validateDropFormData, fetchCollectionRamBalance, fetchCollectionActiveDropsClaims, type DropFormData, type RamBalance } from "@/lib/drops";
 import { closeWharfkitModals, getTransactPlugins } from "@/lib/wharfKit";
 import { toast } from "sonner";
 import { Loader2, Plus, Wallet, Info, Calendar, Image as ImageIcon, Package, Zap, Check, Coins, X, HardDrive, AlertTriangle } from "lucide-react";
@@ -65,30 +65,37 @@ export function CreateDrop() {
 
   const [ramBalance, setRamBalance] = useState<RamBalance | null>(null);
   const [loadingRamBalance, setLoadingRamBalance] = useState(false);
+  const [existingClaims, setExistingClaims] = useState<{ totalRemaining: number; dropCount: number } | null>(null);
 
   const BYTES_PER_NFT = 151;
   const WAX_PER_KB = 0.01;
 
   const fetchRamBalanceForCollection = useCallback(async (collectionName: string) => {
-    if (!collectionName) { setRamBalance(null); return; }
+    if (!collectionName) { setRamBalance(null); setExistingClaims(null); return; }
     setLoadingRamBalance(true);
     try {
-      const balance = await fetchCollectionRamBalance(collectionName);
+      const [balance, claims] = await Promise.all([
+        fetchCollectionRamBalance(collectionName),
+        fetchCollectionActiveDropsClaims(collectionName),
+      ]);
       setRamBalance(balance);
-    } catch { setRamBalance(null); }
+      setExistingClaims(claims);
+    } catch { setRamBalance(null); setExistingClaims(null); }
     finally { setLoadingRamBalance(false); }
   }, []);
 
   useEffect(() => {
     if (formData.collectionName) {
       fetchRamBalanceForCollection(formData.collectionName);
-    } else { setRamBalance(null); }
+    } else { setRamBalance(null); setExistingClaims(null); }
   }, [formData.collectionName, formData.dropType, fetchRamBalanceForCollection]);
 
   const ramShortage = (() => {
-    const claimCount = formData.dropType === 'premint' ? formData.assetIds.length : formData.maxClaimable;
-    if (claimCount <= 0) return null;
-    const requiredBytes = claimCount * BYTES_PER_NFT;
+    const newClaimCount = formData.dropType === 'premint' ? formData.assetIds.length : formData.maxClaimable;
+    if (newClaimCount <= 0) return null;
+    const existingRemaining = existingClaims?.totalRemaining || 0;
+    const totalClaims = newClaimCount + existingRemaining;
+    const requiredBytes = totalClaims * BYTES_PER_NFT;
     const availableBytes = ramBalance?.bytes || 0;
     if (availableBytes >= requiredBytes) return null;
     const shortageBytes = requiredBytes - availableBytes;
@@ -98,6 +105,10 @@ export function CreateDrop() {
       availableBytes,
       requiredBytes,
       estimatedWax: (shortageBytes / 1024 * WAX_PER_KB).toFixed(2),
+      newClaimCount,
+      existingRemaining,
+      existingDropCount: existingClaims?.dropCount || 0,
+      totalClaims,
     };
   })();
 
@@ -344,8 +355,13 @@ export function CreateDrop() {
                       {ramShortage && (
                         <>
                           <p className="text-xs text-muted-foreground">
-                            You need RAM for <strong className="text-foreground">{formData.dropType === 'premint' ? formData.assetIds.length : formData.maxClaimable}</strong> NFTs but only have enough for ~<strong className="text-foreground">{ramShortage.availableNFTs}</strong>.
+                            You need RAM for <strong className="text-foreground">{ramShortage.totalClaims}</strong> total NFTs but only have enough for ~<strong className="text-foreground">{ramShortage.availableNFTs}</strong>.
                           </p>
+                          {ramShortage.existingRemaining > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              Breakdown: <strong className="text-foreground">{ramShortage.newClaimCount}</strong> from this drop + <strong className="text-foreground">{ramShortage.existingRemaining}</strong> from <strong className="text-foreground">{ramShortage.existingDropCount}</strong> existing drop{ramShortage.existingDropCount !== 1 ? 's' : ''}
+                            </p>
+                          )}
                           <p className="text-xs text-muted-foreground">
                             Shortfall: <strong className="text-foreground">{ramShortage.shortageBytes.toLocaleString()}</strong> bytes (~<strong className="text-foreground">{ramShortage.estimatedWax} WAX</strong>)
                           </p>
@@ -357,6 +373,9 @@ export function CreateDrop() {
                       {!ramShortage && (formData.dropType === 'premint' ? formData.assetIds.length : formData.maxClaimable) > 0 && (
                         <p className="text-xs text-primary font-medium">
                           ✓ Enough RAM for {formData.dropType === 'premint' ? formData.assetIds.length : formData.maxClaimable} NFTs
+                          {existingClaims && existingClaims.totalRemaining > 0 && (
+                            <span className="text-muted-foreground font-normal"> (incl. {existingClaims.totalRemaining} from {existingClaims.dropCount} existing drop{existingClaims.dropCount !== 1 ? 's' : ''})</span>
+                          )}
                         </p>
                       )}
                     </div>

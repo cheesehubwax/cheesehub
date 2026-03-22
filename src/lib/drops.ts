@@ -1,5 +1,6 @@
 import { NFTHIVE_CONFIG, WAX_CHAIN } from './waxConfig';
 import { getTokenConfig, formatTokenAmount, getSettlementSymbol, WAX_TOKENS } from './tokenRegistry';
+import { fetchTableRows } from './waxRpcFallback';
 
 export type DropType = 'mint-on-demand' | 'premint';
 
@@ -364,4 +365,60 @@ export function buildEraseDropActions(account: string, dropId: number) {
       },
     },
   ];
+}
+
+/**
+ * Fetch total remaining claimable NFTs across all active mint-on-demand drops for a collection.
+ * Used to calculate collection-wide RAM requirements.
+ */
+export async function fetchCollectionActiveDropsClaims(collectionName: string): Promise<{ totalRemaining: number; dropCount: number }> {
+  const now = Math.floor(Date.now() / 1000);
+  let totalRemaining = 0;
+  let dropCount = 0;
+  let more = true;
+  let lowerBound = '';
+
+  while (more) {
+    const response = await fetchTableRows<{
+      drop_id: number;
+      collection_name: string;
+      assets_to_mint: unknown[];
+      max_claimable: number;
+      current_claimed: number;
+      start_time: number;
+      end_time: number;
+    }>({
+      code: NFTHIVE_CONFIG.dropContract,
+      scope: NFTHIVE_CONFIG.dropContract,
+      table: 'drops',
+      limit: 100,
+      ...(lowerBound ? { lower_bound: lowerBound } : {}),
+    });
+
+    for (const drop of response.rows) {
+      if (drop.collection_name !== collectionName) continue;
+      if (!drop.assets_to_mint || drop.assets_to_mint.length === 0) continue;
+      if (drop.end_time > 0 && drop.end_time < now) continue;
+      if (drop.max_claimable > 0 && drop.current_claimed >= drop.max_claimable) continue;
+
+      const remaining = drop.max_claimable > 0
+        ? drop.max_claimable - drop.current_claimed
+        : 0;
+
+      if (remaining > 0) {
+        totalRemaining += remaining;
+        dropCount++;
+      }
+    }
+
+    more = response.more;
+    if (more && response.next_key) {
+      lowerBound = response.next_key;
+    } else {
+      more = false;
+    }
+  }
+
+  console.log(`[Drops] Collection "${collectionName}": ${dropCount} active mint-on-demand drops, ${totalRemaining} total remaining claims`);
+  return { totalRemaining, dropCount };
 }
