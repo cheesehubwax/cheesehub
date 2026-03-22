@@ -342,3 +342,26 @@ export async function fetchCollectionRamBalance(collectionName: string): Promise
   console.error('All RPC endpoints failed to fetch collection RAM balance');
   return null;
 }
+
+/**
+ * Build actions to erase/delete a drop from nfthivedrops
+ */
+export function buildEraseDropActions(account: string, dropId: number) {
+  return [
+    {
+      account: NFTHIVE_CONFIG.boostContract,
+      name: 'boost',
+      authorization: [{ actor: account, permission: 'active' }],
+      data: { booster: account },
+    },
+    {
+      account: NFTHIVE_CONFIG.dropContract,
+      name: 'erasedrop',
+      authorization: [{ actor: account, permission: 'active' }],
+      data: {
+        authorized_account: account,
+        drop_id: dropId,
+      },
+    },
+  ];
+}
