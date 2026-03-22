@@ -91,9 +91,11 @@ export function CreateDrop() {
   }, [formData.collectionName, formData.dropType, fetchRamBalanceForCollection]);
 
   const ramShortage = (() => {
-    const claimCount = formData.dropType === 'premint' ? formData.assetIds.length : formData.maxClaimable;
-    if (claimCount <= 0) return null;
-    const requiredBytes = claimCount * BYTES_PER_NFT;
+    const newClaimCount = formData.dropType === 'premint' ? formData.assetIds.length : formData.maxClaimable;
+    if (newClaimCount <= 0) return null;
+    const existingRemaining = existingClaims?.totalRemaining || 0;
+    const totalClaims = newClaimCount + existingRemaining;
+    const requiredBytes = totalClaims * BYTES_PER_NFT;
     const availableBytes = ramBalance?.bytes || 0;
     if (availableBytes >= requiredBytes) return null;
     const shortageBytes = requiredBytes - availableBytes;
@@ -103,6 +105,10 @@ export function CreateDrop() {
       availableBytes,
       requiredBytes,
       estimatedWax: (shortageBytes / 1024 * WAX_PER_KB).toFixed(2),
+      newClaimCount,
+      existingRemaining,
+      existingDropCount: existingClaims?.dropCount || 0,
+      totalClaims,
     };
   })();
 
