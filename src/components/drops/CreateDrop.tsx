@@ -65,24 +65,29 @@ export function CreateDrop() {
 
   const [ramBalance, setRamBalance] = useState<RamBalance | null>(null);
   const [loadingRamBalance, setLoadingRamBalance] = useState(false);
+  const [existingClaims, setExistingClaims] = useState<{ totalRemaining: number; dropCount: number } | null>(null);
 
   const BYTES_PER_NFT = 151;
   const WAX_PER_KB = 0.01;
 
   const fetchRamBalanceForCollection = useCallback(async (collectionName: string) => {
-    if (!collectionName) { setRamBalance(null); return; }
+    if (!collectionName) { setRamBalance(null); setExistingClaims(null); return; }
     setLoadingRamBalance(true);
     try {
-      const balance = await fetchCollectionRamBalance(collectionName);
+      const [balance, claims] = await Promise.all([
+        fetchCollectionRamBalance(collectionName),
+        fetchCollectionActiveDropsClaims(collectionName),
+      ]);
       setRamBalance(balance);
-    } catch { setRamBalance(null); }
+      setExistingClaims(claims);
+    } catch { setRamBalance(null); setExistingClaims(null); }
     finally { setLoadingRamBalance(false); }
   }, []);
 
   useEffect(() => {
     if (formData.collectionName) {
       fetchRamBalanceForCollection(formData.collectionName);
-    } else { setRamBalance(null); }
+    } else { setRamBalance(null); setExistingClaims(null); }
   }, [formData.collectionName, formData.dropType, fetchRamBalanceForCollection]);
 
   const ramShortage = (() => {
