@@ -7,7 +7,7 @@ interface DropsHeroProps {
 
 export function DropsHero({ totalDrops }: DropsHeroProps) {
   return (
-    <div className="mb-6">
+    <div className="mb-6 flex justify-center">
       <Card className="bg-card/60 border-border/40 max-w-xs">
         <CardContent className="p-4 flex items-center gap-3">
           <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
