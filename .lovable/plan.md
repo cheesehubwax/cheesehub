@@ -1,20 +1,34 @@
 
 
-## Fix: Official drops displaying newest-first despite sort
+## Add "Delete Drop" functionality to My Drops
 
-### Root cause
+### Summary
+Add a delete button to each drop card in the My Drops section. Clicking it shows a confirmation dialog, then executes two contract actions: `nft.hive::boost` + `nfthivedrops::erasedrop`, matching the on-chain transaction pattern.
 
-In `useEnrichDrops.ts`, the hook initializes state with `useState(drops)` — this captures the initial `drops` prop at mount time. But the real issue is that **both the sorted input AND enriched output need to preserve order**. The `Promise.all` in the effect does preserve order, but there's a timing issue: the initial state may reflect an earlier unsorted array before the effect runs.
+### Changes
 
-More likely, the `id` field values may be string-based and `Number()` conversion might not work as expected, or the data source returns them in a different order that overrides sorting.
+**1. `src/lib/drops.ts`** — Add `buildEraseDropActions` helper
+- Two actions: `nft.hive::boost` (booster: account) + `nfthivedrops::erasedrop` (authorized_account: account, drop_id: dropId)
 
-### Fix
+**2. New file: `src/components/drops/DeleteDropDialog.tsx`**
+- Confirmation dialog (AlertDialog) that warns the action is irreversible
+- Shows the drop name and ID
+- On confirm: calls `useWaxTransaction` with `buildEraseDropActions`, then invalidates the `userDrops` query to refresh the list
+- Props: `dropId: number`, `dropName: string`, `open: boolean`, `onOpenChange`
 
-**`src/pages/Drops.tsx`** — Apply the sort to `enrichedOfficialDrops` right before rendering instead of (or in addition to) sorting in the `useMemo`. This ensures the final displayed array is always oldest-first regardless of what `useEnrichDrops` does:
+**3. `src/components/drops/MyDrops.tsx`**
+- Import `DeleteDropDialog` and `Trash2` icon
+- Add state for selected drop to delete
+- Add a red trash icon button to each drop card (bottom of CardContent, next to the NFT Hive link)
+- Render `DeleteDropDialog` at component level, controlled by state
 
-- Wrap the render call: `<SimpleDropGrid drops={[...enrichedOfficialDrops].sort((a, b) => Number(a.id) - Number(b.id))} />`
-- Do the same for `enrichedCheeseDrops` if desired
+### Technical details
+- Contract: `nfthivedrops`, action: `erasedrop`, params: `{ authorized_account, drop_id }`
+- Preceded by `nft.hive::boost` action (same pattern as drop creation)
+- After successful deletion, invalidate `['userDrops', accountName]` query
 
 ### Files changed
-1. `src/pages/Drops.tsx` — sort enriched arrays at render time (2 lines)
+1. `src/lib/drops.ts` — new `buildEraseDropActions` function
+2. `src/components/drops/DeleteDropDialog.tsx` — new confirmation dialog
+3. `src/components/drops/MyDrops.tsx` — add delete button + dialog integration
 
