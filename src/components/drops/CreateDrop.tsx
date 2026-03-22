@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useWax } from "@/context/WaxContext";
-import { buildDropCreationActions, validateDropFormData, fetchCollectionRamBalance, type DropFormData, type RamBalance } from "@/lib/drops";
+import { buildDropCreationActions, validateDropFormData, fetchCollectionRamBalance, fetchCollectionActiveDropsClaims, type DropFormData, type RamBalance } from "@/lib/drops";
 import { closeWharfkitModals, getTransactPlugins } from "@/lib/wharfKit";
 import { toast } from "sonner";
 import { Loader2, Plus, Wallet, Info, Calendar, Image as ImageIcon, Package, Zap, Check, Coins, X, HardDrive, AlertTriangle } from "lucide-react";
