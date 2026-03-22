@@ -355,8 +355,13 @@ export function CreateDrop() {
                       {ramShortage && (
                         <>
                           <p className="text-xs text-muted-foreground">
-                            You need RAM for <strong className="text-foreground">{formData.dropType === 'premint' ? formData.assetIds.length : formData.maxClaimable}</strong> NFTs but only have enough for ~<strong className="text-foreground">{ramShortage.availableNFTs}</strong>.
+                            You need RAM for <strong className="text-foreground">{ramShortage.totalClaims}</strong> total NFTs but only have enough for ~<strong className="text-foreground">{ramShortage.availableNFTs}</strong>.
                           </p>
+                          {ramShortage.existingRemaining > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              Breakdown: <strong className="text-foreground">{ramShortage.newClaimCount}</strong> from this drop + <strong className="text-foreground">{ramShortage.existingRemaining}</strong> from <strong className="text-foreground">{ramShortage.existingDropCount}</strong> existing drop{ramShortage.existingDropCount !== 1 ? 's' : ''}
+                            </p>
+                          )}
                           <p className="text-xs text-muted-foreground">
                             Shortfall: <strong className="text-foreground">{ramShortage.shortageBytes.toLocaleString()}</strong> bytes (~<strong className="text-foreground">{ramShortage.estimatedWax} WAX</strong>)
                           </p>
@@ -368,6 +373,9 @@ export function CreateDrop() {
                       {!ramShortage && (formData.dropType === 'premint' ? formData.assetIds.length : formData.maxClaimable) > 0 && (
                         <p className="text-xs text-primary font-medium">
                           ✓ Enough RAM for {formData.dropType === 'premint' ? formData.assetIds.length : formData.maxClaimable} NFTs
+                          {existingClaims && existingClaims.totalRemaining > 0 && (
+                            <span className="text-muted-foreground font-normal"> (incl. {existingClaims.totalRemaining} from {existingClaims.dropCount} existing drop{existingClaims.dropCount !== 1 ? 's' : ''})</span>
+                          )}
                         </p>
                       )}
                     </div>
