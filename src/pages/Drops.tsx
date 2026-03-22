@@ -39,7 +39,7 @@ const Drops = () => {
       const isEnded = drop.endDate ? new Date(drop.endDate).getTime() < now : false;
       const isNotStarted = drop.startDate ? new Date(drop.startDate).getTime() > now : false;
       return !isSoldOut && !isEnded && !isNotStarted;
-    });
+    }).sort((a, b) => Number(a.id) - Number(b.id));
   }, [displayDrops]);
 
   // CHEESE tab: ALL drops priced in CHEESE (any collection), active drops
