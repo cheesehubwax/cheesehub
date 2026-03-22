@@ -1,28 +1,20 @@
 
 
-## Rename CHEESEShip → CHEESEDrop + sort official drops oldest-first
+## Fix: Official drops displaying newest-first despite sort
 
-### Changes
+### Root cause
 
-**1. `src/components/Header.tsx` (line 19)**
-- Change `label: "CHEESEShip"` → `label: "CHEESEDrop"`, `suffix: "Ship"` → `suffix: "Drop"`
+In `useEnrichDrops.ts`, the hook initializes state with `useState(drops)` — this captures the initial `drops` prop at mount time. But the real issue is that **both the sorted input AND enriched output need to preserve order**. The `Promise.all` in the effect does preserve order, but there's a timing issue: the initial state may reflect an earlier unsorted array before the effect runs.
 
-**2. `src/pages/Index.tsx` (lines 182-195)**
-- Replace all "CHEESEShip" / "Ship" text with "CHEESEDrop" / "Drop"
+More likely, the `id` field values may be string-based and `Number()` conversion might not work as expected, or the data source returns them in a different order that overrides sorting.
 
-**3. `src/pages/Disclaimer.tsx` (lines 130-132)**
-- Replace "CHEESEShip" with "CHEESEDrop"
+### Fix
 
-**4. `src/pages/Terms.tsx` (line 97)**
-- Replace "CHEESEShip" with "CHEESEDrop"
+**`src/pages/Drops.tsx`** — Apply the sort to `enrichedOfficialDrops` right before rendering instead of (or in addition to) sorting in the `useMemo`. This ensures the final displayed array is always oldest-first regardless of what `useEnrichDrops` does:
 
-**5. `README.md` (line 8)**
-- Replace "CHEESEShip" with "CHEESEDrop"
-
-**6. `src/pages/Drops.tsx` (lines 34-42)**
-- After filtering official drops, sort ascending by drop ID (oldest first):
-  `.sort((a, b) => Number(a.id) - Number(b.id))`
+- Wrap the render call: `<SimpleDropGrid drops={[...enrichedOfficialDrops].sort((a, b) => Number(a.id) - Number(b.id))} />`
+- Do the same for `enrichedCheeseDrops` if desired
 
 ### Files changed
-6 files, all string replacements + one `.sort()` call
+1. `src/pages/Drops.tsx` — sort enriched arrays at render time (2 lines)
 
