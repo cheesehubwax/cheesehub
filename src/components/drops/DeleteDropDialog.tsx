@@ -13,6 +13,7 @@ import { buildEraseDropActions } from "@/lib/drops";
 import { useWax } from "@/context/WaxContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useState } from "react";
 
 interface DeleteDropDialogProps {
   dropId: number;
@@ -22,21 +23,24 @@ interface DeleteDropDialogProps {
 }
 
 export function DeleteDropDialog({ dropId, dropName, open, onOpenChange }: DeleteDropDialogProps) {
-  const { accountName } = useWax();
+  const { accountName, session } = useWax();
   const queryClient = useQueryClient();
-  const { executeTransaction, isLoading } = useWaxTransaction();
+  const { executeTransaction } = useWaxTransaction(session);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleDelete = async () => {
     if (!accountName) return;
+    setIsLoading(true);
     try {
       const actions = buildEraseDropActions(accountName, dropId);
-      await executeTransaction(actions);
-      toast.success(`Drop #${dropId} deleted successfully`);
+      await executeTransaction(actions, { successTitle: 'Drop Deleted' });
       queryClient.invalidateQueries({ queryKey: ['userDrops', accountName] });
       onOpenChange(false);
     } catch (error) {
       console.error('Failed to delete drop:', error);
       toast.error('Failed to delete drop');
+    } finally {
+      setIsLoading(false);
     }
   };
 
