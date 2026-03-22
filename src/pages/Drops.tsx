@@ -134,7 +134,7 @@ const Drops = () => {
                 <p className="text-lg text-muted-foreground">No active official drops found.</p>
               </div>
             ) : (
-              <SimpleDropGrid drops={enrichedOfficialDrops} />
+              <SimpleDropGrid drops={[...enrichedOfficialDrops].sort((a, b) => Number(a.id) - Number(b.id))} />
             )}
           </TabsContent>
 
