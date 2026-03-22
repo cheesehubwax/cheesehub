@@ -33,14 +33,17 @@ const Drops = () => {
   // Official tab: only cheesenftwax collection, active drops
   const officialDrops = useMemo(() => {
     const now = Date.now();
+    const getDropOrderValue = (drop: NFTDrop) => Number(drop.dropId ?? drop.id.replace(/^\D+/, ''));
+
     return displayDrops.filter(drop => {
       if (drop.collectionName !== CHEESE_CONFIG.collectionName) return false;
       const isSoldOut = drop.remaining <= 0 && drop.totalSupply > 0;
       const isEnded = drop.endDate ? new Date(drop.endDate).getTime() < now : false;
       const isNotStarted = drop.startDate ? new Date(drop.startDate).getTime() > now : false;
       return !isSoldOut && !isEnded && !isNotStarted;
-    }).sort((a, b) => Number(a.id) - Number(b.id));
+    }).sort((a, b) => getDropOrderValue(a) - getDropOrderValue(b));
   }, [displayDrops]);
+
 
   // CHEESE tab: ALL drops priced in CHEESE (any collection), active drops
   const cheeseDrops = useMemo(() => {
@@ -134,7 +137,7 @@ const Drops = () => {
                 <p className="text-lg text-muted-foreground">No active official drops found.</p>
               </div>
             ) : (
-              <SimpleDropGrid drops={[...enrichedOfficialDrops].sort((a, b) => Number(a.id) - Number(b.id))} />
+              <SimpleDropGrid drops={[...enrichedOfficialDrops].sort((a, b) => Number(a.dropId ?? a.id.replace(/^\D+/, '')) - Number(b.dropId ?? b.id.replace(/^\D+/, '')))} />
             )}
           </TabsContent>
 
