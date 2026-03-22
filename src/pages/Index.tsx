@@ -2,7 +2,7 @@ import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ShoppingCart } from "lucide-react";
 import cheeseCoin from "@/assets/cheese-coin.png";
 import walletIcon from "@/assets/wallet-icon.png";
 import { TokenStatsBanner } from "@/components/home/TokenStatsBanner";
@@ -179,19 +179,17 @@ const Index = () => {
             </CardContent>
           </Card>
 
-          {/* CHEESEShip */}
+          {/* CHEESEDrop */}
           <Card className="bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border-cheese/20">
             <CardContent className="py-12 text-center">
-              <div className="flex justify-center mb-6">
-                <span className="text-4xl">🛒</span>
-              </div>
-              <h2 className="text-2xl font-bold mb-4 flex items-center justify-center gap-2"><span><span className="text-cheese">CHEESE</span><span className="text-foreground">Ship</span></span><span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span></h2>
+              <ShoppingCart className="h-12 w-12 text-cheese mx-auto mb-4" />
+              <h2 className="text-2xl font-bold mb-4 flex items-center justify-center gap-2"><span><span className="text-cheese">CHEESE</span><span className="text-foreground">Drop</span></span><span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span></h2>
               <p className="text-muted-foreground max-w-sm mx-auto mb-6">
-                Powered by the NFTHIVEDROP smart contract and acting as an alternate Front-End CHEESEShip Shows All Current $CHEESE NFT Drops
+                Powered by the NFTHIVEDROP smart contract and acting as an alternate Front-End CHEESEDrop Shows All Current $CHEESE NFT Drops
               </p>
               <Button asChild size="lg" className="bg-cheese hover:bg-cheese-dark text-primary-foreground font-semibold">
                 <Link to="/drops">
-                  Go to CHEESEShip
+                  Go to CHEESEDrop
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>

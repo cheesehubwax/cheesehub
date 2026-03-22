@@ -5,7 +5,7 @@ WAX blockchain DeFi & NFT platform powered by the $CHEESE token.
 ## Features
 
 - Token swaps via Alcor DEX
-- NFT drops (CHEESEShip) via NFTHive
+- NFT drops (CHEESEDrop) via NFTHive
 - DAO governance
 - NFT farming
 - Token locking

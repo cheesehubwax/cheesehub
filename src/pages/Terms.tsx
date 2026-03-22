@@ -94,7 +94,7 @@ export default function Terms() {
         <section className="space-y-4">
           <h2 className="text-xl font-semibold text-cheese">10. Merchandise & Consumer Protection</h2>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Purchases of CHEESE NFTs and merchandise made through CHEESEShip are covered by applicable consumer protection laws. All goods purchased through the portal may be returned undamaged for a full refund at any time. You acknowledge that such purchases constitute consumer transactions and do not represent a financial investment, security, or speculative instrument.
+            Purchases of CHEESE NFTs and merchandise made through CHEESEDrop are covered by applicable consumer protection laws. All goods purchased through the portal may be returned undamaged for a full refund at any time. You acknowledge that such purchases constitute consumer transactions and do not represent a financial investment, security, or speculative instrument.
           </p>
         </section>
 
