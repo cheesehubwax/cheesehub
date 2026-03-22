@@ -19,7 +19,7 @@ export function useSwapRoute(
     const timer = setTimeout(() => {
       setDebouncedAmount(amount);
       setDebouncedTradeType(tradeType);
-    }, 800);
+    }, 1200);
     return () => clearTimeout(timer);
   }, [amount, tradeType]);
 
@@ -35,8 +35,14 @@ export function useSwapRoute(
     enabled,
     staleTime: 15_000,
     gcTime: 30_000,
-    retry: 1,
-    retryDelay: 3000,
+    retry: (failureCount, err) => {
+      if (err instanceof Error && err.message.includes('Rate limited')) return failureCount < 3;
+      return failureCount < 1;
+    },
+    retryDelay: (attemptIndex, err) => {
+      if (err instanceof Error && err.message.includes('Rate limited')) return Math.min(5000 * 2 ** attemptIndex, 30000);
+      return 3000;
+    },
   });
 
   const noRoute = enabled && !isLoading && !isFetching && !error && route === null;

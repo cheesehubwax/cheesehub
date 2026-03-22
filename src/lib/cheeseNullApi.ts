@@ -2,8 +2,7 @@
 // Uses CHEESEHub's fetchTable for RPC fallback
 
 import { fetchTable } from './wax';
-
-const ALCOR_API_ENDPOINT = 'https://wax.alcor.exchange/api/v2/swap/pools';
+import { fetchTableRows } from './waxRpcFallback';
 
 export const CLAIM_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -90,11 +89,18 @@ export async function fetchContractStats(contractAccount: string): Promise<Contr
 
 export async function fetchAlcorPoolPrice(poolId: number): Promise<AlcorPoolData | null> {
   try {
-    const response = await fetch(`${ALCOR_API_ENDPOINT}/${poolId}`);
-    if (!response.ok) throw new Error(`Alcor API error: ${response.status}`);
-    return await response.json() as AlcorPoolData;
+    const result = await fetchTableRows<AlcorPoolData>({
+      code: 'swap.alcor',
+      scope: 'swap.alcor',
+      table: 'pools',
+      lower_bound: String(poolId),
+      upper_bound: String(poolId),
+      limit: 1,
+    });
+    if (!result.rows || result.rows.length === 0) return null;
+    return result.rows[0];
   } catch (error) {
-    console.error('Error fetching Alcor pool price:', error);
+    console.error('Error fetching Alcor pool price via RPC:', error);
     throw error;
   }
 }
