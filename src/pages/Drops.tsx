@@ -1,5 +1,5 @@
 import { Layout } from "@/components/Layout";
-import { DropsHero } from "@/components/drops/DropsHero";
+import { DropStatsBar } from "@/components/drops/DropStatsBar";
 
 import { CreateDrop } from "@/components/drops/CreateDrop";
 import { MyDrops } from "@/components/drops/MyDrops";
@@ -85,8 +85,6 @@ const Drops = () => {
 
   return (
     <Layout>
-      <DropsHero totalDrops={enrichedOfficialDrops.length} />
-
       <main className="container pb-20">
         <Tabs defaultValue="official" className="w-full">
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
@@ -172,8 +170,13 @@ const Drops = () => {
         </Tabs>
       </main>
 
-      <div className="container pb-12 text-center text-sm text-muted-foreground">
-        <p>
+      <div className="container pb-12 flex flex-col items-center gap-6">
+        <DropStatsBar
+          activeOfficialDrops={enrichedOfficialDrops.length}
+          totalSold={cheeseStats?.totalSold ?? 0}
+          isLoading={isLoading || isLoadingStats}
+        />
+        <p className="text-sm text-muted-foreground">
           Powered by the{" "}
           <a href="https://wax.bloks.io/account/nfthivedrop" target="_blank" rel="noopener noreferrer" className="text-cheese hover:underline">
             NFTHIVEDROP
@@ -181,8 +184,6 @@ const Drops = () => {
           smart contract.
         </p>
       </div>
-
-      
     </Layout>
   );
 };
