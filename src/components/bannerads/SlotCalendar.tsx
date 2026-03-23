@@ -138,8 +138,16 @@ export function SlotCalendar() {
   const [selectedSlots, setSelectedSlots] = useState<BulkSlotSelection[]>([]);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const { isWhitelisted: isAdmin } = useAdminAccess();
+  const [reviewVersion, setReviewVersion] = useState(0);
 
   const futureGroups = useMemo(() => filterFutureGroups(slotGroups, isAdmin), [slotGroups, isAdmin]);
+
+  const handleToggleReview = useCallback((slot: BannerSlot) => {
+    if (!accountName) return;
+    const fp = getContentFingerprint(slot.ipfsHash, slot.websiteUrl, slot.sharedIpfsHash, slot.sharedWebsiteUrl);
+    toggleReview(accountName, slot.time, slot.position, fp);
+    setReviewVersion(v => v + 1);
+  }, [accountName]);
 
   const isSlotSelected = useCallback((time: number, position: number) => {
     return selectedSlots.some(s => s.time === time && s.position === position);
