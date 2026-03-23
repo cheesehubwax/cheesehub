@@ -50,8 +50,9 @@ export function ExternalLinkWarning({ open, onOpenChange, url }: ExternalLinkWar
               {domain}
             </div>
             <p className="text-xs">
-              CHEESEHub is not responsible for the content of external websites.
-              Never enter your private keys on any site you don't trust.
+              This may be a referral or affiliate link. CHEESEHub does not endorse
+              any advertised products or services. Never enter your private keys
+              on any site you don't trust.
             </p>
           </AlertDialogDescription>
         </AlertDialogHeader>
