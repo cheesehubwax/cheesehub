@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
-import { Coins, Info, Loader2 } from "lucide-react";
+import { Coins, Info, Loader2, AlertTriangle } from "lucide-react";
 import { useWax } from "@/context/WaxContext";
 import {
   CHEESE_FEE_ENABLED,
@@ -37,7 +37,17 @@ export function FeePaymentSelector({
   const [priceFetched, setPriceFetched] = useState(false);
   const cheesePricing = useCheeseFeePricing(waxFee);
 
+  const cheeseDisabled = disabled || cheesePricing.isBaselineCritical;
+
+  // Auto-switch to WAX if cheese becomes critical while selected
+  useEffect(() => {
+    if (cheesePricing.isBaselineCritical && selectedMethod === "cheese") {
+      onMethodChange("wax");
+    }
+  }, [cheesePricing.isBaselineCritical, selectedMethod, onMethodChange]);
+
   const handleMethodChange = (method: PaymentMethod) => {
+    if (method === "cheese" && cheesePricing.isBaselineCritical) return;
     onMethodChange(method);
     if (method === "cheese" && !priceFetched) {
       setPriceFetched(true);
@@ -81,14 +91,16 @@ export function FeePaymentSelector({
         >
           {!hideCheeseOption && CHEESE_FEE_ENABLED && (
             <div
-              className={`relative flex items-start space-x-3 p-3 rounded-lg border transition-all cursor-pointer ${
+              className={`relative flex items-start space-x-3 p-3 rounded-lg border transition-all ${
+                cheeseDisabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+              } ${
                 selectedMethod === "cheese"
                   ? "border-cheese/50 bg-cheese/10"
                   : "border-cheese/40 bg-cheese/5 hover:shadow-[0_0_16px_rgba(255,200,50,0.35)]"
               }`}
             >
-              <RadioGroupItem value="cheese" id="payment-cheese" disabled={disabled} className="mt-1" />
-              <Label htmlFor="payment-cheese" className="flex-1 cursor-pointer">
+              <RadioGroupItem value="cheese" id="payment-cheese" disabled={cheeseDisabled} className="mt-1" />
+              <Label htmlFor="payment-cheese" className={`flex-1 ${cheeseDisabled ? "cursor-not-allowed" : "cursor-pointer"}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <img src={cheeseLogo} alt="CHEESE" className="w-5 h-5" />
@@ -103,7 +115,13 @@ export function FeePaymentSelector({
                     </Badge>
                   </div>
                 </div>
-                {selectedMethod === "cheese" && (
+                {cheesePricing.isBaselineCritical && (
+                  <div className="mt-2 flex items-start gap-1.5 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-md p-2">
+                    <AlertTriangle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    <span>CHEESE payments are temporarily unavailable due to price volatility. Please use WAX.</span>
+                  </div>
+                )}
+                {!cheesePricing.isBaselineCritical && selectedMethod === "cheese" && (
                   <div className="mt-2 text-xs text-muted-foreground">
                     {cheesePricing.isLoading ? (
                       <span className="flex items-center gap-1">
