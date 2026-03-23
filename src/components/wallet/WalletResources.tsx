@@ -71,13 +71,30 @@ export function WalletResources({ onResourcesUpdate, showTotalWaxBalance, waxUsd
     if (!accountName) return;
     setIsLoading(true);
     try {
-      const data = await waxRpcCall<AccountResources & Record<string, unknown>>('/v1/chain/get_account', { account_name: accountName });
-      let created: string | undefined;
+      const data = await waxRpcCall<AccountResources & Record<string, unknown> & { created?: string }>('/v1/chain/get_account', { account_name: accountName });
+      // get_account returns 'created' directly (ISO timestamp)
+      let created: string | undefined = data.created as string | undefined;
       let creator: string | undefined;
-      try {
-        const creationRes = await fetch(`https://wax.eosusa.io/v2/history/get_creator?account=${accountName}`);
-        if (creationRes.ok) { const d = await creationRes.json(); created = d.timestamp; creator = d.creator; }
-      } catch (e) { console.warn('Failed to fetch account creation info:', e); }
+      // Try multiple Hyperion endpoints for creator info
+      const hyperionEndpoints = [
+        'https://wax.eosusa.io',
+        'https://api.wax.alohaeos.com',
+        'https://wax.eosphere.io',
+      ];
+      for (const ep of hyperionEndpoints) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
+          const creationRes = await fetch(`${ep}/v2/history/get_creator?account=${accountName}`, { signal: controller.signal });
+          clearTimeout(timeoutId);
+          if (creationRes.ok) {
+            const d = await creationRes.json();
+            if (d.creator) { creator = d.creator; }
+            if (d.timestamp && !created) { created = d.timestamp; }
+            break;
+          }
+        } catch { /* try next endpoint */ }
+      }
 
       const newResources: AccountResources = {
         ram_quota: data.ram_quota || 0, ram_usage: data.ram_usage || 0,
