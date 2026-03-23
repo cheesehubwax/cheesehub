@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, RefreshCw, Eye, ShoppingCart } from "lucide-react";
+import { Loader2, RefreshCw, Eye, ShoppingCart, CheckCircle2 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 import { sanitizeUrl } from "@/lib/sanitizeUrl";
@@ -16,6 +16,7 @@ import { EditBannerDialog } from "./EditBannerDialog";
 import { RemoveBannerDialog } from "./RemoveBannerDialog";
 import { ReinstateBannerDialog } from "./ReinstateBannerDialog";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
+import { getContentFingerprint, isReviewValid, toggleReview } from "@/lib/adReviewStorage";
 
 function PreviewBannerImage({ ipfsHash, label }: { ipfsHash: string; label: string }) {
   const [gatewayIdx, setGatewayIdx] = useState(0);
