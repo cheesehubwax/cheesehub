@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, RefreshCw, Eye, ShoppingCart } from "lucide-react";
+import { Loader2, RefreshCw, Eye, ShoppingCart, CheckCircle2 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 import { sanitizeUrl } from "@/lib/sanitizeUrl";
@@ -16,6 +16,7 @@ import { EditBannerDialog } from "./EditBannerDialog";
 import { RemoveBannerDialog } from "./RemoveBannerDialog";
 import { ReinstateBannerDialog } from "./ReinstateBannerDialog";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
+import { getContentFingerprint, isReviewValid, toggleReview } from "@/lib/adReviewStorage";
 
 function PreviewBannerImage({ ipfsHash, label }: { ipfsHash: string; label: string }) {
   const [gatewayIdx, setGatewayIdx] = useState(0);
@@ -137,8 +138,16 @@ export function SlotCalendar() {
   const [selectedSlots, setSelectedSlots] = useState<BulkSlotSelection[]>([]);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const { isWhitelisted: isAdmin } = useAdminAccess();
+  const [reviewVersion, setReviewVersion] = useState(0);
 
   const futureGroups = useMemo(() => filterFutureGroups(slotGroups, isAdmin), [slotGroups, isAdmin]);
+
+  const handleToggleReview = useCallback((slot: BannerSlot) => {
+    if (!accountName) return;
+    const fp = getContentFingerprint(slot.ipfsHash, slot.websiteUrl, slot.sharedIpfsHash, slot.sharedWebsiteUrl);
+    toggleReview(accountName, slot.time, slot.position, fp);
+    setReviewVersion(v => v + 1);
+  }, [accountName]);
 
   const isSlotSelected = useCallback((time: number, position: number) => {
     return selectedSlots.some(s => s.time === time && s.position === position);
@@ -230,6 +239,22 @@ export function SlotCalendar() {
                           {isAdmin && slot.isOnChain && slot.user !== BANNER_CONTRACT && <Button size="sm" variant="outline" className="border-green-500/50 text-green-600 text-xs h-7 hover:bg-green-500/10" onClick={() => setPreviewTarget(slot)}><Eye className="h-3 w-3 mr-1" />Preview</Button>}
                           {isAdmin && slot.isOnChain && slot.user !== BANNER_CONTRACT && !slot.suspended && <Button size="sm" variant="destructive" className="text-xs h-7" onClick={() => setRemoveTarget(slot)}>Remove</Button>}
                           {isAdmin && slot.isOnChain && slot.suspended && <Button size="sm" variant="outline" className="border-green-500/50 text-green-600 text-xs h-7 hover:bg-green-500/10" onClick={() => setReinstateTarget(slot)}>Reinstate</Button>}
+                          {isAdmin && slot.isOnChain && slot.user !== BANNER_CONTRACT && (() => {
+                            const fp = getContentFingerprint(slot.ipfsHash, slot.websiteUrl, slot.sharedIpfsHash, slot.sharedWebsiteUrl);
+                            const reviewed = accountName ? isReviewValid(accountName, slot.time, slot.position, fp) : false;
+                            // reviewVersion used to trigger re-render
+                            void reviewVersion;
+                            return (
+                              <button
+                                onClick={() => handleToggleReview(slot)}
+                                className={`flex items-center gap-1 text-xs h-7 px-2 rounded-md border transition-colors ${reviewed ? "border-green-500/50 bg-green-500/10 text-green-600" : "border-border/50 bg-muted/30 text-muted-foreground hover:border-muted-foreground/30"}`}
+                                title={reviewed ? "Reviewed by you — click to uncheck" : "Mark as reviewed"}
+                              >
+                                <CheckCircle2 className={`h-3.5 w-3.5 ${reviewed ? "text-green-600" : "text-muted-foreground/50"}`} />
+                                {reviewed ? "Reviewed" : "Review"}
+                              </button>
+                            );
+                          })()}
                         </div>
                       </div>
                     );
