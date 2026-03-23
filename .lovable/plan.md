@@ -1,53 +1,42 @@
 
 
-## Fix: Alcor API rate limiting breaking swap functionality
+## Plan: Ad click warning interstitial + domain blocklist
 
-### Root cause analysis
+### Feature 1 — External link warning dialog
 
-There are **6 distinct Alcor API call sources** across the app:
+When a user clicks a banner ad that links externally, intercept the click and show a confirmation dialog displaying the destination domain. The user must confirm before navigating.
 
-| # | Endpoint | Source | Frequency | Notes |
-|---|----------|--------|-----------|-------|
-| 1 | `/api/v2/tokens` | `useSwapTokens` → `fetchSwapTokenList` | Once (shared cache, 10min stale) | Token list. Shared by CheesePriceBar, swap widget, token prices, fee pricing. Well-cached. |
-| 2 | `/api/v2/swapRouter/getRoute` | `useSwapRoute` → `fetchSwapRoute` | Every amount change (800ms debounce) | Swap routing. Necessary, unavoidable. |
-| 3 | `/api/v2/swap/pools/{id}` | `useCheeseNullData` → `fetchAlcorPoolPrice` | **Every 30 seconds** | CheeseNull page pool price. Runs even when not on CheeseNull page if component is mounted. |
-| 4 | `/api/v2/swap/pools` | `tvl.ts` → `fetchAlcorSwapCheeseTVL` | On CheesePriceBar load + manual refresh | TVL aggregation. |
-| 5 | `/api/v2/tickers` | `tvl.ts` → Alcor spot tickers | On CheesePriceBar load + manual refresh | TVL spot market data. |
-| 6 | `/api/v2/tokens` | `tokenLogos.ts` → `initializeTokenCache` | Fallback only (if shared cache not loaded yet) | Duplicate of #1 if race condition. |
+**`src/components/bannerads/ExternalLinkWarning.tsx`** (new)
+- AlertDialog with title "You are leaving CHEESEHub"
+- Shows the full destination domain extracted from the URL
+- Warning text: "This link goes to an external website not controlled by CHEESEHub. Proceed at your own risk."
+- Two buttons: "Go Back" (cancel) and "Continue to [domain]" (opens link in new tab)
 
-**The main offenders are:**
-- **#3**: CheeseNull pool price polling every 30s hits Alcor continuously, eating into rate limits
-- **#4 + #5**: TVL fetches 2 separate Alcor endpoints on page load and every manual refresh
-- **#6**: Potential duplicate token list fetch if logo system initializes before swap-tokens cache
+**`src/components/bannerads/BannerDisplay.tsx`** (edit)
+- Replace the `<a href={...}>` with a clickable div that opens the warning dialog
+- Pass the sanitized URL to ExternalLinkWarning
+- Placeholder banners (internal `<Link>`) remain unchanged — no interstitial needed for internal routes
 
-When the user opens the swap, they may already be near the rate limit from #3/#4/#5, so the route call (#2) gets a 429.
+### Feature 2 — Domain blocklist
 
-### Solution
+Maintain a blocklist of known scam/malicious domains. Banners linking to blocked domains are silently hidden from display.
 
-**1. CheeseNull pool price → use RPC instead of Alcor API**
-- `fetchAlcorPoolPrice` fetches from Alcor's REST API, but this pool data is available on-chain via the `swap.alcor` contract's `pools` table
-- Replace with an RPC table row fetch using `fetchTableRows` — eliminates the 30s polling against Alcor entirely
+**`src/lib/bannerBlocklist.ts`** (new)
+- Export a `BLOCKED_DOMAINS` set containing known scam domains (e.g. common phishing patterns)
+- Export `isDomainBlocked(url: string): boolean` — extracts hostname from URL, checks against the set (including subdomain matching so `evil.blocked.com` is caught if `blocked.com` is blocked)
 
-**2. TVL → cache aggressively, reduce Alcor calls**
-- The TVL data (`/swap/pools` and `/tickers`) changes slowly. Set `staleTime` to 30 minutes minimum (currently 1 hour but it re-fetches on every manual refresh button click)
-- Add a dedicated `staleTime` check before allowing manual refresh to prevent rapid re-fetching
+**`src/components/bannerads/BannerDisplay.tsx`** (edit)
+- In `extractActiveBanners`, filter out any banner whose `websiteUrl` matches a blocked domain
+- Blocked banners are silently excluded — they never render
 
-**3. Token logos → remove fallback Alcor fetch entirely**
-- The `initializeTokenCache()` fallback in `tokenLogos.ts` makes a redundant call to `/api/v2/tokens`. Since `useSwapTokens` already populates this cache via `initializeTokenCacheFromData`, remove the standalone fetch entirely and rely on the fallback map if the shared cache isn't ready yet
-
-**4. Swap route → increase debounce and add retry backoff**
-- Increase route debounce from 800ms to 1200ms to reduce call frequency during typing
-- Add exponential backoff on 429 errors specifically
+**`src/components/bannerads/RentSlotDialog.tsx`** + **`EditBannerDialog.tsx`** (edit)
+- When the user enters a website URL, check it against the blocklist
+- Show inline validation error "This domain is not allowed" and disable the submit button
 
 ### Files changed
-1. `src/lib/cheeseNullApi.ts` — Replace `fetchAlcorPoolPrice` with RPC table row fetch from `swap.alcor` contract
-2. `src/lib/tokenLogos.ts` — Remove the standalone Alcor API fetch fallback, use only the fallback map
-3. `src/hooks/useSwapRoute.ts` — Increase debounce to 1200ms, add 429-specific retry delay
-4. `src/lib/tvl.ts` — (minor) No structural change needed, already well-cached
-
-### Impact
-- Eliminates ~2 Alcor API calls per minute (CheeseNull polling) — the biggest offender
-- Removes 1 potential duplicate token list fetch (logo fallback)
-- Reduces swap route call frequency by ~33%
-- Zero impact on site usability — all data still available via RPC or shared cache
+1. `src/components/bannerads/ExternalLinkWarning.tsx` — new warning dialog
+2. `src/lib/bannerBlocklist.ts` — new blocklist utility
+3. `src/components/bannerads/BannerDisplay.tsx` — integrate warning + blocklist filter
+4. `src/components/bannerads/RentSlotDialog.tsx` — blocklist validation on URL input
+5. `src/components/bannerads/EditBannerDialog.tsx` — blocklist validation on URL input
 
