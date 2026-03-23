@@ -10,6 +10,7 @@ import { Loader2 } from "lucide-react";
 import { formatSlotDateUTC } from "./SlotCalendar";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 import { closeWharfkitModals, getTransactPlugins } from "@/lib/wharfKit";
+import { isDomainBlocked } from "@/lib/bannerBlocklist";
 
 interface RentSlotDialogProps {
   open: boolean;

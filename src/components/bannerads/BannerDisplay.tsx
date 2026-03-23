@@ -4,7 +4,9 @@ import { Megaphone } from "lucide-react";
 import { useBannerSlots, BannerSlotGroup } from "@/hooks/useBannerSlots";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 import { sanitizeUrl } from "@/lib/sanitizeUrl";
+import { isDomainBlocked } from "@/lib/bannerBlocklist";
 import { logger } from "@/lib/logger";
+import { ExternalLinkWarning } from "./ExternalLinkWarning";
 import cheeseBanner4 from "@/assets/cheese_banner4.png";
 
 interface ActiveBanner {
@@ -23,20 +25,24 @@ function extractActiveBanners(group: BannerSlotGroup): ActiveBanner[] {
 
     // Primary renter banner
     if (!slot.isAvailable && slot.ipfsHash) {
-      banners.push({
-        ipfsHash: slot.ipfsHash,
-        websiteUrl: slot.websiteUrl,
-        user: slot.user,
-      });
+      if (!isDomainBlocked(slot.websiteUrl)) {
+        banners.push({
+          ipfsHash: slot.ipfsHash,
+          websiteUrl: slot.websiteUrl,
+          user: slot.user,
+        });
+      }
     }
 
     // Shared renter banner
     if (slot.rentalType === "shared" && slot.sharedUser && slot.sharedIpfsHash) {
-      banners.push({
-        ipfsHash: slot.sharedIpfsHash,
-        websiteUrl: slot.sharedWebsiteUrl || "#",
-        user: slot.sharedUser,
-      });
+      if (!isDomainBlocked(slot.sharedWebsiteUrl || "")) {
+        banners.push({
+          ipfsHash: slot.sharedIpfsHash,
+          websiteUrl: slot.sharedWebsiteUrl || "#",
+          user: slot.sharedUser,
+        });
+      }
     }
 
     // Placeholder for unrented shared half
@@ -57,6 +63,7 @@ export function BannerDisplay() {
   const { slotGroups } = useBannerSlots();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [gatewayIndex, setGatewayIndex] = useState(0);
+  const [warningUrl, setWarningUrl] = useState<string | null>(null);
 
   const activeBanners = useMemo(() => {
     const nowSec = Math.floor(Date.now() / 1000);
@@ -95,6 +102,12 @@ export function BannerDisplay() {
   const current = activeBanners[currentIndex];
   const currentGateway = IPFS_GATEWAYS[gatewayIndex] ?? IPFS_GATEWAYS[0];
 
+  const handleAdClick = (url: string) => {
+    const sanitized = sanitizeUrl(url);
+    if (sanitized === "#") return;
+    setWarningUrl(sanitized);
+  };
+
   return (
     <div className="w-full flex flex-col items-center gap-1 pt-8 pb-2">
       {activeBanners.length > 0 && current ? (
@@ -111,11 +124,12 @@ export function BannerDisplay() {
             />
           </Link>
         ) : (
-          <a
-            href={sanitizeUrl(current.websiteUrl)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="relative block max-w-[580px] w-full"
+          <div
+            onClick={() => handleAdClick(current.websiteUrl)}
+            className="relative block max-w-[580px] w-full cursor-pointer"
+            role="link"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === "Enter") handleAdClick(current.websiteUrl); }}
           >
             <img
               src={`${currentGateway}${current.ipfsHash}`}
@@ -131,7 +145,7 @@ export function BannerDisplay() {
             <span className="absolute top-1 right-1 text-[10px] font-bold text-foreground/30 bg-background/40 rounded px-1 py-0.5 leading-none pointer-events-none select-none">
               AD
             </span>
-          </a>
+          </div>
         )
       ) : (
         <div className="flex gap-12">
@@ -154,6 +168,12 @@ export function BannerDisplay() {
         <Megaphone className="h-3 w-3" />
         Advertise with CHEESEHub
       </Link>
+
+      <ExternalLinkWarning
+        open={!!warningUrl}
+        onOpenChange={(open) => { if (!open) setWarningUrl(null); }}
+        url={warningUrl || ""}
+      />
     </div>
   );
 }

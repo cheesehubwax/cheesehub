@@ -9,6 +9,7 @@ import { closeWharfkitModals, getTransactPlugins } from "@/lib/wharfKit";
 import { Loader2 } from "lucide-react";
 import { BannerSlot } from "@/hooks/useBannerSlots";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
+import { isDomainBlocked } from "@/lib/bannerBlocklist";
 
 interface EditBannerDialogProps {
   open: boolean;
