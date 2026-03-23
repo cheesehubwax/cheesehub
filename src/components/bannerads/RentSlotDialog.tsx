@@ -87,7 +87,7 @@ export function RentSlotDialog({ open, onOpenChange, startTime, position, waxPri
             </div>
           )}
           <div><Label>IPFS Hash</Label><Input value={ipfsHash} onChange={(e) => setIpfsHash(e.target.value.replace(/^https?:\/\/.*$/i, ""))} placeholder="QmXyz... or bafyabc..." maxLength={128} className="mt-1" /><p className="text-xs text-muted-foreground mt-1">IPFS hash only (no URLs). Max 128 characters.</p></div>
-          <div><Label>Website URL</Label><Input value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} placeholder="https://example.com" maxLength={256} className="mt-1" /><p className="text-xs text-muted-foreground mt-1">Max 256 characters</p></div>
+          <div><Label>Website URL</Label><Input value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} placeholder="https://example.com" maxLength={256} className="mt-1" />{isDomainBlocked(websiteUrl) && <p className="text-xs text-destructive mt-1 font-medium">This domain is not allowed.</p>}<p className="text-xs text-muted-foreground mt-1">Max 256 characters</p></div>
           <div className="rounded-lg border border-border/30 bg-muted/30 p-3 text-xs text-muted-foreground space-y-1"><p className="font-medium text-foreground text-sm">📐 Required Dimensions</p><p><strong>580 × 150 px</strong> — exact size required</p><p>Upload your image to IPFS and paste the hash here.</p></div>
           {previewUrl && <div><Label className="text-muted-foreground">Preview</Label><div className="mt-2 rounded-lg overflow-hidden border border-border/30"><img src={previewUrl} alt="Banner preview" className="w-full h-auto max-h-40 object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} /></div></div>}
           <div className="rounded-lg bg-muted/50 p-3 text-sm"><p className="font-medium">{totalWax.toFixed(2)} WAX</p><p className="text-xs text-muted-foreground">{(waxPricePerDay * priceMultiplier).toFixed(2)} WAX × {numDays} day{numDays > 1 ? "s" : ""}</p>{isPromoz && <p className="text-xs font-medium mt-1" style={{color: 'hsl(142 71% 45%)'}}>🧀 Promoz 50% discount applied</p>}</div>
@@ -95,7 +95,7 @@ export function RentSlotDialog({ open, onOpenChange, startTime, position, waxPri
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleRent} disabled={isSubmitting || !session} className="bg-cheese hover:bg-cheese-dark text-primary-foreground">{isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Rent Slot</Button>
+          <Button onClick={handleRent} disabled={isSubmitting || !session || isDomainBlocked(websiteUrl)} className="bg-cheese hover:bg-cheese-dark text-primary-foreground">{isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Rent Slot</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
