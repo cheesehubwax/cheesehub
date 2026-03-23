@@ -61,9 +61,6 @@ export default function Admin() {
   const feefeeStatus = cheeseWaxSeverity === 'red' || waxdaoWaxSeverity === 'red'
     ? 'critical' : cheeseWaxSeverity === 'yellow' || waxdaoWaxSeverity === 'yellow'
     ? 'warn' : 'ok';
-  const bannadSeverity = data?.deviations?.bannadCheese != null
-    ? getDeviationSeverity(data.deviations.bannadCheese)
-    : 'green';
 
   return (
     <Layout>
@@ -157,7 +154,7 @@ export default function Admin() {
               <ContractStatusCard
                 title="cheesebannad"
                 icon={<Megaphone className="h-5 w-5 text-orange-400" />}
-                status={bannadSeverity === 'red' ? 'critical' : bannadSeverity === 'yellow' ? 'warn' : 'ok'}
+                status="ok"
                 rows={[
                   { label: 'Price/Day', value: data.bannadConfig?.wax_price_per_day ?? '—' },
                   { label: 'WAX/CHEESE Baseline', value: data.bannadConfig?.wax_per_cheese_baseline != null ? Number(data.bannadConfig.wax_per_cheese_baseline).toFixed(4) : '—' },
@@ -165,10 +162,8 @@ export default function Admin() {
                   {
                     label: 'Baseline Drift',
                     value: data.deviations.bannadCheese !== null
-                      ? `${data.deviations.bannadCheese >= 0 ? '+' : ''}${data.deviations.bannadCheese.toFixed(2)}%`
+                      ? `${data.deviations.bannadCheese >= 0 ? '+' : ''}${data.deviations.bannadCheese.toFixed(2)}% (informational)`
                       : '—',
-                    warn: bannadSeverity === 'yellow',
-                    critical: bannadSeverity === 'red',
                   },
                   { label: 'Admins', value: data.bannadAdmins.length },
                 ]}
