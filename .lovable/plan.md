@@ -1,24 +1,18 @@
 
 
-## Plan: Disable CHEESE payment when baselines are critical
+## Plan: Downgrade cheesebannad baseline to informational only
 
-### What this does
+The `cheesebannad` contract's `wax_per_cheese_baseline` isn't actively used for payment gating, so it shouldn't trigger critical/warning status on the admin card.
 
-When the CHEESE/WAX price deviates too far from the contract's stored baseline (8%+ — the "red" threshold), the `cheesefeefee` contract will reject CHEESE payments on-chain. Currently the frontend doesn't detect this, so users select CHEESE, submit, and get a failed transaction. This change proactively disables the CHEESE option and shows a message recommending WAX instead.
+### Changes
 
-### How it works
+**`src/pages/Admin.tsx`**
+- Remove the `bannadSeverity` variable and stop using it to set the cheesebannad card's `status` prop — just hardcode `status="ok"`
+- Remove the `warn`/`critical` flags from the "Baseline Drift" row — show the deviation percentage as plain informational text
+- Optionally add a small "(informational)" label next to the drift value
 
-**1. `src/hooks/useCheeseFeePricing.ts`** — Add a baseline health check
-- Fetch the `cheesefeefee` config table (reuse `fetchFeeFeeConfig`) and pool 1252 reserves (reuse `fetchPoolReserves`) alongside the existing price fetch
-- Calculate the deviation between the live pool price and the stored baseline using `calcDeviation`
-- Expose a new `isBaselineCritical: boolean` field (true when deviation >= 8%) on the returned pricing object
-
-**2. `src/components/shared/FeePaymentSelector.tsx`** — Disable CHEESE when critical
-- Read `isBaselineCritical` from `cheesePricing`
-- When critical: disable the CHEESE radio button, dim the option visually, and show a yellow/amber notice below it: "CHEESE payments are temporarily unavailable due to price volatility. Please use WAX."
-- Auto-select WAX if user had CHEESE selected and it becomes critical
+This is purely a display change — the deviation value still shows, it just won't colour the card red/yellow.
 
 ### Files changed
-1. `src/hooks/useCheeseFeePricing.ts` — add baseline deviation check, expose `isBaselineCritical`
-2. `src/components/shared/FeePaymentSelector.tsx` — disable CHEESE option when critical, show recommendation message
+1. `src/pages/Admin.tsx` — remove severity-based styling for cheesebannad card
 
