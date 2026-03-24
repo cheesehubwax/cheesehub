@@ -1,32 +1,27 @@
 
 
-## Plan: localStorage-based admin review checkoffs for banner ads
+## Plan: Fix token balance fetching to stop unnecessary RPC fallback
 
-Since localStorage is per-browser, each admin will only see their own checkoffs — not other admins'. This is a lightweight solution that still helps individual admins track which ads they've personally reviewed.
+### Problem
+The Hyperion API returns all balances in a single fast call, but a 5-minute staleness threshold causes the system to distrust it and fire 28 individual RPC calls instead. Hyperion indexers commonly lag a few minutes -- this doesn't mean the data is wrong.
 
-### How it works
+### Solution
 
-- Each rented slot (identified by `time:position`) gets a checkoff entry stored in localStorage under a key like `cheese-ad-reviews-{adminAccount}`
-- The stored data includes the admin's account name, timestamp, and a fingerprint of the ad content (hash of `ipfsHash + websiteUrl + sharedIpfsHash + sharedWebsiteUrl`)
-- If the ad's content changes (image or URL edited), the fingerprint won't match and the checkoff is automatically invalidated
-- A small checkbox/icon appears next to each rented slot in the SlotCalendar, visible only to admins
+**1. `src/lib/waxRpcFallback.ts`**
+- Increase `STALE_THRESHOLD_MS` from 5 minutes to 60 minutes. A 5-minute lag on Hyperion is normal and the balances are still accurate. Only truly stale data (1hr+) should trigger fallback.
 
-### Files to create/edit
+**2. `src/hooks/useAllTokenBalances.ts`**
+- When Hyperion IS stale and RPC fallback runs, only query tokens the user likely holds (from Hyperion's stale response) instead of all 28 registry tokens. This avoids dozens of failed RPC calls for contracts that don't exist.
+- Additionally, when Hyperion succeeds (even stale), use its token list as the discovery source rather than the full registry.
 
-**1. New: `src/lib/adReviewStorage.ts`**
-- `getReviews(adminAccount): Record<string, ReviewEntry>` — load from localStorage
-- `toggleReview(adminAccount, time, position, contentFingerprint)` — add/remove review
-- `isReviewValid(adminAccount, time, position, currentFingerprint): boolean` — check if review exists and fingerprint matches
-- Content fingerprint: simple string concat of `ipfsHash|websiteUrl|sharedIpfsHash|sharedWebsiteUrl`
+**3. `src/components/wallet/WalletTransferDialog.tsx`**
+- Soften the fallback warning message: instead of "Using backup data source. Some tokens may not appear." show something like "Balance data may be slightly delayed" when Hyperion was stale but data was still returned.
 
-**2. Edit: `src/components/bannerads/SlotCalendar.tsx`**
-- Import review storage utilities
-- For each rented slot (where `user !== BANNER_CONTRACT`), show a review checkbox visible only to admins
-- Checkbox is checked if the current admin has a valid review for that slot
-- Clicking toggles the review; if content has changed since last review, it shows as unchecked
-- Small text label: "Reviewed by you" or "Not reviewed" next to the checkbox
-- Style: subtle, doesn't interfere with existing rent/edit buttons
+### Why this works
+WaxBlocks and similar tools use Hyperion (or equivalent indexer APIs) as their primary source. They don't fire individual RPC calls per token. By trusting Hyperion's data even when it's a few minutes behind, we get instant results in one API call with no failed requests.
 
-### Limitation note
-Since this uses localStorage, Admin A cannot see Admin B's reviews. Each admin tracks their own reviews independently.
+### Technical detail
+- `STALE_THRESHOLD_MS`: 5 min → 60 min
+- RPC fallback scope: 28 registry tokens → only tokens from Hyperion's (stale) response + critical tokens (WAX, CHEESE)
+- Files changed: 3
 
