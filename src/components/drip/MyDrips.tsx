@@ -198,8 +198,23 @@ export function MyDrips() {
 
   return (
     <div className="space-y-8">
-      {/* Refresh */}
-      <div className="flex justify-end">
+      {/* Actions */}
+      <div className="flex justify-end gap-2">
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept=".json"
+          onChange={handleImportNames}
+          className="hidden"
+        />
+        <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={!accountName}>
+          <Upload className="h-4 w-4 mr-2" />
+          Import Names
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleExportNames} disabled={!accountName}>
+          <Download className="h-4 w-4 mr-2" />
+          Export Names
+        </Button>
         <Button variant="outline" size="sm" onClick={loadDrips} disabled={loading}>
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
