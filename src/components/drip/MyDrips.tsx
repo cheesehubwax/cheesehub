@@ -37,8 +37,44 @@ export function MyDrips() {
   const [successDialog, setSuccessDialog] = useState<{ open: boolean; title: string; description: string; txId: string | null }>({
     open: false, title: "", description: "", txId: null,
   });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const loadDrips = async () => {
+  const handleExportNames = () => {
+    if (!accountName) return;
+    const names = getAllDripNames(accountName);
+    if (Object.keys(names).length === 0) {
+      toast({ title: "Nothing to export", description: "No drip names saved yet." });
+      return;
+    }
+    const blob = new Blob([JSON.stringify(names, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `drip-names-${accountName}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Exported!", description: "Drip names saved to file." });
+  };
+
+  const handleImportNames = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !accountName) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result as string);
+        if (typeof parsed !== "object" || parsed === null) throw new Error("Invalid format");
+        importDripNames(accountName, parsed);
+        toast({ title: "Imported!", description: "Drip names restored." });
+        loadDrips();
+      } catch {
+        toast({ title: "Import failed", description: "Invalid drip names file.", variant: "destructive" });
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
     if (!accountName) return;
     setLoading(true);
     try {
