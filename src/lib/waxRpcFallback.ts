@@ -144,8 +144,9 @@ export interface HyperionResult {
   isStale: boolean;
 }
 
-// Stale threshold: 5 minutes
-const STALE_THRESHOLD_MS = 5 * 60 * 1000;
+// Stale threshold: 60 minutes — Hyperion indexers commonly lag a few minutes,
+// which is fine for balance display. Only truly stale data should trigger RPC fallback.
+const STALE_THRESHOLD_MS = 60 * 60 * 1000;
 
 /**
  * Fetch ALL token balances for an account using Hyperion API

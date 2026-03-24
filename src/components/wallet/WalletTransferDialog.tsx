@@ -328,7 +328,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                       </div>
                       {isUsingFallback && (
                         <div className="p-2 bg-primary/5 border border-primary/20 rounded-lg text-xs text-primary/70">
-                          Using backup data source. Some tokens may not appear.
+                          Balance data may be slightly delayed.
                         </div>
                       )}
                       {balances.length > 0 ? (
