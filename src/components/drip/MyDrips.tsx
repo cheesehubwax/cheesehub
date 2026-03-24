@@ -18,12 +18,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Droplets, Loader2, ArrowDown, ArrowUp, RefreshCw, Pencil, Check } from "lucide-react";
+import { Droplets, Loader2, ArrowDown, ArrowUp, RefreshCw, Pencil, Check, Download, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { TokenLogo } from "@/components/TokenLogo";
 import { TransactionSuccessDialog } from "@/components/wallet/TransactionSuccessDialog";
-import { getDripName, setDripName as saveDripName } from "@/lib/dripNames";
+import { getDripName, setDripName as saveDripName, getAllDripNames, importDripNames } from "@/lib/dripNames";
 import { Input } from "@/components/ui/input";
+import { useRef } from "react";
 
 export function MyDrips() {
   const { session, accountName, isConnected } = useWax();

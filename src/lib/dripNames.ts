@@ -48,3 +48,20 @@ export function getAllDripNames(account: string): Record<number, string> {
     return {};
   }
 }
+
+export function importDripNames(account: string, names: Record<number, string>): void {
+  if (!account) return;
+  try {
+    const key = getKey(account);
+    const data = localStorage.getItem(key);
+    const existing: Record<string, string> = data ? JSON.parse(data) : {};
+    for (const [id, name] of Object.entries(names)) {
+      if (typeof name === "string" && name.trim()) {
+        existing[String(id)] = name.trim();
+      }
+    }
+    localStorage.setItem(key, JSON.stringify(existing));
+  } catch {
+    // silently fail
+  }
+}
