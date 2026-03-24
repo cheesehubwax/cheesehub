@@ -18,12 +18,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Droplets, Loader2, ArrowDown, ArrowUp, RefreshCw, Pencil, Check } from "lucide-react";
+import { Droplets, Loader2, ArrowDown, ArrowUp, RefreshCw, Pencil, Check, Download, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { TokenLogo } from "@/components/TokenLogo";
 import { TransactionSuccessDialog } from "@/components/wallet/TransactionSuccessDialog";
-import { getDripName, setDripName as saveDripName } from "@/lib/dripNames";
+import { getDripName, setDripName as saveDripName, getAllDripNames, importDripNames } from "@/lib/dripNames";
 import { Input } from "@/components/ui/input";
+import { useRef } from "react";
 
 export function MyDrips() {
   const { session, accountName, isConnected } = useWax();
@@ -36,6 +37,43 @@ export function MyDrips() {
   const [successDialog, setSuccessDialog] = useState<{ open: boolean; title: string; description: string; txId: string | null }>({
     open: false, title: "", description: "", txId: null,
   });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExportNames = () => {
+    if (!accountName) return;
+    const names = getAllDripNames(accountName);
+    if (Object.keys(names).length === 0) {
+      toast({ title: "Nothing to export", description: "No drip names saved yet." });
+      return;
+    }
+    const blob = new Blob([JSON.stringify(names, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `drip-names-${accountName}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Exported!", description: "Drip names saved to file." });
+  };
+
+  const handleImportNames = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !accountName) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result as string);
+        if (typeof parsed !== "object" || parsed === null) throw new Error("Invalid format");
+        importDripNames(accountName, parsed);
+        toast({ title: "Imported!", description: "Drip names restored." });
+        loadDrips();
+      } catch {
+        toast({ title: "Import failed", description: "Invalid drip names file.", variant: "destructive" });
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
 
   const loadDrips = async () => {
     if (!accountName) return;
@@ -160,8 +198,23 @@ export function MyDrips() {
 
   return (
     <div className="space-y-8">
-      {/* Refresh */}
-      <div className="flex justify-end">
+      {/* Actions */}
+      <div className="flex justify-end gap-2">
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept=".json"
+          onChange={handleImportNames}
+          className="hidden"
+        />
+        <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={!accountName}>
+          <Upload className="h-4 w-4 mr-2" />
+          Import Names
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleExportNames} disabled={!accountName}>
+          <Download className="h-4 w-4 mr-2" />
+          Export Names
+        </Button>
         <Button variant="outline" size="sm" onClick={loadDrips} disabled={loading}>
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
