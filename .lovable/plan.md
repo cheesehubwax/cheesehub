@@ -1,27 +1,23 @@
 
 
-## Plan: Fix token balance fetching to stop unnecessary RPC fallback
+## Drip Name Backup & Restore
 
-### Problem
-The Hyperion API returns all balances in a single fast call, but a 5-minute staleness threshold causes the system to distrust it and fire 28 individual RPC calls instead. Hyperion indexers commonly lag a few minutes -- this doesn't mean the data is wrong.
+Two small buttons added to the My Drips tab header (next to the Refresh button):
 
-### Solution
+### How it works for the user
 
-**1. `src/lib/waxRpcFallback.ts`**
-- Increase `STALE_THRESHOLD_MS` from 5 minutes to 60 minutes. A 5-minute lag on Hyperion is normal and the balances are still accurate. Only truly stale data (1hr+) should trigger fallback.
+1. **Export** — click a download button, instantly saves a small JSON file (`drip-names-{account}.json`) to their device
+2. **Import** — click an upload button, pick the JSON file, names are restored immediately
 
-**2. `src/hooks/useAllTokenBalances.ts`**
-- When Hyperion IS stale and RPC fallback runs, only query tokens the user likely holds (from Hyperion's stale response) instead of all 28 registry tokens. This avoids dozens of failed RPC calls for contracts that don't exist.
-- Additionally, when Hyperion succeeds (even stale), use its token list as the discovery source rather than the full registry.
+### Technical changes
 
-**3. `src/components/wallet/WalletTransferDialog.tsx`**
-- Soften the fallback warning message: instead of "Using backup data source. Some tokens may not appear." show something like "Balance data may be slightly delayed" when Hyperion was stale but data was still returned.
+**`src/components/drip/MyDrips.tsx`**
+- Add two icon buttons (Download, Upload) next to the existing Refresh button
+- Export: reads `localStorage` for the user's drip names via `getAllDripNames()`, creates a Blob, triggers a file download
+- Import: opens a hidden `<input type="file">` accepting `.json`, parses the file, calls `setDripName()` for each entry, then refreshes the view
 
-### Why this works
-WaxBlocks and similar tools use Hyperion (or equivalent indexer APIs) as their primary source. They don't fire individual RPC calls per token. By trusting Hyperion's data even when it's a few minutes behind, we get instant results in one API call with no failed requests.
+**`src/lib/dripNames.ts`**
+- Add `importDripNames(account: string, names: Record<number, string>)` — bulk-writes names to localStorage
 
-### Technical detail
-- `STALE_THRESHOLD_MS`: 5 min → 60 min
-- RPC fallback scope: 28 registry tokens → only tokens from Hyperion's (stale) response + critical tokens (WAX, CHEESE)
-- Files changed: 3
+No new dependencies. No new pages. Just two small buttons.
 
