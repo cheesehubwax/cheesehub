@@ -75,6 +75,7 @@ export function MyDrips() {
     e.target.value = "";
   };
 
+  const loadDrips = async () => {
     if (!accountName) return;
     setLoading(true);
     try {
