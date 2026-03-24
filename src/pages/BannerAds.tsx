@@ -19,7 +19,7 @@ const BannerAds = () => {
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
               <span className="text-3xl">🗞️</span>
             </div>
-            <p className="text-muted-foreground max-w-lg mx-auto">Rent Banner Ad Slots on CHEESEHub. Your Banner Persists Across All Dapp Pages. Each Day has 2 Slots Available. Choose from Exclusive or Shared. Shared: 70 WAX/day OR Exclusive: 140 WAX/day. Show 2 banners for less than 2 Exclusive Slots.</p>
+            <p className="text-muted-foreground max-w-lg mx-auto">Rent Banner Ad Slots on CHEESEHub. Your Banner Persists Across All Dapp Pages. Each Day has 2 Slots Available. Choose from Exclusive or Shared</p>
           </div>
           <SlotCalendar />
           <BannerAdStatsBar />
