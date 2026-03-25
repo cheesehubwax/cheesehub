@@ -94,14 +94,16 @@ export function BannerDisplay() {
     setGatewayIndex(0);
   }, [currentIndex, activeBanners.length]);
 
+  const isCurrentShared = activeBanners[currentIndex]?.isShared ?? false;
+
   useEffect(() => {
     if (activeBanners.length <= 1) return;
-    const duration = current?.isShared ? 20000 : 8000;
+    const duration = isCurrentShared ? 20000 : 8000;
     const interval = setInterval(() => {
       setCurrentIndex((index) => (index + 1) % activeBanners.length);
     }, duration);
     return () => clearInterval(interval);
-  }, [activeBanners.length, current?.isShared]);
+  }, [activeBanners.length, isCurrentShared]);
 
   const current = activeBanners[currentIndex];
   const currentGateway = IPFS_GATEWAYS[gatewayIndex] ?? IPFS_GATEWAYS[0];
