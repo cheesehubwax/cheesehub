@@ -15,6 +15,7 @@ interface ActiveBanner {
   websiteUrl: string;
   user: string;
   isPlaceholder?: boolean;
+  isShared?: boolean;
 }
 
 function extractActiveBanners(group: BannerSlotGroup): ActiveBanner[] {
