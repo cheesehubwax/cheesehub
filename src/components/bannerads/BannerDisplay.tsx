@@ -15,6 +15,7 @@ interface ActiveBanner {
   websiteUrl: string;
   user: string;
   isPlaceholder?: boolean;
+  isShared?: boolean;
 }
 
 function extractActiveBanners(group: BannerSlotGroup): ActiveBanner[] {
@@ -30,6 +31,7 @@ function extractActiveBanners(group: BannerSlotGroup): ActiveBanner[] {
           ipfsHash: slot.ipfsHash,
           websiteUrl: slot.websiteUrl,
           user: slot.user,
+          isShared: slot.rentalType === "shared",
         });
       }
     }
@@ -41,6 +43,7 @@ function extractActiveBanners(group: BannerSlotGroup): ActiveBanner[] {
           ipfsHash: slot.sharedIpfsHash,
           websiteUrl: slot.sharedWebsiteUrl || "#",
           user: slot.sharedUser,
+          isShared: true,
         });
       }
     }
@@ -91,13 +94,16 @@ export function BannerDisplay() {
     setGatewayIndex(0);
   }, [currentIndex, activeBanners.length]);
 
+  const isCurrentShared = activeBanners[currentIndex]?.isShared ?? false;
+
   useEffect(() => {
     if (activeBanners.length <= 1) return;
+    const duration = isCurrentShared ? 20000 : 8000;
     const interval = setInterval(() => {
       setCurrentIndex((index) => (index + 1) % activeBanners.length);
-    }, 8000);
+    }, duration);
     return () => clearInterval(interval);
-  }, [activeBanners.length]);
+  }, [activeBanners.length, isCurrentShared]);
 
   const current = activeBanners[currentIndex];
   const currentGateway = IPFS_GATEWAYS[gatewayIndex] ?? IPFS_GATEWAYS[0];
