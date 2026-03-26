@@ -10,10 +10,10 @@ interface PriceDeviationGaugeProps {
   unit?: string;
 }
 
-const severityConfig: Record<Severity, { bg: string; text: string; Icon: typeof CheckCircle; label: string }> = {
-  green: { bg: 'bg-green-500/20', text: 'text-green-400', Icon: CheckCircle, label: 'Safe' },
-  yellow: { bg: 'bg-yellow-500/20', text: 'text-yellow-400', Icon: Warning, label: 'Warning' },
-  red: { bg: 'bg-red-500/20', text: 'text-red-400', Icon: WarningCircle, label: 'Critical' },
+const severityConfig: Record<Severity, { bg: string; text: string; bar: string; Icon: typeof CheckCircle; label: string }> = {
+  green: { bg: 'bg-green-500/20', text: 'text-green-400', bar: 'bg-green-400', Icon: CheckCircle, label: 'Safe' },
+  yellow: { bg: 'bg-yellow-500/20', text: 'text-yellow-400', bar: 'bg-yellow-400', Icon: Warning, label: 'Warning' },
+  red: { bg: 'bg-red-500/20', text: 'text-red-400', bar: 'bg-red-400', Icon: WarningCircle, label: 'Critical' },
 };
 
 export function PriceDeviationGauge({ label, baseline, live, deviationPct, unit = '' }: PriceDeviationGaugeProps) {
@@ -55,7 +55,7 @@ export function PriceDeviationGauge({ label, baseline, live, deviationPct, unit 
         <div className="absolute right-[10%] top-0 h-full w-px bg-red-500/50" />
         {deviationPct !== null && (
           <div
-            className={`absolute top-0 h-full ${config.text.replace('text-', 'bg-')} rounded-full`}
+            className={`absolute top-0 h-full ${config.bar} rounded-full`}
             style={{
               width: `${Math.min(Math.abs(deviationPct) * 5, 50)}%`,
               left: deviationPct >= 0 ? '50%' : undefined,
