@@ -1,26 +1,24 @@
 
 
-## Fix: Shared slot primary banner not displaying
+## Fix: Banner transition lag and layout shift
 
 ### Problem
-When a slot is rented as "shared" (rental_type=1) and only the primary renter has joined (no shared_user yet), `isAvailable` is set to `true`. The `extractActiveBanners` function then skips the primary banner because it checks `!slot.isAvailable`.
-
-The `isAvailable` flag conflates two things: "can someone rent this slot?" vs "does this slot have an active primary banner?". A shared slot with a primary renter absolutely has a banner to show.
+When `PositionSlot` rotates between an IPFS banner and the local placeholder, it renders completely different JSX branches (`if (current.localSrc)` vs the IPFS `div`). This causes:
+1. The container has no fixed height — it uses `h-auto`, so it collapses momentarily during the swap
+2. The IPFS image needs to load from a gateway, causing a visible delay
+3. The placeholder image also triggers a layout reflow since dimensions aren't reserved
 
 ### Fix
 
-**`src/components/bannerads/BannerDisplay.tsx`** — Change the primary banner check (line 28) from:
-```
-if (!slot.isAvailable && slot.ipfsHash)
-```
-to:
-```
-if (slot.user !== "cheesebannad" && slot.ipfsHash)
-```
+**`src/components/bannerads/BannerDisplay.tsx`** — Rewrite `PositionSlot` to:
 
-This directly checks whether a real user rented the slot, bypassing the misleading `isAvailable` flag. If the user is the contract itself, there's no banner. If a real account rented it, show their banner regardless of whether the shared half is still open.
+1. **Fixed container**: Wrap in a `w-[580px] h-[150px]` container so the slot never collapses during transitions
+2. **Render all banners simultaneously**: Instead of conditionally rendering only the current banner, render all banners in the array as absolutely positioned layers
+3. **Crossfade with opacity**: The active banner gets `opacity-100`, others get `opacity-0`, with a `transition-opacity duration-500` for smooth fading
+4. **Preload images**: Remove `loading="lazy"` so the next banner's image is already loaded before it fades in
+5. **Keep pointer-events only on active**: `pointer-events-none` on inactive banners so clicks work correctly
+
+This means the placeholder and the real ad are both always mounted and pre-rendered — no DOM swap, no layout shift, no loading delay during rotation.
 
 ### Files changed: 1
-
-No other changes needed. The placeholder logic for the unrented shared half (line 52) and the shared renter logic (line 40) remain correct.
 
