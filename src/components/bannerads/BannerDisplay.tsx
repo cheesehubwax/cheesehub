@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Megaphone } from "lucide-react";
-import { useBannerSlots, BannerSlotGroup } from "@/hooks/useBannerSlots";
+import { useBannerSlots, BannerSlotGroup, BannerSlot } from "@/hooks/useBannerSlots";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 import { sanitizeUrl } from "@/lib/sanitizeUrl";
 import { isDomainBlocked } from "@/lib/bannerBlocklist";
@@ -18,155 +18,178 @@ interface ActiveBanner {
   isShared?: boolean;
 }
 
-function extractActiveBanners(group: BannerSlotGroup): ActiveBanner[] {
+function extractBannersForSlot(slot: BannerSlot): ActiveBanner[] {
   const banners: ActiveBanner[] = [];
+  if (slot.suspended) return banners;
 
-  for (const slot of group.slots) {
-    if (slot.suspended) continue;
-
-    // Primary renter banner
-    if (slot.user !== "cheesebannad" && slot.ipfsHash) {
-      if (!isDomainBlocked(slot.websiteUrl)) {
-        banners.push({
-          ipfsHash: slot.ipfsHash,
-          websiteUrl: slot.websiteUrl,
-          user: slot.user,
-          isShared: slot.rentalType === "shared",
-        });
-      }
-    }
-
-    // Shared renter banner
-    if (slot.rentalType === "shared" && slot.sharedUser && slot.sharedIpfsHash) {
-      if (!isDomainBlocked(slot.sharedWebsiteUrl || "")) {
-        banners.push({
-          ipfsHash: slot.sharedIpfsHash,
-          websiteUrl: slot.sharedWebsiteUrl || "#",
-          user: slot.sharedUser,
-          isShared: true,
-        });
-      }
-    }
-
-    // Placeholder for unrented shared half
-    if (slot.rentalType === "shared" && !slot.suspended && !slot.isAvailable && !slot.sharedUser) {
+  // Primary renter banner
+  if (slot.user !== "cheesebannad" && slot.ipfsHash) {
+    if (!isDomainBlocked(slot.websiteUrl)) {
       banners.push({
-        localSrc: cheeseBanner4,
-        websiteUrl: "/farm",
-        user: "placeholder",
-        isPlaceholder: true,
+        ipfsHash: slot.ipfsHash,
+        websiteUrl: slot.websiteUrl,
+        user: slot.user,
+        isShared: slot.rentalType === "shared",
       });
     }
+  }
+
+  // Shared renter banner
+  if (slot.rentalType === "shared" && slot.sharedUser && slot.sharedIpfsHash) {
+    if (!isDomainBlocked(slot.sharedWebsiteUrl || "")) {
+      banners.push({
+        ipfsHash: slot.sharedIpfsHash,
+        websiteUrl: slot.sharedWebsiteUrl || "#",
+        user: slot.sharedUser,
+        isShared: true,
+      });
+    }
+  }
+
+  // Placeholder for unrented shared half
+  if (slot.rentalType === "shared" && slot.user !== "cheesebannad" && !slot.sharedUser) {
+    banners.push({
+      localSrc: cheeseBanner4,
+      websiteUrl: "/farm",
+      user: "placeholder",
+      isPlaceholder: true,
+    });
   }
 
   return banners;
 }
 
-export function BannerDisplay() {
-  const { slotGroups } = useBannerSlots();
+function PositionSlot({
+  banners,
+  position,
+  onAdClick,
+}: {
+  banners: ActiveBanner[];
+  position: number;
+  onAdClick: (url: string) => void;
+}) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [gatewayIndex, setGatewayIndex] = useState(0);
+
+  useEffect(() => {
+    if (currentIndex >= banners.length) setCurrentIndex(0);
+  }, [banners.length, currentIndex]);
+
+  useEffect(() => {
+    setGatewayIndex(0);
+  }, [currentIndex, banners.length]);
+
+  const isCurrentShared = banners[currentIndex]?.isShared ?? false;
+
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const duration = isCurrentShared ? 20000 : 8000;
+    const interval = setInterval(() => {
+      setCurrentIndex((i) => (i + 1) % banners.length);
+    }, duration);
+    return () => clearInterval(interval);
+  }, [banners.length, isCurrentShared]);
+
+  const current = banners[currentIndex];
+  const currentGateway = IPFS_GATEWAYS[gatewayIndex] ?? IPFS_GATEWAYS[0];
+
+  if (!current) {
+    return (
+      <Link
+        to="/bannerads"
+        className="w-[580px] h-[150px] rounded-lg border border-dashed border-cheese/40 bg-card/40 flex items-center justify-center gap-2 text-cheese/60 hover:border-cheese hover:text-cheese transition-colors"
+      >
+        <Megaphone className="h-4 w-4" />
+        <span className="text-xs font-medium">Slot {position} — Available</span>
+      </Link>
+    );
+  }
+
+  if (current.localSrc) {
+    return (
+      <Link
+        to={current.websiteUrl}
+        className="relative block max-w-[580px] w-full"
+      >
+        <img
+          src={current.localSrc}
+          alt="CHEESEFarm Banner"
+          className="w-full h-auto max-h-[150px] object-contain rounded-lg"
+          loading="lazy"
+        />
+      </Link>
+    );
+  }
+
+  return (
+    <div
+      onClick={() => onAdClick(current.websiteUrl)}
+      className="relative block max-w-[580px] w-full cursor-pointer"
+      role="link"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === "Enter") onAdClick(current.websiteUrl); }}
+    >
+      <img
+        src={`${currentGateway}${current.ipfsHash}`}
+        alt="Banner Ad"
+        className="w-full h-auto max-h-[150px] object-contain rounded-lg"
+        loading="lazy"
+        onError={() => {
+          if (gatewayIndex < IPFS_GATEWAYS.length - 1) {
+            setGatewayIndex((i) => i + 1);
+          }
+        }}
+      />
+      <span className="absolute top-1 right-1 text-[10px] font-bold text-foreground/30 bg-background/40 rounded px-1 py-0.5 leading-none pointer-events-none select-none">
+        AD
+      </span>
+    </div>
+  );
+}
+
+export function BannerDisplay() {
+  const { slotGroups } = useBannerSlots();
   const [warningUrl, setWarningUrl] = useState<string | null>(null);
 
-  const activeBanners = useMemo(() => {
+  const { pos1Banners, pos2Banners } = useMemo(() => {
     const nowSec = Math.floor(Date.now() / 1000);
 
     const currentGroup = slotGroups
       .filter((group) => group.time <= nowSec)
       .sort((a, b) => b.time - a.time)[0];
 
-    if (currentGroup) {
-      const banners = extractActiveBanners(currentGroup);
-      if (banners.length > 0) {
-        logger.info(`[BannerDisplay] Showing ${banners.length} banner(s) from group time=${currentGroup.time}`, banners);
-        return banners;
+    const result = { pos1Banners: [] as ActiveBanner[], pos2Banners: [] as ActiveBanner[] };
+
+    if (!currentGroup) return result;
+
+    for (const slot of currentGroup.slots) {
+      const banners = extractBannersForSlot(slot);
+      if (slot.position === 1) {
+        result.pos1Banners.push(...banners);
+      } else if (slot.position === 2) {
+        result.pos2Banners.push(...banners);
       }
     }
 
-    return [];
+    if (result.pos1Banners.length > 0 || result.pos2Banners.length > 0) {
+      logger.info(`[BannerDisplay] Pos1: ${result.pos1Banners.length} banner(s), Pos2: ${result.pos2Banners.length} banner(s)`);
+    }
+
+    return result;
   }, [slotGroups]);
 
-  useEffect(() => {
-    if (currentIndex >= activeBanners.length) setCurrentIndex(0);
-  }, [activeBanners.length, currentIndex]);
-
-  useEffect(() => {
-    setGatewayIndex(0);
-  }, [currentIndex, activeBanners.length]);
-
-  const isCurrentShared = activeBanners[currentIndex]?.isShared ?? false;
-
-  useEffect(() => {
-    if (activeBanners.length <= 1) return;
-    const duration = isCurrentShared ? 20000 : 8000;
-    const interval = setInterval(() => {
-      setCurrentIndex((index) => (index + 1) % activeBanners.length);
-    }, duration);
-    return () => clearInterval(interval);
-  }, [activeBanners.length, isCurrentShared]);
-
-  const current = activeBanners[currentIndex];
-  const currentGateway = IPFS_GATEWAYS[gatewayIndex] ?? IPFS_GATEWAYS[0];
-
-  const handleAdClick = (url: string) => {
+  const handleAdClick = useCallback((url: string) => {
     const sanitized = sanitizeUrl(url);
     if (sanitized === "#") return;
     setWarningUrl(sanitized);
-  };
+  }, []);
 
   return (
     <div className="w-full flex flex-col items-center gap-1 pt-8 pb-2">
-      {activeBanners.length > 0 && current ? (
-        current.localSrc ? (
-          <Link
-            to={current.websiteUrl}
-            className="relative block max-w-[580px] w-full"
-          >
-            <img
-              src={current.localSrc}
-              alt="CHEESEFarm Banner"
-              className="w-full h-auto max-h-[150px] object-contain rounded-lg"
-              loading="lazy"
-            />
-          </Link>
-        ) : (
-          <div
-            onClick={() => handleAdClick(current.websiteUrl)}
-            className="relative block max-w-[580px] w-full cursor-pointer"
-            role="link"
-            tabIndex={0}
-            onKeyDown={(e) => { if (e.key === "Enter") handleAdClick(current.websiteUrl); }}
-          >
-            <img
-              src={`${currentGateway}${current.ipfsHash}`}
-              alt="Banner Ad"
-              className="w-full h-auto max-h-[150px] object-contain rounded-lg"
-              loading="lazy"
-              onError={() => {
-                if (gatewayIndex < IPFS_GATEWAYS.length - 1) {
-                  setGatewayIndex((index) => index + 1);
-                }
-              }}
-            />
-            <span className="absolute top-1 right-1 text-[10px] font-bold text-foreground/30 bg-background/40 rounded px-1 py-0.5 leading-none pointer-events-none select-none">
-              AD
-            </span>
-          </div>
-        )
-      ) : (
-        <div className="flex gap-12">
-          {[1, 2].map((slot) => (
-            <Link
-              key={slot}
-              to="/bannerads"
-              className="w-[580px] h-[150px] rounded-lg border border-dashed border-cheese/40 bg-card/40 flex items-center justify-center gap-2 text-cheese/60 hover:border-cheese hover:text-cheese transition-colors"
-            >
-              <Megaphone className="h-4 w-4" />
-              <span className="text-xs font-medium">Slot {slot} — Available</span>
-            </Link>
-          ))}
-        </div>
-      )}
+      <div className="flex gap-12">
+        <PositionSlot banners={pos1Banners} position={1} onAdClick={handleAdClick} />
+        <PositionSlot banners={pos2Banners} position={2} onAdClick={handleAdClick} />
+      </div>
       <Link
         to="/bannerads"
         className="flex items-center gap-1 text-xs text-cheese hover:text-cheese transition-colors mt-3"
