@@ -25,7 +25,7 @@ function extractActiveBanners(group: BannerSlotGroup): ActiveBanner[] {
     if (slot.suspended) continue;
 
     // Primary renter banner
-    if (!slot.isAvailable && slot.ipfsHash) {
+    if (slot.user !== "cheesebannad" && slot.ipfsHash) {
       if (!isDomainBlocked(slot.websiteUrl)) {
         banners.push({
           ipfsHash: slot.ipfsHash,
