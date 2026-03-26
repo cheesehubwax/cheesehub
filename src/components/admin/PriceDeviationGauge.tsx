@@ -55,7 +55,7 @@ export function PriceDeviationGauge({ label, baseline, live, deviationPct, unit 
         <div className="absolute right-[10%] top-0 h-full w-px bg-red-500/50" />
         {deviationPct !== null && (
           <div
-            className={`absolute top-0 h-full ${config.text.replace('text-', 'bg-')} rounded-full`}
+            className={`absolute top-0 h-full ${config.bar} rounded-full`}
             style={{
               width: `${Math.min(Math.abs(deviationPct) * 5, 50)}%`,
               left: deviationPct >= 0 ? '50%' : undefined,
