@@ -59,6 +59,63 @@ function extractBannersForSlot(slot: BannerSlot): ActiveBanner[] {
   return banners;
 }
 
+function BannerLayer({
+  banner,
+  isActive,
+  onAdClick,
+}: {
+  banner: ActiveBanner;
+  isActive: boolean;
+  onAdClick: (url: string) => void;
+}) {
+  const [gatewayIndex, setGatewayIndex] = useState(0);
+  const currentGateway = IPFS_GATEWAYS[gatewayIndex] ?? IPFS_GATEWAYS[0];
+
+  const visibilityClass = isActive
+    ? "opacity-100 pointer-events-auto z-10"
+    : "opacity-0 pointer-events-none z-0";
+
+  if (banner.localSrc) {
+    return (
+      <Link
+        to={banner.websiteUrl}
+        className={`absolute inset-0 transition-opacity duration-500 ${visibilityClass}`}
+        tabIndex={isActive ? 0 : -1}
+      >
+        <img
+          src={banner.localSrc}
+          alt="CHEESEFarm Banner"
+          className="w-full h-full object-contain rounded-lg"
+        />
+      </Link>
+    );
+  }
+
+  return (
+    <div
+      onClick={() => isActive && onAdClick(banner.websiteUrl)}
+      className={`absolute inset-0 cursor-pointer transition-opacity duration-500 ${visibilityClass}`}
+      role="link"
+      tabIndex={isActive ? 0 : -1}
+      onKeyDown={(e) => { if (isActive && e.key === "Enter") onAdClick(banner.websiteUrl); }}
+    >
+      <img
+        src={`${currentGateway}${banner.ipfsHash}`}
+        alt="Banner Ad"
+        className="w-full h-full object-contain rounded-lg"
+        onError={() => {
+          if (gatewayIndex < IPFS_GATEWAYS.length - 1) {
+            setGatewayIndex((i) => i + 1);
+          }
+        }}
+      />
+      <span className="absolute top-1 right-1 text-[10px] font-bold text-foreground/30 bg-background/40 rounded px-1 py-0.5 leading-none pointer-events-none select-none">
+        AD
+      </span>
+    </div>
+  );
+}
+
 function PositionSlot({
   banners,
   position,
@@ -69,15 +126,10 @@ function PositionSlot({
   onAdClick: (url: string) => void;
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [gatewayIndex, setGatewayIndex] = useState(0);
 
   useEffect(() => {
     if (currentIndex >= banners.length) setCurrentIndex(0);
   }, [banners.length, currentIndex]);
-
-  useEffect(() => {
-    setGatewayIndex(0);
-  }, [currentIndex, banners.length]);
 
   const isCurrentShared = banners[currentIndex]?.isShared ?? false;
 
@@ -90,10 +142,7 @@ function PositionSlot({
     return () => clearInterval(interval);
   }, [banners.length, isCurrentShared]);
 
-  const current = banners[currentIndex];
-  const currentGateway = IPFS_GATEWAYS[gatewayIndex] ?? IPFS_GATEWAYS[0];
-
-  if (!current) {
+  if (banners.length === 0) {
     return (
       <Link
         to="/bannerads"
@@ -105,44 +154,16 @@ function PositionSlot({
     );
   }
 
-  if (current.localSrc) {
-    return (
-      <Link
-        to={current.websiteUrl}
-        className="relative block max-w-[580px] w-full"
-      >
-        <img
-          src={current.localSrc}
-          alt="CHEESEFarm Banner"
-          className="w-full h-auto max-h-[150px] object-contain rounded-lg"
-          loading="lazy"
-        />
-      </Link>
-    );
-  }
-
   return (
-    <div
-      onClick={() => onAdClick(current.websiteUrl)}
-      className="relative block max-w-[580px] w-full cursor-pointer"
-      role="link"
-      tabIndex={0}
-      onKeyDown={(e) => { if (e.key === "Enter") onAdClick(current.websiteUrl); }}
-    >
-      <img
-        src={`${currentGateway}${current.ipfsHash}`}
-        alt="Banner Ad"
-        className="w-full h-auto max-h-[150px] object-contain rounded-lg"
-        loading="lazy"
-        onError={() => {
-          if (gatewayIndex < IPFS_GATEWAYS.length - 1) {
-            setGatewayIndex((i) => i + 1);
-          }
-        }}
-      />
-      <span className="absolute top-1 right-1 text-[10px] font-bold text-foreground/30 bg-background/40 rounded px-1 py-0.5 leading-none pointer-events-none select-none">
-        AD
-      </span>
+    <div className="relative w-[580px] h-[150px]">
+      {banners.map((banner, idx) => (
+        <BannerLayer
+          key={`${banner.user}-${banner.ipfsHash || "local"}-${idx}`}
+          banner={banner}
+          isActive={idx === currentIndex}
+          onAdClick={onAdClick}
+        />
+      ))}
     </div>
   );
 }
