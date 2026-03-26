@@ -135,12 +135,11 @@ function PositionSlot({
 
   useEffect(() => {
     if (banners.length <= 1) return;
-    const duration = isCurrentShared ? 20000 : 8000;
     const interval = setInterval(() => {
       setCurrentIndex((i) => (i + 1) % banners.length);
-    }, duration);
+    }, 20000);
     return () => clearInterval(interval);
-  }, [banners.length, isCurrentShared]);
+  }, [banners.length]);
 
   if (banners.length === 0) {
     return (
