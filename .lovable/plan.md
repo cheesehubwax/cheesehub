@@ -1,23 +1,26 @@
 
 
-## Drip Name Backup & Restore
+## Fix: Shared slot primary banner not displaying
 
-Two small buttons added to the My Drips tab header (next to the Refresh button):
+### Problem
+When a slot is rented as "shared" (rental_type=1) and only the primary renter has joined (no shared_user yet), `isAvailable` is set to `true`. The `extractActiveBanners` function then skips the primary banner because it checks `!slot.isAvailable`.
 
-### How it works for the user
+The `isAvailable` flag conflates two things: "can someone rent this slot?" vs "does this slot have an active primary banner?". A shared slot with a primary renter absolutely has a banner to show.
 
-1. **Export** — click a download button, instantly saves a small JSON file (`drip-names-{account}.json`) to their device
-2. **Import** — click an upload button, pick the JSON file, names are restored immediately
+### Fix
 
-### Technical changes
+**`src/components/bannerads/BannerDisplay.tsx`** — Change the primary banner check (line 28) from:
+```
+if (!slot.isAvailable && slot.ipfsHash)
+```
+to:
+```
+if (slot.user !== "cheesebannad" && slot.ipfsHash)
+```
 
-**`src/components/drip/MyDrips.tsx`**
-- Add two icon buttons (Download, Upload) next to the existing Refresh button
-- Export: reads `localStorage` for the user's drip names via `getAllDripNames()`, creates a Blob, triggers a file download
-- Import: opens a hidden `<input type="file">` accepting `.json`, parses the file, calls `setDripName()` for each entry, then refreshes the view
+This directly checks whether a real user rented the slot, bypassing the misleading `isAvailable` flag. If the user is the contract itself, there's no banner. If a real account rented it, show their banner regardless of whether the shared half is still open.
 
-**`src/lib/dripNames.ts`**
-- Add `importDripNames(account: string, names: Record<number, string>)` — bulk-writes names to localStorage
+### Files changed: 1
 
-No new dependencies. No new pages. Just two small buttons.
+No other changes needed. The placeholder logic for the unrented shared half (line 52) and the shared renter logic (line 40) remain correct.
 
