@@ -1,18 +1,26 @@
 
 
-## Add Refresh Button to NFT Send Manager
+## Fix Remove Asset Actions in CHEESEFarm
 
-### What
-Add a refresh button (using the existing `RefreshCw` icon already imported) to the NFT viewer toolbar that calls the existing `refetch()` from `useUserNFTs`, preserving current collection and schema filter state.
+### Problem
+The erase action names in `src/lib/farm.ts` are wrong. The contract uses `removecol`, `removeschema`, `removetemp` — not `erasecolvalue`, `eraseschvalue`, `erasetmpvalue`.
 
 ### Changes
 
-**`src/components/wallet/NFTSendManager.tsx`**
-- Destructure `refetch` from `useUserNFTs` (line 30)
-- Add a refresh `Button` with `RefreshCw` icon next to the sort dropdown (after line 152), calling `refetch()` on click
-- Show a spinning animation on the icon while `isLoading` is true after clicking refresh
-- Collection filter, schema filter, search, and sort state are all preserved (they're independent state variables)
+**`src/lib/farm.ts`** — Update 3 (or 4) action builders:
+
+| Function | Current action name | Correct action name |
+|---|---|---|
+| `buildEraseTemplateValuesAction` | `erasetmpvalue` | `removetemp` |
+| `buildEraseSchemaValuesAction` | `eraseschvalue` | `removeschema` |
+| `buildEraseCollectionValuesAction` | `erasecolvalue` | `removecol` |
+| `buildEraseAttributeValuesAction` | `eraseattvalue` | `removeattr` (TBD — user to confirm) |
+
+The data field names may also differ on the contract. The user should verify the parameter names match what the contract expects (e.g., `template_id` vs `temp_id`). If the user can share the ABI or parameter names for these actions, we can fix those too.
+
+### Note
+Keep the trash/delete buttons in `ManageStakableAssets.tsx` — they were correct, just the action names were wrong.
 
 ### Files changed: 1
-- `src/components/wallet/NFTSendManager.tsx`
+- `src/lib/farm.ts`
 
