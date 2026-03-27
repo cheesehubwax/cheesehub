@@ -31,6 +31,7 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [collectionFilter, setCollectionFilter] = useState<string>('all');
+  const [schemaFilter, setSchemaFilter] = useState<string>('all');
   const [selectedNFTs, setSelectedNFTs] = useState<Set<string>>(new Set());
   const [memo, setMemo] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -49,9 +50,25 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
     return Array.from(colMap.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
   }, [nfts]);
 
+  // Get unique schemas for the selected collection
+  const schemas = useMemo(() => {
+    if (collectionFilter === 'all') return [];
+    const schemaMap = new Map<string, number>();
+    nfts.filter(nft => nft.collection === collectionFilter).forEach(nft => {
+      if (nft.schema) schemaMap.set(nft.schema, (schemaMap.get(nft.schema) || 0) + 1);
+    });
+    return Array.from(schemaMap.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [nfts, collectionFilter]);
+
+  const handleCollectionChange = useCallback((value: string) => {
+    setCollectionFilter(value);
+    setSchemaFilter('all');
+  }, []);
+
   const filteredNFTs = useMemo(() => {
     let result = [...nfts];
     if (collectionFilter !== 'all') result = result.filter(nft => nft.collection === collectionFilter);
+    if (schemaFilter !== 'all') result = result.filter(nft => nft.schema === schemaFilter);
     if (debouncedSearch) {
       const query = debouncedSearch.toLowerCase();
       result = result.filter(nft => nft.name.toLowerCase().includes(query) || nft.collection.toLowerCase().includes(query));
@@ -63,7 +80,7 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
       case 'oldest': result.sort((a, b) => parseInt(a.asset_id) - parseInt(b.asset_id)); break;
     }
     return result;
-  }, [nfts, collectionFilter, debouncedSearch, sortBy]);
+  }, [nfts, collectionFilter, schemaFilter, debouncedSearch, sortBy]);
 
   const COLUMNS = 4;
   const ROW_HEIGHT = 140;
@@ -107,15 +124,24 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
       </div>
       <div className="space-y-2">
         <Label>Select NFTs to Send</Label>
-        <div className="flex gap-2">
-          <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" /></div>
-          <Select value={collectionFilter} onValueChange={setCollectionFilter}>
+        <div className="flex flex-wrap gap-2">
+          <div className="relative flex-1 min-w-[120px]"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" /></div>
+          <Select value={collectionFilter} onValueChange={handleCollectionChange}>
             <SelectTrigger className="w-[140px]"><SelectValue placeholder="Collection" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All ({nfts.length})</SelectItem>
               {collections.map(col => <SelectItem key={col.name} value={col.name}>{col.name} ({col.count})</SelectItem>)}
             </SelectContent>
           </Select>
+          {collectionFilter !== 'all' && schemas.length > 0 && (
+            <Select value={schemaFilter} onValueChange={setSchemaFilter}>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Schema" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Schemas</SelectItem>
+                {schemas.map(s => <SelectItem key={s.name} value={s.name}>{s.name} ({s.count})</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
           <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
             <SelectTrigger className="w-[120px]"><SelectValue placeholder="Sort" /></SelectTrigger>
             <SelectContent>
