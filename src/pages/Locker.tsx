@@ -29,7 +29,6 @@ const Locker = () => {
               <p className="text-muted-foreground max-w-2xl mx-auto">
                 Time-lock tokens and LP tokens using the WaxDAO Locker smart contract.
               </p>
-            </div>
           </div>
         </div>
       </section>
