@@ -105,7 +105,8 @@ const Drops = () => {
           </div>
         </div>
 
-          <Tabs defaultValue="official" className="w-full">
+        <Tabs defaultValue="official" className="w-full">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
             <TabsList className="grid w-full max-w-lg grid-cols-4">
               <TabsTrigger value="official" className="flex items-center gap-2">
                 <Star className="h-4 w-4" />
