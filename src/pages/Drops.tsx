@@ -96,11 +96,15 @@ const Drops = () => {
             <img src={cheeseshoppe} alt="CHEESEDrop" className="w-24 h-24 object-contain" />
           </div>
           <div className="text-center space-y-2">
-            <h1 className="text-3xl md:text-4xl font-bold">
-              <span className="text-cheese">CHEESE</span>
-              <span className="text-foreground">Drop</span>
-            </h1>
-            <p className="text-muted-foreground">NFT drops powered by CHEESE</p>
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-2xl">🛒</span>
+              <h1 className="text-3xl md:text-4xl font-bold">
+                <span className="text-cheese">CHEESE</span>
+                <span className="text-foreground">Drop</span>
+              </h1>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
+              <span className="text-2xl">🛒</span>
+            </div>
           </div>
         </div>
 
