@@ -1,12 +1,12 @@
-import { Star } from "lucide-react";
-
 interface DropStatsBarProps {
   activeOfficialDrops: number;
   totalSold: number;
+  cheeseNulled: number;
+  xCheeseValue: number;
   isLoading: boolean;
 }
 
-export function DropStatsBar({ activeOfficialDrops, totalSold, isLoading }: DropStatsBarProps) {
+export function DropStatsBar({ activeOfficialDrops, totalSold, cheeseNulled, xCheeseValue, isLoading }: DropStatsBarProps) {
   const statItems = [
     {
       label: "Active Official Drops",
@@ -18,11 +18,21 @@ export function DropStatsBar({ activeOfficialDrops, totalSold, isLoading }: Drop
       value: isLoading ? "-" : totalSold.toLocaleString(),
       emoji: "🧀",
     },
+    {
+      label: "$CHEESE Nulled",
+      value: isLoading ? "-" : cheeseNulled.toLocaleString(),
+      emoji: "⛔",
+    },
+    {
+      label: "xCHEESE Value",
+      value: isLoading ? "-" : xCheeseValue.toLocaleString(),
+      emoji: "✖️",
+    },
   ];
 
   return (
-    <div className="rounded-xl p-4 max-w-md w-full bg-card border border-border/50">
-      <div className="grid grid-cols-2 gap-4">
+    <div className="rounded-xl p-4 max-w-2xl w-full bg-card border border-border/50">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {statItems.map((stat) => (
           <div key={stat.label} className="text-center">
             <div className="flex items-center justify-center gap-2 mb-1">

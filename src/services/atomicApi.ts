@@ -860,14 +860,17 @@ function parseCheeseAmount(str: string): number {
   return parseFloat(str.split(' ')[0]) || 0;
 }
 
-async function fetchCheeseCollectedFromHyperion(): Promise<number> {
+async function fetchCheeseTransfersHyperion(
+  params: { from?: string; to: string },
+): Promise<number> {
   for (const endpoint of HYPERION_ENDPOINTS_DROPS) {
     try {
       let total = 0;
       let skip = 0;
 
       while (skip < DROPS_MAX_ACTIONS) {
-        const url = `${endpoint}?act.account=cheeseburger&act.name=transfer&transfer.to=nfthivedrops&after=${DROPS_START_DATE}&limit=${DROPS_BATCH_SIZE}&skip=${skip}`;
+        let url = `${endpoint}?act.account=cheeseburger&act.name=transfer&transfer.to=${params.to}&after=${DROPS_START_DATE}&limit=${DROPS_BATCH_SIZE}&skip=${skip}`;
+        if (params.from) url += `&transfer.from=${params.from}`;
         const response = await fetch(url);
         if (!response.ok) throw new Error(`Hyperion error: ${response.status}`);
 
@@ -877,7 +880,7 @@ async function fetchCheeseCollectedFromHyperion(): Promise<number> {
 
         for (const action of actions) {
           const d = action.act?.data;
-          if (d?.quantity && d?.to === 'nfthivedrops') {
+          if (d?.quantity && d?.to === params.to) {
             total += parseCheeseAmount(d.quantity);
           }
         }
@@ -886,18 +889,25 @@ async function fetchCheeseCollectedFromHyperion(): Promise<number> {
         skip += DROPS_BATCH_SIZE;
       }
 
-      if (total > 0) return total;
+      return total;
     } catch (err) {
-      console.error(`CHEESE collected fetch failed for ${endpoint}:`, err);
+      console.error(`CHEESE transfer fetch failed for ${endpoint} (${params.from ?? '*'}->${params.to}):`, err);
       continue;
     }
   }
   return 0;
 }
 
-export async function fetchCheeseDropStats(): Promise<{ activeDrops: number; totalSold: number }> {
+export interface CheeseDropStats {
+  activeDrops: number;
+  totalSold: number;
+  cheeseNulled: number;
+  xCheeseValue: number;
+}
+
+export async function fetchCheeseDropStats(): Promise<CheeseDropStats> {
   try {
-    const [dropsResponse, totalSold] = await Promise.all([
+    const [dropsResponse, totalSold, cheeseNulled, xCheeseValue] = await Promise.all([
       fetch('https://wax.eosusa.io/v1/chain/get_table_rows', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -909,7 +919,9 @@ export async function fetchCheeseDropStats(): Promise<{ activeDrops: number; tot
           limit: 1000,
         }),
       }),
-      fetchCheeseCollectedFromHyperion(),
+      fetchCheeseTransfersHyperion({ to: 'nfthivedrops' }),
+      fetchCheeseTransfersHyperion({ from: 'nfthivedrops', to: 'eosio.null' }),
+      fetchCheeseTransfersHyperion({ from: 'nfthivedrops', to: 'xcheeseliqst' }),
     ]);
 
     const dropsData = await dropsResponse.json();
@@ -958,10 +970,15 @@ export async function fetchCheeseDropStats(): Promise<{ activeDrops: number; tot
       if (isStarted && isNotEnded) activeDrops++;
     }
 
-    return { activeDrops, totalSold: Math.floor(totalSold) };
+    return {
+      activeDrops,
+      totalSold: Math.floor(totalSold),
+      cheeseNulled: Math.floor(cheeseNulled),
+      xCheeseValue: Math.floor(xCheeseValue),
+    };
   } catch (error) {
     console.error('Error fetching CHEESE drop stats:', error);
-    return { activeDrops: 0, totalSold: 0 };
+    return { activeDrops: 0, totalSold: 0, cheeseNulled: 0, xCheeseValue: 0 };
   }
 }
 
