@@ -502,7 +502,7 @@ export function buildSetAttributeValuesAction(
 export function buildEraseTemplateValuesAction(user: string, farmname: string, templateId: number) {
   return {
     account: FARM_CONTRACT,
-    name: "erasetmpvalue",
+    name: "removetemp",
     authorization: [{ actor: user, permission: "active" }],
     data: { user, farmname, template_id: templateId },
   };
@@ -512,7 +512,7 @@ export function buildEraseTemplateValuesAction(user: string, farmname: string, t
 export function buildEraseSchemaValuesAction(user: string, farmname: string, collectionName: string, schemaName: string) {
   return {
     account: FARM_CONTRACT,
-    name: "eraseschvalue",
+    name: "removeschema",
     authorization: [{ actor: user, permission: "active" }],
     data: { user, farmname, collection_name: collectionName, schema_name: schemaName },
   };
@@ -522,7 +522,7 @@ export function buildEraseSchemaValuesAction(user: string, farmname: string, col
 export function buildEraseCollectionValuesAction(user: string, farmname: string, collectionName: string) {
   return {
     account: FARM_CONTRACT,
-    name: "erasecolvalue",
+    name: "removecol",
     authorization: [{ actor: user, permission: "active" }],
     data: { user, farmname, collection_name: collectionName },
   };
