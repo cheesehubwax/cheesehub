@@ -88,7 +88,23 @@ const Drops = () => {
   return (
     <Layout>
       <main className="container pb-20">
-        <Tabs defaultValue="official" className="w-full">
+        {/* Floating Cheese Orb + Title */}
+        <div className="flex flex-col items-center gap-6 mb-10">
+          <div
+            className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer"
+            onClick={playRandomFart}
+          >
+            <img src={cheeseshoppe} alt="CHEESEDrop" className="w-24 h-24 object-contain" />
+          </div>
+          <div className="text-center space-y-2">
+            <h1 className="text-3xl md:text-4xl font-bold">
+              <span className="text-cheese">CHEESE</span>
+              <span className="text-foreground">Drop</span>
+            </h1>
+            <p className="text-muted-foreground">NFT drops powered by CHEESE</p>
+          </div>
+        </div>
+
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
             <TabsList className="grid w-full max-w-lg grid-cols-4">
               <TabsTrigger value="official" className="flex items-center gap-2">
