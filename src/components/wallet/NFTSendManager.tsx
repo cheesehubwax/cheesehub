@@ -8,6 +8,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useWax } from '@/context/WaxContext';
 import { useUserNFTs } from '@/hooks/useUserNFTs';
 import { useDebounce } from '@/hooks/useDebounce';
+import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card';
 import { Check, X, Loader2, Search, Image, Send, RefreshCw, Flame } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { closeWharfkitModals } from '@/lib/wharfKit';
@@ -171,17 +172,29 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
               return (
                 <div key={virtualRow.key} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${virtualRow.size}px`, transform: `translateY(${virtualRow.start}px)` }} className="grid grid-cols-4 gap-2 p-1">
                   {rowNFTs.map(nft => (
-                    <button key={nft.asset_id} onClick={() => toggleNFTSelection(nft.asset_id)}
-                      className={cn('group relative rounded-md overflow-hidden border-2 transition-all hover:opacity-90 h-[130px]', selectedNFTs.has(nft.asset_id) ? 'border-primary ring-1 ring-primary' : 'border-transparent hover:border-muted-foreground/30')}>
-                      {selectedNFTs.has(nft.asset_id) && <div className="absolute top-1 right-1 z-10 bg-primary rounded-full p-0.5"><Check className="h-3 w-3 text-primary-foreground" /></div>}
-                      <div className="aspect-square bg-muted h-[90px] flex items-center justify-center">
-                        <img src={nft.image} alt={nft.name} className="w-full h-full object-cover" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }} />
-                      </div>
-                      <div className="p-1 bg-background/80 absolute bottom-0 left-0 right-0">
-                        <p className="text-[10px] font-medium truncate">{nft.name}</p>
-                        <span className="text-[9px] text-muted-foreground truncate block">{nft.collection}</span>
-                      </div>
-                    </button>
+                    <HoverCard key={nft.asset_id} openDelay={300} closeDelay={100}>
+                      <HoverCardTrigger asChild>
+                        <button onClick={() => toggleNFTSelection(nft.asset_id)}
+                          className={cn('group relative rounded-md overflow-hidden border-2 transition-all hover:opacity-90 h-[130px]', selectedNFTs.has(nft.asset_id) ? 'border-primary ring-1 ring-primary' : 'border-transparent hover:border-muted-foreground/30')}>
+                          {selectedNFTs.has(nft.asset_id) && <div className="absolute top-1 right-1 z-10 bg-primary rounded-full p-0.5"><Check className="h-3 w-3 text-primary-foreground" /></div>}
+                          <div className="aspect-square bg-muted h-[90px] flex items-center justify-center">
+                            <img src={nft.image} alt={nft.name} className="w-full h-full object-cover" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }} />
+                          </div>
+                          <div className="p-1 bg-background/80 absolute bottom-0 left-0 right-0">
+                            <p className="text-[10px] font-medium truncate">{nft.name}</p>
+                            <span className="text-[9px] text-muted-foreground truncate block">{nft.collection}</span>
+                          </div>
+                        </button>
+                      </HoverCardTrigger>
+                      <HoverCardContent side="top" className="w-56 p-3 text-xs space-y-1">
+                        <p className="font-bold text-sm truncate">{nft.name}</p>
+                        <div className="flex justify-between"><span className="text-muted-foreground">Asset ID</span><span className="font-mono">{nft.asset_id}</span></div>
+                        <div className="flex justify-between"><span className="text-muted-foreground">Collection</span><span className="truncate ml-2">{nft.collection}</span></div>
+                        {nft.schema && <div className="flex justify-between"><span className="text-muted-foreground">Schema</span><span>{nft.schema}</span></div>}
+                        {nft.template_id && <div className="flex justify-between"><span className="text-muted-foreground">Template</span><span className="font-mono">{nft.template_id}</span></div>}
+                        {nft.mint && <div className="flex justify-between"><span className="text-muted-foreground">Mint #</span><span>{nft.mint}</span></div>}
+                      </HoverCardContent>
+                    </HoverCard>
                   ))}
                 </div>
               );
