@@ -31,6 +31,7 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [collectionFilter, setCollectionFilter] = useState<string>('all');
+  const [schemaFilter, setSchemaFilter] = useState<string>('all');
   const [selectedNFTs, setSelectedNFTs] = useState<Set<string>>(new Set());
   const [memo, setMemo] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -49,9 +50,25 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
     return Array.from(colMap.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
   }, [nfts]);
 
+  // Get unique schemas for the selected collection
+  const schemas = useMemo(() => {
+    if (collectionFilter === 'all') return [];
+    const schemaMap = new Map<string, number>();
+    nfts.filter(nft => nft.collection === collectionFilter).forEach(nft => {
+      if (nft.schema) schemaMap.set(nft.schema, (schemaMap.get(nft.schema) || 0) + 1);
+    });
+    return Array.from(schemaMap.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [nfts, collectionFilter]);
+
+  const handleCollectionChange = useCallback((value: string) => {
+    setCollectionFilter(value);
+    setSchemaFilter('all');
+  }, []);
+
   const filteredNFTs = useMemo(() => {
     let result = [...nfts];
     if (collectionFilter !== 'all') result = result.filter(nft => nft.collection === collectionFilter);
+    if (schemaFilter !== 'all') result = result.filter(nft => nft.schema === schemaFilter);
     if (debouncedSearch) {
       const query = debouncedSearch.toLowerCase();
       result = result.filter(nft => nft.name.toLowerCase().includes(query) || nft.collection.toLowerCase().includes(query));
@@ -63,7 +80,7 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
       case 'oldest': result.sort((a, b) => parseInt(a.asset_id) - parseInt(b.asset_id)); break;
     }
     return result;
-  }, [nfts, collectionFilter, debouncedSearch, sortBy]);
+  }, [nfts, collectionFilter, schemaFilter, debouncedSearch, sortBy]);
 
   const COLUMNS = 4;
   const ROW_HEIGHT = 140;
