@@ -11,10 +11,11 @@ import { useEnrichDrops } from "@/hooks/useEnrichDrops";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { DropFilters } from "@/components/drops/DropFilters";
 import type { NFTDrop } from "@/types/drop";
 import { Package, Plus, Sandwich, RefreshCw, Loader2, Star } from "lucide-react";
 import { CHEESE_CONFIG } from "@/lib/waxConfig";
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 import cheeseshoppe from "@/assets/cheeseshoppe.png";
 import { playRandomFart } from "@/lib/fartSounds";
 
@@ -65,6 +66,34 @@ const Drops = () => {
 
   const { enrichedDrops: enrichedOfficialDrops, loading: isEnrichingOfficial } = useEnrichDrops(officialDrops);
   const { enrichedDrops: enrichedCheeseDrops, loading: isEnrichingCheese } = useEnrichDrops(cheeseDrops);
+
+  // Filter state
+  const [selectedCollection, setSelectedCollection] = useState("");
+  const [selectedSchema, setSelectedSchema] = useState("");
+
+  const handleCollectionChange = useCallback((value: string) => {
+    setSelectedCollection(value);
+    setSelectedSchema("");
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setSelectedCollection("");
+    setSelectedSchema("");
+  }, []);
+
+  const filterDrops = useCallback((drops: NFTDrop[]) => {
+    let filtered = drops;
+    if (selectedCollection) {
+      filtered = filtered.filter(d => d.collectionName === selectedCollection);
+    }
+    if (selectedSchema) {
+      filtered = filtered.filter(d => d.schemaName === selectedSchema);
+    }
+    return filtered;
+  }, [selectedCollection, selectedSchema]);
+
+  const filteredOfficialDrops = useMemo(() => filterDrops(enrichedOfficialDrops), [filterDrops, enrichedOfficialDrops]);
+  const filteredCheeseDrops = useMemo(() => filterDrops(enrichedCheeseDrops), [filterDrops, enrichedCheeseDrops]);
 
   const handleRefresh = async () => {
     await Promise.all([
