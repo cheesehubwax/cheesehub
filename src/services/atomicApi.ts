@@ -847,19 +847,70 @@ export async function fetchUserDrops(account: string): Promise<Array<{
 }
 
 // Fetch CHEESE drop stats
+const HYPERION_ENDPOINTS_DROPS = [
+  'https://wax.eosusa.io/v2/history/get_actions',
+  'https://wax.eosphere.io/v2/history/get_actions',
+];
+const DROPS_BATCH_SIZE = 1000;
+const DROPS_MAX_ACTIONS = 10000;
+const DROPS_START_DATE = '2025-03-24T00:00:00.000Z';
+
+function parseCheeseAmount(str: string): number {
+  if (!str) return 0;
+  return parseFloat(str.split(' ')[0]) || 0;
+}
+
+async function fetchCheeseCollectedFromHyperion(): Promise<number> {
+  for (const endpoint of HYPERION_ENDPOINTS_DROPS) {
+    try {
+      let total = 0;
+      let skip = 0;
+
+      while (skip < DROPS_MAX_ACTIONS) {
+        const url = `${endpoint}?act.account=cheeseburger&act.name=transfer&transfer.to=nfthivedrops&after=${DROPS_START_DATE}&limit=${DROPS_BATCH_SIZE}&skip=${skip}`;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Hyperion error: ${response.status}`);
+
+        const data = await response.json();
+        const actions = data.actions;
+        if (!actions || actions.length === 0) break;
+
+        for (const action of actions) {
+          const d = action.act?.data;
+          if (d?.quantity && d?.to === 'nfthivedrops') {
+            total += parseCheeseAmount(d.quantity);
+          }
+        }
+
+        if (actions.length < DROPS_BATCH_SIZE) break;
+        skip += DROPS_BATCH_SIZE;
+      }
+
+      if (total > 0) return total;
+    } catch (err) {
+      console.error(`CHEESE collected fetch failed for ${endpoint}:`, err);
+      continue;
+    }
+  }
+  return 0;
+}
+
 export async function fetchCheeseDropStats(): Promise<{ activeDrops: number; totalSold: number }> {
   try {
-    const dropsResponse = await fetch('https://wax.eosusa.io/v1/chain/get_table_rows', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        json: true,
-        code: 'nfthivedrops',
-        scope: 'nfthivedrops',
-        table: 'drops',
-        limit: 1000,
+    const [dropsResponse, totalSold] = await Promise.all([
+      fetch('https://wax.eosusa.io/v1/chain/get_table_rows', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          json: true,
+          code: 'nfthivedrops',
+          scope: 'nfthivedrops',
+          table: 'drops',
+          limit: 1000,
+        }),
       }),
-    });
+      fetchCheeseCollectedFromHyperion(),
+    ]);
 
     const dropsData = await dropsResponse.json();
     const allDrops = dropsData.rows || [];
@@ -880,7 +931,7 @@ export async function fetchCheeseDropStats(): Promise<{ activeDrops: number; tot
     const allPrices = pricesData.rows || [];
 
     const cheeseDropIds = new Set<number>();
-    
+
     for (const price of allPrices) {
       const tokenSymbol = price.token_symbol || '';
       const tokenContract = price.token_contract || '';
@@ -897,12 +948,9 @@ export async function fetchCheeseDropStats(): Promise<{ activeDrops: number; tot
 
     const now = Math.floor(Date.now() / 1000);
     let activeDrops = 0;
-    let totalSold = 0;
 
     for (const drop of allDrops) {
       if (!cheeseDropIds.has(drop.drop_id)) continue;
-      const claimed = drop.current_claimed || 0;
-      totalSold += claimed;
       const startTime = drop.start_time || 0;
       const endTime = drop.end_time || 0;
       const isStarted = startTime === 0 || startTime <= now;
@@ -910,7 +958,7 @@ export async function fetchCheeseDropStats(): Promise<{ activeDrops: number; tot
       if (isStarted && isNotEnded) activeDrops++;
     }
 
-    return { activeDrops, totalSold };
+    return { activeDrops, totalSold: Math.floor(totalSold) };
   } catch (error) {
     console.error('Error fetching CHEESE drop stats:', error);
     return { activeDrops: 0, totalSold: 0 };
