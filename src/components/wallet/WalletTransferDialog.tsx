@@ -348,7 +348,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                         </div>
                       )}
                       {balances.length > 0 ? (
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-4 gap-2">
                           {sortedBalances.map((b) => (
                             <a
                               key={`${b.contract}:${b.symbol}`}
