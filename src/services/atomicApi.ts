@@ -921,8 +921,8 @@ export async function fetchCheeseDropStats(): Promise<CheeseDropStats> {
         }),
       }),
       fetchCheeseTransfersHyperion({ from: 'nfthivedrops' }),
-      fetchCheeseTransfersHyperion({ from: 'nfthivedrops', to: 'eosio.null' }),
-      fetchCheeseTransfersHyperion({ from: 'nfthivedrops', to: 'xcheeseliqst' }),
+      fetchCheeseTransfersHyperion({ from: 'cheesenftwax', to: 'eosio.null' }),
+      fetchCheeseTransfersHyperion({ from: 'cheesenftwax', to: 'xcheeseliqst' }),
     ]);
 
     const dropsData = await dropsResponse.json();
