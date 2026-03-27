@@ -860,9 +860,8 @@ function parseCheeseAmount(str: string): number {
   return parseFloat(str.split(' ')[0]) || 0;
 }
 
-async function fetchCheeseTransfersFromHyperion(
-  from: string,
-  to: string,
+async function fetchCheeseTransfersHyperion(
+  params: { from?: string; to: string },
 ): Promise<number> {
   for (const endpoint of HYPERION_ENDPOINTS_DROPS) {
     try {
@@ -870,7 +869,8 @@ async function fetchCheeseTransfersFromHyperion(
       let skip = 0;
 
       while (skip < DROPS_MAX_ACTIONS) {
-        const url = `${endpoint}?act.account=cheeseburger&act.name=transfer&transfer.from=${from}&transfer.to=${to}&after=${DROPS_START_DATE}&limit=${DROPS_BATCH_SIZE}&skip=${skip}`;
+        let url = `${endpoint}?act.account=cheeseburger&act.name=transfer&transfer.to=${params.to}&after=${DROPS_START_DATE}&limit=${DROPS_BATCH_SIZE}&skip=${skip}`;
+        if (params.from) url += `&transfer.from=${params.from}`;
         const response = await fetch(url);
         if (!response.ok) throw new Error(`Hyperion error: ${response.status}`);
 
@@ -880,7 +880,7 @@ async function fetchCheeseTransfersFromHyperion(
 
         for (const action of actions) {
           const d = action.act?.data;
-          if (d?.quantity && d?.to === to) {
+          if (d?.quantity && d?.to === params.to) {
             total += parseCheeseAmount(d.quantity);
           }
         }
@@ -891,7 +891,7 @@ async function fetchCheeseTransfersFromHyperion(
 
       return total;
     } catch (err) {
-      console.error(`CHEESE transfer fetch failed for ${endpoint} (${from}->${to}):`, err);
+      console.error(`CHEESE transfer fetch failed for ${endpoint} (${params.from ?? '*'}->${params.to}):`, err);
       continue;
     }
   }
@@ -919,9 +919,9 @@ export async function fetchCheeseDropStats(): Promise<CheeseDropStats> {
           limit: 1000,
         }),
       }),
-      fetchCheeseTransfersFromHyperion('nfthivedrops', 'nfthivedrops'),
-      fetchCheeseTransfersFromHyperion('nfthivedrops', 'eosio.null'),
-      fetchCheeseTransfersFromHyperion('nfthivedrops', 'xcheeseliqst'),
+      fetchCheeseTransfersHyperion({ to: 'nfthivedrops' }),
+      fetchCheeseTransfersHyperion({ from: 'nfthivedrops', to: 'eosio.null' }),
+      fetchCheeseTransfersHyperion({ from: 'nfthivedrops', to: 'xcheeseliqst' }),
     ]);
 
     const dropsData = await dropsResponse.json();
@@ -970,13 +970,9 @@ export async function fetchCheeseDropStats(): Promise<CheeseDropStats> {
       if (isStarted && isNotEnded) activeDrops++;
     }
 
-    // totalSold = incoming cheese to nfthivedrops (self-transfers count as incoming collections)
-    // Re-fetch the actual incoming amount
-    const incomingCheese = await fetchCheeseTransfersFromHyperion('*', 'nfthivedrops');
-
     return {
       activeDrops,
-      totalSold: Math.floor(incomingCheese > 0 ? incomingCheese : totalSold),
+      totalSold: Math.floor(totalSold),
       cheeseNulled: Math.floor(cheeseNulled),
       xCheeseValue: Math.floor(xCheeseValue),
     };
