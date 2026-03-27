@@ -349,7 +349,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                       )}
                       {balances.length > 0 ? (
                         <div className="grid grid-cols-2 gap-2">
-                          {balances.map((b) => (
+                          {sortedBalances.map((b) => (
                             <a
                               key={`${b.contract}:${b.symbol}`}
                               href={`https://waxblock.io/account/${b.contract}?action=tables&table=accounts&scope=${accountName}`}
