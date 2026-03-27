@@ -149,9 +149,23 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
     return { totalWax, totalUsd: totalWax * waxPrice };
   }, [balances, tokenPrices, waxPrice]);
 
-  // Token balances for account page
+  // Token balances for account page, sorted by USD value descending
   const waxBalance = balances.find((b) => b.symbol === "WAX");
   const totalWaxUsd = waxBalance ? waxBalance.balance * waxPrice : 0;
+
+  const sortedBalances = useMemo(() => {
+    return [...balances].sort((a, b) => {
+      const getUsdValue = (t: TokenWithBalance) => {
+        if (t.symbol === "WAX" && (t.contract === "eosio.token" || !t.contract)) {
+          return t.balance * waxPrice;
+        }
+        const key = `${t.contract}:${t.symbol}`;
+        const priceInWax = tokenPrices?.get(key) || 0;
+        return t.balance * priceInWax * waxPrice;
+      };
+      return getUsdValue(b) - getUsdValue(a);
+    });
+  }, [balances, tokenPrices, waxPrice]);
 
   // Send tokens: filtered token list
   const filteredTokens = useMemo(() => {
