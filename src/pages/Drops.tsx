@@ -15,6 +15,8 @@ import type { NFTDrop } from "@/types/drop";
 import { Package, Plus, Sandwich, RefreshCw, Loader2, Star } from "lucide-react";
 import { CHEESE_CONFIG } from "@/lib/waxConfig";
 import { useMemo } from "react";
+import cheeseshoppe from "@/assets/cheeseshoppe.png";
+import { playRandomFart } from "@/lib/fartSounds";
 
 const Drops = () => {
   const queryClient = useQueryClient();
