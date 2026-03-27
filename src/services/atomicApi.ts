@@ -861,7 +861,7 @@ function parseCheeseAmount(str: string): number {
 }
 
 async function fetchCheeseTransfersHyperion(
-  params: { from?: string; to: string },
+  params: { from?: string; to?: string },
 ): Promise<number> {
   for (const endpoint of HYPERION_ENDPOINTS_DROPS) {
     try {
@@ -869,8 +869,9 @@ async function fetchCheeseTransfersHyperion(
       let skip = 0;
 
       while (skip < DROPS_MAX_ACTIONS) {
-        let url = `${endpoint}?act.account=cheeseburger&act.name=transfer&transfer.to=${params.to}&after=${DROPS_START_DATE}&limit=${DROPS_BATCH_SIZE}&skip=${skip}`;
+        let url = `${endpoint}?act.account=cheeseburger&act.name=transfer&after=${DROPS_START_DATE}&limit=${DROPS_BATCH_SIZE}&skip=${skip}`;
         if (params.from) url += `&transfer.from=${params.from}`;
+        if (params.to) url += `&transfer.to=${params.to}`;
         const response = await fetch(url);
         if (!response.ok) throw new Error(`Hyperion error: ${response.status}`);
 
@@ -880,7 +881,7 @@ async function fetchCheeseTransfersHyperion(
 
         for (const action of actions) {
           const d = action.act?.data;
-          if (d?.quantity && d?.to === params.to) {
+          if (d?.quantity) {
             total += parseCheeseAmount(d.quantity);
           }
         }
@@ -891,7 +892,7 @@ async function fetchCheeseTransfersHyperion(
 
       return total;
     } catch (err) {
-      console.error(`CHEESE transfer fetch failed for ${endpoint} (${params.from ?? '*'}->${params.to}):`, err);
+      console.error(`CHEESE transfer fetch failed for ${endpoint} (${params.from ?? '*'}->${params.to ?? '*'}):`, err);
       continue;
     }
   }
@@ -919,7 +920,7 @@ export async function fetchCheeseDropStats(): Promise<CheeseDropStats> {
           limit: 1000,
         }),
       }),
-      fetchCheeseTransfersHyperion({ to: 'nfthivedrops' }),
+      fetchCheeseTransfersHyperion({ from: 'nfthivedrops' }),
       fetchCheeseTransfersHyperion({ from: 'nfthivedrops', to: 'eosio.null' }),
       fetchCheeseTransfersHyperion({ from: 'nfthivedrops', to: 'xcheeseliqst' }),
     ]);
