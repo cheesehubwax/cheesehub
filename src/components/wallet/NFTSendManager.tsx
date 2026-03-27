@@ -27,7 +27,8 @@ function isValidWaxAccount(account: string): boolean {
 
 export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
   const { accountName, transferNFTs, burnNFTs } = useWax();
-  const { nfts, isLoading } = useUserNFTs(accountName || undefined);
+  const { nfts, isLoading, refetch } = useUserNFTs(accountName || undefined);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [recipient, setRecipient] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
@@ -150,6 +151,19 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
               <SelectItem value="name">Name A-Z</SelectItem><SelectItem value="collection">Collection</SelectItem>
             </SelectContent>
           </Select>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={async () => {
+              setIsRefreshing(true);
+              await refetch();
+              setIsRefreshing(false);
+            }}
+            title="Refresh NFTs"
+            className="h-9 w-9"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
       </div>
       <div className="flex items-center justify-between text-sm">
