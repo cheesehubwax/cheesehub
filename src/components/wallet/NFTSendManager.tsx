@@ -194,10 +194,6 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
                           <div className="w-full h-full flex items-center justify-center bg-muted">
                             <img src={nft.image} alt={nft.name} className="w-full h-full object-cover" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }} />
                           </div>
-                          <div className="p-1 bg-background/80 absolute bottom-0 left-0 right-0">
-                            <p className="text-[10px] font-medium truncate">{nft.name}</p>
-                            <span className="text-[9px] text-muted-foreground truncate block">{nft.collection}</span>
-                          </div>
                         </button>
                       </HoverCardTrigger>
                       <HoverCardContent side="top" collisionPadding={16} align="center" className="w-64 max-w-xs p-3 text-xs space-y-1">
