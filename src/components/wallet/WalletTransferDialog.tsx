@@ -294,18 +294,18 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
             {/* Main Content */}
             <ScrollArea className="flex-1">
               <div className="p-5">
-                {/* Persistent header across all tabs (hidden on send-nfts for max space) */}
-                {activeSection !== "send-nfts" && (
-                  <div className="space-y-6 mb-6">
-                    <WalletResources
-                      key={resourcesKey}
-                      onResourcesUpdate={setResources}
-                      showTotalWaxBalance
-                      waxUsdPrice={waxPrice}
-                    />
+                {/* Persistent header across all tabs */}
+                <div className="space-y-6 mb-6">
+                  <WalletResources
+                    key={resourcesKey}
+                    onResourcesUpdate={setResources}
+                    showTotalWaxBalance
+                    waxUsdPrice={waxPrice}
+                  />
+                  {activeSection !== "send-nfts" && (
                     <AccountDetailsSection resources={resources} />
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {activeSection === "account" && (
                   <div className="space-y-6">
