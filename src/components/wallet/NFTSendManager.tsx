@@ -124,15 +124,24 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
       </div>
       <div className="space-y-2">
         <Label>Select NFTs to Send</Label>
-        <div className="flex gap-2">
-          <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" /></div>
-          <Select value={collectionFilter} onValueChange={setCollectionFilter}>
+        <div className="flex flex-wrap gap-2">
+          <div className="relative flex-1 min-w-[120px]"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" /></div>
+          <Select value={collectionFilter} onValueChange={handleCollectionChange}>
             <SelectTrigger className="w-[140px]"><SelectValue placeholder="Collection" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All ({nfts.length})</SelectItem>
               {collections.map(col => <SelectItem key={col.name} value={col.name}>{col.name} ({col.count})</SelectItem>)}
             </SelectContent>
           </Select>
+          {collectionFilter !== 'all' && schemas.length > 0 && (
+            <Select value={schemaFilter} onValueChange={setSchemaFilter}>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Schema" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Schemas</SelectItem>
+                {schemas.map(s => <SelectItem key={s.name} value={s.name}>{s.name} ({s.count})</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
           <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
             <SelectTrigger className="w-[120px]"><SelectValue placeholder="Sort" /></SelectTrigger>
             <SelectContent>
