@@ -1,17 +1,18 @@
 
 
-## Fix NFT Hover Card Clipping in Send NFTs Viewer
+## Add Refresh Button to NFT Send Manager
 
-### Problem
-The HoverCard is set to `side="top"` which clips above the scroll container for top-row NFTs. Side NFTs also get cut off horizontally because the popover renders inside the overflow container.
+### What
+Add a refresh button (using the existing `RefreshCw` icon already imported) to the NFT viewer toolbar that calls the existing `refetch()` from `useUserNFTs`, preserving current collection and schema filter state.
 
-### Solution
-Two changes in `src/components/wallet/NFTSendManager.tsx`:
+### Changes
 
-1. **Use Radix portal** — Add `collisionBoundary` and ensure the HoverCardContent renders via portal (default behavior) so it escapes the `overflow-auto` container. The issue is the scroll container clips the popover. We need to add `avoidCollisions={true}` (default) and `collisionPadding={8}` so Radix auto-flips the side when there's not enough room.
-
-2. **Remove fixed `side="top"`** — Remove `side="top"` or keep it as a preference but let Radix auto-flip. With collision detection, it will show below for top-row NFTs and adjust horizontally for side NFTs.
+**`src/components/wallet/NFTSendManager.tsx`**
+- Destructure `refetch` from `useUserNFTs` (line 30)
+- Add a refresh `Button` with `RefreshCw` icon next to the sort dropdown (after line 152), calling `refetch()` on click
+- Show a spinning animation on the icon while `isLoading` is true after clicking refresh
+- Collection filter, schema filter, search, and sort state are all preserved (they're independent state variables)
 
 ### Files changed: 1
-- `src/components/wallet/NFTSendManager.tsx` — Change `HoverCardContent` props from `side="top"` to `side="top" collisionPadding={16}` and add `align="center"`. The Radix primitive auto-flips when colliding with viewport edges.
+- `src/components/wallet/NFTSendManager.tsx`
 
