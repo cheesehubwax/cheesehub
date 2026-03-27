@@ -87,9 +87,8 @@ const Drops = () => {
 
   return (
     <Layout>
-      <main className="container pb-20">
-        {/* Floating Cheese Orb + Title */}
-        <div className="flex flex-col items-center gap-6 mb-10">
+      <section className="container py-12 md:py-20">
+        <div className="flex flex-col items-center gap-8 mb-10">
           <div
             className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer"
             onClick={playRandomFart}
@@ -187,7 +186,7 @@ const Drops = () => {
             <CreateDrop />
           </TabsContent>
         </Tabs>
-      </main>
+      </section>
 
       <div className="container pb-12 flex flex-col items-center gap-6">
         <DropStatsBar
