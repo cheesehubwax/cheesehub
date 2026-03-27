@@ -363,7 +363,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                                   {b.symbol}
                                   <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </div>
-                                <div className="text-xs text-muted-foreground truncate">
+                                <div className="text-xs text-cheese truncate">
                                   {b.balance.toLocaleString()}
                                 </div>
                               </div>
