@@ -202,11 +202,11 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
                       </HoverCardTrigger>
                       <HoverCardContent side="top" collisionPadding={16} align="center" className="w-64 max-w-xs p-3 text-xs space-y-1">
                         <p className="font-bold text-sm break-words whitespace-normal">{nft.name}</p>
-                        <div className="flex justify-between"><span className="text-muted-foreground">Asset ID</span><span className="font-mono">{nft.asset_id}</span></div>
-                        <div className="flex justify-between"><span className="text-muted-foreground">Collection</span><span className="truncate ml-2">{nft.collection}</span></div>
-                        {nft.schema && <div className="flex justify-between"><span className="text-muted-foreground">Schema</span><span>{nft.schema}</span></div>}
-                        {nft.template_id && <div className="flex justify-between"><span className="text-muted-foreground">Template</span><span className="font-mono">{nft.template_id}</span></div>}
-                        {nft.mint && <div className="flex justify-between"><span className="text-muted-foreground">Mint #</span><span>{nft.mint}</span></div>}
+                        <div className="flex justify-between"><span className="text-cheese">Asset ID</span><span className="font-mono">{nft.asset_id}</span></div>
+                        <div className="flex justify-between"><span className="text-cheese">Collection</span><span className="truncate ml-2">{nft.collection}</span></div>
+                        {nft.schema && <div className="flex justify-between"><span className="text-cheese">Schema</span><span>{nft.schema}</span></div>}
+                        {nft.template_id && <div className="flex justify-between"><span className="text-cheese">Template</span><span className="font-mono">{nft.template_id}</span></div>}
+                        {nft.mint && <div className="flex justify-between"><span className="text-cheese">Mint #</span><span>{nft.mint}</span></div>}
                       </HoverCardContent>
                     </HoverCard>
                   ))}
