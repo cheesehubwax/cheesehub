@@ -84,8 +84,8 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
     return result;
   }, [nfts, collectionFilter, schemaFilter, debouncedSearch, sortBy]);
 
-  const COLUMNS = 5;
-  const ROW_HEIGHT = 140;
+  const COLUMNS = 6;
+  const ROW_HEIGHT = 120;
   const rowCount = Math.ceil(filteredNFTs.length / COLUMNS);
   const virtualizer = useVirtualizer({ count: rowCount, getScrollElement: () => parentRef.current, estimateSize: () => ROW_HEIGHT, overscan: 3 });
 
@@ -184,7 +184,7 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
               const startIndex = virtualRow.index * COLUMNS;
               const rowNFTs = filteredNFTs.slice(startIndex, startIndex + COLUMNS);
               return (
-                <div key={virtualRow.key} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${virtualRow.size}px`, transform: `translateY(${virtualRow.start}px)` }} className="grid grid-cols-5 gap-2 p-1">
+                <div key={virtualRow.key} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${virtualRow.size}px`, transform: `translateY(${virtualRow.start}px)` }} className="grid grid-cols-6 gap-2 p-1">
                   {rowNFTs.map(nft => (
                     <HoverCard key={nft.asset_id} openDelay={300} closeDelay={100}>
                       <HoverCardTrigger asChild>
