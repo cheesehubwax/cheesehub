@@ -158,7 +158,7 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
           <Button variant="ghost" size="sm" onClick={() => setSelectedNFTs(new Set())} disabled={selectedNFTs.size === 0}>Clear</Button>
         </div>
       </div>
-      <div ref={parentRef} className="h-[420px] overflow-auto rounded-md border border-border">
+      <div ref={parentRef} className="h-[560px] overflow-auto rounded-md border border-border">
         {isLoading && nfts.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-2"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /><span className="text-muted-foreground text-sm">Loading NFTs...</span></div>
         ) : filteredNFTs.length === 0 ? (
