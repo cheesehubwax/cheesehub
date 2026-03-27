@@ -87,7 +87,7 @@ function chunkArray<T>(array: T[], size: number): T[][] {
 
 export async function fetchTemplatesBatch(
   requests: { templateId: string; collectionName: string }[]
-): Promise<Map<string, { name: string; image: string; isVideo?: boolean }>> {
+): Promise<Map<string, { name: string; image: string; isVideo?: boolean; schemaName?: string }>> {
   const uniqueRequests = new Map<string, { templateId: string; collectionName: string }>();
   for (const req of requests) {
     if (!uniqueRequests.has(req.templateId)) {
@@ -95,7 +95,7 @@ export async function fetchTemplatesBatch(
     }
   }
 
-  const results = new Map<string, { name: string; image: string; isVideo?: boolean }>();
+  const results = new Map<string, { name: string; image: string; isVideo?: boolean; schemaName?: string }>();
   const allIds = Array.from(uniqueRequests.keys());
   
   console.log(`[NFTHive Batch] Fetching ${allIds.length} unique templates`);
@@ -122,6 +122,7 @@ export async function fetchTemplatesBatch(
             name: data.name || template.name || `Template #${template.template_id}`,
             image: media.url,
             isVideo: media.isVideo,
+            schemaName: template.schema?.schema_name || undefined,
           });
         }
       }
@@ -441,6 +442,7 @@ export async function enrichDropTemplates(
           image: cached.image || drop.image,
           name: cached.name && drop.name.startsWith('Drop #') ? cached.name : drop.name,
           isVideo: cached.isVideo,
+          schemaName: cached.schemaName || drop.schemaName,
         };
       }
       return drop;
@@ -600,7 +602,7 @@ export async function fetchUserCollections(account: string): Promise<string[]> {
 export async function fetchTemplateById(
   templateId: string,
   collectionName?: string
-): Promise<{ name: string; image: string; maxSupply: number; issuedSupply: number; isVideo?: boolean } | null> {
+): Promise<{ name: string; image: string; maxSupply: number; issuedSupply: number; isVideo?: boolean; schemaName?: string } | null> {
   try {
     const path = collectionName 
       ? `${ATOMIC_API.paths.templates}/${collectionName}/${templateId}`
@@ -619,6 +621,7 @@ export async function fetchTemplateById(
       isVideo: media.isVideo,
       maxSupply: parseInt(template.max_supply) || 0,
       issuedSupply: parseInt(template.issued_supply) || 0,
+      schemaName: template.schema?.schema_name || undefined,
     };
   } catch (error) {
     console.error('Error fetching template:', error);
