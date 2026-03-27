@@ -203,8 +203,8 @@ const Drops = () => {
         />
         <p className="text-sm text-muted-foreground">
           Powered by the{" "}
-          <a href="https://wax.bloks.io/account/nfthivedrop" target="_blank" rel="noopener noreferrer" className="text-cheese hover:underline">
-            NFTHIVEDROP
+          <a href="https://waxblock.io/account/nfthivedrops" target="_blank" rel="noopener noreferrer" className="text-cheese hover:underline">
+            NFTHIVEDROPS
           </a>{" "}
           smart contract.
         </p>
