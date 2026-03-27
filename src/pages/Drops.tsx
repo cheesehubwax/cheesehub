@@ -105,6 +105,7 @@ const Drops = () => {
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
               <span className="text-2xl">🛒</span>
             </div>
+            <p className="text-muted-foreground">NFT drops powered by CHEESE</p>
           </div>
         </div>
 
