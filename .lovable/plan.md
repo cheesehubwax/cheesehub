@@ -1,24 +1,24 @@
 
 
-## Fix: Banner transition lag and layout shift
+## Fix: CHEESE Collected stat on CheeseDrop page
 
 ### Problem
-When `PositionSlot` rotates between an IPFS banner and the local placeholder, it renders completely different JSX branches (`if (current.localSrc)` vs the IPFS `div`). This causes:
-1. The container has no fixed height — it uses `h-auto`, so it collapses momentarily during the swap
-2. The IPFS image needs to load from a gateway, causing a visible delay
-3. The placeholder image also triggers a layout reflow since dimensions aren't reserved
+The "CHEESE Collected" stat currently sums `current_claimed` from the `nfthivedrops` drops table — that's the **number of NFTs claimed**, not the amount of CHEESE tokens received. The value shows 0 because there's no CHEESE amount in that field.
 
-### Fix
+### Solution
+Query **Hyperion** for actual CHEESE token transfers sent **to** the `nfthivedrops` account (i.e., purchase payments), from March 24, 2025 onward. This follows the exact same pattern already used in `cheeseNullBreakdown.ts` and `fetchPowerupLeaderboard.ts`.
 
-**`src/components/bannerads/BannerDisplay.tsx`** — Rewrite `PositionSlot` to:
+### Changes
 
-1. **Fixed container**: Wrap in a `w-[580px] h-[150px]` container so the slot never collapses during transitions
-2. **Render all banners simultaneously**: Instead of conditionally rendering only the current banner, render all banners in the array as absolutely positioned layers
-3. **Crossfade with opacity**: The active banner gets `opacity-100`, others get `opacity-0`, with a `transition-opacity duration-500` for smooth fading
-4. **Preload images**: Remove `loading="lazy"` so the next banner's image is already loaded before it fades in
-5. **Keep pointer-events only on active**: `pointer-events-none` on inactive banners so clicks work correctly
-
-This means the placeholder and the real ad are both always mounted and pre-rendered — no DOM swap, no layout shift, no loading delay during rotation.
+**`src/services/atomicApi.ts`** — Rewrite `fetchCheeseDropStats` to:
+1. Keep the existing drops table query for `activeDrops` count (that part works fine)
+2. Replace the `totalSold` calculation with a Hyperion query:
+   - Endpoint: `https://wax.eosusa.io/v2/history/get_actions`
+   - Params: `act.account=cheeseburger&act.name=transfer&transfer.to=nfthivedrops&after=2025-03-24T00:00:00.000Z&limit=1000&skip=0`
+   - Paginate with `skip` in batches of 1000 (same pattern as `fetchPowerupLeaderboard.ts`)
+   - Sum `act.data.quantity` amounts (parse the `"1234.0000 CHEESE"` string)
+   - Use fallback Hyperion endpoints: `wax.eosusa.io`, `wax.eosphere.io`
+3. Return `{ activeDrops, totalSold }` where `totalSold` is now the summed CHEESE amount
 
 ### Files changed: 1
 
