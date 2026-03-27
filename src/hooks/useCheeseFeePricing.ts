@@ -44,8 +44,8 @@ export function useCheeseFeePricing(waxFee: number = WAX_FEE_AMOUNT): CheeseFeeP
         fetchPoolReserves(CHEESE_WAX_POOL_ID),
       ]);
       if (!config || !pool) return { critical: false };
-      const { priceBinA: liveCheesePerWax } = calcPriceFromReserves(pool);
-      const deviation = calcDeviation(liveCheesePerWax, config.wax_per_cheese_baseline);
+      const { priceAinB: liveWaxPerCheese } = calcPriceFromReserves(pool);
+      const deviation = calcDeviation(liveWaxPerCheese, config.wax_per_cheese_baseline);
       return { critical: Math.abs(deviation) >= CRITICAL_DEVIATION_PCT };
     },
     staleTime: 30_000,
