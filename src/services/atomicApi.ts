@@ -853,7 +853,7 @@ const HYPERION_ENDPOINTS_DROPS = [
 ];
 const DROPS_BATCH_SIZE = 1000;
 const DROPS_MAX_ACTIONS = 10000;
-const DROPS_START_DATE = '2025-03-24T00:00:00.000Z';
+const DROPS_START_DATE = '2026-03-24T00:00:00.000Z';
 
 function parseCheeseAmount(str: string): number {
   if (!str) return 0;
