@@ -11,10 +11,11 @@ import { useEnrichDrops } from "@/hooks/useEnrichDrops";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { DropFilters } from "@/components/drops/DropFilters";
 import type { NFTDrop } from "@/types/drop";
 import { Package, Plus, Sandwich, RefreshCw, Loader2, Star } from "lucide-react";
 import { CHEESE_CONFIG } from "@/lib/waxConfig";
-import { useMemo } from "react";
+import { useMemo, useState, useCallback } from "react";
 import cheeseshoppe from "@/assets/cheeseshoppe.png";
 import { playRandomFart } from "@/lib/fartSounds";
 
@@ -66,6 +67,34 @@ const Drops = () => {
   const { enrichedDrops: enrichedOfficialDrops, loading: isEnrichingOfficial } = useEnrichDrops(officialDrops);
   const { enrichedDrops: enrichedCheeseDrops, loading: isEnrichingCheese } = useEnrichDrops(cheeseDrops);
 
+  // Filter state
+  const [selectedCollection, setSelectedCollection] = useState("");
+  const [selectedSchema, setSelectedSchema] = useState("");
+
+  const handleCollectionChange = useCallback((value: string) => {
+    setSelectedCollection(value);
+    setSelectedSchema("");
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setSelectedCollection("");
+    setSelectedSchema("");
+  }, []);
+
+  const filterDrops = useCallback((drops: NFTDrop[]) => {
+    let filtered = drops;
+    if (selectedCollection) {
+      filtered = filtered.filter(d => d.collectionName === selectedCollection);
+    }
+    if (selectedSchema) {
+      filtered = filtered.filter(d => d.schemaName === selectedSchema);
+    }
+    return filtered;
+  }, [selectedCollection, selectedSchema]);
+
+  const filteredOfficialDrops = useMemo(() => filterDrops(enrichedOfficialDrops), [filterDrops, enrichedOfficialDrops]);
+  const filteredCheeseDrops = useMemo(() => filterDrops(enrichedCheeseDrops), [filterDrops, enrichedCheeseDrops]);
+
   const handleRefresh = async () => {
     await Promise.all([
       refresh(),
@@ -109,7 +138,7 @@ const Drops = () => {
           </div>
         </div>
 
-        <Tabs defaultValue="official" className="w-full">
+        <Tabs defaultValue="official" className="w-full" onValueChange={() => clearFilters()}>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
             <TabsList className="grid w-full max-w-lg grid-cols-4">
               <TabsTrigger value="official" className="flex items-center gap-2">
@@ -153,12 +182,23 @@ const Drops = () => {
               )}
             </div>
 
-            {isLoading && officialDrops.length === 0 ? renderSkeletonGrid() : officialDrops.length === 0 ? (
+            <DropFilters
+              drops={enrichedOfficialDrops}
+              selectedCollection={selectedCollection}
+              selectedSchema={selectedSchema}
+              onCollectionChange={handleCollectionChange}
+              onSchemaChange={setSelectedSchema}
+              onClear={clearFilters}
+            />
+
+            {isLoading && officialDrops.length === 0 ? renderSkeletonGrid() : filteredOfficialDrops.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-lg text-muted-foreground">No active official drops found.</p>
+                <p className="text-lg text-muted-foreground">
+                  {selectedCollection || selectedSchema ? 'No drops match the selected filters.' : 'No active official drops found.'}
+                </p>
               </div>
             ) : (
-              <SimpleDropGrid drops={[...enrichedOfficialDrops].sort((a, b) => Number(a.dropId ?? a.id.replace(/^\D+/, '')) - Number(b.dropId ?? b.id.replace(/^\D+/, '')))} />
+              <SimpleDropGrid drops={[...filteredOfficialDrops].sort((a, b) => Number(a.dropId ?? a.id.replace(/^\D+/, '')) - Number(b.dropId ?? b.id.replace(/^\D+/, '')))} />
             )}
           </TabsContent>
 
@@ -174,12 +214,23 @@ const Drops = () => {
               )}
             </div>
 
-            {isLoading && cheeseDrops.length === 0 ? renderSkeletonGrid() : cheeseDrops.length === 0 ? (
+            <DropFilters
+              drops={enrichedCheeseDrops}
+              selectedCollection={selectedCollection}
+              selectedSchema={selectedSchema}
+              onCollectionChange={handleCollectionChange}
+              onSchemaChange={setSelectedSchema}
+              onClear={clearFilters}
+            />
+
+            {isLoading && cheeseDrops.length === 0 ? renderSkeletonGrid() : filteredCheeseDrops.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-lg text-muted-foreground">No active $CHEESE drops found.</p>
+                <p className="text-lg text-muted-foreground">
+                  {selectedCollection || selectedSchema ? 'No drops match the selected filters.' : 'No active $CHEESE drops found.'}
+                </p>
               </div>
             ) : (
-              <SimpleDropGrid drops={enrichedCheeseDrops} />
+              <SimpleDropGrid drops={filteredCheeseDrops} />
             )}
           </TabsContent>
 

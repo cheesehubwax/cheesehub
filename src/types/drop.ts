@@ -54,6 +54,7 @@ export interface NFTDrop {
   authRequirements?: DropAuthRequirement[];
   isFree?: boolean;
   accountLimit?: number;
+  schemaName?: string;
 }
 
 export interface AtomicSale {

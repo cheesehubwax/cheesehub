@@ -53,6 +53,7 @@ export function useEnrichDrops(drops: NFTDrop[]) {
                   ...drop,
                   name: drop.name || template.name,
                   image: template.image || drop.image,
+                  schemaName: template.schemaName || drop.schemaName,
                 };
               }
             } catch (err) {
