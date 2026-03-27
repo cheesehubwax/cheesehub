@@ -186,7 +186,7 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
                           </div>
                         </button>
                       </HoverCardTrigger>
-                      <HoverCardContent side="top" className="w-56 p-3 text-xs space-y-1">
+                      <HoverCardContent side="top" collisionPadding={16} align="center" className="w-56 p-3 text-xs space-y-1">
                         <p className="font-bold text-sm truncate">{nft.name}</p>
                         <div className="flex justify-between"><span className="text-muted-foreground">Asset ID</span><span className="font-mono">{nft.asset_id}</span></div>
                         <div className="flex justify-between"><span className="text-muted-foreground">Collection</span><span className="truncate ml-2">{nft.collection}</span></div>
