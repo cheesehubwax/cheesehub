@@ -1,4 +1,5 @@
 import { Layout } from "@/components/Layout";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Lock } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -28,6 +29,7 @@ const Locker = () => {
                   <span className="text-cheese">CHEESE</span>
                   <span className="text-foreground">Lock</span>
                 </h1>
+                <Badge variant="outline" className="text-xs border-primary/50 text-primary">BETA</Badge>
                 <span className="text-2xl">🔐</span>
               </div>
               <p className="text-muted-foreground max-w-2xl mx-auto">
