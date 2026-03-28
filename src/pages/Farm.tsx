@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Layout } from "@/components/Layout";
-import { Badge } from "@/components/ui/badge";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useParams, useNavigate } from "react-router-dom";
 import { BrowseFarms } from "@/components/farm/BrowseFarms";
@@ -50,9 +50,7 @@ const Farm = () => {
                   <span className="text-cheese">CHEESE</span>
                   <span className="text-foreground">Farm</span>
                 </h1>
-                <Badge variant="outline" className="text-xs border-primary/50 text-primary">
-                  BETA
-                </Badge>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
                 <span className="text-2xl">🌱</span>
               </div>
               <p className="text-muted-foreground max-w-2xl mx-auto">

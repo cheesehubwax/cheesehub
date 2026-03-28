@@ -6,7 +6,7 @@ import { BrowseDaos } from "@/components/dao/BrowseDaos";
 import { CreateDao } from "@/components/dao/CreateDao";
 import { MyDaos } from "@/components/dao/MyDaos";
 import { DaoDetail } from "@/components/dao/DaoDetail";
-import { Badge } from "@/components/ui/badge";
+
 import cheeseDaoOrb from "@/assets/cheesedao.png";
 import { playRandomFart } from "@/lib/fartSounds";
 
@@ -42,7 +42,7 @@ const Dao = () => {
                 <span className="text-2xl">🏛️</span>
                 <span className="text-cheese">CHEESE</span>
                 <span className="text-foreground">Dao</span>
-                <Badge variant="outline" className="text-xs border-primary/50 text-primary">BETA</Badge>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
                 <span className="text-2xl">🏛️</span>
               </h1>
               <p className="text-muted-foreground max-w-xl mx-auto text-sm leading-relaxed">
