@@ -12,7 +12,7 @@ import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 import { closeWharfkitModals, getTransactPlugins } from "@/lib/wharfKit";
 import { isDomainBlocked } from "@/lib/bannerBlocklist";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ExternalLink } from "lucide-react";
+import { TermsDialog } from "@/components/shared/TermsDialog";
 
 interface RentSlotDialogProps {
   open: boolean;
@@ -99,10 +99,8 @@ export function RentSlotDialog({ open, onOpenChange, startTime, position, waxPri
         <div className="flex items-start gap-3 py-2">
           <Checkbox id="terms-rent" checked={termsAgreed} onCheckedChange={(v) => setTermsAgreed(v === true)} className="mt-0.5" />
           <label htmlFor="terms-rent" className="text-sm cursor-pointer leading-relaxed text-muted-foreground">
-            I agree to the{" "}
-            <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
-              Terms of Use <ExternalLink className="h-3 w-3" />
-            </a>
+           I agree to the{" "}
+            <TermsDialog />
           </label>
         </div>
         <DialogFooter>
