@@ -29,6 +29,7 @@ import {
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { Checkbox } from "@/components/ui/checkbox";
+import { TermsDialog } from "@/components/shared/TermsDialog";
 import { useCheeseFeePricing } from "@/hooks/useCheeseFeePricing";
 import { useWaxdaoFeePricing } from "@/hooks/useWaxdaoFeePricing";
 import { useToast } from "@/hooks/use-toast";
@@ -690,9 +691,7 @@ export function CreateFarm() {
               <Checkbox id="terms-farm" checked={termsAgreed} onCheckedChange={(v) => setTermsAgreed(v === true)} className="mt-0.5" />
               <label htmlFor="terms-farm" className="text-sm cursor-pointer leading-relaxed text-muted-foreground">
                 I agree to the{" "}
-                <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
-                  Terms of Use <ExternalLink className="h-3 w-3" />
-                </a>
+                <TermsDialog />
               </label>
             </div>
 
