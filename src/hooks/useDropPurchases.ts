@@ -32,7 +32,7 @@ async function fetchOfficialDropData(): Promise<{ ids: Set<number>; templateMap:
     const response = await fetchTableRows<{
       drop_id: number;
       collection_name: string;
-      templates_to_mint: Array<{ template_id: number }>;
+      assets_to_mint: Array<{ template_id: number }>;
     }>({
       code: NFTHIVE_CONFIG.dropContract,
       scope: NFTHIVE_CONFIG.dropContract,
@@ -44,7 +44,7 @@ async function fetchOfficialDropData(): Promise<{ ids: Set<number>; templateMap:
     for (const row of response.rows) {
       if (row.collection_name === CHEESE_CONFIG.collectionName) {
         ids.add(row.drop_id);
-        const firstTemplate = row.templates_to_mint?.[0]?.template_id;
+        const firstTemplate = row.assets_to_mint?.[0]?.template_id;
         if (firstTemplate) {
           templateMap.set(row.drop_id, firstTemplate);
         }
