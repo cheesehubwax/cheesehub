@@ -1,44 +1,56 @@
 
+Goal: restore the Admin CHEESEDrop purchase list so it shows only official `cheesenftwax` purchases again.
 
-## Strengthen Disclaimer to Align with Recent Terms of Use Additions
+What’s broken
+- The filtering approach is correct in principle: fetch recent `claimdrop` purchases, then filter to official drop IDs.
+- The bug is in the ID comparison.
+- Console logs already prove there is overlap:
+  - Hyperion sample purchase IDs: `"11248", "11243", "11245", "11241", ...`
+  - Official IDs sample: `11158, 11159, ..., 11240, 11241`
+- But the code stores official IDs as numbers and compares them against Hyperion `drop_id` values that are arriving as strings.
+- So `officialIds.has(p.dropId)` fails for valid matches because `"11241" !== 11241`.
 
-### Context
-The Disclaimer (`src/pages/Disclaimer.tsx`) is already comprehensive but has gaps compared to the newly strengthened Terms of Use. Several concepts added to the Terms should be mirrored or reinforced in the Disclaimer for consistency and stronger legal positioning.
+Implementation plan
 
-### Gaps Found
+1. Normalize drop IDs before filtering
+- In `src/hooks/useDropPurchases.ts`, normalize all purchase `dropId` values to numbers before storing/filtering.
+- Also defensively normalize official IDs and filter comparisons the same way.
+- This keeps the existing “show all recent purchases, then filter out the ones we don’t want” approach, which matches your request.
 
-| Area | Terms Coverage | Disclaimer Gap |
-|------|---------------|----------------|
-| Corporations Act 2001 reference | Explicit in new section 3 | Not mentioned — section 5 says "no licence" but doesn't reference the Act |
-| "Not managed staking / staking-as-a-service" | Explicit in new section 5 | Section 8 implies it but never uses the term |
-| AML/KYC clarification | Explicit in new section 14 | Not mentioned anywhere |
-| Gambling ad prohibition | Explicit in Terms section 10 | CHEESEAds subsection (7.3) content policy doesn't mention gambling |
-| Australian Consumer Law | Explicit in Terms section 12 | CHEESEDrop (7.7) says "consumer protection laws" but doesn't name ACL |
-| Regulatory/legal risk | Terms risk warnings include it | Section 11 risk warnings omit regulatory risk |
-| "Not a security, MIS, derivative, or non-cash payment facility" | Explicit in Terms section 3 | Section 2 says "not a security, financial product..." but doesn't list MIS, derivative, NCPF specifically |
+2. Keep payment enrichment unchanged
+- Preserve the current transfer lookup by `txId + buyer` so the log still shows how much CHEESE was paid.
+- No need to redesign the purchase pipeline; just fix the type mismatch.
 
-### Proposed Changes to `src/pages/Disclaimer.tsx`
+3. Improve debug logging slightly
+- Update the debug logs to print normalized sample IDs and, if useful, the type of `dropId` during development.
+- This makes future breakage obvious if Hyperion changes payload shape again.
 
-**Section 2 (Nature of CHEESE):**
-- Add explicit list: "not a security, managed investment scheme, derivative, non-cash payment facility, or regulated instrument within the meaning of the Corporations Act 2001 (Cth) or equivalent legislation in any other jurisdiction"
+4. Small robustness cleanup
+- Guard against malformed `drop_id` values by skipping `NaN`.
+- Keep the empty state message only for genuinely empty filtered results, not type-mismatch failures.
 
-**Section 5 (Financial Services):**
-- Add reference to Corporations Act 2001 (Cth)
-- Add: "CHEESEHub does not perform KYC (Know Your Customer) or AML/CTF (Anti-Money Laundering / Counter-Terrorism Financing) checks, as it is a non-custodial, non-intermediary frontend that does not hold, transmit, or control user funds"
+5. Optional nearby fix on Admin page
+- There is also a separate console warning:
+  - “Function components cannot be given refs” from `FailedTransactionLog`
+- That is unrelated to missing purchases, so I would treat it as a separate cleanup unless you want it fixed in the same pass.
 
-**Section 7.3 (CHEESEAds Content Policy):**
-- Add gambling to the prohibited content list: "gambling services, crypto casinos, betting platforms, lotteries, or any other form of wagering"
+Files to update
+- `src/hooks/useDropPurchases.ts`
 
-**Section 7.7 (CHEESEDrop):**
-- Change "consumer protection laws" to explicitly reference "the Australian Consumer Law (Schedule 2 of the Competition and Consumer Act 2010 (Cth)) and equivalent consumer protection legislation in other jurisdictions"
+Expected result
+- The Admin CHEESEDrop section will again show purchases from the official `cheesenftwax` collection only.
+- The unrelated hundreds of non-official purchases will remain filtered out.
+- Payment amounts in CHEESE should continue to display as before.
 
-**Section 8 (Liquidity Provision & Farming):**
-- Add explicit statement: "This is not managed staking, staking-as-a-service, or a managed investment arrangement. CHEESEHub does not pool user funds or exercise any discretion over staking or farming activities"
+Technical detail
+```text
+Current mismatch:
+officialIds = Set<number> { 11241, 11243, ... }
+purchase.dropId = "11241"   // string from Hyperion
 
-**Section 11 (Risk Warnings):**
-- Add new bullet: "Regulatory risk — laws and regulations governing digital assets may change in any jurisdiction, potentially affecting the legality, value, or availability of tokens and platform features"
-- Add new bullet: "Counterparty and protocol risk — third-party smart contracts and services integrated via CHEESEHub are independently operated and may fail, be exploited, or cease operations without notice"
+Set.has("11241") -> false
 
-### Files Changed: 1
-- `src/pages/Disclaimer.tsx`
-
+Fix:
+normalizedDropId = Number(act.drop_id)
+Set.has(normalizedDropId) -> true
+```
