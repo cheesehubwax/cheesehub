@@ -7,6 +7,8 @@ import { PriceDeviationGauge } from '@/components/admin/PriceDeviationGauge';
 import { FailedTransactionLog } from '@/components/admin/FailedTransactionLog';
 import { AddBannerSlotsCard } from '@/components/admin/AddBannerSlotsCard';
 import { parseAssetAmount, getDeviationSeverity } from '@/lib/adminData';
+import { DropPurchaseLog } from '@/components/admin/DropPurchaseLog';
+import { useDropPurchases } from '@/hooks/useDropPurchases';
 import { Flame, CurrencyCircleDollar, Megaphone, Lightning, ShieldCheck, ArrowsClockwise, BookOpenText } from '@phosphor-icons/react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,6 +24,7 @@ export default function Admin() {
 
   const { data, isLoading: configsLoading } = useContractConfigs(isWhitelisted && autoRefresh);
   const { data: failedTxs, isLoading: txsLoading } = useFailedTransactions(isWhitelisted);
+  const { data: dropPurchases, isLoading: purchasesLoading } = useDropPurchases(isWhitelisted);
 
   // Access gate
   if (accessLoading) {
@@ -212,6 +215,9 @@ export default function Admin() {
                 <p className="text-lg font-bold text-foreground">{data.poolPrices.pool1236?.waxPerWaxdao?.toFixed(6) ?? '—'}</p>
               </div>
             </div>
+
+            {/* CHEESEDrop Purchases */}
+            <DropPurchaseLog purchases={dropPurchases ?? []} isLoading={purchasesLoading} />
 
             {/* Failed Transactions */}
             <FailedTransactionLog transactions={failedTxs ?? []} isLoading={txsLoading} />
