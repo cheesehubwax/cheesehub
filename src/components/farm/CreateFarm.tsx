@@ -690,7 +690,7 @@ export function CreateFarm() {
             <div className="flex items-start gap-3">
               <Checkbox id="terms-farm" checked={termsAgreed} onCheckedChange={(v) => setTermsAgreed(v === true)} className="mt-0.5" />
               <label htmlFor="terms-farm" className="text-sm cursor-pointer leading-relaxed text-muted-foreground">
-                I agree to the{" "}
+                I have read the{" "}
                 <TermsDialog />
               </label>
             </div>
