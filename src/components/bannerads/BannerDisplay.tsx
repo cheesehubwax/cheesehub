@@ -125,7 +125,8 @@ function PositionSlot({
   position: number;
   onAdClick: (url: string) => void;
 }) {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  // Offset position 2 by 1 so shared+placeholder banners alternate across positions
+  const [currentIndex, setCurrentIndex] = useState(position === 2 && banners.length > 1 ? 1 : 0);
 
   useEffect(() => {
     if (currentIndex >= banners.length) setCurrentIndex(0);
