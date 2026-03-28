@@ -76,7 +76,7 @@ function formatDetailedCountdown(endTimestamp: number): string {
 export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }: AlcorFarmManagerProps) {
   const { session, accountName } = useWax();
   const { stakedFarms, unstakedIncentives, unstakedPositions, isLoading, refetch, dataSource } = useAlcorFarms();
-  const { refetch: refetchTokenBalances } = useAllTokenBalances(accountName);
+  useAllTokenBalances(accountName);
   const { data: tokenPrices } = useAlcorTokenPrices();
   const { data: waxUsdPrice = 0 } = useWaxPrice();
   const [isTransacting, setIsTransacting] = useState(false);
