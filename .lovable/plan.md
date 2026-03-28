@@ -1,22 +1,27 @@
 
 
-## Replace Terms Popup with Inline Checkboxes
+## Replace Terms Link with Inline Terms Dialog
 
-### Summary
-Remove the modal Terms of Use confirmation dialog and replace it with a simple inline checkbox on each relevant form. The submit button stays disabled until the checkbox is ticked. No more popup interruption.
+### Problem
+The "Terms of Use" link next to each checkbox uses `<a href="/terms" target="_blank">` which opens a new tab pointing to a GitHub Pages route that may not resolve properly. It also navigates the user away from their current workflow.
 
-### Components to update (9 files)
+### Solution
+Create a reusable `TermsDialog` component that opens a scrollable popup containing the full Terms of Use text. Replace the external link in all 9 files with a clickable text trigger that opens this dialog.
 
-Each file gets the same pattern change:
-- Remove `useTermsConfirmation` hook import and usage
-- Remove `<TermsConfirmationDialog>` component
-- Add a `const [termsAgreed, setTermsAgreed] = useState(false)` state
-- Add an inline checkbox + label before the submit button:
-  ```
-  ☐ I agree to the Terms of Use (link)
-  ```
-- Add `!termsAgreed` to the submit button's `disabled` condition
-- Change `onClick={() => requireTerms(handler)}` back to `onClick={handler}`
+### New file: `src/components/shared/TermsDialog.tsx`
+- A `Dialog` with `ScrollArea` containing the full Terms of Use content (extracted from `src/pages/Terms.tsx`)
+- Triggered by a styled text button ("Terms of Use") — no page navigation
+- Extract the terms content into a shared component (e.g. `TermsContent`) used by both the dialog and the `/terms` page to avoid duplication
+
+### Shared content: `src/components/shared/TermsContent.tsx`
+- Move all the sections/paragraphs from `src/pages/Terms.tsx` into a standalone `TermsContent` component
+- Both `Terms.tsx` (full page) and `TermsDialog.tsx` (popup) render `<TermsContent />`
+
+### Update `src/pages/Terms.tsx`
+- Import and render `<TermsContent />` instead of inline JSX
+
+### Update 9 component files
+In each file, replace the `<a href="/terms" target="_blank" ...>Terms of Use <ExternalLink /></a>` with a `<TermsDialog />` trigger component. Remove the `ExternalLink` import if no longer used.
 
 **Files:**
 1. `src/components/locker/CreateLock.tsx`
@@ -29,17 +34,14 @@ Each file gets the same pattern change:
 8. `src/components/bannerads/BulkRentDialog.tsx`
 9. `src/components/drops/CartDrawer.tsx`
 
-### Cleanup (2 files)
-- Delete `src/hooks/useTermsConfirmation.ts`
-- Delete `src/components/shared/TermsConfirmationDialog.tsx`
+### Dialog design
+- Max width `sm:max-w-2xl`, max height `80vh`
+- `ScrollArea` for the terms content
+- Simple close button
+- Trigger is inline styled text: `Terms of Use` in primary color with underline on hover
 
-### Inline checkbox design
-- Uses existing `<Checkbox>` component from `@/components/ui/checkbox`
-- Small text with a link to `/terms` opening in new tab
-- Resets to unchecked when the dialog/form reopens (for dialog-based UIs like RentSlotDialog)
-- No sessionStorage persistence — user must check the box each time they transact
-
-### Files changed: 11
-- 9 component files updated
-- 2 files deleted
+### Files changed: 12
+- 2 new files (`TermsContent.tsx`, `TermsDialog.tsx`)
+- 1 updated (`Terms.tsx` — uses shared content)
+- 9 updated (checkbox label links replaced with dialog trigger)
 
