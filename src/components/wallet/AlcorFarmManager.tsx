@@ -220,7 +220,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
       closeWharfkitModals();
       setTimeout(() => closeWharfkitModals(), 300);
     }
-  }, [session, accountName, onTransactionSuccess, refetch, refetchTokenBalances, onTransactionComplete]);
+  }, [session, accountName, onTransactionSuccess, refetch, onTransactionComplete]);
 
   const handleClaimAll = useCallback(async () => {
     if (!session || !accountName || farmsList.length === 0) return;
@@ -246,7 +246,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
       closeWharfkitModals();
       setTimeout(() => closeWharfkitModals(), 300);
     }
-  }, [session, accountName, farmsList, onTransactionSuccess, refetch, refetchTokenBalances, onTransactionComplete]);
+  }, [session, accountName, farmsList, onTransactionSuccess, refetch, onTransactionComplete]);
 
   const handleUnstake = useCallback(async (incentives: AlcorFarmPosition[]) => {
     if (!session || !accountName || incentives.length === 0) return;
