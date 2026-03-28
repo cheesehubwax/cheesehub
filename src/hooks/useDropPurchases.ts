@@ -3,6 +3,7 @@ import { fetchTableRows } from '@/lib/waxRpcFallback';
 import { NFTHIVE_CONFIG, CHEESE_CONFIG } from '@/lib/waxConfig';
 
 const HYPERION_ENDPOINTS = [
+  'https://wax.eosusa.io',
   'https://wax.eosphere.io',
   'https://api.wax.alohaeos.com',
   'https://wax.greymass.com',
@@ -150,8 +151,16 @@ async function fetchOfficialPurchases(): Promise<DropPurchase[]> {
     fetchOfficialDropIds(),
   ]);
 
+  console.log(`[DropPurchases] ${purchases.length} total claimdrop actions, ${officialIds.size} official drop IDs found`);
+  if (purchases.length > 0) {
+    console.log('[DropPurchases] Sample drop IDs from Hyperion:', purchases.slice(0, 5).map(p => p.dropId));
+  }
+  if (officialIds.size > 0) {
+    console.log('[DropPurchases] Sample official IDs:', [...officialIds].slice(0, 10));
+  }
+
   // Filter to official collection drops only, then enrich with payment data
-  return purchases
+  const filtered = purchases
     .filter(p => officialIds.has(p.dropId))
     .map(p => {
       const key = `${p.txId}:${p.buyer}`;
@@ -161,6 +170,9 @@ async function fetchOfficialPurchases(): Promise<DropPurchase[]> {
       }
       return p;
     });
+
+  console.log(`[DropPurchases] ${filtered.length} purchases matched official collection`);
+  return filtered;
 }
 
 export function useDropPurchases(enabled: boolean) {
