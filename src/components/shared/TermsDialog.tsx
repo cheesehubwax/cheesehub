@@ -21,9 +21,9 @@ export function TermsDialog() {
             <DialogTitle className="text-cheese">Terms of Use</DialogTitle>
             <p className="text-xs text-muted-foreground">Last updated: March 2025</p>
           </DialogHeader>
-          <ScrollArea className="flex-1 pr-4" style={{ maxHeight: 'calc(80vh - 6rem)' }}>
+          <div className="flex-1 overflow-y-auto pr-2" style={{ maxHeight: 'calc(80vh - 6rem)' }}>
             <TermsContent />
-          </ScrollArea>
+          </div>
         </DialogContent>
       </Dialog>
     </>
