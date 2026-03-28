@@ -1,47 +1,30 @@
 
 
-## Replace Terms Link with Inline Terms Dialog
+## Update Terms Checkbox Wording
 
-### Problem
-The "Terms of Use" link next to each checkbox uses `<a href="/terms" target="_blank">` which opens a new tab pointing to a GitHub Pages route that may not resolve properly. It also navigates the user away from their current workflow.
+### Rationale
+Your logic is correct. The Terms of Use already state that using the platform constitutes agreement. The checkbox should confirm the user has *read* them, not redundantly ask for agreement. This is cleaner and more user-friendly.
 
-### Solution
-Create a reusable `TermsDialog` component that opens a scrollable popup containing the full Terms of Use text. Replace the external link in all 9 files with a clickable text trigger that opens this dialog.
+### Change
+In all 9 files, replace:
+```
+I agree to the Terms of Use
+```
+with:
+```
+I have read the Terms of Use
+```
 
-### New file: `src/components/shared/TermsDialog.tsx`
-- A `Dialog` with `ScrollArea` containing the full Terms of Use content (extracted from `src/pages/Terms.tsx`)
-- Triggered by a styled text button ("Terms of Use") — no page navigation
-- Extract the terms content into a shared component (e.g. `TermsContent`) used by both the dialog and the `/terms` page to avoid duplication
+### Files (9)
+1. `src/components/drip/CreateDrip.tsx` (line 422)
+2. `src/components/dao/CreateDao.tsx` (line 625)
+3. `src/components/dao/TreasuryDeposit.tsx` (line 244)
+4. `src/components/farm/CreateFarm.tsx` (line 693)
+5. `src/components/bannerads/BulkRentDialog.tsx` (line 124)
+6. `src/components/bannerads/RentSlotDialog.tsx` (line 102)
+7. `src/components/drops/CartDrawer.tsx` (line 92)
+8. `src/components/locker/CreateLock.tsx` (line 271)
+9. `src/components/locker/CreateLiquidityLock.tsx` (line 293)
 
-### Shared content: `src/components/shared/TermsContent.tsx`
-- Move all the sections/paragraphs from `src/pages/Terms.tsx` into a standalone `TermsContent` component
-- Both `Terms.tsx` (full page) and `TermsDialog.tsx` (popup) render `<TermsContent />`
-
-### Update `src/pages/Terms.tsx`
-- Import and render `<TermsContent />` instead of inline JSX
-
-### Update 9 component files
-In each file, replace the `<a href="/terms" target="_blank" ...>Terms of Use <ExternalLink /></a>` with a `<TermsDialog />` trigger component. Remove the `ExternalLink` import if no longer used.
-
-**Files:**
-1. `src/components/locker/CreateLock.tsx`
-2. `src/components/locker/CreateLiquidityLock.tsx`
-3. `src/components/farm/CreateFarm.tsx`
-4. `src/components/dao/CreateDao.tsx`
-5. `src/components/dao/TreasuryDeposit.tsx`
-6. `src/components/drip/CreateDrip.tsx`
-7. `src/components/bannerads/RentSlotDialog.tsx`
-8. `src/components/bannerads/BulkRentDialog.tsx`
-9. `src/components/drops/CartDrawer.tsx`
-
-### Dialog design
-- Max width `sm:max-w-2xl`, max height `80vh`
-- `ScrollArea` for the terms content
-- Simple close button
-- Trigger is inline styled text: `Terms of Use` in primary color with underline on hover
-
-### Files changed: 12
-- 2 new files (`TermsContent.tsx`, `TermsDialog.tsx`)
-- 1 updated (`Terms.tsx` — uses shared content)
-- 9 updated (checkbox label links replaced with dialog trigger)
+Each is a single-line text change: `I agree to the` → `I have read the`
 
