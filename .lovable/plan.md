@@ -1,30 +1,35 @@
 
 
-## Update Terms Checkbox Wording
+## Add Flanking Emojis to All dApp Headings
 
-### Rationale
-Your logic is correct. The Terms of Use already state that using the platform constitutes agreement. The checkbox should confirm the user has *read* them, not redundantly ask for agreement. This is cleaner and more user-friendly.
+### Problem
+Three dApp pages are missing the emoji decorations on either side of their heading that the other pages already have.
 
-### Change
-In all 9 files, replace:
-```
-I agree to the Terms of Use
-```
-with:
-```
-I have read the Terms of Use
+### Pages to update
+
+| Page | File | Emoji |
+|------|------|-------|
+| CHEESEFarm | `src/pages/Farm.tsx` | 🌱 |
+| CHEESEDao | `src/pages/Dao.tsx` | 🏛️ |
+| CHEESELock | `src/pages/Locker.tsx` | 🔐 |
+
+### Pattern (already used by CHEESEDrop, CHEESEUp, CHEESENull, CHEESEDrip, CHEESEAds)
+```tsx
+<div className="flex items-center justify-center gap-2">
+  <span className="text-2xl">🌱</span>
+  <h1 ...>CHEESEFarm</h1>
+  <Badge>BETA</Badge>
+  <span className="text-2xl">🌱</span>
+</div>
 ```
 
-### Files (9)
-1. `src/components/drip/CreateDrip.tsx` (line 422)
-2. `src/components/dao/CreateDao.tsx` (line 625)
-3. `src/components/dao/TreasuryDeposit.tsx` (line 244)
-4. `src/components/farm/CreateFarm.tsx` (line 693)
-5. `src/components/bannerads/BulkRentDialog.tsx` (line 124)
-6. `src/components/bannerads/RentSlotDialog.tsx` (line 102)
-7. `src/components/drops/CartDrawer.tsx` (line 92)
-8. `src/components/locker/CreateLock.tsx` (line 271)
-9. `src/components/locker/CreateLiquidityLock.tsx` (line 293)
+### Changes per file
 
-Each is a single-line text change: `I agree to the` → `I have read the`
+**Farm.tsx** — Add `<span className="text-2xl">🌱</span>` before the h1 and after the Badge in the heading flex container.
+
+**Dao.tsx** — Replace the `<Users>` icon after the Badge with `<span className="text-2xl">🏛️</span>`, and add matching `<span className="text-2xl">🏛️</span>` before the h1.
+
+**Locker.tsx** — Wrap the h1 in a flex container with `<span className="text-2xl">🔐</span>` on each side (currently the heading has no wrapper div with flex/gap).
+
+### Files changed: 3
 
