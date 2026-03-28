@@ -7,6 +7,8 @@ import { useWax } from "@/context/WaxContext";
 import { usePurchaseDrop } from "@/hooks/usePurchaseDrop";
 import { useTransactionSuccess } from "@/context/TransactionSuccessContext";
 import { useToast } from "@/hooks/use-toast";
+import { useTermsConfirmation } from "@/hooks/useTermsConfirmation";
+import { TermsConfirmationDialog } from "@/components/shared/TermsConfirmationDialog";
 
 export function CartDrawer() {
   const { items, removeFromCart, clearCart, isOpen, setIsOpen, totalItems } = useCart();

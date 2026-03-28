@@ -23,10 +23,13 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Lock, Calendar, AlertCircle, Droplets } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useTermsConfirmation } from "@/hooks/useTermsConfirmation";
+import { TermsConfirmationDialog } from "@/components/shared/TermsConfirmationDialog";
 
 export function CreateLiquidityLock() {
   const waxContext = useWax();
   const { toast } = useToast();
+  const { requireTerms, termsDialogProps } = useTermsConfirmation();
   const [lpTokens, setLpTokens] = useState<LPTokenBalance[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -285,7 +288,7 @@ export function CreateLiquidityLock() {
         </div>
 
         <Button
-          onClick={handleCreate}
+          onClick={() => requireTerms(handleCreate)}
           disabled={creating || !selectedToken || !amount || !unlockDate}
           className="w-full bg-cheese hover:bg-cheese-dark text-primary-foreground font-semibold"
           size="lg"
@@ -302,6 +305,7 @@ export function CreateLiquidityLock() {
             </>
           )}
         </Button>
+        <TermsConfirmationDialog {...termsDialogProps} />
       </CardContent>
     </Card>
   );

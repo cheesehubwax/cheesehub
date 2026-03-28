@@ -11,6 +11,8 @@ import { Droplets, Calendar, AlertCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getTokenLogoUrl } from "@/lib/tokenLogos";
 import { setDripName } from "@/lib/dripNames";
+import { useTermsConfirmation } from "@/hooks/useTermsConfirmation";
+import { TermsConfirmationDialog } from "@/components/shared/TermsConfirmationDialog";
 import {
   Select,
   SelectContent,

@@ -11,6 +11,8 @@ import { formatSlotDateUTC } from "./SlotCalendar";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 import { closeWharfkitModals, getTransactPlugins } from "@/lib/wharfKit";
 import { isDomainBlocked } from "@/lib/bannerBlocklist";
+import { useTermsConfirmation } from "@/hooks/useTermsConfirmation";
+import { TermsConfirmationDialog } from "@/components/shared/TermsConfirmationDialog";
 
 interface RentSlotDialogProps {
   open: boolean;
