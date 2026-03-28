@@ -104,8 +104,6 @@ export function CartDrawer() {
                   Clear Cart
                 </Button>
                 <TermsConfirmationDialog {...termsDialogProps} />
-                  Clear Cart
-                </Button>
               </div>
             </>
           )}
