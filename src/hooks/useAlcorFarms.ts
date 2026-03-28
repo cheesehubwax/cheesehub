@@ -53,7 +53,10 @@ export function useAlcorFarms() {
     }
 
     const fetchId = ++fetchIdRef.current;
-    setIsLoading(true);
+    const isInitialLoad = stakedFarms.length === 0 && unstakedPositions.length === 0;
+    if (isInitialLoad) {
+      setIsLoading(true);
+    }
     setError(null);
 
     try {

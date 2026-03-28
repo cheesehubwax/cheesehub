@@ -211,7 +211,6 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
       const txId = result.resolved?.transaction.id?.toString() || null;
       onTransactionSuccess?.('Rewards Claimed!', `Claimed rewards from ${claims.length} incentive(s)`, txId);
       refetch();
-      setTimeout(() => refetchTokenBalances(), 2000);
       onTransactionComplete?.();
     } catch (error: any) {
       console.error('Claim error:', error);
@@ -238,7 +237,6 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
       const txId = result.resolved?.transaction.id?.toString() || null;
       onTransactionSuccess?.('All Rewards Claimed!', `Claimed rewards from ${claims.length} incentive(s)`, txId);
       refetch();
-      setTimeout(() => refetchTokenBalances(), 2000);
       onTransactionComplete?.();
     } catch (error: any) {
       console.error('Claim all error:', error);
