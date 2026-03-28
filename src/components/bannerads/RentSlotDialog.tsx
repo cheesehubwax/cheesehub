@@ -11,8 +11,8 @@ import { formatSlotDateUTC } from "./SlotCalendar";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 import { closeWharfkitModals, getTransactPlugins } from "@/lib/wharfKit";
 import { isDomainBlocked } from "@/lib/bannerBlocklist";
-import { useTermsConfirmation } from "@/hooks/useTermsConfirmation";
-import { TermsConfirmationDialog } from "@/components/shared/TermsConfirmationDialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ExternalLink } from "lucide-react";
 
 interface RentSlotDialogProps {
   open: boolean;
@@ -27,7 +27,7 @@ interface RentSlotDialogProps {
 export function RentSlotDialog({ open, onOpenChange, startTime, position, waxPricePerDay, isJoining = false, onSuccess }: RentSlotDialogProps) {
   const { session, refreshBalance } = useWax();
   const { toast } = useToast();
-  const { requireTerms, termsDialogProps } = useTermsConfirmation();
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [numDays, setNumDays] = useState(1);
   const [rentalMode, setRentalMode] = useState<"exclusive" | "shared">(isJoining ? "shared" : "exclusive");
   const [ipfsHash, setIpfsHash] = useState("");
@@ -97,10 +97,19 @@ export function RentSlotDialog({ open, onOpenChange, startTime, position, waxPri
           <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground"><p>Memo: <code className="text-foreground">{memo}</code></p></div>
         </div>
         <DialogFooter>
+        <div className="flex items-start gap-3">
+          <Checkbox id="terms-rent" checked={termsAgreed} onCheckedChange={(v) => setTermsAgreed(v === true)} className="mt-0.5" />
+          <label htmlFor="terms-rent" className="text-sm cursor-pointer leading-relaxed text-muted-foreground">
+            I agree to the{" "}
+            <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
+              Terms of Use <ExternalLink className="h-3 w-3" />
+            </a>
+          </label>
+        </div>
+        <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={() => requireTerms(handleRent)} disabled={isSubmitting || !session || isDomainBlocked(websiteUrl)} className="bg-cheese hover:bg-cheese-dark text-primary-foreground">{isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Rent Slot</Button>
+          <Button onClick={handleRent} disabled={isSubmitting || !session || isDomainBlocked(websiteUrl) || !termsAgreed} className="bg-cheese hover:bg-cheese-dark text-primary-foreground">{isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Rent Slot</Button>
         </DialogFooter>
-        <TermsConfirmationDialog {...termsDialogProps} />
       </DialogContent>
     </Dialog>
   );

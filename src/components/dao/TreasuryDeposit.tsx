@@ -11,8 +11,8 @@ import {
 import { TokenLogo } from "@/components/TokenLogo";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { Loader2, ArrowDownToLine, Wallet } from "lucide-react";
-import { useTermsConfirmation } from "@/hooks/useTermsConfirmation";
-import { TermsConfirmationDialog } from "@/components/shared/TermsConfirmationDialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ExternalLink } from "lucide-react";
 
 interface TreasuryDepositProps {
   daoName: string;
@@ -38,7 +38,7 @@ const CUSTOM_TOKEN_VALUE = "__custom__";
 export function TreasuryDeposit({ daoName, onDeposited }: TreasuryDepositProps) {
   const { accountName, session, isConnected } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
-  const { requireTerms, termsDialogProps } = useTermsConfirmation();
+  const [termsAgreed, setTermsAgreed] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [amount, setAmount] = useState("");
@@ -238,9 +238,19 @@ export function TreasuryDeposit({ daoName, onDeposited }: TreasuryDepositProps) 
         </span>
       </div>
 
+      <div className="flex items-start gap-3">
+        <Checkbox id="terms-treasury" checked={termsAgreed} onCheckedChange={(v) => setTermsAgreed(v === true)} className="mt-0.5" />
+        <label htmlFor="terms-treasury" className="text-sm cursor-pointer leading-relaxed text-muted-foreground">
+          I agree to the{" "}
+          <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
+            Terms of Use <ExternalLink className="h-3 w-3" />
+          </a>
+        </label>
+      </div>
+
       <Button
-        onClick={() => requireTerms(handleDeposit)}
-        disabled={loading || !amount || parseFloat(amount) <= 0 || !activeToken}
+        onClick={handleDeposit}
+        disabled={loading || !amount || parseFloat(amount) <= 0 || !activeToken || !termsAgreed}
         className="w-full"
       >
         {loading ? (
@@ -259,7 +269,6 @@ export function TreasuryDeposit({ daoName, onDeposited }: TreasuryDepositProps) 
       <p className="text-xs text-muted-foreground text-center">
         Anyone can deposit tokens. To withdraw, create a Token Transfer proposal.
       </p>
-      <TermsConfirmationDialog {...termsDialogProps} />
     </div>
   );
 }
