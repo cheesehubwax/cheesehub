@@ -22,10 +22,14 @@ const Locker = () => {
               <img src={cheeseLockOrb} alt="CHEESE Lock" className="w-24 h-24 object-contain" />
             </div>
             <div className="text-center space-y-2">
-              <h1 className="text-3xl md:text-4xl font-bold">
-                <span className="text-cheese">CHEESE</span>
-                <span className="text-foreground">Lock</span>
-              </h1>
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-2xl">🔐</span>
+                <h1 className="text-3xl md:text-4xl font-bold">
+                  <span className="text-cheese">CHEESE</span>
+                  <span className="text-foreground">Lock</span>
+                </h1>
+                <span className="text-2xl">🔐</span>
+              </div>
               <p className="text-muted-foreground max-w-2xl mx-auto">
                 Time-lock tokens and LP tokens using the WaxDAO Locker smart contract.
               </p>

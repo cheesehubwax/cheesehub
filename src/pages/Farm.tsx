@@ -45,6 +45,7 @@ const Farm = () => {
             </div>
             <div className="text-center space-y-2">
               <div className="flex items-center justify-center gap-2">
+                <span className="text-2xl">🌱</span>
                 <h1 className="text-3xl md:text-4xl font-bold">
                   <span className="text-cheese">CHEESE</span>
                   <span className="text-foreground">Farm</span>
@@ -52,6 +53,7 @@ const Farm = () => {
                 <Badge variant="outline" className="text-xs border-primary/50 text-primary">
                   BETA
                 </Badge>
+                <span className="text-2xl">🌱</span>
               </div>
               <p className="text-muted-foreground max-w-2xl mx-auto">
                 Create and participate in non-custodial NFT staking farms using the WaxDAO V2 smart contracts.
