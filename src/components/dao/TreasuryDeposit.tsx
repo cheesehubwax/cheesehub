@@ -11,6 +11,8 @@ import {
 import { TokenLogo } from "@/components/TokenLogo";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { Loader2, ArrowDownToLine, Wallet } from "lucide-react";
+import { useTermsConfirmation } from "@/hooks/useTermsConfirmation";
+import { TermsConfirmationDialog } from "@/components/shared/TermsConfirmationDialog";
 
 interface TreasuryDepositProps {
   daoName: string;
@@ -36,6 +38,7 @@ const CUSTOM_TOKEN_VALUE = "__custom__";
 export function TreasuryDeposit({ daoName, onDeposited }: TreasuryDepositProps) {
   const { accountName, session, isConnected } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
+  const { requireTerms, termsDialogProps } = useTermsConfirmation();
 
   const [loading, setLoading] = useState(false);
   const [amount, setAmount] = useState("");
@@ -236,7 +239,7 @@ export function TreasuryDeposit({ daoName, onDeposited }: TreasuryDepositProps) 
       </div>
 
       <Button
-        onClick={handleDeposit}
+        onClick={() => requireTerms(handleDeposit)}
         disabled={loading || !amount || parseFloat(amount) <= 0 || !activeToken}
         className="w-full"
       >
@@ -256,6 +259,7 @@ export function TreasuryDeposit({ daoName, onDeposited }: TreasuryDepositProps) 
       <p className="text-xs text-muted-foreground text-center">
         Anyone can deposit tokens. To withdraw, create a Token Transfer proposal.
       </p>
+      <TermsConfirmationDialog {...termsDialogProps} />
     </div>
   );
 }

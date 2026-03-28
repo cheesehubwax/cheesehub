@@ -21,6 +21,8 @@ import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useToast } from "@/hooks/use-toast";
 import { FeePaymentSelector } from "@/components/shared/FeePaymentSelector";
+import { useTermsConfirmation } from "@/hooks/useTermsConfirmation";
+import { TermsConfirmationDialog } from "@/components/shared/TermsConfirmationDialog";
 
 function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
@@ -47,6 +49,7 @@ export function CreateDao() {
   const { accountName, session, isConnected } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const [loading, setLoading] = useState(false);
+  const { requireTerms, termsDialogProps } = useTermsConfirmation();
   const { toast } = useToast();
 
   const [daoName, setDaoName] = useState("");
@@ -617,9 +620,10 @@ export function CreateDao() {
         </div>
 
         {/* Submit */}
-        <Button onClick={handleCreate} disabled={loading || !paymentMethod} className="w-full bg-primary text-primary-foreground" size="lg">
+        <Button onClick={() => requireTerms(handleCreate)} disabled={loading || !paymentMethod} className="w-full bg-primary text-primary-foreground" size="lg">
           {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Creating DAO...</> : paymentMethod === "cheese" ? "🏛️ Create DAO (Pay with CHEESE)" : paymentMethod === "wax" ? "🏛️ Create DAO (265 WAX)" : "🏛️ Select Payment Method"}
         </Button>
+        <TermsConfirmationDialog {...termsDialogProps} />
 
         {/* Footer */}
         <p className="text-center text-xs text-muted-foreground">

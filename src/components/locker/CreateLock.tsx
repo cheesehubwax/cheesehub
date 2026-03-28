@@ -16,6 +16,8 @@ import {
 import { Lock, Calendar, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getTokenLogoUrl } from "@/lib/tokenLogos";
+import { useTermsConfirmation } from "@/hooks/useTermsConfirmation";
+import { TermsConfirmationDialog } from "@/components/shared/TermsConfirmationDialog";
 
 const TOKEN_LOGO_PLACEHOLDER = '/placeholder.svg';
 
@@ -28,6 +30,7 @@ interface TokenBalance {
 export function CreateLock() {
   const { session, accountName, isConnected } = useWax();
   const { toast } = useToast();
+  const { requireTerms, termsDialogProps } = useTermsConfirmation();
   const [tokens, setTokens] = useState<TokenBalance[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -263,7 +266,7 @@ export function CreateLock() {
         </div>
 
         <Button
-          onClick={handleCreate}
+          onClick={() => requireTerms(handleCreate)}
           disabled={creating || !selectedToken || !amount || !unlockDate}
           className="w-full bg-cheese hover:bg-cheese-dark text-primary-foreground font-semibold"
           size="lg"
@@ -280,6 +283,7 @@ export function CreateLock() {
             </>
           )}
         </Button>
+        <TermsConfirmationDialog {...termsDialogProps} />
       </CardContent>
     </Card>
   );

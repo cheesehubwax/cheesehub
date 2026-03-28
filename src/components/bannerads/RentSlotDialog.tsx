@@ -11,6 +11,8 @@ import { formatSlotDateUTC } from "./SlotCalendar";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 import { closeWharfkitModals, getTransactPlugins } from "@/lib/wharfKit";
 import { isDomainBlocked } from "@/lib/bannerBlocklist";
+import { useTermsConfirmation } from "@/hooks/useTermsConfirmation";
+import { TermsConfirmationDialog } from "@/components/shared/TermsConfirmationDialog";
 
 interface RentSlotDialogProps {
   open: boolean;
@@ -25,6 +27,7 @@ interface RentSlotDialogProps {
 export function RentSlotDialog({ open, onOpenChange, startTime, position, waxPricePerDay, isJoining = false, onSuccess }: RentSlotDialogProps) {
   const { session, refreshBalance } = useWax();
   const { toast } = useToast();
+  const { requireTerms, termsDialogProps } = useTermsConfirmation();
   const [numDays, setNumDays] = useState(1);
   const [rentalMode, setRentalMode] = useState<"exclusive" | "shared">(isJoining ? "shared" : "exclusive");
   const [ipfsHash, setIpfsHash] = useState("");
@@ -95,8 +98,9 @@ export function RentSlotDialog({ open, onOpenChange, startTime, position, waxPri
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleRent} disabled={isSubmitting || !session || isDomainBlocked(websiteUrl)} className="bg-cheese hover:bg-cheese-dark text-primary-foreground">{isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Rent Slot</Button>
+          <Button onClick={() => requireTerms(handleRent)} disabled={isSubmitting || !session || isDomainBlocked(websiteUrl)} className="bg-cheese hover:bg-cheese-dark text-primary-foreground">{isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Rent Slot</Button>
         </DialogFooter>
+        <TermsConfirmationDialog {...termsDialogProps} />
       </DialogContent>
     </Dialog>
   );

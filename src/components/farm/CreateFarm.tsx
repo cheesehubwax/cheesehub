@@ -28,6 +28,8 @@ import {
 } from "@/lib/cheeseFees";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
+import { useTermsConfirmation } from "@/hooks/useTermsConfirmation";
+import { TermsConfirmationDialog } from "@/components/shared/TermsConfirmationDialog";
 import { useCheeseFeePricing } from "@/hooks/useCheeseFeePricing";
 import { useWaxdaoFeePricing } from "@/hooks/useWaxdaoFeePricing";
 import { useToast } from "@/hooks/use-toast";
@@ -86,6 +88,7 @@ export function CreateFarm() {
   const { accountName, isConnected, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const cheesePricing = useCheeseFeePricing();
+  const { requireTerms, termsDialogProps } = useTermsConfirmation();
   const waxdaoPricing = useWaxdaoFeePricing();
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -686,7 +689,7 @@ export function CreateFarm() {
 
             {/* Submit Button */}
             <Button
-              onClick={handleCreate}
+              onClick={() => requireTerms(handleCreate)}
               disabled={loading || !formData.farmName.trim()}
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
               size="lg"
@@ -708,6 +711,7 @@ export function CreateFarm() {
                 </>
               )}
             </Button>
+            <TermsConfirmationDialog {...termsDialogProps} />
           </div>
         )}
       </CardContent>
