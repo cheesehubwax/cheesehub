@@ -96,8 +96,7 @@ export function RentSlotDialog({ open, onOpenChange, startTime, position, waxPri
           <div className="rounded-lg bg-muted/50 p-3 text-sm"><p className="font-medium">{totalWax.toFixed(2)} WAX</p><p className="text-xs text-muted-foreground">{(waxPricePerDay * priceMultiplier).toFixed(2)} WAX × {numDays} day{numDays > 1 ? "s" : ""}</p>{isPromoz && <p className="text-xs font-medium mt-1" style={{color: 'hsl(142 71% 45%)'}}>🧀 Promoz 50% discount applied</p>}</div>
           <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground"><p>Memo: <code className="text-foreground">{memo}</code></p></div>
         </div>
-        <DialogFooter>
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-3 py-2">
           <Checkbox id="terms-rent" checked={termsAgreed} onCheckedChange={(v) => setTermsAgreed(v === true)} className="mt-0.5" />
           <label htmlFor="terms-rent" className="text-sm cursor-pointer leading-relaxed text-muted-foreground">
             I agree to the{" "}

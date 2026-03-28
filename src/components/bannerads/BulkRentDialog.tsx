@@ -118,8 +118,7 @@ export function BulkRentDialog({ open, onOpenChange, selections, waxPricePerDay,
           {previewUrl && <div><Label className="text-muted-foreground">Preview</Label><div className="mt-2 rounded-lg overflow-hidden border border-border/30"><img src={previewUrl} alt="Banner preview" className="w-full h-auto max-h-40 object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} /></div></div>}
           <div className="rounded-lg bg-muted/50 p-3 text-sm"><p className="font-medium">{totalWax.toFixed(2)} WAX total</p><p className="text-xs text-muted-foreground">{selections.length} slot{selections.length > 1 ? "s" : ""} × avg {(totalWax / selections.length).toFixed(2)} WAX each</p>{isPromoz && <p className="text-xs font-medium mt-1" style={{ color: 'hsl(142 71% 45%)' }}>🧀 Promoz 50% discount applied</p>}</div>
         </div>
-        <DialogFooter>
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-3 py-2">
           <Checkbox id="terms-bulkrent" checked={termsAgreed} onCheckedChange={(v) => setTermsAgreed(v === true)} className="mt-0.5" />
           <label htmlFor="terms-bulkrent" className="text-sm cursor-pointer leading-relaxed text-muted-foreground">
             I agree to the{" "}
