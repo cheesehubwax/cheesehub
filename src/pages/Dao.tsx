@@ -39,10 +39,11 @@ const Dao = () => {
             </div>
             <div className="text-center space-y-3">
               <h1 className="text-3xl md:text-4xl font-bold flex items-center justify-center gap-2">
+                <span className="text-2xl">🏛️</span>
                 <span className="text-cheese">CHEESE</span>
                 <span className="text-foreground">Dao</span>
                 <Badge variant="outline" className="text-xs border-primary/50 text-primary">BETA</Badge>
-                <Users className="h-6 w-6 text-muted-foreground" />
+                <span className="text-2xl">🏛️</span>
               </h1>
               <p className="text-muted-foreground max-w-xl mx-auto text-sm leading-relaxed">
                 Create and Manage DAOs (Decentralized Autonomous Organizations) on WAX Utilizing WAXDAOs Battle Tested Smart Contract. Propose, Vote, Govern and Manage Token and NFT Treasuries with On-Chain Transparency.
