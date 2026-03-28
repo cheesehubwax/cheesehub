@@ -26,7 +26,7 @@ export default function Terms() {
         <section className="space-y-4">
           <h2 className="text-xl font-semibold text-cheese">3. No Financial Product or Financial Advice</h2>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            The CHEESE token and any other digital asset accessible through CHEESEHub are not intended to be financial products within the meaning of the <em>Corporations Act 2001</em> (Cth) or the equivalent legislation of any other jurisdiction. Without limitation, CHEESE is not a security, a managed investment scheme, a derivative, or a non-cash payment facility.
+            The CHEESE token and any other digital asset accessible through CHEESEHub are not intended to be financial products within the meaning of the securities, financial services, or corporations legislation of any jurisdiction. Without limitation, CHEESE is not a security, a managed investment scheme, a derivative, or a non-cash payment facility.
           </p>
           <p className="text-sm text-muted-foreground leading-relaxed">
             Nothing on CHEESEHub constitutes financial product advice — whether general or personal. No content, feature, data display, or interface element on this platform should be interpreted as a recommendation, endorsement, or solicitation to buy, sell, hold, stake, farm, lock, or otherwise deal in any digital asset. You should seek independent professional financial, legal, and tax advice before making any decisions relating to digital assets.
@@ -121,7 +121,7 @@ export default function Terms() {
         <section className="space-y-4">
           <h2 className="text-xl font-semibold text-cheese">12. Merchandise & Consumer Protection</h2>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Purchases of CHEESE NFTs and merchandise made through CHEESEDrop are covered by applicable consumer protection laws, including the Australian Consumer Law (Schedule 2 of the <em>Competition and Consumer Act 2010</em> (Cth)) where applicable. All goods purchased through the portal may be returned undamaged for a full refund at any time. You acknowledge that such purchases constitute consumer transactions and do not represent a financial investment, security, or speculative instrument.
+            Purchases of CHEESE NFTs and merchandise made through CHEESEDrop are covered by applicable consumer protection laws in your jurisdiction. All goods purchased through the portal may be returned undamaged for a full refund at any time. You acknowledge that such purchases constitute consumer transactions and do not represent a financial investment, security, or speculative instrument.
           </p>
         </section>
 
