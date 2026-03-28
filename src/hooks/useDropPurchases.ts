@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchTableRows } from '@/lib/waxRpcFallback';
-import { NFTHIVE_CONFIG, CHEESE_CONFIG } from '@/lib/waxConfig';
+import { NFTHIVE_CONFIG, CHEESE_CONFIG, ATOMIC_API } from '@/lib/waxConfig';
+import { getIpfsUrl, extractIpfsHash } from '@/lib/ipfsGateways';
 
 const HYPERION_ENDPOINTS = [
   'https://wax.eosusa.io',
@@ -17,11 +18,13 @@ export interface DropPurchase {
   quantity: string;
   currency: string;
   txId: string;
+  imageUrl?: string;
 }
 
-/** Fetch all drop IDs belonging to the official collection from the on-chain drops table */
-async function fetchOfficialDropIds(): Promise<Set<number>> {
+/** Fetch all drop IDs belonging to the official collection, plus their first template ID */
+async function fetchOfficialDropData(): Promise<{ ids: Set<number>; templateMap: Map<number, number> }> {
   const ids = new Set<number>();
+  const templateMap = new Map<number, number>();
   let more = true;
   let lowerBound = '';
 
@@ -29,6 +32,7 @@ async function fetchOfficialDropIds(): Promise<Set<number>> {
     const response = await fetchTableRows<{
       drop_id: number;
       collection_name: string;
+      templates_to_mint: Array<{ template_id: number }>;
     }>({
       code: NFTHIVE_CONFIG.dropContract,
       scope: NFTHIVE_CONFIG.dropContract,
@@ -40,6 +44,10 @@ async function fetchOfficialDropIds(): Promise<Set<number>> {
     for (const row of response.rows) {
       if (row.collection_name === CHEESE_CONFIG.collectionName) {
         ids.add(row.drop_id);
+        const firstTemplate = row.templates_to_mint?.[0]?.template_id;
+        if (firstTemplate) {
+          templateMap.set(row.drop_id, firstTemplate);
+        }
       }
     }
 
@@ -51,7 +59,36 @@ async function fetchOfficialDropIds(): Promise<Set<number>> {
     }
   }
 
-  return ids;
+  return { ids, templateMap };
+}
+
+/** Batch-fetch template images from AtomicAssets API */
+async function fetchTemplateImages(templateIds: number[]): Promise<Map<number, string>> {
+  const imageMap = new Map<number, string>();
+  if (templateIds.length === 0) return imageMap;
+
+  const unique = [...new Set(templateIds)];
+  const idsParam = unique.join(',');
+
+  try {
+    const res = await fetch(
+      `${ATOMIC_API.baseUrl}/atomicassets/v1/templates?ids=${idsParam}&limit=${unique.length}`
+    );
+    if (!res.ok) return imageMap;
+    const data = await res.json();
+
+    for (const t of data.data || []) {
+      const img = t.immutable_data?.img || t.immutable_data?.image || t.immutable_data?.video || '';
+      if (img) {
+        const hash = extractIpfsHash(img);
+        imageMap.set(Number(t.template_id), hash ? getIpfsUrl(hash) : img);
+      }
+    }
+  } catch {
+    console.warn('[DropPurchases] Failed to fetch template images');
+  }
+
+  return imageMap;
 }
 
 async function fetchDropPurchases(): Promise<DropPurchase[]> {
@@ -148,19 +185,13 @@ async function fetchDropTransfers(): Promise<Map<string, { quantity: string; cur
 }
 
 async function fetchOfficialPurchases(): Promise<DropPurchase[]> {
-  const [purchases, transferMap, officialIds] = await Promise.all([
+  const [purchases, transferMap, dropData] = await Promise.all([
     fetchDropPurchases(),
     fetchDropTransfers(),
-    fetchOfficialDropIds(),
+    fetchOfficialDropData(),
   ]);
 
-  console.log(`[DropPurchases] ${purchases.length} total claimdrop actions, ${officialIds.size} official drop IDs found`);
-  if (purchases.length > 0) {
-    console.log('[DropPurchases] Sample drop IDs from Hyperion:', purchases.slice(0, 5).map(p => p.dropId));
-  }
-  if (officialIds.size > 0) {
-    console.log('[DropPurchases] Sample official IDs:', [...officialIds].slice(0, 10));
-  }
+  const { ids: officialIds, templateMap } = dropData;
 
   // Filter to official collection drops only, then enrich with payment data
   const filtered = purchases
@@ -174,8 +205,21 @@ async function fetchOfficialPurchases(): Promise<DropPurchase[]> {
       return p;
     });
 
-  console.log(`[DropPurchases] ${filtered.length} purchases matched official collection`);
-  return filtered;
+  // Fetch template images for the filtered purchases
+  const neededTemplateIds = [...new Set(
+    filtered.map(p => templateMap.get(p.dropId)).filter((t): t is number => !!t)
+  )];
+  const templateImages = await fetchTemplateImages(neededTemplateIds);
+
+  // Attach image URLs
+  const enriched = filtered.map(p => {
+    const templateId = templateMap.get(p.dropId);
+    const imageUrl = templateId ? templateImages.get(templateId) : undefined;
+    return { ...p, imageUrl };
+  });
+
+  console.log(`[DropPurchases] ${purchases.length} total, ${filtered.length} official, ${neededTemplateIds.length} templates fetched`);
+  return enriched;
 }
 
 export function useDropPurchases(enabled: boolean) {

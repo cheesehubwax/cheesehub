@@ -39,6 +39,7 @@ export function DropPurchaseLog({ purchases, isLoading }: DropPurchaseLogProps) 
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">NFT</TableHead>
                   <TableHead>Time</TableHead>
                   <TableHead>Buyer</TableHead>
                   <TableHead>Drop ID</TableHead>
@@ -50,6 +51,18 @@ export function DropPurchaseLog({ purchases, isLoading }: DropPurchaseLogProps) 
               <TableBody>
                 {purchases.map((p, i) => (
                   <TableRow key={`${p.txId}-${i}`}>
+                    <TableCell className="p-1">
+                      {p.imageUrl ? (
+                        <img
+                          src={p.imageUrl}
+                          alt={`Drop #${p.dropId}`}
+                          className="w-10 h-10 rounded object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded bg-muted flex items-center justify-center text-muted-foreground text-xs">?</div>
+                      )}
+                    </TableCell>
                     <TableCell className="text-xs whitespace-nowrap">
                       {p.timestamp ? new Date(p.timestamp).toLocaleString() : '—'}
                     </TableCell>
