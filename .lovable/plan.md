@@ -1,56 +1,45 @@
 
-Goal: restore the Admin CHEESEDrop purchase list so it shows only official `cheesenftwax` purchases again.
 
-What’s broken
-- The filtering approach is correct in principle: fetch recent `claimdrop` purchases, then filter to official drop IDs.
-- The bug is in the ID comparison.
-- Console logs already prove there is overlap:
-  - Hyperion sample purchase IDs: `"11248", "11243", "11245", "11241", ...`
-  - Official IDs sample: `11158, 11159, ..., 11240, 11241`
-- But the code stores official IDs as numbers and compares them against Hyperion `drop_id` values that are arriving as strings.
-- So `officialIds.has(p.dropId)` fails for valid matches because `"11241" !== 11241`.
+## Replace Terms Popup with Inline Checkboxes
 
-Implementation plan
+### Summary
+Remove the modal Terms of Use confirmation dialog and replace it with a simple inline checkbox on each relevant form. The submit button stays disabled until the checkbox is ticked. No more popup interruption.
 
-1. Normalize drop IDs before filtering
-- In `src/hooks/useDropPurchases.ts`, normalize all purchase `dropId` values to numbers before storing/filtering.
-- Also defensively normalize official IDs and filter comparisons the same way.
-- This keeps the existing “show all recent purchases, then filter out the ones we don’t want” approach, which matches your request.
+### Components to update (9 files)
 
-2. Keep payment enrichment unchanged
-- Preserve the current transfer lookup by `txId + buyer` so the log still shows how much CHEESE was paid.
-- No need to redesign the purchase pipeline; just fix the type mismatch.
+Each file gets the same pattern change:
+- Remove `useTermsConfirmation` hook import and usage
+- Remove `<TermsConfirmationDialog>` component
+- Add a `const [termsAgreed, setTermsAgreed] = useState(false)` state
+- Add an inline checkbox + label before the submit button:
+  ```
+  ☐ I agree to the Terms of Use (link)
+  ```
+- Add `!termsAgreed` to the submit button's `disabled` condition
+- Change `onClick={() => requireTerms(handler)}` back to `onClick={handler}`
 
-3. Improve debug logging slightly
-- Update the debug logs to print normalized sample IDs and, if useful, the type of `dropId` during development.
-- This makes future breakage obvious if Hyperion changes payload shape again.
+**Files:**
+1. `src/components/locker/CreateLock.tsx`
+2. `src/components/locker/CreateLiquidityLock.tsx`
+3. `src/components/farm/CreateFarm.tsx`
+4. `src/components/dao/CreateDao.tsx`
+5. `src/components/dao/TreasuryDeposit.tsx`
+6. `src/components/drip/CreateDrip.tsx`
+7. `src/components/bannerads/RentSlotDialog.tsx`
+8. `src/components/bannerads/BulkRentDialog.tsx`
+9. `src/components/drops/CartDrawer.tsx`
 
-4. Small robustness cleanup
-- Guard against malformed `drop_id` values by skipping `NaN`.
-- Keep the empty state message only for genuinely empty filtered results, not type-mismatch failures.
+### Cleanup (2 files)
+- Delete `src/hooks/useTermsConfirmation.ts`
+- Delete `src/components/shared/TermsConfirmationDialog.tsx`
 
-5. Optional nearby fix on Admin page
-- There is also a separate console warning:
-  - “Function components cannot be given refs” from `FailedTransactionLog`
-- That is unrelated to missing purchases, so I would treat it as a separate cleanup unless you want it fixed in the same pass.
+### Inline checkbox design
+- Uses existing `<Checkbox>` component from `@/components/ui/checkbox`
+- Small text with a link to `/terms` opening in new tab
+- Resets to unchecked when the dialog/form reopens (for dialog-based UIs like RentSlotDialog)
+- No sessionStorage persistence — user must check the box each time they transact
 
-Files to update
-- `src/hooks/useDropPurchases.ts`
+### Files changed: 11
+- 9 component files updated
+- 2 files deleted
 
-Expected result
-- The Admin CHEESEDrop section will again show purchases from the official `cheesenftwax` collection only.
-- The unrelated hundreds of non-official purchases will remain filtered out.
-- Payment amounts in CHEESE should continue to display as before.
-
-Technical detail
-```text
-Current mismatch:
-officialIds = Set<number> { 11241, 11243, ... }
-purchase.dropId = "11241"   // string from Hyperion
-
-Set.has("11241") -> false
-
-Fix:
-normalizedDropId = Number(act.drop_id)
-Set.has(normalizedDropId) -> true
-```
