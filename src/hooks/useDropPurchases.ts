@@ -3,6 +3,7 @@ import { fetchTableRows } from '@/lib/waxRpcFallback';
 import { NFTHIVE_CONFIG, CHEESE_CONFIG } from '@/lib/waxConfig';
 
 const HYPERION_ENDPOINTS = [
+  'https://wax.eosusa.io',
   'https://wax.eosphere.io',
   'https://api.wax.alohaeos.com',
   'https://wax.greymass.com',
