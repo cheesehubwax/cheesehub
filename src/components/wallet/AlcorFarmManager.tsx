@@ -76,7 +76,7 @@ function formatDetailedCountdown(endTimestamp: number): string {
 export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }: AlcorFarmManagerProps) {
   const { session, accountName } = useWax();
   const { stakedFarms, unstakedIncentives, unstakedPositions, isLoading, refetch, dataSource } = useAlcorFarms();
-  const { refetch: refetchTokenBalances } = useAllTokenBalances(accountName);
+  useAllTokenBalances(accountName);
   const { data: tokenPrices } = useAlcorTokenPrices();
   const { data: waxUsdPrice = 0 } = useWaxPrice();
   const [isTransacting, setIsTransacting] = useState(false);
@@ -211,7 +211,6 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
       const txId = result.resolved?.transaction.id?.toString() || null;
       onTransactionSuccess?.('Rewards Claimed!', `Claimed rewards from ${claims.length} incentive(s)`, txId);
       refetch();
-      setTimeout(() => refetchTokenBalances(), 2000);
       onTransactionComplete?.();
     } catch (error: any) {
       console.error('Claim error:', error);
@@ -221,7 +220,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
       closeWharfkitModals();
       setTimeout(() => closeWharfkitModals(), 300);
     }
-  }, [session, accountName, onTransactionSuccess, refetch, refetchTokenBalances, onTransactionComplete]);
+  }, [session, accountName, onTransactionSuccess, refetch, onTransactionComplete]);
 
   const handleClaimAll = useCallback(async () => {
     if (!session || !accountName || farmsList.length === 0) return;
@@ -238,7 +237,6 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
       const txId = result.resolved?.transaction.id?.toString() || null;
       onTransactionSuccess?.('All Rewards Claimed!', `Claimed rewards from ${claims.length} incentive(s)`, txId);
       refetch();
-      setTimeout(() => refetchTokenBalances(), 2000);
       onTransactionComplete?.();
     } catch (error: any) {
       console.error('Claim all error:', error);
@@ -248,7 +246,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
       closeWharfkitModals();
       setTimeout(() => closeWharfkitModals(), 300);
     }
-  }, [session, accountName, farmsList, onTransactionSuccess, refetch, refetchTokenBalances, onTransactionComplete]);
+  }, [session, accountName, farmsList, onTransactionSuccess, refetch, onTransactionComplete]);
 
   const handleUnstake = useCallback(async (incentives: AlcorFarmPosition[]) => {
     if (!session || !accountName || incentives.length === 0) return;
