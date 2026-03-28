@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -7,8 +8,8 @@ import { useWax } from "@/context/WaxContext";
 import { usePurchaseDrop } from "@/hooks/usePurchaseDrop";
 import { useTransactionSuccess } from "@/context/TransactionSuccessContext";
 import { useToast } from "@/hooks/use-toast";
-import { useTermsConfirmation } from "@/hooks/useTermsConfirmation";
-import { TermsConfirmationDialog } from "@/components/shared/TermsConfirmationDialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ExternalLink } from "lucide-react";
 
 export function CartDrawer() {
   const { items, removeFromCart, clearCart, isOpen, setIsOpen, totalItems } = useCart();
@@ -16,7 +17,7 @@ export function CartDrawer() {
   const { purchaseDrop, purchasing } = usePurchaseDrop();
   const { showSuccess } = useTransactionSuccess();
   const { toast } = useToast();
-  const { requireTerms, termsDialogProps } = useTermsConfirmation();
+  const [termsAgreed, setTermsAgreed] = useState(false);
 
   const handlePurchaseAll = async () => {
     let lastTxId: string | undefined;
@@ -84,26 +85,29 @@ export function CartDrawer() {
                 {!isConnected ? (
                   <p className="text-sm text-muted-foreground text-center">Connect wallet to purchase</p>
                 ) : (
-                  <Button
-                    className="w-full bg-primary text-primary-foreground"
-                    onClick={() => {
-                      const hasOfficialItems = items.some(item => (item as any).collectionName === "cheesenftwax");
-                      if (hasOfficialItems) {
-                        requireTerms(handlePurchaseAll);
-                      } else {
-                        handlePurchaseAll();
-                      }
-                    }}
-                    disabled={purchasing}
-                  >
-                    {purchasing ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Processing...</> : "Purchase All"}
-                  </Button>
+                  <>
+                    <div className="flex items-start gap-3">
+                      <Checkbox id="terms-cart" checked={termsAgreed} onCheckedChange={(v) => setTermsAgreed(v === true)} className="mt-0.5" />
+                      <label htmlFor="terms-cart" className="text-sm cursor-pointer leading-relaxed text-muted-foreground">
+                        I agree to the{" "}
+                        <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
+                          Terms of Use <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </label>
+                    </div>
+                    <Button
+                      className="w-full bg-primary text-primary-foreground"
+                      onClick={handlePurchaseAll}
+                      disabled={purchasing || !termsAgreed}
+                    >
+                      {purchasing ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Processing...</> : "Purchase All"}
+                    </Button>
+                  </>
                 )}
 
                 <Button variant="outline" className="w-full" onClick={clearCart}>
                   Clear Cart
                 </Button>
-                <TermsConfirmationDialog {...termsDialogProps} />
               </div>
             </>
           )}

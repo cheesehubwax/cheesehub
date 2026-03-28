@@ -23,13 +23,13 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Lock, Calendar, AlertCircle, Droplets } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useTermsConfirmation } from "@/hooks/useTermsConfirmation";
-import { TermsConfirmationDialog } from "@/components/shared/TermsConfirmationDialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ExternalLink } from "lucide-react";
 
 export function CreateLiquidityLock() {
   const waxContext = useWax();
   const { toast } = useToast();
-  const { requireTerms, termsDialogProps } = useTermsConfirmation();
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [lpTokens, setLpTokens] = useState<LPTokenBalance[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -287,9 +287,19 @@ export function CreateLiquidityLock() {
           </div>
         </div>
 
+        <div className="flex items-start gap-3">
+          <Checkbox id="terms-liqlock" checked={termsAgreed} onCheckedChange={(v) => setTermsAgreed(v === true)} className="mt-0.5" />
+          <label htmlFor="terms-liqlock" className="text-sm cursor-pointer leading-relaxed text-muted-foreground">
+            I agree to the{" "}
+            <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
+              Terms of Use <ExternalLink className="h-3 w-3" />
+            </a>
+          </label>
+        </div>
+
         <Button
-          onClick={() => requireTerms(handleCreate)}
-          disabled={creating || !selectedToken || !amount || !unlockDate}
+          onClick={handleCreate}
+          disabled={creating || !selectedToken || !amount || !unlockDate || !termsAgreed}
           className="w-full bg-cheese hover:bg-cheese-dark text-primary-foreground font-semibold"
           size="lg"
         >
@@ -305,7 +315,6 @@ export function CreateLiquidityLock() {
             </>
           )}
         </Button>
-        <TermsConfirmationDialog {...termsDialogProps} />
       </CardContent>
     </Card>
   );

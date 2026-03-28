@@ -16,8 +16,8 @@ import {
 import { Lock, Calendar, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getTokenLogoUrl } from "@/lib/tokenLogos";
-import { useTermsConfirmation } from "@/hooks/useTermsConfirmation";
-import { TermsConfirmationDialog } from "@/components/shared/TermsConfirmationDialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ExternalLink } from "lucide-react";
 
 const TOKEN_LOGO_PLACEHOLDER = '/placeholder.svg';
 
@@ -30,7 +30,7 @@ interface TokenBalance {
 export function CreateLock() {
   const { session, accountName, isConnected } = useWax();
   const { toast } = useToast();
-  const { requireTerms, termsDialogProps } = useTermsConfirmation();
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [tokens, setTokens] = useState<TokenBalance[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -265,9 +265,19 @@ export function CreateLock() {
           </div>
         </div>
 
+        <div className="flex items-start gap-3">
+          <Checkbox id="terms-lock" checked={termsAgreed} onCheckedChange={(v) => setTermsAgreed(v === true)} className="mt-0.5" />
+          <label htmlFor="terms-lock" className="text-sm cursor-pointer leading-relaxed text-muted-foreground">
+            I agree to the{" "}
+            <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
+              Terms of Use <ExternalLink className="h-3 w-3" />
+            </a>
+          </label>
+        </div>
+
         <Button
-          onClick={() => requireTerms(handleCreate)}
-          disabled={creating || !selectedToken || !amount || !unlockDate}
+          onClick={handleCreate}
+          disabled={creating || !selectedToken || !amount || !unlockDate || !termsAgreed}
           className="w-full bg-cheese hover:bg-cheese-dark text-primary-foreground font-semibold"
           size="lg"
         >
@@ -283,7 +293,6 @@ export function CreateLock() {
             </>
           )}
         </Button>
-        <TermsConfirmationDialog {...termsDialogProps} />
       </CardContent>
     </Card>
   );

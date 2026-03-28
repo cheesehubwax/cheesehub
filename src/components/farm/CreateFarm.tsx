@@ -28,8 +28,7 @@ import {
 } from "@/lib/cheeseFees";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
-import { useTermsConfirmation } from "@/hooks/useTermsConfirmation";
-import { TermsConfirmationDialog } from "@/components/shared/TermsConfirmationDialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useCheeseFeePricing } from "@/hooks/useCheeseFeePricing";
 import { useWaxdaoFeePricing } from "@/hooks/useWaxdaoFeePricing";
 import { useToast } from "@/hooks/use-toast";
@@ -88,7 +87,7 @@ export function CreateFarm() {
   const { accountName, isConnected, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const cheesePricing = useCheeseFeePricing();
-  const { requireTerms, termsDialogProps } = useTermsConfirmation();
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const waxdaoPricing = useWaxdaoFeePricing();
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -687,10 +686,20 @@ export function CreateFarm() {
               </span>
             </div>
 
+            <div className="flex items-start gap-3">
+              <Checkbox id="terms-farm" checked={termsAgreed} onCheckedChange={(v) => setTermsAgreed(v === true)} className="mt-0.5" />
+              <label htmlFor="terms-farm" className="text-sm cursor-pointer leading-relaxed text-muted-foreground">
+                I agree to the{" "}
+                <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
+                  Terms of Use <ExternalLink className="h-3 w-3" />
+                </a>
+              </label>
+            </div>
+
             {/* Submit Button */}
             <Button
-              onClick={() => requireTerms(handleCreate)}
-              disabled={loading || !formData.farmName.trim()}
+              onClick={handleCreate}
+              disabled={loading || !formData.farmName.trim() || !termsAgreed}
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
               size="lg"
             >
@@ -711,7 +720,6 @@ export function CreateFarm() {
                 </>
               )}
             </Button>
-            <TermsConfirmationDialog {...termsDialogProps} />
           </div>
         )}
       </CardContent>

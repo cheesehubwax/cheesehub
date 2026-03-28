@@ -11,8 +11,8 @@ import { Droplets, Calendar, AlertCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getTokenLogoUrl } from "@/lib/tokenLogos";
 import { setDripName } from "@/lib/dripNames";
-import { useTermsConfirmation } from "@/hooks/useTermsConfirmation";
-import { TermsConfirmationDialog } from "@/components/shared/TermsConfirmationDialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ExternalLink } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -36,7 +36,7 @@ export function CreateDrip() {
   const { session, accountName, isConnected } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const { toast } = useToast();
-  const { requireTerms, termsDialogProps } = useTermsConfirmation();
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const { tokens: allTokens, isLoading: loading } = useAllTokenBalances(accountName || undefined);
   const [creating, setCreating] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
@@ -415,10 +415,21 @@ export function CreateDrip() {
           </div>
         </div>
 
+        {/* Terms checkbox */}
+        <div className="flex items-start gap-3">
+          <Checkbox id="terms-drip" checked={termsAgreed} onCheckedChange={(v) => setTermsAgreed(v === true)} className="mt-0.5" />
+          <label htmlFor="terms-drip" className="text-sm cursor-pointer leading-relaxed text-muted-foreground">
+            I agree to the{" "}
+            <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
+              Terms of Use <ExternalLink className="h-3 w-3" />
+            </a>
+          </label>
+        </div>
+
         {/* Submit Button */}
         <Button
-          onClick={() => requireTerms(handleCreate)}
-          disabled={creating || !receiver || !payoutAmount || !tokenName || !tokenContract || !hoursBetween || !endDate}
+          onClick={handleCreate}
+          disabled={creating || !receiver || !payoutAmount || !tokenName || !tokenContract || !hoursBetween || !endDate || !termsAgreed}
           className="w-full bg-cheese hover:bg-cheese-dark text-primary-foreground font-semibold"
           size="lg"
         >
@@ -442,7 +453,6 @@ export function CreateDrip() {
             <span>Missing: {missingFields.join(", ")}</span>
           </div>
         )}
-        <TermsConfirmationDialog {...termsDialogProps} />
       </CardContent>
     </Card>
   );

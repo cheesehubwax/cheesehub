@@ -21,8 +21,8 @@ import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useToast } from "@/hooks/use-toast";
 import { FeePaymentSelector } from "@/components/shared/FeePaymentSelector";
-import { useTermsConfirmation } from "@/hooks/useTermsConfirmation";
-import { TermsConfirmationDialog } from "@/components/shared/TermsConfirmationDialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ExternalLink } from "lucide-react";
 
 function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
@@ -49,7 +49,7 @@ export function CreateDao() {
   const { accountName, session, isConnected } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const [loading, setLoading] = useState(false);
-  const { requireTerms, termsDialogProps } = useTermsConfirmation();
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const { toast } = useToast();
 
   const [daoName, setDaoName] = useState("");
@@ -619,11 +619,20 @@ export function CreateDao() {
           </p>
         </div>
 
+        <div className="flex items-start gap-3">
+          <Checkbox id="terms-dao" checked={termsAgreed} onCheckedChange={(v) => setTermsAgreed(v === true)} className="mt-0.5" />
+          <label htmlFor="terms-dao" className="text-sm cursor-pointer leading-relaxed text-muted-foreground">
+            I agree to the{" "}
+            <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
+              Terms of Use <ExternalLink className="h-3 w-3" />
+            </a>
+          </label>
+        </div>
+
         {/* Submit */}
-        <Button onClick={() => requireTerms(handleCreate)} disabled={loading || !paymentMethod} className="w-full bg-primary text-primary-foreground" size="lg">
+        <Button onClick={handleCreate} disabled={loading || !paymentMethod || !termsAgreed} className="w-full bg-primary text-primary-foreground" size="lg">
           {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Creating DAO...</> : paymentMethod === "cheese" ? "🏛️ Create DAO (Pay with CHEESE)" : paymentMethod === "wax" ? "🏛️ Create DAO (265 WAX)" : "🏛️ Select Payment Method"}
         </Button>
-        <TermsConfirmationDialog {...termsDialogProps} />
 
         {/* Footer */}
         <p className="text-center text-xs text-muted-foreground">
