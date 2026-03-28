@@ -16,6 +16,7 @@ export function CartDrawer() {
   const { purchaseDrop, purchasing } = usePurchaseDrop();
   const { showSuccess } = useTransactionSuccess();
   const { toast } = useToast();
+  const { requireTerms, termsDialogProps } = useTermsConfirmation();
 
   const handlePurchaseAll = async () => {
     let lastTxId: string | undefined;
@@ -85,7 +86,14 @@ export function CartDrawer() {
                 ) : (
                   <Button
                     className="w-full bg-primary text-primary-foreground"
-                    onClick={handlePurchaseAll}
+                    onClick={() => {
+                      const hasOfficialItems = items.some(item => (item as any).collectionName === "cheesenftwax");
+                      if (hasOfficialItems) {
+                        requireTerms(handlePurchaseAll);
+                      } else {
+                        handlePurchaseAll();
+                      }
+                    }}
                     disabled={purchasing}
                   >
                     {purchasing ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Processing...</> : "Purchase All"}
@@ -93,6 +101,9 @@ export function CartDrawer() {
                 )}
 
                 <Button variant="outline" className="w-full" onClick={clearCart}>
+                  Clear Cart
+                </Button>
+                <TermsConfirmationDialog {...termsDialogProps} />
                   Clear Cart
                 </Button>
               </div>
