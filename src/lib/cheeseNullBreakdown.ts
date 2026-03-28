@@ -96,6 +96,7 @@ const NULL_CONTRACTS = [
   { account: 'cheesefeefee', displayName: 'cheesefeefee' },
   { account: 'cheesepowerz', displayName: 'cheesepowerz' },
   { account: 'cheesebannad', displayName: 'cheesebannad' },
+  { account: 'cheesenftwax', displayName: 'cheesenftwax' },
   { account: 'liquidcheese', displayName: 'Liquidity Fees' },
 ] as const;
 
