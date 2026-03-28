@@ -98,7 +98,7 @@ export function useBannerSlots() {
            sharedWebsiteUrl: row.shared_website_url,
            isAvailable: row.user === BANNER_CONTRACT || (row.rental_type === 1 && (!row.shared_user || row.shared_user === BANNER_CONTRACT)),
            isOnChain: true,
-           suspended: row.suspended ?? false,
+           suspended: !!(row.suspended),
          };
 
          const existing = grouped.get(row.time) || [];
