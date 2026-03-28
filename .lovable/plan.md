@@ -1,26 +1,28 @@
 
 
-## Fix Remove Asset Actions in CHEESEFarm
+## Fix Admin Edit Button Visibility on CHEESEAds
 
 ### Problem
-The erase action names in `src/lib/farm.ts` are wrong. The contract uses `removecol`, `removeschema`, `removetemp` — not `erasecolvalue`, `eraseschvalue`, `erasetmpvalue`.
+Line 238 in `SlotCalendar.tsx` shows the Edit button to admins on **all** non-suspended slots. Admins should only see Edit on their **own** ads (with the 48hr buffer), same as regular users. Admins can only **Remove** other people's ads, not edit them.
 
-### Changes
+### Change
 
-**`src/lib/farm.ts`** — Update 3 (or 4) action builders:
+**`src/components/bannerads/SlotCalendar.tsx`** — line 238
 
-| Function | Current action name | Correct action name |
-|---|---|---|
-| `buildEraseTemplateValuesAction` | `erasetmpvalue` | `removetemp` |
-| `buildEraseSchemaValuesAction` | `eraseschvalue` | `removeschema` |
-| `buildEraseCollectionValuesAction` | `erasecolvalue` | `removecol` |
-| `buildEraseAttributeValuesAction` | `eraseattvalue` | `removeattr` (TBD — user to confirm) |
+Current logic:
+```
+isAdmin || ((slot.user === accountName || slot.sharedUser === accountName) && isWithinBuffer(...))
+```
 
-The data field names may also differ on the contract. The user should verify the parameter names match what the contract expects (e.g., `template_id` vs `temp_id`). If the user can share the ABI or parameter names for these actions, we can fix those too.
+New logic — remove `isAdmin ||`, keep only the owner check:
+```
+(slot.user === accountName || slot.sharedUser === accountName) && isWithinBuffer(slot.time, MIN_RENT_BUFFER_HOURS)
+```
 
-### Note
-Keep the trash/delete buttons in `ManageStakableAssets.tsx` — they were correct, just the action names were wrong.
+This means:
+- Admins see Edit **only** on their own ads, with the 48hr buffer — same rules as everyone
+- Admins still see Remove, Preview, Reinstate, and Review buttons on other people's ads (unchanged)
 
 ### Files changed: 1
-- `src/lib/farm.ts`
+- `src/components/bannerads/SlotCalendar.tsx`
 
