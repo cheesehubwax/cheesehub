@@ -83,11 +83,14 @@ async function fetchDropPurchases(): Promise<DropPurchase[]> {
           currency = action['@transfer'].symbol ?? 'CHEESE';
         }
 
+        const normalizedDropId = Number(act.drop_id);
+        if (isNaN(normalizedDropId)) continue;
+
         purchases.push({
           timestamp: action['@timestamp'] || action.timestamp || '',
           buyer: act.claimer || '—',
-          dropId: act.drop_id ?? 0,
-          amount: act.amount ?? 1,
+          dropId: normalizedDropId,
+          amount: Number(act.amount) || 1,
           quantity,
           currency,
           txId: action.trx_id || '',
