@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
+import { fetchTableRows } from '@/lib/waxRpcFallback';
+import { NFTHIVE_CONFIG, CHEESE_CONFIG } from '@/lib/waxConfig';
 
 const HYPERION_ENDPOINTS = [
   'https://wax.eosphere.io',
@@ -16,14 +18,48 @@ export interface DropPurchase {
   txId: string;
 }
 
+/** Fetch all drop IDs belonging to the official collection from the on-chain drops table */
+async function fetchOfficialDropIds(): Promise<Set<number>> {
+  const ids = new Set<number>();
+  let more = true;
+  let lowerBound = '';
+
+  while (more) {
+    const response = await fetchTableRows<{
+      drop_id: number;
+      collection_name: string;
+    }>({
+      code: NFTHIVE_CONFIG.dropContract,
+      scope: NFTHIVE_CONFIG.dropContract,
+      table: 'drops',
+      limit: 100,
+      ...(lowerBound ? { lower_bound: lowerBound } : {}),
+    });
+
+    for (const row of response.rows) {
+      if (row.collection_name === CHEESE_CONFIG.collectionName) {
+        ids.add(row.drop_id);
+      }
+    }
+
+    more = response.more;
+    if (more && response.next_key) {
+      lowerBound = response.next_key;
+    } else {
+      more = false;
+    }
+  }
+
+  return ids;
+}
+
 async function fetchDropPurchases(): Promise<DropPurchase[]> {
-  // Fetch claimdrop actions from nfthivedrops via Hyperion
   for (const endpoint of HYPERION_ENDPOINTS) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-      const url = `${endpoint}/v2/history/get_actions?account=nfthivedrops&act.name=claimdrop&limit=100&sort=desc`;
+      const url = `${endpoint}/v2/history/get_actions?account=nfthivedrops&act.name=claimdrop&limit=200&sort=desc`;
       const response = await fetch(url, { signal: controller.signal });
       clearTimeout(timeoutId);
 
@@ -38,25 +74,12 @@ async function fetchDropPurchases(): Promise<DropPurchase[]> {
         const act = action.act?.data;
         if (!act) continue;
 
-        // Find the matching transfer in the same transaction traces
         let quantity = '—';
         let currency = 'CHEESE';
 
-        // Check inline traces for the transfer amount
         if (action['@transfer']) {
           quantity = action['@transfer'].amount?.toString() ?? '—';
           currency = action['@transfer'].symbol ?? 'CHEESE';
-        }
-
-        // Also check traces array for transfer info
-        if (action.traces) {
-          for (const trace of action.traces) {
-            if (trace.act?.name === 'transfer' && trace.act?.data?.to === 'nfthivedrops') {
-              quantity = trace.act.data.quantity ?? '—';
-              currency = trace.act.data.quantity?.split(' ')[1] ?? 'CHEESE';
-              break;
-            }
-          }
         }
 
         purchases.push({
@@ -79,7 +102,6 @@ async function fetchDropPurchases(): Promise<DropPurchase[]> {
   return [];
 }
 
-// Fetch transfer actions TO nfthivedrops to get payment amounts
 async function fetchDropTransfers(): Promise<Map<string, { quantity: string; currency: string }>> {
   for (const endpoint of HYPERION_ENDPOINTS) {
     try {
@@ -121,27 +143,30 @@ async function fetchDropTransfers(): Promise<Map<string, { quantity: string; cur
   return new Map();
 }
 
-async function fetchDropPurchasesWithPayments(): Promise<DropPurchase[]> {
-  const [purchases, transferMap] = await Promise.all([
+async function fetchOfficialPurchases(): Promise<DropPurchase[]> {
+  const [purchases, transferMap, officialIds] = await Promise.all([
     fetchDropPurchases(),
     fetchDropTransfers(),
+    fetchOfficialDropIds(),
   ]);
 
-  // Enrich purchases with transfer data
-  return purchases.map(p => {
-    const key = `${p.txId}:${p.buyer}`;
-    const transfer = transferMap.get(key);
-    if (transfer) {
-      return { ...p, quantity: transfer.quantity, currency: transfer.currency };
-    }
-    return p;
-  });
+  // Filter to official collection drops only, then enrich with payment data
+  return purchases
+    .filter(p => officialIds.has(p.dropId))
+    .map(p => {
+      const key = `${p.txId}:${p.buyer}`;
+      const transfer = transferMap.get(key);
+      if (transfer) {
+        return { ...p, quantity: transfer.quantity, currency: transfer.currency };
+      }
+      return p;
+    });
 }
 
 export function useDropPurchases(enabled: boolean) {
   return useQuery({
     queryKey: ['admin-drop-purchases'],
-    queryFn: fetchDropPurchasesWithPayments,
+    queryFn: fetchOfficialPurchases,
     enabled,
     staleTime: 60_000,
     refetchInterval: enabled ? 60_000 : false,
