@@ -33,6 +33,7 @@ interface BulkRentDialogProps {
 export function BulkRentDialog({ open, onOpenChange, selections, waxPricePerDay, onRemoveSlot, onUpdateSlotMode, onSuccess }: BulkRentDialogProps) {
   const { session, refreshBalance } = useWax();
   const { toast } = useToast();
+  const { requireTerms, termsDialogProps } = useTermsConfirmation();
   const [ipfsHash, setIpfsHash] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -119,8 +120,9 @@ export function BulkRentDialog({ open, onOpenChange, selections, waxPricePerDay,
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleBulkRent} disabled={isSubmitting || !session || selections.length === 0} className="bg-cheese hover:bg-cheese-dark text-primary-foreground">{isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Rent {selections.length} Slot{selections.length > 1 ? "s" : ""}</Button>
+          <Button onClick={() => requireTerms(handleBulkRent)} disabled={isSubmitting || !session || selections.length === 0} className="bg-cheese hover:bg-cheese-dark text-primary-foreground">{isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Rent {selections.length} Slot{selections.length > 1 ? "s" : ""}</Button>
         </DialogFooter>
+        <TermsConfirmationDialog {...termsDialogProps} />
       </DialogContent>
     </Dialog>
   );
