@@ -6,12 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, RefreshCw, Eye, ShoppingCart, CheckCircle2 } from "lucide-react";
+import { Loader2, RefreshCw, Eye, ShoppingCart, CheckCircle2, Pencil } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 import { sanitizeUrl } from "@/lib/sanitizeUrl";
 import { RentSlotDialog } from "./RentSlotDialog";
 import { BulkRentDialog, BulkSlotSelection } from "./BulkRentDialog";
+import { BulkEditBannerDialog } from "./BulkEditBannerDialog";
 import { EditBannerDialog } from "./EditBannerDialog";
 import { RemoveBannerDialog } from "./RemoveBannerDialog";
 import { ReinstateBannerDialog } from "./ReinstateBannerDialog";
@@ -136,7 +137,10 @@ export function SlotCalendar() {
   const [reinstateTarget, setReinstateTarget] = useState<BannerSlot | null>(null);
   const [previewTarget, setPreviewTarget] = useState<BannerSlot | null>(null);
   const [selectedSlots, setSelectedSlots] = useState<BulkSlotSelection[]>([]);
+  const [selectedEditSlots, setSelectedEditSlots] = useState<BannerSlot[]>([]);
+  const [selectionMode, setSelectionMode] = useState<"rent" | "edit" | null>(null);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [bulkEditDialogOpen, setBulkEditDialogOpen] = useState(false);
   const { isWhitelisted: isAdmin } = useAdminAccess();
   const [reviewVersion, setReviewVersion] = useState(0);
 
@@ -154,22 +158,60 @@ export function SlotCalendar() {
   }, [selectedSlots]);
 
   const toggleSlotSelection = useCallback((time: number, position: number, isJoining: boolean) => {
+    // Switching to rent mode clears edit selections
+    if (selectionMode === "edit") {
+      setSelectedEditSlots([]);
+    }
+    setSelectionMode("rent");
     setSelectedSlots(prev => {
       const exists = prev.some(s => s.time === time && s.position === position);
-      if (exists) return prev.filter(s => !(s.time === time && s.position === position));
+      if (exists) {
+        const next = prev.filter(s => !(s.time === time && s.position === position));
+        if (next.length === 0) setSelectionMode(null);
+        return next;
+      }
       return [...prev, { time, position, isJoining, rentalMode: isJoining ? "shared" as const : "exclusive" as const }];
+    });
+  }, [selectionMode]);
+
+  const toggleEditSlotSelection = useCallback((slot: BannerSlot) => {
+    // Switching to edit mode clears rent selections
+    if (selectionMode === "rent") {
+      setSelectedSlots([]);
+    }
+    setSelectionMode("edit");
+    setSelectedEditSlots(prev => {
+      const exists = prev.some(s => s.time === slot.time && s.position === slot.position);
+      if (exists) {
+        const next = prev.filter(s => !(s.time === slot.time && s.position === slot.position));
+        if (next.length === 0) setSelectionMode(null);
+        return next;
+      }
+      return [...prev, slot];
+    });
+  }, [selectionMode]);
+
+  const removeSlotFromSelection = useCallback((time: number, position: number) => {
+    setSelectedSlots(prev => {
+      const next = prev.filter(s => !(s.time === time && s.position === position));
+      if (next.length === 0) setSelectionMode(null);
+      return next;
     });
   }, []);
 
-  const removeSlotFromSelection = useCallback((time: number, position: number) => {
-    setSelectedSlots(prev => prev.filter(s => !(s.time === time && s.position === position)));
+  const removeEditSlotFromSelection = useCallback((time: number, position: number) => {
+    setSelectedEditSlots(prev => {
+      const next = prev.filter(s => !(s.time === time && s.position === position));
+      if (next.length === 0) setSelectionMode(null);
+      return next;
+    });
   }, []);
 
   const updateSlotMode = useCallback((time: number, position: number, mode: "exclusive" | "shared") => {
     setSelectedSlots(prev => prev.map(s => s.time === time && s.position === position ? { ...s, rentalMode: mode } : s));
   }, []);
 
-  const clearSelection = useCallback(() => setSelectedSlots([]), []);
+  const clearSelection = useCallback(() => { setSelectedSlots([]); setSelectedEditSlots([]); setSelectionMode(null); }, []);
 
   const handleBulkSuccess = useCallback(() => { clearSelection(); refetch(); }, [clearSelection, refetch]);
 
@@ -177,6 +219,12 @@ export function SlotCalendar() {
     if ((slot.isAvailable || !slot.isOnChain) && slot.rentalType !== "shared" && isWithinBuffer(slot.time, MIN_RENT_BUFFER_HOURS)) return { selectable: true, isJoining: false };
     if (slot.isOnChain && slot.isAvailable && slot.rentalType === "shared" && !slot.sharedUser && isWithinBuffer(slot.time, MIN_JOIN_BUFFER_HOURS)) return { selectable: true, isJoining: true };
     return { selectable: false, isJoining: false };
+  };
+
+  const isSlotEditable = (slot: BannerSlot): boolean => {
+    if (!accountName || !slot.isOnChain || slot.suspended) return false;
+    if (slot.user !== accountName && slot.sharedUser !== accountName) return false;
+    return isWithinBuffer(slot.time, MIN_RENT_BUFFER_HOURS);
   };
 
   if (isLoading) return <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-cheese" /></div>;
@@ -204,7 +252,7 @@ export function SlotCalendar() {
         and have it reviewed and possibly reinstated.
       </div>
 
-      {futureGroups.length > 0 && <div className="mb-4 text-sm text-foreground text-center flex items-center justify-center gap-2"><Checkbox disabled className="pointer-events-none" /> Use the checkboxes to select multiple slots and rent them all in one transaction</div>}
+      {futureGroups.length > 0 && <div className="mb-4 text-sm text-foreground text-center flex items-center justify-center gap-2"><Checkbox disabled className="pointer-events-none" /> Use the checkboxes to select multiple slots to rent or edit them all in one transaction</div>}
 
       <div className="space-y-3">
         {futureGroups.length === 0 && (
@@ -225,11 +273,15 @@ export function SlotCalendar() {
                 <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {group.slots.map((slot) => {
                     const { selectable, isJoining } = isSlotSelectable(slot);
+                    const editable = isSlotEditable(slot);
                     const selected = isSlotSelected(slot.time, slot.position);
+                    const editSelected = selectedEditSlots.some(s => s.time === slot.time && s.position === slot.position);
+                    const isHighlighted = selected || editSelected;
                     return (
-                      <div key={slot.position} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border p-3 bg-background/50 transition-colors ${selected ? "border-cheese/60 bg-cheese/5" : "border-border/30"}`}>
+                      <div key={slot.position} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border p-3 bg-background/50 transition-colors ${isHighlighted ? "border-cheese/60 bg-cheese/5" : "border-border/30"}`}>
                         <div className="flex items-center gap-2 sm:gap-3">
                           {selectable && <Checkbox checked={selected} onCheckedChange={() => toggleSlotSelection(slot.time, slot.position, isJoining)} className="data-[state=checked]:bg-cheese data-[state=checked]:border-cheese" />}
+                          {!selectable && editable && <Checkbox checked={editSelected} onCheckedChange={() => toggleEditSlotSelection(slot)} className="data-[state=checked]:bg-cheese data-[state=checked]:border-cheese" />}
                           <span className="text-sm font-medium text-muted-foreground">Pos {slot.position}</span>
                           <SlotBadge slot={slot} accountName={accountName} />
                         </div>
@@ -266,7 +318,7 @@ export function SlotCalendar() {
         ))}
       </div>
 
-      {selectedSlots.length > 0 && (
+      {selectedSlots.length > 0 && selectionMode === "rent" && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-full border border-cheese/40 bg-card/95 backdrop-blur-sm shadow-lg px-5 py-3">
           <ShoppingCart className="h-4 w-4 text-cheese" />
           <span className="text-sm font-medium">{selectedSlots.length} slot{selectedSlots.length > 1 ? "s" : ""} selected</span>
@@ -275,8 +327,18 @@ export function SlotCalendar() {
         </div>
       )}
 
+      {selectedEditSlots.length > 0 && selectionMode === "edit" && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-full border border-cheese/40 bg-card/95 backdrop-blur-sm shadow-lg px-5 py-3">
+          <Pencil className="h-4 w-4 text-cheese" />
+          <span className="text-sm font-medium">{selectedEditSlots.length} slot{selectedEditSlots.length > 1 ? "s" : ""} selected</span>
+          <Button size="sm" variant="ghost" className="text-xs text-muted-foreground h-7" onClick={clearSelection}>Clear</Button>
+          <Button size="sm" className="bg-cheese hover:bg-cheese-dark text-primary-foreground h-8" onClick={() => setBulkEditDialogOpen(true)}>Edit All</Button>
+        </div>
+      )}
+
       {rentTarget && <RentSlotDialog open={!!rentTarget} onOpenChange={(open) => !open && setRentTarget(null)} startTime={rentTarget.time} position={rentTarget.position} waxPricePerDay={pricing.waxPerDay} isJoining={rentTarget.isJoining || false} onSuccess={refetch} />}
       <BulkRentDialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen} selections={selectedSlots} waxPricePerDay={pricing.waxPerDay} onRemoveSlot={removeSlotFromSelection} onUpdateSlotMode={updateSlotMode} onSuccess={handleBulkSuccess} />
+      <BulkEditBannerDialog open={bulkEditDialogOpen} onOpenChange={setBulkEditDialogOpen} slots={selectedEditSlots} onRemoveSlot={removeEditSlotFromSelection} onSuccess={handleBulkSuccess} />
       {editTarget && <EditBannerDialog open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)} slot={editTarget} onSuccess={refetch} />}
       {removeTarget && <RemoveBannerDialog open={!!removeTarget} onOpenChange={(open) => !open && setRemoveTarget(null)} slot={removeTarget} onSuccess={refetch} />}
       {reinstateTarget && <ReinstateBannerDialog open={!!reinstateTarget} onOpenChange={(open) => !open && setReinstateTarget(null)} slot={reinstateTarget} onSuccess={refetch} />}
