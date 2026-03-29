@@ -1,6 +1,4 @@
 import { Layout } from "@/components/Layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Lock } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreateLock } from "@/components/locker/CreateLock";
 import { MyLocks } from "@/components/locker/MyLocks";
