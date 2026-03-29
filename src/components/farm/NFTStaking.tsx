@@ -965,6 +965,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
                   parentRef={stakeParentRef as React.RefObject<HTMLDivElement>}
                   type="stake"
                   globallyStakedMap={globallyStakedMap}
+                  onNavigateToFarm={handleNavigateToFarm}
                 />
               )}
             </TabsContent>
