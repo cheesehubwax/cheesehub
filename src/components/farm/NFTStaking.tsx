@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import {
   Loader2, Search, Layers, CheckSquare, Square, AlertTriangle,
   RefreshCw, Coins, Image as ImageIcon, Check,
@@ -145,7 +146,7 @@ const NFTCard = React.memo(function NFTCard({ nft, isSelected, onToggle, stakedI
       onClick={isStakedElsewhere ? undefined : onToggle}
       disabled={isStakedElsewhere}
       className={cn(
-        "group relative rounded-md overflow-hidden border-2 transition-all aspect-square",
+        "group relative rounded-md overflow-hidden border-2 transition-all hover:opacity-90 h-[115px]",
         isStakedElsewhere && "opacity-50 cursor-not-allowed grayscale-[30%]",
         isSelected
           ? "border-primary ring-1 ring-primary"
@@ -164,7 +165,7 @@ const NFTCard = React.memo(function NFTCard({ nft, isSelected, onToggle, stakedI
           <Check className="h-3 w-3 text-primary-foreground" />
         </div>
       )}
-      <div className="absolute inset-0 bg-muted flex items-center justify-center">
+      <div className="w-full h-full bg-muted flex items-center justify-center">
         {showErrorState ? (
           <button
             type="button"
@@ -174,7 +175,6 @@ const NFTCard = React.memo(function NFTCard({ nft, isSelected, onToggle, stakedI
           >
             <ImageIcon className="h-5 w-5 text-primary mb-1" />
             <span className="text-[9px] text-primary font-medium">Retry</span>
-            <span className="text-[8px] text-muted-foreground mt-0.5">#{nft.asset_id}</span>
           </button>
         ) : (
           <>
@@ -187,7 +187,7 @@ const NFTCard = React.memo(function NFTCard({ nft, isSelected, onToggle, stakedI
               src={currentImageUrl}
               alt={nft.name}
               className={cn(
-                "w-full h-full object-contain transition-opacity",
+                "w-full h-full object-cover transition-opacity",
                 imgLoaded ? "opacity-100" : "opacity-0"
               )}
               loading="lazy"
@@ -201,43 +201,49 @@ const NFTCard = React.memo(function NFTCard({ nft, isSelected, onToggle, stakedI
           </>
         )}
       </div>
-      <div className="absolute bottom-0 left-0 right-0 px-0.5 py-0.5 bg-background/90">
-        <p className="text-[8px] font-medium truncate leading-tight">{nft.name}</p>
-        {isStakedElsewhere ? (
-          <a href={`/farm/${stakedInFarm}`} className="text-[7px] text-amber-500 truncate leading-tight block hover:underline" onClick={(e) => e.stopPropagation()}>in: {stakedInFarm}</a>
-        ) : (
-          <p className="text-[7px] text-muted-foreground truncate leading-tight">#{nft.asset_id}</p>
-        )}
-      </div>
     </button>
   );
 
   if (isStakedElsewhere) {
     return (
-      <div className="flex flex-col">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>{card}</TooltipTrigger>
-            <TooltipContent side="top" className="max-w-[220px]">
-              <p className="text-xs">
-                <AlertTriangle className="h-3 w-3 inline mr-1 text-amber-500" />
-                Already staked in <span className="font-semibold">{stakedInFarm}</span>.
-                Unstake there first.
-              </p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-        <a
-          href={`/farm/${stakedInFarm}`}
-          className="mt-1 text-[10px] text-amber-500 hover:text-amber-400 hover:underline truncate text-center"
-          title={`Go to ${stakedInFarm}`}
-        >
-          Staked in: {stakedInFarm}
-        </a>
-      </div>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <HoverCard openDelay={300} closeDelay={100}>
+              <HoverCardTrigger asChild>{card}</HoverCardTrigger>
+              <HoverCardContent side="top" collisionPadding={16} align="center" className="w-64 max-w-xs p-3 text-xs space-y-1">
+                <p className="font-bold text-sm break-words whitespace-normal">{nft.name}</p>
+                <div className="flex justify-between"><span className="text-cheese">Asset ID</span><span className="font-mono">{nft.asset_id}</span></div>
+                <div className="flex justify-between"><span className="text-cheese">Collection</span><span className="truncate ml-2">{nft.collection}</span></div>
+                {nft.schema && <div className="flex justify-between"><span className="text-cheese">Schema</span><span>{nft.schema}</span></div>}
+                {nft.template_id && <div className="flex justify-between"><span className="text-cheese">Template</span><span className="font-mono">{nft.template_id}</span></div>}
+                <div className="flex justify-between text-amber-500"><span>⚠️ Staked in</span><span className="font-semibold">{stakedInFarm}</span></div>
+              </HoverCardContent>
+            </HoverCard>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-[220px]">
+            <p className="text-xs">
+              <AlertTriangle className="h-3 w-3 inline mr-1 text-amber-500" />
+              Already staked in <span className="font-semibold">{stakedInFarm}</span>. Unstake there first.
+            </p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     );
   }
-  return card;
+
+  return (
+    <HoverCard openDelay={300} closeDelay={100}>
+      <HoverCardTrigger asChild>{card}</HoverCardTrigger>
+      <HoverCardContent side="top" collisionPadding={16} align="center" className="w-64 max-w-xs p-3 text-xs space-y-1">
+        <p className="font-bold text-sm break-words whitespace-normal">{nft.name}</p>
+        <div className="flex justify-between"><span className="text-cheese">Asset ID</span><span className="font-mono">{nft.asset_id}</span></div>
+        <div className="flex justify-between"><span className="text-cheese">Collection</span><span className="truncate ml-2">{nft.collection}</span></div>
+        {nft.schema && <div className="flex justify-between"><span className="text-cheese">Schema</span><span>{nft.schema}</span></div>}
+        {nft.template_id && <div className="flex justify-between"><span className="text-cheese">Template</span><span className="font-mono">{nft.template_id}</span></div>}
+      </HoverCardContent>
+    </HoverCard>
+  );
 });
 
 // ── Virtualized Grid (defined outside main component to avoid re-creation) ──
@@ -251,11 +257,7 @@ interface VirtualGridProps {
   globallyStakedMap?: Map<string, string>;
 }
 
-// Responsive: matches grid-cols-3 sm:grid-cols-4 md:grid-cols-6
 function getGridCols(): number {
-  if (typeof window === "undefined") return 6;
-  if (window.innerWidth < 640) return 3;
-  if (window.innerWidth < 768) return 4;
   return 6;
 }
 
@@ -286,7 +288,7 @@ const VirtualGrid = React.memo(function VirtualGrid({
   });
 
   return (
-    <div ref={parentRef} className="h-[420px] overflow-auto">
+    <div ref={parentRef} className="h-[560px] overflow-auto rounded-md border border-border">
       <div style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}>
         {virtualizer.getVirtualItems().map((vRow) => {
           const start = vRow.index * cols;
@@ -294,7 +296,7 @@ const VirtualGrid = React.memo(function VirtualGrid({
           return (
             <div
               key={vRow.key}
-              className="absolute top-0 left-0 w-full grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-1.5 px-1"
+              className="absolute top-0 left-0 w-full grid grid-cols-6 gap-2 p-1"
               style={{
                 height: `${vRow.size}px`,
                 transform: `translateY(${vRow.start}px)`,

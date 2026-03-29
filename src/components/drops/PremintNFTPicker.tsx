@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { cn } from "@/lib/utils";
 import { useUserNFTs } from "@/hooks/useUserNFTs";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -15,8 +16,8 @@ interface PremintNFTPickerProps {
   onSelectionChange: (assetIds: string[]) => void;
 }
 
-const ITEMS_PER_ROW = 3;
-const ITEM_HEIGHT = 160;
+const ITEMS_PER_ROW = 6;
+const ITEM_HEIGHT = 120;
 
 export function PremintNFTPicker({
   collectionName,
@@ -212,8 +213,7 @@ export function PremintNFTPicker({
 
       <div
         ref={parentRef}
-        className="h-80 border border-border/50 rounded-lg overflow-auto"
-        style={{ contain: "strict" }}
+        className="h-[560px] overflow-auto rounded-md border border-border"
       >
         <div
           style={{
@@ -237,7 +237,7 @@ export function PremintNFTPicker({
                   height: `${virtualRow.size}px`,
                   transform: `translateY(${virtualRow.start}px)`,
                 }}
-                className="grid grid-cols-3 gap-2 p-2"
+                className="grid grid-cols-6 gap-2 p-1"
               >
                 {rowNFTs.map((nft) => (
                   <NFTCard
@@ -266,6 +266,8 @@ interface NFTCardProps {
     name: string;
     image: string;
     collection: string;
+    schema?: string;
+    template_id?: string;
     mint?: string;
   };
   isSelected: boolean;
@@ -276,42 +278,46 @@ function NFTCard({ nft, isSelected, onToggle }: NFTCardProps) {
   const [imageError, setImageError] = useState(false);
 
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className={cn(
-        "relative flex flex-col items-center p-2 rounded-lg border-2 transition-all",
-        isSelected
-          ? "border-primary bg-primary/10"
-          : "border-transparent bg-muted/50 hover:border-primary/50"
-      )}
-    >
-      <div className="relative w-full aspect-square rounded overflow-hidden mb-1">
-        {imageError ? (
-          <div className="flex h-full w-full items-center justify-center bg-muted">
-            <ImageOff className="h-6 w-6 text-muted-foreground/50" />
+    <HoverCard openDelay={300} closeDelay={100}>
+      <HoverCardTrigger asChild>
+        <button
+          type="button"
+          onClick={onToggle}
+          className={cn(
+            "group relative rounded-md overflow-hidden border-2 transition-all hover:opacity-90 h-[115px]",
+            isSelected
+              ? "border-primary ring-1 ring-primary"
+              : "border-transparent hover:border-muted-foreground/30"
+          )}
+        >
+          {isSelected && (
+            <div className="absolute top-1 right-1 z-10 bg-primary rounded-full p-0.5">
+              <Check className="h-3 w-3 text-primary-foreground" />
+            </div>
+          )}
+          <div className="w-full h-full flex items-center justify-center bg-muted">
+            {imageError ? (
+              <ImageOff className="h-6 w-6 text-muted-foreground/50" />
+            ) : (
+              <img
+                src={nft.image}
+                alt={nft.name}
+                className="w-full h-full object-cover"
+                loading="lazy"
+                onError={() => setImageError(true)}
+              />
+            )}
           </div>
-        ) : (
-          <img
-            src={nft.image}
-            alt={nft.name}
-            className="w-full h-full object-cover"
-            loading="lazy"
-            onError={() => setImageError(true)}
-          />
-        )}
-        {isSelected && (
-          <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-            <Check className="h-6 w-6 text-primary" />
-          </div>
-        )}
-      </div>
-      <span className="text-xs font-medium truncate w-full text-center">
-        {nft.name || "Unnamed"}
-      </span>
-      <span className="text-[10px] text-muted-foreground">
-        #{nft.mint || nft.asset_id}
-      </span>
-    </button>
+        </button>
+      </HoverCardTrigger>
+      <HoverCardContent side="top" collisionPadding={16} align="center" className="w-64 max-w-xs p-3 text-xs space-y-1">
+        <p className="font-bold text-sm break-words whitespace-normal">{nft.name || "Unnamed"}</p>
+        <div className="flex justify-between"><span className="text-cheese">Asset ID</span><span className="font-mono">{nft.asset_id}</span></div>
+        <div className="flex justify-between"><span className="text-cheese">Collection</span><span className="truncate ml-2">{nft.collection}</span></div>
+        {nft.schema && <div className="flex justify-between"><span className="text-cheese">Schema</span><span>{nft.schema}</span></div>}
+        {nft.template_id && <div className="flex justify-between"><span className="text-cheese">Template</span><span className="font-mono">{nft.template_id}</span></div>}
+        {nft.mint && <div className="flex justify-between"><span className="text-cheese">Mint #</span><span>{nft.mint}</span></div>}
+      </HoverCardContent>
+    </HoverCard>
   );
 }

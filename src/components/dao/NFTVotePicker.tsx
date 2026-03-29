@@ -1,10 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, Image as ImageIcon, CheckCircle } from "lucide-react";
+import { Loader2, Image as ImageIcon, Check } from "lucide-react";
+import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { DaoInfo, UserNFT, fetchVotedNFTs } from "@/lib/dao";
 import { useWax } from "@/context/WaxContext";
 import { getIpfsUrl } from "@/lib/ipfsGateways";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { cn } from "@/lib/utils";
 
 interface NFTVotePickerProps {
   dao: DaoInfo;
@@ -13,11 +15,15 @@ interface NFTVotePickerProps {
   selectedIds: string[];
 }
 
+const COLUMNS = 6;
+const ROW_HEIGHT = 120;
+
 export function NFTVotePicker({ dao, proposalId, onSelect, selectedIds }: NFTVotePickerProps) {
   const { accountName } = useWax();
   const [userNFTs, setUserNFTs] = useState<UserNFT[]>([]);
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const parentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!accountName) { setLoading(false); return; }
@@ -32,7 +38,6 @@ export function NFTVotePicker({ dao, proposalId, onSelect, selectedIds }: NFTVot
       ]);
       setVotedIds(new Set(voted));
 
-      // Fetch user NFTs matching DAO schemas
       const allNFTs: UserNFT[] = [];
       for (const schema of dao.gov_schemas || []) {
         try {
@@ -70,13 +75,23 @@ export function NFTVotePicker({ dao, proposalId, onSelect, selectedIds }: NFTVot
     setLoading(false);
   }
 
-  const toggleNFT = (assetId: string) => {
+  const eligibleNFTs = useMemo(() => userNFTs.filter(nft => !votedIds.has(nft.asset_id)), [userNFTs, votedIds]);
+
+  const rowCount = Math.ceil(eligibleNFTs.length / COLUMNS);
+  const virtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 3,
+  });
+
+  const toggleNFT = useCallback((assetId: string) => {
     if (selectedIds.includes(assetId)) {
       onSelect(selectedIds.filter(id => id !== assetId));
     } else {
       onSelect([...selectedIds, assetId]);
     }
-  };
+  }, [selectedIds, onSelect]);
 
   if (loading) {
     return (
@@ -86,8 +101,6 @@ export function NFTVotePicker({ dao, proposalId, onSelect, selectedIds }: NFTVot
       </div>
     );
   }
-
-  const eligibleNFTs = userNFTs.filter(nft => !votedIds.has(nft.asset_id));
 
   if (eligibleNFTs.length === 0) {
     return (
@@ -108,50 +121,79 @@ export function NFTVotePicker({ dao, proposalId, onSelect, selectedIds }: NFTVot
         <p className="text-sm text-muted-foreground">
           Select NFTs to vote with ({selectedIds.length} selected)
         </p>
-        {eligibleNFTs.length > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-xs"
-            onClick={() => onSelect(
-              selectedIds.length === eligibleNFTs.length
-                ? []
-                : eligibleNFTs.map(n => n.asset_id)
-            )}
-          >
-            {selectedIds.length === eligibleNFTs.length ? "Deselect All" : "Select All"}
-          </Button>
-        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-xs"
+          onClick={() => onSelect(
+            selectedIds.length === eligibleNFTs.length
+              ? []
+              : eligibleNFTs.map(n => n.asset_id)
+          )}
+        >
+          {selectedIds.length === eligibleNFTs.length ? "Deselect All" : "Select All"}
+        </Button>
       </div>
-      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-60 overflow-y-auto">
-        {eligibleNFTs.map(nft => {
-          const isSelected = selectedIds.includes(nft.asset_id);
-          return (
-            <div
-              key={nft.asset_id}
-              className={`relative rounded-lg border-2 cursor-pointer transition-all overflow-hidden ${
-                isSelected
-                  ? "border-primary ring-1 ring-primary/30"
-                  : "border-border/40 hover:border-primary/30"
-              }`}
-              onClick={() => toggleNFT(nft.asset_id)}
-            >
-              <div className="aspect-square bg-muted/30 flex items-center justify-center">
-                {nft.image ? (
-                  <img src={nft.image} alt={nft.name} className="w-full h-full object-cover" />
-                ) : (
-                  <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                )}
+      <div ref={parentRef} className="h-[560px] overflow-auto rounded-md border border-border">
+        <div style={{ height: `${virtualizer.getTotalSize()}px`, width: "100%", position: "relative" }}>
+          {virtualizer.getVirtualItems().map((virtualRow) => {
+            const startIndex = virtualRow.index * COLUMNS;
+            const rowNFTs = eligibleNFTs.slice(startIndex, startIndex + COLUMNS);
+            return (
+              <div
+                key={virtualRow.key}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  height: `${virtualRow.size}px`,
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+                className="grid grid-cols-6 gap-2 p-1"
+              >
+                {rowNFTs.map(nft => {
+                  const isSelected = selectedIds.includes(nft.asset_id);
+                  return (
+                    <HoverCard key={nft.asset_id} openDelay={300} closeDelay={100}>
+                      <HoverCardTrigger asChild>
+                        <button
+                          className={cn(
+                            "group relative rounded-md overflow-hidden border-2 transition-all hover:opacity-90 h-[115px]",
+                            isSelected
+                              ? "border-primary ring-1 ring-primary"
+                              : "border-transparent hover:border-muted-foreground/30"
+                          )}
+                          onClick={() => toggleNFT(nft.asset_id)}
+                        >
+                          {isSelected && (
+                            <div className="absolute top-1 right-1 z-10 bg-primary rounded-full p-0.5">
+                              <Check className="h-3 w-3 text-primary-foreground" />
+                            </div>
+                          )}
+                          <div className="w-full h-full flex items-center justify-center bg-muted">
+                            {nft.image ? (
+                              <img src={nft.image} alt={nft.name} className="w-full h-full object-cover" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }} />
+                            ) : (
+                              <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                            )}
+                          </div>
+                        </button>
+                      </HoverCardTrigger>
+                      <HoverCardContent side="top" collisionPadding={16} align="center" className="w-64 max-w-xs p-3 text-xs space-y-1">
+                        <p className="font-bold text-sm break-words whitespace-normal">{nft.name}</p>
+                        <div className="flex justify-between"><span className="text-cheese">Asset ID</span><span className="font-mono">{nft.asset_id}</span></div>
+                        <div className="flex justify-between"><span className="text-cheese">Collection</span><span className="truncate ml-2">{nft.collection}</span></div>
+                        {nft.schema && <div className="flex justify-between"><span className="text-cheese">Schema</span><span>{nft.schema}</span></div>}
+                        {nft.template_id && <div className="flex justify-between"><span className="text-cheese">Template</span><span className="font-mono">{nft.template_id}</span></div>}
+                      </HoverCardContent>
+                    </HoverCard>
+                  );
+                })}
               </div>
-              {isSelected && (
-                <div className="absolute top-1 right-1">
-                  <CheckCircle className="h-4 w-4 text-primary fill-primary/20" />
-                </div>
-              )}
-              <p className="text-[10px] text-center truncate px-1 py-0.5">{nft.name}</p>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
