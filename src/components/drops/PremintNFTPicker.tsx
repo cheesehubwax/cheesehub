@@ -284,7 +284,7 @@ function NFTCard({ nft, isSelected, onToggle }: NFTCardProps) {
           type="button"
           onClick={onToggle}
           className={cn(
-            "group relative rounded-md overflow-hidden border-2 transition-all hover:opacity-90 h-[115px]",
+            "group relative rounded-md overflow-hidden border-2 transition-all hover:opacity-90 aspect-square",
             isSelected
               ? "border-primary ring-1 ring-primary"
               : "border-transparent hover:border-muted-foreground/30"
