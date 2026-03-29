@@ -192,14 +192,26 @@ export function SlotCalendar() {
   }, [selectionMode]);
 
   const removeSlotFromSelection = useCallback((time: number, position: number) => {
-    setSelectedSlots(prev => prev.filter(s => !(s.time === time && s.position === position)));
+    setSelectedSlots(prev => {
+      const next = prev.filter(s => !(s.time === time && s.position === position));
+      if (next.length === 0) setSelectionMode(null);
+      return next;
+    });
+  }, []);
+
+  const removeEditSlotFromSelection = useCallback((time: number, position: number) => {
+    setSelectedEditSlots(prev => {
+      const next = prev.filter(s => !(s.time === time && s.position === position));
+      if (next.length === 0) setSelectionMode(null);
+      return next;
+    });
   }, []);
 
   const updateSlotMode = useCallback((time: number, position: number, mode: "exclusive" | "shared") => {
     setSelectedSlots(prev => prev.map(s => s.time === time && s.position === position ? { ...s, rentalMode: mode } : s));
   }, []);
 
-  const clearSelection = useCallback(() => setSelectedSlots([]), []);
+  const clearSelection = useCallback(() => { setSelectedSlots([]); setSelectedEditSlots([]); setSelectionMode(null); }, []);
 
   const handleBulkSuccess = useCallback(() => { clearSelection(); refetch(); }, [clearSelection, refetch]);
 
@@ -207,6 +219,12 @@ export function SlotCalendar() {
     if ((slot.isAvailable || !slot.isOnChain) && slot.rentalType !== "shared" && isWithinBuffer(slot.time, MIN_RENT_BUFFER_HOURS)) return { selectable: true, isJoining: false };
     if (slot.isOnChain && slot.isAvailable && slot.rentalType === "shared" && !slot.sharedUser && isWithinBuffer(slot.time, MIN_JOIN_BUFFER_HOURS)) return { selectable: true, isJoining: true };
     return { selectable: false, isJoining: false };
+  };
+
+  const isSlotEditable = (slot: BannerSlot): boolean => {
+    if (!accountName || !slot.isOnChain || slot.suspended) return false;
+    if (slot.user !== accountName && slot.sharedUser !== accountName) return false;
+    return isWithinBuffer(slot.time, MIN_RENT_BUFFER_HOURS);
   };
 
   if (isLoading) return <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-cheese" /></div>;
