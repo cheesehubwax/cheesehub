@@ -27,7 +27,7 @@ const Dao = () => {
   return (
     <Layout>
       {/* Hero */}
-      <section className="relative py-12 overflow-hidden">
+      <section className="relative py-20 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
         <div className="container relative z-10">
           <div className="flex flex-col items-center gap-8">
@@ -37,14 +37,16 @@ const Dao = () => {
             >
               <img src={cheeseDaoOrb} alt="CHEESE DAO" className="w-24 h-24 object-contain" />
             </div>
-            <div className="text-center space-y-3">
-              <h1 className="text-3xl md:text-4xl font-bold flex items-center justify-center gap-2">
+            <div className="text-center space-y-2">
+              <div className="flex items-center justify-center gap-2">
                 <span className="text-2xl">🏛️</span>
-                <span className="text-cheese">CHEESE</span>
-                <span className="text-foreground">Dao</span>
+                <h1 className="text-3xl md:text-4xl font-bold">
+                  <span className="text-cheese">CHEESE</span>
+                  <span className="text-foreground">Dao</span>
+                </h1>
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
                 <span className="text-2xl">🏛️</span>
-              </h1>
+              </div>
               <p className="text-muted-foreground max-w-xl mx-auto text-sm leading-relaxed">
                 Create and Manage DAOs (Decentralized Autonomous Organizations) on WAX Utilizing WAXDAOs Battle Tested Smart Contract. Propose, Vote, Govern and Manage Token and NFT Treasuries with On-Chain Transparency.
               </p>
