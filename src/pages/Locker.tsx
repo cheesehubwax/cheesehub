@@ -10,9 +10,11 @@ import { playRandomFart } from "@/lib/fartSounds";
 const Locker = () => {
   return (
     <Layout>
-      {/* Hero */}
-      <section className="container py-12 md:py-20">
-        <div className="flex flex-col items-center gap-8">
+      {/* Hero Section */}
+      <section className="relative py-20 overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
+        <div className="container relative z-10">
+          <div className="flex flex-col items-center gap-8">
             <div
               className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer"
               onClick={playRandomFart}
@@ -29,9 +31,10 @@ const Locker = () => {
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
                 <span className="text-2xl">🔐</span>
               </div>
-              <p className="text-muted-foreground max-w-2xl mx-auto">
+              <p className="text-muted-foreground max-w-lg mx-auto">
                 Time-lock tokens and LP tokens using the WaxDAO Locker smart contract.
               </p>
+            </div>
           </div>
         </div>
       </section>

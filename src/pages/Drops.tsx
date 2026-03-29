@@ -87,44 +87,49 @@ const Drops = () => {
 
   return (
     <Layout>
-      <section className="container py-12 md:py-20">
-        <div className="flex flex-col items-center gap-8 mb-10">
-          <div
-            className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer"
-            onClick={playRandomFart}
-          >
-            <img src={cheeseshoppe} alt="CHEESEDrop" className="w-24 h-24 object-contain" />
-          </div>
-          <div className="text-center space-y-2">
-            <div className="flex items-center justify-center gap-2">
-              <span className="text-2xl">🛒</span>
-              <h1 className="text-3xl md:text-4xl font-bold">
-                <span className="text-cheese">CHEESE</span>
-                <span className="text-foreground">Drop</span>
-              </h1>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
-              <span className="text-2xl">🛒</span>
+      <section className="relative py-20 overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
+        <div className="container relative z-10">
+          <div className="flex flex-col items-center gap-8">
+            <div
+              className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer"
+              onClick={playRandomFart}
+            >
+              <img src={cheeseshoppe} alt="CHEESEDrop" className="w-24 h-24 object-contain" />
             </div>
-            <p className="text-muted-foreground">Official and unofficial NFT Drops purchasable with $CHEESE tokens</p>
+            <div className="text-center space-y-2">
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-2xl">🛒</span>
+                <h1 className="text-3xl md:text-4xl font-bold">
+                  <span className="text-cheese">CHEESE</span>
+                  <span className="text-foreground">Drop</span>
+                </h1>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
+                <span className="text-2xl">🛒</span>
+              </div>
+              <p className="text-muted-foreground">Official and unofficial NFT Drops purchasable with $CHEESE tokens</p>
+            </div>
           </div>
         </div>
+      </section>
 
+      <main className="container pb-12">
         <Tabs defaultValue="official" className="w-full">
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-            <TabsList className="grid w-full max-w-lg grid-cols-4">
-              <TabsTrigger value="official" className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+            <TabsList className="bg-card/80 border border-border/50 h-10">
+              <TabsTrigger value="official" className="gap-1.5 text-sm px-4">
                 <Star className="h-4 w-4" />
                 <span className="hidden sm:inline">Official</span>
               </TabsTrigger>
-              <TabsTrigger value="cheese" className="flex items-center gap-2">
+              <TabsTrigger value="cheese" className="gap-1.5 text-sm px-4">
                 <Sandwich className="h-4 w-4" />
                 <span className="hidden sm:inline">CHEESE</span>
               </TabsTrigger>
-              <TabsTrigger value="my-drops" className="flex items-center gap-2">
+              <TabsTrigger value="my-drops" className="gap-1.5 text-sm px-4">
                 <Package className="h-4 w-4" />
                 <span className="hidden sm:inline">My Drops</span>
               </TabsTrigger>
-              <TabsTrigger value="create" className="flex items-center gap-2">
+              <TabsTrigger value="create" className="gap-1.5 text-sm px-4">
                 <Plus className="h-4 w-4" />
                 <span className="hidden sm:inline">Create</span>
               </TabsTrigger>
@@ -191,7 +196,7 @@ const Drops = () => {
             <CreateDrop />
           </TabsContent>
         </Tabs>
-      </section>
+      </main>
 
       <div className="container pb-12 flex flex-col items-center gap-6">
         <DropStatsBar
