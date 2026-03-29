@@ -687,8 +687,10 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
   }, []);
 
   // ── Filter by search + collection + schema ──
+  const currentStakedIds = useMemo(() => new Set(stakedNfts.map(s => s.asset_id)), [stakedNfts]);
+
   const filteredEligible = useMemo(() => {
-    let result = [...eligibleNfts];
+    let result = eligibleNfts.filter(n => !currentStakedIds.has(n.asset_id));
     if (collectionFilter !== "all") result = result.filter(n => n.collection === collectionFilter);
     if (schemaFilter !== "all") result = result.filter(n => n.schema === schemaFilter);
     if (searchQuery.trim()) {
@@ -702,7 +704,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
       );
     }
     return result;
-  }, [eligibleNfts, searchQuery, collectionFilter, schemaFilter]);
+  }, [eligibleNfts, searchQuery, collectionFilter, schemaFilter, currentStakedIds]);
 
   const filteredStaked = useMemo(() => {
     let result = [...stakedNftDetails];
@@ -764,7 +766,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
     if (!accountName || selectedToStake.size === 0) return;
     setIsStaking(true);
     try {
-      const ids = Array.from(selectedToStake).filter((id) => !globallyStakedMap.has(id));
+      const ids = Array.from(selectedToStake).filter((id) => !globallyStakedMap.has(id) && !currentStakedIds.has(id));
       if (ids.length === 0) return;
       const action = buildStakeNftsAction(accountName, farm.farm_name, ids);
       const result = await executeTransaction([action], {
