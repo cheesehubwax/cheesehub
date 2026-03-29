@@ -251,7 +251,7 @@ export const PowerUpCard = ({
       </Button>
 
       <p className="text-center text-xs text-muted-foreground">
-        Resources are rented for 24 hours from the PowerUp pool
+        Resources are rented for 24 hours • Greymass Fuel sponsorship attempted but not guaranteed
       </p>
 
       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
