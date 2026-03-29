@@ -146,7 +146,7 @@ const NFTCard = React.memo(function NFTCard({ nft, isSelected, onToggle, stakedI
       onClick={isStakedElsewhere ? undefined : onToggle}
       disabled={isStakedElsewhere}
       className={cn(
-        "group relative rounded-md overflow-hidden border-2 transition-all hover:opacity-90 aspect-square",
+        "group relative rounded-md overflow-hidden border-2 transition-all hover:opacity-90 h-[115px]",
         isStakedElsewhere && "opacity-50 cursor-not-allowed grayscale-[30%]",
         isSelected
           ? "border-primary ring-1 ring-primary"

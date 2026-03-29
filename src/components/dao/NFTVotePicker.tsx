@@ -159,7 +159,7 @@ export function NFTVotePicker({ dao, proposalId, onSelect, selectedIds }: NFTVot
                       <HoverCardTrigger asChild>
                         <button
                           className={cn(
-                            "group relative rounded-md overflow-hidden border-2 transition-all hover:opacity-90 aspect-square",
+                            "group relative rounded-md overflow-hidden border-2 transition-all hover:opacity-90 h-[115px]",
                             isSelected
                               ? "border-primary ring-1 ring-primary"
                               : "border-transparent hover:border-muted-foreground/30"
