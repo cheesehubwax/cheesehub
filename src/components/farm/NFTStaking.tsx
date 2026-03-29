@@ -766,7 +766,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
     if (!accountName || selectedToStake.size === 0) return;
     setIsStaking(true);
     try {
-      const ids = Array.from(selectedToStake).filter((id) => !globallyStakedMap.has(id));
+      const ids = Array.from(selectedToStake).filter((id) => !globallyStakedMap.has(id) && !currentStakedIds.has(id));
       if (ids.length === 0) return;
       const action = buildStakeNftsAction(accountName, farm.farm_name, ids);
       const result = await executeTransaction([action], {
