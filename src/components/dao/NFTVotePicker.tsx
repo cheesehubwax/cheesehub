@@ -1,13 +1,12 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback, } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, Image as ImageIcon, Check } from "lucide-react";
-import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
+import { Loader2, Image as ImageIcon } from "lucide-react";
 import { DaoInfo, UserNFT, fetchVotedNFTs } from "@/lib/dao";
 import { useWax } from "@/context/WaxContext";
 import { getIpfsUrl } from "@/lib/ipfsGateways";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { cn } from "@/lib/utils";
 import { useSquareGridRowHeight } from "@/hooks/useSquareGridRowHeight";
+import { NFTGridCard } from "@/components/shared/NFTGridCard";
 
 interface NFTVotePickerProps {
   dao: DaoInfo;
@@ -161,39 +160,12 @@ export function NFTVotePicker({ dao, proposalId, onSelect, selectedIds }: NFTVot
                 {rowNFTs.map(nft => {
                   const isSelected = selectedIds.includes(nft.asset_id);
                   return (
-                    <HoverCard key={nft.asset_id} openDelay={300} closeDelay={100}>
-                      <HoverCardTrigger asChild>
-                        <button
-                          className={cn(
-                            "group relative w-full aspect-square rounded-md overflow-hidden border-2 transition-all hover:opacity-90",
-                            isSelected
-                              ? "border-primary ring-1 ring-primary"
-                              : "border-transparent hover:border-muted-foreground/30"
-                          )}
-                          onClick={() => toggleNFT(nft.asset_id)}
-                        >
-                          {isSelected && (
-                            <div className="absolute top-1 right-1 z-10 bg-primary rounded-full p-0.5">
-                              <Check className="h-3 w-3 text-primary-foreground" />
-                            </div>
-                          )}
-                          <div className="w-full h-full flex items-center justify-center bg-muted">
-                            {nft.image ? (
-                              <img src={nft.image} alt={nft.name} className="w-full h-full object-cover" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }} />
-                            ) : (
-                              <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                            )}
-                          </div>
-                        </button>
-                      </HoverCardTrigger>
-                      <HoverCardContent side="top" collisionPadding={16} align="center" className="w-64 max-w-xs p-3 text-xs space-y-1">
-                        <p className="font-bold text-sm break-words whitespace-normal">{nft.name}</p>
-                        <div className="flex justify-between"><span className="text-cheese">Asset ID</span><span className="font-mono">{nft.asset_id}</span></div>
-                        <div className="flex justify-between"><span className="text-cheese">Collection</span><span className="truncate ml-2">{nft.collection}</span></div>
-                        {nft.schema && <div className="flex justify-between"><span className="text-cheese">Schema</span><span>{nft.schema}</span></div>}
-                        {nft.template_id && <div className="flex justify-between"><span className="text-cheese">Template</span><span className="font-mono">{nft.template_id}</span></div>}
-                      </HoverCardContent>
-                    </HoverCard>
+                    <NFTGridCard
+                      key={nft.asset_id}
+                      nft={nft}
+                      isSelected={isSelected}
+                      onToggle={() => toggleNFT(nft.asset_id)}
+                    />
                   );
                 })}
               </div>
