@@ -168,6 +168,15 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
     return expired;
   }, [groupedPositions]);
 
+  // Count all stakeable opportunities: fully unstaked positions + staked positions with new incentives
+  const totalStakeableCount = useMemo(() => {
+    let count = unstakedList.length;
+    groupedPositions.forEach((pos) => {
+      if (pos.unstakedIncentives.length > 0) count++;
+    });
+    return count;
+  }, [unstakedList, groupedPositions]);
+
   const getIncentiveKey = (farm: AlcorFarmPosition) => `${farm.positionId}-${farm.incentiveId}`;
 
   const totalRewardsByToken = useMemo(() => {
@@ -319,21 +328,32 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
   }, [session, accountName, onTransactionSuccess, refetch, onTransactionComplete]);
 
   const handleStakeAllUnstakedPositions = useCallback(async () => {
-    if (!session || !accountName || unstakedList.length === 0) return;
+    if (!session || !accountName) return;
     setIsTransacting(true);
     try {
-      const actions = unstakedList.flatMap(pos =>
-        pos.availableIncentives.map(incentive =>
-          buildStakeAction(accountName, incentive.incentiveId, pos.positionId)
-        )
-      );
+      const actions: any[] = [];
+
+      // Fully unstaked LP positions
+      unstakedList.forEach(pos => {
+        pos.availableIncentives.forEach(incentive => {
+          actions.push(buildStakeAction(accountName, incentive.incentiveId, pos.positionId));
+        });
+      });
+
+      // Staked positions with new unstaked incentives
+      groupedPositions.forEach(pos => {
+        pos.unstakedIncentives.forEach(incentive => {
+          actions.push(buildStakeAction(accountName, incentive.incentiveId, pos.positionId));
+        });
+      });
+
       if (actions.length === 0) {
         toast.error('No stakeable incentives found');
         return;
       }
       const result = await session.transact({ actions });
       const txId = result.resolved?.transaction.id?.toString() || null;
-      onTransactionSuccess?.('All Positions Staked!', `Staked ${unstakedList.length} position(s) into ${actions.length} farm incentive(s)`, txId);
+      onTransactionSuccess?.('All Positions Staked!', `Staked ${totalStakeableCount} position(s) into ${actions.length} farm incentive(s)`, txId);
       refetch();
       onTransactionComplete?.();
     } catch (error: any) {
@@ -344,7 +364,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
       closeWharfkitModals();
       setTimeout(() => closeWharfkitModals(), 300);
     }
-  }, [session, accountName, unstakedList, onTransactionSuccess, refetch, onTransactionComplete]);
+  }, [session, accountName, unstakedList, groupedPositions, totalStakeableCount, onTransactionSuccess, refetch, onTransactionComplete]);
 
   const handleClaimUnstakeAllExpired = useCallback(async (expiredIncentives: AlcorFarmPosition[]) => {
     if (!session || !accountName || expiredIncentives.length === 0) return;
@@ -446,9 +466,9 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
               {isTransacting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><LogOut className="h-3.5 w-3.5" />Claim & Unstake Ended ({allExpiredIncentives.length})</>}
             </Button>
           )}
-          {unstakedList.length > 0 && (
+          {totalStakeableCount > 0 && (
             <Button size="sm" onClick={handleStakeAllUnstakedPositions} disabled={isTransacting} className="h-8 px-3 text-xs bg-green-600 hover:bg-green-700 text-white gap-1.5">
-              {isTransacting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Zap className="h-3.5 w-3.5" />Stake All Positions ({unstakedList.length})</>}
+              {isTransacting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Zap className="h-3.5 w-3.5" />Stake All Positions ({totalStakeableCount})</>}
             </Button>
           )}
           <Button size="sm" variant="ghost" onClick={() => { setIsRefreshing(true); refetch(); setTimeout(() => setIsRefreshing(false), 1000); }} disabled={isTransacting || isRefreshing} className="h-8 w-8 p-0">
