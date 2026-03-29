@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +13,7 @@ import { Check, X, Loader2, Search, Image, Send, RefreshCw, Flame } from 'lucide
 import { cn } from '@/lib/utils';
 import { closeWharfkitModals } from '@/lib/wharfKit';
 import { toast } from 'sonner';
+import { useSquareGridRowHeight } from '@/hooks/useSquareGridRowHeight';
 
 interface NFTSendManagerProps {
   onTransactionSuccess: (title: string, description: string, txId: string | null) => void;
@@ -86,8 +87,13 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
 
   const COLUMNS = 6;
   const ROW_HEIGHT = 120;
+  const rowHeight = useSquareGridRowHeight(parentRef, { columns: COLUMNS, fallback: ROW_HEIGHT });
   const rowCount = Math.ceil(filteredNFTs.length / COLUMNS);
-  const virtualizer = useVirtualizer({ count: rowCount, getScrollElement: () => parentRef.current, estimateSize: () => ROW_HEIGHT, overscan: 3 });
+  const virtualizer = useVirtualizer({ count: rowCount, getScrollElement: () => parentRef.current, estimateSize: () => rowHeight, overscan: 3 });
+
+  useEffect(() => {
+    virtualizer.measure();
+  }, [rowHeight, virtualizer]);
 
   const toggleNFTSelection = useCallback((assetId: string) => {
     setSelectedNFTs(prev => {
@@ -189,7 +195,7 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
                     <HoverCard key={nft.asset_id} openDelay={300} closeDelay={100}>
                       <HoverCardTrigger asChild>
                         <button onClick={() => toggleNFTSelection(nft.asset_id)}
-                          className={cn('group relative rounded-md overflow-hidden border-2 transition-all hover:opacity-90 h-[115px]', selectedNFTs.has(nft.asset_id) ? 'border-primary ring-1 ring-primary' : 'border-transparent hover:border-muted-foreground/30')}>
+                          className={cn('group relative w-full aspect-square rounded-md overflow-hidden border-2 transition-all hover:opacity-90', selectedNFTs.has(nft.asset_id) ? 'border-primary ring-1 ring-primary' : 'border-transparent hover:border-muted-foreground/30')}>
                           {selectedNFTs.has(nft.asset_id) && <div className="absolute top-1 right-1 z-10 bg-primary rounded-full p-0.5"><Check className="h-3 w-3 text-primary-foreground" /></div>}
                           <div className="w-full h-full flex items-center justify-center bg-muted">
                             <img src={nft.image} alt={nft.name} className="w-full h-full object-cover" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }} />

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Check, Search, ImageOff, Loader2, Package, RefreshCw, SortAsc, SortDesc } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useUserNFTs } from "@/hooks/useUserNFTs";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useWax } from "@/context/WaxContext";
+import { useSquareGridRowHeight } from "@/hooks/useSquareGridRowHeight";
 
 interface PremintNFTPickerProps {
   collectionName: string;
@@ -31,6 +32,7 @@ export function PremintNFTPicker({
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "name" | "collection">("newest");
   const parentRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const rowHeight = useSquareGridRowHeight(parentRef, { columns: ITEMS_PER_ROW, fallback: ITEM_HEIGHT });
 
   const { 
     nfts, 
@@ -81,9 +83,13 @@ export function PremintNFTPicker({
   const virtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => ITEM_HEIGHT,
+    estimateSize: () => rowHeight,
     overscan: 3,
   });
+
+  useEffect(() => {
+    virtualizer.measure();
+  }, [rowHeight, virtualizer]);
 
   const toggleNFTSelection = useCallback((assetId: string) => {
     if (selectedAssetIds.includes(assetId)) {
@@ -284,7 +290,7 @@ function NFTCard({ nft, isSelected, onToggle }: NFTCardProps) {
           type="button"
           onClick={onToggle}
           className={cn(
-            "group relative rounded-md overflow-hidden border-2 transition-all hover:opacity-90 h-[115px]",
+            "group relative w-full aspect-square rounded-md overflow-hidden border-2 transition-all hover:opacity-90",
             isSelected
               ? "border-primary ring-1 ring-primary"
               : "border-transparent hover:border-muted-foreground/30"

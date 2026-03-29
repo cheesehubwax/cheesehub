@@ -31,6 +31,7 @@ import { getTokenLogoUrl } from "@/lib/tokenLogos";
 import { waxRpcCall } from "@/lib/waxRpcFallback";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { useSquareGridRowHeight } from "@/hooks/useSquareGridRowHeight";
 
 const TOKEN_LOGO_PLACEHOLDER = "/placeholder.svg";
 const IPFS_GATEWAY = "https://ipfs.io/ipfs/";
@@ -146,7 +147,7 @@ const NFTCard = React.memo(function NFTCard({ nft, isSelected, onToggle, stakedI
       onClick={isStakedElsewhere ? undefined : onToggle}
       disabled={isStakedElsewhere}
       className={cn(
-        "group relative rounded-md overflow-hidden border-2 transition-all hover:opacity-90 h-[115px]",
+        "group relative w-full aspect-square rounded-md overflow-hidden border-2 transition-all hover:opacity-90",
         isStakedElsewhere && "opacity-50 cursor-not-allowed grayscale-[30%]",
         isSelected
           ? "border-primary ring-1 ring-primary"
@@ -261,8 +262,6 @@ function getGridCols(): number {
   return 6;
 }
 
-const GRID_ROW_HEIGHT = 120;
-
 const VirtualGrid = React.memo(function VirtualGrid({
   items,
   selected,
@@ -272,6 +271,7 @@ const VirtualGrid = React.memo(function VirtualGrid({
   globallyStakedMap,
 }: VirtualGridProps) {
   const [cols, setCols] = useState(getGridCols);
+  const gridRowHeight = useSquareGridRowHeight(parentRef, { columns: cols });
 
   useEffect(() => {
     const handleResize = () => setCols(getGridCols());
@@ -283,9 +283,13 @@ const VirtualGrid = React.memo(function VirtualGrid({
   const virtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => GRID_ROW_HEIGHT,
+    estimateSize: () => gridRowHeight,
     overscan: 3,
   });
+
+  useEffect(() => {
+    virtualizer.measure();
+  }, [gridRowHeight, virtualizer]);
 
   return (
     <div ref={parentRef} className="h-[560px] overflow-auto rounded-md border border-border">

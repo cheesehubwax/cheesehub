@@ -7,6 +7,7 @@ import { useWax } from "@/context/WaxContext";
 import { getIpfsUrl } from "@/lib/ipfsGateways";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { cn } from "@/lib/utils";
+import { useSquareGridRowHeight } from "@/hooks/useSquareGridRowHeight";
 
 interface NFTVotePickerProps {
   dao: DaoInfo;
@@ -24,6 +25,7 @@ export function NFTVotePicker({ dao, proposalId, onSelect, selectedIds }: NFTVot
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const parentRef = useRef<HTMLDivElement>(null);
+  const rowHeight = useSquareGridRowHeight(parentRef, { columns: COLUMNS, fallback: ROW_HEIGHT });
 
   useEffect(() => {
     if (!accountName) { setLoading(false); return; }
@@ -81,9 +83,13 @@ export function NFTVotePicker({ dao, proposalId, onSelect, selectedIds }: NFTVot
   const virtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: () => rowHeight,
     overscan: 3,
   });
+
+  useEffect(() => {
+    virtualizer.measure();
+  }, [rowHeight, virtualizer]);
 
   const toggleNFT = useCallback((assetId: string) => {
     if (selectedIds.includes(assetId)) {
@@ -159,7 +165,7 @@ export function NFTVotePicker({ dao, proposalId, onSelect, selectedIds }: NFTVot
                       <HoverCardTrigger asChild>
                         <button
                           className={cn(
-                            "group relative rounded-md overflow-hidden border-2 transition-all hover:opacity-90 h-[115px]",
+                            "group relative w-full aspect-square rounded-md overflow-hidden border-2 transition-all hover:opacity-90",
                             isSelected
                               ? "border-primary ring-1 ring-primary"
                               : "border-transparent hover:border-muted-foreground/30"
