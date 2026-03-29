@@ -157,12 +157,12 @@ export function DaoDetail({ daoName, onBack }: DaoDetailProps) {
   );
 
   const menuItems: { key: Section; label: string; icon: React.ReactNode; badge?: number; pulse?: boolean; hidden?: boolean }[] = [
-    { key: "info", label: "DAO Info", icon: <Info className="h-4 w-4" /> },
-    { key: "stake", label: "Stake", icon: <Layers className="h-4 w-4" />, hidden: dao?.dao_type === 5 },
-    { key: "new-proposal", label: "New Proposal", icon: <Plus className="h-4 w-4" />, hidden: !canPropose },
-    { key: "active", label: "Active Proposals", icon: <Vote className="h-4 w-4" />, badge: activeProposals.length, pulse: unvotedCount > 0 },
-    { key: "past", label: "Past Proposals", icon: <Archive className="h-4 w-4" />, badge: pastProposals.length },
-    { key: "treasury", label: "Treasury", icon: <Coins className="h-4 w-4" /> },
+    { key: "info", label: "DAO Info", icon: <span className="text-sm">ℹ️</span> },
+    { key: "stake", label: "Stake", icon: <span className="text-sm">🥩</span>, hidden: dao?.dao_type === 5 },
+    { key: "new-proposal", label: "New Proposal", icon: <span className="text-sm">✍️</span>, hidden: !canPropose },
+    { key: "active", label: "Active Proposals", icon: <span className="text-sm">📢</span>, badge: activeProposals.length, pulse: unvotedCount > 0 },
+    { key: "past", label: "Past Proposals", icon: <span className="text-sm">🕰️</span>, badge: pastProposals.length },
+    { key: "treasury", label: "Treasury", icon: <span className="text-sm">💎</span> },
   ];
 
   const socialEntries = useMemo(() => {
