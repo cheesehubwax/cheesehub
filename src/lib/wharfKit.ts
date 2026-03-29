@@ -211,6 +211,88 @@ export function ensureModalOnTop() {
   }
 }
 
+// Centralized transaction error parsing for WharfKit/Fuel errors
+export interface TransactErrorInfo {
+  type: 'fuel_rejected' | 'fuel_unreachable' | 'cpu_billing' | 'net_billing' | 'not_broadcast' | 'cancelled' | 'generic';
+  title: string;
+  description: string;
+  duration: number;
+}
+
+export function parseTransactError(error: unknown): TransactErrorInfo {
+  const msg = error instanceof Error ? error.message : String(error);
+  const lower = msg.toLowerCase();
+
+  // Nested cause chain - dig into WharfKit error wrapping
+  const causeMsg = (error as any)?.cause?.message?.toLowerCase() || '';
+  const allMsg = lower + ' ' + causeMsg;
+
+  console.error('[WharfKit] Transaction error details:', {
+    message: msg,
+    cause: (error as any)?.cause?.message,
+    causeOfCause: (error as any)?.cause?.cause?.message,
+    stack: error instanceof Error ? error.stack : undefined,
+  });
+
+  // User cancelled
+  if (allMsg.includes('cancelled') || allMsg.includes('canceled') || allMsg.includes('rejected by user') || allMsg.includes('user rejected')) {
+    return {
+      type: 'cancelled',
+      title: 'Transaction cancelled',
+      description: 'You cancelled the transaction in your wallet.',
+      duration: 4000,
+    };
+  }
+
+  // Fuel/resource provider specific rejections
+  if (allMsg.includes('resource provider') || allMsg.includes('fuel') || allMsg.includes('cosign')) {
+    return {
+      type: 'fuel_rejected',
+      title: 'Resource sponsorship declined',
+      description: 'Greymass Fuel declined to sponsor this transaction. This can happen when Fuel is at its daily limit or the transaction type is not eligible. Try again later, or ensure your account has some CPU staked.',
+      duration: 12000,
+    };
+  }
+
+  // Network/endpoint failures
+  if (allMsg.includes('fetch') || allMsg.includes('network') || allMsg.includes('econnrefused') || allMsg.includes('timeout') || allMsg.includes('failed to fetch') || allMsg.includes('503') || allMsg.includes('502')) {
+    return {
+      type: 'fuel_unreachable',
+      title: 'Network error',
+      description: 'Could not reach the blockchain endpoint or Greymass Fuel service. Check your internet connection and try again.',
+      duration: 10000,
+    };
+  }
+
+  // CPU billing failure (Fuel attempted but chain still billed user)
+  if (allMsg.includes('cpu') || allMsg.includes('billed') || allMsg.includes('deadline exceeded')) {
+    return {
+      type: 'cpu_billing',
+      title: 'Not enough CPU',
+      description: 'Greymass Fuel was attempted but the chain still billed your account for CPU. Fuel may be temporarily unavailable or at its daily limit. Try again in a few minutes, or ask someone to stake a small amount of CPU to your account.',
+      duration: 12000,
+    };
+  }
+
+  // NET billing failure
+  if (allMsg.includes('net usage') || allMsg.includes('net exceeded')) {
+    return {
+      type: 'net_billing',
+      title: 'Not enough NET',
+      description: 'Your account does not have enough NET bandwidth. Try again later or stake some NET to your account.',
+      duration: 10000,
+    };
+  }
+
+  // Generic fallback
+  return {
+    type: 'generic',
+    title: 'Transaction failed',
+    description: msg.length > 200 ? msg.slice(0, 200) + '…' : msg,
+    duration: 8000,
+  };
+}
+
 // Restore pointer events on Radix elements
 export function restoreRadixPointerEvents() {
   document.querySelectorAll('[data-radix-portal], [role="dialog"]').forEach(el => {
