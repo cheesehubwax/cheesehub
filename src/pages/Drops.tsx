@@ -196,7 +196,7 @@ const Drops = () => {
             <CreateDrop />
           </TabsContent>
         </Tabs>
-      </section>
+      </main>
 
       <div className="container pb-12 flex flex-col items-center gap-6">
         <DropStatsBar

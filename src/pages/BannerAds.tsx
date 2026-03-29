@@ -31,6 +31,7 @@ const BannerAds = () => {
             Smart Contract
           </p>
         </div>
+        </div>
       </section>
     </Layout>
   );
