@@ -55,7 +55,8 @@ export async function fetchUserGlobalStakes(account: string): Promise<GlobalStak
     let hasMore = true;
     let upperBound = '';
     let iterations = 0;
-    const MAX_ITERATIONS = 20;
+    const PAGE_SIZE = 1000;
+    const MAX_ITERATIONS = 10;
     const seenFarms = new Set<string>();
 
     while (hasMore && iterations < MAX_ITERATIONS) {
@@ -64,7 +65,7 @@ export async function fetchUserGlobalStakes(account: string): Promise<GlobalStak
           code: FARM_CONTRACT,
           scope: FARM_CONTRACT,
           table: 'stakers',
-          limit: 100,
+          limit: PAGE_SIZE,
           reverse: true,
           ...(upperBound ? { upper_bound: upperBound } : {}),
         });
@@ -76,9 +77,9 @@ export async function fetchUserGlobalStakes(account: string): Promise<GlobalStak
 
         for (const row of response.rows) {
           const farmRow = row as Record<string, unknown>;
-          const user = (farmRow.user || '') as string;
+          const user = (farmRow.user || farmRow.staker || farmRow.owner || '') as string;
           const farmName = (farmRow.farmname || farmRow.farm_name || '') as string;
-          const assetIds = (farmRow.asset_ids || []) as (string | number)[];
+          const assetIds = (farmRow.asset_ids || farmRow.staked_assets || farmRow.assets || []) as (string | number)[];
 
           if (user === account && farmName && assetIds.length > 0 && !seenFarms.has(farmName)) {
             seenFarms.add(farmName);
@@ -90,9 +91,9 @@ export async function fetchUserGlobalStakes(account: string): Promise<GlobalStak
         }
 
         const lastRow = response.rows[response.rows.length - 1] as Record<string, unknown>;
-        const lastId = lastRow.id as number | undefined;
+        const lastId = Number(lastRow.ID ?? lastRow.id);
 
-        if (lastId !== undefined && response.more) {
+        if (Number.isFinite(lastId) && response.more) {
           upperBound = String(lastId - 1);
         } else {
           hasMore = false;
