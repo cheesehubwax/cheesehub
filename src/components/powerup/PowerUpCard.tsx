@@ -135,6 +135,17 @@ export const PowerUpCard = ({
 
       const result = await session.transact({ actions: [action] }, { transactPlugins: getTransactPlugins(session) });
 
+      console.log("Transaction result:", result);
+
+      const txId = result.resolved?.transaction.id?.toString();
+      if (!txId) {
+        toast.error("Transaction may not have confirmed", {
+          description: "The wallet signed the transaction but it may not have been broadcast. Please check your account on waxblock.io.",
+          duration: 10000,
+        });
+        return;
+      }
+
       setSuccessDetails({
         cpuMs: estimate?.estimatedCpuMs || 0,
         netBytes: estimate?.estimatedNetBytes || 0,
@@ -148,8 +159,6 @@ export const PowerUpCard = ({
 
       setCpuAmount("0");
       setNetAmount("0");
-
-      console.log("Transaction result:", result);
     } catch (error) {
       closeWharfkitModals();
       console.error("Transaction failed:", error);
