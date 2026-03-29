@@ -212,6 +212,8 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
   const [isUnstaking, setIsUnstaking] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [collectionFilter, setCollectionFilter] = useState<string>("all");
+  const [schemaFilter, setSchemaFilter] = useState<string>("all");
 
   const stakeParentRef = useRef<HTMLDivElement>(null);
   const unstakeParentRef = useRef<HTMLDivElement>(null);
@@ -641,29 +643,62 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
     gcTime: 0,
   });
 
-  // ── Filter by search ──
+  // ── Derive collections & schemas for filters ──
+  const allNftsForFilter = useMemo(() => [...eligibleNfts, ...stakedNftDetails], [eligibleNfts, stakedNftDetails]);
+
+  const collections = useMemo(() => {
+    const map = new Map<string, number>();
+    allNftsForFilter.forEach(nft => map.set(nft.collection, (map.get(nft.collection) || 0) + 1));
+    return Array.from(map.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [allNftsForFilter]);
+
+  const schemas = useMemo(() => {
+    if (collectionFilter === "all") return [];
+    const map = new Map<string, number>();
+    allNftsForFilter.filter(nft => nft.collection === collectionFilter).forEach(nft => {
+      if (nft.schema) map.set(nft.schema, (map.get(nft.schema) || 0) + 1);
+    });
+    return Array.from(map.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [allNftsForFilter, collectionFilter]);
+
+  const handleCollectionChange = useCallback((value: string) => {
+    setCollectionFilter(value);
+    setSchemaFilter("all");
+  }, []);
+
+  // ── Filter by search + collection + schema ──
   const filteredEligible = useMemo(() => {
-    if (!searchQuery.trim()) return eligibleNfts;
-    const q = searchQuery.toLowerCase();
-    return eligibleNfts.filter(
-      (n) =>
-        n.name.toLowerCase().includes(q) ||
-        n.collection.toLowerCase().includes(q) ||
-        n.asset_id.includes(q) ||
-        n.template_id.includes(q)
-    );
-  }, [eligibleNfts, searchQuery]);
+    let result = [...eligibleNfts];
+    if (collectionFilter !== "all") result = result.filter(n => n.collection === collectionFilter);
+    if (schemaFilter !== "all") result = result.filter(n => n.schema === schemaFilter);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (n) =>
+          n.name.toLowerCase().includes(q) ||
+          n.collection.toLowerCase().includes(q) ||
+          n.asset_id.includes(q) ||
+          n.template_id.includes(q)
+      );
+    }
+    return result;
+  }, [eligibleNfts, searchQuery, collectionFilter, schemaFilter]);
 
   const filteredStaked = useMemo(() => {
-    if (!searchQuery.trim()) return stakedNftDetails;
-    const q = searchQuery.toLowerCase();
-    return stakedNftDetails.filter(
-      (n) =>
-        n.name.toLowerCase().includes(q) ||
-        n.collection.toLowerCase().includes(q) ||
-        n.asset_id.includes(q)
-    );
-  }, [stakedNftDetails, searchQuery]);
+    let result = [...stakedNftDetails];
+    if (collectionFilter !== "all") result = result.filter(n => n.collection === collectionFilter);
+    if (schemaFilter !== "all") result = result.filter(n => n.schema === schemaFilter);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (n) =>
+          n.name.toLowerCase().includes(q) ||
+          n.collection.toLowerCase().includes(q) ||
+          n.asset_id.includes(q)
+      );
+    }
+    return result;
+  }, [stakedNftDetails, searchQuery, collectionFilter, schemaFilter]);
 
   // ── Bulk select ──
   const selectAllEligible = () => {
@@ -844,14 +879,32 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name, collection, or template ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex flex-wrap gap-2">
+            <div className="relative flex-1 min-w-[120px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, collection, or template ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select value={collectionFilter} onValueChange={handleCollectionChange}>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Collection" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All ({allNftsForFilter.length})</SelectItem>
+                {collections.map(col => <SelectItem key={col.name} value={col.name}>{col.name} ({col.count})</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {collectionFilter !== "all" && schemas.length > 0 && (
+              <Select value={schemaFilter} onValueChange={setSchemaFilter}>
+                <SelectTrigger className="w-[140px]"><SelectValue placeholder="Schema" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Schemas</SelectItem>
+                  {schemas.map(s => <SelectItem key={s.name} value={s.name}>{s.name} ({s.count})</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           <Tabs defaultValue="unstaked">
