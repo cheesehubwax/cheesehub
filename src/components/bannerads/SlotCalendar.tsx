@@ -252,7 +252,7 @@ export function SlotCalendar() {
         and have it reviewed and possibly reinstated.
       </div>
 
-      {futureGroups.length > 0 && <div className="mb-4 text-sm text-foreground text-center flex items-center justify-center gap-2"><Checkbox disabled className="pointer-events-none" /> Use the checkboxes to select multiple slots and rent them all in one transaction</div>}
+      {futureGroups.length > 0 && <div className="mb-4 text-sm text-foreground text-center flex items-center justify-center gap-2"><Checkbox disabled className="pointer-events-none" /> Use the checkboxes to select multiple slots to rent or edit them all in one transaction</div>}
 
       <div className="space-y-3">
         {futureGroups.length === 0 && (
@@ -273,11 +273,15 @@ export function SlotCalendar() {
                 <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {group.slots.map((slot) => {
                     const { selectable, isJoining } = isSlotSelectable(slot);
+                    const editable = isSlotEditable(slot);
                     const selected = isSlotSelected(slot.time, slot.position);
+                    const editSelected = selectedEditSlots.some(s => s.time === slot.time && s.position === slot.position);
+                    const isHighlighted = selected || editSelected;
                     return (
-                      <div key={slot.position} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border p-3 bg-background/50 transition-colors ${selected ? "border-cheese/60 bg-cheese/5" : "border-border/30"}`}>
+                      <div key={slot.position} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border p-3 bg-background/50 transition-colors ${isHighlighted ? "border-cheese/60 bg-cheese/5" : "border-border/30"}`}>
                         <div className="flex items-center gap-2 sm:gap-3">
                           {selectable && <Checkbox checked={selected} onCheckedChange={() => toggleSlotSelection(slot.time, slot.position, isJoining)} className="data-[state=checked]:bg-cheese data-[state=checked]:border-cheese" />}
+                          {!selectable && editable && <Checkbox checked={editSelected} onCheckedChange={() => toggleEditSlotSelection(slot)} className="data-[state=checked]:bg-cheese data-[state=checked]:border-cheese" />}
                           <span className="text-sm font-medium text-muted-foreground">Pos {slot.position}</span>
                           <SlotBadge slot={slot} accountName={accountName} />
                         </div>
