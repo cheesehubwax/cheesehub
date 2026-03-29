@@ -12,6 +12,7 @@ import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 import { sanitizeUrl } from "@/lib/sanitizeUrl";
 import { RentSlotDialog } from "./RentSlotDialog";
 import { BulkRentDialog, BulkSlotSelection } from "./BulkRentDialog";
+import { BulkEditBannerDialog } from "./BulkEditBannerDialog";
 import { EditBannerDialog } from "./EditBannerDialog";
 import { RemoveBannerDialog } from "./RemoveBannerDialog";
 import { ReinstateBannerDialog } from "./ReinstateBannerDialog";
@@ -136,7 +137,10 @@ export function SlotCalendar() {
   const [reinstateTarget, setReinstateTarget] = useState<BannerSlot | null>(null);
   const [previewTarget, setPreviewTarget] = useState<BannerSlot | null>(null);
   const [selectedSlots, setSelectedSlots] = useState<BulkSlotSelection[]>([]);
+  const [selectedEditSlots, setSelectedEditSlots] = useState<BannerSlot[]>([]);
+  const [selectionMode, setSelectionMode] = useState<"rent" | "edit" | null>(null);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [bulkEditDialogOpen, setBulkEditDialogOpen] = useState(false);
   const { isWhitelisted: isAdmin } = useAdminAccess();
   const [reviewVersion, setReviewVersion] = useState(0);
 
@@ -154,12 +158,38 @@ export function SlotCalendar() {
   }, [selectedSlots]);
 
   const toggleSlotSelection = useCallback((time: number, position: number, isJoining: boolean) => {
+    // Switching to rent mode clears edit selections
+    if (selectionMode === "edit") {
+      setSelectedEditSlots([]);
+    }
+    setSelectionMode("rent");
     setSelectedSlots(prev => {
       const exists = prev.some(s => s.time === time && s.position === position);
-      if (exists) return prev.filter(s => !(s.time === time && s.position === position));
+      if (exists) {
+        const next = prev.filter(s => !(s.time === time && s.position === position));
+        if (next.length === 0) setSelectionMode(null);
+        return next;
+      }
       return [...prev, { time, position, isJoining, rentalMode: isJoining ? "shared" as const : "exclusive" as const }];
     });
-  }, []);
+  }, [selectionMode]);
+
+  const toggleEditSlotSelection = useCallback((slot: BannerSlot) => {
+    // Switching to edit mode clears rent selections
+    if (selectionMode === "rent") {
+      setSelectedSlots([]);
+    }
+    setSelectionMode("edit");
+    setSelectedEditSlots(prev => {
+      const exists = prev.some(s => s.time === slot.time && s.position === slot.position);
+      if (exists) {
+        const next = prev.filter(s => !(s.time === slot.time && s.position === slot.position));
+        if (next.length === 0) setSelectionMode(null);
+        return next;
+      }
+      return [...prev, slot];
+    });
+  }, [selectionMode]);
 
   const removeSlotFromSelection = useCallback((time: number, position: number) => {
     setSelectedSlots(prev => prev.filter(s => !(s.time === time && s.position === position)));
