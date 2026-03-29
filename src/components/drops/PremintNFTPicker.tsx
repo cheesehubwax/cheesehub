@@ -1,15 +1,14 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { Check, Search, ImageOff, Loader2, Package, RefreshCw, SortAsc, SortDesc } from "lucide-react";
+import { Search, Loader2, Package, RefreshCw, SortAsc, SortDesc } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
-import { cn } from "@/lib/utils";
 import { useUserNFTs } from "@/hooks/useUserNFTs";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useWax } from "@/context/WaxContext";
 import { useSquareGridRowHeight } from "@/hooks/useSquareGridRowHeight";
+import { NFTGridCard } from "@/components/shared/NFTGridCard";
 
 interface PremintNFTPickerProps {
   collectionName: string;
@@ -246,7 +245,7 @@ export function PremintNFTPicker({
                 className="grid grid-cols-6 gap-2 p-1"
               >
                 {rowNFTs.map((nft) => (
-                  <NFTCard
+                  <NFTGridCard
                     key={nft.asset_id}
                     nft={nft}
                     isSelected={selectedAssetIds.includes(nft.asset_id)}
@@ -263,67 +262,5 @@ export function PremintNFTPicker({
         These NFTs will be transferred to the drop contract when you create the drop.
       </p>
     </div>
-  );
-}
-
-interface NFTCardProps {
-  nft: {
-    asset_id: string;
-    name: string;
-    image: string;
-    collection: string;
-    schema?: string;
-    template_id?: string;
-    mint?: string;
-  };
-  isSelected: boolean;
-  onToggle: () => void;
-}
-
-function NFTCard({ nft, isSelected, onToggle }: NFTCardProps) {
-  const [imageError, setImageError] = useState(false);
-
-  return (
-    <HoverCard openDelay={300} closeDelay={100}>
-      <HoverCardTrigger asChild>
-        <button
-          type="button"
-          onClick={onToggle}
-          className={cn(
-            "group relative w-full aspect-square rounded-md overflow-hidden border-2 transition-all hover:opacity-90",
-            isSelected
-              ? "border-primary ring-1 ring-primary"
-              : "border-transparent hover:border-muted-foreground/30"
-          )}
-        >
-          {isSelected && (
-            <div className="absolute top-1 right-1 z-10 bg-primary rounded-full p-0.5">
-              <Check className="h-3 w-3 text-primary-foreground" />
-            </div>
-          )}
-          <div className="w-full h-full flex items-center justify-center bg-muted">
-            {imageError ? (
-              <ImageOff className="h-6 w-6 text-muted-foreground/50" />
-            ) : (
-              <img
-                src={nft.image}
-                alt={nft.name}
-                className="w-full h-full object-cover"
-                loading="lazy"
-                onError={() => setImageError(true)}
-              />
-            )}
-          </div>
-        </button>
-      </HoverCardTrigger>
-      <HoverCardContent side="top" collisionPadding={16} align="center" className="w-64 max-w-xs p-3 text-xs space-y-1">
-        <p className="font-bold text-sm break-words whitespace-normal">{nft.name || "Unnamed"}</p>
-        <div className="flex justify-between"><span className="text-cheese">Asset ID</span><span className="font-mono">{nft.asset_id}</span></div>
-        <div className="flex justify-between"><span className="text-cheese">Collection</span><span className="truncate ml-2">{nft.collection}</span></div>
-        {nft.schema && <div className="flex justify-between"><span className="text-cheese">Schema</span><span>{nft.schema}</span></div>}
-        {nft.template_id && <div className="flex justify-between"><span className="text-cheese">Template</span><span className="font-mono">{nft.template_id}</span></div>}
-        {nft.mint && <div className="flex justify-between"><span className="text-cheese">Mint #</span><span>{nft.mint}</span></div>}
-      </HoverCardContent>
-    </HoverCard>
   );
 }

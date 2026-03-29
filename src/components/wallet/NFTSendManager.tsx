@@ -8,12 +8,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useWax } from '@/context/WaxContext';
 import { useUserNFTs } from '@/hooks/useUserNFTs';
 import { useDebounce } from '@/hooks/useDebounce';
-import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card';
-import { Check, X, Loader2, Search, Image, Send, RefreshCw, Flame } from 'lucide-react';
+import { X, Loader2, Search, Image, Send, RefreshCw, Flame } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { closeWharfkitModals } from '@/lib/wharfKit';
 import { toast } from 'sonner';
 import { useSquareGridRowHeight } from '@/hooks/useSquareGridRowHeight';
+import { NFTGridCard } from '@/components/shared/NFTGridCard';
 
 interface NFTSendManagerProps {
   onTransactionSuccess: (title: string, description: string, txId: string | null) => void;
@@ -192,25 +192,12 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
               return (
                 <div key={virtualRow.key} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: `${virtualRow.size}px`, transform: `translateY(${virtualRow.start}px)` }} className="grid grid-cols-6 gap-2 p-1">
                   {rowNFTs.map(nft => (
-                    <HoverCard key={nft.asset_id} openDelay={300} closeDelay={100}>
-                      <HoverCardTrigger asChild>
-                        <button onClick={() => toggleNFTSelection(nft.asset_id)}
-                          className={cn('group relative w-full aspect-square rounded-md overflow-hidden border-2 transition-all hover:opacity-90', selectedNFTs.has(nft.asset_id) ? 'border-primary ring-1 ring-primary' : 'border-transparent hover:border-muted-foreground/30')}>
-                          {selectedNFTs.has(nft.asset_id) && <div className="absolute top-1 right-1 z-10 bg-primary rounded-full p-0.5"><Check className="h-3 w-3 text-primary-foreground" /></div>}
-                          <div className="w-full h-full flex items-center justify-center bg-muted">
-                            <img src={nft.image} alt={nft.name} className="w-full h-full object-cover" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.svg'; }} />
-                          </div>
-                        </button>
-                      </HoverCardTrigger>
-                      <HoverCardContent side="top" collisionPadding={16} align="center" className="w-64 max-w-xs p-3 text-xs space-y-1">
-                        <p className="font-bold text-sm break-words whitespace-normal">{nft.name}</p>
-                        <div className="flex justify-between"><span className="text-cheese">Asset ID</span><span className="font-mono">{nft.asset_id}</span></div>
-                        <div className="flex justify-between"><span className="text-cheese">Collection</span><span className="truncate ml-2">{nft.collection}</span></div>
-                        {nft.schema && <div className="flex justify-between"><span className="text-cheese">Schema</span><span>{nft.schema}</span></div>}
-                        {nft.template_id && <div className="flex justify-between"><span className="text-cheese">Template</span><span className="font-mono">{nft.template_id}</span></div>}
-                        {nft.mint && <div className="flex justify-between"><span className="text-cheese">Mint #</span><span>{nft.mint}</span></div>}
-                      </HoverCardContent>
-                    </HoverCard>
+                    <NFTGridCard
+                      key={nft.asset_id}
+                      nft={nft}
+                      isSelected={selectedNFTs.has(nft.asset_id)}
+                      onToggle={() => toggleNFTSelection(nft.asset_id)}
+                    />
                   ))}
                 </div>
               );
