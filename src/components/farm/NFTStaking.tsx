@@ -70,6 +70,60 @@ function getMediaUrl(data: Record<string, string | undefined> | undefined): { ur
 
 // ── Virtualized Grid (defined outside main component to avoid re-creation) ──
 
+// Farm-specific NFT card wrapper that adds "staked elsewhere" tooltip
+interface FarmNFTCardProps {
+  nft: NFTAsset;
+  isSelected: boolean;
+  onToggle: () => void;
+  stakedInFarm?: string;
+}
+
+const FarmNFTCard = React.memo(function FarmNFTCard({ nft, isSelected, onToggle, stakedInFarm }: FarmNFTCardProps) {
+  const isStakedElsewhere = Boolean(stakedInFarm);
+
+  if (isStakedElsewhere) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div>
+              <NFTGridCard
+                nft={nft}
+                isSelected={isSelected}
+                onToggle={onToggle}
+                disabled
+                borderClass="border-amber-500/50"
+                extraBadge={
+                  <div className="absolute top-1 left-1 z-10">
+                    <AlertTriangle className="h-3 w-3 text-amber-500" />
+                  </div>
+                }
+                extraHoverContent={
+                  <div className="flex justify-between text-amber-500"><span>⚠️ Staked in</span><span className="font-semibold">{stakedInFarm}</span></div>
+                }
+              />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="max-w-[220px]">
+            <p className="text-xs">
+              <AlertTriangle className="h-3 w-3 inline mr-1 text-amber-500" />
+              Already staked in <span className="font-semibold">{stakedInFarm}</span>. Unstake there first.
+            </p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  return (
+    <NFTGridCard
+      nft={nft}
+      isSelected={isSelected}
+      onToggle={onToggle}
+    />
+  );
+});
+
 interface VirtualGridProps {
   items: NFTAsset[];
   selected: Set<string>;
