@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,9 +78,10 @@ interface FarmNFTCardProps {
   isSelected: boolean;
   onToggle: () => void;
   stakedInFarm?: string;
+  onNavigateToFarm?: () => void;
 }
 
-const FarmNFTCard = React.memo(function FarmNFTCard({ nft, isSelected, onToggle, stakedInFarm }: FarmNFTCardProps) {
+const FarmNFTCard = React.memo(function FarmNFTCard({ nft, isSelected, onToggle, stakedInFarm, onNavigateToFarm }: FarmNFTCardProps) {
   const isStakedElsewhere = Boolean(stakedInFarm);
 
   if (isStakedElsewhere) {
@@ -87,17 +89,23 @@ const FarmNFTCard = React.memo(function FarmNFTCard({ nft, isSelected, onToggle,
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <div>
+            <div className="relative opacity-60 cursor-pointer" onClick={onNavigateToFarm}>
               <NFTGridCard
                 nft={nft}
-                isSelected={isSelected}
-                onToggle={onToggle}
-                disabled
+                isSelected={false}
+                onToggle={onNavigateToFarm || (() => {})}
                 borderClass="border-amber-500/50"
                 extraBadge={
-                  <div className="absolute top-1 left-1 z-10">
-                    <AlertTriangle className="h-3 w-3 text-amber-500" />
-                  </div>
+                  <>
+                    <div className="absolute top-1 left-1 z-10">
+                      <AlertTriangle className="h-3 w-3 text-amber-500" />
+                    </div>
+                    <div className="absolute bottom-0 left-0 right-0 z-10 bg-black/70 px-1 py-0.5 text-center">
+                      <span className="text-[8px] font-medium text-amber-400 leading-tight">
+                        Staked in {stakedInFarm}
+                      </span>
+                    </div>
+                  </>
                 }
                 extraHoverContent={
                   <div className="flex justify-between text-amber-500"><span>⚠️ Staked in</span><span className="font-semibold">{stakedInFarm}</span></div>
@@ -108,7 +116,7 @@ const FarmNFTCard = React.memo(function FarmNFTCard({ nft, isSelected, onToggle,
           <TooltipContent side="bottom" className="max-w-[220px]">
             <p className="text-xs">
               <AlertTriangle className="h-3 w-3 inline mr-1 text-amber-500" />
-              Already staked in <span className="font-semibold">{stakedInFarm}</span>. Unstake there first.
+              Staked in <span className="font-semibold">{stakedInFarm}</span>. Click to go there and unstake.
             </p>
           </TooltipContent>
         </Tooltip>
@@ -132,6 +140,7 @@ interface VirtualGridProps {
   parentRef: React.RefObject<HTMLDivElement>;
   type: "stake" | "unstake";
   globallyStakedMap?: Map<string, string>;
+  onNavigateToFarm?: (farmName: string) => void;
 }
 
 function getGridCols(): number {
@@ -145,6 +154,7 @@ const VirtualGrid = React.memo(function VirtualGrid({
   parentRef,
   type,
   globallyStakedMap,
+  onNavigateToFarm,
 }: VirtualGridProps) {
   const [cols, setCols] = useState(getGridCols);
   const gridRowHeight = useSquareGridRowHeight(parentRef, { columns: cols });
@@ -182,15 +192,19 @@ const VirtualGrid = React.memo(function VirtualGrid({
                 transform: `translateY(${vRow.start}px)`,
               }}
             >
-              {rowItems.map((nft) => (
-                <FarmNFTCard
-                  key={nft.asset_id}
-                  nft={nft}
-                  isSelected={selected.has(nft.asset_id)}
-                  onToggle={() => onToggle(nft.asset_id)}
-                  stakedInFarm={type === "stake" ? globallyStakedMap?.get(nft.asset_id) : undefined}
-                />
-              ))}
+              {rowItems.map((nft) => {
+                const stakedInFarm = type === "stake" ? globallyStakedMap?.get(nft.asset_id) : undefined;
+                return (
+                  <FarmNFTCard
+                    key={nft.asset_id}
+                    nft={nft}
+                    isSelected={selected.has(nft.asset_id)}
+                    onToggle={() => onToggle(nft.asset_id)}
+                    stakedInFarm={stakedInFarm}
+                    onNavigateToFarm={stakedInFarm && onNavigateToFarm ? () => onNavigateToFarm(stakedInFarm) : undefined}
+                  />
+                );
+              })}
             </div>
           );
         })}
