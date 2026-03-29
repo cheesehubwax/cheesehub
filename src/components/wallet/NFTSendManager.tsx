@@ -8,7 +8,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useWax } from '@/context/WaxContext';
 import { useUserNFTs } from '@/hooks/useUserNFTs';
 import { useDebounce } from '@/hooks/useDebounce';
-import { X, Loader2, Search, Image, Send, RefreshCw, Flame } from 'lucide-react';
+import { Check, X, Loader2, Search, Image, Send, RefreshCw, Flame } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { closeWharfkitModals } from '@/lib/wharfKit';
 import { toast } from 'sonner';
