@@ -106,9 +106,9 @@ export const NFTGridCard = React.memo(function NFTGridCard({
           : borderClass || "border-transparent hover:border-muted-foreground/30"
       )}
     >
-      {extraBadge}
+      <div className="relative z-30">{extraBadge}</div>
       {isSelected && (
-        <div className="absolute top-1 right-1 z-10 rounded-full p-0.5 bg-primary">
+        <div className="absolute top-1 right-1 z-30 rounded-full p-0.5 bg-primary">
           <Check className="h-3 w-3 text-primary-foreground" />
         </div>
       )}

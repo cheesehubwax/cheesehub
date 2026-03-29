@@ -687,8 +687,10 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
   }, []);
 
   // ── Filter by search + collection + schema ──
+  const currentStakedIds = useMemo(() => new Set(stakedNfts.map(s => s.asset_id)), [stakedNfts]);
+
   const filteredEligible = useMemo(() => {
-    let result = [...eligibleNfts];
+    let result = eligibleNfts.filter(n => !currentStakedIds.has(n.asset_id));
     if (collectionFilter !== "all") result = result.filter(n => n.collection === collectionFilter);
     if (schemaFilter !== "all") result = result.filter(n => n.schema === schemaFilter);
     if (searchQuery.trim()) {
@@ -702,7 +704,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
       );
     }
     return result;
-  }, [eligibleNfts, searchQuery, collectionFilter, schemaFilter]);
+  }, [eligibleNfts, searchQuery, collectionFilter, schemaFilter, currentStakedIds]);
 
   const filteredStaked = useMemo(() => {
     let result = [...stakedNftDetails];
