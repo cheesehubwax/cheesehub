@@ -133,9 +133,13 @@ export const PowerUpCard = ({
         },
       };
 
-      const result = await session.transact({ actions: [action] }, { transactPlugins: getTransactPlugins(session) });
+      const plugins = getTransactPlugins(session);
+      console.log('[CHEESEUp] Transacting with plugins:', plugins.length, 'wallet:', session.walletPlugin?.id);
 
-      console.log("Transaction result:", result);
+      const result = await session.transact({ actions: [action] }, { transactPlugins: plugins });
+
+      console.log("[CHEESEUp] Transaction result:", result);
+      console.log("[CHEESEUp] Resolved tx id:", result.resolved?.transaction.id?.toString());
 
       const txId = result.resolved?.transaction.id?.toString();
       if (!txId) {
@@ -161,22 +165,17 @@ export const PowerUpCard = ({
       setNetAmount("0");
     } catch (error) {
       closeWharfkitModals();
-      console.error("Transaction failed:", error);
-      const errorMessage = error instanceof Error ? error.message : "Transaction failed";
+      console.error("[CHEESEUp] Transaction failed:", error);
 
-      const isCpuError = errorMessage.toLowerCase().includes("cpu") ||
-                         errorMessage.toLowerCase().includes("billed") ||
-                         errorMessage.toLowerCase().includes("net usage") ||
-                         errorMessage.toLowerCase().includes("deadline exceeded");
+      const errorInfo = parseTransactError(error);
 
-      if (isCpuError) {
-        toast.error("Transaction failed - resource sponsorship unavailable", {
-          description: "Greymass Fuel may be temporarily unavailable or at daily limit. Try again in a moment, or ask someone to send you a small amount of CPU first.",
-          duration: 10000,
-        });
+      if (errorInfo.type === 'cancelled') {
+        // Silent - user intentionally cancelled
+        console.log('[CHEESEUp] User cancelled transaction');
       } else {
-        toast.error("PowerUp failed", {
-          description: errorMessage,
+        toast.error(errorInfo.title, {
+          description: errorInfo.description,
+          duration: errorInfo.duration,
         });
       }
     } finally {
