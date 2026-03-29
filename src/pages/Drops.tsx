@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import type { NFTDrop } from "@/types/drop";
-import { Package, Plus, Sandwich, RefreshCw, Loader2, Star } from "lucide-react";
+import { RefreshCw, Loader2 } from "lucide-react";
 import { CHEESE_CONFIG } from "@/lib/waxConfig";
 import { useMemo } from "react";
 import cheeseshoppe from "@/assets/cheeseshoppe.png";
@@ -118,19 +118,19 @@ const Drops = () => {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
             <TabsList className="bg-card/80 border border-border/50 h-10">
               <TabsTrigger value="official" className="gap-1.5 text-sm px-4">
-                <Star className="h-4 w-4" />
+                <span className="text-sm">⭐</span>
                 <span className="hidden sm:inline">Official</span>
               </TabsTrigger>
               <TabsTrigger value="cheese" className="gap-1.5 text-sm px-4">
-                <Sandwich className="h-4 w-4" />
+                <span className="text-sm">🧀</span>
                 <span className="hidden sm:inline">CHEESE</span>
               </TabsTrigger>
               <TabsTrigger value="my-drops" className="gap-1.5 text-sm px-4">
-                <Package className="h-4 w-4" />
+                <span className="text-sm">📂</span>
                 <span className="hidden sm:inline">My Drops</span>
               </TabsTrigger>
               <TabsTrigger value="create" className="gap-1.5 text-sm px-4">
-                <Plus className="h-4 w-4" />
+                <span className="text-sm">✍️</span>
                 <span className="hidden sm:inline">Create</span>
               </TabsTrigger>
             </TabsList>

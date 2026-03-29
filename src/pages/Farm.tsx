@@ -9,7 +9,7 @@ import { MyFarms } from "@/components/farm/MyFarms";
 import { FarmDetail } from "@/components/farm/FarmDetail";
 import cheeseFarmLogo from "@/assets/cheesefarm.png";
 import { playRandomFart } from "@/lib/fartSounds";
-import { Search, FolderOpen, Plus } from "lucide-react";
+
 
 const Farm = () => {
   const { farmName } = useParams<{ farmName?: string }>();
@@ -66,13 +66,13 @@ const Farm = () => {
           <div className="flex justify-center mb-6">
             <TabsList className="bg-card/80 border border-border/50 h-10">
               <TabsTrigger value="browse" className="gap-1.5 text-sm px-4">
-                <Search className="h-4 w-4" /> Browse Farms
+                <span className="text-sm">🔍</span> Browse Farms
               </TabsTrigger>
               <TabsTrigger value="create" className="gap-1.5 text-sm px-4">
-                <Plus className="h-4 w-4" /> Create Farm
+                <span className="text-sm">✍️</span> Create Farm
               </TabsTrigger>
               <TabsTrigger value="my-farms" className="gap-1.5 text-sm px-4">
-                <FolderOpen className="h-4 w-4" /> My Farms
+                <span className="text-sm">📂</span> My Farms
               </TabsTrigger>
             </TabsList>
           </div>
