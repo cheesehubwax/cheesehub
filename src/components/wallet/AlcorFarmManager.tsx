@@ -318,6 +318,34 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
     }
   }, [session, accountName, onTransactionSuccess, refetch, onTransactionComplete]);
 
+  const handleStakeAllUnstakedPositions = useCallback(async () => {
+    if (!session || !accountName || unstakedList.length === 0) return;
+    setIsTransacting(true);
+    try {
+      const actions = unstakedList.flatMap(pos =>
+        pos.availableIncentives.map(incentive =>
+          buildStakeAction(accountName, incentive.incentiveId, pos.positionId)
+        )
+      );
+      if (actions.length === 0) {
+        toast.error('No stakeable incentives found');
+        return;
+      }
+      const result = await session.transact({ actions });
+      const txId = result.resolved?.transaction.id?.toString() || null;
+      onTransactionSuccess?.('All Positions Staked!', `Staked ${unstakedList.length} position(s) into ${actions.length} farm incentive(s)`, txId);
+      refetch();
+      onTransactionComplete?.();
+    } catch (error: any) {
+      console.error('Stake all positions error:', error);
+      toast.error(error?.message || 'Failed to stake all positions');
+    } finally {
+      setIsTransacting(false);
+      closeWharfkitModals();
+      setTimeout(() => closeWharfkitModals(), 300);
+    }
+  }, [session, accountName, unstakedList, onTransactionSuccess, refetch, onTransactionComplete]);
+
   const handleClaimUnstakeAllExpired = useCallback(async (expiredIncentives: AlcorFarmPosition[]) => {
     if (!session || !accountName || expiredIncentives.length === 0) return;
     setIsTransacting(true);
@@ -419,9 +447,9 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
             </Button>
           )}
           {unstakedList.length > 0 && (
-            <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/30 text-xs animate-pulse">
-              <Zap className="h-3 w-3 mr-1" />{unstakedList.length} unstaked
-            </Badge>
+            <Button size="sm" onClick={handleStakeAllUnstakedPositions} disabled={isTransacting} className="h-8 px-3 text-xs bg-green-600 hover:bg-green-700 text-white gap-1.5">
+              {isTransacting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Zap className="h-3.5 w-3.5" />Stake All Positions ({unstakedList.length})</>}
+            </Button>
           )}
           <Button size="sm" variant="ghost" onClick={() => { setIsRefreshing(true); refetch(); setTimeout(() => setIsRefreshing(false), 1000); }} disabled={isTransacting || isRefreshing} className="h-8 w-8 p-0">
             <RefreshCw className={cn("h-4 w-4 transition-transform", isRefreshing && "animate-spin")} />
