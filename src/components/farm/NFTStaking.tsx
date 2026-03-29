@@ -86,41 +86,29 @@ const FarmNFTCard = React.memo(function FarmNFTCard({ nft, isSelected, onToggle,
 
   if (isStakedElsewhere) {
     return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="relative opacity-60 cursor-pointer" onClick={onNavigateToFarm}>
-              <NFTGridCard
-                nft={nft}
-                isSelected={false}
-                onToggle={onNavigateToFarm || (() => {})}
-                borderClass="border-amber-500/50"
-                extraBadge={
-                  <>
-                    <div className="absolute top-1 left-1 z-10">
-                      <AlertTriangle className="h-3 w-3 text-amber-500" />
-                    </div>
-                    <div className="absolute bottom-0 left-0 right-0 z-10 bg-black/70 px-1 py-0.5 text-center">
-                      <span className="text-[8px] font-medium text-amber-400 leading-tight">
-                        Staked in {stakedInFarm}
-                      </span>
-                    </div>
-                  </>
-                }
-                extraHoverContent={
-                  <div className="flex justify-between text-amber-500"><span>⚠️ Staked in</span><span className="font-semibold">{stakedInFarm}</span></div>
-                }
-              />
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-[220px]">
-            <p className="text-xs">
-              <AlertTriangle className="h-3 w-3 inline mr-1 text-amber-500" />
-              Staked in <span className="font-semibold">{stakedInFarm}</span>. Click to go there and unstake.
-            </p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <div className="opacity-60">
+        <NFTGridCard
+          nft={nft}
+          isSelected={false}
+          onToggle={onNavigateToFarm || (() => {})}
+          borderClass="border-amber-500/50"
+          extraBadge={
+            <>
+              <div className="absolute top-1 left-1">
+                <AlertTriangle className="h-3 w-3 text-amber-500" />
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-1 py-0.5 text-center">
+                <span className="text-[8px] font-medium text-amber-400 leading-tight">
+                  Staked in {stakedInFarm}
+                </span>
+              </div>
+            </>
+          }
+          extraHoverContent={
+            <div className="flex justify-between text-amber-500"><span>⚠️ Staked in</span><span className="font-semibold">{stakedInFarm}</span></div>
+          }
+        />
+      </div>
     );
   }
 
