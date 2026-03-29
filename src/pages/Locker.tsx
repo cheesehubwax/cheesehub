@@ -1,6 +1,4 @@
 import { Layout } from "@/components/Layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Lock } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreateLock } from "@/components/locker/CreateLock";
 import { MyLocks } from "@/components/locker/MyLocks";
@@ -39,36 +37,28 @@ const Locker = () => {
       </section>
 
       <div className="container pb-12">
-        <Card className="max-w-4xl mx-auto bg-card/80 border-border/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Lock className="h-5 w-5 text-primary" />
-              Token Locker
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="create" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto">
-                <TabsTrigger value="create" className="text-xs sm:text-sm">Create Lock</TabsTrigger>
-                <TabsTrigger value="my-locks" className="text-xs sm:text-sm">My Locks</TabsTrigger>
-                <TabsTrigger value="lp-lock" className="text-xs sm:text-sm">LP Lock</TabsTrigger>
-                <TabsTrigger value="my-lp" className="text-xs sm:text-sm">My LP Locks</TabsTrigger>
-              </TabsList>
-              <TabsContent value="create" className="mt-6">
-                <CreateLock />
-              </TabsContent>
-              <TabsContent value="my-locks" className="mt-6">
-                <MyLocks />
-              </TabsContent>
-              <TabsContent value="lp-lock" className="mt-6">
-                <CreateLiquidityLock />
-              </TabsContent>
-              <TabsContent value="my-lp" className="mt-6">
-                <MyLiquidityLocks />
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+        <Tabs defaultValue="create" className="w-full max-w-4xl mx-auto">
+          <div className="flex justify-center mb-6">
+            <TabsList className="bg-card/80 border border-border/50 h-10">
+              <TabsTrigger value="create" className="gap-1.5 text-sm px-4">Create Lock</TabsTrigger>
+              <TabsTrigger value="my-locks" className="gap-1.5 text-sm px-4">My Locks</TabsTrigger>
+              <TabsTrigger value="lp-lock" className="gap-1.5 text-sm px-4">LP Lock</TabsTrigger>
+              <TabsTrigger value="my-lp" className="gap-1.5 text-sm px-4">My LP Locks</TabsTrigger>
+            </TabsList>
+          </div>
+          <TabsContent value="create">
+            <CreateLock />
+          </TabsContent>
+          <TabsContent value="my-locks">
+            <MyLocks />
+          </TabsContent>
+          <TabsContent value="lp-lock">
+            <CreateLiquidityLock />
+          </TabsContent>
+          <TabsContent value="my-lp">
+            <MyLiquidityLocks />
+          </TabsContent>
+        </Tabs>
 
         <div className="text-center text-sm text-muted-foreground mt-8">
           <p>
