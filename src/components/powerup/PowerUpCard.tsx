@@ -16,6 +16,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { TokenLogo } from "@/components/TokenLogo";
+import cheeseUpOrb from "@/assets/cheeseup.png";
 
 interface SuccessDetails {
   cpuMs: number;
@@ -249,11 +250,14 @@ export const PowerUpCard = ({
         <DialogContent className="bg-card border-border">
           <DialogHeader>
             <DialogTitle className="text-foreground flex items-center gap-2">
-              <span>✅</span>
-              Transaction Successful!
+              <img src={cheeseUpOrb} alt="CHEESEUp" className="w-8 h-8 object-contain" />
+              CHEESEUp Successful!
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="flex justify-center py-2">
+            <img src={cheeseUpOrb} alt="CHEESEUp" className="w-20 h-20 object-contain" />
+          </div>
+          <div className="space-y-4">
             <p className="text-muted-foreground">
               PowerUp transaction sent for{" "}
               <span className="text-foreground font-semibold">{successDetails?.recipient}</span>
