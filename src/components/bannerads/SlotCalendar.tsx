@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, RefreshCw, Eye, ShoppingCart, CheckCircle2 } from "lucide-react";
+import { Loader2, RefreshCw, Eye, ShoppingCart, CheckCircle2, Pencil } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 import { sanitizeUrl } from "@/lib/sanitizeUrl";
@@ -318,7 +318,7 @@ export function SlotCalendar() {
         ))}
       </div>
 
-      {selectedSlots.length > 0 && (
+      {selectedSlots.length > 0 && selectionMode === "rent" && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-full border border-cheese/40 bg-card/95 backdrop-blur-sm shadow-lg px-5 py-3">
           <ShoppingCart className="h-4 w-4 text-cheese" />
           <span className="text-sm font-medium">{selectedSlots.length} slot{selectedSlots.length > 1 ? "s" : ""} selected</span>
@@ -327,8 +327,18 @@ export function SlotCalendar() {
         </div>
       )}
 
+      {selectedEditSlots.length > 0 && selectionMode === "edit" && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-full border border-cheese/40 bg-card/95 backdrop-blur-sm shadow-lg px-5 py-3">
+          <Pencil className="h-4 w-4 text-cheese" />
+          <span className="text-sm font-medium">{selectedEditSlots.length} slot{selectedEditSlots.length > 1 ? "s" : ""} selected</span>
+          <Button size="sm" variant="ghost" className="text-xs text-muted-foreground h-7" onClick={clearSelection}>Clear</Button>
+          <Button size="sm" className="bg-cheese hover:bg-cheese-dark text-primary-foreground h-8" onClick={() => setBulkEditDialogOpen(true)}>Edit All</Button>
+        </div>
+      )}
+
       {rentTarget && <RentSlotDialog open={!!rentTarget} onOpenChange={(open) => !open && setRentTarget(null)} startTime={rentTarget.time} position={rentTarget.position} waxPricePerDay={pricing.waxPerDay} isJoining={rentTarget.isJoining || false} onSuccess={refetch} />}
       <BulkRentDialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen} selections={selectedSlots} waxPricePerDay={pricing.waxPerDay} onRemoveSlot={removeSlotFromSelection} onUpdateSlotMode={updateSlotMode} onSuccess={handleBulkSuccess} />
+      <BulkEditBannerDialog open={bulkEditDialogOpen} onOpenChange={setBulkEditDialogOpen} slots={selectedEditSlots} onRemoveSlot={removeEditSlotFromSelection} onSuccess={handleBulkSuccess} />
       {editTarget && <EditBannerDialog open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)} slot={editTarget} onSuccess={refetch} />}
       {removeTarget && <RemoveBannerDialog open={!!removeTarget} onOpenChange={(open) => !open && setRemoveTarget(null)} slot={removeTarget} onSuccess={refetch} />}
       {reinstateTarget && <ReinstateBannerDialog open={!!reinstateTarget} onOpenChange={(open) => !open && setReinstateTarget(null)} slot={reinstateTarget} onSuccess={refetch} />}
