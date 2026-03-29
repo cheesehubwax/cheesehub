@@ -2,7 +2,7 @@ import { Layout } from "@/components/Layout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreateDrip } from "@/components/drip/CreateDrip";
 import { MyDrips } from "@/components/drip/MyDrips";
-import { Droplets, List } from "lucide-react";
+
 import cheeseDripOrb from "@/assets/cheesedrop2.png";
 import { playRandomFart } from "@/lib/fartSounds";
 
@@ -46,12 +46,10 @@ export default function Drip() {
           <div className="flex justify-center mb-6">
             <TabsList className="bg-card/80 border border-border/50 h-10">
               <TabsTrigger value="create" className="gap-1.5 text-sm px-4">
-                <Droplets className="h-4 w-4" />
-                Create Drip
+                <span className="text-sm">✍️</span> Create Drip
               </TabsTrigger>
               <TabsTrigger value="my-drips" className="gap-1.5 text-sm px-4">
-                <List className="h-4 w-4" />
-                My Drips
+                <span className="text-sm">📂</span> My Drips
               </TabsTrigger>
             </TabsList>
           </div>

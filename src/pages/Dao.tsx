@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
-import { Users, Plus, User } from "lucide-react";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BrowseDaos } from "@/components/dao/BrowseDaos";
 import { CreateDao } from "@/components/dao/CreateDao";
@@ -61,13 +61,13 @@ const Dao = () => {
           <div className="flex justify-center mb-6">
             <TabsList className="bg-card/80 border border-border/50 h-10">
               <TabsTrigger value="browse" className="gap-1.5 text-sm px-4">
-                <Users className="h-4 w-4" /> Browse DAOs
+                <span className="text-sm">🔍</span> Browse DAOs
               </TabsTrigger>
               <TabsTrigger value="create" className="gap-1.5 text-sm px-4">
-                <Plus className="h-4 w-4" /> Create DAO
+                <span className="text-sm">✍️</span> Create DAO
               </TabsTrigger>
               <TabsTrigger value="my-daos" className="gap-1.5 text-sm px-4">
-                <User className="h-4 w-4" /> My DAOs
+                <span className="text-sm">📂</span> My DAOs
               </TabsTrigger>
             </TabsList>
           </div>

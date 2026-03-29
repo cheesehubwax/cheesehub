@@ -43,10 +43,10 @@ const Locker = () => {
         <Tabs defaultValue="create" className="w-full max-w-xl mx-auto">
           <div className="flex justify-center mb-6">
             <TabsList className="bg-card/80 border border-border/50 h-10">
-              <TabsTrigger value="create" className="gap-1.5 text-sm px-4">Create Lock</TabsTrigger>
-              <TabsTrigger value="my-locks" className="gap-1.5 text-sm px-4">My Locks</TabsTrigger>
-              <TabsTrigger value="lp-lock" className="gap-1.5 text-sm px-4">LP Lock</TabsTrigger>
-              <TabsTrigger value="my-lp" className="gap-1.5 text-sm px-4">My LP Locks</TabsTrigger>
+              <TabsTrigger value="create" className="gap-1.5 text-sm px-4"><span className="text-sm">✍️</span> Create Lock</TabsTrigger>
+              <TabsTrigger value="my-locks" className="gap-1.5 text-sm px-4"><span className="text-sm">📂</span> My Locks</TabsTrigger>
+              <TabsTrigger value="lp-lock" className="gap-1.5 text-sm px-4"><span className="text-sm">✍️</span> LP Lock</TabsTrigger>
+              <TabsTrigger value="my-lp" className="gap-1.5 text-sm px-4"><span className="text-sm">📂</span> My LP Locks</TabsTrigger>
             </TabsList>
           </div>
           <TabsContent value="create">
