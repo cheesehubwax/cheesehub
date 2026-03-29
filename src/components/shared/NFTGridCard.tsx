@@ -95,9 +95,11 @@ export const NFTGridCard = React.memo(function NFTGridCard({
   const showErrorState = !hasValidImage || imgError;
 
   const card = (
-    <button
+    <div
+      role="button"
+      tabIndex={disabled ? -1 : 0}
       onClick={disabled ? undefined : onToggle}
-      disabled={disabled}
+      onKeyDown={disabled ? undefined : (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
       className={cn(
         "group relative w-full aspect-square rounded-md overflow-hidden border-2 transition-all hover:opacity-90",
         disabled && "opacity-50 cursor-not-allowed grayscale-[30%]",
@@ -106,7 +108,8 @@ export const NFTGridCard = React.memo(function NFTGridCard({
           : borderClass || "border-transparent hover:border-muted-foreground/30"
       )}
     >
-      <div className="relative z-30">{extraBadge}</div>
+      {/* Badge overlay – absolute full-card so children inherit z-30 stacking */}
+      <div className="absolute inset-0 z-30 pointer-events-none">{extraBadge}</div>
       {isSelected && (
         <div className="absolute top-1 right-1 z-30 rounded-full p-0.5 bg-primary">
           <Check className="h-3 w-3 text-primary-foreground" />
@@ -114,15 +117,17 @@ export const NFTGridCard = React.memo(function NFTGridCard({
       )}
       <div className="w-full h-full bg-muted flex items-center justify-center">
         {showErrorState ? (
-          <button
-            type="button"
+          <div
+            role="button"
+            tabIndex={0}
             className="w-full h-full flex flex-col items-center justify-center bg-muted/50 cursor-pointer hover:bg-muted/80 transition-colors z-20"
             onClick={handleRetry}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleRetry(e as any); } }}
             title="Click to retry loading image"
           >
             <ImageIcon className="h-5 w-5 text-primary mb-1" />
             <span className="text-[9px] text-primary font-medium">Retry</span>
-          </button>
+          </div>
         ) : (
           <>
             {!imgLoaded && (
@@ -148,7 +153,7 @@ export const NFTGridCard = React.memo(function NFTGridCard({
           </>
         )}
       </div>
-    </button>
+    </div>
   );
 
   return (
