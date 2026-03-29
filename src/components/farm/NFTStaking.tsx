@@ -470,11 +470,18 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
       const stakedAssetIds = new Set(stakedNfts.map((s) => s.asset_id));
 
       // Build eligible sets from config
+      const wholeCollections = new Set<string>();
+      stakableConfig.collections.forEach((c) => c.collection && wholeCollections.add(c.collection));
+      const eligibleSchemas = new Set(
+        stakableConfig.schemas
+          .filter((s) => s.collection && s.schema)
+          .map((s) => `${s.collection}::${s.schema}`)
+      );
+      const templateIds = new Set(stakableConfig.templates.map((t) => t.template_id).filter(Boolean));
       const eligibleCollections = new Set<string>();
-      stakableConfig.collections.forEach((c) => c.collection && eligibleCollections.add(c.collection));
+      wholeCollections.forEach((c) => eligibleCollections.add(c));
       stakableConfig.schemas.forEach((s) => s.collection && eligibleCollections.add(s.collection));
       stakableConfig.templates.forEach((t) => t.collection && eligibleCollections.add(t.collection));
-      const templateIds = new Set(stakableConfig.templates.map((t) => t.template_id).filter(Boolean));
 
       // STRATEGY 1: Blockchain-first – query user's on-chain assets
       const eligibleAssetIds: string[] = [];
@@ -505,8 +512,8 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
               if (stakedAssetIds.has(id)) continue;
 
               let isEligible = false;
-              if (eligibleCollections.has(asset.collection_name)) isEligible = true;
-              if (stakableConfig.schemas.some((s) => s.collection === asset.collection_name && s.schema === asset.schema_name)) isEligible = true;
+              if (wholeCollections.has(asset.collection_name)) isEligible = true;
+              if (eligibleSchemas.has(`${asset.collection_name}::${asset.schema_name}`)) isEligible = true;
               if (templateIds.has(asset.template_id)) isEligible = true;
 
               if (isEligible) {
