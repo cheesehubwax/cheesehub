@@ -37,7 +37,7 @@ const Locker = () => {
       </section>
 
       <div className="container pb-12">
-        <Tabs defaultValue="create" className="w-full max-w-4xl mx-auto">
+        <Tabs defaultValue="create" className="w-full max-w-xl mx-auto">
           <div className="flex justify-center mb-6">
             <TabsList className="bg-card/80 border border-border/50 h-10">
               <TabsTrigger value="create" className="gap-1.5 text-sm px-4">Create Lock</TabsTrigger>
