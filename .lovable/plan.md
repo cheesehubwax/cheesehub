@@ -1,21 +1,49 @@
 
 
-## Universalise Tab Styling with Yellow Active Text
+## Unify All NFT Viewers to Match NFTSendManager Standard
 
 ### Problem
-Tabs across CHEESEFarm, CHEESEDao, CHEESEDrip, CHEESELock, and CHEESEDrop all use the default shadcn/ui tab styling — white text when active. They should use cheese-yellow for the active tab text and have a consistent look across all dApp pages.
+The NFT staking viewer in `NFTStaking.tsx` uses a cramped grid (`h-[420px]`, no HoverCards, bottom text overlays on cards) and the DAO `NFTVotePicker.tsx` uses a tiny `max-h-60` non-virtualized grid with 3-4 columns. The `PremintNFTPicker.tsx` also uses a small `h-80` grid with 3 columns. These all need to match the NFTSendManager's style per the existing memory standard.
 
-### Solution
-Update the shared `TabsTrigger` component in `src/components/ui/tabs.tsx` to use cheese-yellow text when active. This single change propagates to every tab usage site-wide — no per-page edits needed.
+### Reference standard (NFTSendManager)
+- **6-column virtualized grid** (`grid-cols-6`)
+- **`h-[560px]`** scroll container with `rounded-md border border-border`
+- **Pure image tiles** — no bottom text overlays, `object-cover` fills the card
+- **HoverCard metadata popups** with `side="top" collisionPadding={16} align="center"` showing Name, Asset ID, Collection, Schema, Template, Mint # with `text-cheese` labels
+- **ROW_HEIGHT = 120**, card height `h-[115px]`
 
-### Change
+### Changes
 
-**`src/components/ui/tabs.tsx`** — Update `TabsTrigger` default classes:
-- Replace `data-[state=active]:text-foreground` with `data-[state=active]:text-[hsl(var(--cheese))]`
-- This makes all active tab text cheese-yellow instead of white
-- Inactive tabs remain `text-muted-foreground` (unchanged)
+**1. `src/components/farm/NFTStaking.tsx`**
+- Update `VirtualGrid` component:
+  - Change `h-[420px]` → `h-[560px]` with `rounded-md border border-border`
+  - Change grid from `grid-cols-3 sm:grid-cols-4 md:grid-cols-6` → fixed `grid-cols-6`
+  - Update `getGridCols()` to always return 6
+- Update `NFTCard` component:
+  - Remove bottom text overlay (`bg-background/90` div with name/asset_id)
+  - Add fixed `h-[115px]` to the card button
+  - Use `object-cover` instead of `object-contain`
+  - Wrap each card in a `HoverCard` with metadata popup matching the standard (Name, Asset ID, Collection, Schema, Template with `text-cheese` labels)
+  - Import `HoverCard, HoverCardTrigger, HoverCardContent` from UI
 
-### Scope
-- **1 file changed**: `src/components/ui/tabs.tsx`
-- Affects all 12+ files using tabs — no individual file edits required
+**2. `src/components/dao/NFTVotePicker.tsx`**
+- Replace the non-virtualized `grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-60` with a virtualized 6-column grid
+  - Add `useVirtualizer` from `@tanstack/react-virtual`
+  - Use `h-[560px]` scroll container with `rounded-md border border-border`
+  - ROW_HEIGHT = 120, 6 columns
+- Replace inline card rendering with pure image tiles (no bottom text `p` tag)
+- Add HoverCard metadata popup on each card
+- Remove the inline card `<p>` name text at the bottom
+
+**3. `src/components/drops/PremintNFTPicker.tsx`**
+- Change `ITEMS_PER_ROW` from 3 → 6
+- Change `ITEM_HEIGHT` from 160 → 120
+- Change scroll container from `h-80` → `h-[560px]`
+- Change grid from `grid-cols-3` → `grid-cols-6`
+- Update `NFTCard` sub-component:
+  - Remove bottom name/mint text
+  - Use fixed `h-[115px]`, `object-cover`
+  - Add HoverCard metadata popup with standard styling
+
+### Files changed: 3
 
