@@ -43,14 +43,14 @@ export default function Drip() {
 
       <main className="container pb-12">
         <Tabs defaultValue="create" className="space-y-8">
-          <div className="flex justify-center">
-            <TabsList className="grid w-full max-w-md grid-cols-2 h-14">
-              <TabsTrigger value="create" className="gap-2 text-base font-semibold h-12">
-                <Droplets className="h-5 w-5" />
+          <div className="flex justify-center mb-6">
+            <TabsList className="bg-card/80 border border-border/50 h-10">
+              <TabsTrigger value="create" className="gap-1.5 text-sm px-4">
+                <Droplets className="h-4 w-4" />
                 Create Drip
               </TabsTrigger>
-              <TabsTrigger value="my-drips" className="gap-2 text-base font-semibold h-12">
-                <List className="h-5 w-5" />
+              <TabsTrigger value="my-drips" className="gap-1.5 text-sm px-4">
+                <List className="h-4 w-4" />
                 My Drips
               </TabsTrigger>
             </TabsList>
