@@ -29,6 +29,7 @@ export function PremintNFTPicker({
   
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "name" | "collection">("newest");
+  const [schemaFilter, setSchemaFilter] = useState<string>("all");
   const parentRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const rowHeight = useSquareGridRowHeight(parentRef, { columns: ITEMS_PER_ROW, fallback: ITEM_HEIGHT });
@@ -46,8 +47,21 @@ export function PremintNFTPicker({
     ? (loadingProgress.loaded / loadingProgress.total) * 100 
     : 0;
 
+  // Derive schemas from loaded NFTs
+  const schemas = useMemo(() => {
+    const map = new Map<string, number>();
+    nfts.forEach(nft => {
+      if (nft.schema) map.set(nft.schema, (map.get(nft.schema) || 0) + 1);
+    });
+    return Array.from(map.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [nfts]);
+
   const filteredNFTs = useMemo(() => {
     let result = [...nfts];
+
+    if (schemaFilter !== "all") {
+      result = result.filter(nft => nft.schema === schemaFilter);
+    }
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -55,7 +69,8 @@ export function PremintNFTPicker({
         (nft) =>
           nft.name.toLowerCase().includes(query) ||
           nft.asset_id.includes(query) ||
-          nft.collection.toLowerCase().includes(query)
+          nft.collection.toLowerCase().includes(query) ||
+          (nft.schema && nft.schema.toLowerCase().includes(query))
       );
     }
 
@@ -75,7 +90,7 @@ export function PremintNFTPicker({
     }
 
     return result;
-  }, [nfts, searchQuery, sortOrder]);
+  }, [nfts, searchQuery, sortOrder, schemaFilter]);
 
   const rowCount = Math.ceil(filteredNFTs.length / ITEMS_PER_ROW);
 
@@ -176,6 +191,19 @@ export function PremintNFTPicker({
             className="pl-9"
           />
         </div>
+        {schemas.length > 0 && (
+          <Select value={schemaFilter} onValueChange={setSchemaFilter}>
+            <SelectTrigger className="w-full sm:w-36">
+              <SelectValue placeholder="Schema" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Schemas</SelectItem>
+              {schemas.map(s => (
+                <SelectItem key={s.name} value={s.name}>{s.name} ({s.count})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as typeof sortOrder)}>
           <SelectTrigger className="w-full sm:w-36">
             <SelectValue />

@@ -1,6 +1,8 @@
-import { useState, useEffect, useRef, useMemo, useCallback, } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, Image as ImageIcon } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Image as ImageIcon, Search, RefreshCw } from "lucide-react";
 import { DaoInfo, UserNFT, fetchVotedNFTs } from "@/lib/dao";
 import { useWax } from "@/context/WaxContext";
 import { getIpfsUrl } from "@/lib/ipfsGateways";
@@ -23,6 +25,9 @@ export function NFTVotePicker({ dao, proposalId, onSelect, selectedIds }: NFTVot
   const [userNFTs, setUserNFTs] = useState<UserNFT[]>([]);
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [collectionFilter, setCollectionFilter] = useState<string>("all");
+  const [schemaFilter, setSchemaFilter] = useState<string>("all");
   const parentRef = useRef<HTMLDivElement>(null);
   const rowHeight = useSquareGridRowHeight(parentRef, { columns: COLUMNS, fallback: ROW_HEIGHT });
 
@@ -78,7 +83,46 @@ export function NFTVotePicker({ dao, proposalId, onSelect, selectedIds }: NFTVot
 
   const eligibleNFTs = useMemo(() => userNFTs.filter(nft => !votedIds.has(nft.asset_id)), [userNFTs, votedIds]);
 
-  const rowCount = Math.ceil(eligibleNFTs.length / COLUMNS);
+  // Derive collections
+  const collections = useMemo(() => {
+    const map = new Map<string, number>();
+    eligibleNFTs.forEach(nft => map.set(nft.collection, (map.get(nft.collection) || 0) + 1));
+    return Array.from(map.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [eligibleNFTs]);
+
+  // Derive schemas for selected collection
+  const schemas = useMemo(() => {
+    if (collectionFilter === "all") return [];
+    const map = new Map<string, number>();
+    eligibleNFTs.filter(nft => nft.collection === collectionFilter).forEach(nft => {
+      if (nft.schema) map.set(nft.schema, (map.get(nft.schema) || 0) + 1);
+    });
+    return Array.from(map.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [eligibleNFTs, collectionFilter]);
+
+  const handleCollectionChange = useCallback((value: string) => {
+    setCollectionFilter(value);
+    setSchemaFilter("all");
+  }, []);
+
+  // Filter
+  const filteredNFTs = useMemo(() => {
+    let result = [...eligibleNFTs];
+    if (collectionFilter !== "all") result = result.filter(nft => nft.collection === collectionFilter);
+    if (schemaFilter !== "all") result = result.filter(nft => nft.schema === schemaFilter);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(nft =>
+        nft.name.toLowerCase().includes(q) ||
+        nft.collection.toLowerCase().includes(q) ||
+        nft.asset_id.includes(q) ||
+        (nft.schema && nft.schema.toLowerCase().includes(q))
+      );
+    }
+    return result;
+  }, [eligibleNFTs, collectionFilter, schemaFilter, searchQuery]);
+
+  const rowCount = Math.ceil(filteredNFTs.length / COLUMNS);
   const virtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => parentRef.current,
@@ -121,29 +165,61 @@ export function NFTVotePicker({ dao, proposalId, onSelect, selectedIds }: NFTVot
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
+      {/* Search and Filters */}
+      <div className="flex flex-wrap gap-2">
+        <div className="relative flex-1 min-w-[120px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search NFTs..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Select value={collectionFilter} onValueChange={handleCollectionChange}>
+          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Collection" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All ({eligibleNFTs.length})</SelectItem>
+            {collections.map(col => <SelectItem key={col.name} value={col.name}>{col.name} ({col.count})</SelectItem>)}
+          </SelectContent>
+        </Select>
+        {collectionFilter !== "all" && schemas.length > 0 && (
+          <Select value={schemaFilter} onValueChange={setSchemaFilter}>
+            <SelectTrigger className="w-[140px]"><SelectValue placeholder="Schema" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Schemas</SelectItem>
+              {schemas.map(s => <SelectItem key={s.name} value={s.name}>{s.name} ({s.count})</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
+        <Button variant="ghost" size="icon" onClick={() => loadNFTs()} className="h-9 w-9" title="Refresh NFTs">
+          <RefreshCw className="h-4 w-4" />
+        </Button>
+      </div>
+
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Select NFTs to vote with ({selectedIds.length} selected)
+          {selectedIds.length} of {filteredNFTs.length} selected
         </p>
         <Button
           variant="ghost"
           size="sm"
           className="text-xs"
           onClick={() => onSelect(
-            selectedIds.length === eligibleNFTs.length
+            selectedIds.length === filteredNFTs.length
               ? []
-              : eligibleNFTs.map(n => n.asset_id)
+              : filteredNFTs.map(n => n.asset_id)
           )}
         >
-          {selectedIds.length === eligibleNFTs.length ? "Deselect All" : "Select All"}
+          {selectedIds.length === filteredNFTs.length ? "Deselect All" : "Select All"}
         </Button>
       </div>
       <div ref={parentRef} className="h-[560px] overflow-auto rounded-md border border-border">
         <div style={{ height: `${virtualizer.getTotalSize()}px`, width: "100%", position: "relative" }}>
           {virtualizer.getVirtualItems().map((virtualRow) => {
             const startIndex = virtualRow.index * COLUMNS;
-            const rowNFTs = eligibleNFTs.slice(startIndex, startIndex + COLUMNS);
+            const rowNFTs = filteredNFTs.slice(startIndex, startIndex + COLUMNS);
             return (
               <div
                 key={virtualRow.key}
@@ -157,17 +233,14 @@ export function NFTVotePicker({ dao, proposalId, onSelect, selectedIds }: NFTVot
                 }}
                 className="grid grid-cols-6 gap-2 p-1"
               >
-                {rowNFTs.map(nft => {
-                  const isSelected = selectedIds.includes(nft.asset_id);
-                  return (
-                    <NFTGridCard
-                      key={nft.asset_id}
-                      nft={nft}
-                      isSelected={isSelected}
-                      onToggle={() => toggleNFT(nft.asset_id)}
-                    />
-                  );
-                })}
+                {rowNFTs.map(nft => (
+                  <NFTGridCard
+                    key={nft.asset_id}
+                    nft={nft}
+                    isSelected={selectedIds.includes(nft.asset_id)}
+                    onToggle={() => toggleNFT(nft.asset_id)}
+                  />
+                ))}
               </div>
             );
           })}

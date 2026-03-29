@@ -1,20 +1,24 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { buildDepositNFTToTreasuryAction, buildNFTDepositAction, buildAnnounceDepoAction } from "@/lib/dao";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { getIpfsUrl } from "@/lib/ipfsGateways";
-import { Loader2, ArrowDownToLine, Wallet, Check, Search, RefreshCw, Image as ImageIcon, ImageOff } from "lucide-react";
+import { Loader2, ArrowDownToLine, Wallet, Search, RefreshCw, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { useSquareGridRowHeight } from "@/hooks/useSquareGridRowHeight";
+import { NFTGridCard } from "@/components/shared/NFTGridCard";
 
 interface UserNFTItem {
   asset_id: string;
   name: string;
   image: string;
   collection: string;
+  schema?: string;
+  template_id?: string;
   mint?: string;
 }
 
@@ -24,6 +28,9 @@ interface TreasuryNFTDepositProps {
 }
 
 type SortOption = "newest" | "oldest" | "name" | "collection";
+
+const COLUMNS = 6;
+const ROW_HEIGHT = 120;
 
 export function TreasuryNFTDeposit({ daoName, onDeposited }: TreasuryNFTDepositProps) {
   const { accountName, session, isConnected } = useWax();
@@ -35,6 +42,10 @@ export function TreasuryNFTDeposit({ daoName, onDeposited }: TreasuryNFTDepositP
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [collectionFilter, setCollectionFilter] = useState<string>("all");
+  const [schemaFilter, setSchemaFilter] = useState<string>("all");
+
+  const parentRef = useRef<HTMLDivElement>(null);
+  const rowHeight = useSquareGridRowHeight(parentRef, { columns: COLUMNS, fallback: ROW_HEIGHT });
 
   useEffect(() => {
     if (!accountName) { setLoading(false); return; }
@@ -60,6 +71,8 @@ export function TreasuryNFTDeposit({ daoName, onDeposited }: TreasuryNFTDepositP
             name: data.name || `NFT #${asset.asset_id}`,
             image,
             collection: asset.collection?.collection_name || "",
+            schema: asset.schema?.schema_name || "",
+            template_id: asset.template?.template_id || "",
             mint: asset.template_mint || "",
           };
         }));
@@ -70,27 +83,40 @@ export function TreasuryNFTDeposit({ daoName, onDeposited }: TreasuryNFTDepositP
     setLoading(false);
   }
 
-  // Derive collections from NFTs
+  // Derive collections
   const collections = useMemo(() => {
     const map = new Map<string, number>();
-    nfts.forEach(nft => {
-      map.set(nft.collection, (map.get(nft.collection) || 0) + 1);
-    });
+    nfts.forEach(nft => map.set(nft.collection, (map.get(nft.collection) || 0) + 1));
     return Array.from(map.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name));
   }, [nfts]);
+
+  // Derive schemas for selected collection
+  const schemas = useMemo(() => {
+    if (collectionFilter === "all") return [];
+    const map = new Map<string, number>();
+    nfts.filter(nft => nft.collection === collectionFilter).forEach(nft => {
+      if (nft.schema) map.set(nft.schema, (map.get(nft.schema) || 0) + 1);
+    });
+    return Array.from(map.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [nfts, collectionFilter]);
+
+  const handleCollectionChange = useCallback((value: string) => {
+    setCollectionFilter(value);
+    setSchemaFilter("all");
+  }, []);
 
   // Filter and sort
   const filteredNFTs = useMemo(() => {
     let result = [...nfts];
-    if (collectionFilter !== "all") {
-      result = result.filter(nft => nft.collection === collectionFilter);
-    }
+    if (collectionFilter !== "all") result = result.filter(nft => nft.collection === collectionFilter);
+    if (schemaFilter !== "all") result = result.filter(nft => nft.schema === schemaFilter);
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       result = result.filter(nft =>
         nft.name.toLowerCase().includes(query) ||
         nft.collection.toLowerCase().includes(query) ||
-        nft.asset_id.includes(query)
+        nft.asset_id.includes(query) ||
+        (nft.schema && nft.schema.toLowerCase().includes(query))
       );
     }
     switch (sortBy) {
@@ -100,7 +126,19 @@ export function TreasuryNFTDeposit({ daoName, onDeposited }: TreasuryNFTDepositP
       case "oldest": result.sort((a, b) => parseInt(a.asset_id) - parseInt(b.asset_id)); break;
     }
     return result;
-  }, [nfts, collectionFilter, searchQuery, sortBy]);
+  }, [nfts, collectionFilter, schemaFilter, searchQuery, sortBy]);
+
+  const rowCount = Math.ceil(filteredNFTs.length / COLUMNS);
+  const virtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => rowHeight,
+    overscan: 3,
+  });
+
+  useEffect(() => {
+    virtualizer.measure();
+  }, [rowHeight, virtualizer]);
 
   const toggleNFT = useCallback((id: string) => {
     setSelected(prev => {
@@ -172,8 +210,8 @@ export function TreasuryNFTDeposit({ daoName, onDeposited }: TreasuryNFTDepositP
       </div>
 
       {/* Search and Filters */}
-      <div className="flex gap-2">
-        <div className="relative flex-1">
+      <div className="flex flex-wrap gap-2">
+        <div className="relative flex-1 min-w-[120px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search by name, collection, or ID..."
@@ -182,8 +220,8 @@ export function TreasuryNFTDeposit({ daoName, onDeposited }: TreasuryNFTDepositP
             className="pl-9"
           />
         </div>
-        <Select value={collectionFilter} onValueChange={setCollectionFilter}>
-          <SelectTrigger className="w-[130px]">
+        <Select value={collectionFilter} onValueChange={handleCollectionChange}>
+          <SelectTrigger className="w-[140px]">
             <SelectValue placeholder="Collection" />
           </SelectTrigger>
           <SelectContent>
@@ -195,8 +233,21 @@ export function TreasuryNFTDeposit({ daoName, onDeposited }: TreasuryNFTDepositP
             ))}
           </SelectContent>
         </Select>
+        {collectionFilter !== "all" && schemas.length > 0 && (
+          <Select value={schemaFilter} onValueChange={setSchemaFilter}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Schema" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Schemas</SelectItem>
+              {schemas.map(s => (
+                <SelectItem key={s.name} value={s.name}>{s.name} ({s.count})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-          <SelectTrigger className="w-[110px]">
+          <SelectTrigger className="w-[120px]">
             <SelectValue placeholder="Sort" />
           </SelectTrigger>
           <SelectContent>
@@ -230,8 +281,8 @@ export function TreasuryNFTDeposit({ daoName, onDeposited }: TreasuryNFTDepositP
         </div>
       </div>
 
-      {/* NFT Grid */}
-      <div className="h-[240px] overflow-auto rounded-md border border-border">
+      {/* NFT Grid - Virtualized */}
+      <div ref={parentRef} className="h-[560px] overflow-auto rounded-md border border-border">
         {loading && nfts.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-2">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -243,15 +294,34 @@ export function TreasuryNFTDeposit({ daoName, onDeposited }: TreasuryNFTDepositP
             <p>{nfts.length === 0 ? "No NFTs in wallet" : "No NFTs match filter"}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-4 gap-2 p-2">
-            {filteredNFTs.map(nft => (
-              <NFTCard
-                key={nft.asset_id}
-                nft={nft}
-                isSelected={selected.has(nft.asset_id)}
-                onToggle={() => toggleNFT(nft.asset_id)}
-              />
-            ))}
+          <div style={{ height: `${virtualizer.getTotalSize()}px`, width: "100%", position: "relative" }}>
+            {virtualizer.getVirtualItems().map((virtualRow) => {
+              const startIndex = virtualRow.index * COLUMNS;
+              const rowNFTs = filteredNFTs.slice(startIndex, startIndex + COLUMNS);
+              return (
+                <div
+                  key={virtualRow.key}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: `${virtualRow.size}px`,
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                  className="grid grid-cols-6 gap-2 p-1"
+                >
+                  {rowNFTs.map(nft => (
+                    <NFTGridCard
+                      key={nft.asset_id}
+                      nft={nft}
+                      isSelected={selected.has(nft.asset_id)}
+                      onToggle={() => toggleNFT(nft.asset_id)}
+                    />
+                  ))}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -278,55 +348,5 @@ export function TreasuryNFTDeposit({ daoName, onDeposited }: TreasuryNFTDepositP
         Anyone can deposit NFTs. To withdraw, create an NFT Transfer proposal.
       </p>
     </div>
-  );
-}
-
-interface NFTCardProps {
-  nft: UserNFTItem;
-  isSelected: boolean;
-  onToggle: () => void;
-}
-
-function NFTCard({ nft, isSelected, onToggle }: NFTCardProps) {
-  const [imgError, setImgError] = useState(false);
-
-  return (
-    <button
-      onClick={onToggle}
-      className={cn(
-        "relative rounded-md overflow-hidden border-2 transition-all hover:opacity-90 h-[120px]",
-        isSelected
-          ? "border-primary ring-1 ring-primary"
-          : "border-transparent hover:border-muted-foreground/30"
-      )}
-    >
-      {isSelected && (
-        <div className="absolute top-1 right-1 z-10 bg-primary rounded-full p-0.5">
-          <Check className="h-3 w-3 text-primary-foreground" />
-        </div>
-      )}
-      <div className="aspect-square bg-muted h-[80px]">
-        {imgError ? (
-          <div className="w-full h-full flex items-center justify-center">
-            <ImageOff className="h-6 w-6 text-muted-foreground" />
-          </div>
-        ) : (
-          <img
-            src={nft.image}
-            alt={nft.name}
-            className="w-full h-full object-cover"
-            loading="lazy"
-            onError={() => setImgError(true)}
-          />
-        )}
-      </div>
-      <div className="p-1 bg-background/80 absolute bottom-0 left-0 right-0">
-        <p className="text-[10px] font-medium truncate">{nft.name}</p>
-        <div className="flex items-center justify-between">
-          <span className="text-[9px] text-muted-foreground truncate max-w-[60%]">{nft.collection}</span>
-          {nft.mint && <span className="text-[9px] text-muted-foreground">#{nft.mint}</span>}
-        </div>
-      </div>
-    </button>
   );
 }
