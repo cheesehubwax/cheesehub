@@ -16,6 +16,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { TokenLogo } from "@/components/TokenLogo";
+import cheeseUpOrb from "@/assets/cheeseup.png";
 
 interface SuccessDetails {
   cpuMs: number;
