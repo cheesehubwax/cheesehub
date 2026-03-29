@@ -1,36 +1,37 @@
 
 
-## Make "Staked Elsewhere" NFTs Clickable to Navigate to Other Farm
+## Fix "Staked in [farm]" Label Visibility + Filter Already-Staked NFTs
 
-### Summary
-The cross-farm detection (`globallyStakedMap`) and visual treatment (amber border, warning icon) already exist in `FarmNFTCard` (lines 82-126). The fix: remove `disabled`, add opacity dimming, add a visible "Staked in [farm]" label, and make clicking navigate to that farm.
+### Problems identified
 
-### Changes — `src/components/farm/NFTStaking.tsx`
+1. **"Staked in [farm]" label invisible when image fails to load**: The retry overlay in `NFTGridCard` uses `z-20` and covers the entire card, hiding the `extraBadge` at `z-10`. If IPFS images fail (common), users never see the staked-elsewhere indicator.
 
-1. **Add `useNavigate`** import from `react-router-dom`
+2. **NFTs already staked in the current farm appearing as eligible**: The error `"asset id ... is already staked here"` means `stakedNfts` data is stale or incomplete when the eligible query runs. The eligible query filters by `stakedAssetIds`, but if that set is outdated, already-staked NFTs leak through.
 
-2. **Update `FarmNFTCardProps`** to accept an `onNavigateToFarm?: () => void` callback
+### Changes
 
-3. **Update the staked-elsewhere branch** (lines 85-116):
-   - Remove `disabled` prop from `NFTGridCard`
-   - Add `opacity-60` wrapper styling
-   - Replace `onToggle` with `onNavigateToFarm` so clicking navigates instead of selecting
-   - Add a visible overlay badge: "Staked in [farm]" (amber text, small font) — visible without hovering
-   - Keep existing tooltip and amber border for extra context
-   - Add `cursor-pointer` styling
+**File: `src/components/shared/NFTGridCard.tsx`**
+- Raise `extraBadge` z-index from `z-10` to `z-30` so it renders above both the retry overlay (`z-20`) and the loading spinner. This ensures the "Staked in [farm]" badge and warning icon are always visible regardless of image load state.
 
-4. **In `VirtualGrid`** (line 186-193), pass a navigate callback to `FarmNFTCard`:
-   - Accept `onNavigateToFarm` prop (a function taking farm name)
-   - Wire it: `onNavigateToFarm={() => onNavigateToFarm?.(stakedInFarm)}`
+**File: `src/components/farm/NFTStaking.tsx`**
+- Add a safety filter in `filteredEligible`: exclude any NFT whose `asset_id` exists in `stakedNfts` (the current farm's staked list). This is a second line of defense against stale cache causing "already staked here" errors.
+- Also filter them out in the `handleStakeAll` / stake transaction builder so even if they render, they cannot be submitted.
 
-5. **In the main component**, create navigate handler and pass it through:
-   ```ts
-   const navigate = useNavigate();
-   const handleNavigateToFarm = (farmName: string) => navigate(`/farm/${farmName}`);
-   ```
+### Technical detail
 
-### Result
-Staked-elsewhere NFTs appear dimmed with a visible "Staked in [farm]" label. Clicking navigates to that farm so the user can unstake there.
+```
+NFTGridCard z-index layers:
+  z-10  → selection checkmark (top-right)
+  z-20  → retry/error overlay (full card)
+  z-30  → extraBadge (staked-elsewhere label + warning icon) ← NEW
+```
 
-### Files changed: 1
+For the stale-data filter:
+```ts
+// In filteredEligible useMemo, add:
+const currentStakedIds = new Set(stakedNfts.map(s => s.asset_id));
+result = result.filter(n => !currentStakedIds.has(n.asset_id));
+```
+
+### Files changed: 2
 
