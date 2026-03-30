@@ -11,7 +11,7 @@ import { useAllTokenBalances } from '@/hooks/useAllTokenBalances';
 import { buildClaimRewardsAction, buildUnstakeAction, buildStakeAction, AlcorFarmPosition, UnstakedIncentive } from '@/lib/alcorFarms';
 import { TokenLogo } from '@/components/TokenLogo';
 import { toast } from 'sonner';
-import { closeWharfkitModals } from '@/lib/wharfKit';
+import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
 import { IncreaseLiquidityDialog } from './IncreaseLiquidityDialog';
 import { CreateAlcorFarmDialog } from './CreateAlcorFarmDialog';
 import { cn } from '@/lib/utils';
@@ -264,7 +264,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
       const actions = incentives.map(incentive =>
         buildUnstakeAction(accountName, incentive.incentiveId, incentive.positionId)
       );
-      const result = await session.transact({ actions });
+      const result = await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       const txId = result.resolved?.transaction.id?.toString() || null;
       const removedIds = new Set(incentives.map(i => `${i.positionId}-${i.incentiveId}`));
       setOptimisticallyRemovedIds(prev => new Set([...prev, ...removedIds]));
@@ -373,7 +373,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
       const actions = expiredIncentives.map(incentive =>
         buildUnstakeAction(accountName, incentive.incentiveId, incentive.positionId)
       );
-      const result = await session.transact({ actions });
+      const result = await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       const txId = result.resolved?.transaction.id?.toString() || null;
       const removedIds = new Set(expiredIncentives.map(i => `${i.positionId}-${i.incentiveId}`));
       setOptimisticallyRemovedIds(prev => new Set([...prev, ...removedIds]));

@@ -81,7 +81,7 @@ export function StakeManager({ resources, onTransactionComplete, onTransactionSu
     try {
       const actions = [{ account: 'eosio', name: 'delegatebw', authorization: [session.permissionLevel],
         data: { from: accountName, receiver: stakeReceiver, stake_net_quantity: `${netAmount.toFixed(8)} WAX`, stake_cpu_quantity: `${cpuAmount.toFixed(8)} WAX`, transfer: false } }];
-      const result = await session.transact({ actions });
+      const result = await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       const txId = result.resolved?.transaction.id?.toString() || null;
       const desc = [];
       if (cpuAmount > 0) desc.push(`${cpuAmount.toFixed(8)} WAX to CPU`);

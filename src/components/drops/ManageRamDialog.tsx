@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { closeWharfkitModals } from "@/lib/wharfKit";
+import { closeWharfkitModals, getTransactPlugins } from "@/lib/wharfKit";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,7 +63,7 @@ export function ManageRamDialog() {
     setLoading(true);
     try {
       const actions = buildDepositRamActions(accountName, selectedCollection, amount);
-      await session.transact({ actions });
+      await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       toast.success(`Successfully deposited ${amount} WAX for RAM`);
       setDepositAmount(""); await fetchRamBalance();
     } catch (error) { toast.error(error instanceof Error ? error.message : "Failed to deposit RAM"); }
@@ -79,7 +79,7 @@ export function ManageRamDialog() {
     setLoading(true);
     try {
       const actions = buildWithdrawRamActions(accountName, selectedCollection, bytes);
-      await session.transact({ actions });
+      await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       toast.success(`Successfully withdrew ${bytes.toLocaleString()} bytes of RAM`);
       setWithdrawBytes(""); await fetchRamBalance();
     } catch (error) { toast.error(error instanceof Error ? error.message : "Failed to withdraw RAM"); }
