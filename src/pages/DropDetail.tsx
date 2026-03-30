@@ -4,8 +4,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Loader2, ShoppingCart, Info } from "lucide-react";
+import { ArrowLeft, Loader2, ShoppingCart, Info, Minus, Plus } from "lucide-react";
 import { TokenLogo } from "@/components/TokenLogo";
 import { fetchDropById } from "@/services/atomicApi";
 import { useWax } from "@/context/WaxContext";
@@ -22,6 +23,7 @@ const DropDetail = () => {
   const [drop, setDrop] = useState<NFTDrop | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedPriceIndex, setSelectedPriceIndex] = useState<number | null>(null);
+  const [quantity, setQuantity] = useState(1);
   const { eligibility } = useDropEligibility(drop, accountName || undefined);
 
   useEffect(() => {
@@ -54,6 +56,13 @@ const DropDetail = () => {
     return 'eosio.token';
   }
 
+  // Compute max purchasable quantity
+  const maxQuantity = Math.min(
+    drop ? (drop.totalSupply > 0 ? drop.remaining : 99) : 1,
+    drop?.accountLimit && drop.accountLimit > 0 ? drop.accountLimit : 99,
+    99
+  );
+
   const handleAddToCart = () => {
     if (!drop) return;
     const prices = drop.prices && drop.prices.length > 0 ? drop.prices : [];
@@ -83,7 +92,8 @@ const DropDetail = () => {
       precision,
       listingPrice: listingPrice || `${price.toFixed(precision)} ${currency}`,
     };
-    addToCart(drop, selectedPrice);
+    addToCart(drop, selectedPrice, quantity);
+    setQuantity(1);
   };
 
   if (loading) {
@@ -200,6 +210,46 @@ const DropDetail = () => {
                   </div>
                 )}
 
+                {/* Quantity selector */}
+                {!isFree && !isOutOfStock && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Quantity</span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        disabled={quantity <= 1}
+                      >
+                        <Minus className="h-3 w-3" />
+                      </Button>
+                      <Select
+                        value={String(quantity)}
+                        onValueChange={(v) => setQuantity(Number(v))}
+                      >
+                        <SelectTrigger className="w-16 h-8 text-center">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: Math.min(maxQuantity, 20) }, (_, i) => i + 1).map((n) => (
+                            <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => setQuantity(Math.min(maxQuantity, quantity + 1))}
+                        disabled={quantity >= maxQuantity}
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 {drop.totalSupply > 0 && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Supply</span>
@@ -231,7 +281,7 @@ const DropDetail = () => {
                     disabled={!eligibility.isEligible || (!isFree && drop.prices && drop.prices.length > 1 && selectedPriceIndex === null)}
                   >
                     <ShoppingCart className="h-4 w-4 mr-2" />
-                    {isFree ? "Claim Free Drop" : selectedPriceIndex === null && drop.prices && drop.prices.length > 1 ? "Select Payment First" : "Add to Cart"}
+                    {isFree ? "Claim Free Drop" : selectedPriceIndex === null && drop.prices && drop.prices.length > 1 ? "Select Payment First" : `Add ${quantity > 1 ? quantity + "x " : ""}to Cart`}
                   </Button>
                 )}
               </CardContent>
