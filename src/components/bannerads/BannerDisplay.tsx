@@ -205,11 +205,14 @@ export function BannerDisplay() {
     setWarningUrl(sanitized);
   }, []);
 
+  const hasPos1 = pos1Banners.length > 0;
+  const hasPos2 = pos2Banners.length > 0;
+
   return (
     <div className="w-full flex flex-col items-center gap-1 pt-8 pb-2">
-      <div className="flex gap-12">
-        <PositionSlot banners={pos1Banners} position={1} onAdClick={handleAdClick} />
-        <PositionSlot banners={pos2Banners} position={2} onAdClick={handleAdClick} />
+      <div className="flex gap-12 justify-center">
+        {(hasPos1 || !hasPos2) && <PositionSlot banners={pos1Banners} position={1} onAdClick={handleAdClick} />}
+        {(hasPos2 || !hasPos1) && <PositionSlot banners={pos2Banners} position={2} onAdClick={handleAdClick} />}
       </div>
       <Link
         to="/bannerads"
