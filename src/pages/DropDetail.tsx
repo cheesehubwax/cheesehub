@@ -23,6 +23,7 @@ const DropDetail = () => {
   const [drop, setDrop] = useState<NFTDrop | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedPriceIndex, setSelectedPriceIndex] = useState<number | null>(null);
+  const [quantity, setQuantity] = useState(1);
   const { eligibility } = useDropEligibility(drop, accountName || undefined);
 
   useEffect(() => {
