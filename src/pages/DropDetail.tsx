@@ -56,6 +56,13 @@ const DropDetail = () => {
     return 'eosio.token';
   }
 
+  // Compute max purchasable quantity
+  const maxQuantity = Math.min(
+    drop ? (drop.totalSupply > 0 ? drop.remaining : 99) : 1,
+    drop?.accountLimit && drop.accountLimit > 0 ? drop.accountLimit : 99,
+    99
+  );
+
   const handleAddToCart = () => {
     if (!drop) return;
     const prices = drop.prices && drop.prices.length > 0 ? drop.prices : [];
@@ -85,7 +92,8 @@ const DropDetail = () => {
       precision,
       listingPrice: listingPrice || `${price.toFixed(precision)} ${currency}`,
     };
-    addToCart(drop, selectedPrice);
+    addToCart(drop, selectedPrice, quantity);
+    setQuantity(1);
   };
 
   if (loading) {
