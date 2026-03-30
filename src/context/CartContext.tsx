@@ -8,7 +8,7 @@ export interface CartItem extends NFTDrop {
 
 interface CartContextType {
   items: CartItem[];
-  addToCart: (item: NFTDrop, selectedPrice: SelectedPrice) => void;
+  addToCart: (item: NFTDrop, selectedPrice: SelectedPrice, quantity?: number) => void;
   removeFromCart: (id: string) => void;
   clearCart: () => void;
   totalItems: number;
@@ -22,19 +22,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
 
-  const addToCart = (item: NFTDrop, selectedPrice: SelectedPrice) => {
+  const addToCart = (item: NFTDrop, selectedPrice: SelectedPrice, quantity: number = 1) => {
     setItems((prev) => {
-      // Create unique key combining drop ID and selected currency
       const cartKey = `${item.id}-${selectedPrice.currency}`;
       const existing = prev.find((i) => `${i.id}-${i.selectedPrice.currency}` === cartKey);
       if (existing) {
         return prev.map((i) =>
           `${i.id}-${i.selectedPrice.currency}` === cartKey
-            ? { ...i, quantity: i.quantity + 1 }
+            ? { ...i, quantity: i.quantity + quantity }
             : i
         );
       }
-      return [...prev, { ...item, quantity: 1, selectedPrice }];
+      return [...prev, { ...item, quantity, selectedPrice }];
     });
     setIsOpen(true);
   };
