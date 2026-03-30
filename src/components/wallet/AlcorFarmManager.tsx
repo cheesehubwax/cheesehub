@@ -216,7 +216,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
     setIsTransacting(true);
     try {
       const actions = buildClaimRewardsAction(accountName, claims);
-      const result = await session.transact({ actions });
+      const result = await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       const txId = result.resolved?.transaction.id?.toString() || null;
       onTransactionSuccess?.('Rewards Claimed!', `Claimed rewards from ${claims.length} incentive(s)`, txId);
       refetch();
@@ -242,7 +242,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
       });
       const claims = Array.from(claimsMap.values());
       const actions = buildClaimRewardsAction(accountName, claims);
-      const result = await session.transact({ actions });
+      const result = await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       const txId = result.resolved?.transaction.id?.toString() || null;
       onTransactionSuccess?.('All Rewards Claimed!', `Claimed rewards from ${claims.length} incentive(s)`, txId);
       refetch();
