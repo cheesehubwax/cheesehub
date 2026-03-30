@@ -11,7 +11,7 @@ import { useAllTokenBalances } from '@/hooks/useAllTokenBalances';
 import { buildClaimRewardsAction, buildUnstakeAction, buildStakeAction, AlcorFarmPosition, UnstakedIncentive } from '@/lib/alcorFarms';
 import { TokenLogo } from '@/components/TokenLogo';
 import { toast } from 'sonner';
-import { closeWharfkitModals } from '@/lib/wharfKit';
+import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
 import { IncreaseLiquidityDialog } from './IncreaseLiquidityDialog';
 import { CreateAlcorFarmDialog } from './CreateAlcorFarmDialog';
 import { cn } from '@/lib/utils';
@@ -216,7 +216,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
     setIsTransacting(true);
     try {
       const actions = buildClaimRewardsAction(accountName, claims);
-      const result = await session.transact({ actions });
+      const result = await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       const txId = result.resolved?.transaction.id?.toString() || null;
       onTransactionSuccess?.('Rewards Claimed!', `Claimed rewards from ${claims.length} incentive(s)`, txId);
       refetch();
@@ -242,7 +242,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
       });
       const claims = Array.from(claimsMap.values());
       const actions = buildClaimRewardsAction(accountName, claims);
-      const result = await session.transact({ actions });
+      const result = await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       const txId = result.resolved?.transaction.id?.toString() || null;
       onTransactionSuccess?.('All Rewards Claimed!', `Claimed rewards from ${claims.length} incentive(s)`, txId);
       refetch();
@@ -264,7 +264,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
       const actions = incentives.map(incentive =>
         buildUnstakeAction(accountName, incentive.incentiveId, incentive.positionId)
       );
-      const result = await session.transact({ actions });
+      const result = await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       const txId = result.resolved?.transaction.id?.toString() || null;
       const removedIds = new Set(incentives.map(i => `${i.positionId}-${i.incentiveId}`));
       setOptimisticallyRemovedIds(prev => new Set([...prev, ...removedIds]));
@@ -291,7 +291,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
     setIsTransacting(true);
     try {
       const action = buildStakeAction(accountName, incentive.incentiveId, positionId);
-      const result = await session.transact({ actions: [action] });
+      const result = await session.transact({ actions: [action] }, { transactPlugins: getTransactPlugins(session) });
       const txId = result.resolved?.transaction.id?.toString() || null;
       onTransactionSuccess?.('Position Staked!', `Staked position #${positionId} to ${incentive.rewardToken.symbol} farm rewards`, txId);
       refetch();
@@ -311,7 +311,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
     setIsTransacting(true);
     try {
       const actions = incentives.map(incentive => buildStakeAction(accountName, incentive.incentiveId, positionId));
-      const result = await session.transact({ actions });
+      const result = await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       const txId = result.resolved?.transaction.id?.toString() || null;
       const rewardSymbols = incentives.map(i => i.rewardToken.symbol).join(', ');
       onTransactionSuccess?.('Position Staked!', `Staked position #${positionId} to ${incentives.length} farm rewards (${rewardSymbols})`, txId);
@@ -351,7 +351,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
         toast.error('No stakeable incentives found');
         return;
       }
-      const result = await session.transact({ actions });
+      const result = await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       const txId = result.resolved?.transaction.id?.toString() || null;
       onTransactionSuccess?.('All Positions Staked!', `Staked ${totalStakeableCount} position(s) into ${actions.length} farm incentive(s)`, txId);
       refetch();
@@ -373,7 +373,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
       const actions = expiredIncentives.map(incentive =>
         buildUnstakeAction(accountName, incentive.incentiveId, incentive.positionId)
       );
-      const result = await session.transact({ actions });
+      const result = await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       const txId = result.resolved?.transaction.id?.toString() || null;
       const removedIds = new Set(expiredIncentives.map(i => `${i.positionId}-${i.incentiveId}`));
       setOptimisticallyRemovedIds(prev => new Set([...prev, ...removedIds]));

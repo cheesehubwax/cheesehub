@@ -81,7 +81,7 @@ export function StakeManager({ resources, onTransactionComplete, onTransactionSu
     try {
       const actions = [{ account: 'eosio', name: 'delegatebw', authorization: [session.permissionLevel],
         data: { from: accountName, receiver: stakeReceiver, stake_net_quantity: `${netAmount.toFixed(8)} WAX`, stake_cpu_quantity: `${cpuAmount.toFixed(8)} WAX`, transfer: false } }];
-      const result = await session.transact({ actions });
+      const result = await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       const txId = result.resolved?.transaction.id?.toString() || null;
       const desc = [];
       if (cpuAmount > 0) desc.push(`${cpuAmount.toFixed(8)} WAX to CPU`);
@@ -103,7 +103,7 @@ export function StakeManager({ resources, onTransactionComplete, onTransactionSu
     try {
       const actions = [{ account: 'eosio', name: 'undelegatebw', authorization: [session.permissionLevel],
         data: { from: accountName, receiver: accountName, unstake_net_quantity: `${netAmount.toFixed(8)} WAX`, unstake_cpu_quantity: `${cpuAmount.toFixed(8)} WAX` } }];
-      const result = await session.transact({ actions });
+      const result = await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       const txId = result.resolved?.transaction.id?.toString() || null;
       onTransactionSuccess?.('Unstaked Successfully!', `Refund available in 3 days.`, txId);
       setCpuUnstakeAmount(''); setNetUnstakeAmount(''); fetchStakedResources(); fetchRefundInfo(); onTransactionComplete?.();
@@ -116,7 +116,7 @@ export function StakeManager({ resources, onTransactionComplete, onTransactionSu
     setIsTransacting(true);
     try {
       const actions = [{ account: 'eosio', name: 'refund', authorization: [session.permissionLevel], data: { owner: accountName } }];
-      const result = await session.transact({ actions });
+      const result = await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       const txId = result.resolved?.transaction.id?.toString() || null;
       const cpuRefund = parseFloat(refundInfo.cpu_amount?.split(' ')[0] || '0');
       const netRefund = parseFloat(refundInfo.net_amount?.split(' ')[0] || '0');
