@@ -50,6 +50,7 @@ function InfoTooltip({ text }: { text: string }) {
 export function CreateDao() {
   const { accountName, session, isConnected } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
+  const cheesePricing = useCheeseFeePricing();
   const [loading, setLoading] = useState(false);
   const [termsAgreed, setTermsAgreed] = useState(false);
   const { toast } = useToast();
