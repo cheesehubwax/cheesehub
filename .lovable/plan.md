@@ -1,33 +1,47 @@
 
 
-## Fix Missing Greymass Fuel on Multiple Transaction Flows
+## Fix Missing `assertpoint` in CHEESE Payment Flow
 
-### Problem
-Three files call `session.transact({ actions })` **without** passing `{ transactPlugins: getTransactPlugins(session) }`, which means those transactions skip Greymass Fuel entirely. For Anchor users, this means no free CPU/NET sponsorship — transactions fail if the account has insufficient resources.
+### Root Cause
 
-### Files to fix
+The `assertpoint` action is **only included in the WAX payment path**, but it's needed for ALL payment methods. This action creates the user's row in the `farms.waxdao` points table. Without it, when the `cheesefeefee` contract tries to credit points via inline transfer, there's no row to credit, so `createfarm` fails with "You don't have a points balance."
 
-**1. `src/components/wallet/StakeManager.tsx`** — 3 calls (stake, unstake, refund)
-- Line 84: `session.transact({ actions })` → add `{ transactPlugins: getTransactPlugins(session) }`
-- Line 106: same fix
-- Line 119: same fix
-
-**2. `src/components/wallet/AlcorFarmManager.tsx`** — 7 calls (claim, claim all, unstake, stake single, stake all positions, stake all, unstake expired)
-- Lines 219, 245, 267, 294, 314, 354, 376: all missing the transactPlugins option
-
-**3. `src/components/drops/ManageRamDialog.tsx`** — 2 calls (deposit RAM, withdraw RAM)
-- Lines 66, 82: both missing the transactPlugins option
-
-### Fix pattern
-Every `session.transact({ actions })` becomes:
+**CreateFarm.tsx (lines 177-182) — current broken code:**
 ```ts
-session.transact({ actions }, { transactPlugins: getTransactPlugins(session) })
+if (paymentMethod === "cheese") {
+  actions.push(buildCheesePaymentAction(...));     // ← no assertpoint!
+} else {
+  actions.push(buildAssertPointAction(accountName)); // ← only WAX gets it
+  actions.push(buildFarmCreationFeeWaxAction(accountName));
+}
 ```
 
-Ensure `getTransactPlugins` is imported from `@/lib/wharfKit` in each file (already imported in StakeManager, needs checking in the others).
+**Bonus bug found in CreateDao.tsx (lines 119-124):** The CHEESE path pushes NO payment action at all — only WAX gets fee actions. CHEESE-paying DAO creators send zero fee to the contract.
 
-### Result
-All transaction flows will pass through Greymass Fuel for Anchor sessions, restoring free CPU/NET sponsorship across the entire app.
+### Fix
 
-### Files changed: 3
+**1. `src/components/farm/CreateFarm.tsx`** — Add `assertpoint` before the CHEESE payment action:
+```ts
+if (paymentMethod === "cheese" && cheesePricing.isAvailable) {
+  actions.push(buildAssertPointAction(accountName));  // ADD THIS
+  actions.push(buildCheesePaymentAction(...));
+} else {
+  actions.push(buildAssertPointAction(accountName));
+  actions.push(buildFarmCreationFeeWaxAction(accountName));
+}
+```
+
+**2. `src/components/dao/CreateDao.tsx`** — Add `assertpoint` AND the CHEESE payment action for the cheese path:
+```ts
+if (paymentMethod === "cheese" && cheesePricing.isAvailable) {
+  actions.push(buildAssertPointAction(accountName));
+  actions.push(buildCheesePaymentAction(accountName, cheesePricing.formattedForTx, "dao", daoName));
+} else if (paymentMethod === "wax") {
+  actions.push(buildAssertPointAction(accountName));
+  actions.push(buildDaoCreationFeeAction(accountName));
+}
+```
+Also add the missing `buildCheesePaymentAction` import from `@/lib/cheeseFees` and `useCheeseFeePricing` hook.
+
+### Files changed: 2
 
