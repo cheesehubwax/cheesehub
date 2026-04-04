@@ -258,11 +258,6 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
                   )}
                 </>
               )}
-              {isConnected && (
-                <Button variant="outline" size="sm" onClick={() => setDepositOpen(true)}>
-                  <Download className="h-4 w-4 mr-1" /> Deposit Rewards
-                </Button>
-              )}
               <Button variant="outline" size="sm" onClick={() => refetch()}>
                 <RefreshCw className="h-4 w-4" />
               </Button>
@@ -301,7 +296,135 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
         </div>
       )}
 
-      {/* Stats cards */}
+      {/* Farm Information + Reward Pools side by side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Farm Information */}
+        <Card className="bg-card/80 border-border/50">
+          <CardHeader>
+            <CardTitle className="text-lg">Farm Information</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-muted-foreground">Status</p>
+                <Badge className={`text-xs ${status.className}`}>{status.label}</Badge>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Type</p>
+                <p className="font-medium">{getFarmTypeLabel(farm.farm_type)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Creator</p>
+                <p className="font-medium font-mono">{farm.creator}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Created</p>
+                <p className="font-medium">{createdDate}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Expiration</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium">{expirationDate}</p>
+                  {isCreator && !isUnderConstruction && !isExpired && !isPermClosed && (
+                    <Button size="sm" variant="outline" onClick={() => setExtendFarmOpen(true)} className="h-6 text-xs px-2">
+                      Extend
+                    </Button>
+                  )}
+                  {isCreator && isExpired && !isPermClosed && (
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => setCloseFarmOpen(true)} className="h-6 text-xs px-2">
+                        Close
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={() => setPermCloseOpen(true)} className="h-6 text-xs px-2">
+                        Perm Close
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {isCreator && (
+              <div className="flex flex-wrap gap-2 pt-4 border-t border-border/30">
+                {(isUnderConstruction || isPermClosed) && hasStakers && (
+                  <Button size="sm" variant="outline" onClick={() => setKickOpen(true)}>
+                    Kick Stakers
+                  </Button>
+                )}
+                {isPermClosed && !hasStakers && (
+                  <Button size="sm" variant="outline" onClick={() => setEmptyOpen(true)}>
+                    Empty Farm
+                  </Button>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Reward Pools */}
+        <Card className="bg-card/80 border-border/50">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg text-foreground">Reward Pools</CardTitle>
+            <div className="flex gap-2">
+              {isConnected && (
+                <Button size="sm" variant="outline" onClick={() => setDepositOpen(true)}>
+                  <Download className="h-4 w-4 mr-1" /> + Deposit
+                </Button>
+              )}
+              {isCreator && !isUnderConstruction && !isExpired && !isPermClosed && (
+                <Button size="sm" variant="outline" onClick={() => setWithdrawOpen(true)}>
+                  <Upload className="h-4 w-4 mr-1" /> Withdraw
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {farm.reward_pools.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No reward pools configured</p>
+            ) : (
+              <div className="space-y-3">
+                {farm.reward_pools.map((pool, i) => {
+                  const effective = calculateEffectiveBalance(pool, farm.last_payout, now);
+                  return (
+                    <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                      <div className="flex items-center gap-3">
+                        <TokenLogo contract={pool.contract} symbol={pool.symbol} size="md" />
+                        <div>
+                          <p className="font-semibold text-foreground">{pool.symbol}</p>
+                          <p className="text-xs text-foreground/70 font-mono">{pool.contract}</p>
+                        </div>
+                      </div>
+                      <div className="text-right space-y-1">
+                        <Badge variant="outline" className="font-mono text-xs bg-primary/10 text-primary border-primary/30">
+                          {pool.balance} {pool.symbol}
+                        </Badge>
+                        {pool.total_hourly_reward && (
+                          <p className="text-xs text-foreground/70">
+                            {pool.total_hourly_reward}/hr
+                          </p>
+                        )}
+                        {effective.hoursRemaining !== null && (
+                          <p className="text-xs text-foreground/70">
+                            ~{Math.floor(effective.hoursRemaining / 24)}d remaining
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Farm Stats */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-foreground">Farm Stats</h3>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>
+          <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+        </Button>
+      </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
         <Card className="bg-card/60 border-border/40">
           <CardContent className="p-3 sm:p-4 text-center">
@@ -333,120 +456,6 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
         </Card>
       </div>
 
-      {/* Farm Information */}
-      <Card className="bg-card/80 border-border/50">
-        <CardHeader>
-          <CardTitle className="text-lg">Farm Information</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 text-sm">
-            <div>
-              <p className="text-muted-foreground">Status</p>
-              <Badge className={`text-xs ${status.className}`}>{status.label}</Badge>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Type</p>
-              <p className="font-medium">{getFarmTypeLabel(farm.farm_type)}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Creator</p>
-              <p className="font-medium font-mono">{farm.creator}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Created</p>
-              <p className="font-medium">{createdDate}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Expiration</p>
-              <div className="flex items-center gap-2">
-                <p className="font-medium">{expirationDate}</p>
-                {/* Extend button next to expiration when active & not expired */}
-                {isCreator && !isUnderConstruction && !isExpired && !isPermClosed && (
-                  <Button size="sm" variant="outline" onClick={() => setExtendFarmOpen(true)} className="h-6 text-xs px-2">
-                    Extend
-                  </Button>
-                )}
-                {/* Close/Perm Close next to expiration when expired */}
-                {isCreator && isExpired && !isPermClosed && (
-                  <>
-                    <Button size="sm" variant="outline" onClick={() => setCloseFarmOpen(true)} className="h-6 text-xs px-2">
-                      Close
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={() => setPermCloseOpen(true)} className="h-6 text-xs px-2">
-                      Perm Close
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Kick Stakers and Empty Farm in farm info section */}
-          {isCreator && (
-            <div className="flex flex-wrap gap-2 pt-4 border-t border-border/30">
-              {(isUnderConstruction || isPermClosed) && hasStakers && (
-                <Button size="sm" variant="outline" onClick={() => setKickOpen(true)}>
-                  Kick Stakers
-                </Button>
-              )}
-              {isPermClosed && !hasStakers && (
-                <Button size="sm" variant="outline" onClick={() => setEmptyOpen(true)}>
-                  Empty Farm
-                </Button>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Reward Pools */}
-      <Card className="bg-card/80 border-border/50">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-lg text-foreground">Reward Pools</CardTitle>
-          {/* Withdraw button next to Reward Pools header when active */}
-          {isCreator && !isUnderConstruction && !isExpired && !isPermClosed && (
-            <Button size="sm" variant="outline" onClick={() => setWithdrawOpen(true)}>
-              <Upload className="h-4 w-4 mr-1" /> Withdraw
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent>
-          {farm.reward_pools.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No reward pools configured</p>
-          ) : (
-            <div className="space-y-3">
-              {farm.reward_pools.map((pool, i) => {
-                const effective = calculateEffectiveBalance(pool, farm.last_payout, now);
-                return (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                    <div className="flex items-center gap-3">
-                      <TokenLogo contract={pool.contract} symbol={pool.symbol} size="md" />
-                      <div>
-                        <p className="font-semibold text-foreground">{pool.symbol}</p>
-                        <p className="text-xs text-foreground/70 font-mono">{pool.contract}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-mono font-semibold text-foreground">{formatAmount(effective.effectiveBalance)}</p>
-                      {pool.total_hourly_reward && (
-                        <p className="text-xs text-foreground/70">
-                          {pool.total_hourly_reward}/hr
-                        </p>
-                      )}
-                      {effective.hoursRemaining !== null && (
-                        <p className="text-xs text-foreground/70">
-                          ~{Math.floor(effective.hoursRemaining / 24)}d remaining
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Stakeable Assets */}
       <StakeableAssets farmName={farm.farm_name} farmType={farm.farm_type} />
 
@@ -455,7 +464,12 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
         <NFTStaking farm={farm} onRefresh={refetch} />
       )}
 
-      {/* Management Dialogs */}
+      {/* Deposit dialog - available to all connected users */}
+      {isConnected && (
+        <DepositRewardsDialog farm={farm} open={depositOpen} onOpenChange={setDepositOpen} onSuccess={refetch} />
+      )}
+
+      {/* Creator-only management dialogs */}
       {isCreator && (
         <>
           <EditFarmProfile farm={farm} open={editProfileOpen} onOpenChange={setEditProfileOpen} onSuccess={refetch} />
@@ -465,7 +479,6 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
           <PermCloseFarmDialog farm={farm} open={permCloseOpen} onOpenChange={setPermCloseOpen} onSuccess={refetch} />
           <KickUsersDialog farm={farm} open={kickOpen} onOpenChange={setKickOpen} onSuccess={refetch} />
           <EmptyFarmDialog farm={farm} open={emptyOpen} onOpenChange={setEmptyOpen} onSuccess={refetch} />
-          <DepositRewardsDialog farm={farm} open={depositOpen} onOpenChange={setDepositOpen} onSuccess={refetch} />
           <WithdrawRewardsDialog farm={farm} open={withdrawOpen} onOpenChange={setWithdrawOpen} onSuccess={refetch} />
           <ManageStakableAssets farm={farm} open={manageAssetsOpen} onOpenChange={setManageAssetsOpen} onSuccess={refetch} />
         </>
