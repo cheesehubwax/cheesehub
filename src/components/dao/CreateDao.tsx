@@ -17,6 +17,8 @@ import {
   buildAssertPointAction, buildDaoCreationFeeAction, buildCreateDaoAction,
   buildSetProfileActionWithSocials, DaoSocials,
 } from "@/lib/dao";
+import { buildCheesePaymentAction } from "@/lib/cheeseFees";
+import { useCheeseFeePricing } from "@/hooks/useCheeseFeePricing";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useToast } from "@/hooks/use-toast";
