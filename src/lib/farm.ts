@@ -589,7 +589,7 @@ export function buildAddRewardsAction(sender: string, farmName: string, tokenCon
       from: sender,
       to: FARM_CONTRACT,
       quantity,
-      memo: `|deposit|${farmName}|`,
+      memo: `|farm_deposit|${farmName}|`,
     },
   };
 }
