@@ -19,7 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Plus, Sprout, Trash2, ChevronDown, AlertTriangle, Info, ExternalLink, Play, Globe, Youtube, BookOpen } from "lucide-react";
 import {
   FARM_TYPES, FARM_CREATION_FEES, validateFarmName, FARM_TYPE_LABELS, FarmType,
-  buildCreateFarmAction, buildAssertPointAction, buildFarmCreationFeeWaxAction,
+  buildCreateFarmAction, buildAssertPointAction,
   RewardToken,
 } from "@/lib/farm";
 import {
@@ -174,12 +174,14 @@ export function CreateFarm() {
     try {
       const actions: any[] = [];
 
-      if (paymentMethod === "cheese" && cheesePricing.isAvailable) {
-        actions.push(buildAssertPointAction(accountName));
+      if (paymentMethod === "cheese" && cheesePricing.isAvailable && waxdaoPricing.isAvailable) {
         actions.push(buildCheesePaymentAction(accountName, cheesePricing.formattedForTx, "farm", formData.farmName));
-      } else {
         actions.push(buildAssertPointAction(accountName));
-        actions.push(buildFarmCreationFeeWaxAction(accountName));
+        actions.push(buildWaxdaoFeeAction(accountName, "farms.waxdao", waxdaoPricing.formattedForTx, "|create_farm|"));
+      } else if (waxdaoPricing.isAvailable) {
+        actions.push(buildWaxPaymentAction(accountName, "farm", formData.farmName));
+        actions.push(buildAssertPointAction(accountName));
+        actions.push(buildWaxdaoFeeAction(accountName, "farms.waxdao", waxdaoPricing.formattedForTx, "|create_farm|"));
       }
 
       const profile = {

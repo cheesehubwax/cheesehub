@@ -14,11 +14,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger as AccordionTriggerUI } from "@/components/ui/accordion";
 import {
   DAO_TYPES, CREATABLE_DAO_TYPES, PROPOSER_TYPES,
-  buildAssertPointAction, buildDaoCreationFeeAction, buildCreateDaoAction,
+  buildAssertPointAction, buildCreateDaoAction,
   buildSetProfileActionWithSocials, DaoSocials,
 } from "@/lib/dao";
-import { buildCheesePaymentAction } from "@/lib/cheeseFees";
+import { buildCheesePaymentAction, buildWaxPaymentAction, buildWaxdaoFeeAction } from "@/lib/cheeseFees";
 import { useCheeseFeePricing } from "@/hooks/useCheeseFeePricing";
+import { useWaxdaoFeePricing } from "@/hooks/useWaxdaoFeePricing";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useToast } from "@/hooks/use-toast";
@@ -51,6 +52,7 @@ export function CreateDao() {
   const { accountName, session, isConnected } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const cheesePricing = useCheeseFeePricing();
+  const waxdaoPricing = useWaxdaoFeePricing();
   const [loading, setLoading] = useState(false);
   const [termsAgreed, setTermsAgreed] = useState(false);
   const { toast } = useToast();
@@ -121,12 +123,14 @@ export function CreateDao() {
     setLoading(true);
     const actions = [];
 
-    if (paymentMethod === "cheese" && cheesePricing.isAvailable) {
-      actions.push(buildAssertPointAction(accountName));
+    if (paymentMethod === "cheese" && cheesePricing.isAvailable && waxdaoPricing.isAvailable) {
       actions.push(buildCheesePaymentAction(accountName, cheesePricing.formattedForTx, "dao", daoName));
-    } else if (paymentMethod === "wax") {
       actions.push(buildAssertPointAction(accountName));
-      actions.push(buildDaoCreationFeeAction(accountName));
+      actions.push(buildWaxdaoFeeAction(accountName, "dao.waxdao", waxdaoPricing.formattedForTx, "|dao_payment|"));
+    } else if (paymentMethod === "wax" && waxdaoPricing.isAvailable) {
+      actions.push(buildWaxPaymentAction(accountName, "dao", daoName));
+      actions.push(buildAssertPointAction(accountName));
+      actions.push(buildWaxdaoFeeAction(accountName, "dao.waxdao", waxdaoPricing.formattedForTx, "|dao_payment|"));
     }
 
     actions.push(buildCreateDaoAction(accountName, {
