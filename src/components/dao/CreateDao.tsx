@@ -121,7 +121,10 @@ export function CreateDao() {
     setLoading(true);
     const actions = [];
 
-    if (paymentMethod === "wax") {
+    if (paymentMethod === "cheese" && cheesePricing.isAvailable) {
+      actions.push(buildAssertPointAction(accountName));
+      actions.push(buildCheesePaymentAction(accountName, cheesePricing.formattedForTx, "dao", daoName));
+    } else if (paymentMethod === "wax") {
       actions.push(buildAssertPointAction(accountName));
       actions.push(buildDaoCreationFeeAction(accountName));
     }
