@@ -19,7 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Plus, Sprout, Trash2, ChevronDown, AlertTriangle, Info, ExternalLink, Play, Globe, Youtube, BookOpen } from "lucide-react";
 import {
   FARM_TYPES, FARM_CREATION_FEES, validateFarmName, FARM_TYPE_LABELS, FarmType,
-  buildCreateFarmAction, buildAssertPointAction, buildFarmCreationFeeWaxAction,
+  buildCreateFarmAction, buildAssertPointAction,
   RewardToken,
 } from "@/lib/farm";
 import {
