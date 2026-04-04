@@ -17,6 +17,8 @@ import {
   buildAssertPointAction, buildDaoCreationFeeAction, buildCreateDaoAction,
   buildSetProfileActionWithSocials, DaoSocials,
 } from "@/lib/dao";
+import { buildCheesePaymentAction } from "@/lib/cheeseFees";
+import { useCheeseFeePricing } from "@/hooks/useCheeseFeePricing";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useToast } from "@/hooks/use-toast";
@@ -48,6 +50,7 @@ function InfoTooltip({ text }: { text: string }) {
 export function CreateDao() {
   const { accountName, session, isConnected } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
+  const cheesePricing = useCheeseFeePricing();
   const [loading, setLoading] = useState(false);
   const [termsAgreed, setTermsAgreed] = useState(false);
   const { toast } = useToast();
@@ -118,7 +121,10 @@ export function CreateDao() {
     setLoading(true);
     const actions = [];
 
-    if (paymentMethod === "wax") {
+    if (paymentMethod === "cheese" && cheesePricing.isAvailable) {
+      actions.push(buildAssertPointAction(accountName));
+      actions.push(buildCheesePaymentAction(accountName, cheesePricing.formattedForTx, "dao", daoName));
+    } else if (paymentMethod === "wax") {
       actions.push(buildAssertPointAction(accountName));
       actions.push(buildDaoCreationFeeAction(accountName));
     }

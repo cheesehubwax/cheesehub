@@ -175,6 +175,7 @@ export function CreateFarm() {
       const actions: any[] = [];
 
       if (paymentMethod === "cheese" && cheesePricing.isAvailable) {
+        actions.push(buildAssertPointAction(accountName));
         actions.push(buildCheesePaymentAction(accountName, cheesePricing.formattedForTx, "farm", formData.farmName));
       } else {
         actions.push(buildAssertPointAction(accountName));
