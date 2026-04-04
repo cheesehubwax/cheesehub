@@ -246,9 +246,6 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
                   <Button variant="outline" size="sm" onClick={() => setEditProfileOpen(true)}>
                     <Edit className="h-4 w-4 mr-1" /> Edit
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => setDepositOpen(true)}>
-                    <Download className="h-4 w-4 mr-1" /> Deposit
-                  </Button>
                   {isUnderConstruction && (
                     <>
                       <Button variant="outline" size="sm" onClick={() => setManageAssetsOpen(true)}>
@@ -260,6 +257,11 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
                     </>
                   )}
                 </>
+              )}
+              {isConnected && (
+                <Button variant="outline" size="sm" onClick={() => setDepositOpen(true)}>
+                  <Download className="h-4 w-4 mr-1" /> Deposit Rewards
+                </Button>
               )}
               <Button variant="outline" size="sm" onClick={() => refetch()}>
                 <RefreshCw className="h-4 w-4" />
