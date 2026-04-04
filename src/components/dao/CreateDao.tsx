@@ -123,12 +123,14 @@ export function CreateDao() {
     setLoading(true);
     const actions = [];
 
-    if (paymentMethod === "cheese" && cheesePricing.isAvailable) {
-      actions.push(buildAssertPointAction(accountName));
+    if (paymentMethod === "cheese" && cheesePricing.isAvailable && waxdaoPricing.isAvailable) {
       actions.push(buildCheesePaymentAction(accountName, cheesePricing.formattedForTx, "dao", daoName));
-    } else if (paymentMethod === "wax") {
       actions.push(buildAssertPointAction(accountName));
-      actions.push(buildDaoCreationFeeAction(accountName));
+      actions.push(buildWaxdaoFeeAction(accountName, "dao.waxdao", waxdaoPricing.formattedForTx, "|dao_payment|"));
+    } else if (paymentMethod === "wax" && waxdaoPricing.isAvailable) {
+      actions.push(buildWaxPaymentAction(accountName, "dao", daoName));
+      actions.push(buildAssertPointAction(accountName));
+      actions.push(buildWaxdaoFeeAction(accountName, "dao.waxdao", waxdaoPricing.formattedForTx, "|dao_payment|"));
     }
 
     actions.push(buildCreateDaoAction(accountName, {
