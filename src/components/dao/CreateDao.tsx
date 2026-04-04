@@ -14,11 +14,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger as AccordionTriggerUI } from "@/components/ui/accordion";
 import {
   DAO_TYPES, CREATABLE_DAO_TYPES, PROPOSER_TYPES,
-  buildAssertPointAction, buildDaoCreationFeeAction, buildCreateDaoAction,
+  buildAssertPointAction, buildCreateDaoAction,
   buildSetProfileActionWithSocials, DaoSocials,
 } from "@/lib/dao";
-import { buildCheesePaymentAction } from "@/lib/cheeseFees";
+import { buildCheesePaymentAction, buildWaxPaymentAction, buildWaxdaoFeeAction } from "@/lib/cheeseFees";
 import { useCheeseFeePricing } from "@/hooks/useCheeseFeePricing";
+import { useWaxdaoFeePricing } from "@/hooks/useWaxdaoFeePricing";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useToast } from "@/hooks/use-toast";

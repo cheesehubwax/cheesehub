@@ -174,12 +174,14 @@ export function CreateFarm() {
     try {
       const actions: any[] = [];
 
-      if (paymentMethod === "cheese" && cheesePricing.isAvailable) {
-        actions.push(buildAssertPointAction(accountName));
+      if (paymentMethod === "cheese" && cheesePricing.isAvailable && waxdaoPricing.isAvailable) {
         actions.push(buildCheesePaymentAction(accountName, cheesePricing.formattedForTx, "farm", formData.farmName));
-      } else {
         actions.push(buildAssertPointAction(accountName));
-        actions.push(buildFarmCreationFeeWaxAction(accountName));
+        actions.push(buildWaxdaoFeeAction(accountName, "farms.waxdao", waxdaoPricing.formattedForTx, "|create_farm|"));
+      } else if (waxdaoPricing.isAvailable) {
+        actions.push(buildWaxPaymentAction(accountName, "farm", formData.farmName));
+        actions.push(buildAssertPointAction(accountName));
+        actions.push(buildWaxdaoFeeAction(accountName, "farms.waxdao", waxdaoPricing.formattedForTx, "|create_farm|"));
       }
 
       const profile = {
