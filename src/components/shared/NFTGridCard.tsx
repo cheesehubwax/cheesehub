@@ -3,21 +3,7 @@ import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/h
 import { Check, Loader2, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const IPFS_GATEWAYS = [
-  "https://ipfs.io/ipfs/",
-  "https://gateway.pinata.cloud/ipfs/",
-  "https://cloudflare-ipfs.com/ipfs/",
-  "https://dweb.link/ipfs/",
-];
-
-function extractIpfsHash(url: string): string | null {
-  if (!url) return null;
-  if (url.startsWith("ipfs://")) return url.replace("ipfs://", "");
-  const m = url.match(/\/ipfs\/([a-zA-Z0-9]+.*)/);
-  if (m) return m[1];
-  if (/^Qm[a-zA-Z0-9]{44}/.test(url) || /^bafy[a-zA-Z0-9]+/.test(url)) return url;
-  return null;
-}
+import { IPFS_GATEWAYS, extractIpfsHash } from "@/lib/ipfsGateways";
 
 export interface NFTGridCardData {
   asset_id: string;
