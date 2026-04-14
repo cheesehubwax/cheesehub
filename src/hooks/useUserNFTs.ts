@@ -19,59 +19,35 @@ interface CachedNFTData {
   assetIds: string[];
 }
 
-import { getIpfsUrl } from '@/lib/ipfsGateways';
-
+const IPFS_GATEWAY = 'https://ipfs.io/ipfs/';
 const CACHE_KEY_PREFIX = 'cheesehub_nfts_';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-function getImageUrl(img: string | undefined): string {
+function getImageUrl(img: string | undefined, isIpfsHash = false): string {
   if (!img) return '/placeholder.svg';
   if (img.startsWith('http')) return img;
   if (img.startsWith('ipfs://')) {
     const hash = img.replace('ipfs://', '');
-    return getIpfsUrl(hash);
+    return `${IPFS_GATEWAY}${hash}`;
   }
   if (img.startsWith('Qm') || img.startsWith('bafy') || img.startsWith('bafk')) {
-    return getIpfsUrl(img);
+    return `${IPFS_GATEWAY}${img}`;
   }
   return img || '/placeholder.svg';
 }
 
-// Known alternate image fields used by various WAX NFT collections
-const KNOWN_IMAGE_FIELDS = ['backimg', 'frontimg', 'glbimg', 'pfp', 'logo', 'icon'];
-
-// Check if a string looks like an IPFS hash or image URL
-function looksLikeImageValue(val: string): boolean {
-  if (/^Qm[a-zA-Z0-9]{44}/.test(val) || /^bafy[a-zA-Z0-9]+/.test(val) || /^bafk[a-zA-Z0-9]+/.test(val)) return true;
-  if (val.startsWith('ipfs://')) return true;
-  if (/^https?:\/\/.+\.(png|jpg|jpeg|gif|webp|svg|mp4|webm)/i.test(val)) return true;
-  if (/\/ipfs\/[a-zA-Z0-9]/.test(val)) return true;
-  return false;
-}
-
-// Helper to extract media URL from NFT data, with expanded field scanning
+// Helper to extract media URL from NFT data, with video fallback for video-only NFTs
 function getMediaUrl(data: Record<string, string | undefined>): { url: string; isVideo: boolean } {
-  // 1. Standard image fields
+  // Try standard image fields first
   const imageField = data.img || data.image;
-  if (imageField) return { url: getImageUrl(imageField), isVideo: false };
-
-  // 2. Video field (video-only NFTs)
-  const videoField = data.video;
-  if (videoField) return { url: getImageUrl(videoField), isVideo: true };
-
-  // 3. Known alternate fields
-  for (const field of KNOWN_IMAGE_FIELDS) {
-    const val = data[field];
-    if (val) return { url: getImageUrl(val), isVideo: false };
+  if (imageField) {
+    return { url: getImageUrl(imageField), isVideo: false };
   }
 
-  // 4. Scan ALL string values for IPFS hashes or image URLs
-  for (const [key, val] of Object.entries(data)) {
-    if (!val || typeof val !== 'string') continue;
-    if (['name', 'description', 'img', 'image', 'video', ...KNOWN_IMAGE_FIELDS].includes(key)) continue;
-    if (looksLikeImageValue(val)) {
-      return { url: getImageUrl(val), isVideo: false };
-    }
+  // Fallback to video field (common in video-only NFTs)
+  const videoField = data.video;
+  if (videoField) {
+    return { url: getImageUrl(videoField), isVideo: true };
   }
 
   return { url: '/placeholder.svg', isVideo: false };

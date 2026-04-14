@@ -1,7 +1,6 @@
 // Unified IPFS gateway configuration
 // Ordered by reliability and speed (based on real-world testing)
 export const IPFS_GATEWAYS = [
-  'https://atomichub-ipfs.com/ipfs/',
   'https://gateway.pinata.cloud/ipfs/',
   'https://dweb.link/ipfs/',
   'https://nftstorage.link/ipfs/',
