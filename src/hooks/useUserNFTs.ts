@@ -11,9 +11,17 @@ export interface UserNFT {
   schema: string;
   template_id: string;
   mint: string;
+  transferred_at_time?: string;
+}
+
+function compareByWalletArrivalDesc(a: UserNFT, b: UserNFT): number {
+  const transferCompare = (b.transferred_at_time || '').localeCompare(a.transferred_at_time || '', undefined, { numeric: true });
+  if (transferCompare !== 0) return transferCompare;
+  return b.asset_id.localeCompare(a.asset_id, undefined, { numeric: true });
 }
 
 interface CachedNFTData {
+  version: number;
   nfts: UserNFT[];
   timestamp: number;
   assetIds: string[];
@@ -21,6 +29,7 @@ interface CachedNFTData {
 
 const IPFS_GATEWAY = 'https://ipfs.io/ipfs/';
 const CACHE_KEY_PREFIX = 'cheesehub_nfts_';
+const CACHE_VERSION = 2;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 function getImageUrl(img: string | undefined, isIpfsHash = false): string {
@@ -60,6 +69,11 @@ function getCachedNFTs(owner: string): CachedNFTData | null {
     if (!cached) return null;
 
     const data: CachedNFTData = JSON.parse(cached);
+    if (data.version !== CACHE_VERSION) {
+      localStorage.removeItem(`${CACHE_KEY_PREFIX}${owner}`);
+      return null;
+    }
+
     // Check if cache is still valid
     if (Date.now() - data.timestamp < CACHE_TTL) {
       return data;
@@ -74,6 +88,7 @@ function getCachedNFTs(owner: string): CachedNFTData | null {
 function setCachedNFTs(owner: string, nfts: UserNFT[], assetIds: string[]): void {
   try {
     const data: CachedNFTData = {
+      version: CACHE_VERSION,
       nfts,
       timestamp: Date.now(),
       assetIds,
@@ -192,7 +207,7 @@ async function fetchApiPage(owner: string, page: number, limit: number): Promise
     limit: String(limit),
     page: String(page),
     order: 'desc',
-    sort: 'asset_id',
+    sort: 'transferred',
   });
 
   const cacheBuster = `&_ts=${Date.now()}`;
@@ -210,6 +225,7 @@ async function fetchApiPage(owner: string, page: number, limit: number): Promise
       asset_id: string;
       name: string;
       template_mint: string;
+      transferred_at_time?: string;
       collection: { collection_name: string };
       schema: { schema_name: string };
       template?: { template_id: string };
@@ -228,6 +244,7 @@ async function fetchApiPage(owner: string, page: number, limit: number): Promise
         schema: asset.schema.schema_name,
         template_id: asset.template?.template_id || '',
         mint: asset.template_mint || '1',
+        transferred_at_time: asset.transferred_at_time,
       };
     });
 
@@ -274,6 +291,7 @@ async function fetchAssetMetadata(assetIds: string[]): Promise<UserNFT[]> {
               asset_id: string;
               name: string;
               template_mint: string;
+              transferred_at_time?: string;
               collection: { collection_name: string };
               schema: { schema_name: string };
               template?: { template_id: string };
@@ -292,6 +310,7 @@ async function fetchAssetMetadata(assetIds: string[]): Promise<UserNFT[]> {
                 schema: asset.schema.schema_name,
                 template_id: asset.template?.template_id || '',
                 mint: asset.template_mint || '1',
+                transferred_at_time: asset.transferred_at_time,
               };
             });
           }
@@ -389,7 +408,7 @@ export function useUserNFTs(accountName: string | null | undefined, collectionFi
 
       // Progressive update - show what we have so far
       if (allNfts.length > 0) {
-        allNfts.sort((a, b) => b.asset_id.localeCompare(a.asset_id, undefined, { numeric: true }));
+        allNfts.sort(compareByWalletArrivalDesc);
         setNfts([...allNfts]);
         setLoadingProgress({ loaded: allNfts.length, total: ownedAssetIds.size });
       }
@@ -427,7 +446,7 @@ export function useUserNFTs(accountName: string | null | undefined, collectionFi
 
           // Progressive update
           if (foundAny) {
-            allNfts.sort((a, b) => b.asset_id.localeCompare(a.asset_id, undefined, { numeric: true }));
+            allNfts.sort(compareByWalletArrivalDesc);
             setNfts([...allNfts]);
             setLoadingProgress({ loaded: allNfts.length, total: ownedAssetIds.size });
           }
@@ -519,7 +538,7 @@ export function useUserNFTs(accountName: string | null | undefined, collectionFi
       }
 
       // Final sort and update
-      finalNfts.sort((a, b) => b.asset_id.localeCompare(a.asset_id, undefined, { numeric: true }));
+      finalNfts.sort(compareByWalletArrivalDesc);
       setNfts(finalNfts);
       setLoadingProgress({ loaded: finalNfts.length, total: stableCollectionFilter ? finalNfts.length : ownedAssetIds.size });
 
