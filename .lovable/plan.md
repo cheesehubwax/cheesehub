@@ -1,30 +1,28 @@
 
 
-## Fix GitHub Pages SPA Deep-Link Routing
+## Fix NFT Sort Order in Send Manager
 
 ### Problem
-The `404.html` and `index.html` use **mismatched** SPA redirect strategies:
-- `404.html` converts `/cheesehub/bannerads` → `/cheesehub/?/bannerads` via URL replacement
-- `index.html` reads `sessionStorage.redirect` — but `404.html` never writes to `sessionStorage`
+The "Newest" sort option is selected by default but NFTs don't appear in newest-first order.
 
-Result: the `?/bannerads` query string stays in the URL and React Router never sees `/bannerads` as the actual path, so routing breaks.
+### Root Cause
+The sort comparator uses `parseInt(b.asset_id) - parseInt(a.asset_id)` (line 82). While this works for most WAX asset IDs, numeric subtraction of parsed integers can produce unstable sort results when dealing with edge cases. The `useUserNFTs` hook itself uses `Number()` instead. A more robust approach is `localeCompare` with `{ numeric: true }`, which handles arbitrarily large numeric strings without any precision concern.
 
 ### Fix
-Align both files to use the same redirect mechanism. The standard approach (used by [spa-github-pages](https://github.com/rafgraph/spa-github-pages)):
+**File: `src/components/wallet/NFTSendManager.tsx`** (lines 79-84)
 
-**1. `public/404.html`** — store the real path in `sessionStorage` before redirecting:
-```js
-sessionStorage.redirect = l.pathname + l.search + l.hash;
-l.replace(
-  l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
-  l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/')
-);
+Replace the sort comparators:
+```ts
+// Before
+case 'newest': result.sort((a, b) => parseInt(b.asset_id) - parseInt(a.asset_id)); break;
+case 'oldest': result.sort((a, b) => parseInt(a.asset_id) - parseInt(b.asset_id)); break;
+
+// After
+case 'newest': result.sort((a, b) => b.asset_id.localeCompare(a.asset_id, undefined, { numeric: true })); break;
+case 'oldest': result.sort((a, b) => a.asset_id.localeCompare(b.asset_id, undefined, { numeric: true })); break;
 ```
 
-**2. `index.html`** — the existing handler already reads `sessionStorage.redirect` and calls `history.replaceState`. No changes needed.
+Also apply the same fix to **`src/components/dao/TreasuryNFTDeposit.tsx`** (lines 125-126) for consistency.
 
-This way, visiting `/cheesehub/bannerads` → 404.html saves the path → redirects to `/cheesehub/` → index.html restores `/cheesehub/bannerads` via replaceState → React Router matches the route.
-
-### Files changed: 1
-- `public/404.html`
+### Files changed: 2
 
