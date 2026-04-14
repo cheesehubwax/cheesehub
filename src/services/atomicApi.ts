@@ -65,11 +65,36 @@ export function getImageUrl(img: string | undefined): string {
   return img || '/placeholder.svg';
 }
 
+// Known alternate image fields used by various WAX NFT collections
+const KNOWN_IMAGE_FIELDS = ['backimg', 'frontimg', 'glbimg', 'pfp', 'logo', 'icon'];
+
+function looksLikeImageValue(val: string): boolean {
+  if (/^Qm[a-zA-Z0-9]{44}/.test(val) || /^bafy[a-zA-Z0-9]+/.test(val) || /^bafk[a-zA-Z0-9]+/.test(val)) return true;
+  if (val.startsWith('ipfs://')) return true;
+  if (/^https?:\/\/.+\.(png|jpg|jpeg|gif|webp|svg|mp4|webm)/i.test(val)) return true;
+  if (/\/ipfs\/[a-zA-Z0-9]/.test(val)) return true;
+  return false;
+}
+
 function getMediaUrl(data: Record<string, string>): { url: string; isVideo: boolean } {
   const imageField = data.img || data.image;
   if (imageField) return { url: getImageUrl(imageField), isVideo: false };
   const videoField = data.video;
   if (videoField) return { url: getImageUrl(videoField), isVideo: true };
+
+  for (const field of KNOWN_IMAGE_FIELDS) {
+    const val = data[field];
+    if (val) return { url: getImageUrl(val), isVideo: false };
+  }
+
+  for (const [key, val] of Object.entries(data)) {
+    if (!val || typeof val !== 'string') continue;
+    if (['name', 'description', 'img', 'image', 'video', ...KNOWN_IMAGE_FIELDS].includes(key)) continue;
+    if (looksLikeImageValue(val)) {
+      return { url: getImageUrl(val), isVideo: false };
+    }
+  }
+
   return { url: '/placeholder.svg', isVideo: false };
 }
 
