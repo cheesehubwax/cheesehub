@@ -21,6 +21,7 @@ function compareByWalletArrivalDesc(a: UserNFT, b: UserNFT): number {
 }
 
 interface CachedNFTData {
+  version: number;
   nfts: UserNFT[];
   timestamp: number;
   assetIds: string[];
@@ -28,6 +29,7 @@ interface CachedNFTData {
 
 const IPFS_GATEWAY = 'https://ipfs.io/ipfs/';
 const CACHE_KEY_PREFIX = 'cheesehub_nfts_';
+const CACHE_VERSION = 2;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 function getImageUrl(img: string | undefined, isIpfsHash = false): string {
@@ -67,6 +69,11 @@ function getCachedNFTs(owner: string): CachedNFTData | null {
     if (!cached) return null;
 
     const data: CachedNFTData = JSON.parse(cached);
+    if (data.version !== CACHE_VERSION) {
+      localStorage.removeItem(`${CACHE_KEY_PREFIX}${owner}`);
+      return null;
+    }
+
     // Check if cache is still valid
     if (Date.now() - data.timestamp < CACHE_TTL) {
       return data;
@@ -81,6 +88,7 @@ function getCachedNFTs(owner: string): CachedNFTData | null {
 function setCachedNFTs(owner: string, nfts: UserNFT[], assetIds: string[]): void {
   try {
     const data: CachedNFTData = {
+      version: CACHE_VERSION,
       nfts,
       timestamp: Date.now(),
       assetIds,
