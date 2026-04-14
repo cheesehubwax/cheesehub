@@ -389,7 +389,7 @@ export function useUserNFTs(accountName: string | null | undefined, collectionFi
 
       // Progressive update - show what we have so far
       if (allNfts.length > 0) {
-        allNfts.sort((a, b) => Number(b.asset_id) - Number(a.asset_id));
+        allNfts.sort((a, b) => b.asset_id.localeCompare(a.asset_id, undefined, { numeric: true }));
         setNfts([...allNfts]);
         setLoadingProgress({ loaded: allNfts.length, total: ownedAssetIds.size });
       }
@@ -427,7 +427,7 @@ export function useUserNFTs(accountName: string | null | undefined, collectionFi
 
           // Progressive update
           if (foundAny) {
-            allNfts.sort((a, b) => Number(b.asset_id) - Number(a.asset_id));
+            allNfts.sort((a, b) => b.asset_id.localeCompare(a.asset_id, undefined, { numeric: true }));
             setNfts([...allNfts]);
             setLoadingProgress({ loaded: allNfts.length, total: ownedAssetIds.size });
           }
@@ -519,7 +519,7 @@ export function useUserNFTs(accountName: string | null | undefined, collectionFi
       }
 
       // Final sort and update
-      finalNfts.sort((a, b) => Number(b.asset_id) - Number(a.asset_id));
+      finalNfts.sort((a, b) => b.asset_id.localeCompare(a.asset_id, undefined, { numeric: true }));
       setNfts(finalNfts);
       setLoadingProgress({ loaded: finalNfts.length, total: stableCollectionFilter ? finalNfts.length : ownedAssetIds.size });
 
