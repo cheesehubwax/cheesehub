@@ -79,8 +79,8 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
     switch (sortBy) {
       case 'collection': result.sort((a, b) => a.collection.localeCompare(b.collection)); break;
       case 'name': result.sort((a, b) => a.name.localeCompare(b.name)); break;
-      case 'newest': result.sort((a, b) => parseInt(b.asset_id) - parseInt(a.asset_id)); break;
-      case 'oldest': result.sort((a, b) => parseInt(a.asset_id) - parseInt(b.asset_id)); break;
+      case 'newest': result.sort((a, b) => b.asset_id.localeCompare(a.asset_id, undefined, { numeric: true })); break;
+      case 'oldest': result.sort((a, b) => a.asset_id.localeCompare(b.asset_id, undefined, { numeric: true })); break;
     }
     return result;
   }, [nfts, collectionFilter, schemaFilter, debouncedSearch, sortBy]);
