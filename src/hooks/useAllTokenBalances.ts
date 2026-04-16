@@ -75,6 +75,27 @@ async function fetchBalancesForAccount(accountName: string): Promise<{ tokens: T
           };
         }
       });
+      // Supplement: ensure critical tokens (WAX, CHEESE) are never missing
+      const criticalTokens = WAX_TOKENS.filter(t => t.symbol === 'WAX' || t.symbol === 'CHEESE');
+      const resultKeys = new Set(results.map(r => `${r.contract}:${r.symbol}`));
+      const missingCritical = criticalTokens.filter(t => !resultKeys.has(`${t.contract}:${t.symbol}`));
+
+      if (missingCritical.length > 0) {
+        console.warn('[Balance] Hyperion missing critical tokens:', missingCritical.map(t => t.symbol));
+        const rpcBalances = await fetchAllTokenBalancesViaRpc(accountName, missingCritical);
+        for (const [key, data] of rpcBalances) {
+          const [contract, symbol] = key.split(':');
+          const knownToken = TOKEN_REGISTRY_MAP.get(key);
+          results.push({
+            symbol, contract,
+            precision: knownToken?.precision || data.precision,
+            displayName: knownToken?.displayName || symbol,
+            balance: data.balance,
+            isLpToken: isLpToken(contract),
+          });
+        }
+      }
+
       console.log('[Balance] Hyperion returned', results.length, 'tokens (fresh data)');
     }
   } catch (error) {
