@@ -154,17 +154,23 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
   const totalWaxUsd = waxBalance ? waxBalance.balance * waxPrice : 0;
 
   const sortedBalances = useMemo(() => {
-    return [...balances].sort((a, b) => {
-      const getUsdValue = (t: TokenWithBalance) => {
-        if (t.symbol === "WAX" && (t.contract === "eosio.token" || !t.contract)) {
-          return t.balance * waxPrice;
-        }
-        const key = `${t.contract}:${t.symbol}`;
-        const priceInWax = tokenPrices?.get(key) || 0;
-        return t.balance * priceInWax * waxPrice;
-      };
-      return getUsdValue(b) - getUsdValue(a);
-    });
+    const getUsdValue = (t: TokenWithBalance) => {
+      if (t.symbol === "WAX" && (t.contract === "eosio.token" || !t.contract)) {
+        return t.balance * waxPrice;
+      }
+      const key = `${t.contract}:${t.symbol}`;
+      const priceInWax = tokenPrices?.get(key) || 0;
+      return t.balance * priceInWax * waxPrice;
+    };
+    return [...balances]
+      .filter((t) => {
+        if (t.balance <= 0) return false;
+        // Always keep WAX and CHEESE visible regardless of USD value
+        if (t.symbol === "WAX" && (t.contract === "eosio.token" || !t.contract)) return true;
+        if (t.symbol === "CHEESE" && t.contract === "cheeseburger") return true;
+        return getUsdValue(t) > 0.01;
+      })
+      .sort((a, b) => getUsdValue(b) - getUsdValue(a));
   }, [balances, tokenPrices, waxPrice]);
 
   // Send tokens: filtered token list
