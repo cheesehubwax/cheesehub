@@ -165,10 +165,17 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
     return [...balances]
       .filter((t) => {
         if (t.balance <= 0) return false;
-        // Always keep WAX and CHEESE visible regardless of USD value
-        if (t.symbol === "WAX" && (t.contract === "eosio.token" || !t.contract)) return true;
-        if (t.symbol === "CHEESE" && t.contract === "cheeseburger") return true;
-        return getUsdValue(t) > 0.01;
+        // Only filter as dust if we have a known price AND USD value is <= $0.01.
+        // Tokens without price data (priceInWax = 0) are kept so unpriced holdings still show.
+        if (t.symbol === "WAX" && (t.contract === "eosio.token" || !t.contract)) {
+          return t.balance * waxPrice > 0.01;
+        }
+        const key = `${t.contract}:${t.symbol}`;
+        const priceInWax = tokenPrices?.get(key) || 0;
+        if (priceInWax > 0) {
+          return t.balance * priceInWax * waxPrice > 0.01;
+        }
+        return true;
       })
       .sort((a, b) => getUsdValue(b) - getUsdValue(a));
   }, [balances, tokenPrices, waxPrice]);
