@@ -93,19 +93,21 @@ export function Header() {
 
         <div className="flex items-center gap-1 sm:gap-2">
           <WalletConnect />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative hover:bg-primary/10 h-8 w-8 sm:h-9 sm:w-9"
-            onClick={() => setIsOpen(true)}
-          >
-            <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-            {totalItems > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full bg-primary text-[10px] sm:text-xs font-bold text-primary-foreground">
-                {totalItems}
-              </span>
-            )}
-          </Button>
+          {location.pathname.startsWith("/drops") && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative hover:bg-primary/10 h-8 w-8 sm:h-9 sm:w-9"
+              onClick={() => setIsOpen(true)}
+            >
+              <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
+              {totalItems > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full bg-primary text-[10px] sm:text-xs font-bold text-primary-foreground">
+                  {totalItems}
+                </span>
+              )}
+            </Button>
+          )}
         </div>
       </div>
 
