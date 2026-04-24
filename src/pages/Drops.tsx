@@ -183,7 +183,46 @@ const Drops = () => {
                 <p className="text-lg text-muted-foreground">No active official drops found.</p>
               </div>
             ) : (
-              <SimpleDropGrid drops={[...enrichedOfficialDrops].sort((a, b) => Number(a.dropId ?? a.id.replace(/^\D+/, '')) - Number(b.dropId ?? b.id.replace(/^\D+/, '')))} />
+              <Tabs value={officialSubTab} onValueChange={(v) => setOfficialSubTab(v as 'collectibles' | 'accountnames')} className="w-full">
+                <div className="flex justify-center mb-6">
+                  <TabsList className="bg-card/80 border border-border/50 h-9">
+                    <TabsTrigger value="collectibles" className="gap-1.5 text-sm px-4">
+                      <span className="text-sm">🖼️</span>
+                      <span>Collectibles</span>
+                      <span className="ml-1 rounded bg-primary/15 text-primary text-[10px] font-bold px-1.5 py-0.5 leading-none">
+                        {sortedCollectibles.length}
+                      </span>
+                    </TabsTrigger>
+                    <TabsTrigger value="accountnames" className="gap-1.5 text-sm px-4">
+                      <span className="text-sm">👤</span>
+                      <span>Account Names</span>
+                      <span className="ml-1 rounded bg-primary/15 text-primary text-[10px] font-bold px-1.5 py-0.5 leading-none">
+                        {sortedAccountNames.length}
+                      </span>
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
+
+                <TabsContent value="collectibles">
+                  {sortedCollectibles.length === 0 ? (
+                    <div className="text-center py-12">
+                      <p className="text-lg text-muted-foreground">No active collectibles drops.</p>
+                    </div>
+                  ) : (
+                    <SimpleDropGrid drops={sortedCollectibles} />
+                  )}
+                </TabsContent>
+
+                <TabsContent value="accountnames">
+                  {sortedAccountNames.length === 0 ? (
+                    <div className="text-center py-12">
+                      <p className="text-lg text-muted-foreground">No account name drops available.</p>
+                    </div>
+                  ) : (
+                    <SimpleDropGrid drops={sortedAccountNames} />
+                  )}
+                </TabsContent>
+              </Tabs>
             )}
           </TabsContent>
 
