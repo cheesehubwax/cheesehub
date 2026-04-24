@@ -66,6 +66,26 @@ const Drops = () => {
   const { enrichedDrops: enrichedOfficialDrops, loading: isEnrichingOfficial } = useEnrichDrops(officialDrops);
   const { enrichedDrops: enrichedCheeseDrops, loading: isEnrichingCheese } = useEnrichDrops(cheeseDrops);
 
+  // Sub-category state for Official tab (cheesenftwax schemas)
+  const [officialSubTab, setOfficialSubTab] = useState<'collectibles' | 'accountnames'>('collectibles');
+
+  const accountNamesDrops = useMemo(
+    () => enrichedOfficialDrops.filter(d => d.schemaName === 'accountnames'),
+    [enrichedOfficialDrops]
+  );
+  const collectiblesDrops = useMemo(
+    () => enrichedOfficialDrops.filter(d => d.schemaName !== 'accountnames'),
+    [enrichedOfficialDrops]
+  );
+  const sortedCollectibles = useMemo(
+    () => [...collectiblesDrops].sort((a, b) => Number(a.dropId ?? a.id.replace(/^\D+/, '')) - Number(b.dropId ?? b.id.replace(/^\D+/, ''))),
+    [collectiblesDrops]
+  );
+  const sortedAccountNames = useMemo(
+    () => [...accountNamesDrops].sort((a, b) => Number(a.dropId ?? a.id.replace(/^\D+/, '')) - Number(b.dropId ?? b.id.replace(/^\D+/, ''))),
+    [accountNamesDrops]
+  );
+
   const handleRefresh = async () => {
     await Promise.all([
       refresh(),
