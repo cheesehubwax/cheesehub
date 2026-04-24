@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import type { NFTDrop } from "@/types/drop";
 import { RefreshCw, Loader2 } from "lucide-react";
 import { CHEESE_CONFIG } from "@/lib/waxConfig";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import cheeseshoppe from "@/assets/cheeseshoppe.png";
 import { playRandomFart } from "@/lib/fartSounds";
 
