@@ -1,3 +1,21 @@
+# ARCHIVED — DO NOT IMPLEMENT
+
+**Status:** Dropped (April 2026)
+
+**Reason:** The `tf.waxdao` contract is **custodial** — user tokens are pooled
+and held by the contract during staking. Adding a frontend for a custodial,
+pooled, passive-return product creates material legal exposure under
+Australian law (likely qualifies as an unregistered Managed Investment
+Scheme per ASIC INFO 225) and inherits third-party contract risk that
+CheeseHub cannot audit, patch, or insure against. CHEESEFarm will remain
+**NFT-only / non-custodial** (`farms.waxdao`).
+
+Do not re-open this plan without re-evaluating the legal position. If the
+contract is ever migrated to a non-custodial design, a fresh plan should
+be written from scratch.
+
+---
+
 ## Add V2 Token Staking Farms (tf.waxdao) to CHEESEFarm
 
 A new tab inside CHEESEFarm for browsing and interacting with WaxDAO V2 **token** staking farms. NFT farms (`farms.waxdao`) stay untouched. Farm **creation** is deferred to a later phase — Phase 1 covers viewing, staking, unstaking, claiming, and withdrawing rewards.
