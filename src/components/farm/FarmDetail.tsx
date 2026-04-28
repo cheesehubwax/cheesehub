@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft, Loader2, Sprout, Clock, Users, Gift, RefreshCw,
   Copy, ExternalLink, Edit, Globe, MessageCircle, Twitter,
-  Youtube, BookOpen, Layers, Download, Upload, Info
+  Youtube, BookOpen, Layers, Download, Upload, Info, HandCoins
 } from "lucide-react";
 import {
   fetchFarmDetails, FarmInfo, getIpfsUrl, FARM_TYPE_LABELS, FarmType,
@@ -282,6 +282,29 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
         />
       )}
 
+      {/* Public sponsor hint on expired farms (non-creator viewers) */}
+      {!isCreator && isExpired && !isPermClosed && (
+        <Card className="bg-orange-500/5 border-orange-500/20">
+          <CardContent className="p-4 flex items-start gap-3">
+            <Info className="h-5 w-5 text-orange-400 shrink-0 mt-0.5" />
+            <div className="flex-1 text-sm text-orange-400">
+              <strong>Farm Expired.</strong> If unstaking fails with a contract assertion, the reward pool may be empty.
+              Anyone can deposit a small amount of the listed reward token to unblock claims and unstakes.
+            </div>
+            {isConnected && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setDepositOpen(true)}
+                className="border-orange-500/40 text-orange-400 hover:bg-orange-500/10 hover:text-orange-400 shrink-0"
+              >
+                <HandCoins className="h-4 w-4 mr-1" /> Sponsor Rewards
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Social links */}
       {socialLinks.length > 0 && (
         <div className="flex flex-wrap gap-2">
@@ -367,8 +390,24 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
             <CardTitle className="text-lg text-foreground">Reward Pools</CardTitle>
             <div className="flex gap-2">
               {isConnected && (
-                <Button size="sm" variant="outline" onClick={() => setDepositOpen(true)}>
-                  <Download className="h-4 w-4 mr-1" /> + Deposit
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setDepositOpen(true)}
+                  disabled={isUnderConstruction || isPermClosed}
+                  title={
+                    isUnderConstruction
+                      ? "Farm is under construction — open it before depositing"
+                      : isPermClosed
+                        ? "Farm is permanently closed — deposits are not accepted"
+                        : undefined
+                  }
+                >
+                  {isCreator ? (
+                    <><Download className="h-4 w-4 mr-1" /> + Deposit</>
+                  ) : (
+                    <><HandCoins className="h-4 w-4 mr-1" /> Sponsor Rewards</>
+                  )}
                 </Button>
               )}
               {isCreator && !isUnderConstruction && !isExpired && !isPermClosed && (
@@ -466,7 +505,7 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
 
       {/* Deposit dialog - available to all connected users */}
       {isConnected && (
-        <DepositRewardsDialog farm={farm} open={depositOpen} onOpenChange={setDepositOpen} onSuccess={refetch} />
+        <DepositRewardsDialog farm={farm} open={depositOpen} onOpenChange={setDepositOpen} onSuccess={refetch} isCreator={isCreator} />
       )}
 
       {/* Creator-only management dialogs */}

@@ -60,6 +60,9 @@ export default function Disclaimer() {
           <p className="text-sm text-muted-foreground leading-relaxed">
             CHEESEHub does not perform Know Your Customer (KYC), Anti-Money Laundering (AML), or Counter-Terrorism Financing (CTF) checks. As a non-custodial, non-intermediary frontend interface, CHEESEHub does not hold, transmit, pool, or exercise control over user funds at any time. Users are solely responsible for ensuring their own compliance with applicable AML/CTF and identity verification requirements in their jurisdiction.
           </p>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Reward token deposits to third-party <code className="text-foreground bg-muted px-1 rounded">farms.waxdao</code> NFT staking contracts are permissionless and non-refundable to the depositor; deposited tokens are distributed to stakers by the contract and can only be withdrawn by the original farm creator. CHEESEHub does not custody, control, or have access to deposited rewards at any time.
+          </p>
         </section>
 
         <section className="space-y-4">
