@@ -1,39 +1,22 @@
-# Fix CHEESE/USD price drift
+## Fix: Internal CHEESEHub banner ads should not show "leaving" warning
 
-## Problem
+### Problem
+`BannerDisplay.tsx` treats every IPFS-banner click as external and opens `ExternalLinkWarning`. When an advertiser sets the banner's website URL to a CHEESEHub page (e.g. `https://cheesehub.../dao` or the published domain pointing at `/dao`), users see a warning that they're leaving CHEESEHub for CHEESEHub.
 
-The CHEESE/USD figure in `CheesePriceBar` (and anywhere downstream of `useCheesePriceData`) reads `usd_price` directly from Alcor's `/api/v2/tokens` endpoint. Alcor computes that field by multiplying `system_price` (CHEESE/WAX) by an external WAX→USD feed (CoinGecko-style), not by the on-chain CHEESE↔WAXUSDC pool. That feed is frequently stale or off — right now Alcor reports:
+### Fix
+In `src/components/bannerads/BannerDisplay.tsx`, detect internal URLs in `handleAdClick` and route via React Router instead of opening the external-link warning.
 
-- `CHEESE.system_price` = 1.81623 WAX
-- `CHEESE.usd_price` = $0.01210
-- `WAXUSDC.system_price` = 143.193 (i.e. 1 WAXUSDC ≈ 143 WAX → 1 WAX ≈ $0.00698)
-- Implied CHEESE/USD via WAXUSDC = 1.81623 / 143.193 ≈ **$0.01268**
+Logic:
+1. Sanitize the URL (existing `sanitizeUrl`).
+2. Parse it. If hostname matches `window.location.hostname` (covers preview, custom domain, and any host the app is currently served from), treat as internal:
+   - Take the `pathname + search + hash` portion.
+   - Strip the app's `BASE_URL` prefix if present (so GitHub Pages base path works).
+   - Use `useNavigate()` to push the internal route — no warning dialog, no new tab.
+3. Otherwise, fall back to the existing `setWarningUrl(...)` flow.
 
-So the displayed value is consistently a few % lower than the real DEX-implied USD price, exactly what the user is seeing.
+Also handle relative URLs (already starts with `/`) — route internally directly without opening the warning. Currently relative URLs get rejected by `sanitizeUrl` to `#`, which is fine, but the placeholder banner already uses `<Link>` so this only affects renter-supplied URLs that happen to be relative; we'll skip the warning for those too if encountered.
 
-## Fix
+### Files changed
+- `src/components/bannerads/BannerDisplay.tsx` — add `useNavigate`, update `handleAdClick` to branch on same-origin vs external.
 
-Compute CHEESE/USD ourselves from the same `/tokens` payload (no extra request needed) using the WAXUSDC bridge:
-
-```
-waxUsdPrice  = 1 / WAXUSDC.system_price       // WAX→USD from on-chain pool
-cheeseUsd    = CHEESE.system_price * waxUsdPrice
-```
-
-Fall back to `CHEESE.usd_price` only if WAXUSDC is missing or its `system_price` ≤ 0.
-
-## Changes
-
-**`src/hooks/useCheesePriceData.ts`**
-- Look up the WAXUSDC token (`contract: 'eth.token'`, `ticker: 'WAXUSDC'`) alongside CHEESE.
-- Derive `usdPrice` as `cheese.system_price / waxusdc.system_price` when available.
-- Keep `waxPrice` as `cheese.system_price` (unchanged).
-- Fall back to Alcor's `cheese.usd_price` if WAXUSDC isn't present.
-
-**`src/components/home/CheesePriceBar.tsx`**
-- The derived `waxUsdPrice` (used by `useCheeseTVL`) currently does `usdPrice / waxPrice`, which already simplifies to `1 / WAXUSDC.system_price` after the fix — so TVL math gets the corrected WAX/USD too. No code change needed there, but verify the resulting market cap / TVL still render correctly.
-
-## Out of scope
-
-- No changes to `useSwapTokens`, the swap widget, or the Alcor `/tokens` fetch — we just reinterpret the data we already have.
-- No new network requests, no new caching.
+No other components need changes; `ExternalLinkWarning` stays as-is for true external links.
