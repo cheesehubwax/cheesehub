@@ -116,6 +116,9 @@ function BannerLayer({
   );
 }
 
+// Persist rotation state across route changes (BannerDisplay remounts per page)
+const rotationState: Record<number, { index: number; lastTick: number }> = {};
+
 function PositionSlot({
   banners,
   position,
@@ -125,22 +128,51 @@ function PositionSlot({
   position: number;
   onAdClick: (url: string) => void;
 }) {
-  // Offset position 2 by 1 so shared+placeholder banners alternate across positions
-  const [currentIndex, setCurrentIndex] = useState(position === 2 && banners.length > 1 ? 1 : 0);
+  const ROTATE_MS = 20000;
+
+  const computeInitialIndex = () => {
+    const saved = rotationState[position];
+    if (saved && banners.length > 0) {
+      const elapsed = Date.now() - saved.lastTick;
+      const advance = Math.floor(elapsed / ROTATE_MS);
+      return (saved.index + advance) % banners.length;
+    }
+    // Offset position 2 by 1 so shared+placeholder banners alternate across positions
+    return position === 2 && banners.length > 1 ? 1 : 0;
+  };
+
+  const [currentIndex, setCurrentIndex] = useState(computeInitialIndex);
 
   useEffect(() => {
     if (currentIndex >= banners.length) setCurrentIndex(0);
   }, [banners.length, currentIndex]);
 
+  // Persist current index so it survives route changes
+  useEffect(() => {
+    rotationState[position] = { index: currentIndex, lastTick: Date.now() };
+  }, [position, currentIndex]);
+
   const isCurrentShared = banners[currentIndex]?.isShared ?? false;
 
   useEffect(() => {
     if (banners.length <= 1) return;
-    const interval = setInterval(() => {
+    const saved = rotationState[position];
+    const elapsed = saved ? Date.now() - saved.lastTick : 0;
+    const initialDelay = Math.max(0, ROTATE_MS - (elapsed % ROTATE_MS));
+
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const timeout = setTimeout(() => {
       setCurrentIndex((i) => (i + 1) % banners.length);
-    }, 20000);
-    return () => clearInterval(interval);
-  }, [banners.length]);
+      interval = setInterval(() => {
+        setCurrentIndex((i) => (i + 1) % banners.length);
+      }, ROTATE_MS);
+    }, initialDelay);
+
+    return () => {
+      clearTimeout(timeout);
+      if (interval) clearInterval(interval);
+    };
+  }, [banners.length, position]);
 
   if (banners.length === 0) {
     return (
