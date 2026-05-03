@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Megaphone } from "lucide-react";
 import { useBannerSlots, BannerSlotGroup, BannerSlot } from "@/hooks/useBannerSlots";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
@@ -171,6 +171,7 @@ function PositionSlot({
 export function BannerDisplay() {
   const { slotGroups } = useBannerSlots();
   const [warningUrl, setWarningUrl] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const { pos1Banners, pos2Banners } = useMemo(() => {
     const nowSec = Math.floor(Date.now() / 1000);
@@ -200,10 +201,33 @@ export function BannerDisplay() {
   }, [slotGroups]);
 
   const handleAdClick = useCallback((url: string) => {
-    const sanitized = sanitizeUrl(url);
+    const trimmed = (url || "").trim();
+    if (!trimmed) return;
+
+    // Relative path → internal route
+    if (trimmed.startsWith("/")) {
+      navigate(trimmed);
+      return;
+    }
+
+    const sanitized = sanitizeUrl(trimmed);
     if (sanitized === "#") return;
+
+    try {
+      const parsed = new URL(sanitized);
+      if (parsed.hostname === window.location.hostname) {
+        const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+        let path = parsed.pathname;
+        if (base && path.startsWith(base)) path = path.slice(base.length) || "/";
+        navigate(path + parsed.search + parsed.hash);
+        return;
+      }
+    } catch {
+      // fall through to external warning
+    }
+
     setWarningUrl(sanitized);
-  }, []);
+  }, [navigate]);
 
   const hasPos1 = pos1Banners.length > 0;
   const hasPos2 = pos2Banners.length > 0;
