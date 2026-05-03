@@ -213,12 +213,33 @@ export function BannerDisplay() {
     const sanitized = sanitizeUrl(trimmed);
     if (sanitized === "#") return;
 
+    // Known CHEESEHub deployment hostnames — treat as internal
+    const INTERNAL_HOSTS = [
+      "cheesehubwax.github.io",
+      "cheesehub.app",
+      "www.cheesehub.app",
+    ];
+
     try {
       const parsed = new URL(sanitized);
-      if (parsed.hostname === window.location.hostname) {
-        const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
-        let path = parsed.pathname;
-        if (base && path.startsWith(base)) path = path.slice(base.length) || "/";
+      const host = parsed.hostname.toLowerCase();
+      const isInternal =
+        host === window.location.hostname ||
+        INTERNAL_HOSTS.includes(host) ||
+        host.endsWith(".lovable.app") ||
+        host.endsWith(".lovableproject.com");
+
+      if (isInternal) {
+        let path = parsed.pathname || "/";
+        const KNOWN_BASES = ["/cheesehub"];
+        const localBase = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+        if (localBase && !KNOWN_BASES.includes(localBase)) KNOWN_BASES.push(localBase);
+        for (const base of KNOWN_BASES) {
+          if (base && (path === base || path.startsWith(base + "/"))) {
+            path = path.slice(base.length) || "/";
+            break;
+          }
+        }
         navigate(path + parsed.search + parsed.hash);
         return;
       }
