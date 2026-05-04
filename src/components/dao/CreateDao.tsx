@@ -18,7 +18,7 @@ import {
   buildSetProfileActionWithSocials, DaoSocials,
   PROPOSAL_FEE_TOKENS,
 } from "@/lib/dao";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ProposalFeeInput, ProposalFeeValue } from "@/components/dao/ProposalFeeInput";
 import { buildCheesePaymentAction, buildWaxPaymentAction, buildWaxdaoFeeAction } from "@/lib/cheeseFees";
 import { useCheeseFeePricing } from "@/hooks/useCheeseFeePricing";
 import { useWaxdaoFeePricing } from "@/hooks/useWaxdaoFeePricing";
@@ -71,7 +71,9 @@ export function CreateDao() {
   const [minimumVotes, setMinimumVotes] = useState(1);
   const [minimumWeight, setMinimumWeight] = useState(0);
   const [proposalCost, setProposalCost] = useState(0);
-  const [proposalCostSymbol, setProposalCostSymbol] = useState("WAX");
+  const [feeToken, setFeeToken] = useState<ProposalFeeValue>({
+    amount: 0, symbol: "WAX", contract: "eosio.token", precision: 8,
+  });
   const [paymentMethod, setPaymentMethod] = useState<"wax" | "cheese" | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [helpAccordionValue, setHelpAccordionValue] = useState<string[]>([]);
@@ -150,9 +152,9 @@ export function CreateDao() {
       minimumVotes,
       proposerType: parseInt(proposerType),
       authors: Array.from(new Set([accountName, ...authors.map(a => a.trim().toLowerCase()).filter(Boolean)])),
-      proposalCost,
-      proposalCostSymbol,
-      proposalCostPrecision: PROPOSAL_FEE_TOKENS.find(t => t.symbol === proposalCostSymbol)?.precision ?? 8,
+      proposalCost: feeToken.amount,
+      proposalCostSymbol: feeToken.symbol,
+      proposalCostPrecision: feeToken.precision,
     }));
 
     if (description || avatar || coverImage || Object.values(socials).some(v => v)) {
