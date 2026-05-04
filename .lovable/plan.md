@@ -1,38 +1,47 @@
+## Issue
+
+On the testdao5 proposal, you voted Yes with 6 NFTs. The tally correctly shows "Yes: 6", but the per-user line reads "You voted yes (weight: 1)". The number 1 is wrong — it should be 6 (the number of NFTs used for the vote).
+
 ## Root cause
 
-In `src/lib/dao.ts` → `buildCreateDaoAction` (line 773):
+In `src/components/dao/ProposalCard.tsx`, every vote handler stores the local `UserVote.weight` as:
 
 ```ts
-proposer_type: config.proposerType || 1,
+weight: stakedWeight?.weight || 1
 ```
 
-The "Authors Only" UI option has key `"0"`. `parseInt("0") = 0`, which is **falsy**, so `|| 1` overrides it and sends `proposer_type: 1` ("Anyone") to the contract. The `authors` array still goes through, which is why testdao4 had 2 authors recorded but displayed "Anyone".
+`stakedWeight` is only fetched for token-staking DAOs (`dao.dao_type === 4`):
 
-Verified on-chain against `dao.waxdao::daos` for testdao4: `proposer_type: 1`, `authors: ["fragglerockk", "liquidcheese"]`. So this is a write bug, not a display bug — `DaoDetail.tsx` and `DaoCard.tsx` are rendering correctly.
+```ts
+if (!accountName || dao.dao_type !== 4) return;
+fetchUserStakedTokens(daoName, accountName).then(setStakedWeight);
+```
+
+For NFT-governance DAOs (`dao.dao_type === 5`, "Type 5"), `stakedWeight` stays null, so the recorded weight always falls back to `1`, regardless of how many NFTs were sent with the vote.
 
 ## Fix
 
-One-line change in `src/lib/dao.ts`:
+Use the count of `selectedNFTs` as the weight when the DAO is type 5; otherwise keep the existing token-stake weight.
 
-```ts
-// before
-proposer_type: config.proposerType || 1,
-// after — preserves 0 ("Authors Only"), still defaults when undefined
-proposer_type: config.proposerType ?? 1,
-```
+### Changes in `src/components/dao/ProposalCard.tsx`
 
-`??` only falls back when the value is `null`/`undefined`, so `0` and `2` pass through correctly.
+1. Compute the effective weight in one place:
+   ```ts
+   const computeVoteWeight = () => {
+     if (isType5) return selectedNFTs.length || 1;
+     return stakedWeight?.weight || 1;
+   };
+   ```
+2. Use `computeVoteWeight()` in both `handleYNAVote` and `handleMultiVote` when constructing `voteData`:
+   ```ts
+   const voteData: UserVote = { choice_index: ..., weight: computeVoteWeight() };
+   ```
+3. (Optional polish) When `isType5`, show "Weight: N NFTs" instead of the staked-token "Weight: balance" line near line 169–170, so the displayed weight matches what was used to vote.
 
-## Why no other fields need changing
+No on-chain behavior changes — this only corrects the locally-stored/displayed weight for NFT DAOs.
 
-I audited the rest of `buildCreateDaoAction` for the same `|| fallback` pattern on numeric fields:
+## Verification
 
-- `threshold || 50.0`, `hoursPerProposal || 72`, `daoType || 4`, `minimumVotes || 1` — `0` is not a meaningful value for any of these, leave as-is.
-- `minimumWeight || 0` — already correct.
-- `proposer_type` is the only enum where `0` is a valid choice, so it's the only line that needs `??`.
-
-## Files changed
-
-- `src/lib/dao.ts` — single-line change on the `proposer_type` field inside `buildCreateDaoAction`.
-
-No UI changes. Existing DAOs are not affected (the contract has no `editproposer` action), but every new DAO created with "Authors Only" selected will now be saved correctly on-chain.
+After the fix, voting with 6 NFTs in testdao5 should display:
+- Tally: "Yes: 6" (unchanged)
+- Per-user line: "You voted yes (weight: 6)"
