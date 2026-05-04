@@ -18,7 +18,7 @@ import {
   buildSetProfileActionWithSocials, DaoSocials,
   PROPOSAL_FEE_TOKENS,
 } from "@/lib/dao";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ProposalFeeInput, ProposalFeeValue } from "@/components/dao/ProposalFeeInput";
 import { buildCheesePaymentAction, buildWaxPaymentAction, buildWaxdaoFeeAction } from "@/lib/cheeseFees";
 import { useCheeseFeePricing } from "@/hooks/useCheeseFeePricing";
 import { useWaxdaoFeePricing } from "@/hooks/useWaxdaoFeePricing";
@@ -70,8 +70,9 @@ export function CreateDao() {
   const [hoursPerProposal, setHoursPerProposal] = useState(72);
   const [minimumVotes, setMinimumVotes] = useState(1);
   const [minimumWeight, setMinimumWeight] = useState(0);
-  const [proposalCost, setProposalCost] = useState(0);
-  const [proposalCostSymbol, setProposalCostSymbol] = useState("WAX");
+  const [feeToken, setFeeToken] = useState<ProposalFeeValue>({
+    amount: 0, symbol: "WAX", contract: "eosio.token", precision: 8,
+  });
   const [paymentMethod, setPaymentMethod] = useState<"wax" | "cheese" | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [helpAccordionValue, setHelpAccordionValue] = useState<string[]>([]);
@@ -150,9 +151,9 @@ export function CreateDao() {
       minimumVotes,
       proposerType: parseInt(proposerType),
       authors: Array.from(new Set([accountName, ...authors.map(a => a.trim().toLowerCase()).filter(Boolean)])),
-      proposalCost,
-      proposalCostSymbol,
-      proposalCostPrecision: PROPOSAL_FEE_TOKENS.find(t => t.symbol === proposalCostSymbol)?.precision ?? 8,
+      proposalCost: feeToken.amount,
+      proposalCostSymbol: feeToken.symbol,
+      proposalCostPrecision: feeToken.precision,
     }));
 
     if (description || avatar || coverImage || Object.values(socials).some(v => v)) {
@@ -676,27 +677,14 @@ export function CreateDao() {
               <div>
                 <Label className="text-sm font-medium">
                   Proposal Submission Fee
-                  <InfoTooltip text="Fee required to submit a proposal. Choose any supported token. Set to 0 for free proposals." />
+                  <InfoTooltip text="Fee required to submit a proposal. Any WAX token is supported. Set amount to 0 for free proposals." />
                 </Label>
-                <div className="flex gap-2 mt-1">
-                  <Input
-                    type="number"
-                    value={proposalCost}
-                    onChange={e => setProposalCost(parseFloat(e.target.value) || 0)}
-                    min={0}
-                    step={0.01}
-                    className="flex-1"
-                  />
-                  <Select value={proposalCostSymbol} onValueChange={setProposalCostSymbol}>
-                    <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {PROPOSAL_FEE_TOKENS.map(t => (
-                        <SelectItem key={t.symbol} value={t.symbol}>{t.symbol}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="mt-1">
+                  <ProposalFeeInput value={feeToken} onChange={setFeeToken} />
                 </div>
-                <FieldHint>Choose any supported token. Set to 0 for free proposals.</FieldHint>
+                <FieldHint>
+                  Pick a preset or enter any token symbol + contract. Set amount to 0 for free proposals.
+                </FieldHint>
               </div>
             </CardContent>
           </Card>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,8 +15,9 @@ import {
   buildNFTTransferProposalAction,
   buildAnnounceDepoAction, buildProposalCostAction,
   VOTING_TYPE_LABELS,
-  findProposalFeeToken,
+  findProposalFeeToken, getCachedFeeToken, rememberFeeToken, resolveTokenStats,
 } from "@/lib/dao";
+import { getTokenConfig } from "@/lib/tokenRegistry";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useToast } from "@/hooks/use-toast";
@@ -41,6 +42,32 @@ export function CreateProposal({ daoName, dao, treasuryNFTs = [], onClose, onCre
   const { executeTransaction } = useWaxTransaction(session);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+
+  // Resolve which contract to use to pay the DAO's proposal_cost token.
+  const feeSymbol = useMemo(() => (dao.proposal_cost?.split(" ")[1] || "WAX"), [dao.proposal_cost]);
+  const feeAmount = useMemo(() => parseFloat(dao.proposal_cost?.split(" ")[0] || "0"), [dao.proposal_cost]);
+  const requiresFee = !!dao.proposal_cost && dao.proposal_cost !== "0" && feeAmount > 0;
+
+  const presetContract =
+    findProposalFeeToken(feeSymbol)?.contract
+    ?? getCachedFeeToken(feeSymbol)?.contract
+    ?? getTokenConfig(feeSymbol)?.contract
+    ?? "";
+  const [feeContract, setFeeContract] = useState<string>(presetContract);
+  const [resolvingFee, setResolvingFee] = useState(false);
+
+  // If we have a contract guess, verify it on chain (and cache).
+  useEffect(() => {
+    if (!requiresFee || !feeContract) return;
+    let cancelled = false;
+    (async () => {
+      setResolvingFee(true);
+      const stats = await resolveTokenStats(feeContract, feeSymbol);
+      if (!cancelled && stats) rememberFeeToken(feeSymbol, feeContract, stats.precision);
+      if (!cancelled) setResolvingFee(false);
+    })();
+    return () => { cancelled = true; };
+  }, [requiresFee, feeContract, feeSymbol]);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -78,20 +105,30 @@ export function CreateProposal({ daoName, dao, treasuryNFTs = [], onClose, onCre
     const actions = [];
 
     // Pay proposal cost if required
-    if (dao.proposal_cost && dao.proposal_cost !== "0" && parseFloat(dao.proposal_cost) > 0) {
-      const feeSymbol = dao.proposal_cost.split(" ")[1] || "WAX";
-      const feeToken = findProposalFeeToken(feeSymbol);
-      if (!feeToken) {
+    if (requiresFee) {
+      const ct = feeContract.trim().toLowerCase();
+      if (!ct) {
         toast({
-          title: "Unsupported fee token",
-          description: `This DAO requires a ${feeSymbol} proposal fee, which is not yet supported in this UI.`,
+          title: "Token contract required",
+          description: `Please specify the contract that issues ${feeSymbol} so the fee can be paid.`,
           variant: "destructive",
         });
         setLoading(false);
         return;
       }
+      const stats = await resolveTokenStats(ct, feeSymbol);
+      if (!stats) {
+        toast({
+          title: "Invalid token contract",
+          description: `No ${feeSymbol} token found on contract "${ct}".`,
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+      rememberFeeToken(feeSymbol, ct, stats.precision);
       actions.push(buildAnnounceDepoAction(accountName));
-      actions.push(buildProposalCostAction(accountName, dao.proposal_cost, feeToken.contract));
+      actions.push(buildProposalCostAction(accountName, dao.proposal_cost, ct));
     }
 
     const type = parseInt(proposalType);
@@ -273,10 +310,27 @@ export function CreateProposal({ daoName, dao, treasuryNFTs = [], onClose, onCre
         )}
 
         {/* Proposal Cost */}
-        {dao.proposal_cost && dao.proposal_cost !== "0" && parseFloat(dao.proposal_cost) > 0 && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/20 p-2 rounded">
-            <Info className="h-4 w-4 text-primary shrink-0" />
-            Proposal cost: {dao.proposal_cost}
+        {requiresFee && (
+          <div className="space-y-2 bg-muted/20 p-3 rounded">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Info className="h-4 w-4 text-primary shrink-0" />
+              Proposal cost: <span className="text-foreground font-medium">{dao.proposal_cost}</span>
+              {resolvingFee && <Loader2 className="h-3 w-3 animate-spin ml-1" />}
+            </div>
+            {!presetContract && (
+              <div>
+                <Label className="text-xs">Token contract for {feeSymbol}</Label>
+                <Input
+                  value={feeContract}
+                  onChange={e => setFeeContract(e.target.value.toLowerCase().replace(/[^a-z1-5.]/g, "").slice(0, 12))}
+                  placeholder="e.g. mytoken.acc"
+                  maxLength={12}
+                />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  This DAO uses a custom fee token. Enter the contract that issues {feeSymbol}.
+                </p>
+              </div>
+            )}
           </div>
         )}
 

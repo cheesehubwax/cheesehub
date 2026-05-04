@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
-import { buildEditPropCostAction, PROPOSAL_FEE_TOKENS } from "@/lib/dao";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { buildEditPropCostAction, PROPOSAL_FEE_TOKENS, getCachedFeeToken } from "@/lib/dao";
+import { ProposalFeeInput, ProposalFeeValue } from "@/components/dao/ProposalFeeInput";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 
@@ -21,22 +20,25 @@ export function EditProposalCost({ open, onOpenChange, daoName, currentCost, onU
   const { accountName, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const [loading, setLoading] = useState(false);
-  const [cost, setCost] = useState(() => {
+  const [feeToken, setFeeToken] = useState<ProposalFeeValue>(() => {
     const parts = currentCost.split(" ");
-    return parseFloat(parts[0]) || 0;
-  });
-  const [symbol, setSymbol] = useState(() => {
-    const parts = currentCost.split(" ");
-    const s = parts[1] || "WAX";
-    return PROPOSAL_FEE_TOKENS.some(t => t.symbol === s) ? s : "WAX";
+    const amount = parseFloat(parts[0]) || 0;
+    const sym = parts[1] || "WAX";
+    const preset = PROPOSAL_FEE_TOKENS.find(t => t.symbol === sym);
+    const cached = preset ? null : getCachedFeeToken(sym);
+    return {
+      amount,
+      symbol: sym,
+      contract: preset?.contract ?? cached?.contract ?? "",
+      precision: preset?.precision ?? cached?.precision ?? (parts[0]?.includes(".") ? parts[0].split(".")[1].length : 0),
+    };
   });
 
   const handleSave = async () => {
     if (!session || !accountName) return;
+    if (!feeToken.contract || !feeToken.symbol) return;
     setLoading(true);
-
-    const token = PROPOSAL_FEE_TOKENS.find(t => t.symbol === symbol) ?? PROPOSAL_FEE_TOKENS[0];
-    const formatted = `${cost.toFixed(token.precision)} ${token.symbol}`;
+    const formatted = `${feeToken.amount.toFixed(feeToken.precision)} ${feeToken.symbol}`;
     const action = buildEditPropCostAction(accountName, daoName, formatted);
     const result = await executeTransaction([action], {
       successTitle: "Proposal Cost Updated! 🧀",
@@ -52,7 +54,7 @@ export function EditProposalCost({ open, onOpenChange, daoName, currentCost, onU
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Edit Proposal Cost</DialogTitle>
         </DialogHeader>
@@ -63,24 +65,8 @@ export function EditProposalCost({ open, onOpenChange, daoName, currentCost, onU
           </div>
           <div>
             <Label>New Cost</Label>
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                value={cost}
-                onChange={e => setCost(parseFloat(e.target.value) || 0)}
-                min={0}
-                step={0.00000001}
-                placeholder="0 for free"
-                className="flex-1"
-              />
-              <Select value={symbol} onValueChange={setSymbol}>
-                <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {PROPOSAL_FEE_TOKENS.map(t => (
-                    <SelectItem key={t.symbol} value={t.symbol}>{t.symbol}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="mt-1">
+              <ProposalFeeInput value={feeToken} onChange={setFeeToken} />
             </div>
             <p className="text-xs text-muted-foreground mt-1">Set to 0 for free proposals</p>
           </div>
