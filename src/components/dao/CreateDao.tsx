@@ -16,8 +16,6 @@ import {
   DAO_TYPES, CREATABLE_DAO_TYPES, PROPOSER_TYPES,
   buildAssertPointAction, buildCreateDaoAction,
   buildSetProfileActionWithSocials, DaoSocials,
-  PROPOSAL_FEE_TOKENS,
-  buildEditPropCostAction,
 } from "@/lib/dao";
 import { ProposalFeeInput, ProposalFeeValue } from "@/components/dao/ProposalFeeInput";
 import { buildCheesePaymentAction, buildWaxPaymentAction, buildWaxdaoFeeAction } from "@/lib/cheeseFees";
@@ -153,17 +151,10 @@ export function CreateDao() {
       proposerType: parseInt(proposerType),
       authors: Array.from(new Set([accountName, ...authors.map(a => a.trim().toLowerCase()).filter(Boolean)])),
       // dao.waxdao::createdao asserts proposal_cost must be in WAX.
-      // Non-WAX tokens are applied via editpropcost in the same transaction.
       proposalCost: feeToken.amount,
       proposalCostSymbol: "WAX",
       proposalCostPrecision: 8,
     }));
-
-    // If user picked a non-WAX fee token, switch the proposal cost immediately after creation.
-    if (feeToken.symbol !== "WAX") {
-      const formatted = `${feeToken.amount.toFixed(feeToken.precision)} ${feeToken.symbol}`;
-      actions.push(buildEditPropCostAction(accountName, daoName, formatted));
-    }
 
     if (description || avatar || coverImage || Object.values(socials).some(v => v)) {
       actions.push(buildSetProfileActionWithSocials(
