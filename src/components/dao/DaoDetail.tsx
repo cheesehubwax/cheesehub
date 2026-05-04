@@ -345,6 +345,7 @@ export function DaoDetail({ daoName, onBack }: DaoDetailProps) {
                     <Badge key={a} variant="outline" className="text-xs">{a}</Badge>
                   ))}
                 </div>
+                <p className="text-xs text-muted-foreground">Authors are fixed at DAO creation and cannot be modified.</p>
               </div>
             )}
 
