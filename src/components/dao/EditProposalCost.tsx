@@ -60,7 +60,9 @@ export function EditProposalCost({ open, onOpenChange, daoName, currentCost, onU
             <div className="mt-1">
               <ProposalFeeInput value={feeToken} onChange={setFeeToken} />
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Set to 0 for free proposals</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Set to 0 for free proposals. Fees must be in WAX (contract requirement).
+            </p>
           </div>
         </div>
         <DialogFooter>
