@@ -1,34 +1,38 @@
-# Revert Proposal Fee to WAX-Only
+## Root cause
 
-The `dao.waxdao` contract hard-codes WAX as the only valid `proposal_cost` token for both `createdao` and `editpropcost`. Custom tokens (CHEESE, etc.) remain supported for governance, but the proposal submission fee must be WAX.
+In `src/lib/dao.ts` → `buildCreateDaoAction` (line 773):
 
-## Changes
+```ts
+proposer_type: config.proposerType || 1,
+```
 
-### 1. `src/components/dao/ProposalFeeInput.tsx`
-- Remove token selector; render a WAX-only numeric input.
-- Add a small caption: "Proposal fees are denominated in WAX (contract requirement)."
-- Drop any localStorage persistence of custom fee tokens.
+The "Authors Only" UI option has key `"0"`. `parseInt("0") = 0`, which is **falsy**, so `|| 1` overrides it and sends `proposer_type: 1` ("Anyone") to the contract. The `authors` array still goes through, which is why testdao4 had 2 authors recorded but displayed "Anyone".
 
-### 2. `src/components/dao/CreateDao.tsx`
-- Remove the batched `editpropcost` action appended after `createdao`.
-- Always pass `WAX` (precision 8) as `proposalCostSymbol` / `proposalCostPrecision`.
-- Remove any `feeToken.symbol !== "WAX"` branching and related state.
+Verified on-chain against `dao.waxdao::daos` for testdao4: `proposer_type: 1`, `authors: ["fragglerockk", "liquidcheese"]`. So this is a write bug, not a display bug — `DaoDetail.tsx` and `DaoCard.tsx` are rendering correctly.
 
-### 3. `src/components/dao/EditProposalCost.tsx`
-- Lock the edit form to WAX only (remove token picker if present).
-- Keep the action wired to `buildEditPropCostAction` with WAX formatting.
+## Fix
 
-### 4. `src/lib/dao.ts`
-- Keep `buildEditPropCostAction` and `buildCreateDaoAction` helpers intact.
-- No signature changes required; callers will simply always pass WAX.
-- Remove any now-unused custom-token fee helpers/constants if present.
+One-line change in `src/lib/dao.ts`:
 
-### 5. UI copy
-- In CreateDao and EditProposalCost, add a one-line note clarifying that governance token (voting) can still be CHEESE / NFTs / other tokens — only the per-proposal submission fee is WAX.
+```ts
+// before
+proposer_type: config.proposerType || 1,
+// after — preserves 0 ("Authors Only"), still defaults when undefined
+proposer_type: config.proposerType ?? 1,
+```
 
-## Out of scope
-- Governance token selection (CHEESE / custom / NFT) remains unchanged.
-- Treasury, voting, and DAO type logic untouched.
+`??` only falls back when the value is `null`/`undefined`, so `0` and `2` pass through correctly.
 
-## Verification
-- Create a non-custodial NFT DAO with CHEESE governance token and 1 WAX proposal fee → transaction should sign and broadcast without the "Proposal cost must be in WAX" assertion.
+## Why no other fields need changing
+
+I audited the rest of `buildCreateDaoAction` for the same `|| fallback` pattern on numeric fields:
+
+- `threshold || 50.0`, `hoursPerProposal || 72`, `daoType || 4`, `minimumVotes || 1` — `0` is not a meaningful value for any of these, leave as-is.
+- `minimumWeight || 0` — already correct.
+- `proposer_type` is the only enum where `0` is a valid choice, so it's the only line that needs `??`.
+
+## Files changed
+
+- `src/lib/dao.ts` — single-line change on the `proposer_type` field inside `buildCreateDaoAction`.
+
+No UI changes. Existing DAOs are not affected (the contract has no `editproposer` action), but every new DAO created with "Authors Only" selected will now be saved correctly on-chain.

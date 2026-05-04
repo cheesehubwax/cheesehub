@@ -770,7 +770,8 @@ export function buildCreateDaoAction(
       hours_per_proposal: config.hoursPerProposal || 72,
       minimum_weight: config.minimumWeight || 0,
       minimum_votes: config.minimumVotes || 1,
-      proposer_type: config.proposerType || 1,
+      // Use ?? so a valid `0` ("Authors Only") isn't coerced to 1 ("Anyone").
+      proposer_type: config.proposerType ?? 1,
       authors: config.authors || [],
       proposal_cost: proposalCostFormatted,
     },
