@@ -151,6 +151,8 @@ export function CreateDao() {
       proposerType: parseInt(proposerType),
       authors: Array.from(new Set([accountName, ...authors.map(a => a.trim().toLowerCase()).filter(Boolean)])),
       proposalCost,
+      proposalCostSymbol,
+      proposalCostPrecision: PROPOSAL_FEE_TOKENS.find(t => t.symbol === proposalCostSymbol)?.precision ?? 8,
     }));
 
     if (description || avatar || coverImage || Object.values(socials).some(v => v)) {
