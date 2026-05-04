@@ -18,6 +18,7 @@ import {
   buildSetProfileActionWithSocials, DaoSocials,
 } from "@/lib/dao";
 import { ProposalFeeInput, ProposalFeeValue } from "@/components/dao/ProposalFeeInput";
+import { GovSchemaRow, GovSchemaCheck } from "@/components/dao/GovSchemaRow";
 import { buildCheesePaymentAction, buildWaxPaymentAction, buildWaxdaoFeeAction } from "@/lib/cheeseFees";
 import { useCheeseFeePricing } from "@/hooks/useCheeseFeePricing";
 import { useWaxdaoFeePricing } from "@/hooks/useWaxdaoFeePricing";
@@ -88,6 +89,7 @@ export function CreateDao() {
   const [govSchemas, setGovSchemas] = useState<{ collection_name: string; schema_name: string }[]>([
     { collection_name: "", schema_name: "" },
   ]);
+  const [schemaStatuses, setSchemaStatuses] = useState<GovSchemaCheck[]>(["idle"]);
 
   useEffect(() => {
     if (scrollToAnchor && helpOpen && anchorRef.current) {
@@ -98,10 +100,19 @@ export function CreateDao() {
     }
   }, [scrollToAnchor, helpOpen]);
 
-  const addSchema = () => setGovSchemas(prev => [...prev, { collection_name: "", schema_name: "" }]);
-  const removeSchema = (idx: number) => setGovSchemas(prev => prev.filter((_, i) => i !== idx));
+  const addSchema = () => {
+    setGovSchemas(prev => [...prev, { collection_name: "", schema_name: "" }]);
+    setSchemaStatuses(prev => [...prev, "idle"]);
+  };
+  const removeSchema = (idx: number) => {
+    setGovSchemas(prev => prev.filter((_, i) => i !== idx));
+    setSchemaStatuses(prev => prev.filter((_, i) => i !== idx));
+  };
   const updateSchema = (idx: number, field: "collection_name" | "schema_name", value: string) => {
     setGovSchemas(prev => prev.map((s, i) => i === idx ? { ...s, [field]: value } : s));
+  };
+  const updateSchemaStatus = (idx: number, status: GovSchemaCheck) => {
+    setSchemaStatuses(prev => prev.map((s, i) => (i === idx ? status : s)));
   };
 
   const daoTypeDescriptions: Record<number, string> = {
