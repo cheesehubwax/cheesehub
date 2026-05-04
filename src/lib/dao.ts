@@ -685,10 +685,13 @@ export function buildCreateDaoAction(
     daoName: string; daoType?: number; tokenContract?: string; tokenSymbol?: string;
     govFarmName?: string; govSchemas?: { collection_name: string; schema_name: string }[];
     threshold?: number; hoursPerProposal?: number; minimumWeight?: number;
-    minimumVotes?: number; proposerType?: number; authors?: string[]; proposalCost?: number;
+    minimumVotes?: number; proposerType?: number; authors?: string[];
+    proposalCost?: number; proposalCostSymbol?: string; proposalCostPrecision?: number;
   }
 ) {
-  const proposalCostFormatted = `${(config.proposalCost || 0).toFixed(8)} WAX`;
+  const feeSymbol = config.proposalCostSymbol || "WAX";
+  const feePrecision = config.proposalCostPrecision ?? 8;
+  const proposalCostFormatted = `${(config.proposalCost || 0).toFixed(feePrecision)} ${feeSymbol}`;
   const daoType = config.daoType || 4;
   const useToken = daoType === 4;
   const useFarm = [1, 2, 3].includes(daoType);
