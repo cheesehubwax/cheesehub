@@ -8,6 +8,23 @@ export const DAO_CONTRACT = "dao.waxdao";
 // Fee constants for DAO creation
 export const DAO_CREATION_FEE = "265.00000000 WAX";
 
+// Tokens supported as proposal submission fees in the UI.
+// The smart contract accepts any asset, but we expose a curated list.
+export interface ProposalFeeToken {
+  symbol: string;
+  contract: string;
+  precision: number;
+}
+export const PROPOSAL_FEE_TOKENS: ProposalFeeToken[] = [
+  { symbol: "WAX", contract: "eosio.token", precision: 8 },
+  { symbol: "CHEESE", contract: "cheese4token", precision: 4 },
+  { symbol: "WAXDAO", contract: "token.waxdao", precision: 8 },
+];
+
+export function findProposalFeeToken(symbol: string): ProposalFeeToken | undefined {
+  return PROPOSAL_FEE_TOKENS.find(t => t.symbol === symbol);
+}
+
 // Build action for announcing deposit (required before proposal payment)
 export function buildAnnounceDepoAction(user: string) {
   return {
@@ -18,10 +35,10 @@ export function buildAnnounceDepoAction(user: string) {
   };
 }
 
-// Build action for paying proposal cost
-export function buildProposalCostAction(sender: string, proposalCost: string) {
+// Build action for paying proposal cost. tokenContract defaults to eosio.token (WAX).
+export function buildProposalCostAction(sender: string, proposalCost: string, tokenContract = "eosio.token") {
   return {
-    account: "eosio.token",
+    account: tokenContract,
     name: "transfer",
     authorization: [{ actor: sender, permission: "active" }],
     data: {
@@ -668,10 +685,13 @@ export function buildCreateDaoAction(
     daoName: string; daoType?: number; tokenContract?: string; tokenSymbol?: string;
     govFarmName?: string; govSchemas?: { collection_name: string; schema_name: string }[];
     threshold?: number; hoursPerProposal?: number; minimumWeight?: number;
-    minimumVotes?: number; proposerType?: number; authors?: string[]; proposalCost?: number;
+    minimumVotes?: number; proposerType?: number; authors?: string[];
+    proposalCost?: number; proposalCostSymbol?: string; proposalCostPrecision?: number;
   }
 ) {
-  const proposalCostFormatted = `${(config.proposalCost || 0).toFixed(8)} WAX`;
+  const feeSymbol = config.proposalCostSymbol || "WAX";
+  const feePrecision = config.proposalCostPrecision ?? 8;
+  const proposalCostFormatted = `${(config.proposalCost || 0).toFixed(feePrecision)} ${feeSymbol}`;
   const daoType = config.daoType || 4;
   const useToken = daoType === 4;
   const useFarm = [1, 2, 3].includes(daoType);
