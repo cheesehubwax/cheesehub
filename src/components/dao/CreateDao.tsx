@@ -677,13 +677,13 @@ export function CreateDao() {
               <div>
                 <Label className="text-sm font-medium">
                   Proposal Submission Fee
-                  <InfoTooltip text="Fee required to submit a proposal. Any WAX token is supported. Set amount to 0 for free proposals." />
+                  <InfoTooltip text="WAX fee required to submit a proposal. Set amount to 0 for free proposals. The contract requires WAX." />
                 </Label>
                 <div className="mt-1">
                   <ProposalFeeInput value={feeToken} onChange={setFeeToken} />
                 </div>
                 <FieldHint>
-                  Pick a preset or enter any token symbol + contract. Set amount to 0 for free proposals.
+                  Submission fees are paid in WAX. Set amount to 0 for free proposals.
                 </FieldHint>
               </div>
             </CardContent>
