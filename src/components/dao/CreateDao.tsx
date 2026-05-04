@@ -136,6 +136,35 @@ export function CreateDao() {
       return;
     }
 
+    if (needsSchemas) {
+      const filled = govSchemas
+        .map((s, i) => ({ s, i }))
+        .filter(({ s }) => s.collection_name && s.schema_name);
+      if (filled.length === 0) {
+        toast({ title: "Add at least 1 governance schema", description: "NFT-based DAOs require at least one collection + schema.", variant: "destructive" });
+        return;
+      }
+      const bad = filled.find(({ i }) => schemaStatuses[i] && schemaStatuses[i] !== "ok" && schemaStatuses[i] !== "checking");
+      if (bad) {
+        const reasons: Record<string, string> = {
+          no_collection: "Collection does not exist on AtomicAssets.",
+          no_schema: "Schema does not exist in that collection.",
+          not_authorized: `You (${accountName}) must be an authorized account on every governance collection.`,
+        };
+        toast({
+          title: "Invalid governance schema",
+          description: reasons[bad.s.collection_name && schemaStatuses[bad.i]] ?? reasons[schemaStatuses[bad.i]] ?? "One or more governance schemas are invalid.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const stillChecking = filled.some(({ i }) => schemaStatuses[i] === "checking");
+      if (stillChecking) {
+        toast({ title: "Still verifying schemas", description: "Please wait for on-chain verification to finish.", variant: "destructive" });
+        return;
+      }
+    }
+
     setLoading(true);
     const actions = [];
 
