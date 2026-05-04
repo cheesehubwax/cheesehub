@@ -71,6 +71,7 @@ export function CreateDao() {
   const [minimumVotes, setMinimumVotes] = useState(1);
   const [minimumWeight, setMinimumWeight] = useState(0);
   const [proposalCost, setProposalCost] = useState(0);
+  const [proposalCostSymbol, setProposalCostSymbol] = useState("WAX");
   const [paymentMethod, setPaymentMethod] = useState<"wax" | "cheese" | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [helpAccordionValue, setHelpAccordionValue] = useState<string[]>([]);
