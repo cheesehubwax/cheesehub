@@ -146,7 +146,7 @@ export function CreateDao() {
       minimumWeight,
       minimumVotes,
       proposerType: parseInt(proposerType),
-      authors: [accountName],
+      authors: Array.from(new Set([accountName, ...authors.map(a => a.trim().toLowerCase()).filter(Boolean)])),
       proposalCost,
     }));
 
