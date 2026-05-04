@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Slider } from "@/components/ui/slider";
-import { Loader2, Plus, Users, Trash2, AlertTriangle, HelpCircle, ChevronDown } from "lucide-react";
+import { Loader2, Plus, Users, Trash2, AlertTriangle, HelpCircle, ChevronDown, X } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -60,6 +60,8 @@ export function CreateDao() {
   const [daoName, setDaoName] = useState("");
   const [daoType, setDaoType] = useState(4);
   const [proposerType, setProposerType] = useState("1");
+  const [authors, setAuthors] = useState<string[]>([]);
+  const [authorInput, setAuthorInput] = useState("");
   const [tokenContract, setTokenContract] = useState("");
   const [tokenSymbol, setTokenSymbol] = useState("");
   const [threshold, setThreshold] = useState(50);
@@ -144,7 +146,7 @@ export function CreateDao() {
       minimumWeight,
       minimumVotes,
       proposerType: parseInt(proposerType),
-      authors: [accountName],
+      authors: Array.from(new Set([accountName, ...authors.map(a => a.trim().toLowerCase()).filter(Boolean)])),
       proposalCost,
     }));
 
@@ -580,6 +582,91 @@ export function CreateDao() {
                   })}
                 </RadioGroup>
               </div>
+
+              {proposerType === "0" && (
+                <div>
+                  <Label className="text-sm font-medium">
+                    Authorized Authors
+                    <InfoTooltip text="WAX accounts allowed to create proposals. The creator is included automatically. Cannot be changed after DAO creation." />
+                  </Label>
+                  <div className="flex gap-2 mt-2">
+                    <Input
+                      placeholder="wax.account"
+                      value={authorInput}
+                      maxLength={12}
+                      onChange={e => setAuthorInput(e.target.value.toLowerCase())}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const v = authorInput.trim().toLowerCase();
+                          if (!v) return;
+                          if (!/^[a-z1-5.]{1,12}$/.test(v)) {
+                            toast({ title: "Invalid WAX account", description: "Use a-z, 1-5, dot. Max 12 chars.", variant: "destructive" });
+                            return;
+                          }
+                          if (v === accountName) {
+                            toast({ title: "Already included", description: "The creator is added automatically." });
+                            return;
+                          }
+                          if (authors.includes(v)) {
+                            toast({ title: "Duplicate", description: `${v} is already in the list.` });
+                            return;
+                          }
+                          setAuthors([...authors, v]);
+                          setAuthorInput("");
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const v = authorInput.trim().toLowerCase();
+                        if (!v) return;
+                        if (!/^[a-z1-5.]{1,12}$/.test(v)) {
+                          toast({ title: "Invalid WAX account", description: "Use a-z, 1-5, dot. Max 12 chars.", variant: "destructive" });
+                          return;
+                        }
+                        if (v === accountName) {
+                          toast({ title: "Already included", description: "The creator is added automatically." });
+                          return;
+                        }
+                        if (authors.includes(v)) {
+                          toast({ title: "Duplicate", description: `${v} is already in the list.` });
+                          return;
+                        }
+                        setAuthors([...authors, v]);
+                        setAuthorInput("");
+                      }}
+                    >
+                      <Plus className="h-4 w-4" /> Add
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-primary/10 border border-primary/30 text-foreground">
+                      {accountName || "creator"} <span className="text-[10px] text-muted-foreground">(creator)</span>
+                    </span>
+                    {authors.map(a => (
+                      <span key={a} className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-muted border border-border/50">
+                        {a}
+                        <button
+                          type="button"
+                          onClick={() => setAuthors(authors.filter(x => x !== a))}
+                          className="ml-1 text-muted-foreground hover:text-destructive"
+                          aria-label={`Remove ${a}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <FieldHint>
+                    The creator is automatically included. Add any additional accounts allowed to create proposals.{" "}
+                    <span className="text-cheese">Authors cannot be changed after creation.</span>
+                  </FieldHint>
+                </div>
+              )}
 
               <div>
                 <Label className="text-sm font-medium">
