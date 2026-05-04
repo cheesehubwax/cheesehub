@@ -15,6 +15,7 @@ import {
   buildNFTTransferProposalAction,
   buildAnnounceDepoAction, buildProposalCostAction,
   VOTING_TYPE_LABELS,
+  findProposalFeeToken,
 } from "@/lib/dao";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
@@ -78,8 +79,19 @@ export function CreateProposal({ daoName, dao, treasuryNFTs = [], onClose, onCre
 
     // Pay proposal cost if required
     if (dao.proposal_cost && dao.proposal_cost !== "0" && parseFloat(dao.proposal_cost) > 0) {
+      const feeSymbol = dao.proposal_cost.split(" ")[1] || "WAX";
+      const feeToken = findProposalFeeToken(feeSymbol);
+      if (!feeToken) {
+        toast({
+          title: "Unsupported fee token",
+          description: `This DAO requires a ${feeSymbol} proposal fee, which is not yet supported in this UI.`,
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
       actions.push(buildAnnounceDepoAction(accountName));
-      actions.push(buildProposalCostAction(accountName, dao.proposal_cost));
+      actions.push(buildProposalCostAction(accountName, dao.proposal_cost, feeToken.contract));
     }
 
     const type = parseInt(proposalType);
