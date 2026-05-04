@@ -153,7 +153,7 @@ export function CreateDao() {
         };
         toast({
           title: "Invalid governance schema",
-          description: reasons[bad.s.collection_name && schemaStatuses[bad.i]] ?? reasons[schemaStatuses[bad.i]] ?? "One or more governance schemas are invalid.",
+          description: reasons[schemaStatuses[bad.i]] ?? "One or more governance schemas are invalid.",
           variant: "destructive",
         });
         return;
