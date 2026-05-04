@@ -739,6 +739,21 @@ export function buildCreateDaoAction(
   const useFarm = [1, 2, 3].includes(daoType);
   const useSchemas = [1, 2, 5].includes(daoType);
 
+  // gov_token_symbol must be an extended-symbol string "<precision>,<SYMBOL>".
+  // For non-token DAOs the contract expects the sentinel "0,NULL" / "null".
+  let govTokenSymbol = "0,NULL";
+  let govTokenContract = "null";
+  if (useToken) {
+    const rawSym = (config.tokenSymbol || "").trim();
+    if (rawSym.includes(",")) {
+      // Already in "precision,SYMBOL" form
+      govTokenSymbol = rawSym.toUpperCase().replace(/^([0-9]+),\s*/, (_, p) => `${p},`);
+    } else if (rawSym) {
+      govTokenSymbol = `8,${rawSym.toUpperCase()}`;
+    }
+    govTokenContract = (config.tokenContract || "").trim() || "null";
+  }
+
   return {
     account: DAO_CONTRACT,
     name: "createdao",
@@ -747,8 +762,8 @@ export function buildCreateDaoAction(
       user: creator,
       daoname: config.daoName,
       dao_type: daoType,
-      gov_token_contract: useToken ? (config.tokenContract || "") : "",
-      gov_token_symbol: useToken ? (config.tokenSymbol || "") : "",
+      gov_token_contract: govTokenContract,
+      gov_token_symbol: govTokenSymbol,
       gov_farm_name: useFarm ? (config.govFarmName || "null") : "null",
       gov_schemas: useSchemas ? (config.govSchemas || []) : [],
       threshold: config.threshold || 50.0,
