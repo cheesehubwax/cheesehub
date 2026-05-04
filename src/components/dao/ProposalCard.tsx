@@ -71,6 +71,11 @@ export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: paren
     return sum + (typeof c.total_votes === "string" ? parseInt(c.total_votes) || 0 : c.total_votes || 0);
   }, 0);
 
+  const computeVoteWeight = () => {
+    if (isType5) return selectedNFTs.length || 1;
+    return stakedWeight?.weight || 1;
+  };
+
   const handleYNAVote = async (vote: "yes" | "no" | "abstain") => {
     if (!session || !accountName) return;
     setVotingChoice(vote);
@@ -84,7 +89,7 @@ export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: paren
     const result = await executeTransaction([action]);
     if (result.success) {
       const choiceMap: Record<string, number> = { yes: 0, no: 1, abstain: 2 };
-      const voteData: UserVote = { choice_index: choiceMap[vote], weight: stakedWeight?.weight || 1 };
+      const voteData: UserVote = { choice_index: choiceMap[vote], weight: computeVoteWeight() };
       onVote?.(proposal.proposal_id, voteData);
     }
     setVotingChoice(null);
@@ -109,7 +114,7 @@ export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: paren
 
     const result = await executeTransaction([action]);
     if (result.success) {
-      const voteData: UserVote = { choice_index: choiceIndex, weight: stakedWeight?.weight || 1 };
+      const voteData: UserVote = { choice_index: choiceIndex, weight: computeVoteWeight() };
       onVote?.(proposal.proposal_id, voteData);
     }
     setTxLoading(false);
@@ -166,8 +171,11 @@ export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: paren
               {isExpired ? "Ended" : "Ends"} {endDate.toLocaleDateString()}
             </span>
           )}
-          {stakedWeight && (
+          {stakedWeight && !isType5 && (
             <span className="text-xs">Weight: {stakedWeight.balance}</span>
+          )}
+          {isType5 && selectedNFTs.length > 0 && (
+            <span className="text-xs">Weight: {selectedNFTs.length} NFT{selectedNFTs.length === 1 ? "" : "s"}</span>
           )}
         </div>
 
