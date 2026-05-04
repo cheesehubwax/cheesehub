@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Slider } from "@/components/ui/slider";
-import { Loader2, Plus, Users, Trash2, AlertTriangle, HelpCircle, ChevronDown, X } from "lucide-react";
+import { Loader2, Plus, Users, AlertTriangle, HelpCircle, ChevronDown, X } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -18,6 +18,7 @@ import {
   buildSetProfileActionWithSocials, DaoSocials,
 } from "@/lib/dao";
 import { ProposalFeeInput, ProposalFeeValue } from "@/components/dao/ProposalFeeInput";
+import { GovSchemaRow, GovSchemaCheck } from "@/components/dao/GovSchemaRow";
 import { buildCheesePaymentAction, buildWaxPaymentAction, buildWaxdaoFeeAction } from "@/lib/cheeseFees";
 import { useCheeseFeePricing } from "@/hooks/useCheeseFeePricing";
 import { useWaxdaoFeePricing } from "@/hooks/useWaxdaoFeePricing";
@@ -88,6 +89,7 @@ export function CreateDao() {
   const [govSchemas, setGovSchemas] = useState<{ collection_name: string; schema_name: string }[]>([
     { collection_name: "", schema_name: "" },
   ]);
+  const [schemaStatuses, setSchemaStatuses] = useState<GovSchemaCheck[]>(["idle"]);
 
   useEffect(() => {
     if (scrollToAnchor && helpOpen && anchorRef.current) {
@@ -98,10 +100,19 @@ export function CreateDao() {
     }
   }, [scrollToAnchor, helpOpen]);
 
-  const addSchema = () => setGovSchemas(prev => [...prev, { collection_name: "", schema_name: "" }]);
-  const removeSchema = (idx: number) => setGovSchemas(prev => prev.filter((_, i) => i !== idx));
+  const addSchema = () => {
+    setGovSchemas(prev => [...prev, { collection_name: "", schema_name: "" }]);
+    setSchemaStatuses(prev => [...prev, "idle"]);
+  };
+  const removeSchema = (idx: number) => {
+    setGovSchemas(prev => prev.filter((_, i) => i !== idx));
+    setSchemaStatuses(prev => prev.filter((_, i) => i !== idx));
+  };
   const updateSchema = (idx: number, field: "collection_name" | "schema_name", value: string) => {
     setGovSchemas(prev => prev.map((s, i) => i === idx ? { ...s, [field]: value } : s));
+  };
+  const updateSchemaStatus = (idx: number, status: GovSchemaCheck) => {
+    setSchemaStatuses(prev => prev.map((s, i) => (i === idx ? status : s)));
   };
 
   const daoTypeDescriptions: Record<number, string> = {
@@ -123,6 +134,35 @@ export function CreateDao() {
     if (!daoName.trim() || !/^[a-z1-5.]{1,12}$/.test(daoName)) {
       toast({ title: "Invalid DAO name", description: "Must be 1-12 chars, a-z, 1-5, and .", variant: "destructive" });
       return;
+    }
+
+    if (needsSchemas) {
+      const filled = govSchemas
+        .map((s, i) => ({ s, i }))
+        .filter(({ s }) => s.collection_name && s.schema_name);
+      if (filled.length === 0) {
+        toast({ title: "Add at least 1 governance schema", description: "NFT-based DAOs require at least one collection + schema.", variant: "destructive" });
+        return;
+      }
+      const bad = filled.find(({ i }) => schemaStatuses[i] && schemaStatuses[i] !== "ok" && schemaStatuses[i] !== "checking");
+      if (bad) {
+        const reasons: Record<string, string> = {
+          no_collection: "Collection does not exist on AtomicAssets.",
+          no_schema: "Schema does not exist in that collection.",
+          not_authorized: `You (${accountName}) must be an authorized account on every governance collection.`,
+        };
+        toast({
+          title: "Invalid governance schema",
+          description: reasons[schemaStatuses[bad.i]] ?? "One or more governance schemas are invalid.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const stillChecking = filled.some(({ i }) => schemaStatuses[i] === "checking");
+      if (stillChecking) {
+        toast({ title: "Still verifying schemas", description: "Please wait for on-chain verification to finish.", variant: "destructive" });
+        return;
+      }
     }
 
     setLoading(true);
@@ -457,24 +497,19 @@ export function CreateDao() {
           <Card className="border-primary/40 bg-primary/5">
             <CardContent className="pt-5 space-y-3">
               <SectionHeader>Governance NFT Schemas</SectionHeader>
+              <p className="text-xs text-muted-foreground">
+                You must be an authorized account on every collection listed below. The <code className="bg-muted px-1 rounded">dao.waxdao</code> contract verifies this on-chain and will reject creation otherwise. Ask the collection owner to add you via <code className="bg-muted px-1 rounded">addcolauth</code> if needed.
+              </p>
               {govSchemas.map((s, i) => (
-                <div key={i} className="flex gap-2">
-                  <Input
-                    placeholder="Collection name"
-                    value={s.collection_name}
-                    onChange={e => updateSchema(i, "collection_name", e.target.value)}
-                  />
-                  <Input
-                    placeholder="Schema name"
-                    value={s.schema_name}
-                    onChange={e => updateSchema(i, "schema_name", e.target.value)}
-                  />
-                  {govSchemas.length > 1 && (
-                    <Button variant="ghost" size="icon" onClick={() => removeSchema(i)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  )}
-                </div>
+                <GovSchemaRow
+                  key={i}
+                  collection={s.collection_name}
+                  schema={s.schema_name}
+                  creator={accountName ?? ""}
+                  onChange={(field, val) => updateSchema(i, field, val)}
+                  onRemove={govSchemas.length > 1 ? () => removeSchema(i) : undefined}
+                  onStatusChange={(status) => updateSchemaStatus(i, status)}
+                />
               ))}
               <Button variant="outline" size="sm" onClick={addSchema}>
                 <Plus className="h-4 w-4 mr-1" /> Add Schema
