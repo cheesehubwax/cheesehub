@@ -678,27 +678,14 @@ export function CreateDao() {
               <div>
                 <Label className="text-sm font-medium">
                   Proposal Submission Fee
-                  <InfoTooltip text="Fee required to submit a proposal. Choose any supported token. Set to 0 for free proposals." />
+                  <InfoTooltip text="Fee required to submit a proposal. Any WAX token is supported. Set amount to 0 for free proposals." />
                 </Label>
-                <div className="flex gap-2 mt-1">
-                  <Input
-                    type="number"
-                    value={proposalCost}
-                    onChange={e => setProposalCost(parseFloat(e.target.value) || 0)}
-                    min={0}
-                    step={0.01}
-                    className="flex-1"
-                  />
-                  <Select value={proposalCostSymbol} onValueChange={setProposalCostSymbol}>
-                    <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {PROPOSAL_FEE_TOKENS.map(t => (
-                        <SelectItem key={t.symbol} value={t.symbol}>{t.symbol}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="mt-1">
+                  <ProposalFeeInput value={feeToken} onChange={setFeeToken} />
                 </div>
-                <FieldHint>Choose any supported token. Set to 0 for free proposals.</FieldHint>
+                <FieldHint>
+                  Pick a preset or enter any token symbol + contract. Set amount to 0 for free proposals.
+                </FieldHint>
               </div>
             </CardContent>
           </Card>
