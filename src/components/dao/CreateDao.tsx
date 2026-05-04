@@ -70,7 +70,6 @@ export function CreateDao() {
   const [hoursPerProposal, setHoursPerProposal] = useState(72);
   const [minimumVotes, setMinimumVotes] = useState(1);
   const [minimumWeight, setMinimumWeight] = useState(0);
-  const [proposalCost, setProposalCost] = useState(0);
   const [feeToken, setFeeToken] = useState<ProposalFeeValue>({
     amount: 0, symbol: "WAX", contract: "eosio.token", precision: 8,
   });
