@@ -468,24 +468,19 @@ export function CreateDao() {
           <Card className="border-primary/40 bg-primary/5">
             <CardContent className="pt-5 space-y-3">
               <SectionHeader>Governance NFT Schemas</SectionHeader>
+              <p className="text-xs text-muted-foreground">
+                You must be an authorized account on every collection listed below. The <code className="bg-muted px-1 rounded">dao.waxdao</code> contract verifies this on-chain and will reject creation otherwise. Ask the collection owner to add you via <code className="bg-muted px-1 rounded">addcolauth</code> if needed.
+              </p>
               {govSchemas.map((s, i) => (
-                <div key={i} className="flex gap-2">
-                  <Input
-                    placeholder="Collection name"
-                    value={s.collection_name}
-                    onChange={e => updateSchema(i, "collection_name", e.target.value)}
-                  />
-                  <Input
-                    placeholder="Schema name"
-                    value={s.schema_name}
-                    onChange={e => updateSchema(i, "schema_name", e.target.value)}
-                  />
-                  {govSchemas.length > 1 && (
-                    <Button variant="ghost" size="icon" onClick={() => removeSchema(i)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  )}
-                </div>
+                <GovSchemaRow
+                  key={i}
+                  collection={s.collection_name}
+                  schema={s.schema_name}
+                  creator={accountName ?? ""}
+                  onChange={(field, val) => updateSchema(i, field, val)}
+                  onRemove={govSchemas.length > 1 ? () => removeSchema(i) : undefined}
+                  onStatusChange={(status) => updateSchemaStatus(i, status)}
+                />
               ))}
               <Button variant="outline" size="sm" onClick={addSchema}>
                 <Plus className="h-4 w-4 mr-1" /> Add Schema
