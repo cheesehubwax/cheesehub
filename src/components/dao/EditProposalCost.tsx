@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
-import { buildEditPropCostAction, PROPOSAL_FEE_TOKENS, getCachedFeeToken } from "@/lib/dao";
+import { buildEditPropCostAction } from "@/lib/dao";
 import { ProposalFeeInput, ProposalFeeValue } from "@/components/dao/ProposalFeeInput";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
@@ -23,22 +23,14 @@ export function EditProposalCost({ open, onOpenChange, daoName, currentCost, onU
   const [feeToken, setFeeToken] = useState<ProposalFeeValue>(() => {
     const parts = currentCost.split(" ");
     const amount = parseFloat(parts[0]) || 0;
-    const sym = parts[1] || "WAX";
-    const preset = PROPOSAL_FEE_TOKENS.find(t => t.symbol === sym);
-    const cached = preset ? null : getCachedFeeToken(sym);
-    return {
-      amount,
-      symbol: sym,
-      contract: preset?.contract ?? cached?.contract ?? "",
-      precision: preset?.precision ?? cached?.precision ?? (parts[0]?.includes(".") ? parts[0].split(".")[1].length : 0),
-    };
+    // The dao.waxdao contract requires WAX for proposal_cost.
+    return { amount, symbol: "WAX", contract: "eosio.token", precision: 8 };
   });
 
   const handleSave = async () => {
     if (!session || !accountName) return;
-    if (!feeToken.contract || !feeToken.symbol) return;
     setLoading(true);
-    const formatted = `${feeToken.amount.toFixed(feeToken.precision)} ${feeToken.symbol}`;
+    const formatted = `${feeToken.amount.toFixed(8)} WAX`;
     const action = buildEditPropCostAction(accountName, daoName, formatted);
     const result = await executeTransaction([action], {
       successTitle: "Proposal Cost Updated! 🧀",
@@ -68,7 +60,9 @@ export function EditProposalCost({ open, onOpenChange, daoName, currentCost, onU
             <div className="mt-1">
               <ProposalFeeInput value={feeToken} onChange={setFeeToken} />
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Set to 0 for free proposals</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Set to 0 for free proposals. Fees must be in WAX (contract requirement).
+            </p>
           </div>
         </div>
         <DialogFooter>

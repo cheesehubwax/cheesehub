@@ -16,8 +16,6 @@ import {
   DAO_TYPES, CREATABLE_DAO_TYPES, PROPOSER_TYPES,
   buildAssertPointAction, buildCreateDaoAction,
   buildSetProfileActionWithSocials, DaoSocials,
-  PROPOSAL_FEE_TOKENS,
-  buildEditPropCostAction,
 } from "@/lib/dao";
 import { ProposalFeeInput, ProposalFeeValue } from "@/components/dao/ProposalFeeInput";
 import { buildCheesePaymentAction, buildWaxPaymentAction, buildWaxdaoFeeAction } from "@/lib/cheeseFees";
@@ -153,17 +151,10 @@ export function CreateDao() {
       proposerType: parseInt(proposerType),
       authors: Array.from(new Set([accountName, ...authors.map(a => a.trim().toLowerCase()).filter(Boolean)])),
       // dao.waxdao::createdao asserts proposal_cost must be in WAX.
-      // Non-WAX tokens are applied via editpropcost in the same transaction.
       proposalCost: feeToken.amount,
       proposalCostSymbol: "WAX",
       proposalCostPrecision: 8,
     }));
-
-    // If user picked a non-WAX fee token, switch the proposal cost immediately after creation.
-    if (feeToken.symbol !== "WAX") {
-      const formatted = `${feeToken.amount.toFixed(feeToken.precision)} ${feeToken.symbol}`;
-      actions.push(buildEditPropCostAction(accountName, daoName, formatted));
-    }
 
     if (description || avatar || coverImage || Object.values(socials).some(v => v)) {
       actions.push(buildSetProfileActionWithSocials(
@@ -686,13 +677,13 @@ export function CreateDao() {
               <div>
                 <Label className="text-sm font-medium">
                   Proposal Submission Fee
-                  <InfoTooltip text="Fee required to submit a proposal. Any WAX token is supported. Set amount to 0 for free proposals." />
+                  <InfoTooltip text="WAX fee required to submit a proposal. Set amount to 0 for free proposals. The contract requires WAX." />
                 </Label>
                 <div className="mt-1">
                   <ProposalFeeInput value={feeToken} onChange={setFeeToken} />
                 </div>
                 <FieldHint>
-                  Pick a preset or enter any token symbol + contract. Set amount to 0 for free proposals.
+                  Submission fees are paid in WAX. Set amount to 0 for free proposals.
                 </FieldHint>
               </div>
             </CardContent>
