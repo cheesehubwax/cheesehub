@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,7 +18,6 @@ import {
   findProposalFeeToken, getCachedFeeToken, rememberFeeToken, resolveTokenStats,
 } from "@/lib/dao";
 import { getTokenConfig } from "@/lib/tokenRegistry";
-import { useEffect, useMemo } from "react";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useToast } from "@/hooks/use-toast";
