@@ -8,6 +8,23 @@ export const DAO_CONTRACT = "dao.waxdao";
 // Fee constants for DAO creation
 export const DAO_CREATION_FEE = "265.00000000 WAX";
 
+// Tokens supported as proposal submission fees in the UI.
+// The smart contract accepts any asset, but we expose a curated list.
+export interface ProposalFeeToken {
+  symbol: string;
+  contract: string;
+  precision: number;
+}
+export const PROPOSAL_FEE_TOKENS: ProposalFeeToken[] = [
+  { symbol: "WAX", contract: "eosio.token", precision: 8 },
+  { symbol: "CHEESE", contract: "cheese4token", precision: 4 },
+  { symbol: "WAXDAO", contract: "token.waxdao", precision: 8 },
+];
+
+export function findProposalFeeToken(symbol: string): ProposalFeeToken | undefined {
+  return PROPOSAL_FEE_TOKENS.find(t => t.symbol === symbol);
+}
+
 // Build action for announcing deposit (required before proposal payment)
 export function buildAnnounceDepoAction(user: string) {
   return {
@@ -18,10 +35,10 @@ export function buildAnnounceDepoAction(user: string) {
   };
 }
 
-// Build action for paying proposal cost
-export function buildProposalCostAction(sender: string, proposalCost: string) {
+// Build action for paying proposal cost. tokenContract defaults to eosio.token (WAX).
+export function buildProposalCostAction(sender: string, proposalCost: string, tokenContract = "eosio.token") {
   return {
-    account: "eosio.token",
+    account: tokenContract,
     name: "transfer",
     authorization: [{ actor: sender, permission: "active" }],
     data: {
