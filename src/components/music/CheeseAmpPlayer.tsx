@@ -762,11 +762,28 @@ export function CheeseAmpPlayer() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className={cn("h-7 text-xs", sortAZ && "text-cheese")}
-                      onClick={() => setSortAZ(prev => !prev)}
+                      className={cn("h-7 text-xs", sortMode !== 'newest' && "text-cheese")}
+                      onClick={() =>
+                        setSortMode(prev =>
+                          prev === 'newest' ? 'az' : prev === 'az' ? 'za' : 'newest'
+                        )
+                      }
+                      title={
+                        sortMode === 'newest'
+                          ? 'Sorted by newest mint — click for A–Z'
+                          : sortMode === 'az'
+                          ? 'Sorted A–Z — click for Z–A'
+                          : 'Sorted Z–A — click for newest'
+                      }
                     >
-                      {sortAZ ? <ArrowUpAZ className="h-3.5 w-3.5 mr-1" /> : <ArrowDownAZ className="h-3.5 w-3.5 mr-1" />}
-                      A–Z
+                      {sortMode === 'az' ? (
+                        <ArrowDownAZ className="h-3.5 w-3.5 mr-1" />
+                      ) : sortMode === 'za' ? (
+                        <ArrowUpAZ className="h-3.5 w-3.5 mr-1" />
+                      ) : (
+                        <ArrowDownAZ className="h-3.5 w-3.5 mr-1 opacity-50" />
+                      )}
+                      {sortMode === 'newest' ? 'Newest' : sortMode === 'az' ? 'A–Z' : 'Z–A'}
                     </Button>
                   )}
                 </div>
