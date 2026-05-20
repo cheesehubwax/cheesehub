@@ -85,7 +85,7 @@ export function MediaDisplay({
       audioPlayer.mountVideo(videoContainerRef.current);
     }
     return () => {};
-  }, [isVideo, showingArt, trackId]);
+  }, [isVideo, showingArt, trackId, isTheaterMode]);
 
   const handleFullscreen = useCallback(() => {
     if (videoContainerRef.current) {
