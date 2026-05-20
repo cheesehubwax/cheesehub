@@ -345,9 +345,6 @@ export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: paren
             <Button size="sm" variant="outline" onClick={handleFinalize} disabled={txLoading}>
               Finalize Proposal
             </Button>
-            <Button size="sm" variant="ghost" onClick={handleRecount} disabled={txLoading}>
-              <RefreshCw className="h-3 w-3 mr-1" /> Recount
-            </Button>
           </div>
         )}
       </CardContent>
