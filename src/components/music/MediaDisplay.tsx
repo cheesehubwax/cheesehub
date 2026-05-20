@@ -40,6 +40,9 @@ interface MediaDisplayProps {
   isTheaterMode?: boolean;
   onToggleTheater?: () => void;
   onExpandArt?: (src: string) => void;
+  trackId?: string;
+  videoAspectRatio?: number | null;
+  videoFailed?: boolean;
 }
 
 export function MediaDisplay({ 
@@ -56,6 +59,9 @@ export function MediaDisplay({
   isTheaterMode = false,
   onToggleTheater,
   onExpandArt,
+  trackId,
+  videoAspectRatio,
+  videoFailed,
 }: MediaDisplayProps) {
   const showingArt = displayMode === 'front' || displayMode === 'back';
   const artSrc = displayMode === 'back' ? backArt : (displayMode === 'front' ? (frontArt || coverArt) : coverArt);
@@ -79,7 +85,7 @@ export function MediaDisplay({
       audioPlayer.mountVideo(videoContainerRef.current);
     }
     return () => {};
-  }, [isVideo, showingArt]);
+  }, [isVideo, showingArt, trackId]);
 
   const handleFullscreen = useCallback(() => {
     if (videoContainerRef.current) {
@@ -133,9 +139,15 @@ export function MediaDisplay({
         <div 
           ref={videoContainerRef}
           className={cn(
-            "absolute inset-0 overflow-hidden bg-black",
+            "overflow-hidden bg-black",
+            isTheaterMode ? "absolute inset-0" : "w-full h-full flex items-center justify-center",
             isTheaterMode ? "rounded-none" : "rounded-lg"
           )}
+          style={
+            !isTheaterMode && videoAspectRatio
+              ? { aspectRatio: String(videoAspectRatio), height: 'auto' }
+              : undefined
+          }
         />
       )}
       
@@ -154,6 +166,12 @@ export function MediaDisplay({
             onClick={showingArt ? handleImageClick : undefined}
           />
         )
+      )}
+
+      {videoFailed && !showVideo && hasVideo && (
+        <div className="absolute top-2 left-2 text-[10px] bg-black/60 text-white/80 px-2 py-1 rounded">
+          Video unavailable — playing audio
+        </div>
       )}
 
       {(isHovering || isTheaterMode) && (
