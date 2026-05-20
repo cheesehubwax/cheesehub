@@ -125,21 +125,20 @@ export function CheeseAmpPlayer() {
   const { accountName, session } = useWax();
   const { nfts, stackedNfts, isLoading: isLoadingNfts, refetch } = useMusicNFTs();
   const [viewMode, setViewMode] = useState<'library' | 'playlists'>('library');
-  const [sortAZ, setSortAZ] = useState(false);
+  const [sortMode, setSortMode] = useState<'newest' | 'az' | 'za'>('newest');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('cover');
   const [activeExtraAudioKey, setActiveExtraAudioKey] = useState<string | null>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
-  const activeTracks = useMemo(() => 
-    sortAZ
-      ? [...stackedNfts].sort((a, b) => {
-          const nameA = (a.title || a.name || '').toLowerCase();
-          const nameB = (b.title || b.name || '').toLowerCase();
-          return nameA.localeCompare(nameB);
-        })
-      : stackedNfts,
-    [stackedNfts, sortAZ]
-  );
+  const activeTracks = useMemo(() => {
+    if (sortMode === 'newest') return stackedNfts;
+    const sorted = [...stackedNfts].sort((a, b) => {
+      const nameA = (a.title || a.name || '').trim().toLowerCase();
+      const nameB = (b.title || b.name || '').trim().toLowerCase();
+      return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+    });
+    return sortMode === 'za' ? sorted.reverse() : sorted;
+  }, [stackedNfts, sortMode]);
   const playlist = useCheeseAmpPlaylist(accountName, activeTracks);
   const [playbackState, setPlaybackState] = useState<PlaybackState>({
     isPlaying: false,
@@ -763,11 +762,28 @@ export function CheeseAmpPlayer() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className={cn("h-7 text-xs", sortAZ && "text-cheese")}
-                      onClick={() => setSortAZ(prev => !prev)}
+                      className={cn("h-7 text-xs", sortMode !== 'newest' && "text-cheese")}
+                      onClick={() =>
+                        setSortMode(prev =>
+                          prev === 'newest' ? 'az' : prev === 'az' ? 'za' : 'newest'
+                        )
+                      }
+                      title={
+                        sortMode === 'newest'
+                          ? 'Sorted by newest mint — click for A–Z'
+                          : sortMode === 'az'
+                          ? 'Sorted A–Z — click for Z–A'
+                          : 'Sorted Z–A — click for newest'
+                      }
                     >
-                      {sortAZ ? <ArrowUpAZ className="h-3.5 w-3.5 mr-1" /> : <ArrowDownAZ className="h-3.5 w-3.5 mr-1" />}
-                      A–Z
+                      {sortMode === 'az' ? (
+                        <ArrowDownAZ className="h-3.5 w-3.5 mr-1" />
+                      ) : sortMode === 'za' ? (
+                        <ArrowUpAZ className="h-3.5 w-3.5 mr-1" />
+                      ) : (
+                        <ArrowDownAZ className="h-3.5 w-3.5 mr-1 opacity-50" />
+                      )}
+                      {sortMode === 'newest' ? 'Newest' : sortMode === 'az' ? 'A–Z' : 'Z–A'}
                     </Button>
                   )}
                 </div>
