@@ -67,7 +67,7 @@ export function TokenStatsBanner() {
                       href="https://waxblock.io/account/cheeseburger?code=cheeseburger&scope=CHEESE&table=stat&lower_bound=&upper_bound=&limit=10&reverse=false#contract-tables"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-foreground/70 hover:text-foreground underline transition-colors"
+                      className="text-xs text-cheese/70 hover:text-foreground underline transition-colors"
                     >
                       proof
                     </a>
@@ -99,7 +99,7 @@ export function TokenStatsBanner() {
                       href="https://waxblock.io/account/waxdaolocker?code=waxdaolocker&scope=waxdaolocker&table=locks&lower_bound=249&upper_bound=259&limit=10&reverse=false#contract-tables"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-foreground/70 hover:text-foreground underline transition-colors"
+                      className="text-xs text-cheese/70 hover:text-foreground underline transition-colors"
                     >
                       proof
                     </a>
@@ -153,7 +153,7 @@ export function TokenStatsBanner() {
                       href="https://waxblock.io/account/waxdaolocker?code=waxdaolocker&scope=waxdaolocker&table=locks&lower_bound=249&upper_bound=259&limit=10&reverse=false#contract-tables"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-foreground/70 hover:text-foreground underline transition-colors"
+                      className="text-xs text-cheese/70 hover:text-foreground underline transition-colors"
                     >
                       proof
                     </a>
@@ -189,7 +189,7 @@ export function TokenStatsBanner() {
                           href="https://waxblock.io/account/eosio.null?code=cheeseburger&scope=eosio.null&table=accounts&lower_bound=&upper_bound=&limit=10&reverse=false#contract-tables"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-foreground/70 hover:text-foreground underline transition-colors"
+                          className="text-xs text-cheese/70 hover:text-foreground underline transition-colors"
                           onClick={(e) => e.stopPropagation()}
                         >
                           proof
@@ -290,7 +290,7 @@ export function TokenStatsBanner() {
                         href="https://waxblock.io/account/cheeseburger#keys"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-foreground/70 hover:text-foreground underline transition-colors"
+                        className="text-xs text-cheese/70 hover:text-foreground underline transition-colors"
                       >
                         proof
                       </a>
