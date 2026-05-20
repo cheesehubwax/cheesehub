@@ -1,58 +1,44 @@
-## Goal
+# Fix: Finalize button missing on pending proposals
 
-Reset the broken GitHub connection by archiving the old `cheesehub` repo and letting Lovable create a fresh repo with the same name, so the existing GitHub Pages URL (`https://cheesehubwax.github.io/cheesehub/`) keeps working with zero changes for users.
+## Problem
+On `testdao5`, your two past proposals show status `pending`. The Finalize / Recount buttons never appear because `ProposalCard.tsx` only renders them when the proposal is both `active` AND expired:
 
-## Why the name must stay `cheesehub`
+```tsx
+{isActive && isExpired && accountName && ( ... Finalize / Recount ... )}
+```
 
-The app's deploy config hard-codes the repo name in two places:
+But in `src/lib/dao.ts` (line ~598), a proposal whose `end_time` has passed gets reclassified:
+- `pending` — ended recently (under the expiry threshold), still finalizable on-chain
+- `expired` — ended a long time ago
 
-- `vite.config.ts` → `base: mode === "production" ? "/cheesehub/" : "/"`
-- `public/404.html` → `pathSegmentsToKeep = 1` (keeps the `/cheesehub/` prefix for SPA deep-link refresh)
+Once status flips away from `active`, the buttons disappear, even though the on-chain `finalize` action is exactly what's needed to move them to passed/rejected/executed.
 
-`BrowserRouter` reads `import.meta.env.BASE_URL`, so it follows `base` automatically. As long as the new repo is named exactly `cheesehub`, none of this needs to change.
+## Fix
+Update the visibility gate in `src/components/dao/ProposalCard.tsx` so Finalize/Recount also show for `pending` (and `expired`/`inconclusive`) proposals that have ended and have not yet been finalized on-chain.
 
-## Plan
+Change:
+```tsx
+{isActive && isExpired && accountName && ( ... )}
+```
+to something like:
+```tsx
+const needsFinalize =
+  accountName &&
+  (
+    (isActive && isExpired) ||
+    proposal.status === "pending" ||
+    proposal.status === "expired" ||
+    proposal.status === "inconclusive"
+  );
 
-### 1. Back up
-- On GitHub, old repo → `Code → Download ZIP` as a safety net.
-- Confirm the current Lovable preview reflects the latest state you want to keep (it does — Lovable is the source of truth, GitHub is just out of sync).
+{needsFinalize && ( ... Finalize / Recount ... )}
+```
 
-### 2. Rename the old repo on GitHub
-- Old repo → Settings → Repository name → rename `cheesehub` → `cheesehub-classic` (or `cheesehub-archive`).
-- GitHub keeps redirects for old git URLs, so no external link breaks.
-- Its Pages URL becomes `https://cheesehubwax.github.io/cheesehub-classic/` — no one is using that, ignore it.
+No other logic changes — `handleFinalize` / `handleRecount` and the `buildFinalizeProposalAction` / `buildRecountProposalAction` builders already work; they just weren't reachable from the UI for these statuses.
 
-### 3. Disconnect GitHub in Lovable
-- Lovable → workspace Settings → Integrations → disconnect GitHub.
-- Project Settings → GitHub → disconnect if it appears there too.
+## Scope
+- One file: `src/components/dao/ProposalCard.tsx`
+- Pure UI/presentation change, no contract or data-fetching changes.
 
-### 4. Reconnect and create the new repo
-- `+` menu (bottom-left of chat) → GitHub → Connect project.
-- Authorize Lovable on the `cheesehubwax` account if prompted.
-- Create a new repo named exactly **`cheesehub`** under `cheesehubwax`.
-- Wait for Lovable's initial push to complete.
-
-### 5. Enable GitHub Pages on the new repo
-- New repo → Settings → Pages → Source = **GitHub Actions**.
-- Actions tab → confirm `Deploy to GitHub Pages` (from `.github/workflows/deploy.yml`, which travels with the code) runs green.
-- First successful deploy republishes `https://cheesehubwax.github.io/cheesehub/`.
-
-### 6. Verify
-- Load `https://cheesehubwax.github.io/cheesehub/` — homepage renders.
-- Hit a deep link like `/cheesehub/dao` and hard-refresh — SPA fallback works (404.html → index.html).
-- Make a 1-character edit in Lovable, confirm a commit lands in the new repo and the site updates after the workflow finishes.
-
-## Downtime expectation
-
-The Pages URL keeps serving from the old repo until step 5 completes, but step 2 (rename) changes the old repo's slug, which means `cheesehubwax.github.io/cheesehub/` will 404 between step 2 and the first successful deploy on the new repo in step 5. Expect roughly **5–15 minutes of downtime** on the public site depending on how fast the new repo's first Action runs. To minimize it, do steps 2 → 4 → 5 back-to-back without pauses.
-
-## Rollback
-
-If anything goes wrong, rename `cheesehub-classic` back to `cheesehub` on GitHub. Its previous Pages deployment is still in place and will resume serving immediately.
-
-## What does NOT change
-
-- Lovable preview URL
-- Lovable Cloud database, edge functions, secrets
-- Project code (it's already in Lovable; GitHub just becomes a fresh mirror)
-- Any in-app branding, config, or contract integrations
+## Verification
+After the change, open `testdao5` → Past Proposals as `fragglerockk`; both pending proposals should now show "Finalize Proposal" and "Recount" buttons. Clicking Finalize signs the on-chain `finalize` action and the status will update on next refresh.

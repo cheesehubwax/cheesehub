@@ -335,7 +335,12 @@ export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: paren
         )}
 
         {/* Finalize / Recount Actions */}
-        {isActive && isExpired && accountName && (
+        {accountName && (
+          (isActive && isExpired) ||
+          proposal.status === "pending" ||
+          proposal.status === "expired" ||
+          proposal.status === "inconclusive"
+        ) && (
           <div className="flex gap-2 pt-1">
             <Button size="sm" variant="outline" onClick={handleFinalize} disabled={txLoading}>
               Finalize Proposal
