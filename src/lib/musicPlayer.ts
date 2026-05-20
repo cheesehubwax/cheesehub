@@ -102,7 +102,7 @@ class CheeseAmpMedia {
     const video = this.getVideoElement();
     video.style.width = '100%';
     video.style.height = '100%';
-    video.style.objectFit = 'cover';
+    video.style.objectFit = 'contain';
     if (video.parentElement !== container) {
       container.appendChild(video);
     }
