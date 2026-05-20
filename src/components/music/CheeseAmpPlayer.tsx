@@ -151,6 +151,8 @@ export function CheeseAmpPlayer() {
     error: null,
     isVideo: false,
     hasVideo: false,
+    videoFailed: false,
+    videoAspectRatio: null,
   });
   const [showPlaylist, setShowPlaylist] = useState(true);
   const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
