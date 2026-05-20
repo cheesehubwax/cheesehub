@@ -1,33 +1,26 @@
-# Fix: CHEESEAmp shows "Failed to load media from all gateways" while track is playing
+# Fix: video clipped in CHEESEAmp player and theater mode
 
 ## Problem
+When playing a music video in CHEESEAmp, portions of the video are cut off in both the small player view and the expanded/theater view.
 
-When a music NFT plays, CHEESEAmp shows a red "Failed to load media from all gateways" banner — but the audio actually plays. Console confirms the pattern:
+## Root cause
+In `src/lib/musicPlayer.ts`, `mountVideo()` sets the video element's `objectFit` to `'cover'`. Combined with the aspect-square small container and the fullscreen theater container, `cover` crops any video whose aspect ratio doesn't match the container — which is most music videos (typically 16:9 against a square / arbitrary screen).
 
-1. `Video element failed, trying audio fallback`
-2. `All racing gateways failed, trying remaining sequentially...`
-3. A later gateway succeeds and audio plays.
+```ts
+video.style.objectFit = 'cover'; // crops the video
+```
 
-The error message from the failed attempts is never cleared, so the UI keeps displaying it.
+## Fix (one line, one file)
+Change the video element's `object-fit` to `contain` so the whole frame is always visible (letterboxed against the black background that's already in place).
 
-## Root cause (in `src/lib/musicPlayer.ts`)
+`src/lib/musicPlayer.ts` — `mountVideo`:
+```ts
+video.style.objectFit = 'contain';
+```
 
-Three places leave `_error` set or re-set it after success:
+The container in `MediaDisplay.tsx` already has `bg-black`, so letterbox bars look intentional. No change needed in `MediaDisplay.tsx`.
 
-1. `tryGateways` sets `this._error = 'Failed to load media from all gateways'` before throwing. When the caller (`play`) catches that and successfully falls back to the audio element, nothing clears `_error`.
-2. `tryGateways` on success only clears `_isLoading`, not `_error` from a prior failed race.
-3. The `'error'` event listener attached once in `setupMediaListeners` (line 72) sets `_error = 'Failed to load media'` whenever the video element errors — even after we've already switched to the audio element and started playing. That listener fires asynchronously and overwrites the cleared state.
-
-## Fix (single file: `src/lib/musicPlayer.ts`)
-
-1. In `tryGateways`, clear `this._error = null` on the successful path (both racing-win and sequential-fallback success) before calling `notifyCallbacks`.
-2. In `play`, on the successful audio fallback after video failure, clear `this._error = null` and call `notifyCallbacks` so the UI drops the stale banner.
-3. Make the shared `'error'` event listener context-aware: only set `_error` when the element that errored is the currently active element (`this.getActiveElement() === element`). This prevents a late-firing video error from clobbering state while audio is playing.
-
-No behavior changes for genuine all-gateways failures — `_error` is still set and surfaced when every fallback path fails.
-
-## Scope
-
-- One file, presentation/logic of the media player only.
-- No UI component changes, no contract or data changes.
-- Verify by reloading CHEESEAmp, playing a track that previously triggered the warning, and confirming the error banner no longer appears while the track plays.
+## Verification
+- Play a 16:9 video NFT in the small player — full frame visible, black bars top/bottom.
+- Enter theater mode — full frame visible, black bars on sides for ultrawide displays.
+- Cover art display path is unaffected (uses `<img>` with its own classes).
