@@ -70,6 +70,10 @@ class CheeseAmpMedia {
       this.notifyCallbacks();
     });
     element.addEventListener('error', () => {
+      // Only surface element errors when this element is the active one.
+      // Prevents a late-firing video error from clobbering state while audio
+      // is playing via the fallback path.
+      if (this.getActiveElement() !== element) return;
       this._error = 'Failed to load media';
       this._isLoading = false;
       this.notifyCallbacks();
@@ -188,6 +192,11 @@ class CheeseAmpMedia {
         this._mediaType = 'audio';
         try {
           await this.loadAndPlay(mediaUrl, this.audio);
+          // Clear any error set by the failed video attempt so the UI
+          // doesn't show a stale "Failed to load media" banner.
+          this._error = null;
+          this._isLoading = false;
+          this.notifyCallbacks();
           return;
         } catch {
           // Fall through to error
@@ -316,6 +325,7 @@ class CheeseAmpMedia {
       const winningUrl = await racePromise;
       console.log(`[musicPlayer] Racing gateway won: ${winningUrl.split('/ipfs/')[0]}`);
       await this.setSrcAndPlay(element, winningUrl);
+      this._error = null;
       this._isLoading = false;
       this.notifyCallbacks();
     } catch {
@@ -323,6 +333,7 @@ class CheeseAmpMedia {
       for (const gateway of IPFS_GATEWAYS.slice(3)) {
         try {
           await this.setSrcAndPlay(element, `${gateway}${hash}`);
+          this._error = null;
           this._isLoading = false;
           this.notifyCallbacks();
           return;
