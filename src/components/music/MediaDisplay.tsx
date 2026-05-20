@@ -139,15 +139,9 @@ export function MediaDisplay({
         <div 
           ref={videoContainerRef}
           className={cn(
-            "overflow-hidden bg-black",
-            isTheaterMode ? "absolute inset-0" : "w-full h-full flex items-center justify-center",
+            "absolute inset-0 overflow-hidden bg-black",
             isTheaterMode ? "rounded-none" : "rounded-lg"
           )}
-          style={
-            !isTheaterMode && videoAspectRatio
-              ? { aspectRatio: String(videoAspectRatio), height: 'auto' }
-              : undefined
-          }
         />
       )}
       
