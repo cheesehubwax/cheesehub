@@ -1,47 +1,58 @@
-## Issue
+## Goal
 
-On the testdao5 proposal, you voted Yes with 6 NFTs. The tally correctly shows "Yes: 6", but the per-user line reads "You voted yes (weight: 1)". The number 1 is wrong — it should be 6 (the number of NFTs used for the vote).
+Reset the broken GitHub connection by archiving the old `cheesehub` repo and letting Lovable create a fresh repo with the same name, so the existing GitHub Pages URL (`https://cheesehubwax.github.io/cheesehub/`) keeps working with zero changes for users.
 
-## Root cause
+## Why the name must stay `cheesehub`
 
-In `src/components/dao/ProposalCard.tsx`, every vote handler stores the local `UserVote.weight` as:
+The app's deploy config hard-codes the repo name in two places:
 
-```ts
-weight: stakedWeight?.weight || 1
-```
+- `vite.config.ts` → `base: mode === "production" ? "/cheesehub/" : "/"`
+- `public/404.html` → `pathSegmentsToKeep = 1` (keeps the `/cheesehub/` prefix for SPA deep-link refresh)
 
-`stakedWeight` is only fetched for token-staking DAOs (`dao.dao_type === 4`):
+`BrowserRouter` reads `import.meta.env.BASE_URL`, so it follows `base` automatically. As long as the new repo is named exactly `cheesehub`, none of this needs to change.
 
-```ts
-if (!accountName || dao.dao_type !== 4) return;
-fetchUserStakedTokens(daoName, accountName).then(setStakedWeight);
-```
+## Plan
 
-For NFT-governance DAOs (`dao.dao_type === 5`, "Type 5"), `stakedWeight` stays null, so the recorded weight always falls back to `1`, regardless of how many NFTs were sent with the vote.
+### 1. Back up
+- On GitHub, old repo → `Code → Download ZIP` as a safety net.
+- Confirm the current Lovable preview reflects the latest state you want to keep (it does — Lovable is the source of truth, GitHub is just out of sync).
 
-## Fix
+### 2. Rename the old repo on GitHub
+- Old repo → Settings → Repository name → rename `cheesehub` → `cheesehub-classic` (or `cheesehub-archive`).
+- GitHub keeps redirects for old git URLs, so no external link breaks.
+- Its Pages URL becomes `https://cheesehubwax.github.io/cheesehub-classic/` — no one is using that, ignore it.
 
-Use the count of `selectedNFTs` as the weight when the DAO is type 5; otherwise keep the existing token-stake weight.
+### 3. Disconnect GitHub in Lovable
+- Lovable → workspace Settings → Integrations → disconnect GitHub.
+- Project Settings → GitHub → disconnect if it appears there too.
 
-### Changes in `src/components/dao/ProposalCard.tsx`
+### 4. Reconnect and create the new repo
+- `+` menu (bottom-left of chat) → GitHub → Connect project.
+- Authorize Lovable on the `cheesehubwax` account if prompted.
+- Create a new repo named exactly **`cheesehub`** under `cheesehubwax`.
+- Wait for Lovable's initial push to complete.
 
-1. Compute the effective weight in one place:
-   ```ts
-   const computeVoteWeight = () => {
-     if (isType5) return selectedNFTs.length || 1;
-     return stakedWeight?.weight || 1;
-   };
-   ```
-2. Use `computeVoteWeight()` in both `handleYNAVote` and `handleMultiVote` when constructing `voteData`:
-   ```ts
-   const voteData: UserVote = { choice_index: ..., weight: computeVoteWeight() };
-   ```
-3. (Optional polish) When `isType5`, show "Weight: N NFTs" instead of the staked-token "Weight: balance" line near line 169–170, so the displayed weight matches what was used to vote.
+### 5. Enable GitHub Pages on the new repo
+- New repo → Settings → Pages → Source = **GitHub Actions**.
+- Actions tab → confirm `Deploy to GitHub Pages` (from `.github/workflows/deploy.yml`, which travels with the code) runs green.
+- First successful deploy republishes `https://cheesehubwax.github.io/cheesehub/`.
 
-No on-chain behavior changes — this only corrects the locally-stored/displayed weight for NFT DAOs.
+### 6. Verify
+- Load `https://cheesehubwax.github.io/cheesehub/` — homepage renders.
+- Hit a deep link like `/cheesehub/dao` and hard-refresh — SPA fallback works (404.html → index.html).
+- Make a 1-character edit in Lovable, confirm a commit lands in the new repo and the site updates after the workflow finishes.
 
-## Verification
+## Downtime expectation
 
-After the fix, voting with 6 NFTs in testdao5 should display:
-- Tally: "Yes: 6" (unchanged)
-- Per-user line: "You voted yes (weight: 6)"
+The Pages URL keeps serving from the old repo until step 5 completes, but step 2 (rename) changes the old repo's slug, which means `cheesehubwax.github.io/cheesehub/` will 404 between step 2 and the first successful deploy on the new repo in step 5. Expect roughly **5–15 minutes of downtime** on the public site depending on how fast the new repo's first Action runs. To minimize it, do steps 2 → 4 → 5 back-to-back without pauses.
+
+## Rollback
+
+If anything goes wrong, rename `cheesehub-classic` back to `cheesehub` on GitHub. Its previous Pages deployment is still in place and will resume serving immediately.
+
+## What does NOT change
+
+- Lovable preview URL
+- Lovable Cloud database, edge functions, secrets
+- Project code (it's already in Lovable; GitHub just becomes a fresh mirror)
+- Any in-app branding, config, or contract integrations
