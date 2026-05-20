@@ -151,6 +151,8 @@ export function CheeseAmpPlayer() {
     error: null,
     isVideo: false,
     hasVideo: false,
+    videoFailed: false,
+    videoAspectRatio: null,
   });
   const [showPlaylist, setShowPlaylist] = useState(true);
   const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
@@ -382,7 +384,17 @@ export function CheeseAmpPlayer() {
         {/* Left: Now Playing */}
         <div className="flex flex-col w-64 shrink-0">
           {/* Cover Art / Video */}
-          <div className="aspect-square rounded-lg overflow-hidden bg-muted/30 border border-border/50 mb-4">
+          <div
+            className={cn(
+              "rounded-lg overflow-hidden bg-muted/30 border border-border/50 mb-4 w-full",
+              !(playbackState.isVideo && playbackState.videoAspectRatio) && "aspect-square"
+            )}
+            style={
+              playbackState.isVideo && playbackState.videoAspectRatio
+                ? { aspectRatio: String(playbackState.videoAspectRatio) }
+                : undefined
+            }
+          >
             {currentTrack ? (
               <MediaDisplay
                 coverArt={currentTrack.coverArt}
@@ -398,6 +410,9 @@ export function CheeseAmpPlayer() {
                 isTheaterMode={isTheaterMode}
                 onToggleTheater={handleToggleTheater}
                 onExpandArt={(src) => setLightboxSrc(src)}
+                trackId={currentTrack.asset_id}
+                videoAspectRatio={playbackState.videoAspectRatio}
+                videoFailed={playbackState.videoFailed}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
