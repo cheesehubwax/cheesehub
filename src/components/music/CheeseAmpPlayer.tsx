@@ -384,7 +384,17 @@ export function CheeseAmpPlayer() {
         {/* Left: Now Playing */}
         <div className="flex flex-col w-64 shrink-0">
           {/* Cover Art / Video */}
-          <div className="aspect-square rounded-lg overflow-hidden bg-muted/30 border border-border/50 mb-4">
+          <div
+            className={cn(
+              "rounded-lg overflow-hidden bg-muted/30 border border-border/50 mb-4 w-full",
+              !(playbackState.isVideo && playbackState.videoAspectRatio) && "aspect-square"
+            )}
+            style={
+              playbackState.isVideo && playbackState.videoAspectRatio
+                ? { aspectRatio: String(playbackState.videoAspectRatio) }
+                : undefined
+            }
+          >
             {currentTrack ? (
               <MediaDisplay
                 coverArt={currentTrack.coverArt}
