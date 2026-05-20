@@ -82,12 +82,10 @@ export function MediaDisplay({
   useEffect(() => {
     const audioPlayer = getAudioPlayer();
     if (isVideo && !showingArt && videoContainerRef.current) {
-      audioPlayer.mountVideo(videoContainerRef.current, isTheaterMode ? 'cover' : 'contain');
-    } else if (isVideo && !showingArt) {
-      audioPlayer.setVideoFit(isTheaterMode ? 'cover' : 'contain');
+      audioPlayer.mountVideo(videoContainerRef.current);
     }
     return () => {};
-  }, [isVideo, showingArt, trackId, isTheaterMode]);
+  }, [isVideo, showingArt, trackId]);
 
   const handleFullscreen = useCallback(() => {
     if (videoContainerRef.current) {
