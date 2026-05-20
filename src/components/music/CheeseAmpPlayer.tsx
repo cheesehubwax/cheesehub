@@ -400,6 +400,9 @@ export function CheeseAmpPlayer() {
                 isTheaterMode={isTheaterMode}
                 onToggleTheater={handleToggleTheater}
                 onExpandArt={(src) => setLightboxSrc(src)}
+                trackId={currentTrack.asset_id}
+                videoAspectRatio={playbackState.videoAspectRatio}
+                videoFailed={playbackState.videoFailed}
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
