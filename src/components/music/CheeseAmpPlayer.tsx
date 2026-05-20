@@ -125,21 +125,20 @@ export function CheeseAmpPlayer() {
   const { accountName, session } = useWax();
   const { nfts, stackedNfts, isLoading: isLoadingNfts, refetch } = useMusicNFTs();
   const [viewMode, setViewMode] = useState<'library' | 'playlists'>('library');
-  const [sortAZ, setSortAZ] = useState(false);
+  const [sortMode, setSortMode] = useState<'newest' | 'az' | 'za'>('newest');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('cover');
   const [activeExtraAudioKey, setActiveExtraAudioKey] = useState<string | null>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
-  const activeTracks = useMemo(() => 
-    sortAZ
-      ? [...stackedNfts].sort((a, b) => {
-          const nameA = (a.title || a.name || '').toLowerCase();
-          const nameB = (b.title || b.name || '').toLowerCase();
-          return nameA.localeCompare(nameB);
-        })
-      : stackedNfts,
-    [stackedNfts, sortAZ]
-  );
+  const activeTracks = useMemo(() => {
+    if (sortMode === 'newest') return stackedNfts;
+    const sorted = [...stackedNfts].sort((a, b) => {
+      const nameA = (a.title || a.name || '').trim().toLowerCase();
+      const nameB = (b.title || b.name || '').trim().toLowerCase();
+      return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+    });
+    return sortMode === 'za' ? sorted.reverse() : sorted;
+  }, [stackedNfts, sortMode]);
   const playlist = useCheeseAmpPlaylist(accountName, activeTracks);
   const [playbackState, setPlaybackState] = useState<PlaybackState>({
     isPlaying: false,
