@@ -110,15 +110,19 @@ class CheeseAmpMedia {
     return this.video;
   }
 
-  mountVideo(container: HTMLElement): void {
+  mountVideo(container: HTMLElement, fit: 'contain' | 'cover' = 'contain'): void {
     this.videoContainer = container;
     const video = this.getVideoElement();
     video.style.width = '100%';
     video.style.height = '100%';
-    video.style.objectFit = 'contain';
+    video.style.objectFit = fit;
     if (video.parentElement !== container) {
       container.appendChild(video);
     }
+  }
+
+  setVideoFit(fit: 'contain' | 'cover'): void {
+    if (this.video) this.video.style.objectFit = fit;
   }
 
   unmountVideo(): void {
