@@ -18,6 +18,8 @@ export interface PlaybackState {
   error: string | null;
   isVideo: boolean;
   hasVideo: boolean;
+  videoFailed: boolean;
+  videoAspectRatio: number | null;
 }
 
 type PlaybackCallback = (state: PlaybackState) => void;
@@ -35,6 +37,11 @@ class CheeseAmpMedia {
   private _error: string | null = null;
   private _mediaType: MediaType = 'audio';
   private _hasVideo: boolean = false;
+  private _videoFailed: boolean = false;
+  private _videoAspectRatio: number | null = null;
+  private _playToken: number = 0;
+  private _pendingListeners: Map<HTMLMediaElement, { canplay: () => void; error: () => void }> = new Map();
+  private _trackChangeCallbacks: Set<() => void> = new Set();
   private updateInterval: number | null = null;
   private videoContainer: HTMLElement | null = null;
 
@@ -93,6 +100,12 @@ class CheeseAmpMedia {
       this.video.loop = false;
       this.video.volume = this._isMuted ? 0 : this._volume;
       this.setupMediaListeners(this.video);
+      this.video.addEventListener('loadedmetadata', () => {
+        if (this.video && this.video.videoWidth && this.video.videoHeight) {
+          this._videoAspectRatio = this.video.videoWidth / this.video.videoHeight;
+          this.notifyCallbacks();
+        }
+      });
     }
     return this.video;
   }
@@ -144,6 +157,8 @@ class CheeseAmpMedia {
       error: this._error,
       isVideo: this._mediaType === 'video',
       hasVideo: this._hasVideo,
+      videoFailed: this._videoFailed,
+      videoAspectRatio: this._videoAspectRatio,
     };
   }
 
@@ -158,9 +173,18 @@ class CheeseAmpMedia {
     return () => this.trackEndCallbacks.delete(callback);
   }
 
+  onTrackChange(callback: () => void): () => void {
+    this._trackChangeCallbacks.add(callback);
+    return () => this._trackChangeCallbacks.delete(callback);
+  }
+
   async play(track: MusicNFT, preferVideo = false, overrideAudioUrl?: string): Promise<void> {
+    const token = ++this._playToken;
     this._error = null;
     this._isLoading = true;
+    this._videoFailed = false;
+    this._videoAspectRatio = null;
+    const trackChanged = this.currentTrack?.asset_id !== track.asset_id;
     this.currentTrack = track;
     this._hasVideo = !!(track.videoUrl || track.clipUrl);
     
@@ -179,19 +203,24 @@ class CheeseAmpMedia {
     }
     
     this.notifyCallbacks();
+    if (trackChanged) this._trackChangeCallbacks.forEach(cb => cb());
 
     const mediaUrl = overrideAudioUrl || (useVideo ? track.videoUrl! : track.audioUrl);
     const element = useVideo ? this.getVideoElement() : this.audio;
     
     try {
       await this.loadAndPlay(mediaUrl, element);
+      if (token !== this._playToken) return;
     } catch (e) {
+      if (token !== this._playToken) return;
       // If video element failed, try falling back to audio element with same URL
       if (useVideo && mediaUrl) {
         console.warn('[musicPlayer] Video element failed, trying audio fallback');
         this._mediaType = 'audio';
+        this._videoFailed = true;
         try {
           await this.loadAndPlay(mediaUrl, this.audio);
+          if (token !== this._playToken) return;
           // Clear any error set by the failed video attempt so the UI
           // doesn't show a stale "Failed to load media" banner.
           this._error = null;
@@ -199,6 +228,7 @@ class CheeseAmpMedia {
           this.notifyCallbacks();
           return;
         } catch {
+          if (token !== this._playToken) return;
           // Fall through to error
         }
       }
@@ -234,10 +264,20 @@ class CheeseAmpMedia {
   }
 
   private setSrcAndPlay(element: HTMLAudioElement | HTMLVideoElement, url: string): Promise<void> {
+    // Detach any stale listeners from a superseded call on this element
+    const prior = this._pendingListeners.get(element);
+    if (prior) {
+      element.removeEventListener('canplay', prior.canplay);
+      element.removeEventListener('error', prior.error);
+      this._pendingListeners.delete(element);
+    }
+    try { element.pause(); } catch {}
+
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         element.removeEventListener('canplay', onCanPlay);
         element.removeEventListener('error', onError);
+        this._pendingListeners.delete(element);
         // Don't reject — try to play anyway, browser may still be buffering
         element.play().then(resolve).catch(reject);
       }, 15000);
@@ -245,17 +285,20 @@ class CheeseAmpMedia {
       const onCanPlay = () => {
         clearTimeout(timeout);
         element.removeEventListener('error', onError);
+        this._pendingListeners.delete(element);
         element.play().then(resolve).catch(reject);
       };
 
       const onError = () => {
         clearTimeout(timeout);
         element.removeEventListener('canplay', onCanPlay);
+        this._pendingListeners.delete(element);
         reject(new Error('Failed to load media'));
       };
 
       element.addEventListener('canplay', onCanPlay, { once: true });
       element.addEventListener('error', onError, { once: true });
+      this._pendingListeners.set(element, { canplay: onCanPlay, error: onError });
       element.src = url;
       element.load();
     });
@@ -281,6 +324,7 @@ class CheeseAmpMedia {
   }
 
   private async tryGateways(hash: string, element: HTMLAudioElement | HTMLVideoElement): Promise<void> {
+    const token = this._playToken;
     const TIMEOUT = 10000;
     
     // Race first 3 gateways with HEAD check
@@ -323,16 +367,21 @@ class CheeseAmpMedia {
 
     try {
       const winningUrl = await racePromise;
+      if (token !== this._playToken) return;
       console.log(`[musicPlayer] Racing gateway won: ${winningUrl.split('/ipfs/')[0]}`);
       await this.setSrcAndPlay(element, winningUrl);
+      if (token !== this._playToken) return;
       this._error = null;
       this._isLoading = false;
       this.notifyCallbacks();
     } catch {
+      if (token !== this._playToken) return;
       console.warn('[musicPlayer] All racing gateways failed, trying remaining sequentially...');
       for (const gateway of IPFS_GATEWAYS.slice(3)) {
+        if (token !== this._playToken) return;
         try {
           await this.setSrcAndPlay(element, `${gateway}${hash}`);
+          if (token !== this._playToken) return;
           this._error = null;
           this._isLoading = false;
           this.notifyCallbacks();
@@ -341,6 +390,7 @@ class CheeseAmpMedia {
           continue;
         }
       }
+      if (token !== this._playToken) return;
       this._error = 'Failed to load media from all gateways';
       this._isLoading = false;
       this.notifyCallbacks();
@@ -398,6 +448,7 @@ class CheeseAmpMedia {
   }
 
   stop(): void {
+    this._playToken++;
     this.audio.pause();
     this.audio.currentTime = 0;
     if (this.video) {
@@ -406,6 +457,8 @@ class CheeseAmpMedia {
     }
     this.currentTrack = null;
     this._hasVideo = false;
+    this._videoFailed = false;
+    this._videoAspectRatio = null;
     this._mediaType = 'audio';
     this.notifyCallbacks();
   }
