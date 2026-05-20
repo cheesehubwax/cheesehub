@@ -126,51 +126,12 @@ export function MediaDisplay({
 
   const showVideo = isVideo && !showingArt;
 
-  return (
-    <div 
-      className={cn(
-        "relative w-full h-full",
-        isTheaterMode && "fixed inset-0 z-50 bg-black"
-      )}
-      onMouseEnter={() => setIsHovering(true)}
-      onMouseLeave={() => setIsHovering(false)}
-    >
-      {showVideo && (
-        <div 
-          ref={videoContainerRef}
-          className={cn(
-            "absolute inset-0 overflow-hidden bg-black",
-            isTheaterMode ? "rounded-none" : "rounded-lg"
-          )}
-        />
-      )}
-      
-      {!showVideo && (
-        hasError || !imgSrc ? (
-          <FallbackDisc />
-        ) : (
-          <img
-            src={imgSrc}
-            alt={alt}
-            className={cn(
-              "w-full h-full object-cover",
-              showingArt && onExpandArt && "cursor-zoom-in"
-            )}
-            onError={handleError}
-            onClick={showingArt ? handleImageClick : undefined}
-          />
-        )
-      )}
-
-      {videoFailed && !showVideo && hasVideo && (
-        <div className="absolute top-2 left-2 text-[10px] bg-black/60 text-white/80 px-2 py-1 rounded">
-          Video unavailable — playing audio
-        </div>
-      )}
-
+  // Controls overlay shared between normal and theater layouts
+  const controlsOverlay = (
+    <>
       {(isHovering || isTheaterMode) && (
         <div className={cn(
-          "absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 p-2",
+          "absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 p-2 z-10",
           isTheaterMode && "bg-gradient-to-t from-black/60 to-transparent"
         )}>
           {hasVideo && onToggleVideo && (
@@ -203,35 +164,31 @@ export function MediaDisplay({
             </TooltipProvider>
           )}
 
-          {showVideo && (
-            <>
-              {onToggleTheater && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-background/90"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onToggleTheater();
-                        }}
-                      >
-                        {isTheaterMode ? (
-                          <Minimize2 className="h-4 w-4" />
-                        ) : (
-                          <Maximize2 className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top">
-                      {isTheaterMode ? 'Exit theater mode' : 'Theater mode'}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-            </>
+          {showVideo && onToggleTheater && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-background/90"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleTheater();
+                    }}
+                  >
+                    {isTheaterMode ? (
+                      <Minimize2 className="h-4 w-4" />
+                    ) : (
+                      <Maximize2 className="h-4 w-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  {isTheaterMode ? 'Exit theater mode' : 'Theater mode'}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
 
           {showingArt && onExpandArt && imgSrc && (
@@ -256,12 +213,82 @@ export function MediaDisplay({
           )}
         </div>
       )}
+    </>
+  );
 
-      {isTheaterMode && isHovering && (
-        <div className="absolute top-4 left-4 text-white/60 text-xs bg-black/40 px-2 py-1 rounded">
-          Press ESC or click ✕ to exit
+  // Theater mode: backdrop + container sized to the video's exact aspect ratio
+  if (isTheaterMode && showVideo) {
+    const aspect = videoAspectRatio && videoAspectRatio > 0 ? videoAspectRatio : 16 / 9;
+    return (
+      <div
+        className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center cursor-pointer"
+        onClick={() => onToggleTheater?.()}
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}
+      >
+        <div
+          className="relative cursor-default"
+          style={{
+            aspectRatio: String(aspect),
+            width: aspect >= 1 ? 'min(95vw, calc(95vh * ' + aspect + '))' : 'auto',
+            height: aspect < 1 ? 'min(95vh, calc(95vw / ' + aspect + '))' : 'auto',
+            maxWidth: '95vw',
+            maxHeight: '95vh',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            ref={videoContainerRef}
+            className="absolute inset-0 overflow-hidden bg-black"
+          />
+          {controlsOverlay}
+          {isHovering && (
+            <div className="absolute top-2 left-2 text-white/60 text-xs bg-black/40 px-2 py-1 rounded">
+              Press ESC or click outside to exit
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      className="relative w-full h-full"
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
+    >
+      {showVideo && (
+        <div 
+          ref={videoContainerRef}
+          className="absolute inset-0 overflow-hidden bg-black rounded-lg"
+        />
+      )}
+      
+      {!showVideo && (
+        hasError || !imgSrc ? (
+          <FallbackDisc />
+        ) : (
+          <img
+            src={imgSrc}
+            alt={alt}
+            className={cn(
+              "w-full h-full object-cover",
+              showingArt && onExpandArt && "cursor-zoom-in"
+            )}
+            onError={handleError}
+            onClick={showingArt ? handleImageClick : undefined}
+          />
+        )
+      )}
+
+      {videoFailed && !showVideo && hasVideo && (
+        <div className="absolute top-2 left-2 text-[10px] bg-black/60 text-white/80 px-2 py-1 rounded">
+          Video unavailable — playing audio
         </div>
       )}
+
+      {controlsOverlay}
     </div>
   );
 }
