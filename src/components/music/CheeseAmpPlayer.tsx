@@ -448,10 +448,10 @@ export function CheeseAmpPlayer() {
           <div className="mb-4 min-h-[48px]">
             {currentTrack ? (
               <>
-                <h3 className="font-medium truncate text-sm">
+                <h3 className="font-medium text-sm break-words">
                   {currentTrack.title || currentTrack.name}
                 </h3>
-                <p className="text-xs text-muted-foreground truncate">
+                <p className="text-xs text-muted-foreground break-words">
                   {currentTrack.artist || currentTrack.collection}
                 </p>
               </>
@@ -800,7 +800,7 @@ export function CheeseAmpPlayer() {
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <p className={cn(
-                                        "text-sm truncate font-medium",
+                                        "text-sm font-medium break-words",
                                         isCurrentTrack && "text-cheese"
                                       )}>
                                         {track.title || track.name}
@@ -811,7 +811,7 @@ export function CheeseAmpPlayer() {
                                     </TooltipContent>
                                   </Tooltip>
                                 </TooltipProvider>
-                                <p className="text-xs text-muted-foreground truncate">
+                                <p className="text-xs text-muted-foreground break-words">
                                   {track.artist || track.collection}
                                 </p>
                               </div>
