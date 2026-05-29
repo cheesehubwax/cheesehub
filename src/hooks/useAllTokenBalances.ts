@@ -34,7 +34,7 @@ async function fetchBalancesForAccount(accountName: string): Promise<{ tokens: T
 
       // Only query tokens Hyperion already reported + critical tokens (WAX, CHEESE)
       // instead of all 28 registry tokens — avoids failed RPC calls to dead contracts
-      const criticalTokens = WAX_TOKENS.filter(t => t.symbol === 'WAX' || t.symbol === 'CHEESE');
+      const criticalTokens = WAX_TOKENS.filter(t => t.symbol === 'WAX' || t.symbol === 'CHEESE' || t.symbol === 'WAXDAO');
       const hyperionTokenKeys = new Set(hyperionResult.tokens.map((ht: HyperionToken) => `${ht.contract}:${ht.symbol}`));
       const tokensToQuery = [
         ...hyperionResult.tokens.map((ht: HyperionToken) => ({ contract: ht.contract, symbol: ht.symbol, precision: ht.precision || 8 })),
@@ -76,7 +76,7 @@ async function fetchBalancesForAccount(accountName: string): Promise<{ tokens: T
         }
       });
       // Supplement: ensure critical tokens (WAX, CHEESE) are never missing
-      const criticalTokens = WAX_TOKENS.filter(t => t.symbol === 'WAX' || t.symbol === 'CHEESE');
+      const criticalTokens = WAX_TOKENS.filter(t => t.symbol === 'WAX' || t.symbol === 'CHEESE' || t.symbol === 'WAXDAO');
       const resultKeys = new Set(results.map(r => `${r.contract}:${r.symbol}`));
       const missingCritical = criticalTokens.filter(t => !resultKeys.has(`${t.contract}:${t.symbol}`));
 
