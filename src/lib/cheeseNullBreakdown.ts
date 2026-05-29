@@ -19,6 +19,8 @@ export interface NullBreakdownEntry {
   percent24h: number;
   amount7d: number;
   percent7d: number;
+  amount30d: number;
+  percent30d: number;
 }
 
 function parseAsset(str: string): number {
@@ -109,6 +111,7 @@ function getAgo(days: number): string {
 export async function fetchNullBreakdown(): Promise<NullBreakdownEntry[]> {
   const after24h = getAgo(1);
   const after7d = getAgo(7);
+  const after30d = getAgo(30);
 
   const results = await Promise.all(
     NULL_CONTRACTS.map(async ({ account, displayName }) => ({
@@ -117,17 +120,20 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownEntry[]> {
       amount: await fetchContractNulled(account),
       amount24h: await fetchContractNulledFromHyperion(account, after24h),
       amount7d: await fetchContractNulledFromHyperion(account, after7d),
+      amount30d: await fetchContractNulledFromHyperion(account, after30d),
     }))
   );
 
   const grandTotal = results.reduce((sum, r) => sum + r.amount, 0);
   const grandTotal24h = results.reduce((sum, r) => sum + r.amount24h, 0);
   const grandTotal7d = results.reduce((sum, r) => sum + r.amount7d, 0);
+  const grandTotal30d = results.reduce((sum, r) => sum + r.amount30d, 0);
 
   return results.map((r) => ({
     ...r,
     percent: grandTotal > 0 ? (r.amount / grandTotal) * 100 : 0,
     percent24h: grandTotal24h > 0 ? (r.amount24h / grandTotal24h) * 100 : 0,
     percent7d: grandTotal7d > 0 ? (r.amount7d / grandTotal7d) * 100 : 0,
+    percent30d: grandTotal30d > 0 ? (r.amount30d / grandTotal30d) * 100 : 0,
   }));
 }
