@@ -199,7 +199,7 @@ export function TokenStatsBanner() {
                   </div>
                 </div>
               </PopoverTrigger>
-              <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[720px] max-w-[720px] p-0" align="end">
+              <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[860px] max-w-[860px] p-0" align="end">
                 <div className="p-3 border-b border-border">
                   <p className="text-sm font-semibold text-foreground">Null Breakdown by Contract</p>
                 </div>
@@ -214,12 +214,14 @@ export function TokenStatsBanner() {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="h-8 text-xs whitespace-nowrap">Contract</TableHead>
-                         <TableHead className="h-8 text-xs text-right whitespace-nowrap">Nulled</TableHead>
-                         <TableHead className="h-8 text-xs text-right w-16">%</TableHead>
-                         <TableHead className="h-8 text-xs text-right whitespace-nowrap">7d</TableHead>
-                         <TableHead className="h-8 text-xs text-right w-16 whitespace-nowrap">7d %</TableHead>
                          <TableHead className="h-8 text-xs text-right whitespace-nowrap">24h</TableHead>
                          <TableHead className="h-8 text-xs text-right w-16 whitespace-nowrap">24h %</TableHead>
+                         <TableHead className="h-8 text-xs text-right whitespace-nowrap">7d</TableHead>
+                         <TableHead className="h-8 text-xs text-right w-16 whitespace-nowrap">7d %</TableHead>
+                         <TableHead className="h-8 text-xs text-right whitespace-nowrap">30d</TableHead>
+                         <TableHead className="h-8 text-xs text-right w-16 whitespace-nowrap">30d %</TableHead>
+                         <TableHead className="h-8 text-xs text-right whitespace-nowrap">Total</TableHead>
+                         <TableHead className="h-8 text-xs text-right w-16">%</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -227,10 +229,10 @@ export function TokenStatsBanner() {
                         <TableRow key={entry.contract}>
                           <TableCell className="py-2 text-xs font-mono whitespace-nowrap">{entry.displayName ?? entry.contract}</TableCell>
                           <TableCell className="py-2 text-xs text-right">
-                            {formatFullNumber(entry.amount)} <span className="text-cheese">CHEESE</span>
+                            {formatFullNumber(entry.amount24h)} <span className="text-cheese">CHEESE</span>
                           </TableCell>
                           <TableCell className="py-2 text-xs text-right font-semibold">
-                            {entry.percent.toFixed(1)}%
+                            {entry.percent24h.toFixed(1)}%
                           </TableCell>
                           <TableCell className="py-2 text-xs text-right">
                             {formatFullNumber(entry.amount7d)} <span className="text-cheese">CHEESE</span>
@@ -239,10 +241,16 @@ export function TokenStatsBanner() {
                             {entry.percent7d.toFixed(1)}%
                           </TableCell>
                           <TableCell className="py-2 text-xs text-right">
-                            {formatFullNumber(entry.amount24h)} <span className="text-cheese">CHEESE</span>
+                            {formatFullNumber(entry.amount30d)} <span className="text-cheese">CHEESE</span>
                           </TableCell>
                           <TableCell className="py-2 text-xs text-right font-semibold">
-                            {entry.percent24h.toFixed(1)}%
+                            {entry.percent30d.toFixed(1)}%
+                          </TableCell>
+                          <TableCell className="py-2 text-xs text-right">
+                            {formatFullNumber(entry.amount)} <span className="text-cheese">CHEESE</span>
+                          </TableCell>
+                          <TableCell className="py-2 text-xs text-right font-semibold">
+                            {entry.percent.toFixed(1)}%
                           </TableCell>
                         </TableRow>
                       ))}
