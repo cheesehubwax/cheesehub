@@ -13,8 +13,8 @@ import {
   DAO_TYPES, PROPOSER_TYPES, StakedToken,
 } from "@/lib/dao";
 import { getVotesForDao, saveVote } from "@/lib/voteStorage";
-import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 import { useWax } from "@/context/WaxContext";
+import { useIpfsImageSrc } from "@/hooks/useIpfsImageSrc";
 import { ProposalCard } from "./ProposalCard";
 import { CreateProposal } from "./CreateProposal";
 import { DaoStaking } from "./DaoStaking";
@@ -31,24 +31,6 @@ type Section = "info" | "stake" | "new-proposal" | "active" | "past" | "treasury
 interface DaoDetailProps {
   daoName: string;
   onBack: () => void;
-}
-
-function useIpfsImageSrc(hash: string | undefined) {
-  const [gatewayIdx, setGatewayIdx] = useState(0);
-  const src = useMemo(() => {
-    if (!hash) return "";
-    if (hash.startsWith("http")) return hash;
-    if (hash.startsWith("Qm") || hash.startsWith("bafy")) {
-      return `${IPFS_GATEWAYS[gatewayIdx % IPFS_GATEWAYS.length]}${hash}`;
-    }
-    return hash;
-  }, [hash, gatewayIdx]);
-
-  const onError = useCallback(() => {
-    setGatewayIdx(prev => prev + 1 < IPFS_GATEWAYS.length ? prev + 1 : prev);
-  }, []);
-
-  return { src, onError };
 }
 
 export function DaoDetail({ daoName, onBack }: DaoDetailProps) {

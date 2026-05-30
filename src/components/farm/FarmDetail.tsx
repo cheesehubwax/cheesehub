@@ -9,13 +9,14 @@ import {
   Youtube, BookOpen, Layers, Download, Upload, Info, HandCoins
 } from "lucide-react";
 import {
-  fetchFarmDetails, FarmInfo, getIpfsUrl, FARM_TYPE_LABELS, FarmType,
+  fetchFarmDetails, FarmInfo, FARM_TYPE_LABELS, FarmType,
   calculateEffectiveBalance
 } from "@/lib/farm";
 import { useWax } from "@/context/WaxContext";
 import { useQuery } from "@tanstack/react-query";
 import { TokenLogo } from "@/components/TokenLogo";
 import { useToast } from "@/hooks/use-toast";
+import { useIpfsImageSrc } from "@/hooks/useIpfsImageSrc";
 import { NFTStaking } from "./NFTStaking";
 import { EditFarmProfile } from "./EditFarmProfile";
 import { OpenFarmDialog } from "./OpenFarmDialog";
@@ -153,6 +154,9 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
     staleTime: 30_000,
   });
 
+  const logo = useIpfsImageSrc(farm?.logo);
+  const cover = useIpfsImageSrc(farm?.profile?.cover_image);
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -175,8 +179,6 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
     );
   }
 
-  const logoUrl = farm.logo ? getIpfsUrl(farm.logo) : "";
-  const coverUrl = farm.profile?.cover_image ? getIpfsUrl(farm.profile.cover_image) : "";
   const status = getStatusInfo(farm);
   const isCreator = accountName === farm.creator;
   const now = Math.floor(Date.now() / 1000);
@@ -207,9 +209,9 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
       </Button>
 
       {/* Cover image */}
-      {coverUrl && (
+      {cover.src && (
         <div className="w-full rounded-xl overflow-hidden">
-          <img src={coverUrl} alt="Farm cover" className="w-full h-auto max-h-[400px] object-contain bg-card/60" />
+          <img src={cover.src} alt="Farm cover" onError={cover.onError} className="w-full h-auto max-h-[400px] object-contain bg-card/60" />
         </div>
       )}
 
@@ -218,8 +220,8 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
         <CardContent className="p-6">
           <div className="flex flex-col sm:flex-row items-start gap-6">
             <div className="h-20 w-20 rounded-xl bg-primary/10 flex items-center justify-center overflow-hidden shrink-0">
-              {logoUrl ? (
-                <img src={logoUrl} alt={farm.farm_name} className="h-full w-full object-contain" />
+              {logo.src ? (
+                <img src={logo.src} alt={farm.farm_name} onError={logo.onError} className="h-full w-full object-contain" />
               ) : (
                 <Sprout className="h-10 w-10 text-primary" />
               )}
