@@ -9,13 +9,14 @@ import {
   Youtube, BookOpen, Layers, Download, Upload, Info, HandCoins
 } from "lucide-react";
 import {
-  fetchFarmDetails, FarmInfo, getIpfsUrl, FARM_TYPE_LABELS, FarmType,
+  fetchFarmDetails, FarmInfo, FARM_TYPE_LABELS, FarmType,
   calculateEffectiveBalance
 } from "@/lib/farm";
 import { useWax } from "@/context/WaxContext";
 import { useQuery } from "@tanstack/react-query";
 import { TokenLogo } from "@/components/TokenLogo";
 import { useToast } from "@/hooks/use-toast";
+import { useIpfsImageSrc } from "@/hooks/useIpfsImageSrc";
 import { NFTStaking } from "./NFTStaking";
 import { EditFarmProfile } from "./EditFarmProfile";
 import { OpenFarmDialog } from "./OpenFarmDialog";
@@ -175,8 +176,6 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
     );
   }
 
-  const logoUrl = farm.logo ? getIpfsUrl(farm.logo) : "";
-  const coverUrl = farm.profile?.cover_image ? getIpfsUrl(farm.profile.cover_image) : "";
   const status = getStatusInfo(farm);
   const isCreator = accountName === farm.creator;
   const now = Math.floor(Date.now() / 1000);
