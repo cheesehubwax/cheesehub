@@ -370,7 +370,10 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                                   <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </div>
                                 <div className="text-xs text-cheese truncate">
-                                  {b.balance.toLocaleString()}
+                                  {b.balance.toLocaleString(undefined, {
+                                    minimumFractionDigits: b.precision,
+                                    maximumFractionDigits: b.precision,
+                                  })}
                                 </div>
                               </div>
                             </a>
