@@ -15,6 +15,8 @@ interface OpenFarmDialogProps {
   onSuccess: () => void;
 }
 
+const DURATION_PRESETS = [30, 60, 90, 180, 360];
+
 export function OpenFarmDialog({ farm, open, onOpenChange, onSuccess }: OpenFarmDialogProps) {
   const { accountName, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
@@ -24,6 +26,16 @@ export function OpenFarmDialog({ farm, open, onOpenChange, onSuccess }: OpenFarm
   );
 
   const hasRewards = farm.reward_pools.some(p => parseFloat(p.balance) > 0);
+
+  const isPresetActive = (days: number) => {
+    if (!expirationDate) return false;
+    const target = new Date(Date.now() + days * 86400 * 1000);
+    return (
+      target.getFullYear() === expirationDate.getFullYear() &&
+      target.getMonth() === expirationDate.getMonth() &&
+      target.getDate() === expirationDate.getDate()
+    );
+  };
 
   const handleOpen = async () => {
     if (!accountName || !expirationDate) return;
@@ -58,6 +70,19 @@ export function OpenFarmDialog({ farm, open, onOpenChange, onSuccess }: OpenFarm
           )}
           <div>
             <Label>Expiration Date</Label>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {DURATION_PRESETS.map(d => (
+                <Button
+                  key={d}
+                  type="button"
+                  size="sm"
+                  variant={isPresetActive(d) ? "default" : "outline"}
+                  onClick={() => setExpirationDate(new Date(Date.now() + d * 86400 * 1000))}
+                >
+                  {d}d
+                </Button>
+              ))}
+            </div>
             <Calendar
               mode="single"
               selected={expirationDate}
