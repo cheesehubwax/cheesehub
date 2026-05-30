@@ -1,25 +1,34 @@
-## Fix
+## Quick-select duration buttons for farm expiration
 
-In theater mode, instead of `fixed inset-0` with a letterboxed `<video>`, center a container sized to the video's actual aspect ratio. The video fills that container exactly — no crop, no black bars around the frame. The area outside the container is a dimmed backdrop (click-to-exit).
+Add a row of preset duration buttons (**30d / 60d / 90d / 180d / 360d**) above the calendar in both farm expiration dialogs. Clicking a preset sets the calendar's selected date to `baseDate + N days`.
 
-### Changes
+### Files
 
-**`src/components/music/MediaDisplay.tsx`**
-- When `isTheaterMode` is true, render a fixed full-viewport backdrop (`fixed inset-0 z-50 bg-black/90 flex items-center justify-center`) that is no longer the video container itself.
-- Inside it, render the video container as a centered child with:
-  - `max-w-[95vw] max-h-[95vh]`
-  - `aspectRatio: String(videoAspectRatio ?? 16/9)` inline style
-  - Width auto-derived: use `width: 95vw` capped by `max-h-[95vh]` via aspect-ratio (browsers handle this automatically with `aspect-ratio` + both max constraints).
-- Keep `object-fit: contain` on the `<video>` (safe fallback before metadata loads, and identical to `fill` once container matches aspect).
-- While `videoAspectRatio` is null (metadata not yet loaded), fall back to `16/9`.
-- Move the hover controls overlay and ESC hint so they're positioned relative to the inner video container, not the full backdrop.
-- Backdrop click (outside the video container) exits theater mode — wire to `onToggleTheater`. Stop propagation on the inner container so clicks on controls don't exit.
+**`src/components/farm/OpenFarmDialog.tsx`**
+- Base date = `new Date()` (today).
+- Render a `flex flex-wrap gap-2` row of 5 outline `Button size="sm"` presets directly above the `<Calendar>`.
+- onClick sets `expirationDate` to `new Date(Date.now() + N * 86400 * 1000)`.
+- Highlight active preset (`variant="default"` when the selected date matches that preset within the same day, else `variant="outline"`).
 
-**No changes** to `src/lib/musicPlayer.ts` (keeps `objectFit = 'contain'`) or `CheeseAmpPlayer.tsx`.
+**`src/components/farm/ExtendFarmDialog.tsx`**
+- Base date = `currentExpDate` (the farm's existing expiration), so presets extend *from* current expiration — matches the existing default behavior on line 23.
+- Same 5 presets, same styling and active-state logic.
+- Keep the `disabled={(date) => date <= currentExpDate}` guard on the Calendar.
 
-### Result
+### Shared shape
 
-- 16:9 video on any viewport → container is wide rectangle, no bars.
-- Portrait video → container is tall rectangle, no bars.
-- Square → square container.
-- Backdrop fills the rest of the screen (dimmed), matching standard video-player theater UX.
+```tsx
+const PRESETS = [30, 60, 90, 180, 360];
+// Render:
+<div className="flex flex-wrap gap-2 mt-2">
+  {PRESETS.map(d => (
+    <Button key={d} type="button" size="sm"
+      variant={isActive(d) ? "default" : "outline"}
+      onClick={() => setDate(addDays(base, d))}>
+      {d}d
+    </Button>
+  ))}
+</div>
+```
+
+No changes to `farm.ts`, transaction logic, or other dialogs.
