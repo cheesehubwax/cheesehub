@@ -15,6 +15,8 @@ interface ExtendFarmDialogProps {
   onSuccess: () => void;
 }
 
+const DURATION_PRESETS = [30, 60, 90, 180, 360];
+
 export function ExtendFarmDialog({ farm, open, onOpenChange, onSuccess }: ExtendFarmDialogProps) {
   const { accountName, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
@@ -62,6 +64,17 @@ export function ExtendFarmDialog({ farm, open, onOpenChange, onSuccess }: Extend
 
   const currentExpDate = farm.expiration > 0 ? new Date(farm.expiration * 1000) : new Date();
 
+  const presetBase = farm.expiration > 0 ? currentExpDate : new Date();
+  const isPresetActive = (days: number) => {
+    if (!newDate) return false;
+    const target = new Date(presetBase.getTime() + days * 86400 * 1000);
+    return (
+      target.getFullYear() === newDate.getFullYear() &&
+      target.getMonth() === newDate.getMonth() &&
+      target.getDate() === newDate.getDate()
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -74,6 +87,19 @@ export function ExtendFarmDialog({ farm, open, onOpenChange, onSuccess }: Extend
           </p>
           <div>
             <Label>New Expiration Date</Label>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {DURATION_PRESETS.map(d => (
+                <Button
+                  key={d}
+                  type="button"
+                  size="sm"
+                  variant={isPresetActive(d) ? "default" : "outline"}
+                  onClick={() => setNewDate(new Date(presetBase.getTime() + d * 86400 * 1000))}
+                >
+                  +{d}d
+                </Button>
+              ))}
+            </div>
             <Calendar
               mode="single"
               selected={newDate}
