@@ -3,8 +3,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sprout } from "lucide-react";
 import { TokenLogo } from "@/components/TokenLogo";
-import { FarmInfo, getIpfsUrl, FARM_TYPE_LABELS, FarmType } from "@/lib/farm";
+import { FarmInfo, FARM_TYPE_LABELS, FarmType } from "@/lib/farm";
 import { useNavigate } from "react-router-dom";
+import { useIpfsImageSrc } from "@/hooks/useIpfsImageSrc";
 
 function formatAmount(val: string | number): string {
   const num = typeof val === "string" ? parseFloat(val) : val;
@@ -55,7 +56,7 @@ function getDaysRemaining(expiration: number): string {
 
 export function FarmCard({ farm }: { farm: FarmInfo }) {
   const navigate = useNavigate();
-  const logoUrl = farm.logo ? getIpfsUrl(farm.logo) : "";
+  const logo = useIpfsImageSrc(farm.logo);
   const status = getStatusInfo(farm);
 
   return (
@@ -67,8 +68,8 @@ export function FarmCard({ farm }: { farm: FarmInfo }) {
         {/* Header */}
         <div className="flex items-start gap-3">
           <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center overflow-hidden shrink-0">
-            {logoUrl ? (
-              <img src={logoUrl} alt={farm.farm_name} className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            {logo.src ? (
+              <img src={logo.src} alt={farm.farm_name} className="h-full w-full object-cover" onError={logo.onError} />
             ) : (
               <Sprout className="h-6 w-6 text-primary" />
             )}
