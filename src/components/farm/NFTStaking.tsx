@@ -756,10 +756,19 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
     try {
       const ids = Array.from(selectedToStake).filter((id) => !globallyStakedMap.has(id) && !currentStakedIds.has(id));
       if (ids.length === 0) return;
-      const action = buildStakeNftsAction(accountName, farm.farm_name, ids);
-      const result = await executeTransaction([action], {
+      const hasPendingClaim =
+        stakedNfts.length > 0 &&
+        !!stakerData &&
+        stakerData.claimableBalances.some((b) => parseFloat(String(b.quantity).split(" ")[0]) > 0);
+      const stakeAction = buildStakeNftsAction(accountName, farm.farm_name, ids);
+      const actions = hasPendingClaim
+        ? [buildClaimRewardsAction(accountName, farm.farm_name), stakeAction]
+        : [stakeAction];
+      const result = await executeTransaction(actions, {
         successTitle: "NFTs Staked! 🌱",
-        successDescription: `Staked ${ids.length} NFT(s)`,
+        successDescription: hasPendingClaim
+          ? `Claimed pending rewards and staked ${ids.length} NFT(s)`
+          : `Staked ${ids.length} NFT(s)`,
       });
       if (result.success) {
         setSelectedToStake(new Set());
