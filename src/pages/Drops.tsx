@@ -81,8 +81,21 @@ const Drops = () => {
     () => [...collectiblesDrops].sort((a, b) => Number(a.dropId ?? a.id.replace(/^\D+/, '')) - Number(b.dropId ?? b.id.replace(/^\D+/, ''))),
     [collectiblesDrops]
   );
-  const sortedAccountNames = useMemo(
-    () => [...accountNamesDrops].sort((a, b) => Number(a.dropId ?? a.id.replace(/^\D+/, '')) - Number(b.dropId ?? b.id.replace(/^\D+/, ''))),
+  const classifyAccountDrop = (drop: NFTDrop): 'premium' | 'semi' => {
+    const desc = (drop.description ?? '').toLowerCase().replace(/\s+/g, ' ');
+    const isSemi = /semi[\s-]?premium/.test(desc);
+    if (isSemi) return 'semi';
+    if (/\bpremium\b/.test(desc)) return 'premium';
+    return 'semi';
+  };
+  const sortByDropId = (a: NFTDrop, b: NFTDrop) =>
+    Number(a.dropId ?? a.id.replace(/^\D+/, '')) - Number(b.dropId ?? b.id.replace(/^\D+/, ''));
+  const premiumAccountDrops = useMemo(
+    () => accountNamesDrops.filter(d => classifyAccountDrop(d) === 'premium').sort(sortByDropId),
+    [accountNamesDrops]
+  );
+  const semiPremiumAccountDrops = useMemo(
+    () => accountNamesDrops.filter(d => classifyAccountDrop(d) !== 'premium').sort(sortByDropId),
     [accountNamesDrops]
   );
 
@@ -197,7 +210,7 @@ const Drops = () => {
                       <span className="text-sm">👤</span>
                       <span>Account Names</span>
                       <span className="ml-1 rounded bg-primary/15 text-primary text-[10px] font-bold px-1.5 py-0.5 leading-none">
-                        {sortedAccountNames.length}
+                        {accountNamesDrops.length}
                       </span>
                     </TabsTrigger>
                   </TabsList>
@@ -214,12 +227,39 @@ const Drops = () => {
                 </TabsContent>
 
                 <TabsContent value="accountnames">
-                  {sortedAccountNames.length === 0 ? (
+                  {accountNamesDrops.length === 0 ? (
                     <div className="text-center py-12">
                       <p className="text-lg text-muted-foreground">No account name drops available.</p>
                     </div>
                   ) : (
-                    <SimpleDropGrid drops={sortedAccountNames} />
+                    <div className="space-y-12">
+                      <section>
+                        <div className="mb-4 flex items-center gap-3">
+                          <h3 className="font-display text-2xl font-bold text-foreground">Premium Accounts</h3>
+                          <span className="rounded bg-primary/15 text-primary text-xs font-bold px-2 py-0.5 leading-none">
+                            {premiumAccountDrops.length}
+                          </span>
+                        </div>
+                        {premiumAccountDrops.length === 0 ? (
+                          <p className="text-muted-foreground">No premium accounts available.</p>
+                        ) : (
+                          <SimpleDropGrid drops={premiumAccountDrops} />
+                        )}
+                      </section>
+                      <section>
+                        <div className="mb-4 flex items-center gap-3">
+                          <h3 className="font-display text-2xl font-bold text-foreground">Semi-Premium Accounts</h3>
+                          <span className="rounded bg-primary/15 text-primary text-xs font-bold px-2 py-0.5 leading-none">
+                            {semiPremiumAccountDrops.length}
+                          </span>
+                        </div>
+                        {semiPremiumAccountDrops.length === 0 ? (
+                          <p className="text-muted-foreground">No semi-premium accounts available.</p>
+                        ) : (
+                          <SimpleDropGrid drops={semiPremiumAccountDrops} />
+                        )}
+                      </section>
+                    </div>
                   )}
                 </TabsContent>
               </Tabs>
