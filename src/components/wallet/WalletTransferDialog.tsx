@@ -168,6 +168,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
         // Always keep WAX and CHEESE visible regardless of USD value
         if (t.symbol === "WAX" && (t.contract === "eosio.token" || !t.contract)) return true;
         if (t.symbol === "CHEESE" && t.contract === "cheeseburger") return true;
+        if (t.symbol === "WAXWETH") return true;
         return getUsdValue(t) > 0.01;
       })
       .sort((a, b) => getUsdValue(b) - getUsdValue(a));
