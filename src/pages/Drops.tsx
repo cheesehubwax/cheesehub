@@ -4,6 +4,7 @@ import { DropStatsBar } from "@/components/drops/DropStatsBar";
 import { CreateDrop } from "@/components/drops/CreateDrop";
 import { MyDrops } from "@/components/drops/MyDrops";
 import { SimpleDropGrid } from "@/components/drops/VirtualizedDropGrid";
+import { DropCard } from "@/components/drops/DropCard";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchCheeseDropStats } from "@/services/atomicApi";
 import { useDropsLoader } from "@/hooks/useDropsLoader";
@@ -91,7 +92,7 @@ const Drops = () => {
   const sortByDropId = (a: NFTDrop, b: NFTDrop) =>
     Number(a.dropId ?? a.id.replace(/^\D+/, '')) - Number(b.dropId ?? b.id.replace(/^\D+/, ''));
   const premiumAccountDrops = useMemo(
-    () => accountNamesDrops.filter(d => classifyAccountDrop(d) === 'premium').sort(sortByDropId),
+    () => accountNamesDrops.filter(d => classifyAccountDrop(d) === 'premium').sort(sortByDropId).reverse(),
     [accountNamesDrops]
   );
   const semiPremiumAccountDrops = useMemo(
@@ -243,7 +244,11 @@ const Drops = () => {
                         {premiumAccountDrops.length === 0 ? (
                           <p className="text-muted-foreground">No premium accounts available.</p>
                         ) : (
-                          <SimpleDropGrid drops={premiumAccountDrops} alwaysGlow />
+                          <div className="mx-auto grid max-w-3xl gap-6 sm:grid-cols-2">
+                            {premiumAccountDrops.map((drop) => (
+                              <DropCard key={drop.id} drop={drop} alwaysGlow />
+                            ))}
+                          </div>
                         )}
                       </section>
                       <section>
