@@ -1,37 +1,35 @@
-## Problem
+## Goal
 
-When you stake more NFTs into a farm where you already have NFTs staked, the WaxDAO V2 `farms.waxdao` contract recalculates your stake state and your pending (unclaimed) rewards are wiped — no tokens are sent to your account, so it looks like the claimable balance vanished.
+In the CHEESEDrop → Official → Account Names sub-tab, replace the single flat grid with two stacked sections:
 
-The unstake flow already handles this correctly:
+1. **Premium Accounts** — account name drops whose description marks them as premium
+2. **Semi-Premium Accounts** — account name drops whose description marks them as semi-premium (and any other account name drops as a fallback)
 
-```
-src/components/farm/NFTStaking.tsx:791
-const claimAction   = buildClaimRewardsAction(accountName, farm.farm_name);
-const unstakeAction = buildUnstakeNftsAction(accountName, farm.farm_name, ids);
-executeTransaction([claimAction, unstakeAction], …)
-```
+Using the description (not price) so future price changes don't break the grouping.
 
-But the stake flow does not:
+## Changes
 
-```
-src/components/farm/NFTStaking.tsx:759
-const action = buildStakeNftsAction(accountName, farm.farm_name, ids);
-executeTransaction([action], …)
-```
+Single file: `src/pages/Drops.tsx`
 
-## Fix
+- Add a small helper inside the component that classifies an account-name drop from its description text (lowercased, whitespace-collapsed). Matching rules:
+  - Premium if the description contains "premium" but NOT "semi" / "semi-premium" / "semipremium" near it.
+  - Semi-premium if the description contains "semi-premium", "semi premium", or "semipremium".
+  - Anything else falls into the Semi-Premium bucket as a safe default so no drop disappears.
+- Replace the `sortedAccountNames` memo with two memos derived from `accountNamesDrops`:
+  - `premiumAccountDrops` — classifier returns `premium`, sorted by `dropId` asc.
+  - `semiPremiumAccountDrops` — everything else, sorted by `dropId` asc.
+- In the `accountnames` `TabsContent`, render two stacked titled sections:
+  - "Premium Accounts" heading + count chip, then `<SimpleDropGrid drops={premiumAccountDrops} />` (muted empty-state line if none).
+  - "Semi-Premium Accounts" heading + count chip, then `<SimpleDropGrid drops={semiPremiumAccountDrops} />` (muted empty-state line if none).
+- Keep the Account Names tab trigger count as the combined total (`accountNamesDrops.length`).
+- Headings use existing typography (`font-display text-2xl font-bold text-foreground` with a `text-muted-foreground` subline). No new design tokens, no other files touched.
 
-Update `handleStake` in `src/components/farm/NFTStaking.tsx` to prepend a claim action when the user already has staked NFTs in this farm with a non-empty claimable balance:
+## Description field
 
-1. Check `stakedNfts.length > 0` and that `stakerData.claimableBalances` has any non-zero entries (use the existing `stakerData` memo).
-2. If yes, build `buildClaimRewardsAction(accountName, farm.farm_name)` and prepend it to the actions array passed to `executeTransaction`.
-3. Update the success toast description to mention the auto-claim when one was included (e.g. "Claimed pending rewards and staked N NFT(s)").
-4. Leave the no-existing-stake path unchanged (single stake action).
+Drops carry a `description` string (already part of the enriched `NFTDrop` used by the grid). The classifier reads `drop.description ?? ''` defensively so missing values just fall through to Semi-Premium.
 
-No changes to `lib/farm.ts`, contract bindings, or other dialogs. Unstake flow already correct and stays as-is.
+## Out of scope
 
-## Verification
-
-- Stake additional NFTs while having a non-zero claimable balance → wallet signs a 2-action tx (claim + stakenfts), CHEESE arrives in the user's account, new NFTs are staked, claimable resets to 0 only because it was just paid out.
-- Stake into a farm with no prior stake → single-action tx as before.
-- Greymass Fuel transact plugin path unchanged (executeTransaction already wires it).
+- No change to Collectibles tab, CHEESE tab, My Drops, Create, or any other page.
+- No change to drop fetching, enrichment, cart, or pricing logic.
+- No edits to drop descriptions on-chain — classification is purely client-side display.
