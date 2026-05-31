@@ -1,35 +1,22 @@
 ## Goal
-
-In the CHEESEDrop → Official → Account Names sub-tab, replace the single flat grid with two stacked sections:
-
-1. **Premium Accounts** — account name drops whose description marks them as premium
-2. **Semi-Premium Accounts** — account name drops whose description marks them as semi-premium (and any other account name drops as a fallback)
-
-Using the description (not price) so future price changes don't break the grouping.
+Make Premium Account drop cards continuously pulsate with a yellow/cheese glow. Semi-Premium cards keep current behavior (glow only on hover).
 
 ## Changes
 
-Single file: `src/pages/Drops.tsx`
+1. **`src/components/drops/DropCard.tsx`**
+   - Add optional `highlight?: boolean` prop to `DropCardProps`.
+   - When `highlight` is true, append classes that produce a constant yellow pulsing glow + border, e.g. `border-cheese/60 animate-pulse-glow shadow-[0_0_24px_hsl(var(--cheese)/0.45)]` (replacing the default `border-border/50 hover:border-primary/50 hover-cheese-glow`). When false, keep current classes unchanged.
 
-- Add a small helper inside the component that classifies an account-name drop from its description text (lowercased, whitespace-collapsed). Matching rules:
-  - Premium if the description contains "premium" but NOT "semi" / "semi-premium" / "semipremium" near it.
-  - Semi-premium if the description contains "semi-premium", "semi premium", or "semipremium".
-  - Anything else falls into the Semi-Premium bucket as a safe default so no drop disappears.
-- Replace the `sortedAccountNames` memo with two memos derived from `accountNamesDrops`:
-  - `premiumAccountDrops` — classifier returns `premium`, sorted by `dropId` asc.
-  - `semiPremiumAccountDrops` — everything else, sorted by `dropId` asc.
-- In the `accountnames` `TabsContent`, render two stacked titled sections:
-  - "Premium Accounts" heading + count chip, then `<SimpleDropGrid drops={premiumAccountDrops} />` (muted empty-state line if none).
-  - "Semi-Premium Accounts" heading + count chip, then `<SimpleDropGrid drops={semiPremiumAccountDrops} />` (muted empty-state line if none).
-- Keep the Account Names tab trigger count as the combined total (`accountNamesDrops.length`).
-- Headings use existing typography (`font-display text-2xl font-bold text-foreground` with a `text-muted-foreground` subline). No new design tokens, no other files touched.
+2. **`src/components/drops/VirtualizedDropGrid.tsx`**
+   - Add optional `highlight?: boolean` to both `VirtualizedDropGridProps` and `SimpleDropGrid` props, forwarded to each `<DropCard />`.
 
-## Description field
+3. **`src/pages/Drops.tsx`**
+   - On the Premium Accounts `<SimpleDropGrid>`, pass `highlight`. Leave the Semi-Premium grid untouched.
 
-Drops carry a `description` string (already part of the enriched `NFTDrop` used by the grid). The classifier reads `drop.description ?? ''` defensively so missing values just fall through to Semi-Premium.
+4. **`tailwind.config.ts`**
+   - Add a `pulse-glow` keyframe + animation (cheese-yellow box-shadow oscillating between low and high intensity, ~2s ease-in-out infinite). Uses the existing `--cheese` HSL token so no new colors are introduced.
 
-## Out of scope
-
-- No change to Collectibles tab, CHEESE tab, My Drops, Create, or any other page.
-- No change to drop fetching, enrichment, cart, or pricing logic.
-- No edits to drop descriptions on-chain — classification is purely client-side display.
+## Notes
+- Uses existing `cheese` semantic token; no hard-coded colors.
+- Hover behavior on Premium remains compatible — the pulsing glow continues regardless of hover.
+- Purely presentational change; no logic, fetching, or classification rules touched.
