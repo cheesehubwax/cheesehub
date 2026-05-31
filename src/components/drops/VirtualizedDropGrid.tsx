@@ -97,7 +97,7 @@ export function VirtualizedDropGrid({ drops, isLoading, progress }: VirtualizedD
   );
 }
 
-export function SimpleDropGrid({ drops }: { drops: NFTDrop[] }) {
+export function SimpleDropGrid({ drops, alwaysGlow }: { drops: NFTDrop[]; alwaysGlow?: boolean }) {
   const loadedImagesRef = useRef<Set<string>>(new Set());
   
   const handleImageLoaded = useCallback((dropId: string) => {
@@ -112,6 +112,7 @@ export function SimpleDropGrid({ drops }: { drops: NFTDrop[] }) {
           drop={drop}
           isImageCached={loadedImagesRef.current.has(drop.id)}
           onImageLoaded={handleImageLoaded}
+          alwaysGlow={alwaysGlow}
         />
       ))}
     </div>
