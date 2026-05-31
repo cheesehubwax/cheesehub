@@ -243,7 +243,7 @@ const Drops = () => {
                         {premiumAccountDrops.length === 0 ? (
                           <p className="text-muted-foreground">No premium accounts available.</p>
                         ) : (
-                          <SimpleDropGrid drops={premiumAccountDrops} highlight />
+                          <SimpleDropGrid drops={premiumAccountDrops} />
                         )}
                       </section>
                       <section>

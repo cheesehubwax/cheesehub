@@ -7,14 +7,13 @@ interface VirtualizedDropGridProps {
   drops: NFTDrop[];
   isLoading?: boolean;
   progress?: { loaded: number; total: number };
-  highlight?: boolean;
 }
 
 const COLUMN_COUNTS = { sm: 1, md: 2, lg: 3, xl: 4 };
 const ROW_HEIGHT = 480;
 const GAP = 24;
 
-export function VirtualizedDropGrid({ drops, isLoading, progress, highlight }: VirtualizedDropGridProps) {
+export function VirtualizedDropGrid({ drops, isLoading, progress }: VirtualizedDropGridProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const loadedImagesRef = useRef<Set<string>>(new Set());
   
@@ -88,7 +87,6 @@ export function VirtualizedDropGrid({ drops, isLoading, progress, highlight }: V
                   drop={drop}
                   isImageCached={loadedImagesRef.current.has(drop.id)}
                   onImageLoaded={handleImageLoaded}
-                  highlight={highlight}
                 />
               ))}
             </div>
@@ -99,7 +97,7 @@ export function VirtualizedDropGrid({ drops, isLoading, progress, highlight }: V
   );
 }
 
-export function SimpleDropGrid({ drops, highlight }: { drops: NFTDrop[]; highlight?: boolean }) {
+export function SimpleDropGrid({ drops }: { drops: NFTDrop[] }) {
   const loadedImagesRef = useRef<Set<string>>(new Set());
   
   const handleImageLoaded = useCallback((dropId: string) => {
@@ -114,7 +112,6 @@ export function SimpleDropGrid({ drops, highlight }: { drops: NFTDrop[]; highlig
           drop={drop}
           isImageCached={loadedImagesRef.current.has(drop.id)}
           onImageLoaded={handleImageLoaded}
-          highlight={highlight}
         />
       ))}
     </div>

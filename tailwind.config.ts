@@ -94,18 +94,6 @@ export default {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.6" },
         },
-        "cheese-pulse-glow": {
-          "0%, 100%": {
-            boxShadow:
-              "0 0 12px hsl(var(--cheese) / 0.35), 0 0 24px hsl(var(--cheese) / 0.15)",
-            borderColor: "hsl(var(--cheese) / 0.5)",
-          },
-          "50%": {
-            boxShadow:
-              "0 0 28px hsl(var(--cheese) / 0.75), 0 0 56px hsl(var(--cheese) / 0.4)",
-            borderColor: "hsl(var(--cheese) / 0.95)",
-          },
-        },
         "float": {
           "0%, 100%": { transform: "translateY(0)" },
           "50%": { transform: "translateY(-5px)" },
@@ -115,7 +103,6 @@ export default {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "pulse-glow": "pulse-glow 2s ease-in-out infinite",
-        "cheese-pulse-glow": "cheese-pulse-glow 2s ease-in-out infinite",
         "float": "float 3s ease-in-out infinite",
       },
     },

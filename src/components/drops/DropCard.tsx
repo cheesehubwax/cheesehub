@@ -25,10 +25,9 @@ export interface DropCardProps {
   drop: NFTDrop;
   isImageCached?: boolean;
   onImageLoaded?: (dropId: string) => void;
-  highlight?: boolean;
 }
 
-export function DropCard({ drop, isImageCached, onImageLoaded, highlight }: DropCardProps) {
+export function DropCard({ drop, isImageCached, onImageLoaded }: DropCardProps) {
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(isImageCached ?? false);
   const [currentImageUrl, setCurrentImageUrl] = useState(drop.image);
@@ -136,13 +135,7 @@ export function DropCard({ drop, isImageCached, onImageLoaded, highlight }: Drop
     : currentImageUrl;
 
   return (
-    <Card
-      className={
-        highlight
-          ? "group overflow-hidden border-2 border-cheese/60 bg-card/50 backdrop-blur-sm transition-all duration-300 animate-cheese-pulse-glow"
-          : "group overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:border-primary/50 hover-cheese-glow"
-      }
-    >
+    <Card className="group overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:border-primary/50 hover-cheese-glow">
       <Link to={`/drops/${drop.id}`}>
         <div className="relative aspect-square overflow-hidden bg-muted/50">
           {imageError && isVideoUrl(currentImageUrl) ? (
