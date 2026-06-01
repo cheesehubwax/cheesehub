@@ -40,10 +40,9 @@ const Drops = () => {
 
     return displayDrops.filter(drop => {
       if (drop.collectionName !== CHEESE_CONFIG.collectionName) return false;
-      const isSoldOut = drop.remaining <= 0 && drop.totalSupply > 0;
       const isEnded = drop.endDate ? new Date(drop.endDate).getTime() < now : false;
       const isNotStarted = drop.startDate ? new Date(drop.startDate).getTime() > now : false;
-      return !isSoldOut && !isEnded && !isNotStarted;
+      return !isEnded && !isNotStarted;
     }).sort((a, b) => getDropOrderValue(a) - getDropOrderValue(b));
   }, [displayDrops]);
 
@@ -52,10 +51,9 @@ const Drops = () => {
   const cheeseDrops = useMemo(() => {
     const now = Date.now();
     return displayDrops.filter(drop => {
-      const isSoldOut = drop.remaining <= 0 && drop.totalSupply > 0;
       const isEnded = drop.endDate ? new Date(drop.endDate).getTime() < now : false;
       const isNotStarted = drop.startDate ? new Date(drop.startDate).getTime() > now : false;
-      if (isSoldOut || isEnded || isNotStarted) return false;
+      if (isEnded || isNotStarted) return false;
       if (drop.collectionName === CHEESE_CONFIG.collectionName) return false;
       // Check if any price option is CHEESE
       const hasCheese = drop.currency === 'CHEESE' ||
