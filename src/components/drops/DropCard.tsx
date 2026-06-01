@@ -161,7 +161,7 @@ export function DropCard({ drop, isImageCached, onImageLoaded, alwaysGlow }: Dro
           <img
             src={displayImageUrl}
             alt={drop.name}
-            className={`h-full w-full object-cover transition-transform duration-500 ${isSoldOut ? 'grayscale opacity-70' : 'group-hover:scale-110'} ${imageLoaded ? 'opacity-100' : 'opacity-0'} ${isSoldOut && imageLoaded ? 'opacity-70' : ''}`}
+            className={`h-full w-full object-cover transition-transform duration-500 ${isSoldOut ? 'grayscale' : 'group-hover:scale-110'} ${!imageLoaded ? 'opacity-0' : isSoldOut ? 'opacity-60' : 'opacity-100'}`}
             onError={handleImageError}
             onLoad={handleImageLoad}
             loading="lazy"
