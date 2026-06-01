@@ -1,8 +1,15 @@
 // Fetches per-contract null breakdown from Hyperion + on-chain stats
 
-const HYPERION_ENDPOINT = 'https://wax.eosusa.io/v2/history/get_actions';
+const HYPERION_ENDPOINTS = [
+  'https://wax.eosusa.io/v2/history/get_actions',
+  'https://wax.hivebp.io/v2/history/get_actions',
+  'https://api.waxsweden.org/v2/history/get_actions',
+  'https://wax.greymass.com/v2/history/get_actions',
+];
 const BATCH_SIZE = 1000;
 const MAX_ACTIONS = 50000;
+// Endpoint is considered stale if indexer is more than this far behind real time
+const STALENESS_THRESHOLD_MS = 10 * 60 * 1000;
 
 const WAX_RPC_ENDPOINTS = [
   'https://wax.eosusa.io/v1/chain/get_table_rows',
@@ -28,12 +35,52 @@ function parseAsset(str: string): number {
   return parseFloat(str.split(' ')[0]) || 0;
 }
 
+// Probe each endpoint, return the first one whose indexer is fresh enough.
+// Falls back to the freshest stale endpoint if none are fresh.
+async function pickHyperionEndpoint(): Promise<string> {
+  const now = Date.now();
+  const staleCandidates: Array<{ endpoint: string; lagMs: number }> = [];
+
+  for (const endpoint of HYPERION_ENDPOINTS) {
+    try {
+      // Cheap probe: fetch 1 action to read last_indexed_block_time
+      const probeUrl = `${endpoint}?act.account=cheeseburger&act.name=transfer&limit=1`;
+      const response = await fetch(probeUrl);
+      if (!response.ok) continue;
+      const data = await response.json();
+      const indexedAt = data?.last_indexed_block_time;
+      if (!indexedAt) continue;
+      // Hyperion timestamps come back without a trailing Z; treat as UTC
+      const indexedMs = new Date(
+        indexedAt.endsWith('Z') ? indexedAt : `${indexedAt}Z`
+      ).getTime();
+      if (Number.isNaN(indexedMs)) continue;
+      const lagMs = now - indexedMs;
+      if (lagMs <= STALENESS_THRESHOLD_MS) {
+        return endpoint;
+      }
+      staleCandidates.push({ endpoint, lagMs });
+    } catch {
+      continue;
+    }
+  }
+
+  // No fresh endpoint — fall back to the least-stale one we saw,
+  // or the first configured endpoint if every probe failed.
+  if (staleCandidates.length > 0) {
+    staleCandidates.sort((a, b) => a.lagMs - b.lagMs);
+    return staleCandidates[0].endpoint;
+  }
+  return HYPERION_ENDPOINTS[0];
+}
+
 async function fetchContractNulledFromHyperion(account: string, after?: string): Promise<number> {
+  const endpoint = await pickHyperionEndpoint();
   let total = 0;
   let skip = 0;
 
   while (skip < MAX_ACTIONS) {
-    let url = `${HYPERION_ENDPOINT}?act.account=cheeseburger&act.name=transfer&transfer.from=${account}&transfer.to=eosio.null&limit=${BATCH_SIZE}&skip=${skip}`;
+    let url = `${endpoint}?act.account=cheeseburger&act.name=transfer&transfer.from=${account}&transfer.to=eosio.null&limit=${BATCH_SIZE}&skip=${skip}`;
     if (after) url += `&after=${after}`;
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Hyperion API error: ${response.status}`);
