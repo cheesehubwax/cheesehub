@@ -201,7 +201,7 @@ export function DropCard({ drop, isImageCached, onImageLoaded, alwaysGlow }: Dro
 
       {isSoldOut && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-          <span className="font-display text-3xl sm:text-4xl font-extrabold tracking-widest -rotate-12 px-6 py-2 border-4 border-destructive-foreground/90 bg-destructive/90 text-destructive-foreground shadow-2xl">
+          <span className="font-display text-3xl sm:text-4xl font-extrabold tracking-widest -rotate-12 px-6 py-2 border-4 border-white/90 bg-amber-500/90 text-white shadow-2xl">
             SOLD
           </span>
         </div>
