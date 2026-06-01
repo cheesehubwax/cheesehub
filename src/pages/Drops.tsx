@@ -94,7 +94,27 @@ const Drops = () => {
     [accountNamesDrops]
   );
   const semiPremiumAccountDrops = useMemo(
-    () => accountNamesDrops.filter(d => classifyAccountDrop(d) !== 'premium').sort(sortByDropId),
+    () => {
+      const semi = accountNamesDrops.filter(d => classifyAccountDrop(d) !== 'premium').sort(sortByDropId);
+      const hasCheeseMeme = semi.some(d => d.name.toLowerCase().includes('.cheese.meme'));
+      if (hasCheeseMeme) return semi;
+      const fallbackImage = accountNamesDrops.find(d => d.image && d.image !== '/placeholder.svg')?.image || '/placeholder.svg';
+      const historicalCheeseMeme: NFTDrop = {
+        id: 'historical-cheese-meme',
+        collectionName: CHEESE_CONFIG.collectionName,
+        schemaName: 'accountnames',
+        name: '.cheese.meme',
+        description: 'Premium .meme account name — claimed.',
+        image: fallbackImage,
+        price: 200,
+        currency: 'CHEESE',
+        prices: [{ price: 200, currency: 'CHEESE', listingPrice: '200.0000 CHEESE' }],
+        totalSupply: 1,
+        remaining: 0,
+        attributes: [],
+      };
+      return [historicalCheeseMeme, ...semi];
+    },
     [accountNamesDrops]
   );
 
