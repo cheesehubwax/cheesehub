@@ -30,13 +30,19 @@ export function VirtualizedDropGrid({ drops, isLoading, progress }: VirtualizedD
     return COLUMN_COUNTS.xl;
   }, []);
 
+  const sortedDrops = useMemo(() => {
+    const available = drops.filter(d => d.remaining > 0);
+    const sold = drops.filter(d => d.remaining <= 0);
+    return [...available, ...sold];
+  }, [drops]);
+
   const rows = useMemo(() => {
     const result: NFTDrop[][] = [];
-    for (let i = 0; i < drops.length; i += columnCount) {
-      result.push(drops.slice(i, i + columnCount));
+    for (let i = 0; i < sortedDrops.length; i += columnCount) {
+      result.push(sortedDrops.slice(i, i + columnCount));
     }
     return result;
-  }, [drops, columnCount]);
+  }, [sortedDrops, columnCount]);
 
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -104,9 +110,15 @@ export function SimpleDropGrid({ drops, alwaysGlow }: { drops: NFTDrop[]; always
     loadedImagesRef.current.add(dropId);
   }, []);
 
+  const sortedDrops = useMemo(() => {
+    const available = drops.filter(d => d.remaining > 0);
+    const sold = drops.filter(d => d.remaining <= 0);
+    return [...available, ...sold];
+  }, [drops]);
+
   return (
     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {drops.map((drop) => (
+      {sortedDrops.map((drop) => (
         <DropCard 
           key={drop.id} 
           drop={drop}

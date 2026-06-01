@@ -135,70 +135,110 @@ export function DropCard({ drop, isImageCached, onImageLoaded, alwaysGlow }: Dro
     ? `${currentImageUrl}${currentImageUrl.includes('?') ? '&' : '?'}retry=${retryCount}` 
     : currentImageUrl;
 
+  const isSoldOut = drop.remaining <= 0;
+
+  const imageInner = (
+    <div className="relative aspect-square overflow-hidden bg-muted/50">
+      {imageError && isVideoUrl(currentImageUrl) ? (
+        <div className="flex h-full w-full flex-col items-center justify-center bg-muted/30">
+          <Film className="h-12 w-12 text-muted-foreground/50" />
+          <span className="mt-2 text-xs text-muted-foreground">Video NFT</span>
+        </div>
+      ) : imageError ? (
+        <div className="flex h-full w-full flex-col items-center justify-center gap-2">
+          <ImageOff className="h-12 w-12 text-muted-foreground/50" />
+          <Button variant="ghost" size="sm" onClick={handleRetry} className="text-xs text-muted-foreground hover:text-foreground">
+            <RotateCw className="mr-1 h-3 w-3" /> Retry
+          </Button>
+        </div>
+      ) : (
+        <>
+          {!imageLoaded && (
+            <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            </div>
+          )}
+          <img
+            src={displayImageUrl}
+            alt={drop.name}
+            className={`h-full w-full object-cover transition-transform duration-500 ${isSoldOut ? 'grayscale' : 'group-hover:scale-110'} ${!imageLoaded ? 'opacity-0' : isSoldOut ? 'opacity-60' : 'opacity-100'}`}
+            onError={handleImageError}
+            onLoad={handleImageLoad}
+            loading="lazy"
+          />
+        </>
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
+
+      {/* Drop type badge */}
+      <div className={`absolute top-2 ${drop.authRequired ? 'left-24' : 'left-2'} flex items-center gap-1 rounded-full backdrop-blur-sm px-2 py-1 text-xs font-medium ${
+        drop.templateId ? 'bg-primary/90 text-primary-foreground' : 'bg-accent/90 text-accent-foreground border border-border/30'
+      }`}>
+        {drop.templateId ? 'Mint on Demand' : 'Pre-mint'}
+      </div>
+
+      {drop.authRequired && (
+        <div className="absolute top-2 left-2 flex items-center gap-1 rounded-full bg-amber-500/90 backdrop-blur-sm px-2 py-1 text-xs font-medium text-black">
+          <Lock className="h-3 w-3" />
+          {isFreeAuthDrop ? 'Holders Only' : 'Auth Required'}
+        </div>
+      )}
+
+      {/* Price badge on image */}
+      <div className={`absolute bottom-2 right-2 flex items-center gap-1 rounded-full backdrop-blur-sm px-2.5 py-1 border shadow-lg ${
+        isFreeAuthDrop ? 'bg-green-500/90 border-green-400/50' : 'bg-background/90 border-border/50'
+      }`}>
+        {isFreeAuthDrop ? (
+          <span className="font-display text-sm font-bold text-white">FREE</span>
+        ) : (
+          <>
+            <TokenLogo contract={getContractForCurrency(primaryPrice.currency)} symbol={primaryPrice.currency} size="sm" />
+            <span className="font-display text-sm font-bold text-primary">{primaryPrice.price.toLocaleString()}</span>
+            <span className="text-xs text-muted-foreground">{primaryPrice.currency}</span>
+          </>
+        )}
+      </div>
+
+      {isSoldOut && (
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+          <span className="font-display text-3xl sm:text-4xl font-extrabold tracking-widest -rotate-12 px-6 py-2 border-4 border-destructive-foreground/90 bg-destructive/90 text-destructive-foreground shadow-2xl">
+            SOLD
+          </span>
+        </div>
+      )}
+    </div>
+  );
+
+  if (isSoldOut) {
+    return (
+      <Card className="group overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm">
+        {imageInner}
+        <CardContent className="p-4">
+          {drop.collectionName && (
+            <span className="mb-2 inline-block rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">{drop.collectionName}</span>
+          )}
+          <h3 className="font-display text-lg font-semibold text-muted-foreground">{drop.name}</h3>
+          <p className="mt-1 line-clamp-2 whitespace-pre-line text-sm text-muted-foreground/70">{drop.description}</p>
+
+          <div className="mt-3 space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Minted</span>
+              <span className="font-medium text-foreground">{drop.totalSupply - drop.remaining} / {drop.totalSupply}</span>
+            </div>
+            <Progress value={mintedPercent} className="h-2 bg-muted" />
+          </div>
+        </CardContent>
+        <div className="border-t border-border/50 p-4 text-center">
+          <span className="text-sm font-medium text-muted-foreground">Sold Out</span>
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <Card className={`group overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:border-primary/50 ${alwaysGlow ? 'cheese-glow border-primary/50' : 'hover-cheese-glow'}`}>
       <Link to={`/drops/${drop.id}`}>
-        <div className="relative aspect-square overflow-hidden bg-muted/50">
-          {imageError && isVideoUrl(currentImageUrl) ? (
-            <div className="flex h-full w-full flex-col items-center justify-center bg-muted/30">
-              <Film className="h-12 w-12 text-muted-foreground/50" />
-              <span className="mt-2 text-xs text-muted-foreground">Video NFT</span>
-            </div>
-          ) : imageError ? (
-            <div className="flex h-full w-full flex-col items-center justify-center gap-2">
-              <ImageOff className="h-12 w-12 text-muted-foreground/50" />
-              <Button variant="ghost" size="sm" onClick={handleRetry} className="text-xs text-muted-foreground hover:text-foreground">
-                <RotateCw className="mr-1 h-3 w-3" /> Retry
-              </Button>
-            </div>
-          ) : (
-            <>
-              {!imageLoaded && (
-                <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
-                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                </div>
-              )}
-              <img
-                src={displayImageUrl}
-                alt={drop.name}
-                className={`h-full w-full object-cover transition-transform duration-500 group-hover:scale-110 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
-                onError={handleImageError}
-                onLoad={handleImageLoad}
-                loading="lazy"
-              />
-            </>
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent" />
-          
-          {/* Drop type badge */}
-          <div className={`absolute top-2 ${drop.authRequired ? 'left-24' : 'left-2'} flex items-center gap-1 rounded-full backdrop-blur-sm px-2 py-1 text-xs font-medium ${
-            drop.templateId ? 'bg-primary/90 text-primary-foreground' : 'bg-accent/90 text-accent-foreground border border-border/30'
-          }`}>
-            {drop.templateId ? 'Mint on Demand' : 'Pre-mint'}
-          </div>
-
-          {drop.authRequired && (
-            <div className="absolute top-2 left-2 flex items-center gap-1 rounded-full bg-amber-500/90 backdrop-blur-sm px-2 py-1 text-xs font-medium text-black">
-              <Lock className="h-3 w-3" />
-              {isFreeAuthDrop ? 'Holders Only' : 'Auth Required'}
-            </div>
-          )}
-          
-          {/* Price badge on image */}
-          <div className={`absolute bottom-2 right-2 flex items-center gap-1 rounded-full backdrop-blur-sm px-2.5 py-1 border shadow-lg ${
-            isFreeAuthDrop ? 'bg-green-500/90 border-green-400/50' : 'bg-background/90 border-border/50'
-          }`}>
-            {isFreeAuthDrop ? (
-              <span className="font-display text-sm font-bold text-white">FREE</span>
-            ) : (
-              <>
-                <TokenLogo contract={getContractForCurrency(primaryPrice.currency)} symbol={primaryPrice.currency} size="sm" />
-                <span className="font-display text-sm font-bold text-primary">{primaryPrice.price.toLocaleString()}</span>
-                <span className="text-xs text-muted-foreground">{primaryPrice.currency}</span>
-              </>
-            )}
-          </div>
-        </div>
+        {imageInner}
       </Link>
 
       <CardContent className="p-4">
@@ -232,11 +272,6 @@ export function DropCard({ drop, isImageCached, onImageLoaded, alwaysGlow }: Dro
         </div>
       </CardContent>
 
-      {drop.remaining === 0 && (
-        <div className="border-t border-border/50 p-4 text-center">
-          <span className="text-sm font-medium text-muted-foreground">Sold Out</span>
-        </div>
-      )}
     </Card>
   );
 }
