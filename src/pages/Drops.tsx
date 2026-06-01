@@ -40,10 +40,9 @@ const Drops = () => {
 
     return displayDrops.filter(drop => {
       if (drop.collectionName !== CHEESE_CONFIG.collectionName) return false;
-      const isSoldOut = drop.remaining <= 0 && drop.totalSupply > 0;
       const isEnded = drop.endDate ? new Date(drop.endDate).getTime() < now : false;
       const isNotStarted = drop.startDate ? new Date(drop.startDate).getTime() > now : false;
-      return !isSoldOut && !isEnded && !isNotStarted;
+      return !isEnded && !isNotStarted;
     }).sort((a, b) => getDropOrderValue(a) - getDropOrderValue(b));
   }, [displayDrops]);
 
@@ -52,10 +51,9 @@ const Drops = () => {
   const cheeseDrops = useMemo(() => {
     const now = Date.now();
     return displayDrops.filter(drop => {
-      const isSoldOut = drop.remaining <= 0 && drop.totalSupply > 0;
       const isEnded = drop.endDate ? new Date(drop.endDate).getTime() < now : false;
       const isNotStarted = drop.startDate ? new Date(drop.startDate).getTime() > now : false;
-      if (isSoldOut || isEnded || isNotStarted) return false;
+      if (isEnded || isNotStarted) return false;
       if (drop.collectionName === CHEESE_CONFIG.collectionName) return false;
       // Check if any price option is CHEESE
       const hasCheese = drop.currency === 'CHEESE' ||
@@ -96,7 +94,27 @@ const Drops = () => {
     [accountNamesDrops]
   );
   const semiPremiumAccountDrops = useMemo(
-    () => accountNamesDrops.filter(d => classifyAccountDrop(d) !== 'premium').sort(sortByDropId),
+    () => {
+      const semi = accountNamesDrops.filter(d => classifyAccountDrop(d) !== 'premium').sort(sortByDropId);
+      const hasCheeseMeme = semi.some(d => d.name.toLowerCase().includes('.cheese.meme'));
+      if (hasCheeseMeme) return semi;
+      const fallbackImage = accountNamesDrops.find(d => d.image && d.image !== '/placeholder.svg')?.image || '/placeholder.svg';
+      const historicalCheeseMeme: NFTDrop = {
+        id: 'historical-cheese-meme',
+        collectionName: CHEESE_CONFIG.collectionName,
+        schemaName: 'accountnames',
+        name: '.cheese.meme',
+        description: 'Premium .meme account name — claimed.',
+        image: fallbackImage,
+        price: 200,
+        currency: 'CHEESE',
+        prices: [{ price: 200, currency: 'CHEESE', listingPrice: '200.0000 CHEESE' }],
+        totalSupply: 1,
+        remaining: 0,
+        attributes: [],
+      };
+      return [historicalCheeseMeme, ...semi];
+    },
     [accountNamesDrops]
   );
 

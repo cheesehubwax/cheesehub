@@ -1,33 +1,38 @@
 ## Goal
 
-When any drop sells out (remaining = 0), keep it visible in the grid as a black-and-white placeholder with a clear "SOLD" overlay, instead of looking identical to live drops. Sold-out cards should sink to the bottom of their grid so available drops stay on top.
+Make `.cheese.meme` (a semi-premium account name that sold previously) show up in the Account Names → Semi-Premium grid as a SOLD placeholder card.
 
-Applies to every drops grid on the page (semi-premium account names, premium account names, official collectibles, and CHEESE drops), not just semi-premium.
+## Root cause
 
-## Scope
-
-UI-only. No data layer, contract, or loader changes. The drops loader already returns drops with `remaining = 0`; we just render them differently and reorder them.
+`src/pages/Drops.tsx` `officialDrops` memo explicitly filters out sold-out drops (`isSoldOut` = remaining ≤ 0). So even if `.cheese.meme` is still indexed on-chain, it never reaches the grid. The new SOLD overlay we just shipped has nothing to render.
 
 ## Changes
 
-1. **`src/components/drops/DropCard.tsx`**
-   - Treat any card with `drop.remaining === 0` as the sold-out variant automatically (no new prop needed — sold-out state is intrinsic to the drop).
-   - Sold-out rendering:
-     - Render the card as a non-interactive `<div>` (no `<Link>`); drop hover scale / hover-glow / always-glow classes.
-     - Apply `grayscale opacity-70` to the image.
-     - Add a centered diagonal "SOLD" stamp overlay above the image (semantic tokens only: `bg-destructive/90 text-destructive-foreground`, `-rotate-12`, bold display font, thick border, high z-index so it sits above the gradient and existing badges).
-     - Keep the existing bottom "Sold Out" footer.
-   - Live drops render exactly as today; `alwaysGlow` only applies when not sold out.
+1. **`src/pages/Drops.tsx` — stop filtering sold-out drops out of the Official tab.**
+   - In `officialDrops`, drop the `isSoldOut` exclusion. Keep `isEnded` and `isNotStarted` filters (those are time-based, not supply-based, and we don't want expired drops resurfacing).
+   - Same change in `cheeseDrops` for consistency with the user's earlier "apply same placeholder to any of the other drops if they sell out" instruction.
+   - Result: any sold-out, non-expired drop appears with the grayscale + SOLD overlay and sinks to the bottom of its grid (handled by `SimpleDropGrid`/`VirtualizedDropGrid`).
 
-2. **`src/components/drops/VirtualizedDropGrid.tsx`**
-   - Inside both `VirtualizedDropGrid` and `SimpleDropGrid`, stable-reorder the incoming `drops` so `remaining > 0` items appear first (original order preserved within each group) and `remaining === 0` items appear at the end. This makes the bottom-sink behavior automatic for every consumer.
+2. **`src/pages/Drops.tsx` — hardcoded fallback for `.cheese.meme`.**
+   - If after the filter above, `semiPremiumAccountDrops` does not contain a drop whose `name` matches `.cheese.meme` (case-insensitive), synthesize one and prepend it. The grid's sort will still push it to the bottom because `remaining = 0`.
+   - The synthetic entry uses:
+     - `id`: `historical-cheese-meme`
+     - `name`: `.cheese.meme`
+     - `collectionName`: `cheesenftwax`
+     - `schemaName`: `accountnames`
+     - `description`: short note that the name was claimed (e.g. "Premium .meme account name — claimed.")
+     - `image`: reuse the image of the first available account-name drop already in `accountNamesDrops` so it visually matches. If none is loaded yet, fall back to `/placeholder.svg` (the grayscale overlay still reads as SOLD).
+     - `price`: `200`, `currency`: `CHEESE`, `prices`: `[{ price: 200, currency: 'CHEESE', listingPrice: '200.0000 CHEESE' }]`
+     - `totalSupply`: 1, `remaining`: 0, `attributes`: [].
 
-3. **`src/pages/Drops.tsx`**
-   - No code changes required — sort/reorder is handled inside the grids. Existing `alwaysGlow` usage on premium account names is unaffected (only applies when not sold out).
+3. **No DropCard / grid changes** — sold-state styling, non-clickability, and bottom-sink reordering all already work from the previous turn.
 
 ## Out of scope
 
-- Hiding sold drops from the API response.
-- Fetching, filtering, or cart logic.
-- Drop detail page (`/drops/:id`) styling.
-- Pre-1-of-1 detection (we treat any 0-remaining drop the same way, regardless of supply size).
+- Recording the actual buyer / sale TX (display-only placeholder).
+- Touching the `/drops/:id` detail route (sold cards are already non-clickable).
+- Changing fetchers, caches, or contract reads.
+
+## Open question (no blocker)
+
+If the on-chain `.cheese.meme` drop is also still indexed, the page will show two cards (the real one + the hardcoded fallback). The dedupe check in step 2 prevents that. If you'd rather skip the hardcoded fallback entirely and rely only on the unfiltered on-chain data, say the word and I'll drop step 2.
