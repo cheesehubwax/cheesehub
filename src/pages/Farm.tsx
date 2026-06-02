@@ -7,6 +7,9 @@ import { BrowseFarms } from "@/components/farm/BrowseFarms";
 import { CreateFarm } from "@/components/farm/CreateFarm";
 import { MyFarms } from "@/components/farm/MyFarms";
 import { FarmDetail } from "@/components/farm/FarmDetail";
+import { FarmCard } from "@/components/farm/FarmCard";
+import { fetchAllFarms } from "@/lib/farm";
+import { useQuery } from "@tanstack/react-query";
 import cheeseFarmLogo from "@/assets/cheesefarm.png";
 import { playRandomFart } from "@/lib/fartSounds";
 
@@ -15,6 +18,14 @@ const Farm = () => {
   const { farmName } = useParams<{ farmName?: string }>();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("browse");
+
+  const { data: allFarms = [] } = useQuery({
+    queryKey: ["farms"],
+    queryFn: fetchAllFarms,
+    staleTime: 60_000,
+    enabled: !farmName,
+  });
+  const featuredFarm = allFarms.find(f => f.farm_name === "cheesefarm");
 
   if (farmName) {
     return (
@@ -60,6 +71,19 @@ const Farm = () => {
           </div>
         </div>
       </section>
+
+      {featuredFarm && (
+        <div className="container pb-8 flex justify-center">
+          <div className="w-full max-w-md">
+            <p className="text-center text-cheese text-xs uppercase tracking-wider mb-3">
+              ⭐ Featured Farm
+            </p>
+            <div className="rounded-xl p-[2px] bg-gradient-to-br from-cheese/60 via-cheese/20 to-cheese/60 shadow-[0_0_30px_-5px_hsl(var(--cheese)/0.4)]">
+              <FarmCard farm={featuredFarm} />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="container pb-12">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
