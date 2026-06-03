@@ -208,6 +208,7 @@ const VirtualGrid = React.memo(function VirtualGrid({
 export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
   const { accountName, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
+  const { totals: claimTotals } = useFarmClaimTotals(accountName);
   const navigate = useNavigate();
 
   const handleNavigateToFarm = useCallback((farmName: string) => {
