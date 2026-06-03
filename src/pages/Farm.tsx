@@ -12,12 +12,16 @@ import { fetchAllFarms } from "@/lib/farm";
 import { useQuery } from "@tanstack/react-query";
 import cheeseFarmLogo from "@/assets/cheesefarm.png";
 import { playRandomFart } from "@/lib/fartSounds";
+import { useWax } from "@/context/WaxContext";
+import { useFarmClaimTotals } from "@/hooks/useFarmClaimTotals";
 
 
 const Farm = () => {
   const { farmName } = useParams<{ farmName?: string }>();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("browse");
+  const { accountName } = useWax();
+  const { totals: claimTotals } = useFarmClaimTotals(accountName);
 
   const { data: allFarms = [] } = useQuery({
     queryKey: ["farms"],
@@ -79,7 +83,7 @@ const Farm = () => {
               ⭐ Featured Farm
             </p>
             <div className="rounded-xl p-[2px] bg-gradient-to-br from-cheese/60 via-cheese/20 to-cheese/60 shadow-[0_0_30px_-5px_hsl(var(--cheese)/0.4)]">
-              <FarmCard farm={featuredFarm} />
+              <FarmCard farm={featuredFarm} userClaimed={claimTotals[featuredFarm.farm_name]} />
             </div>
           </div>
         </div>

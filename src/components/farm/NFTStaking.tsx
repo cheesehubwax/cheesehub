@@ -34,6 +34,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useSquareGridRowHeight } from "@/hooks/useSquareGridRowHeight";
 import { NFTGridCard } from "@/components/shared/NFTGridCard";
+import { claimableBalancesToClaimed, applyClaimToAccount } from "@/lib/farmClaimHistory";
 
 const TOKEN_LOGO_PLACEHOLDER = "/placeholder.svg";
 const IPFS_GATEWAY = "https://ipfs.io/ipfs/";
@@ -760,6 +761,9 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
         stakedNfts.length > 0 &&
         !!stakerData &&
         stakerData.claimableBalances.some((b) => parseFloat(String(b.quantity).split(" ")[0]) > 0);
+      const preClaim = hasPendingClaim && stakerData
+        ? claimableBalancesToClaimed(stakerData.claimableBalances)
+        : [];
       const stakeAction = buildStakeNftsAction(accountName, farm.farm_name, ids);
       const actions = hasPendingClaim
         ? [buildClaimRewardsAction(accountName, farm.farm_name), stakeAction]
@@ -771,6 +775,9 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
           : `Staked ${ids.length} NFT(s)`,
       });
       if (result.success) {
+        if (preClaim.length > 0) {
+          applyClaimToAccount(accountName, farm.farm_name, preClaim);
+        }
         setSelectedToStake(new Set());
         queryClient.invalidateQueries({ queryKey: ["farmDetail", farm.farm_name] });
         await refetchAll();
@@ -797,6 +804,9 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
     setIsUnstaking(true);
     try {
       const ids = Array.from(selectedToUnstake);
+      const preClaim = stakerData
+        ? claimableBalancesToClaimed(stakerData.claimableBalances)
+        : [];
       const claimAction = buildClaimRewardsAction(accountName, farm.farm_name);
       const unstakeAction = buildUnstakeNftsAction(accountName, farm.farm_name, ids);
       const result = await executeTransaction([claimAction, unstakeAction], {
@@ -804,6 +814,9 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
         successDescription: `Claimed rewards and unstaked ${ids.length} NFT(s)`,
       });
       if (result.success) {
+        if (preClaim.length > 0) {
+          applyClaimToAccount(accountName, farm.farm_name, preClaim);
+        }
         setSelectedToUnstake(new Set());
         queryClient.invalidateQueries({ queryKey: ["farmDetail", farm.farm_name] });
         await refetchAll();
@@ -825,12 +838,18 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
     if (!accountName) return;
     setIsClaiming(true);
     try {
+      const preClaim = stakerData
+        ? claimableBalancesToClaimed(stakerData.claimableBalances)
+        : [];
       const action = buildClaimRewardsAction(accountName, farm.farm_name);
       const result = await executeTransaction([action], {
         successTitle: "Rewards Claimed! 💰",
         successDescription: `Successfully claimed from ${farm.farm_name}`,
       });
       if (result.success) {
+        if (preClaim.length > 0) {
+          applyClaimToAccount(accountName, farm.farm_name, preClaim);
+        }
         await refetchStaked();
         onRefresh();
       }
