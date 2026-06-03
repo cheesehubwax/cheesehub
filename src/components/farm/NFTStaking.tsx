@@ -765,10 +765,18 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
       if (ids.length === 0) return;
       const hasPendingClaim =
         stakedNfts.length > 0 &&
-        !!stakerData &&
-        stakerData.claimableBalances.some((b) => parseFloat(String(b.quantity).split(" ")[0]) > 0);
-      const preClaim = hasPendingClaim && stakerData
-        ? claimableBalancesToClaimed(stakerData.claimableBalances)
+        ((liveRewards.some((r) => r.amount > 0)) ||
+          (!!stakerData &&
+            stakerData.claimableBalances.some(
+              (b) => parseFloat(String(b.quantity).split(" ")[0]) > 0,
+            )));
+      const livePreClaim = pendingRewardsToClaimed(liveRewards);
+      const preClaim = hasPendingClaim
+        ? (livePreClaim.length > 0
+            ? livePreClaim
+            : stakerData
+              ? claimableBalancesToClaimed(stakerData.claimableBalances)
+              : [])
         : [];
       const stakeAction = buildStakeNftsAction(accountName, farm.farm_name, ids);
       const actions = hasPendingClaim
