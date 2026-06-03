@@ -35,6 +35,7 @@ import { cn } from "@/lib/utils";
 import { useSquareGridRowHeight } from "@/hooks/useSquareGridRowHeight";
 import { NFTGridCard } from "@/components/shared/NFTGridCard";
 import { claimableBalancesToClaimed, applyClaimToAccount } from "@/lib/farmClaimHistory";
+import { useFarmClaimTotals } from "@/hooks/useFarmClaimTotals";
 
 const TOKEN_LOGO_PLACEHOLDER = "/placeholder.svg";
 const IPFS_GATEWAY = "https://ipfs.io/ipfs/";
