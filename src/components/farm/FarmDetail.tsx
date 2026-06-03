@@ -457,6 +457,27 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
                 })}
               </div>
             )}
+            {(() => {
+              const userClaimed = claimTotals[farm.farm_name];
+              if (!isConnected || !userClaimed || userClaimed.length === 0) return null;
+              return (
+                <div className="mt-4 pt-4 border-t border-cheese/20">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+                    You've claimed (lifetime)
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    {userClaimed.map((c, i) => (
+                      <div key={`${c.contract}:${c.symbol}:${i}`} className="flex items-center gap-1.5 text-sm">
+                        <TokenLogo contract={c.contract} symbol={c.symbol} size="sm" />
+                        <span className="font-mono text-cheese">
+                          {formatAmount(c.amount)} {c.symbol}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       </div>
