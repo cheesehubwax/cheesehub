@@ -6,6 +6,7 @@ import { TokenLogo } from "@/components/TokenLogo";
 import { FarmInfo, FARM_TYPE_LABELS, FarmType } from "@/lib/farm";
 import { useNavigate } from "react-router-dom";
 import { useIpfsImageSrc } from "@/hooks/useIpfsImageSrc";
+import type { ClaimedToken } from "@/lib/farmClaimHistory";
 
 function formatAmount(val: string | number): string {
   const num = typeof val === "string" ? parseFloat(val) : val;
@@ -54,7 +55,7 @@ function getDaysRemaining(expiration: number): string {
   return `${hours}h remaining`;
 }
 
-export function FarmCard({ farm }: { farm: FarmInfo }) {
+export function FarmCard({ farm, userClaimed }: { farm: FarmInfo; userClaimed?: ClaimedToken[] }) {
   const navigate = useNavigate();
   const logo = useIpfsImageSrc(farm.logo);
   const status = getStatusInfo(farm);
@@ -112,6 +113,25 @@ export function FarmCard({ farm }: { farm: FarmInfo }) {
                 </span>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* User's lifetime claimed (only if connected & ever claimed) */}
+        {userClaimed && userClaimed.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-cheese/20">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
+              You've claimed
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {userClaimed.map((c, i) => (
+                <div key={`${c.contract}:${c.symbol}:${i}`} className="flex items-center gap-1 text-xs">
+                  <TokenLogo contract={c.contract} symbol={c.symbol} size="sm" />
+                  <span className="font-mono text-cheese">
+                    {formatAmount(c.amount)} {c.symbol}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
