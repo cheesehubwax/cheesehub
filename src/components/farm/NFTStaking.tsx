@@ -1146,7 +1146,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
                           }}
                         />
                         <span className="font-mono text-cheese">
-                          {c.amount.toLocaleString(undefined, { maximumFractionDigits: c.precision })} {c.symbol}
+                          {c.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })} {c.symbol}
                         </span>
                       </div>
                     ))}
