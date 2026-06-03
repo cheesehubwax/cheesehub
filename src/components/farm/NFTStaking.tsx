@@ -35,6 +35,7 @@ import { cn } from "@/lib/utils";
 import { useSquareGridRowHeight } from "@/hooks/useSquareGridRowHeight";
 import { NFTGridCard } from "@/components/shared/NFTGridCard";
 import { claimableBalancesToClaimed, applyClaimToAccount } from "@/lib/farmClaimHistory";
+import { useFarmClaimTotals } from "@/hooks/useFarmClaimTotals";
 
 const TOKEN_LOGO_PLACEHOLDER = "/placeholder.svg";
 const IPFS_GATEWAY = "https://ipfs.io/ipfs/";
@@ -207,6 +208,7 @@ const VirtualGrid = React.memo(function VirtualGrid({
 export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
   const { accountName, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
+  const { totals: claimTotals } = useFarmClaimTotals(accountName);
   const navigate = useNavigate();
 
   const handleNavigateToFarm = useCallback((farmName: string) => {
@@ -1123,6 +1125,35 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
                 Claim Rewards
               </Button>
             </div>
+
+            {(() => {
+              const userClaimed = claimTotals[farm.farm_name];
+              if (!userClaimed || userClaimed.length === 0) return null;
+              return (
+                <div className="mt-4 pt-4 border-t border-cheese/20">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+                    You've claimed (lifetime)
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    {userClaimed.map((c, i) => (
+                      <div key={`${c.contract}:${c.symbol}:${i}`} className="flex items-center gap-1.5 text-sm">
+                        <img
+                          src={c.contract ? getTokenLogoUrl(c.contract, c.symbol) : TOKEN_LOGO_PLACEHOLDER}
+                          alt={c.symbol}
+                          className="w-4 h-4 rounded-full"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = TOKEN_LOGO_PLACEHOLDER;
+                          }}
+                        />
+                        <span className="font-mono text-cheese">
+                          {c.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })} {c.symbol}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       )}
