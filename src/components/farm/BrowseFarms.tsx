@@ -10,11 +10,13 @@ import { fetchAllFarms, FarmInfo, fetchUserGlobalStakes } from "@/lib/farm";
 import { useWax } from "@/context/WaxContext";
 import { useQuery } from "@tanstack/react-query";
 import { FarmCard } from "./FarmCard";
+import { useFarmClaimTotals } from "@/hooks/useFarmClaimTotals";
 
 type SortOption = "newest" | "staked" | "name";
 
 export function BrowseFarms() {
   const { accountName } = useWax();
+  const { totals: claimTotals } = useFarmClaimTotals(accountName);
   const [search, setSearch] = useState("");
   const [activeOnly, setActiveOnly] = useState(true);
   const [stakedOnly, setStakedOnly] = useState(false);
@@ -125,7 +127,11 @@ export function BrowseFarms() {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map(farm => (
-            <FarmCard key={farm.farm_name} farm={farm} />
+            <FarmCard
+              key={farm.farm_name}
+              farm={farm}
+              userClaimed={claimTotals[farm.farm_name]}
+            />
           ))}
         </div>
       )}
