@@ -1125,6 +1125,35 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
                 Claim Rewards
               </Button>
             </div>
+
+            {(() => {
+              const userClaimed = claimTotals[farm.farm_name];
+              if (!userClaimed || userClaimed.length === 0) return null;
+              return (
+                <div className="mt-4 pt-4 border-t border-cheese/20">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+                    You've claimed (lifetime)
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    {userClaimed.map((c, i) => (
+                      <div key={`${c.contract}:${c.symbol}:${i}`} className="flex items-center gap-1.5 text-sm">
+                        <img
+                          src={c.contract ? getTokenLogoUrl(c.contract, c.symbol) : TOKEN_LOGO_PLACEHOLDER}
+                          alt={c.symbol}
+                          className="w-4 h-4 rounded-full"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = TOKEN_LOGO_PLACEHOLDER;
+                          }}
+                        />
+                        <span className="font-mono text-cheese">
+                          {c.amount.toLocaleString(undefined, { maximumFractionDigits: c.precision })} {c.symbol}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       )}
