@@ -818,9 +818,12 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
     setIsUnstaking(true);
     try {
       const ids = Array.from(selectedToUnstake);
-      const preClaim = stakerData
-        ? claimableBalancesToClaimed(stakerData.claimableBalances)
-        : [];
+      const livePreClaim = pendingRewardsToClaimed(liveRewards);
+      const preClaim = livePreClaim.length > 0
+        ? livePreClaim
+        : stakerData
+          ? claimableBalancesToClaimed(stakerData.claimableBalances)
+          : [];
       const claimAction = buildClaimRewardsAction(accountName, farm.farm_name);
       const unstakeAction = buildUnstakeNftsAction(accountName, farm.farm_name, ids);
       const result = await executeTransaction([claimAction, unstakeAction], {
@@ -852,9 +855,12 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
     if (!accountName) return;
     setIsClaiming(true);
     try {
-      const preClaim = stakerData
-        ? claimableBalancesToClaimed(stakerData.claimableBalances)
-        : [];
+      const livePreClaim = pendingRewardsToClaimed(liveRewards);
+      const preClaim = livePreClaim.length > 0
+        ? livePreClaim
+        : stakerData
+          ? claimableBalancesToClaimed(stakerData.claimableBalances)
+          : [];
       const action = buildClaimRewardsAction(accountName, farm.farm_name);
       const result = await executeTransaction([action], {
         successTitle: "Rewards Claimed! 💰",
