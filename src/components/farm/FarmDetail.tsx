@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { TokenLogo } from "@/components/TokenLogo";
 import { useToast } from "@/hooks/use-toast";
 import { useIpfsImageSrc } from "@/hooks/useIpfsImageSrc";
+import { useFarmClaimTotals } from "@/hooks/useFarmClaimTotals";
 import { NFTStaking } from "./NFTStaking";
 import { EditFarmProfile } from "./EditFarmProfile";
 import { OpenFarmDialog } from "./OpenFarmDialog";
@@ -136,6 +137,7 @@ function CreatorInfoBox({ farm, isUnderConstruction, isPermClosed, isExpired, ha
 
 export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
   const { accountName, isConnected, session } = useWax();
+  const { totals: claimTotals } = useFarmClaimTotals(accountName);
   const { toast } = useToast();
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [openFarmOpen, setOpenFarmOpen] = useState(false);
