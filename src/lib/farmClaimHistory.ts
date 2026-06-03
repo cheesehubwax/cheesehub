@@ -394,3 +394,21 @@ export function claimableBalancesToClaimed(
   }
   return out;
 }
+
+/**
+ * Convert UI-computed live pending rewards (`{symbol, amount, contract, precision}`)
+ * into ClaimedToken[] for the lifetime-claimed tracker. Filters out zero/negative
+ * amounts and entries with no symbol.
+ */
+export function pendingRewardsToClaimed(
+  rewards: Array<{ symbol: string; amount: number; contract?: string }> | undefined,
+): ClaimedToken[] {
+  if (!rewards?.length) return [];
+  const out: ClaimedToken[] = [];
+  for (const r of rewards) {
+    if (!r.symbol) continue;
+    if (!Number.isFinite(r.amount) || r.amount <= 0) continue;
+    out.push({ symbol: r.symbol, amount: r.amount, contract: r.contract || "" });
+  }
+  return out;
+}

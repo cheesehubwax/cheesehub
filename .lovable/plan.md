@@ -1,67 +1,32 @@
-## Goal
-Show the connected user's **lifetime total claimed** (per reward token) for each farm they're staked in, on the `/farm` cards — using a one-time Hyperion baseline + locally incremented running total per claim.
+## Problem
 
-## Approach
-1. **First load per account**: fetch full claim history from Hyperion → compute baseline totals → persist locally as the snapshot.
-2. **Every subsequent claim** (made through the app): read the claimed amounts from the successful transaction's traces and **add** them to the local totals — no re-scan needed.
-3. **Display** the running totals on each `FarmCard`.
+After claiming rewards from a farm, the "You've claimed (lifetime)" total in the Rewards Card does not increase.
 
-This means Hyperion is only hit once per account (and on explicit "refresh history"), avoiding repeated heavy queries.
+## Root cause
 
-## Plan
+In `src/components/farm/NFTStaking.tsx`, all three claim paths (`handleClaim`, `handleStake` with pending-claim, `handleUnstake`) compute `preClaim` from `stakerData.claimableBalances`:
 
-### 1. New `src/lib/farmClaimHistory.ts`
-- Types:
-  ```ts
-  type ClaimedToken = { contract: string; symbol: string; amount: number };
-  type ClaimTotals = Record<string /*farm_name*/, ClaimedToken[]>;
-  type ClaimSnapshot = {
-    account: string;
-    totals: ClaimTotals;
-    baselineFetchedAt: number;  // unix ms — when Hyperion baseline was taken
-    lastClaimSeenAt: number;    // unix ms — newest claim included (for future incremental re-syncs if needed)
-    version: 1;
-  };
-  ```
-- Storage: `localStorage` key `cheesehub:farmClaims:v1:<account>`. Helpers: `loadSnapshot(account)`, `saveSnapshot(snap)`, `clearSnapshot(account)`.
-- `fetchBaselineFromHyperion(account)`:
-  - Hits `get_actions` on the same Hyperion fallback list used in `src/lib/waxRpcFallback.ts`.
-  - Filters: `account={account}`, `act.account=farms.waxdao`, `act.name=claim`, page size 1000, paginate until empty or 10 pages.
-  - For each claim action, walk `inline_traces` (Hyperion v2 `notified` / `action_traces`) for `transfer` actions where `to === account`, parse the asset, attribute to `act.data.farm_name`. Sum into `ClaimTotals`.
-  - Returns `{ totals, lastClaimSeenAt }` or throws on full-fallback failure.
-- `addClaimToTotals(snap, farmName, claimed: ClaimedToken[])`: pure merge — sum into existing per-`(contract,symbol)` entry or append new.
-- `useFarmClaimTotals(account)` hook:
-  - On mount: if `loadSnapshot(account)` exists → return it.
-  - Else: call `fetchBaselineFromHyperion`, save snapshot, return it.
-  - Exposes `{ totals, isLoading, error, refetchBaseline, applyClaim(farmName, claimed) }`.
-  - `applyClaim` updates state + `saveSnapshot` (single source of truth).
+```ts
+const preClaim = claimableBalancesToClaimed(stakerData.claimableBalances);
+```
 
-### 2. Hook the claim transaction
-- In `src/components/farm/NFTStaking.tsx`, after the existing `claim` transaction resolves successfully:
-  - Parse the resulting tx traces (already returned by `useWaxTransaction` / wharfkit response) for `transfer` actions where `to === accountName`, build `ClaimedToken[]`.
-  - Call `applyClaim(farmName, claimedTokens)` from the hook (or dispatch through a tiny context if cleaner).
-- If the tx response doesn't expose inline transfers reliably, fall back to using the `claimable_balances` snapshot read **immediately before** sending the claim (already available in `NFTStaking`) — that value equals what gets transferred.
+But `claimable_balances` from the contract is the **base** amount and is only materialized when state changes. Between stake/claim/unstake events it typically reads `0.0000 SYMBOL`. The actual payout the user receives is the live-accrued value: `base + ratePerHour × hoursElapsed`, which the UI already calculates into `liveRewards`.
 
-### 3. `src/components/farm/FarmCard.tsx`
-- Add optional prop `userClaimed?: ClaimedToken[]`.
-- When present and non-empty, render above the "View Details" button:
-  - `border-t border-cheese/20 pt-2 mt-2`
-  - Label: `text-[10px] uppercase tracking-wider text-muted-foreground` → "You've claimed"
-  - Tokens: `flex flex-wrap gap-2` with `<TokenLogo size="sm" />` + `formatAmount(amount)` + symbol in `text-cheese font-mono text-xs`.
-- Undefined/empty → render nothing (no layout shift for non-stakers).
+So in normal usage `preClaim` is empty → `applyClaimToAccount` no-ops → the lifetime total never grows.
 
-### 4. Wire into list + featured card
-- `src/components/farm/BrowseFarms.tsx`: call `useFarmClaimTotals(accountName)`, pass `userClaimed={totals[farm.farm_name]}` into each `<FarmCard />`.
-- `src/pages/Farm.tsx`: same hook, pass `userClaimed={totals["cheesefarm"]}` into the featured card.
+## Fix
 
-### 5. UX details
-- One-time baseline fetch shows no blocking spinner on the card — totals simply appear when ready. A subtle `🔄` icon in the BrowseFarms filter row triggers `refetchBaseline()` if the user ever wants to resync from Hyperion.
-- On wallet change: snapshot is account-scoped, so switching wallets uses a different key (no leakage).
+Use the live-computed accrued rewards (`liveRewards`) as the source for `preClaim`, falling back to `claimableBalances` only if `liveRewards` is empty.
 
-## Risks / notes
-- **Local-only persistence**: totals live in the browser. Different browser/device = re-baseline from Hyperion (fine, that's the original cost). Documented in the refresh tooltip.
-- **Missed claims outside the app** (e.g. user claims via waxblock or another dapp between sessions): would be missed by the incremental updater. Mitigation: when the snapshot's `baselineFetchedAt` is older than 24h, automatically re-baseline in the background. This keeps it accurate without spamming Hyperion.
-- **Hyperion inline-trace shape** varies slightly across mirrors — parser handles both `action_traces[].act.data` and the v2 `notified` field, skipping anything it can't parse.
+Add a small helper (in `src/lib/farmClaimHistory.ts`) to convert `PendingReward[]` (`{symbol, amount, contract, precision}`) into `ClaimedToken[]`, filtering out zero/negative amounts and entries with no symbol.
+
+Update the three claim sites in `NFTStaking.tsx` to build `preClaim` from `liveRewards` via this new helper.
+
+## Files to change
+
+- `src/lib/farmClaimHistory.ts` — add `pendingRewardsToClaimed(rewards)` helper.
+- `src/components/farm/NFTStaking.tsx` — replace `claimableBalancesToClaimed(stakerData.claimableBalances)` with `pendingRewardsToClaimed(liveRewards)` (with a fallback to the existing call when `liveRewards` is empty) in `handleClaim`, `handleStake`, and `handleUnstake`. Update `hasPendingClaim` in `handleStake` to also consider `liveRewards`.
 
 ## Out of scope
-- No server-side store; no contract changes; no USD value; no UI changes to the claim flow itself; no "since last stake" windowing (still lifetime per account per farm).
+
+No changes to the Hyperion baseline fetch, storage schema, or the FarmDetail display.
