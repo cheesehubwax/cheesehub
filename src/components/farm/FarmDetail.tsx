@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { TokenLogo } from "@/components/TokenLogo";
 import { useToast } from "@/hooks/use-toast";
 import { useIpfsImageSrc } from "@/hooks/useIpfsImageSrc";
+import { useFarmClaimTotals } from "@/hooks/useFarmClaimTotals";
 import { NFTStaking } from "./NFTStaking";
 import { EditFarmProfile } from "./EditFarmProfile";
 import { OpenFarmDialog } from "./OpenFarmDialog";
@@ -136,6 +137,7 @@ function CreatorInfoBox({ farm, isUnderConstruction, isPermClosed, isExpired, ha
 
 export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
   const { accountName, isConnected, session } = useWax();
+  const { totals: claimTotals } = useFarmClaimTotals(accountName);
   const { toast } = useToast();
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const [openFarmOpen, setOpenFarmOpen] = useState(false);
@@ -455,6 +457,27 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
                 })}
               </div>
             )}
+            {(() => {
+              const userClaimed = claimTotals[farm.farm_name];
+              if (!isConnected || !userClaimed || userClaimed.length === 0) return null;
+              return (
+                <div className="mt-4 pt-4 border-t border-cheese/20">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+                    You've claimed (lifetime)
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    {userClaimed.map((c, i) => (
+                      <div key={`${c.contract}:${c.symbol}:${i}`} className="flex items-center gap-1.5 text-sm">
+                        <TokenLogo contract={c.contract} symbol={c.symbol} size="sm" />
+                        <span className="font-mono text-cheese">
+                          {formatAmount(c.amount)} {c.symbol}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       </div>
