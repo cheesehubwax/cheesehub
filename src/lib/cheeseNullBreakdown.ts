@@ -1,5 +1,7 @@
 // Fetches per-contract null breakdown from Hyperion + on-chain stats
 
+import { fetchContractStats, parseAssetAmount } from './cheeseNullApi';
+
 const HYPERION_ENDPOINTS = [
   'https://wax.eosusa.io/v2/history/get_actions',
   'https://wax.hivebp.io/v2/history/get_actions',
@@ -136,6 +138,18 @@ async function fetchCheesepowerzNulled(): Promise<number> {
 async function fetchContractNulled(account: string): Promise<number> {
   if (account === 'cheesepowerz') {
     return fetchCheesepowerzNulled();
+  }
+  if (account === 'cheeseburner') {
+    // Authoritative on-chain counter incremented by the burn action itself.
+    // Avoids Hyperion gaps/lag and the 50k action cap.
+    try {
+      const stats = await fetchContractStats(account);
+      if (stats && stats.total_cheese_burned) {
+        return parseAssetAmount(stats.total_cheese_burned);
+      }
+    } catch {
+      // fall through to Hyperion
+    }
   }
   return fetchContractNulledFromHyperion(account);
 }
