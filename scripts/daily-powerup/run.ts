@@ -13,7 +13,7 @@ const ALLOWLIST = (process.env.ALLOWLIST ?? "")
   .map(s => s.trim())
   .filter(Boolean);
 
-const MIN_STAKED = 1000; // CHEESE
+const MIN_STAKED = 5000; // CHEESE
 const BATCH_SIZE = 50;
 const MAX_BISECT_OPS = 20;
 const POWERUP_TARGET = "cheesepowerz";

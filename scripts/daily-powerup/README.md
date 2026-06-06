@@ -1,6 +1,6 @@
 # Daily CHEESE Powerup
 
-Off-chain cron that powers up every `cheesecheese` staker with >= 1000 CHEESE
+Off-chain cron that powers up every `cheesecheese` staker with >= 5000 CHEESE
 staked, plus the signing account itself, once per day at 00:00 UTC.
 
 ## What it does
@@ -8,7 +8,7 @@ staked, plus the signing account itself, once per day at 00:00 UTC.
 1. **Self-powerup** — `power.chz` -> `cheesepowerz`, 1 CHEESE, memo `power.chz`,
    so the signing account has CPU to send the rest.
 2. Reads every row of `cheesecheese::staketable`.
-3. Keeps accounts with `staked >= 1000 CHEESE` (excludes the signer).
+3. Keeps accounts with `staked >= 5000 CHEESE` (excludes the signer).
 4. Pre-validates each account exists on-chain.
 5. Sends `1.0000 CHEESE` from `power.chz` -> `cheesepowerz` with the staker's
    account name as the memo (CPU-only powerup).
