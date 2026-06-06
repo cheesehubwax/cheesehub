@@ -1,0 +1,45 @@
+name: Daily CHEESE Powerup
+
+on:
+  schedule:
+    # 00:00 UTC every day. GitHub cron can drift up to ~15 min.
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Set to '1' to skip all transactions"
+        required: false
+        default: "0"
+      allowlist:
+        description: "Optional comma-separated account allowlist"
+        required: false
+        default: ""
+
+concurrency:
+  group: daily-powerup
+  cancel-in-progress: false
+
+jobs:
+  powerup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install deps
+        working-directory: scripts/daily-powerup
+        run: bun install
+
+      - name: Run daily powerup
+        working-directory: scripts/daily-powerup
+        env:
+          WAX_SIGNER_ACCOUNT: ${{ vars.WAX_SIGNER_ACCOUNT }}
+          WAX_SIGNER_PERMISSION: ${{ vars.WAX_SIGNER_PERMISSION }}
+          WAX_DAILYPOWER_KEY: ${{ secrets.WAX_DAILYPOWER_KEY }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          ALLOWLIST: ${{ github.event.inputs.allowlist }}
+        run: bun run run.ts
