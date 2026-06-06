@@ -1,0 +1,13 @@
+{
+  "name": "daily-powerup",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun run run.ts"
+  },
+  "dependencies": {
+    "@wharfkit/antelope": "^1.0.13",
+    "@wharfkit/session": "^1.4.0",
+    "@wharfkit/wallet-plugin-privatekey": "^1.1.0"
+  }
+}
