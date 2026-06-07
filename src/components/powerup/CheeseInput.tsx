@@ -9,6 +9,10 @@ interface CheeseInputProps {
   label?: string;
   icon?: ReactNode;
   accentColor?: "cpu" | "net" | "cheese";
+  tokenSymbol?: string;
+  tokenLogo?: string;
+  showBalance?: boolean;
+  decimals?: number;
 }
 
 export const CheeseInput = ({
@@ -17,7 +21,11 @@ export const CheeseInput = ({
   balance = 0,
   label = "You spend",
   icon,
-  accentColor = "cheese"
+  accentColor = "cheese",
+  tokenSymbol = "CHEESE",
+  tokenLogo = cheeseLogo,
+  showBalance = true,
+  decimals = 4,
 }: CheeseInputProps) => {
   const [isFocused, setIsFocused] = useState(false);
 
@@ -40,9 +48,11 @@ export const CheeseInput = ({
             {icon}
             <span className="text-sm font-medium text-foreground">{label}</span>
           </div>
-          <span className="text-sm text-muted-foreground">
-            Balance: <span className="text-foreground font-mono">{balance.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</span>
-          </span>
+          {showBalance && (
+            <span className="text-sm text-muted-foreground">
+              Balance: <span className="text-foreground font-mono">{balance.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}</span>
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-4">
@@ -60,8 +70,8 @@ export const CheeseInput = ({
           </div>
 
           <div className="flex items-center gap-2 bg-secondary/50 px-3 py-2 rounded-xl border border-border/50">
-            <img src={cheeseLogo} alt="CHEESE" className="w-6 h-6" />
-            <span className="font-bold text-foreground">CHEESE</span>
+            <img src={tokenLogo} alt={tokenSymbol} className="w-6 h-6" />
+            <span className="font-bold text-foreground">{tokenSymbol}</span>
           </div>
         </div>
       </div>

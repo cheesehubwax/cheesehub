@@ -5,9 +5,6 @@ import { CheeseInput } from "./CheeseInput";
 import { ResourceEstimate } from "./ResourceEstimate";
 import { RecipientInput } from "./RecipientInput";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Cpu, Wifi } from "lucide-react";
 import { toast } from "sonner";
 import { usePowerupEstimate } from "@/hooks/usePowerupEstimate";
 import { useCheesePriceData } from "@/hooks/useCheesePriceData";
@@ -21,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { TokenLogo } from "@/components/TokenLogo";
 import cheeseUpOrb from "@/assets/cheeseup.png";
+import waxCoin from "@/assets/wax-coin.png";
 
 interface SuccessDetails {
   cpuMs: number;
@@ -283,49 +281,27 @@ export const PowerUpCard = ({
         </TabsContent>
 
         <TabsContent value="wax" className="space-y-4 mt-4">
-          <div className="p-3 bg-muted/30 rounded-lg text-xs text-muted-foreground">
-            Rent resources using WAX PowerUp. Resources are rented for 24 hours and are non-refundable.
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="flex items-center gap-1.5 text-sm">
-                <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
-                CPU (WAX)
-              </Label>
-              <Input
-                type="number"
-                placeholder="0.00"
-                value={waxCpuAmount}
-                onChange={(e) => setWaxCpuAmount(e.target.value)}
-                min={0}
-                step={0.00000001}
-                disabled={isTransacting}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="flex items-center gap-1.5 text-sm">
-                <Wifi className="h-3.5 w-3.5 text-muted-foreground" />
-                NET (WAX)
-              </Label>
-              <Input
-                type="number"
-                placeholder="0.00"
-                value={waxNetAmount}
-                onChange={(e) => setWaxNetAmount(e.target.value)}
-                min={0}
-                step={0.00000001}
-                disabled={isTransacting}
-              />
-            </div>
-          </div>
-          {totalWax > 0 && (
-            <div className="p-3 rounded-lg bg-muted/30 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Total</span>
-                <span className="font-medium">{totalWax.toFixed(8)} WAX</span>
-              </div>
-            </div>
-          )}
+          <CheeseInput
+            value={waxCpuAmount}
+            onChange={setWaxCpuAmount}
+            label="CPU Power"
+            icon={<span className="text-lg">🖥️</span>}
+            accentColor="cpu"
+            tokenSymbol="WAX"
+            tokenLogo={waxCoin}
+            showBalance={false}
+          />
+
+          <CheeseInput
+            value={waxNetAmount}
+            onChange={setWaxNetAmount}
+            label="NET Bandwidth"
+            icon={<span className="text-lg">📡</span>}
+            accentColor="net"
+            tokenSymbol="WAX"
+            tokenLogo={waxCoin}
+            showBalance={false}
+          />
         </TabsContent>
       </Tabs>
 
