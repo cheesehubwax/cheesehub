@@ -13,11 +13,27 @@ const ALLOWLIST = (process.env.ALLOWLIST ?? "")
   .map(s => s.trim())
   .filter(Boolean);
 
-const MIN_STAKED = 5000; // CHEESE
+// Tunable via repo Variables / workflow_dispatch inputs. Empty string => default.
+const MIN_STAKED_RAW = process.env.MIN_STAKED?.trim();
+const POWERUP_AMOUNT_RAW = process.env.POWERUP_AMOUNT?.trim();
+const MIN_STAKED = Number(MIN_STAKED_RAW && MIN_STAKED_RAW.length > 0 ? MIN_STAKED_RAW : "5000");
+const POWERUP_AMOUNT = Number(
+  POWERUP_AMOUNT_RAW && POWERUP_AMOUNT_RAW.length > 0 ? POWERUP_AMOUNT_RAW : "1.0000"
+);
+
+if (!Number.isFinite(MIN_STAKED) || MIN_STAKED < 0) {
+  throw new Error(`Invalid MIN_STAKED=${process.env.MIN_STAKED}; must be a finite number >= 0`);
+}
+if (!Number.isFinite(POWERUP_AMOUNT) || POWERUP_AMOUNT <= 0 || POWERUP_AMOUNT > 100) {
+  throw new Error(
+    `Invalid POWERUP_AMOUNT=${process.env.POWERUP_AMOUNT}; must be a finite number in (0, 100]`
+  );
+}
+
 const BATCH_SIZE = 50;
 const MAX_BISECT_OPS = 20;
 const POWERUP_TARGET = "cheesepowerz";
-const TRANSFER_AMOUNT = "1.0000 CHEESE";
+const TRANSFER_AMOUNT = `${POWERUP_AMOUNT.toFixed(4)} CHEESE`;
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 const log = (...args: unknown[]) => console.log("[powerup]", ...args);
@@ -92,6 +108,7 @@ async function sendBatchWithBisect(
 
 async function main() {
   log(`signer=${SIGNER}@${PERMISSION} dry_run=${DRY_RUN} allowlist=${ALLOWLIST.length}`);
+  log(`config: min_staked=${MIN_STAKED} CHEESE, per_account=${TRANSFER_AMOUNT}`);
 
   if (!DRY_RUN && !PRIVATE_KEY) {
     throw new Error("WAX_DAILYPOWER_KEY env var is required");
@@ -120,7 +137,7 @@ async function main() {
   if (skipped.length) log(`skipping ${skipped.length} missing accounts:`, skipped.join(","));
   log(`valid stakers: ${valid.length}`);
 
-  const totalCheese = (valid.length + 1).toFixed(4);
+  const totalCheese = ((valid.length + 1) * POWERUP_AMOUNT).toFixed(4);
   log(`projected CHEESE spend: ${totalCheese} (incl. self-powerup)`);
 
   if (DRY_RUN) {
@@ -160,7 +177,7 @@ async function main() {
   log(`sent:        ${stats.sent.length}`);
   log(`failed:      ${stats.failed.length}`);
   log(`txs:         ${stats.txIds.length + 1} (including self-powerup)`);
-  log(`cheese spent (approx): ${(stats.sent.length + 1).toFixed(4)} CHEESE`);
+  log(`cheese spent (approx): ${((stats.sent.length + 1) * POWERUP_AMOUNT).toFixed(4)} CHEESE`);
   log("tx ids:");
   log(`  self-powerup: ${selfStats.txIds[0]}`);
   for (const id of stats.txIds) log(`  ${id}`);

@@ -24,6 +24,21 @@ staked, plus the signing account itself, once per day at 00:00 UTC.
 | `WAX_DAILYPOWER_KEY`    | GH repo **secret**          | WIF private key for the permission.           |
 | `DRY_RUN`               | optional                    | `1` = no transactions, just print plan.       |
 | `ALLOWLIST`             | optional                    | Comma-separated accounts to restrict to.      |
+| `MIN_STAKED`            | optional GH repo variable   | Eligibility cutoff in CHEESE. Default `5000`. |
+| `POWERUP_AMOUNT`        | optional GH repo variable   | CHEESE sent per account. Default `1.0000`. Sanity-capped to `(0, 100]`. Rounded to 4 decimals. |
+
+## Tuning the amount / threshold
+
+Two ways to change them without editing code:
+
+1. **Persistent** — GitHub → repo Settings → Secrets and variables → Actions → Variables tab.
+   Set `MIN_STAKED` and/or `POWERUP_AMOUNT`. Applied to every scheduled run.
+2. **One-off** — Actions tab → "Daily CHEESE Powerup" → Run workflow.
+   Fill `powerup_amount` and/or `min_staked` inputs; they override the repo variables for that
+   run only. Leave empty to fall back to the repo variable, then the built-in default.
+
+`POWERUP_AMOUNT` is rounded to 4 decimals (CHEESE precision) and rejected if it isn't a finite
+number in `(0, 100]`. `MIN_STAKED` must be a finite number `>= 0`.
 
 ## One-time setup on the signing account
 
