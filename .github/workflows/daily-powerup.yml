@@ -14,6 +14,14 @@ on:
         description: "Optional comma-separated account allowlist"
         required: false
         default: ""
+      powerup_amount:
+        description: "Override CHEESE per account (e.g. 1.0000). Empty = use repo var or default 1.0000"
+        required: false
+        default: ""
+      min_staked:
+        description: "Override min staked CHEESE eligibility (e.g. 5000). Empty = use repo var or default 5000"
+        required: false
+        default: ""
 
 concurrency:
   group: daily-powerup
@@ -42,4 +50,6 @@ jobs:
           WAX_DAILYPOWER_KEY: ${{ secrets.WAX_DAILYPOWER_KEY }}
           DRY_RUN: ${{ github.event.inputs.dry_run }}
           ALLOWLIST: ${{ github.event.inputs.allowlist }}
+          MIN_STAKED: ${{ github.event.inputs.min_staked || vars.MIN_STAKED }}
+          POWERUP_AMOUNT: ${{ github.event.inputs.powerup_amount || vars.POWERUP_AMOUNT }}
         run: bun run run.ts
