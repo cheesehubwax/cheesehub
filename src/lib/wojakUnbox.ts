@@ -23,7 +23,7 @@ export const WOJAK_PACK_TEMPLATE = '515930';
 export function buildUnboxAction(
   user: string,
   packAssetId: string,
-  permission: { actor: string; permission: string }
+  permission: unknown
 ) {
   return {
     account: 'atomicassets',
