@@ -40,55 +40,105 @@ function pickImage(data: Record<string, string | undefined> | undefined): string
 }
 
 /**
- * Fetch every staker row for a single farm. The `stakers` table is scoped
- * by farm name on the V2 farms.waxdao contract, so a scoped query returns
- * only that farm's stakers without any client-side filtering.
+ * Fetch every staker row for a single farm.
+ *
+ * On farms.waxdao V2 the `stakers` table is scoped by the **contract**, not
+ * by farm name (each row carries a `farmname` field). The `stakednfts` table
+ * is scoped by farm name with one row per staked asset.
+ *
+ * Strategy:
+ *   1. Paginate `stakednfts` (scope = farmName) and group by owner. Cheap & correct.
+ *   2. Fallback: paginate the global `stakers` table (scope = FARM_CONTRACT)
+ *      and keep rows matching this farm.
  */
 export async function fetchFarmStakers(farmName: string): Promise<FarmStakerRow[]> {
-  const out: FarmStakerRow[] = [];
-  let lowerBound: string | undefined = undefined;
-  let iterations = 0;
+  const byUser = new Map<string, Set<string>>();
+  const addAsset = (user: string, assetId: string) => {
+    const u = user.trim();
+    const id = String(assetId).trim();
+    if (!u || !id) return;
+    let set = byUser.get(u);
+    if (!set) {
+      set = new Set();
+      byUser.set(u, set);
+    }
+    set.add(id);
+  };
+
   const MAX_ITERATIONS = 20;
   const PAGE_SIZE = 1000;
 
-  while (iterations < MAX_ITERATIONS) {
-    const res = await fetchTableRows<Record<string, unknown>>({
-      code: FARM_CONTRACT,
-      scope: farmName,
-      table: "stakers",
-      limit: PAGE_SIZE,
-      ...(lowerBound ? { lower_bound: lowerBound } : {}),
-    });
-
-    const rows = res.rows || [];
-    for (const row of rows) {
-      const user = String(row.user || row.staker || row.owner || "").trim();
-      const rawIds = (row.asset_ids || row.staked_assets || row.assets || []) as Array<string | number>;
-      const assetIds = Array.isArray(rawIds) ? rawIds.map(id => String(id)).filter(Boolean) : [];
-      if (!user || assetIds.length === 0) continue;
-
-      // Same wallet can theoretically appear multiple times; merge.
-      const existing = out.find(r => r.user === user);
-      if (existing) {
-        for (const id of assetIds) {
-          if (!existing.assetIds.includes(id)) existing.assetIds.push(id);
-        }
-      } else {
-        out.push({ user, assetIds });
+  // Strategy 1: stakednfts scoped by farmName, one row per asset.
+  try {
+    let lowerBound: string | undefined = undefined;
+    let iterations = 0;
+    while (iterations < MAX_ITERATIONS) {
+      const res = await fetchTableRows<Record<string, unknown>>({
+        code: FARM_CONTRACT,
+        scope: farmName,
+        table: "stakednfts",
+        limit: PAGE_SIZE,
+        ...(lowerBound ? { lower_bound: lowerBound } : {}),
+      });
+      const rows = res.rows || [];
+      for (const row of rows) {
+        const owner = String(row.owner || row.staker || row.user || row.wallet || "").trim();
+        const assetId = row.asset_id ?? row.assetid ?? row.id;
+        if (!owner || assetId == null) continue;
+        addAsset(owner, String(assetId));
       }
+      if (!res.more || rows.length === 0) break;
+      const last = rows[rows.length - 1] as Record<string, unknown>;
+      const lastKey = last.asset_id ?? last.assetid ?? last.id;
+      if (lastKey == null) break;
+      // Advance past the last asset_id (numeric primary key).
+      const next = BigInt(String(lastKey)) + 1n;
+      lowerBound = next.toString();
+      iterations++;
     }
-
-    if (!res.more || rows.length === 0) break;
-    const last = rows[rows.length - 1] as Record<string, unknown>;
-    const lastKey = last.user ?? last.staker ?? last.owner ?? last.ID ?? last.id;
-    if (lastKey == null) break;
-    // PostgREST-style: advance just past the last key. For `name` PKs the
-    // RPC will accept the same name and return overlapping rows; dedupe above.
-    lowerBound = String(lastKey);
-    iterations++;
+  } catch (e) {
+    console.warn("[fetchFarmStakers] stakednfts strategy failed:", e);
   }
 
-  // Sort by staked count desc
+  // Strategy 2: fall back to global stakers table if stakednfts yielded nothing.
+  if (byUser.size === 0) {
+    try {
+      let upperBound: string | undefined = undefined;
+      let iterations = 0;
+      while (iterations < MAX_ITERATIONS) {
+        const res = await fetchTableRows<Record<string, unknown>>({
+          code: FARM_CONTRACT,
+          scope: FARM_CONTRACT,
+          table: "stakers",
+          limit: PAGE_SIZE,
+          reverse: true,
+          ...(upperBound ? { upper_bound: upperBound } : {}),
+        });
+        const rows = res.rows || [];
+        for (const row of rows) {
+          const rowFarm = (row.farmname || row.farm_name || "") as string;
+          if (rowFarm !== farmName) continue;
+          const user = String(row.user || row.staker || row.owner || "").trim();
+          const rawIds = (row.asset_ids || row.staked_assets || row.assets || []) as Array<string | number>;
+          if (!user || !Array.isArray(rawIds)) continue;
+          for (const id of rawIds) addAsset(user, String(id));
+        }
+        if (!res.more || rows.length === 0) break;
+        const last = rows[rows.length - 1] as Record<string, unknown>;
+        const lastId = Number(last.ID ?? last.id);
+        if (!Number.isFinite(lastId)) break;
+        upperBound = String(lastId - 1);
+        iterations++;
+      }
+    } catch (e) {
+      console.warn("[fetchFarmStakers] global stakers fallback failed:", e);
+    }
+  }
+
+  const out: FarmStakerRow[] = Array.from(byUser.entries()).map(([user, set]) => ({
+    user,
+    assetIds: Array.from(set),
+  }));
   out.sort((a, b) => b.assetIds.length - a.assetIds.length);
   return out;
 }
