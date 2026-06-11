@@ -1,6 +1,7 @@
 // Fetch the list of stakers for a single farm + per-asset thumbnails.
-// Uses the farms.waxdao `stakers` table (scoped by farm name) and the
-// AtomicAssets API for asset metadata.
+// Uses the farms.waxdao `stakednfts` / `stakers` tables and the
+// AtomicAssets API for asset metadata. Asset metadata is memoised at the
+// module level so repeated views & row expansions are free.
 
 import { fetchTableRows } from "./waxRpcFallback";
 import { fetchWithFallback } from "./fetchWithFallback";
@@ -39,6 +40,21 @@ function pickImage(data: Record<string, string | undefined> | undefined): string
   return toImageUrl(img);
 }
 
+// Module-level memo so the same asset id is never re-fetched within a session.
+// Keyed by asset_id. Bounded loosely — at ~250 bytes per entry this is fine
+// well past 10k unique assets.
+const assetMetaMemo = new Map<string, StakerAssetMeta>();
+
+/** Read whatever asset metadata is already cached (no network). */
+export function getCachedAssets(assetIds: string[]): Map<string, StakerAssetMeta> {
+  const out = new Map<string, StakerAssetMeta>();
+  for (const id of assetIds) {
+    const v = assetMetaMemo.get(id);
+    if (v) out.set(id, v);
+  }
+  return out;
+}
+
 /**
  * Fetch every staker row for a single farm.
  *
@@ -51,6 +67,12 @@ function pickImage(data: Record<string, string | undefined> | undefined): string
  *   2. Fallback: paginate the global `stakers` table (scope = FARM_CONTRACT)
  *      and keep rows matching this farm.
  */
+// Safety cap: stop scanning after ~50k assets. Prevents a runaway loop if
+// a contract ever returns `more: true` indefinitely. Real farms stay well
+// under this.
+const MAX_STAKEDNFTS_PAGES = 50;
+const MAX_GLOBAL_STAKERS_PAGES = 20;
+
 export async function fetchFarmStakers(farmName: string): Promise<FarmStakerRow[]> {
   const byUser = new Map<string, Set<string>>();
   const addAsset = (user: string, assetId: string) => {
@@ -65,14 +87,13 @@ export async function fetchFarmStakers(farmName: string): Promise<FarmStakerRow[
     set.add(id);
   };
 
-  const MAX_ITERATIONS = 20;
   const PAGE_SIZE = 1000;
 
   // Strategy 1: stakednfts scoped by farmName, one row per asset.
   try {
     let lowerBound: string | undefined = undefined;
     let iterations = 0;
-    while (iterations < MAX_ITERATIONS) {
+    while (iterations < MAX_STAKEDNFTS_PAGES) {
       const res = await fetchTableRows<Record<string, unknown>>({
         code: FARM_CONTRACT,
         scope: farmName,
@@ -105,7 +126,7 @@ export async function fetchFarmStakers(farmName: string): Promise<FarmStakerRow[
     try {
       let upperBound: string | undefined = undefined;
       let iterations = 0;
-      while (iterations < MAX_ITERATIONS) {
+      while (iterations < MAX_GLOBAL_STAKERS_PAGES) {
         const res = await fetchTableRows<Record<string, unknown>>({
           code: FARM_CONTRACT,
           scope: FARM_CONTRACT,
@@ -145,47 +166,53 @@ export async function fetchFarmStakers(farmName: string): Promise<FarmStakerRow[
 
 /**
  * Fetch metadata + image for a batch of asset IDs from AtomicAssets.
- * Mirrors the batching pattern used in useUserNFTs.
+ * Memoised per asset id — only ids missing from the in-memory cache are
+ * actually requested over the network. Returns a map covering every
+ * requested id that resolved successfully.
  */
 export async function fetchAssetsMetadata(assetIds: string[]): Promise<Map<string, StakerAssetMeta>> {
-  const out = new Map<string, StakerAssetMeta>();
-  if (assetIds.length === 0) return out;
+  if (assetIds.length === 0) return new Map();
 
   const unique = Array.from(new Set(assetIds));
-  const batchSize = 50;
-  const batches: string[][] = [];
-  for (let i = 0; i < unique.length; i += batchSize) {
-    batches.push(unique.slice(i, i + batchSize));
-  }
+  const missing = unique.filter(id => !assetMetaMemo.has(id));
 
-  const parallelLimit = 3;
-  for (let i = 0; i < batches.length; i += parallelLimit) {
-    const group = batches.slice(i, i + parallelLimit);
-    await Promise.all(
-      group.map(async (batch) => {
-        try {
-          const path = `${ATOMIC_API.paths.assets}?ids=${batch.join(",")}&limit=${batch.length}`;
-          const response = await fetchWithFallback(ATOMIC_API.baseUrls, path);
-          const json = await response.json();
-          if (!json?.success || !Array.isArray(json.data)) return;
+  if (missing.length > 0) {
+    const batchSize = 50;
+    const batches: string[][] = [];
+    for (let i = 0; i < missing.length; i += batchSize) {
+      batches.push(missing.slice(i, i + batchSize));
+    }
 
-          for (const asset of json.data) {
-            const data = { ...(asset.immutable_data || {}), ...(asset.data || {}) } as Record<string, string | undefined>;
-            out.set(String(asset.asset_id), {
-              asset_id: String(asset.asset_id),
-              name: data.name || asset.name || `NFT #${asset.asset_id}`,
-              image: pickImage(data),
-              collection: asset.collection?.collection_name || "",
-              template_id: asset.template?.template_id || "",
-              mint: asset.template_mint || "",
-            });
+    const parallelLimit = 3;
+    for (let i = 0; i < batches.length; i += parallelLimit) {
+      const group = batches.slice(i, i + parallelLimit);
+      await Promise.all(
+        group.map(async (batch) => {
+          try {
+            const path = `${ATOMIC_API.paths.assets}?ids=${batch.join(",")}&limit=${batch.length}`;
+            const response = await fetchWithFallback(ATOMIC_API.baseUrls, path);
+            const json = await response.json();
+            if (!json?.success || !Array.isArray(json.data)) return;
+
+            for (const asset of json.data) {
+              const data = { ...(asset.immutable_data || {}), ...(asset.data || {}) } as Record<string, string | undefined>;
+              const meta: StakerAssetMeta = {
+                asset_id: String(asset.asset_id),
+                name: data.name || asset.name || `NFT #${asset.asset_id}`,
+                image: pickImage(data),
+                collection: asset.collection?.collection_name || "",
+                template_id: asset.template?.template_id || "",
+                mint: asset.template_mint || "",
+              };
+              assetMetaMemo.set(meta.asset_id, meta);
+            }
+          } catch (err) {
+            console.warn("[fetchAssetsMetadata] batch failed:", err);
           }
-        } catch (err) {
-          console.warn("[fetchAssetsMetadata] batch failed:", err);
-        }
-      })
-    );
+        })
+      );
+    }
   }
 
-  return out;
+  return getCachedAssets(unique);
 }

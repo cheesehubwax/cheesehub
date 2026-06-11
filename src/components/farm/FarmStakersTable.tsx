@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +10,7 @@ import {
   HoverCard, HoverCardContent, HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { Users, RefreshCw, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
-import { useFarmStakers } from "@/hooks/useFarmStakers";
+import { useFarmStakers, useStakerAssetMeta } from "@/hooks/useFarmStakers";
 import type { StakerAssetMeta } from "@/lib/farmStakers";
 
 interface FarmStakersTableProps {
@@ -18,6 +18,7 @@ interface FarmStakersTableProps {
 }
 
 const PREVIEW_LIMIT = 8;
+const ROW_PAGE_SIZE = 50;
 
 function Thumb({ assetId, meta }: { assetId: string; meta?: StakerAssetMeta }) {
   const img = meta?.image && !meta.image.includes("placeholder") ? meta.image : null;
@@ -63,18 +64,44 @@ function Thumb({ assetId, meta }: { assetId: string; meta?: StakerAssetMeta }) {
 function StakerRow({
   user,
   assetIds,
-  assets,
 }: {
   user: string;
   assetIds: string[];
-  assets: Map<string, StakerAssetMeta>;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const visible = expanded ? assetIds : assetIds.slice(0, PREVIEW_LIMIT);
+  const [inView, setInView] = useState(false);
+  const rowRef = useRef<HTMLTableRowElement>(null);
+
+  // Reveal & fetch metadata only once the row scrolls near the viewport.
+  useEffect(() => {
+    if (inView || !rowRef.current) return;
+    const el = rowRef.current;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setInView(true);
+            io.disconnect();
+            break;
+          }
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [inView]);
+
+  const visibleIds = expanded ? assetIds : assetIds.slice(0, PREVIEW_LIMIT);
   const overflow = assetIds.length - PREVIEW_LIMIT;
 
+  // Fetch metadata only for the ids currently rendered, and only after the
+  // row is visible. Expanding triggers a second (cached) fetch covering the
+  // remaining ids.
+  const { assets } = useStakerAssetMeta(visibleIds, inView);
+
   return (
-    <TableRow>
+    <TableRow ref={rowRef}>
       <TableCell className="p-2 align-top">
         <a
           href={`https://waxblock.io/account/${user}`}
@@ -90,7 +117,7 @@ function StakerRow({
       </TableCell>
       <TableCell className="p-2 align-top">
         <div className="flex flex-wrap gap-1.5">
-          {visible.map(id => (
+          {visibleIds.map(id => (
             <Thumb key={id} assetId={id} meta={assets.get(id)} />
           ))}
           {!expanded && overflow > 0 && (
@@ -129,9 +156,12 @@ function StakerRow({
 }
 
 export function FarmStakersTable({ farmName }: FarmStakersTableProps) {
-  const { stakers, assets, isLoading, isFetching, error, refetch } = useFarmStakers(farmName, true);
+  const { stakers, isLoading, isFetching, error, refetch } = useFarmStakers(farmName, true);
+  const [visibleCount, setVisibleCount] = useState(ROW_PAGE_SIZE);
 
   const totalStaked = stakers.reduce((sum, s) => sum + s.assetIds.length, 0);
+  const visibleStakers = stakers.slice(0, visibleCount);
+  const hiddenStakers = Math.max(0, stakers.length - visibleStakers.length);
 
   return (
     <Card className="bg-card/80 border-border/50">
@@ -175,11 +205,25 @@ export function FarmStakersTable({ farmName }: FarmStakersTableProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {stakers.map(s => (
-                  <StakerRow key={s.user} user={s.user} assetIds={s.assetIds} assets={assets} />
+                {visibleStakers.map(s => (
+                  <StakerRow key={s.user} user={s.user} assetIds={s.assetIds} />
                 ))}
               </TableBody>
             </Table>
+            {hiddenStakers > 0 && (
+              <div className="mt-3 flex justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setVisibleCount(c => c + ROW_PAGE_SIZE)}
+                >
+                  Show {Math.min(ROW_PAGE_SIZE, hiddenStakers)} more
+                  <span className="text-muted-foreground ml-2 text-xs">
+                    ({hiddenStakers} remaining)
+                  </span>
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
