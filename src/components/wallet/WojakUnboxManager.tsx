@@ -141,7 +141,7 @@ export function WojakUnboxManager({ onTransactionComplete, onTransactionSuccess 
                 key={pack.assetId}
                 className="rounded-lg border border-border bg-muted/20 overflow-hidden flex flex-col"
               >
-                <div className="aspect-square bg-muted/40">
+                <div className="aspect-square bg-muted/40 relative">
                   <img
                     src={getImageUrl(pack.image)}
                     alt={pack.name}
@@ -149,12 +149,16 @@ export function WojakUnboxManager({ onTransactionComplete, onTransactionSuccess 
                     loading="lazy"
                     onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/placeholder.svg'; }}
                   />
+                  {pack.mintNumber !== null && (
+                    <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-cheese text-primary-foreground text-[10px] font-bold font-mono shadow-md leading-none">
+                      #{pack.mintNumber}
+                    </span>
+                  )}
                 </div>
                 <div className="p-2 flex-1 flex flex-col gap-1.5">
                   <p className="text-xs font-medium truncate">{pack.name}</p>
                   <p className="text-[10px] text-muted-foreground font-mono truncate">
-                    #{pack.assetId}
-                    {pack.mintNumber !== null && <> · mint {pack.mintNumber}</>}
+                    {pack.assetId}
                   </p>
                   <Button
                     size="sm"
