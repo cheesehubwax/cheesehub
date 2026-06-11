@@ -30,6 +30,7 @@ import { DepositRewardsDialog } from "./DepositRewardsDialog";
 import { WithdrawRewardsDialog } from "./WithdrawRewardsDialog";
 import { ManageStakableAssets } from "./ManageStakableAssets";
 import { StakeableAssets } from "./StakeableAssets";
+import { FarmStakersTable } from "./FarmStakersTable";
 
 interface FarmDetailProps {
   farmName: string;
@@ -522,6 +523,9 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
 
       {/* Stakeable Assets */}
       <StakeableAssets farmName={farm.farm_name} farmType={farm.farm_type} />
+
+      {/* Owner-only: who is currently staking in this farm */}
+      {isCreator && <FarmStakersTable farmName={farm.farm_name} />}
 
       {/* NFT Staking - show when connected */}
       {isConnected && (
