@@ -1,14 +1,15 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   fetchFarmStakers,
   fetchAssetsMetadata,
+  getCachedAssets,
   type FarmStakerRow,
   type StakerAssetMeta,
 } from "@/lib/farmStakers";
 
 export interface UseFarmStakersResult {
   stakers: FarmStakerRow[];
-  assets: Map<string, StakerAssetMeta>;
   isLoading: boolean;
   isFetching: boolean;
   error: unknown;
@@ -16,8 +17,8 @@ export interface UseFarmStakersResult {
 }
 
 /**
- * Loads the stakers table for a single farm, then fetches asset metadata
- * for every staked asset id (deduped) so the UI can render thumbnails.
+ * Loads the stakers table for a single farm. Cheap — one paginated RPC.
+ * Asset metadata is loaded lazily per row via `useStakerAssetMeta`.
  */
 export function useFarmStakers(farmName: string | undefined, enabled: boolean): UseFarmStakersResult {
   const stakersQuery = useQuery({
@@ -27,26 +28,46 @@ export function useFarmStakers(farmName: string | undefined, enabled: boolean): 
     staleTime: 60_000,
   });
 
-  const allAssetIds = (stakersQuery.data || []).flatMap(s => s.assetIds);
-  // Stable cache key from sorted unique ids
-  const assetsKey = Array.from(new Set(allAssetIds)).sort().join(",");
+  return {
+    stakers: stakersQuery.data || [],
+    isLoading: stakersQuery.isLoading,
+    isFetching: stakersQuery.isFetching,
+    error: stakersQuery.error,
+    refetch: () => {
+      stakersQuery.refetch();
+    },
+  };
+}
 
-  const assetsQuery = useQuery({
-    queryKey: ["farm-stakers-assets", farmName, assetsKey],
-    queryFn: () => fetchAssetsMetadata(allAssetIds),
-    enabled: !!farmName && enabled && allAssetIds.length > 0,
+export interface UseStakerAssetMetaResult {
+  assets: Map<string, StakerAssetMeta>;
+  isLoading: boolean;
+}
+
+/**
+ * Lazily resolve metadata for a slice of asset ids. The fetch only runs when
+ * `enabled` is true (typically: the row has scrolled into view). Already-cached
+ * ids resolve instantly without hitting the network.
+ */
+export function useStakerAssetMeta(assetIds: string[], enabled: boolean): UseStakerAssetMetaResult {
+  const key = useMemo(
+    () => Array.from(new Set(assetIds)).sort().join(","),
+    [assetIds]
+  );
+
+  const query = useQuery({
+    queryKey: ["staker-asset-meta", key],
+    queryFn: () => fetchAssetsMetadata(assetIds),
+    enabled: enabled && assetIds.length > 0,
     staleTime: 5 * 60_000,
   });
 
+  // Prefer fresh query data; fall back to the module memo so already-cached
+  // ids show through immediately even before the query is enabled.
+  const assets = query.data ?? getCachedAssets(assetIds);
+
   return {
-    stakers: stakersQuery.data || [],
-    assets: assetsQuery.data || new Map(),
-    isLoading: stakersQuery.isLoading,
-    isFetching: stakersQuery.isFetching || assetsQuery.isFetching,
-    error: stakersQuery.error || assetsQuery.error,
-    refetch: () => {
-      stakersQuery.refetch();
-      assetsQuery.refetch();
-    },
+    assets,
+    isLoading: query.isLoading && enabled,
   };
 }
