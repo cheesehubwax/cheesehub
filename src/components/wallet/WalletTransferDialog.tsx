@@ -18,6 +18,7 @@ import { VoteManager } from "./VoteManager";
 import { VoteRewardsManager } from "./VoteRewardsManager";
 import { CreateAccountManager } from "./CreateAccountManager";
 import { AlcorFarmManager } from "./AlcorFarmManager";
+import { WojakUnboxManager } from "./WojakUnboxManager";
 import { TransactionSuccessDialog } from "./TransactionSuccessDialog";
 import { TokenLogo } from "@/components/TokenLogo";
 import { closeWharfkitModals } from "@/lib/wharfKit";
@@ -33,6 +34,7 @@ import {
   Gift,
   UserPlus,
   Sprout,
+  Package,
   X,
   Search,
   ExternalLink,
@@ -57,7 +59,8 @@ type WalletSection =
   | "governance"
   | "vote-rewards"
   | "create-account"
-  | "alcor-farms";
+  | "alcor-farms"
+  | "unbox-wojak";
 
 const SIDEBAR_ITEMS: { id: WalletSection; label: string; icon: React.ElementType; bottom?: boolean }[] = [
   { id: "account", label: "Account", icon: Wallet },
@@ -70,6 +73,7 @@ const SIDEBAR_ITEMS: { id: WalletSection; label: string; icon: React.ElementType
   { id: "vote-rewards", label: "Vote Rewards", icon: Gift },
   { id: "create-account", label: "Create Account", icon: UserPlus },
   { id: "alcor-farms", label: "Manage Alcor Farms", icon: Sprout, bottom: true },
+  { id: "unbox-wojak", label: "Open Wojak Pack", icon: Package, bottom: true },
 ];
 
 function isValidWaxAccount(account: string): boolean {
@@ -550,6 +554,13 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
 
                 {activeSection === "alcor-farms" && (
                   <AlcorFarmManager
+                    onTransactionComplete={handleTransactionComplete}
+                    onTransactionSuccess={handleTransactionSuccess}
+                  />
+                )}
+
+                {activeSection === "unbox-wojak" && (
+                  <WojakUnboxManager
                     onTransactionComplete={handleTransactionComplete}
                     onTransactionSuccess={handleTransactionSuccess}
                   />
