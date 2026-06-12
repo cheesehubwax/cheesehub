@@ -1,51 +1,47 @@
-# Scale the Stakers Table for Large Farms
+# Make the Current Stakers table scale to large farms
 
-## Current cost (worst case)
+## Goal
 
-- `stakednfts` scan: 1 RPC call per 1000 rows, capped at 20 pages (~20k assets). Fine.
-- Asset metadata: **every** asset id is fetched upfront via AtomicAssets in batches of 50, 3 parallel. For a 5,000-NFT farm that's ~100 HTTP calls before anything renders, even though only ~8 thumbnails per wallet are visible until the user clicks "+N".
-- Render: every staker row mounts at once; long tail of empty `<Thumb>` HoverCards.
+Stop the table from overloading the browser / AtomicAssets API on farms with 100+ stakers and 50+ NFTs each, while still letting the owner see the full list.
 
-So `cheesefarm` (31 NFTs) is fine, but a 5k-NFT farm spams the atomic API and delays first paint by several seconds.
+## Pattern to follow (already used elsewhere in CHEESEHub)
 
-## Plan
+- `src/components/wallet/NFTSendManager.tsx` and `src/components/farm/NFTStaking.tsx` both use **`@tanstack/react-virtual`** (`useVirtualizer`) to render only the rows currently in the viewport, regardless of total list size.
+- `useUserNFTs` and `NFTStaking` batch AtomicAssets metadata fetches (size ~50) with limited parallelism, exactly like `fetchAssetsMetadata` already does in `src/lib/farmStakers.ts`.
 
-### 1. Lazy metadata — only fetch what's visible
-Replace the single "fetch every asset" query with per-wallet on-demand fetching:
+We'll apply the same pattern to `FarmStakersTable` rather than a manual paginator. Virtualisation + the existing per-row `IntersectionObserver` together cap work to "what's on screen" no matter how many stakers exist.
 
-- The component renders rows immediately from the (cheap) `stakednfts` data — wallet, staked count, asset-id chips as placeholders.
-- For each row, fetch metadata only for the **first 8 asset ids** (the preview strip). Use `useQueries` keyed by `(farmName, user, previewSlice)` so each row's preview is cached independently and runs in parallel but bounded.
-- When the user clicks "+N", fetch metadata for the remainder of that wallet's asset ids (one extra query per expansion).
+## Changes
 
-This shrinks the cold-load fetch from `ceil(totalAssets/50)` calls to `ceil(stakers*8/50)` calls. For a 5k-NFT farm with 100 stakers that's ~16 calls instead of ~100, and most rows reuse cached templates anyway.
+### 1. `src/components/farm/FarmStakersTable.tsx` — virtualise the row list
 
-### 2. Cache by template, not by asset
-Most farms stake many copies of the same template, so the dominant cost is repeated `name+image` for the same artwork.
+- Replace the current `slice(0, visibleCount)` + "Show more" button with a virtualised body using `useVirtualizer` from `@tanstack/react-virtual` (already installed; see `NFTSendManager.tsx`).
+- Layout:
+  - Wrap the `<TableBody>` rows in a scrollable container (`max-h-[600px] overflow-auto`) with a `ref` passed as `getScrollElement`.
+  - `count = stakers.length`, `estimateSize = () => 88` (≈ row height with one preview row of thumbs), `overscan: 4`.
+  - Render only `virtualizer.getVirtualItems()` as `<StakerRow>` inside an absolutely-positioned spacer, matching the `NFTSendManager` pattern.
+- Remove `ROW_PAGE_SIZE`, `visibleCount`, `hiddenStakers`, and the "Show more" button — virtualisation supersedes them.
+- Keep `PREVIEW_LIMIT = 8` per row and the existing `+N` expand control. When a row is expanded, call `virtualizer.measure()` / use `measureElement` so the virtualiser picks up the taller height.
+- Keep `IntersectionObserver` inside `StakerRow` (it doubles as the gate for `useStakerAssetMeta`); virtualiser only mounts visible rows anyway, but the observer still defers the fetch until the row has actually painted, which avoids a burst of 8 × `overscan` requests during fast scrolls.
+- Header badge keeps the **true totals** (`stakers.length wallets · totalStaked NFTs`).
 
-- Switch `fetchAssetsMetadata` to a two-step fetch:
-  1. One small `/atomicassets/v1/assets?ids=...` call to map `asset_id → template_id, mint, collection`.
-  2. Resolve `name + image` via the existing **`templateCache` + `fetchTemplatesBatch`** in `src/services/atomicApi.ts` / `src/lib/templateCache.ts`.
-- That cache is process-wide and 15-min TTL, so revisiting a farm or scrolling between farms is effectively free.
-- Asset-id → template_id results are also memoized in a module-level `Map` so re-expanding a row never re-hits the API.
+### 2. No changes needed to data/fetching
 
-### 3. Paginate stakers in the UI
-Even with cheap rows, mounting hundreds of `<TableRow>`s is wasteful.
+- `src/hooks/useFarmStakers.ts` — already one paginated RPC, lazy per-row metadata via `useStakerAssetMeta`. Leave as-is.
+- `src/lib/farmStakers.ts` — already memoises asset metadata at the module level (`assetMetaMemo`), batches by 50 with parallel limit 3, and caps `stakednfts` scans at 50 pages. Leave as-is.
 
-- Show the top 50 stakers by staked count by default with a "Show more" button (loads +50). Total count and aggregate NFT count remain in the header badge so the owner always knows the full size.
-- Optional simple search input (filter by wallet) gated behind a small icon — only renders rows that match.
+### 3. Sanity caps already in place
 
-### 4. Hard safety caps
-- Stop `stakednfts` pagination at 50k assets (≈50 RPC calls) and surface a small "Showing first 50,000 staked NFTs" notice. Real V2 farms don't approach this; the cap just prevents a runaway loop if a contract returns malformed `more=true`.
-- Per-row preview fetch only fires when the row is in (or near) the viewport using `IntersectionObserver`. Cheap to add, eliminates work for off-screen rows when "Show more" reveals a long list.
+- `MAX_STAKEDNFTS_PAGES = 50` / `MAX_GLOBAL_STAKERS_PAGES = 20` in `farmStakers.ts`.
+- `staleTime: 60_000` on stakers, `5 * 60_000` on metadata.
+- `templateCache.ts` 15-min TTL covers repeated template lookups.
 
-### 5. Verification
-- Re-test `/farm/cheesefarm` (31 NFTs) — visually identical, fewer requests.
-- Spot-check a large farm (e.g. a public 1000+ NFT WaxDAO V2 farm) in the network tab: cold-load should issue ≤ ~20 atomic-API calls regardless of total NFT count, and "+N" expansions should add one call each (or zero if templates were already cached).
+## Verification
 
-## Files touched
-
-- `src/lib/farmStakers.ts` — split `fetchAssetsMetadata` into `fetchAssetsTemplateIds` + use `templateCache.batchGetOrFetch`; add module-level asset→template memo; add the 50k cap.
-- `src/hooks/useFarmStakers.ts` — drop the eager all-assets query. Return only stakers + a `useStakerAssetPreview(user, ids)` helper that lazily resolves metadata.
-- `src/components/farm/FarmStakersTable.tsx` — render rows from stakers directly; per-row preview hook with `IntersectionObserver`; "Show more" pagination of 50; expand-on-click loads the remainder.
-
-No contract calls, no schema changes, no new dependencies.
+- `/farm/cheesefarm` (31 NFTs, ~handful of stakers): table renders the full list; no scroll bar appears; no behaviour regression.
+- A large farm such as `/farm/pixeljourney` (23,338 staked NFTs across many wallets):
+  - On first paint, DevTools shows the DOM contains only ~8 `<StakerRow>` elements regardless of total count.
+  - Network tab shows ≤ ~2 AtomicAssets batch calls before scroll; scrolling triggers more batches lazily, and revisiting already-seen rows triggers zero new requests (module memo).
+  - Memory profile stays flat while scrolling end-to-end (rows recycle).
+- Expanding a row with 50+ NFTs grows it in place, virtualiser remeasures, and the page below shifts down without jank.
+- No change to contract calls, transaction logic, or any other surface.
