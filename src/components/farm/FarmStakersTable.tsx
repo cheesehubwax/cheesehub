@@ -1,11 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
 import {
   HoverCard, HoverCardContent, HoverCardTrigger,
 } from "@/components/ui/hover-card";
@@ -18,7 +16,11 @@ interface FarmStakersTableProps {
 }
 
 const PREVIEW_LIMIT = 8;
-const ROW_PAGE_SIZE = 50;
+// Row layout: wallet | staked count | NFT thumbnails | external link
+const ROW_GRID = "grid-cols-[minmax(0,1.4fr)_72px_minmax(0,3fr)_40px]";
+const ESTIMATED_ROW_HEIGHT = 88;     // collapsed row (≤ 8 thumbs in one line)
+const EXPANDED_ROW_HEIGHT_HINT = 220; // initial guess; real height measured
+const SCROLL_HEIGHT = 560;
 
 function Thumb({ assetId, meta }: { assetId: string; meta?: StakerAssetMeta }) {
   const img = meta?.image && !meta.image.includes("placeholder") ? meta.image : null;
@@ -61,21 +63,35 @@ function Thumb({ assetId, meta }: { assetId: string; meta?: StakerAssetMeta }) {
   );
 }
 
-function StakerRow({
+const StakerRow = ({
   user,
   assetIds,
+  expanded,
+  onToggleExpanded,
+  measureRef,
 }: {
   user: string;
   assetIds: string[];
-}) {
-  const [expanded, setExpanded] = useState(false);
+  expanded: boolean;
+  onToggleExpanded: () => void;
+  measureRef: (node: HTMLDivElement | null) => void;
+}) => {
   const [inView, setInView] = useState(false);
-  const rowRef = useRef<HTMLTableRowElement>(null);
+  const localRef = useRef<HTMLDivElement | null>(null);
+
+  // Combined ref: feed both the virtualizer measurer and our IO target.
+  const setRefs = useCallback(
+    (node: HTMLDivElement | null) => {
+      localRef.current = node;
+      measureRef(node);
+    },
+    [measureRef]
+  );
 
   // Reveal & fetch metadata only once the row scrolls near the viewport.
   useEffect(() => {
-    if (inView || !rowRef.current) return;
-    const el = rowRef.current;
+    if (inView || !localRef.current) return;
+    const el = localRef.current;
     const io = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -101,67 +117,83 @@ function StakerRow({
   const { assets } = useStakerAssetMeta(visibleIds, inView);
 
   return (
-    <TableRow ref={rowRef}>
-      <TableCell className="p-2 align-top">
-        <a
-          href={`https://waxblock.io/account/${user}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs font-mono text-primary hover:underline"
-        >
-          {user}
-        </a>
-      </TableCell>
-      <TableCell className="p-2 align-top">
+    <div
+      ref={setRefs}
+      data-index-stable
+      className={`grid ${ROW_GRID} gap-2 items-start p-2 border-b border-border/40 hover:bg-muted/30 transition-colors`}
+    >
+      <a
+        href={`https://waxblock.io/account/${user}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-xs font-mono text-primary hover:underline truncate"
+      >
+        {user}
+      </a>
+      <div>
         <Badge variant="outline" className="font-mono">{assetIds.length}</Badge>
-      </TableCell>
-      <TableCell className="p-2 align-top">
-        <div className="flex flex-wrap gap-1.5">
-          {visibleIds.map(id => (
-            <Thumb key={id} assetId={id} meta={assets.get(id)} />
-          ))}
-          {!expanded && overflow > 0 && (
-            <button
-              type="button"
-              onClick={() => setExpanded(true)}
-              className="h-8 px-2 rounded bg-muted text-xs text-muted-foreground hover:text-foreground hover:bg-muted/80 inline-flex items-center gap-1"
-            >
-              +{overflow} <ChevronDown className="h-3 w-3" />
-            </button>
-          )}
-          {expanded && overflow > 0 && (
-            <button
-              type="button"
-              onClick={() => setExpanded(false)}
-              className="h-8 px-2 rounded bg-muted text-xs text-muted-foreground hover:text-foreground hover:bg-muted/80 inline-flex items-center gap-1"
-            >
-              Collapse <ChevronUp className="h-3 w-3" />
-            </button>
-          )}
-        </div>
-      </TableCell>
-      <TableCell className="p-2 align-top">
-        <a
-          href={`https://waxblock.io/account/${user}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center text-xs text-muted-foreground hover:text-primary"
-          aria-label={`Open ${user} on waxblock`}
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-        </a>
-      </TableCell>
-    </TableRow>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {visibleIds.map(id => (
+          <Thumb key={id} assetId={id} meta={assets.get(id)} />
+        ))}
+        {!expanded && overflow > 0 && (
+          <button
+            type="button"
+            onClick={onToggleExpanded}
+            className="h-8 px-2 rounded bg-muted text-xs text-muted-foreground hover:text-foreground hover:bg-muted/80 inline-flex items-center gap-1"
+          >
+            +{overflow} <ChevronDown className="h-3 w-3" />
+          </button>
+        )}
+        {expanded && overflow > 0 && (
+          <button
+            type="button"
+            onClick={onToggleExpanded}
+            className="h-8 px-2 rounded bg-muted text-xs text-muted-foreground hover:text-foreground hover:bg-muted/80 inline-flex items-center gap-1"
+          >
+            Collapse <ChevronUp className="h-3 w-3" />
+          </button>
+        )}
+      </div>
+      <a
+        href={`https://waxblock.io/account/${user}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center text-xs text-muted-foreground hover:text-primary"
+        aria-label={`Open ${user} on waxblock`}
+      >
+        <ExternalLink className="h-3.5 w-3.5" />
+      </a>
+    </div>
   );
-}
+};
 
 export function FarmStakersTable({ farmName }: FarmStakersTableProps) {
   const { stakers, isLoading, isFetching, error, refetch } = useFarmStakers(farmName, true);
-  const [visibleCount, setVisibleCount] = useState(ROW_PAGE_SIZE);
+  const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
+  const parentRef = useRef<HTMLDivElement>(null);
 
   const totalStaked = stakers.reduce((sum, s) => sum + s.assetIds.length, 0);
-  const visibleStakers = stakers.slice(0, visibleCount);
-  const hiddenStakers = Math.max(0, stakers.length - visibleStakers.length);
+
+  const virtualizer = useVirtualizer({
+    count: stakers.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: (index) => {
+      const s = stakers[index];
+      if (!s) return ESTIMATED_ROW_HEIGHT;
+      return expandedUsers.has(s.user) ? EXPANDED_ROW_HEIGHT_HINT : ESTIMATED_ROW_HEIGHT;
+    },
+    overscan: 4,
+  });
+
+  const toggleExpanded = useCallback((user: string) => {
+    setExpandedUsers(prev => {
+      const next = new Set(prev);
+      if (next.has(user)) next.delete(user); else next.add(user);
+      return next;
+    });
+  }, []);
 
   return (
     <Card className="bg-card/80 border-border/50">
@@ -194,36 +226,53 @@ export function FarmStakersTable({ farmName }: FarmStakersTableProps) {
             No active stakers yet.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Wallet</TableHead>
-                  <TableHead className="w-20">Staked</TableHead>
-                  <TableHead>NFTs</TableHead>
-                  <TableHead className="w-12">Link</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {visibleStakers.map(s => (
-                  <StakerRow key={s.user} user={s.user} assetIds={s.assetIds} />
-                ))}
-              </TableBody>
-            </Table>
-            {hiddenStakers > 0 && (
-              <div className="mt-3 flex justify-center">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setVisibleCount(c => c + ROW_PAGE_SIZE)}
-                >
-                  Show {Math.min(ROW_PAGE_SIZE, hiddenStakers)} more
-                  <span className="text-muted-foreground ml-2 text-xs">
-                    ({hiddenStakers} remaining)
-                  </span>
-                </Button>
+          <div className="rounded-md border border-border/50 overflow-hidden">
+            <div
+              className={`grid ${ROW_GRID} gap-2 px-2 py-2 bg-muted/40 border-b border-border/50 text-xs font-medium text-muted-foreground uppercase tracking-wider`}
+            >
+              <span>Wallet</span>
+              <span>Staked</span>
+              <span>NFTs</span>
+              <span className="sr-only">Link</span>
+            </div>
+            <div
+              ref={parentRef}
+              className="overflow-auto"
+              style={{ height: `${SCROLL_HEIGHT}px` }}
+            >
+              <div
+                style={{
+                  height: `${virtualizer.getTotalSize()}px`,
+                  width: "100%",
+                  position: "relative",
+                }}
+              >
+                {virtualizer.getVirtualItems().map(vRow => {
+                  const s = stakers[vRow.index];
+                  if (!s) return null;
+                  return (
+                    <div
+                      key={vRow.key}
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        transform: `translateY(${vRow.start}px)`,
+                      }}
+                    >
+                      <StakerRow
+                        user={s.user}
+                        assetIds={s.assetIds}
+                        expanded={expandedUsers.has(s.user)}
+                        onToggleExpanded={() => toggleExpanded(s.user)}
+                        measureRef={virtualizer.measureElement}
+                      />
+                    </div>
+                  );
+                })}
               </div>
-            )}
+            </div>
           </div>
         )}
       </CardContent>
