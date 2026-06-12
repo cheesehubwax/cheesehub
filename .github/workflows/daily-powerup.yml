@@ -1,9 +1,9 @@
 name: Daily CHEESE Powerup
 
 on:
-  schedule:
-    # 00:00 UTC every day. GitHub cron can drift up to ~15 min.
-    - cron: "0 0 * * *"
+  # Scheduled run paused until further notice. Re-enable by uncommenting below.
+  # schedule:
+  #   - cron: "0 0 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
