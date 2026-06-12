@@ -16,9 +16,14 @@ interface FarmStakersTableProps {
 }
 
 const PREVIEW_LIMIT = 8;
+// Farms with this many total staked NFTs default every row to a single
+// `+N` button so loading the page doesn't fire hundreds of metadata
+// requests. Owners can expand only the wallets they care about.
+const LARGE_FARM_THRESHOLD = 500;
 // Row layout: wallet | staked count | NFT thumbnails | external link
 const ROW_GRID = "grid-cols-[minmax(0,1.4fr)_72px_minmax(0,3fr)_40px]";
 const ESTIMATED_ROW_HEIGHT = 88;     // collapsed row (≤ 8 thumbs in one line)
+const COLLAPSED_ALL_ROW_HEIGHT = 56; // row with only the +N button
 const EXPANDED_ROW_HEIGHT_HINT = 220; // initial guess; real height measured
 const SCROLL_HEIGHT = 560;
 
@@ -70,6 +75,7 @@ const StakerRow = ({
   expanded,
   onToggleExpanded,
   measureRef,
+  largeFarm,
 }: {
   user: string;
   assetIds: string[];
@@ -77,7 +83,13 @@ const StakerRow = ({
   expanded: boolean;
   onToggleExpanded: () => void;
   measureRef: (node: HTMLDivElement | null) => void;
+  largeFarm: boolean;
 }) => {
+  // On large farms, rows start fully collapsed (no thumbs rendered) until
+  // the user opts in. `revealed` controls that opt-in. On small farms the
+  // row always renders its preview thumbs.
+  const [revealed, setRevealed] = useState(false);
+  const collapsedAll = largeFarm && !revealed;
   const [inView, setInView] = useState(false);
   const localRef = useRef<HTMLDivElement | null>(null);
 
@@ -110,7 +122,11 @@ const StakerRow = ({
     return () => io.disconnect();
   }, [inView]);
 
-  const visibleIds = expanded ? assetIds : assetIds.slice(0, PREVIEW_LIMIT);
+  const visibleIds = collapsedAll
+    ? []
+    : expanded
+      ? assetIds
+      : assetIds.slice(0, PREVIEW_LIMIT);
   const overflow = assetIds.length - PREVIEW_LIMIT;
 
   // Fetch metadata only for the ids currently rendered, and only after the
@@ -136,10 +152,32 @@ const StakerRow = ({
         <Badge variant="outline" className="font-mono">{assetIds.length}</Badge>
       </div>
       <div className="flex flex-wrap gap-1.5">
-        {visibleIds.map(id => (
-          <Thumb key={id} assetId={id} meta={assets.get(id)} />
-        ))}
-        {!expanded && overflow > 0 && (
+        {collapsedAll ? (
+          <button
+            type="button"
+            onClick={() => setRevealed(true)}
+            className="h-8 px-2 rounded bg-muted text-xs text-muted-foreground hover:text-foreground hover:bg-muted/80 inline-flex items-center gap-1"
+          >
+            +{assetIds.length} <ChevronDown className="h-3 w-3" />
+          </button>
+        ) : (
+          <>
+            {visibleIds.map(id => (
+              <Thumb key={id} assetId={id} meta={assets.get(id)} />
+            ))}
+            {largeFarm && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (expanded) onToggleExpanded();
+                  setRevealed(false);
+                }}
+                className="h-8 px-2 rounded bg-muted text-xs text-muted-foreground hover:text-foreground hover:bg-muted/80 inline-flex items-center gap-1"
+              >
+                Hide <ChevronUp className="h-3 w-3" />
+              </button>
+            )}
+            {!expanded && overflow > 0 && (
           <button
             type="button"
             onClick={onToggleExpanded}
@@ -156,6 +194,8 @@ const StakerRow = ({
           >
             Collapse <ChevronUp className="h-3 w-3" />
           </button>
+        )}
+          </>
         )}
       </div>
       <a
@@ -177,6 +217,7 @@ export function FarmStakersTable({ farmName }: FarmStakersTableProps) {
   const parentRef = useRef<HTMLDivElement>(null);
 
   const totalStaked = stakers.reduce((sum, s) => sum + s.assetIds.length, 0);
+  const isLargeFarm = totalStaked >= LARGE_FARM_THRESHOLD;
 
   const virtualizer = useVirtualizer({
     count: stakers.length,
@@ -184,6 +225,7 @@ export function FarmStakersTable({ farmName }: FarmStakersTableProps) {
     estimateSize: (index) => {
       const s = stakers[index];
       if (!s) return ESTIMATED_ROW_HEIGHT;
+      if (isLargeFarm && !expandedUsers.has(s.user)) return COLLAPSED_ALL_ROW_HEIGHT;
       return expandedUsers.has(s.user) ? EXPANDED_ROW_HEIGHT_HINT : ESTIMATED_ROW_HEIGHT;
     },
     overscan: 4,
@@ -207,6 +249,11 @@ export function FarmStakersTable({ farmName }: FarmStakersTableProps) {
             <Badge variant="outline" className="ml-2 text-xs">
               {stakers.length} wallet{stakers.length === 1 ? "" : "s"} · {totalStaked} NFT{totalStaked === 1 ? "" : "s"}
             </Badge>
+          )}
+          {isLargeFarm && (
+            <span className="ml-2 text-xs text-muted-foreground font-normal">
+              click +N to load thumbnails
+            </span>
           )}
         </CardTitle>
         <Button variant="outline" size="sm" onClick={refetch} disabled={isFetching}>
@@ -270,6 +317,7 @@ export function FarmStakersTable({ farmName }: FarmStakersTableProps) {
                         expanded={expandedUsers.has(s.user)}
                         onToggleExpanded={() => toggleExpanded(s.user)}
                         measureRef={virtualizer.measureElement}
+                        largeFarm={isLargeFarm}
                       />
                     </div>
                   );
