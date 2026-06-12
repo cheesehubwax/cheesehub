@@ -266,6 +266,7 @@ export function FarmStakersTable({ farmName }: FarmStakersTableProps) {
                       <StakerRow
                         user={s.user}
                         assetIds={s.assetIds}
+                        index={vRow.index}
                         expanded={expandedUsers.has(s.user)}
                         onToggleExpanded={() => toggleExpanded(s.user)}
                         measureRef={virtualizer.measureElement}
