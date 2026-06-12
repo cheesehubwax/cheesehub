@@ -217,6 +217,7 @@ export function FarmStakersTable({ farmName }: FarmStakersTableProps) {
   const parentRef = useRef<HTMLDivElement>(null);
 
   const totalStaked = stakers.reduce((sum, s) => sum + s.assetIds.length, 0);
+  const isLargeFarm = totalStaked >= LARGE_FARM_THRESHOLD;
 
   const virtualizer = useVirtualizer({
     count: stakers.length,
@@ -224,6 +225,7 @@ export function FarmStakersTable({ farmName }: FarmStakersTableProps) {
     estimateSize: (index) => {
       const s = stakers[index];
       if (!s) return ESTIMATED_ROW_HEIGHT;
+      if (isLargeFarm && !expandedUsers.has(s.user)) return COLLAPSED_ALL_ROW_HEIGHT;
       return expandedUsers.has(s.user) ? EXPANDED_ROW_HEIGHT_HINT : ESTIMATED_ROW_HEIGHT;
     },
     overscan: 4,
@@ -247,6 +249,11 @@ export function FarmStakersTable({ farmName }: FarmStakersTableProps) {
             <Badge variant="outline" className="ml-2 text-xs">
               {stakers.length} wallet{stakers.length === 1 ? "" : "s"} · {totalStaked} NFT{totalStaked === 1 ? "" : "s"}
             </Badge>
+          )}
+          {isLargeFarm && (
+            <span className="ml-2 text-xs text-muted-foreground font-normal">
+              click +N to load thumbnails
+            </span>
           )}
         </CardTitle>
         <Button variant="outline" size="sm" onClick={refetch} disabled={isFetching}>
@@ -310,6 +317,7 @@ export function FarmStakersTable({ farmName }: FarmStakersTableProps) {
                         expanded={expandedUsers.has(s.user)}
                         onToggleExpanded={() => toggleExpanded(s.user)}
                         measureRef={virtualizer.measureElement}
+                        largeFarm={isLargeFarm}
                       />
                     </div>
                   );
