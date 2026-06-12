@@ -66,12 +66,14 @@ function Thumb({ assetId, meta }: { assetId: string; meta?: StakerAssetMeta }) {
 const StakerRow = ({
   user,
   assetIds,
+  index,
   expanded,
   onToggleExpanded,
   measureRef,
 }: {
   user: string;
   assetIds: string[];
+  index: number;
   expanded: boolean;
   onToggleExpanded: () => void;
   measureRef: (node: HTMLDivElement | null) => void;
@@ -119,7 +121,7 @@ const StakerRow = ({
   return (
     <div
       ref={setRefs}
-      data-index-stable
+      data-index={index}
       className={`grid ${ROW_GRID} gap-2 items-start p-2 border-b border-border/40 hover:bg-muted/30 transition-colors`}
     >
       <a
