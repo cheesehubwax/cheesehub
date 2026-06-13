@@ -824,6 +824,22 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
     }
   };
 
+  // Wraps handleStake: if the user already has staked NFTs with pending rewards,
+  // open a confirmation dialog first so they know the contract will auto-claim.
+  const willAutoClaimOnStake = stakedNfts.length > 0 && totalPending > 0;
+  const requestStake = () => {
+    if (!accountName || selectedToStake.size === 0) return;
+    if (willAutoClaimOnStake) {
+      setConfirmStakeOpen(true);
+      return;
+    }
+    void handleStake();
+  };
+  const confirmAndStake = () => {
+    setConfirmStakeOpen(false);
+    void handleStake();
+  };
+
   const handleUnstake = async () => {
     if (!accountName || selectedToUnstake.size === 0) return;
     setIsUnstaking(true);
