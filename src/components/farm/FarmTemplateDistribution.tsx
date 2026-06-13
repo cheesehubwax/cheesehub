@@ -178,20 +178,24 @@ export function FarmTemplateDistribution({ farmName }: FarmTemplateDistributionP
                           </div>
                         </div>
                         <div className="text-right text-xs font-mono shrink-0">
-                          {r.error ? (
+                          {r.error && r.countUnknown ? (
                             <div className="text-destructive">—</div>
                           ) : (
                             <>
                               <div>
-                                <span className="text-foreground">{formatNum(r.stakedInFarm)}</span>
+                                <span className="text-foreground">
+                                  {r.countUnknown ? "—" : formatNum(r.stakedInFarm)}
+                                </span>
                                 <span className="text-muted-foreground"> / {formatNum(r.issuedSupply)} issued</span>{" "}
-                                <span className="text-cheese">({formatPct(r.issuedPct)})</span>
+                                <span className="text-cheese">
+                                  ({r.countUnknown ? "—" : formatPct(r.issuedPct)})
+                                </span>
                               </div>
                               <div className="text-muted-foreground">
                                 {r.maxSupply > 0 ? (
                                   <>
-                                    {formatNum(r.stakedInFarm)} / {formatNum(r.maxSupply)} max{" "}
-                                    <span>({formatPct(r.maxPct)})</span>
+                                    {r.countUnknown ? "—" : formatNum(r.stakedInFarm)} / {formatNum(r.maxSupply)} max{" "}
+                                    <span>({r.countUnknown ? "—" : formatPct(r.maxPct)})</span>
                                   </>
                                 ) : (
                                   <>uncapped max</>
