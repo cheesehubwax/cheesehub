@@ -19,7 +19,8 @@ interface FarmTemplateDistributionProps {
   farmName: string;
 }
 
-function formatNum(n: number): string {
+function formatNum(n: number | undefined | null): string {
+  if (n == null || !Number.isFinite(n)) return "0";
   return n.toLocaleString();
 }
 
