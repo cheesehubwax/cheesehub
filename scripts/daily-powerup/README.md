@@ -75,6 +75,16 @@ bun run run.ts
 
 `eligible_stakers * 1.0000 CHEESE` per day. The script prints the projected
 cost on every run.
+
+## Troubleshooting
+
+- **`Invalid Base58 character encountered` with `char: "\n"`** — the
+  `WAX_DAILYPOWER_KEY` secret has a trailing newline. The script trims
+  whitespace automatically, but you should still re-paste the secret
+  cleanly in GitHub → Settings → Secrets and variables → Actions.
+- **Workflow ran for real when you wanted a dry run** — in the Actions tab,
+  "Run workflow" form, set the **dry_run** input to `1` (default is `0`,
+  which signs for real). The log will then show `dry_run=true`.
 *** Add File: scripts/daily-powerup/package.json
 {
   "name": "daily-powerup",
