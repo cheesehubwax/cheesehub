@@ -5,9 +5,10 @@ import { WalletPluginPrivateKey } from "@wharfkit/wallet-plugin-privatekey";
 import { ENDPOINTS } from "./waxRpc";
 
 export function createSession(actor: string, permission: string, privateKeyWif: string): Session {
-  PrivateKey.from(privateKeyWif); // validate early
+  const key = (privateKeyWif ?? "").trim();
+  PrivateKey.from(key); // validate early
 
-  const wallet = new WalletPluginPrivateKey(privateKeyWif);
+  const wallet = new WalletPluginPrivateKey(key);
 
   return new Session(
     {

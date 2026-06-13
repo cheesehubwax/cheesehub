@@ -6,7 +6,7 @@ import { createSession, buildTransferAction, submitActions } from "./waxSign";
 
 const SIGNER = process.env.WAX_SIGNER_ACCOUNT ?? "power.chz";
 const PERMISSION = process.env.WAX_SIGNER_PERMISSION ?? "dailypower";
-const PRIVATE_KEY = process.env.WAX_DAILYPOWER_KEY ?? "";
+const PRIVATE_KEY = (process.env.WAX_DAILYPOWER_KEY ?? "").trim();
 const DRY_RUN = process.env.DRY_RUN === "1";
 const ALLOWLIST = (process.env.ALLOWLIST ?? "")
   .split(",")
