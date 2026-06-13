@@ -193,9 +193,9 @@ export function FarmTemplateDistribution({ farmName }: FarmTemplateDistributionP
                                 <span className="text-cheese">
                                   ({r.countUnknown ? "—" : formatPct(r.circulatingPct)})
                                 </span>
-                        </div>
-                      </>
-                    )}
+                              </div>
+                            </>
+                          )}
                   </div>
                 </div>
               );
