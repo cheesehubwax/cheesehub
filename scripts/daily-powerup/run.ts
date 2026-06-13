@@ -35,7 +35,6 @@ const MAX_BISECT_OPS = 20;
 const POWERUP_TARGET = "cheesepowerz";
 const TRANSFER_AMOUNT = `${POWERUP_AMOUNT.toFixed(4)} CHEESE`;
 
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 const log = (...args: unknown[]) => console.log("[powerup]", ...args);
 
 function chunk<T>(arr: T[], size: number): T[][] {
@@ -137,35 +136,20 @@ async function main() {
   if (skipped.length) log(`skipping ${skipped.length} missing accounts:`, skipped.join(","));
   log(`valid stakers: ${valid.length}`);
 
-  const totalCheese = ((valid.length + 1) * POWERUP_AMOUNT).toFixed(4);
-  log(`projected CHEESE spend: ${totalCheese} (incl. self-powerup)`);
+  const totalCheese = (valid.length * POWERUP_AMOUNT).toFixed(4);
+  log(`projected CHEESE spend: ${totalCheese}`);
 
   if (DRY_RUN) {
     log("DRY_RUN=1 set; skipping all transactions.");
-    log("self-powerup action would be:", {
-      from: SIGNER,
-      to: POWERUP_TARGET,
-      quantity: TRANSFER_AMOUNT,
-      memo: SIGNER,
-    });
     log("first batch (up to 50):", valid.slice(0, BATCH_SIZE).map(s => s.account));
     return;
   }
 
   const session = createSession(SIGNER, PERMISSION, PRIVATE_KEY);
 
-  // Phase 0: self-powerup
-  log("phase 0: self-powerup");
-  const selfStats: RunStats = { txIds: [], sent: [], failed: [], bisectOps: 0 };
-  await sendBatchWithBisect(session, [SIGNER], selfStats);
-  if (selfStats.failed.length) {
-    throw new Error("self-powerup failed; aborting run");
-  }
-  log(`self-powerup tx=${selfStats.txIds[0]}; waiting 3s for CPU to settle...`);
-  await sleep(3000);
-
-  // Phase 1: stakers
-  log(`phase 1: sending to ${valid.length} stakers in batches of ${BATCH_SIZE}`);
+  // Send powerup transfers to stakers. power.chz relies on its own staked WAX
+  // (CPU/NET) to land these transactions; no self-powerup phase.
+  log(`sending to ${valid.length} stakers in batches of ${BATCH_SIZE}`);
   const stats: RunStats = { txIds: [], sent: [], failed: [], bisectOps: 0 };
   for (const batch of chunk(valid.map(s => s.account), BATCH_SIZE)) {
     await sendBatchWithBisect(session, batch, stats);
@@ -176,10 +160,9 @@ async function main() {
   log(`skipped:     ${skipped.length} (missing accounts)`);
   log(`sent:        ${stats.sent.length}`);
   log(`failed:      ${stats.failed.length}`);
-  log(`txs:         ${stats.txIds.length + 1} (including self-powerup)`);
-  log(`cheese spent (approx): ${((stats.sent.length + 1) * POWERUP_AMOUNT).toFixed(4)} CHEESE`);
+  log(`txs:         ${stats.txIds.length}`);
+  log(`cheese spent (approx): ${(stats.sent.length * POWERUP_AMOUNT).toFixed(4)} CHEESE`);
   log("tx ids:");
-  log(`  self-powerup: ${selfStats.txIds[0]}`);
   for (const id of stats.txIds) log(`  ${id}`);
   if (stats.failed.length) {
     log("failed accounts:", stats.failed.join(","));
