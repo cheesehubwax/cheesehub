@@ -49,13 +49,14 @@ export function FarmTemplateDistribution({ farmName }: FarmTemplateDistributionP
     enabled && !tooMany && templateCount > 0,
   );
 
-  // Farms without templates: nothing to show.
+  const loaded = rows.length > 0;
+
+  // Farms without templates: nothing to show. Render after all hooks have
+  // been called so hook order stays stable across loading/loaded states.
   if (configQuery.isLoading) {
     return <Skeleton className="h-16 w-full rounded-xl" />;
   }
   if (templateCount === 0) return null;
-
-  const loaded = rows.length > 0;
 
   return (
     <Card className="bg-card/80 border-border/50">
