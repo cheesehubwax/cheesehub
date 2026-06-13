@@ -24,8 +24,8 @@ function formatNum(n: number | undefined | null): string {
   return n.toLocaleString();
 }
 
-function formatPct(p: number | null): string {
-  if (p === null) return "—";
+function formatPct(p: number | null | undefined): string {
+  if (p == null || !Number.isFinite(p)) return "—";
   if (p >= 10) return `${p.toFixed(1)}%`;
   return `${p.toFixed(2)}%`;
 }
