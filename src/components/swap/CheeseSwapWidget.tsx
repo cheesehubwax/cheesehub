@@ -70,7 +70,7 @@ export function CheeseSwapWidget({
   const tradeType: TradeType = activeField === "in" ? "EXACT_INPUT" : "EXACT_OUTPUT";
   const routeAmount = activeField === "in" ? amountIn : amountOut;
 
-  const { route, isFetching: routeLoading, error: routeError, noRoute, isRetrying } = useSwapRoute(
+  const { route, isFetching: routeLoading, error: routeError, noRoute, isRetrying, exhaustedTransient, refetch: refetchRoute } = useSwapRoute(
     tokenIn,
     tokenOut,
     routeAmount,
@@ -234,7 +234,7 @@ export function CheeseSwapWidget({
         />
       </div>
 
-      {/* Route error — only show after retries are exhausted, never while retrying transient failures */}
+      {/* Route error — only show non-transient final errors. Transient failures are silently retried / self-healed. */}
       {routeError && hasAmount && !isRetrying && !routeLoading && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-destructive/10 text-destructive text-sm">
           <AlertCircle className="w-4 h-4 shrink-0" />
@@ -296,12 +296,22 @@ export function CheeseSwapWidget({
 
       {/* Swap / Connect button */}
       <button
-        onClick={canSwap ? handleSwap : !accountName ? login : undefined}
-        disabled={!!accountName && !canSwap}
+        onClick={
+          canSwap
+            ? handleSwap
+            : !accountName
+            ? login
+            : exhaustedTransient && hasAmount
+            ? () => refetchRoute()
+            : undefined
+        }
+        disabled={!!accountName && !canSwap && !(exhaustedTransient && hasAmount)}
         className={`w-full py-3 rounded-xl font-bold text-base transition-colors ${
           canSwap
             ? "bg-cheese text-cheese-foreground hover:bg-cheese/90"
             : !accountName
+            ? "bg-cheese text-cheese-foreground hover:bg-cheese/90"
+            : exhaustedTransient && hasAmount
             ? "bg-cheese text-cheese-foreground hover:bg-cheese/90"
             : "bg-secondary text-muted-foreground cursor-not-allowed"
         }`}
@@ -317,9 +327,13 @@ export function CheeseSwapWidget({
           "Select tokens"
         ) : !hasAmount ? (
           "Enter amount"
-        ) : routeLoading ? (
+        ) : routeLoading || isRetrying ? (
           "Finding best route..."
-        ) : routeError || noRoute ? (
+        ) : noRoute ? (
+          "No route available"
+        ) : exhaustedTransient ? (
+          "Route unavailable — retry"
+        ) : routeError ? (
           "No route available"
         ) : !route ? (
           "Enter amount"

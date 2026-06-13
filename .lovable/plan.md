@@ -1,28 +1,45 @@
-## Problem
+# Fix: CHEESESwap "Failed to fetch" still showing & no longer self-healing
 
-When swapping CHEESE → WAXWBTC, the Alcor route endpoint (`/api/v2/swapRouter/getRoute`) intermittently returns a network error or 429 rate-limit on the first attempt. The widget immediately shows the red "Failed to fetch" alert under the inputs and disables the Swap button. React Query then retries with backoff and ~30s later the route resolves and the swap becomes available. The fetch is actually self-healing — only the UX is broken.
+## Root cause
 
-## Fix (UI-only, no contract / business logic changes)
+Alcor's `/api/v2/swapRouter/getRoute` intermittently fails the first call (CORS-shaped browser `TypeError: Failed to fetch` or HTTP 429). The current logic has two problems that together produce what you're seeing:
 
-Two small, focused edits:
+1. **Hard surface of the error.** `CheeseSwapWidget` shows the red banner whenever `routeError && !isRetrying && !routeLoading`. `isRetrying` is derived from `useSwapRoute` as `!!error && (isFetching || failureCount < 3)`. Between retry attempts React Query is *not* `isFetching` and `failureCount` can already equal the cap, so the banner flashes red and the swap button flips to "No route available" even though another attempt is still scheduled or possible.
+2. **Retries give up too soon.** With the cap at 3 and 1s→2s→4s backoff, total recovery window is only ~7s. Alcor's transient window is often 15–30s, so the query exhausts retries before the API recovers — and because `staleTime: 15_000` keeps the failed result cached, the user sees a permanent failure until they change the input.
+
+Also, browser fetch failures on Alcor commonly throw a bare `TypeError` whose `.message` is just `"Failed to fetch"` — already covered, but the UI logic above defeats the suppression.
+
+## Fix (Alcor only — no provider changes)
 
 ### 1. `src/hooks/useSwapRoute.ts`
-- Treat generic network errors ("Failed to fetch", `TypeError`, `AbortError` from network) the same as rate-limit errors: retry up to 3 times with exponential backoff (1s → 2s → 4s, capped). Currently only `Rate limited` messages retry more than once; bare "Failed to fetch" retries only once which leaves the user staring at a red error.
-- Expose `failureCount` (already on the query result) so the widget can distinguish "transient, still retrying" from "final failure".
-- Return a derived `isRetrying` boolean: `true` when there is an error AND the query is still fetching/will retry.
+- Increase transient retry cap to **6** attempts (covers ~30s window) with backoff `1s, 2s, 4s, 8s, 12s, 15s` (capped 15s) for generic transient errors; keep 5s→30s backoff for explicit 429 `Rate limited`.
+- Do **not** cache failures: set `retryOnMount: true` and add `throwOnError: false`. Most importantly, drop `staleTime` for error results by leaving `staleTime` on success only — React Query already refetches on next trigger when there's an error, but we add a manual safety net below.
+- Replace the brittle `isRetrying` derivation with one that stays `true` for the entire retry window: `isRetrying = !!error && failureCount < MAX_TRANSIENT_RETRIES` for transient errors (ignore `isFetching`, since the gap between attempts is the exact moment the UI was flashing red).
+- Distinguish error kinds in the return value: `transientError` (suppress in UI) vs `finalError` (show in UI). Only expose `finalError` as `error`.
+- After exhausting retries on a transient error, schedule one delayed `refetch()` via `setTimeout` 20s later (cleaned up on unmount / query key change) so the widget self-heals like it used to, instead of being stuck.
 
 ### 2. `src/components/swap/CheeseSwapWidget.tsx`
-- Hide the red `routeError` banner while `isRetrying` is true OR while `routeLoading` is true. Only show the red banner after retries are exhausted (final failure) or when `noRoute` is true with a clear "No route available for this pair" message.
-- While retrying, keep the existing subtle "Finding best route..." label on the Swap button (already implemented) so the UI looks like it's just working, not failing.
-- Leave the actual swap action, route-fetch parameters, and Alcor endpoints untouched.
+- Render the red banner only when `error` is the new `finalError` (non-transient) **and** `!routeLoading` **and** `!isRetrying`. Transient failures never reach the banner.
+- Swap button text precedence while hasAmount is true:
+  1. `isSwapping` → "Swapping..."
+  2. `routeLoading || isRetrying` → "Finding best route..."
+  3. `noRoute` → "No route available"
+  4. `finalError` → "Route unavailable — retry"
+  5. `route` → "Swap"
+- When state (4) is shown, clicking the button calls `refetch()` (exposed from the hook) so the user has an explicit recovery affordance in addition to the automatic 20s retry.
 
-## Out of scope
-
-- No changes to `swapApi.ts` request shape, Alcor endpoints, debounce timing, or transaction signing.
-- No changes to other widgets that consume Alcor data.
+### 3. `src/lib/swapApi.ts` (small hardening, no behavior change for happy path)
+- In `fetchSwapRoute`, wrap the `fetch(...)` call in `try/catch` and re-throw a normalized `Error("Failed to fetch swap route — network")` when the underlying error is a `TypeError`. This ensures the retry classifier in the hook matches reliably across browsers (Safari throws `"Load failed"`, Chrome `"Failed to fetch"`, Firefox `"NetworkError when attempting to fetch resource"`).
+- Do **not** add any new endpoint, provider, debounce change, or transaction-path change.
 
 ## Verification
 
-- Open Alcor swap dialog, select CHEESE → WAXWBTC, type an amount.
-- Throttle network or trigger a 429 in DevTools: red banner should NOT appear; button shows "Finding best route…" until route resolves, then becomes "Swap".
-- Genuinely unsupported pair: red "No route available" still shows after retries are exhausted.
+- With DevTools network throttling / blocking the first `getRoute` request: widget shows "Finding best route…" continuously, no red banner, then resolves to a real quote within the retry window.
+- Forced permanent failure (block the endpoint entirely): after ~30s the widget shows "Route unavailable — retry" with a clickable button; clicking refetches.
+- Genuinely unsupported pair returns `route: null` → "No route available" (unchanged).
+- Successful path (WAX → CHEESE) unchanged: same debounce, same quote, same transaction.
+
+## Out of scope
+- No secondary route provider (per your decision).
+- No changes to `swapTokens`, balances, or `normalizeRouteActions`.
+- No UI restyle beyond the button label states above.
