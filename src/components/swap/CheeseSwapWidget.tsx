@@ -70,7 +70,7 @@ export function CheeseSwapWidget({
   const tradeType: TradeType = activeField === "in" ? "EXACT_INPUT" : "EXACT_OUTPUT";
   const routeAmount = activeField === "in" ? amountIn : amountOut;
 
-  const { route, isFetching: routeLoading, error: routeError, noRoute } = useSwapRoute(
+  const { route, isFetching: routeLoading, error: routeError, noRoute, isRetrying } = useSwapRoute(
     tokenIn,
     tokenOut,
     routeAmount,
@@ -234,8 +234,8 @@ export function CheeseSwapWidget({
         />
       </div>
 
-      {/* Route error */}
-      {routeError && hasAmount && (
+      {/* Route error — only show after retries are exhausted, never while retrying transient failures */}
+      {routeError && hasAmount && !isRetrying && !routeLoading && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-destructive/10 text-destructive text-sm">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{(routeError as Error)?.message || "Unable to find a route for this swap"}</span>
