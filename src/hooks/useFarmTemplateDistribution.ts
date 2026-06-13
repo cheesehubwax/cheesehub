@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   TEMPLATE_FETCH_CONCURRENCY,
-  fetchTemplateStakedCount,
+  fetchFarmTemplateCounts,
   fetchTemplateStats,
   mapWithConcurrency,
 } from "@/lib/farmTemplateStats";
@@ -17,6 +17,7 @@ export interface TemplateDistributionRow {
   stakedInFarm: number;
   issuedPct: number | null; // null when issuedSupply === 0
   maxPct: number | null;    // null when maxSupply === 0 (uncapped)
+  countUnknown?: boolean;   // true when the accounts request failed
   error?: string;
 }
 
@@ -48,15 +49,25 @@ export function useFarmTemplateDistribution(
     staleTime: 10 * 60_000,
     gcTime: 30 * 60_000,
     queryFn: async (): Promise<TemplateDistributionRow[]> => {
+      // Resolve per-collection template counts in one request per collection.
+      let countsMap = new Map<string, number>();
+      let countsFailed = false;
+      try {
+        countsMap = await fetchFarmTemplateCounts(
+          templates.map((t) => t.collection),
+        );
+      } catch (err) {
+        console.warn("[useFarmTemplateDistribution] accounts fetch failed:", err);
+        countsFailed = true;
+      }
+
       const rows = await mapWithConcurrency(
         templates,
         TEMPLATE_FETCH_CONCURRENCY,
         async (t): Promise<TemplateDistributionRow> => {
+          const stakedInFarm = countsMap.get(`${t.collection}:${t.template_id}`) ?? 0;
           try {
-            const [stats, stakedInFarm] = await Promise.all([
-              fetchTemplateStats(t.collection, t.template_id),
-              fetchTemplateStakedCount(t.collection, t.template_id),
-            ]);
+            const stats = await fetchTemplateStats(t.collection, t.template_id);
             const issuedPct =
               stats.issuedSupply > 0 ? (stakedInFarm / stats.issuedSupply) * 100 : null;
             const maxPct =
@@ -71,6 +82,7 @@ export function useFarmTemplateDistribution(
               stakedInFarm,
               issuedPct,
               maxPct,
+              countUnknown: countsFailed,
             };
           } catch (err) {
             return {
@@ -80,9 +92,10 @@ export function useFarmTemplateDistribution(
               image: "/placeholder.svg",
               issuedSupply: 0,
               maxSupply: 0,
-              stakedInFarm: 0,
+              stakedInFarm,
               issuedPct: null,
               maxPct: null,
+              countUnknown: countsFailed,
               error: (err as Error).message || "Failed to load",
             };
           }
