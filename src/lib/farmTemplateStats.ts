@@ -60,30 +60,38 @@ export async function fetchTemplateStats(
 }
 
 /**
- * Number of assets of this template currently held by the farm contract.
- * Uses the AtomicAssets count flag so we never download asset bodies.
+ * Per-template asset counts currently held by the farm contract, for the
+ * given list of collections. One request per unique collection via the
+ * AtomicAssets accounts endpoint:
+ *   GET /atomicassets/v1/accounts/{owner}/{collection_name}
+ * Returns a map keyed by `"{collection}:{template_id}"` → count.
  */
-export async function fetchTemplateStakedCount(
-  collection: string,
-  templateId: number,
-): Promise<number> {
-  const params = new URLSearchParams({
-    collection_name: collection,
-    template_id: String(templateId),
-    owner: FARM_CONTRACT,
-    page: "1",
-    limit: "1",
-    count: "true",
+export async function fetchFarmTemplateCounts(
+  collections: string[],
+): Promise<Map<string, number>> {
+  const unique = Array.from(new Set(collections.filter(Boolean)));
+  const out = new Map<string, number>();
+  if (unique.length === 0) return out;
+
+  await mapWithConcurrency(unique, TEMPLATE_FETCH_CONCURRENCY, async (collection) => {
+    const path = `/atomicassets/v1/accounts/${encodeURIComponent(FARM_CONTRACT)}/${encodeURIComponent(collection)}`;
+    const res = await fetchWithFallback(ATOMIC_API.baseUrls, path);
+    const json = await res.json();
+    if (!json?.success || !json.data) {
+      throw new Error(`Account templates for ${collection} failed`);
+    }
+    const templates = (json.data.templates || []) as Array<{
+      template_id: string | number;
+      assets: string | number;
+    }>;
+    for (const t of templates) {
+      const tid = String(t.template_id);
+      const n = Number(t.assets);
+      out.set(`${collection}:${tid}`, Number.isFinite(n) ? n : 0);
+    }
   });
-  const path = `/atomicassets/v1/assets?${params.toString()}`;
-  const res = await fetchWithFallback(ATOMIC_API.baseUrls, path);
-  const json = await res.json();
-  if (!json?.success) {
-    throw new Error(`Asset count for ${collection}/${templateId} failed`);
-  }
-  // With count=true the API returns the total in `data` as a string/number.
-  const n = Number(json.data);
-  return Number.isFinite(n) ? n : 0;
+
+  return out;
 }
 
 /** Run an async mapper with a hard concurrency cap. Preserves input order. */
