@@ -999,6 +999,21 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
             </TabsList>
 
             <TabsContent value="unstaked" className="mt-4 space-y-3">
+              {willAutoClaimOnStake && (
+                <Alert className="border-cheese/40 bg-cheese/5">
+                  <Info className="h-4 w-4 text-cheese" />
+                  <AlertDescription className="text-xs">
+                    You currently have{" "}
+                    <span className="font-semibold text-cheese">
+                      {pendingRewards
+                        .filter((r) => r.amount > 0)
+                        .map((r) => `${r.amount.toFixed(r.precision)} ${r.symbol}`)
+                        .join(" + ")}
+                    </span>{" "}
+                    pending. Staking additional NFTs will auto-claim your pending rewards as part of the same transaction.
+                  </AlertDescription>
+                </Alert>
+              )}
               <div className="flex items-center justify-between">
                 <Button variant="ghost" size="sm" onClick={selectAllEligible}>
                   {selectedToStake.size === filteredEligible.filter((n) => !globallyStakedMap.has(n.asset_id)).length &&
@@ -1007,7 +1022,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
                     : "Select All"}
                 </Button>
                 <Button
-                  onClick={handleStake}
+                  onClick={requestStake}
                   disabled={isStaking || selectedToStake.size === 0 || isExpired}
                   size="sm"
                   className="bg-primary text-primary-foreground"
