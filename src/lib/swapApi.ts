@@ -90,7 +90,14 @@ export async function fetchSwapRoute(
     maxHops: "3",
   });
 
-  const res = await fetch(`${ALCOR_API}/swapRouter/getRoute?${params}`, { signal });
+  let res: Response;
+  try {
+    res = await fetch(`${ALCOR_API}/swapRouter/getRoute?${params}`, { signal });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") throw e;
+    // Normalize cross-browser network failures so the retry classifier matches.
+    throw new Error("Failed to fetch swap route — network");
+  }
   if (!res.ok) {
     if (res.status === 429) {
       throw new Error("Rate limited — please wait a moment and try again");
