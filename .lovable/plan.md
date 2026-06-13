@@ -1,26 +1,37 @@
-# Harden daily-powerup reads with triple-scan + merge
+## Goal
 
-## Why
-`scripts/daily-powerup/waxRpc.ts::fetchTableAll` already fails over across 4 RPC endpoints per page, but only does a single linear pass. If any endpoint returns an HTTP-200 page that's silently truncated (or `more=false` prematurely), eligible stakers get skipped until the next day's run. Arne's friend's "scan 3 times" suggestion is the right fix.
+When a user stakes additional NFTs into a farm where they are already earning rewards, make it clear that the farm contract will automatically claim their current pending rewards as part of the stake transaction.
 
-Action submission already has redundancy (`waxSign.ts` multi-endpoint `fetch` + `run.ts` batch bisect), so no changes needed there.
+## Where
 
-We do not persist `get_table_rows` output anywhere — the GitHub Actions runner is ephemeral and nothing is uploaded as an artifact or committed. Point 3 of the friend's advice does not apply.
+`src/components/farm/NFTStaking.tsx` — the "Unstaked" tab's `handleStake` flow.
 
-## Changes
+## Behavior
 
-### `scripts/daily-powerup/run.ts`
-Replace the single `fetchTableAll(...)` read of `cheesecheese::staketable` with **three independent scans**, each starting from a different endpoint in the rotation so a bad endpoint cannot poison all three passes. Merge results by `staker` (dedup, keep highest `cheesestaked` seen across passes for safety).
+1. Persistent inline notice on the Unstaked tab (always visible, no click needed):
+   - Shown only when the user already has staked NFTs in this farm AND `totalPending > 0`.
+   - Rendered above the Select All / Stake Selected row using the existing `Alert` component (info style, ℹ️ icon).
+   - Copy: "You currently have **{formatted pending amounts}** pending. Staking additional NFTs will auto-claim your pending rewards as part of the same transaction."
+   - Reuses the existing live `pendingRewards` array already computed in the component (so the displayed totals tick up in real time alongside the rest of the UI).
 
-- Log per-scan row counts and the merged distinct-staker count.
-- If any scan returns < 90% of the largest scan's count, log a `WARN` line (visible in Actions output) — does not abort, since the merged set is still the safest answer.
-- Total added latency: ~2-4s for two extra full table scans (staketable has a few thousand rows). Acceptable inside the 15-minute job timeout.
+2. Confirmation step on click of "Stake Selected":
+   - Only triggers when `stakedNfts.length > 0 && totalPending > 0` AND the user has not already confirmed this session for this farm.
+   - Uses an `AlertDialog` (already a project primitive) with:
+     - Title: "Pending rewards will be claimed"
+     - Description: lists the pending amounts (symbol + formatted amount via existing precision) and explains the contract auto-claims on stake.
+     - Cancel button → aborts.
+     - Confirm button → proceeds with existing `handleStake` logic and, on success, calls the existing `applyClaimToAccount` path so the user's lifetime claim totals stay accurate (this already happens for the explicit Claim button — we wire the same call into the stake success path for this case).
+   - If there are no pending rewards or no existing stake, stake proceeds immediately as today (no extra click).
 
-### `scripts/daily-powerup/waxRpc.ts`
-Add an optional `startEndpointIndex` parameter to `fetchTableAll` so each of the three scans can start from a different endpoint in the `ENDPOINTS` array (round-robin: 0, 1, 2). Existing per-page fallback behavior is preserved — `startEndpointIndex` only rotates the *preferred* endpoint, the others still serve as fallback.
+3. After a successful stake-with-auto-claim:
+   - Convert the just-claimed `pendingRewards` to the `ClaimedToken[]` shape (helper `pendingRewardsToClaimed` already imported) and call `applyClaimToAccount(accountName, farm.farm_name, claimed)` so the farm's claimed totals update immediately, matching what already happens after a manual claim.
 
-No other files change. No workflow / cron / secrets / variables changes.
+## Out of scope
 
-## Verification
-- Run the workflow with `dry_run=1` and confirm the log shows three scans, their individual counts, the merged count, and the projected CHEESE spend matching the merged count.
-- Confirm `eligible (>= MIN_STAKED CHEESE): N` matches the merged distinct-staker count from the three passes.
+- No changes to the on-chain action itself (`buildStakeNftsAction`) — the auto-claim is contract behavior, we are only surfacing it.
+- No changes to unstake or claim flows.
+- No changes to other farm types (token DAOs, Alcor, etc.).
+
+## Files touched
+
+- `src/components/farm/NFTStaking.tsx` (UI + handler only)
