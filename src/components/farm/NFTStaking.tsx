@@ -9,11 +9,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
   Loader2, Search, Layers, CheckSquare, Square, AlertTriangle,
-  RefreshCw, Coins, Image as ImageIcon,
+  RefreshCw, Coins, Image as ImageIcon, Info,
 } from "lucide-react";
 import {
   FarmInfo, fetchUserStakes, fetchFarmStakableConfig,
