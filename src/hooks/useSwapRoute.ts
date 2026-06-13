@@ -29,23 +29,42 @@ export function useSwapRoute(
   const enabled =
     !!tokenIn && !!tokenOut && !tokensIdentical && !!debouncedAmount && parseFloat(debouncedAmount) > 0 && !!receiver && receiver !== "placeholder111";
 
-  const { data: route, isLoading, error, isFetching } = useQuery<SwapRoute | null>({
+  const { data: route, isLoading, error, isFetching, failureCount } = useQuery<SwapRoute | null>({
     queryKey: ["swap-route", tokenIn?.ticker, tokenIn?.contract, tokenOut?.ticker, tokenOut?.contract, debouncedAmount, slippage, receiver, debouncedTradeType],
     queryFn: ({ signal }) => fetchSwapRoute(tokenIn!, tokenOut!, debouncedAmount, slippage, receiver, signal, debouncedTradeType),
     enabled,
     staleTime: 15_000,
     gcTime: 30_000,
     retry: (failureCount, err) => {
-      if (err instanceof Error && err.message.includes('Rate limited')) return failureCount < 3;
+      const msg = err instanceof Error ? err.message : '';
+      const isTransient =
+        msg.includes('Rate limited') ||
+        msg.includes('Failed to fetch') ||
+        msg.includes('NetworkError') ||
+        msg.includes('Load failed') ||
+        (err instanceof TypeError);
+      if (isTransient) return failureCount < 3;
       return failureCount < 1;
     },
     retryDelay: (attemptIndex, err) => {
-      if (err instanceof Error && err.message.includes('Rate limited')) return Math.min(5000 * 2 ** attemptIndex, 30000);
-      return 3000;
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.includes('Rate limited')) return Math.min(5000 * 2 ** attemptIndex, 30000);
+      return Math.min(1000 * 2 ** attemptIndex, 4000);
     },
   });
 
   const noRoute = enabled && !isLoading && !isFetching && !error && route === null;
 
-  return { route: route ?? undefined, isLoading: isLoading && enabled, isFetching, error, noRoute };
+  // While we have an error but the query is still actively retrying (or about
+  // to), treat it as transient and don't surface a red banner to the user.
+  const isRetrying = !!error && (isFetching || failureCount < 3);
+
+  return {
+    route: route ?? undefined,
+    isLoading: isLoading && enabled,
+    isFetching,
+    error,
+    noRoute,
+    isRetrying,
+  };
 }

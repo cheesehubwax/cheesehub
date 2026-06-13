@@ -1,46 +1,28 @@
-# Fix broken CHEESEFARM cover image
+## Problem
 
-## Root cause
+When swapping CHEESE → WAXWBTC, the Alcor route endpoint (`/api/v2/swapRouter/getRoute`) intermittently returns a network error or 429 rate-limit on the first attempt. The widget immediately shows the red "Failed to fetch" alert under the inputs and disables the Swap button. React Query then retries with backoff and ~30s later the route resolves and the swap becomes available. The fetch is actually self-healing — only the UX is broken.
 
-The CHEESEFARM cover image hash on-chain is:
+## Fix (UI-only, no contract / business logic changes)
 
-`bafkreiboplxjqffji562begutm4zxcsybcsdinoh5ohgbgsz7hxbcyq334`
+Two small, focused edits:
 
-This is a valid IPFS CIDv1 (raw codec, `bafk…` prefix). However `src/hooks/useIpfsImageSrc.ts` only prepends an IPFS gateway when the hash starts with `Qm` or `bafy`:
+### 1. `src/hooks/useSwapRoute.ts`
+- Treat generic network errors ("Failed to fetch", `TypeError`, `AbortError` from network) the same as rate-limit errors: retry up to 3 times with exponential backoff (1s → 2s → 4s, capped). Currently only `Rate limited` messages retry more than once; bare "Failed to fetch" retries only once which leaves the user staring at a red error.
+- Expose `failureCount` (already on the query result) so the widget can distinguish "transient, still retrying" from "final failure".
+- Return a derived `isRetrying` boolean: `true` when there is an error AND the query is still fetching/will retry.
 
-```ts
-if (hash.startsWith("Qm") || hash.startsWith("bafy")) {
-  return `${IPFS_GATEWAYS[gatewayIdx % IPFS_GATEWAYS.length]}${hash}`;
-}
-return hash;
-```
-
-Because `bafkrei…` matches neither, the raw CID is returned as the `src` and the browser fails to load it — that's the broken cover the user is seeing.
-
-Same hook is also used by `FarmCard` logo and other farms, so any farm whose creator pastes a CIDv1 (very common on AtomicHub / IPFS uploaders today) currently shows a broken image.
-
-## Change
-
-Single-file edit to `src/hooks/useIpfsImageSrc.ts`:
-
-- Recognize any CIDv1 prefix, not just `bafy`. Match `Qm` (CIDv0) OR `baf` (covers `bafy`, `bafk`, `bafyb`, `bafkrei`, etc.) as IPFS hashes that should be served through `IPFS_GATEWAYS`.
-- Keep existing behavior for `http(s)://` URLs and unrecognized strings.
-- Keep gateway-cycling `onError` behavior unchanged.
-
-Effectively the check becomes:
-
-```ts
-if (hash.startsWith("Qm") || hash.startsWith("baf")) { … }
-```
+### 2. `src/components/swap/CheeseSwapWidget.tsx`
+- Hide the red `routeError` banner while `isRetrying` is true OR while `routeLoading` is true. Only show the red banner after retries are exhausted (final failure) or when `noRoute` is true with a clear "No route available for this pair" message.
+- While retrying, keep the existing subtle "Finding best route..." label on the Swap button (already implemented) so the UI looks like it's just working, not failing.
+- Leave the actual swap action, route-fetch parameters, and Alcor endpoints untouched.
 
 ## Out of scope
 
-- No UI/markup changes in `FarmDetail.tsx`.
-- No changes to `ipfsGateways.ts`, farm fetching, or any other module.
-- Not touching unrelated NFT image pipelines (those already handle CIDv1 via `extractIpfsHash`).
+- No changes to `swapApi.ts` request shape, Alcor endpoints, debounce timing, or transaction signing.
+- No changes to other widgets that consume Alcor data.
 
 ## Verification
 
-1. Navigate to `/farm/cheesefarm` — cover image renders (served from `gateway.pinata.cloud/ipfs/bafkrei…`).
-2. If the first gateway fails, `onError` cycles to the next gateway exactly as before.
-3. Existing `Qm…` avatars/logos on other farms still load (regression check on `/farm` list and another farm detail).
+- Open Alcor swap dialog, select CHEESE → WAXWBTC, type an amount.
+- Throttle network or trigger a 429 in DevTools: red banner should NOT appear; button shows "Finding best route…" until route resolves, then becomes "Swap".
+- Genuinely unsupported pair: red "No route available" still shows after retries are exhausted.
