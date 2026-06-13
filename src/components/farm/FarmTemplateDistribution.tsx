@@ -184,10 +184,8 @@ export function FarmTemplateDistribution({ farmName }: FarmTemplateDistributionP
                           ) : (
                             <>
                               <div>
-                                <span className="text-foreground">
+                                <span className="text-white">
                                   {r.countUnknown ? "—" : formatNum(r.stakedInFarm)}
-                                </span>
-                                <span className="text-muted-foreground">
                                   {" "}/ {formatNum(r.circulatingSupply)} circulating
                                 </span>{" "}
                                 <span className="text-cheese">
