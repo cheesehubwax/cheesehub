@@ -236,6 +236,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
   const [isStaking, setIsStaking] = useState(false);
   const [isUnstaking, setIsUnstaking] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
+  const [confirmStakeOpen, setConfirmStakeOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [collectionFilter, setCollectionFilter] = useState<string>("all");
   const [schemaFilter, setSchemaFilter] = useState<string>("all");
