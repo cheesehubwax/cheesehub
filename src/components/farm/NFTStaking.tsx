@@ -9,11 +9,21 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
   Loader2, Search, Layers, CheckSquare, Square, AlertTriangle,
-  RefreshCw, Coins, Image as ImageIcon,
+  RefreshCw, Coins, Image as ImageIcon, Info,
 } from "lucide-react";
 import {
   FarmInfo, fetchUserStakes, fetchFarmStakableConfig,
@@ -226,6 +236,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
   const [isStaking, setIsStaking] = useState(false);
   const [isUnstaking, setIsUnstaking] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
+  const [confirmStakeOpen, setConfirmStakeOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [collectionFilter, setCollectionFilter] = useState<string>("all");
   const [schemaFilter, setSchemaFilter] = useState<string>("all");
@@ -813,6 +824,22 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
     }
   };
 
+  // Wraps handleStake: if the user already has staked NFTs with pending rewards,
+  // open a confirmation dialog first so they know the contract will auto-claim.
+  const willAutoClaimOnStake = stakedNfts.length > 0 && totalPending > 0;
+  const requestStake = () => {
+    if (!accountName || selectedToStake.size === 0) return;
+    if (willAutoClaimOnStake) {
+      setConfirmStakeOpen(true);
+      return;
+    }
+    void handleStake();
+  };
+  const confirmAndStake = () => {
+    setConfirmStakeOpen(false);
+    void handleStake();
+  };
+
   const handleUnstake = async () => {
     if (!accountName || selectedToUnstake.size === 0) return;
     setIsUnstaking(true);
@@ -972,6 +999,21 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
             </TabsList>
 
             <TabsContent value="unstaked" className="mt-4 space-y-3">
+              {willAutoClaimOnStake && (
+                <Alert className="border-cheese/40 bg-cheese/5">
+                  <Info className="h-4 w-4 text-cheese" />
+                  <AlertDescription className="text-xs">
+                    You currently have{" "}
+                    <span className="font-semibold text-cheese">
+                      {pendingRewards
+                        .filter((r) => r.amount > 0)
+                        .map((r) => `${r.amount.toFixed(r.precision)} ${r.symbol}`)
+                        .join(" + ")}
+                    </span>{" "}
+                    pending. Staking additional NFTs will auto-claim your pending rewards as part of the same transaction.
+                  </AlertDescription>
+                </Alert>
+              )}
               <div className="flex items-center justify-between">
                 <Button variant="ghost" size="sm" onClick={selectAllEligible}>
                   {selectedToStake.size === filteredEligible.filter((n) => !globallyStakedMap.has(n.asset_id)).length &&
@@ -980,7 +1022,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
                     : "Select All"}
                 </Button>
                 <Button
-                  onClick={handleStake}
+                  onClick={requestStake}
                   disabled={isStaking || selectedToStake.size === 0 || isExpired}
                   size="sm"
                   className="bg-primary text-primary-foreground"
@@ -1175,6 +1217,47 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
           </CardContent>
         </Card>
       )}
+
+      <AlertDialog open={confirmStakeOpen} onOpenChange={setConfirmStakeOpen}>
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Coins className="h-5 w-5 text-cheese" />
+              Pending rewards will be claimed
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p>
+                  Staking additional NFTs into{" "}
+                  <span className="font-semibold text-cheese">{farm.farm_name}</span>{" "}
+                  will auto-claim your current pending rewards in the same transaction:
+                </p>
+                <div className="rounded-md border border-cheese/30 bg-cheese/5 p-3 space-y-1">
+                  {pendingRewards
+                    .filter((r) => r.amount > 0)
+                    .map((r) => (
+                      <div key={r.symbol} className="flex justify-between font-mono">
+                        <span className="text-muted-foreground">{r.symbol}</span>
+                        <span className="text-cheese">
+                          {r.amount.toFixed(r.precision)}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  This is enforced by the farm smart contract and cannot be skipped.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmAndStake}>
+              Claim & Stake
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
