@@ -85,6 +85,18 @@ cost on every run.
 - **Workflow ran for real when you wanted a dry run** — in the Actions tab,
   "Run workflow" form, set the **dry_run** input to `1` (default is `0`,
   which signs for real). The log will then show `dry_run=true`.
+
+## Table schema
+
+`cheesecheese::staketable` rows look like:
+
+```json
+{ "staker": "someaccount", "cheesestaked": "50000.0000 CHEESE", "staketime": 0, "unstaketime": 0 }
+```
+
+`filterStakers.ts` reads `staker` and `cheesestaked`. Do not rename these to
+`account` / `staked` — that field mismatch silently filters every row out and
+the run reports `eligible: 0` while spending no CHEESE.
 *** Add File: scripts/daily-powerup/package.json
 {
   "name": "daily-powerup",

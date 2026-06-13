@@ -54,9 +54,14 @@ export async function fetchTableAll<T>(
         const data: { rows: T[]; more: boolean; next_key?: string } = await r.json();
         out.push(...(data.rows ?? []));
         if (!data.more || !data.rows?.length) return out;
-        const last = data.rows[data.rows.length - 1] as unknown as { account?: string };
+        const last = data.rows[data.rows.length - 1] as unknown as {
+          staker?: string;
+          account?: string;
+        };
         lower_bound =
-          data.next_key && data.next_key !== "" ? data.next_key : (last?.account ?? "");
+          data.next_key && data.next_key !== ""
+            ? data.next_key
+            : (last?.staker ?? last?.account ?? "");
         if (!data.next_key && lower_bound) lower_bound = lower_bound + " ";
         pageOk = true;
         break;

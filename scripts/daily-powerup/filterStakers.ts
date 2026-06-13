@@ -1,8 +1,8 @@
 // Parse cheesecheese::staketable rows and filter to eligible stakers.
 
 export interface StakeRow {
-  account: string;
-  staked: string;
+  staker: string;
+  cheesestaked: string;
   [k: string]: unknown;
 }
 
@@ -28,9 +28,9 @@ export function filterEligible(
   const seen = new Set<string>();
   const out: EligibleStaker[] = [];
   for (const row of rows) {
-    const account = row.account;
+    const account = row.staker;
     if (!account || exclude.has(account) || seen.has(account)) continue;
-    const staked = parseAssetAmount(row.staked);
+    const staked = parseAssetAmount(row.cheesestaked);
     if (!Number.isFinite(staked) || staked < minStaked) continue;
     seen.add(account);
     out.push({ account, staked });
