@@ -194,29 +194,16 @@ export function FarmTemplateDistribution({ farmName }: FarmTemplateDistributionP
                                   ({r.countUnknown ? "—" : formatPct(r.circulatingPct)})
                                 </span>
                               </div>
-                              <div className="text-muted-foreground">
-                                {r.countUnknown ? "—" : formatNum(r.stakedInFarm)} /{" "}
-                                {formatNum(r.issuedSupply)} issued ·{" "}
-                                {formatNum(r.burnedSupply)} nulled ·{" "}
-                                {r.maxSupply > 0 ? (
-                                  <>
-                                    {formatNum(r.maxSupply)} max{" "}
-                                    <span>({r.countUnknown ? "—" : formatPct(r.maxPct)})</span>
-                                  </>
-                                ) : (
-                                  <>uncapped max</>
-                                )}
-                              </div>
                             </>
                           )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  </div>
                 </div>
-              </>
-            )}
-          </CardContent>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </CardContent>
         </CollapsibleContent>
       </Collapsible>
     </Card>
