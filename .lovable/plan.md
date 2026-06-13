@@ -1,69 +1,46 @@
-## Problem
+# Fix broken CHEESEFARM cover image
 
-Two correctness bugs in the template distribution panel:
+## Root cause
 
-1. **Staked counts are 0.** We assumed the farm contract holds the NFTs (`/accounts/farms.waxdao/{collection}` → per-template `assets`). It doesn't — `farms.waxdao` reports `{"templates":[]}` for `cheesenftwax`. Staked NFTs live in the contract's `stakednfts` table, not the asset escrow.
-2. **Issued supply ignores burns.** Template 894299 shows 18 issued, but 10 have been nulled → only 8 in circulation. The AtomicAssets `templates/{c}/{t}` endpoint returns `issued_supply=18` and no `burned_supply`. We need the dedicated stats endpoint.
+The CHEESEFARM cover image hash on-chain is:
 
-## Fix
+`bafkreiboplxjqffji562begutm4zxcsybcsdinoh5ohgbgsz7hxbcyq334`
 
-### A. Derive staked counts from `stakednfts` (exact, no guessing)
+This is a valid IPFS CIDv1 (raw codec, `bafk…` prefix). However `src/hooks/useIpfsImageSrc.ts` only prepends an IPFS gateway when the hash starts with `Qm` or `bafy`:
 
-Reuse the same data path the Stakers table already loads:
-
-- Call `fetchFarmStakers(farmName)` → flattens to a deduped `assetIds[]`.
-- Call `fetchAssetsMetadata(assetIds)` (bulk, in chunks; already used by `useStakerAssetMeta`) → each `StakerAssetMeta` carries `collection` + `template_id`.
-- Group locally: `Map<"{collection}:{template_id}", number>`.
-
-This gives the exact count of NFTs staked in this farm per template, with zero new endpoints and no farm-escrow assumption. Concurrency is bounded by the existing bulk-metadata fetcher.
-
-### B. Use the templates `stats` endpoint for circulating supply
-
-Verified shape:
-
-```
-GET /atomicassets/v1/templates/{collection}/{template_id}/stats
-→ { success: true, data: { assets: "18", burned: "10" } }
+```ts
+if (hash.startsWith("Qm") || hash.startsWith("bafy")) {
+  return `${IPFS_GATEWAYS[gatewayIdx % IPFS_GATEWAYS.length]}${hash}`;
+}
+return hash;
 ```
 
-In `fetchTemplateStats`, do **two** calls per template (still cached, still concurrency-capped):
+Because `bafkrei…` matches neither, the raw CID is returned as the `src` and the browser fails to load it — that's the broken cover the user is seeing.
 
-- `/templates/{c}/{t}` → `name`, `image`, `issuedSupply`, `maxSupply` (unchanged)
-- `/templates/{c}/{t}/stats` → `burnedSupply`
+Same hook is also used by `FarmCard` logo and other farms, so any farm whose creator pastes a CIDv1 (very common on AtomicHub / IPFS uploaders today) currently shows a broken image.
 
-Compute `circulatingSupply = max(0, issuedSupply - burnedSupply)`.
+## Change
 
-### C. UI: show both denominators
+Single-file edit to `src/hooks/useIpfsImageSrc.ts`:
 
-Per the earlier "show both" choice, render two lines per row:
+- Recognize any CIDv1 prefix, not just `bafy`. Match `Qm` (CIDv0) OR `baf` (covers `bafy`, `bafk`, `bafyb`, `bafkrei`, etc.) as IPFS hashes that should be served through `IPFS_GATEWAYS`.
+- Keep existing behavior for `http(s)://` URLs and unrecognized strings.
+- Keep gateway-cycling `onError` behavior unchanged.
 
-- `staked / circulating (pct%)` — primary, cheese-colored
-- `staked / issued · N burned · max` (or `uncapped`)
+Effectively the check becomes:
 
-`countUnknown` semantics stay the same: if stakers fail to load, show `—` for staked + percentages; supply still renders.
+```ts
+if (hash.startsWith("Qm") || hash.startsWith("baf")) { … }
+```
 
-### D. Remove dead code
+## Out of scope
 
-Drop `fetchFarmTemplateCounts` and the `FARM_CONTRACT`/accounts code path from `src/lib/farmTemplateStats.ts` — no longer used.
-
-## Files to change
-
-- `src/lib/farmTemplateStats.ts` — remove `fetchFarmTemplateCounts`; extend `fetchTemplateStats` to also fetch `/stats` and return `burnedSupply` + `circulatingSupply`; add a `fetchFarmStakedCountsByTemplate(farmName)` helper that calls `fetchFarmStakers` + `fetchAssetsMetadata` and returns the `Map`.
-- `src/hooks/useFarmTemplateDistribution.ts` — swap the counts source; recompute `issuedPct` against circulating supply (and keep a separate `maxPct` against `maxSupply`); extend `TemplateDistributionRow` with `circulatingSupply` and `burnedSupply`.
-- `src/components/farm/FarmTemplateDistribution.tsx` — render the new two-line breakdown.
+- No UI/markup changes in `FarmDetail.tsx`.
+- No changes to `ipfsGateways.ts`, farm fetching, or any other module.
+- Not touching unrelated NFT image pipelines (those already handle CIDv1 via `extractIpfsHash`).
 
 ## Verification
 
-On `/farm/cheesefarm`, template #894299 (`$CHEESE Mug 1`) should show:
-
-```
-7 / 8 circulating (87.5%)
-7 / 18 issued · 10 nulled · uncapped max
-```
-
-Network panel:
-
-- 1× `stakednfts` pagination (existing)
-- 1× bulk `assets?ids=...` per ~100 staked assets (existing path)
-- 2× `templates/...` calls per template (detail + stats), both 200s
-- Zero `count=true` requests, zero `/accounts/farms.waxdao/...` requests.
+1. Navigate to `/farm/cheesefarm` — cover image renders (served from `gateway.pinata.cloud/ipfs/bafkrei…`).
+2. If the first gateway fails, `onError` cycles to the next gateway exactly as before.
+3. Existing `Qm…` avatars/logos on other farms still load (regression check on `/farm` list and another farm detail).

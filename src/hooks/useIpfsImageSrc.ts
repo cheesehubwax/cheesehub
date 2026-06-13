@@ -8,7 +8,7 @@ export function useIpfsImageSrc(hash: string | undefined) {
   const src = useMemo(() => {
     if (!hash) return "";
     if (hash.startsWith("http")) return hash;
-    if (hash.startsWith("Qm") || hash.startsWith("bafy")) {
+    if (hash.startsWith("Qm") || hash.startsWith("baf")) {
       return `${IPFS_GATEWAYS[gatewayIdx % IPFS_GATEWAYS.length]}${hash}`;
     }
     return hash;
