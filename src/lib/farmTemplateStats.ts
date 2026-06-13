@@ -11,7 +11,7 @@
 
 import { fetchWithFallback } from "./fetchWithFallback";
 import { ATOMIC_API } from "./waxConfig";
-import { FARM_CONTRACT } from "./farm";
+import { fetchFarmStakers, fetchAssetsMetadata } from "./farmStakers";
 
 export const TEMPLATE_DISTRIBUTION_MAX = 50;
 export const TEMPLATE_FETCH_CONCURRENCY = 5;
@@ -35,6 +35,8 @@ export interface TemplateStats {
   image: string;
   issuedSupply: number;
   maxSupply: number; // 0 = uncapped
+  burnedSupply: number;
+  circulatingSupply: number; // max(0, issued - burned)
 }
 
 export async function fetchTemplateStats(
@@ -42,55 +44,66 @@ export async function fetchTemplateStats(
   templateId: number,
 ): Promise<TemplateStats> {
   const path = `/atomicassets/v1/templates/${encodeURIComponent(collection)}/${encodeURIComponent(String(templateId))}`;
-  const res = await fetchWithFallback(ATOMIC_API.baseUrls, path);
-  const json = await res.json();
+  const statsPath = `${path}/stats`;
+  const [detailRes, statsRes] = await Promise.all([
+    fetchWithFallback(ATOMIC_API.baseUrls, path),
+    fetchWithFallback(ATOMIC_API.baseUrls, statsPath).catch(() => null),
+  ]);
+  const json = await detailRes.json();
   if (!json?.success || !json.data) {
     throw new Error(`Template ${collection}/${templateId} not found`);
   }
   const data = json.data;
   const immutable = (data.immutable_data || {}) as Record<string, string | undefined>;
+  const issuedSupply = Number(data.issued_supply ?? 0);
+  const maxSupply = Number(data.max_supply ?? 0);
+
+  let burnedSupply = 0;
+  if (statsRes) {
+    try {
+      const sj = await statsRes.json();
+      if (sj?.success && sj.data) {
+        const b = Number(sj.data.burned ?? 0);
+        if (Number.isFinite(b)) burnedSupply = b;
+      }
+    } catch {
+      // ignore — burned stays 0
+    }
+  }
+
   return {
     templateId,
     collection,
     name: immutable.name || data.name || `Template #${templateId}`,
     image: toImageUrl(immutable.img || immutable.image),
-    issuedSupply: Number(data.issued_supply ?? 0),
-    maxSupply: Number(data.max_supply ?? 0),
+    issuedSupply,
+    maxSupply,
+    burnedSupply,
+    circulatingSupply: Math.max(0, issuedSupply - burnedSupply),
   };
 }
 
 /**
- * Per-template asset counts currently held by the farm contract, for the
- * given list of collections. One request per unique collection via the
- * AtomicAssets accounts endpoint:
- *   GET /atomicassets/v1/accounts/{owner}/{collection_name}
- * Returns a map keyed by `"{collection}:{template_id}"` → count.
+ * Exact per-template staked counts for a farm. Pulls the farm's
+ * `stakednfts` rows (asset ids actually staked) and resolves each id to
+ * its `{collection, template_id}` via the AtomicAssets bulk assets
+ * endpoint, then counts locally. Returns a map keyed by
+ * `"{collection}:{template_id}"` → count.
  */
-export async function fetchFarmTemplateCounts(
-  collections: string[],
+export async function fetchFarmStakedCountsByTemplate(
+  farmName: string,
 ): Promise<Map<string, number>> {
-  const unique = Array.from(new Set(collections.filter(Boolean)));
   const out = new Map<string, number>();
-  if (unique.length === 0) return out;
-
-  await mapWithConcurrency(unique, TEMPLATE_FETCH_CONCURRENCY, async (collection) => {
-    const path = `/atomicassets/v1/accounts/${encodeURIComponent(FARM_CONTRACT)}/${encodeURIComponent(collection)}`;
-    const res = await fetchWithFallback(ATOMIC_API.baseUrls, path);
-    const json = await res.json();
-    if (!json?.success || !json.data) {
-      throw new Error(`Account templates for ${collection} failed`);
-    }
-    const templates = (json.data.templates || []) as Array<{
-      template_id: string | number;
-      assets: string | number;
-    }>;
-    for (const t of templates) {
-      const tid = String(t.template_id);
-      const n = Number(t.assets);
-      out.set(`${collection}:${tid}`, Number.isFinite(n) ? n : 0);
-    }
-  });
-
+  const stakers = await fetchFarmStakers(farmName);
+  const allIds = stakers.flatMap((s) => s.assetIds);
+  if (allIds.length === 0) return out;
+  const meta = await fetchAssetsMetadata(allIds);
+  for (const id of allIds) {
+    const m = meta.get(id);
+    if (!m || !m.collection || !m.template_id) continue;
+    const key = `${m.collection}:${m.template_id}`;
+    out.set(key, (out.get(key) ?? 0) + 1);
+  }
   return out;
 }
 
