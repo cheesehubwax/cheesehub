@@ -214,14 +214,19 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownEntry[]> {
   const after30d = getAgo(30);
 
   const results = await Promise.all(
-    NULL_CONTRACTS.map(async ({ account, displayName }) => ({
-      contract: account,
-      displayName,
-      amount: await fetchContractNulled(account),
-      amount24h: await fetchContractNulledFromHyperion(account, after24h),
-      amount7d: await fetchContractNulledFromHyperion(account, after7d),
-      amount30d: await fetchContractNulledFromHyperion(account, after30d),
-    }))
+    NULL_CONTRACTS.map(async ({ account, displayName }) => {
+      const windowFetch = account === 'cheesepowerz'
+        ? fetchCheesepowerzReceivedWindow
+        : (after: string) => fetchContractNulledFromHyperion(account, after);
+      return {
+        contract: account,
+        displayName,
+        amount: await fetchContractNulled(account),
+        amount24h: await windowFetch(after24h),
+        amount7d: await windowFetch(after7d),
+        amount30d: await windowFetch(after30d),
+      };
+    })
   );
 
   const grandTotal = results.reduce((sum, r) => sum + r.amount, 0);
