@@ -35,7 +35,6 @@ const MAX_BISECT_OPS = 20;
 const POWERUP_TARGET = "cheesepowerz";
 const TRANSFER_AMOUNT = `${POWERUP_AMOUNT.toFixed(4)} CHEESE`;
 
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 const log = (...args: unknown[]) => console.log("[powerup]", ...args);
 
 function chunk<T>(arr: T[], size: number): T[][] {
