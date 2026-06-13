@@ -113,9 +113,53 @@ async function main() {
     throw new Error("WAX_DAILYPOWER_KEY env var is required");
   }
 
-  log("reading cheesecheese::staketable...");
-  const rows = await fetchTableAll<StakeRow>("cheesecheese", "cheesecheese", "staketable", 1000);
-  log(`fetched ${rows.length} rows`);
+  log("reading cheesecheese::staketable (3 independent scans)...");
+  const scans = await Promise.all(
+    [0, 1, 2].map(async idx => {
+      try {
+        const r = await fetchTableAll<StakeRow>(
+          "cheesecheese",
+          "cheesecheese",
+          "staketable",
+          1000,
+          idx
+        );
+        log(`scan #${idx + 1}: ${r.length} rows`);
+        return r;
+      } catch (e) {
+        log(`scan #${idx + 1} FAILED:`, e instanceof Error ? e.message : String(e));
+        return [] as StakeRow[];
+      }
+    })
+  );
+
+  const maxLen = Math.max(...scans.map(s => s.length));
+  if (maxLen === 0) throw new Error("All 3 staketable scans returned 0 rows");
+  for (const [i, s] of scans.entries()) {
+    if (s.length < maxLen * 0.9) {
+      log(
+        `WARN: scan #${i + 1} returned ${s.length} rows (< 90% of max ${maxLen}); merged set still used`
+      );
+    }
+  }
+
+  // Merge by staker; keep highest cheesestaked seen across passes for safety.
+  const merged = new Map<string, StakeRow>();
+  for (const scan of scans) {
+    for (const row of scan) {
+      if (!row?.staker) continue;
+      const prev = merged.get(row.staker);
+      if (!prev) {
+        merged.set(row.staker, row);
+        continue;
+      }
+      const prevAmt = parseFloat(String(prev.cheesestaked).split(" ")[0]) || 0;
+      const curAmt = parseFloat(String(row.cheesestaked).split(" ")[0]) || 0;
+      if (curAmt > prevAmt) merged.set(row.staker, row);
+    }
+  }
+  const rows = Array.from(merged.values());
+  log(`merged distinct stakers: ${rows.length}`);
 
   let eligible = filterEligible(rows, MIN_STAKED, [SIGNER]);
   log(`eligible (>= ${MIN_STAKED} CHEESE): ${eligible.length}`);

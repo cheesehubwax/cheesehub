@@ -21,15 +21,22 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = TIME
 
 /**
  * Fetch all rows of a table, paginating until `more === false`.
+ * `startEndpointIndex` rotates the *preferred* endpoint per call so callers
+ * doing multiple independent scans don't all favor the same RPC. The full
+ * endpoint list still serves as fallback for each page.
  */
 export async function fetchTableAll<T>(
   code: string,
   scope: string,
   table: string,
-  pageSize = 1000
+  pageSize = 1000,
+  startEndpointIndex = 0
 ): Promise<T[]> {
   const out: T[] = [];
   let lower_bound = "";
+  const rotated = ENDPOINTS.map(
+    (_, i) => ENDPOINTS[(startEndpointIndex + i) % ENDPOINTS.length]
+  );
   for (let i = 0; i < 50; i++) {
     const body = JSON.stringify({
       json: true,
@@ -43,7 +50,7 @@ export async function fetchTableAll<T>(
 
     let pageOk = false;
     let lastErr: unknown = null;
-    for (const ep of ENDPOINTS) {
+    for (const ep of rotated) {
       try {
         const r = await fetchWithTimeout(`${ep}/v1/chain/get_table_rows`, {
           method: "POST",
