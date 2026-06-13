@@ -1,39 +1,87 @@
-## Goal
+## Per-Template Staked % (Owner-Only, Manual Compute, ≤ 50 Templates)
 
-For busy farms, stop auto-loading any NFT thumbnails in the Current Stakers table. Each row shows only the wallet + staked count + a single `+N` expander button. Clicking the expander reveals that wallet's thumbnails (first 8, then a further `+N` to see the rest, exactly like today). This prevents AtomicAssets / IPFS request storms on farms like PixelJourney (~23k staked NFTs).
+Add a collapsible "Template Distribution" panel above `FarmStakersTable` on the farm detail page, **visible only to the farm creator**. Manual-trigger only.
 
-## Trigger
+### Visibility gate
 
-A farm is considered "large" when `totalStaked >= 500` (sum of `assetIds.length` across all stakers).
+`FarmDetail.tsx` already computes `const isCreator = accountName === farm.creator;`. Pass `isCreator` to the new component and render nothing when false. Non-owners see no panel and trigger zero extra network calls.
 
-- Small farm (< 500): unchanged behaviour — each row auto-renders up to 8 thumbnails, with `+N` expander for the rest.
-- Large farm (>= 500): every row starts fully collapsed — zero thumbnails rendered, only a `+{assetIds.length}` button. Clicking it expands that row to the normal "8 thumbs + further expander" view the user already knows.
+### Eligibility (owner view)
 
-The 500 threshold lives as a single constant (`LARGE_FARM_THRESHOLD = 500`) at the top of `FarmStakersTable.tsx` so it's easy to tune later.
+Read from existing `fetchFarmStakableConfig(farmName)` (React Query cached):
 
-## Scope of changes
+- `templates.length === 0` → panel hidden (farm stakes by schema/collection/attribute; out of scope).
+- `templates.length > 50` → panel renders disabled with: "Template distribution unavailable — this farm accepts more than 50 templates."
+- `1 ≤ templates.length ≤ 50` → panel renders with a "Compute distribution" button.
 
-Only `src/components/farm/FarmStakersTable.tsx`. No data-layer, hook, or fetching changes — `useFarmStakers` / `fetchAssetsMetadata` already gate network calls on visible asset ids, so rendering zero thumbs means zero requests.
+### Data sources (only after button click)
 
-### Edits in `FarmStakersTable.tsx`
+For each allowed template `{ collection, template_id }`:
 
-1. Add `const LARGE_FARM_THRESHOLD = 500;`
-2. Compute `const isLargeFarm = totalStaked >= LARGE_FARM_THRESHOLD;` in `FarmStakersTable`.
-3. Pass `isLargeFarm` into each `StakerRow`.
-4. In `StakerRow`, introduce a `collapsedAll` state derived from `isLargeFarm && !userExpanded`:
-   - When `collapsedAll` is true: render no `<Thumb>` elements; render only one button `+{assetIds.length} ▾` that, when clicked, sets the row to the existing "expanded preview" view (first 8 thumbs + existing `+N` further expander).
-   - When the user collapses again, it returns to the `+{assetIds.length}` state.
-5. Keep `useStakerAssetMeta(visibleIds, inView)` — when `visibleIds` is empty no fetch fires (hook already guards on `assetIds.length > 0`).
-6. Adjust `estimateSize` so collapsed-all rows use the slim height (~56 px) since there are no thumb rows. Existing `measureElement` corrects any drift.
-7. Header badge gets a small hint on large farms: `… NFTs · click +N to load thumbnails` (muted), so users understand why rows look empty.
+1. **Issued / max supply + name + image** — `GET /atomicassets/v2/templates/{collection}/{template_id}`. One call per template. Concurrency 5. Cached `staleTime: 10m`.
+2. **Staked count per template in this farm** — `GET /atomicassets/v2/assets?collection_name={c}&template_id={t}&owner={FARM_CONTRACT}&page=1&limit=1&count=true`. The `data` field returns the total count. One call per template. Concurrency 5.
+
+Both go through `fetchWithFallback(ATOMIC_API.baseUrls, path)` — multi-endpoint fallback + 429 backoff already apply.
+
+Total: ~2 × N calls (max 100 for a 50-template farm), ~2–3s end-to-end.
+
+### UI
+
+New component: `src/components/farm/FarmTemplateDistribution.tsx`
+
+- Header: emoji + "Template Distribution" + small muted hint ("X templates · owner-only · click to compute").
+- Idle: single "Compute distribution" button.
+- Loading: skeleton rows, spinner on button, "X / Y templates loaded" progress.
+- Loaded: list sorted by `% issued` desc. Each row:
+
+  ```text
+  [thumb 32x32] #template_id  Template Name              1,234 / 5,000 issued (24.7%)
+                              collection · atomichub link  1,234 / 10,000 max (12.3%)
+                              [progress bar — issued %]
+  ```
+
+- Failed templates show "—" with small retry icon.
+- "Recompute" button after load (bypasses staleTime).
+- `Collapsible` from `@/components/ui/collapsible`, collapsed by default.
+
+### Wiring
+
+`src/components/farm/FarmDetail.tsx` — render directly above `<FarmStakersTable />`, gated on `isCreator`:
+
+```tsx
+{isCreator && <FarmTemplateDistribution farmName={farmName} />}
+```
+
+### Technical details
+
+New files:
+
+- `src/lib/farmTemplateStats.ts`
+  - `fetchTemplateStats(collection, templateId)` → `{ issued_supply, max_supply, name, image }`
+  - `fetchTemplateStakedCount(collection, templateId)` → `number`
+  - `TEMPLATE_DISTRIBUTION_MAX = 50`, `TEMPLATE_FETCH_CONCURRENCY = 5`
+- `src/hooks/useFarmTemplateDistribution.ts`
+  - Inputs: `farmName`, `templates: StakableTemplate[]`, `enabled: boolean`
+  - `useQueries` returning per-template `{ templateId, collection, name, image, issuedSupply, maxSupply, stakedInFarm, issuedPct, maxPct, error }`
+  - `staleTime: 10m`, `gcTime: 30m`. Internal p-limit-style helper caps in-flight at 5.
+- `src/components/farm/FarmTemplateDistribution.tsx` — UI only, consumes the hook.
+
+Reused: `fetchFarmStakableConfig` (cached), `ATOMIC_API.baseUrls` + `fetchWithFallback`, IPFS helpers from `src/lib/ipfsGateways.ts`.
 
 ### Out of scope
 
-- `useFarmStakers.ts`, `farmStakers.ts`, virtualizer config, paging caps — unchanged.
-- Daily-powerup workflow — unchanged (still paused).
+- Showing the panel to non-owners.
+- Schema / collection grouping (deferred).
+- Auto-loading (always manual button).
+- Changes to `FarmStakersTable`, `useFarmStakers`, `farmStakers.ts`, daily-powerup workflow.
+- Cross-session / localStorage persistence (React Query session cache only).
 
-## Verification
+### Verification
 
-- `/farm/cheesefarm` (small): behaviour identical to today — thumbs render up to 8 on each row.
-- `/farm/pixeljourney` (large, ~23k staked): table opens with zero AtomicAssets requests, all rows show only `+N` buttons. Expanding a single wallet triggers exactly one metadata batch (≤ 8 ids). Collapsing then re-expanding the same wallet triggers zero new network requests (module-level `assetMetaMemo` already covers it).
-- Network panel: at most one `atomicassets/v1/assets?ids=…` request per user-initiated expand on large farms; none on load.
+- `/farm/cheesefarm` as creator: panel renders, button loads in < 2s, percentages match `atomichub.io`.
+- `/farm/cheesefarm` as non-creator: panel does not render, no extra network calls.
+- `/farm/pixeljourney` as creator (large staked, template-locked): no auto-load; click fires exactly 2×N atomic calls.
+- Farm with > 50 templates (as creator): disabled message, no calls.
+- Farm with 0 templates: panel hidden entirely.
+- Recompute bypasses cache and refires.
+- 429 / endpoint failure: per-row error state with retry.
