@@ -117,7 +117,7 @@ export function FarmTemplateDistribution({ farmName }: FarmTemplateDistributionP
               <>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>
-                    {rows.length} template{rows.length === 1 ? "" : "s"} · sorted by issued %
+                    {rows.length} template{rows.length === 1 ? "" : "s"} · sorted by circulating %
                   </span>
                   <Button
                     variant="outline"
@@ -131,7 +131,7 @@ export function FarmTemplateDistribution({ farmName }: FarmTemplateDistributionP
                 </div>
                 <div className="rounded-md border border-border/50 overflow-hidden divide-y divide-border/40">
                   {rows.map((r) => {
-                    const pctValue = r.issuedPct ?? 0;
+                    const pctValue = r.circulatingPct ?? 0;
                     const ahUrl = `https://atomichub.io/explorer/template/wax-mainnet/${r.collection}/${r.templateId}`;
                     return (
                       <div
@@ -186,15 +186,20 @@ export function FarmTemplateDistribution({ farmName }: FarmTemplateDistributionP
                                 <span className="text-foreground">
                                   {r.countUnknown ? "—" : formatNum(r.stakedInFarm)}
                                 </span>
-                                <span className="text-muted-foreground"> / {formatNum(r.issuedSupply)} issued</span>{" "}
+                                <span className="text-muted-foreground">
+                                  {" "}/ {formatNum(r.circulatingSupply)} circulating
+                                </span>{" "}
                                 <span className="text-cheese">
-                                  ({r.countUnknown ? "—" : formatPct(r.issuedPct)})
+                                  ({r.countUnknown ? "—" : formatPct(r.circulatingPct)})
                                 </span>
                               </div>
                               <div className="text-muted-foreground">
+                                {r.countUnknown ? "—" : formatNum(r.stakedInFarm)} /{" "}
+                                {formatNum(r.issuedSupply)} issued ·{" "}
+                                {formatNum(r.burnedSupply)} nulled ·{" "}
                                 {r.maxSupply > 0 ? (
                                   <>
-                                    {r.countUnknown ? "—" : formatNum(r.stakedInFarm)} / {formatNum(r.maxSupply)} max{" "}
+                                    {formatNum(r.maxSupply)} max{" "}
                                     <span>({r.countUnknown ? "—" : formatPct(r.maxPct)})</span>
                                   </>
                                 ) : (

@@ -1,87 +1,69 @@
-## Per-Template Staked % (Owner-Only, Manual Compute, ≤ 50 Templates)
+## Problem
 
-Add a collapsible "Template Distribution" panel above `FarmStakersTable` on the farm detail page, **visible only to the farm creator**. Manual-trigger only.
+Two correctness bugs in the template distribution panel:
 
-### Visibility gate
+1. **Staked counts are 0.** We assumed the farm contract holds the NFTs (`/accounts/farms.waxdao/{collection}` → per-template `assets`). It doesn't — `farms.waxdao` reports `{"templates":[]}` for `cheesenftwax`. Staked NFTs live in the contract's `stakednfts` table, not the asset escrow.
+2. **Issued supply ignores burns.** Template 894299 shows 18 issued, but 10 have been nulled → only 8 in circulation. The AtomicAssets `templates/{c}/{t}` endpoint returns `issued_supply=18` and no `burned_supply`. We need the dedicated stats endpoint.
 
-`FarmDetail.tsx` already computes `const isCreator = accountName === farm.creator;`. Pass `isCreator` to the new component and render nothing when false. Non-owners see no panel and trigger zero extra network calls.
+## Fix
 
-### Eligibility (owner view)
+### A. Derive staked counts from `stakednfts` (exact, no guessing)
 
-Read from existing `fetchFarmStakableConfig(farmName)` (React Query cached):
+Reuse the same data path the Stakers table already loads:
 
-- `templates.length === 0` → panel hidden (farm stakes by schema/collection/attribute; out of scope).
-- `templates.length > 50` → panel renders disabled with: "Template distribution unavailable — this farm accepts more than 50 templates."
-- `1 ≤ templates.length ≤ 50` → panel renders with a "Compute distribution" button.
+- Call `fetchFarmStakers(farmName)` → flattens to a deduped `assetIds[]`.
+- Call `fetchAssetsMetadata(assetIds)` (bulk, in chunks; already used by `useStakerAssetMeta`) → each `StakerAssetMeta` carries `collection` + `template_id`.
+- Group locally: `Map<"{collection}:{template_id}", number>`.
 
-### Data sources (only after button click)
+This gives the exact count of NFTs staked in this farm per template, with zero new endpoints and no farm-escrow assumption. Concurrency is bounded by the existing bulk-metadata fetcher.
 
-For each allowed template `{ collection, template_id }`:
+### B. Use the templates `stats` endpoint for circulating supply
 
-1. **Issued / max supply + name + image** — `GET /atomicassets/v2/templates/{collection}/{template_id}`. One call per template. Concurrency 5. Cached `staleTime: 10m`.
-2. **Staked count per template in this farm** — `GET /atomicassets/v2/assets?collection_name={c}&template_id={t}&owner={FARM_CONTRACT}&page=1&limit=1&count=true`. The `data` field returns the total count. One call per template. Concurrency 5.
+Verified shape:
 
-Both go through `fetchWithFallback(ATOMIC_API.baseUrls, path)` — multi-endpoint fallback + 429 backoff already apply.
-
-Total: ~2 × N calls (max 100 for a 50-template farm), ~2–3s end-to-end.
-
-### UI
-
-New component: `src/components/farm/FarmTemplateDistribution.tsx`
-
-- Header: emoji + "Template Distribution" + small muted hint ("X templates · owner-only · click to compute").
-- Idle: single "Compute distribution" button.
-- Loading: skeleton rows, spinner on button, "X / Y templates loaded" progress.
-- Loaded: list sorted by `% issued` desc. Each row:
-
-  ```text
-  [thumb 32x32] #template_id  Template Name              1,234 / 5,000 issued (24.7%)
-                              collection · atomichub link  1,234 / 10,000 max (12.3%)
-                              [progress bar — issued %]
-  ```
-
-- Failed templates show "—" with small retry icon.
-- "Recompute" button after load (bypasses staleTime).
-- `Collapsible` from `@/components/ui/collapsible`, collapsed by default.
-
-### Wiring
-
-`src/components/farm/FarmDetail.tsx` — render directly above `<FarmStakersTable />`, gated on `isCreator`:
-
-```tsx
-{isCreator && <FarmTemplateDistribution farmName={farmName} />}
+```
+GET /atomicassets/v1/templates/{collection}/{template_id}/stats
+→ { success: true, data: { assets: "18", burned: "10" } }
 ```
 
-### Technical details
+In `fetchTemplateStats`, do **two** calls per template (still cached, still concurrency-capped):
 
-New files:
+- `/templates/{c}/{t}` → `name`, `image`, `issuedSupply`, `maxSupply` (unchanged)
+- `/templates/{c}/{t}/stats` → `burnedSupply`
 
-- `src/lib/farmTemplateStats.ts`
-  - `fetchTemplateStats(collection, templateId)` → `{ issued_supply, max_supply, name, image }`
-  - `fetchTemplateStakedCount(collection, templateId)` → `number`
-  - `TEMPLATE_DISTRIBUTION_MAX = 50`, `TEMPLATE_FETCH_CONCURRENCY = 5`
-- `src/hooks/useFarmTemplateDistribution.ts`
-  - Inputs: `farmName`, `templates: StakableTemplate[]`, `enabled: boolean`
-  - `useQueries` returning per-template `{ templateId, collection, name, image, issuedSupply, maxSupply, stakedInFarm, issuedPct, maxPct, error }`
-  - `staleTime: 10m`, `gcTime: 30m`. Internal p-limit-style helper caps in-flight at 5.
-- `src/components/farm/FarmTemplateDistribution.tsx` — UI only, consumes the hook.
+Compute `circulatingSupply = max(0, issuedSupply - burnedSupply)`.
 
-Reused: `fetchFarmStakableConfig` (cached), `ATOMIC_API.baseUrls` + `fetchWithFallback`, IPFS helpers from `src/lib/ipfsGateways.ts`.
+### C. UI: show both denominators
 
-### Out of scope
+Per the earlier "show both" choice, render two lines per row:
 
-- Showing the panel to non-owners.
-- Schema / collection grouping (deferred).
-- Auto-loading (always manual button).
-- Changes to `FarmStakersTable`, `useFarmStakers`, `farmStakers.ts`, daily-powerup workflow.
-- Cross-session / localStorage persistence (React Query session cache only).
+- `staked / circulating (pct%)` — primary, cheese-colored
+- `staked / issued · N burned · max` (or `uncapped`)
 
-### Verification
+`countUnknown` semantics stay the same: if stakers fail to load, show `—` for staked + percentages; supply still renders.
 
-- `/farm/cheesefarm` as creator: panel renders, button loads in < 2s, percentages match `atomichub.io`.
-- `/farm/cheesefarm` as non-creator: panel does not render, no extra network calls.
-- `/farm/pixeljourney` as creator (large staked, template-locked): no auto-load; click fires exactly 2×N atomic calls.
-- Farm with > 50 templates (as creator): disabled message, no calls.
-- Farm with 0 templates: panel hidden entirely.
-- Recompute bypasses cache and refires.
-- 429 / endpoint failure: per-row error state with retry.
+### D. Remove dead code
+
+Drop `fetchFarmTemplateCounts` and the `FARM_CONTRACT`/accounts code path from `src/lib/farmTemplateStats.ts` — no longer used.
+
+## Files to change
+
+- `src/lib/farmTemplateStats.ts` — remove `fetchFarmTemplateCounts`; extend `fetchTemplateStats` to also fetch `/stats` and return `burnedSupply` + `circulatingSupply`; add a `fetchFarmStakedCountsByTemplate(farmName)` helper that calls `fetchFarmStakers` + `fetchAssetsMetadata` and returns the `Map`.
+- `src/hooks/useFarmTemplateDistribution.ts` — swap the counts source; recompute `issuedPct` against circulating supply (and keep a separate `maxPct` against `maxSupply`); extend `TemplateDistributionRow` with `circulatingSupply` and `burnedSupply`.
+- `src/components/farm/FarmTemplateDistribution.tsx` — render the new two-line breakdown.
+
+## Verification
+
+On `/farm/cheesefarm`, template #894299 (`$CHEESE Mug 1`) should show:
+
+```
+7 / 8 circulating (87.5%)
+7 / 18 issued · 10 nulled · uncapped max
+```
+
+Network panel:
+
+- 1× `stakednfts` pagination (existing)
+- 1× bulk `assets?ids=...` per ~100 staked assets (existing path)
+- 2× `templates/...` calls per template (detail + stats), both 200s
+- Zero `count=true` requests, zero `/accounts/farms.waxdao/...` requests.
