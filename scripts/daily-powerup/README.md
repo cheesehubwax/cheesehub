@@ -5,15 +5,17 @@ staked, plus the signing account itself, once per day at 00:00 UTC.
 
 ## What it does
 
-1. **Self-powerup** — `power.chz` -> `cheesepowerz`, 1 CHEESE, memo `power.chz`,
-   so the signing account has CPU to send the rest.
-2. Reads every row of `cheesecheese::staketable`.
-3. Keeps accounts with `staked >= 5000 CHEESE` (excludes the signer).
-4. Pre-validates each account exists on-chain.
-5. Sends `1.0000 CHEESE` from `power.chz` -> `cheesepowerz` with the staker's
+1. Reads every row of `cheesecheese::staketable`.
+2. Keeps accounts with `staked >= 5000 CHEESE` (excludes the signer).
+3. Pre-validates each account exists on-chain.
+4. Sends `1.0000 CHEESE` from `power.chz` -> `cheesepowerz` with the staker's
    account name as the memo (CPU-only powerup).
-6. Batches 50 transfers per tx. If a batch fails, bisects to drop bad account(s).
+5. Batches 50 transfers per tx. If a batch fails, bisects to drop bad account(s).
    Run exits non-zero if anything ultimately failed.
+
+`power.chz` relies on its own staked WAX (CPU/NET) to sign these transactions —
+there is no self-powerup phase. Keep it staked with enough CPU to cover
+~`ceil(eligible / 50)` transactions per day (plus headroom for bisect retries).
 
 ## Required env / secrets
 
@@ -51,8 +53,8 @@ number in `(0, 100]`. `MIN_STAKED` must be a finite number `>= 0`.
 3. Add the private key to GitHub repo secrets as `WAX_DAILYPOWER_KEY`.
 4. Add repo variables `WAX_SIGNER_ACCOUNT=power.chz` and
    `WAX_SIGNER_PERMISSION=dailypower`.
-5. Keep `power.chz` topped up with a small baseline of staked WAX so the
-   very first self-powerup tx can land each day.
+5. Keep `power.chz` staked with enough WAX (CPU/NET) to cover the daily batch
+   of transfers (~1 tx per 50 stakers, plus a margin for bisect retries).
 
 ## Manual / local invocation
 
@@ -71,8 +73,8 @@ bun run run.ts
 
 ## CHEESE budget
 
-`(eligible_stakers + 1) * 1.0000 CHEESE` per day. The script prints the
-projected cost on every run.
+`eligible_stakers * 1.0000 CHEESE` per day. The script prints the projected
+cost on every run.
 *** Add File: scripts/daily-powerup/package.json
 {
   "name": "daily-powerup",
