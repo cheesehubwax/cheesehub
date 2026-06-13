@@ -106,6 +106,45 @@ async function fetchContractNulledFromHyperion(account: string, after?: string):
   return total;
 }
 
+// cheesepowerz nulls 100% of CHEESE it receives. Its outgoing null may be
+// performed via `cheeseburger::retire` (not a transfer to eosio.null), and
+// even when it is a transfer-to-null the indexer lag can hide it for
+// minutes/hours. To stay consistent with the lifetime counter
+// (`stats.total_cheese_received`), derive windowed totals from inflows:
+// sum CHEESE transfers TO cheesepowerz in the window.
+async function fetchCheesepowerzReceivedWindow(after: string): Promise<number> {
+  const endpoint = await pickHyperionEndpoint();
+  let total = 0;
+  let skip = 0;
+
+  while (skip < MAX_ACTIONS) {
+    const url =
+      `${endpoint}?act.account=cheeseburger&act.name=transfer` +
+      `&transfer.to=cheesepowerz&limit=${BATCH_SIZE}&skip=${skip}&after=${after}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Hyperion API error: ${response.status}`);
+
+    const data = await response.json();
+    const actions = data.actions;
+
+    if (!actions || actions.length === 0) break;
+
+    for (const action of actions) {
+      const d = action.act?.data;
+      // Defensive: ensure the recipient is actually cheesepowerz and the
+      // quantity is CHEESE (the act filter already enforces the contract).
+      if (d?.to === 'cheesepowerz' && typeof d?.quantity === 'string') {
+        total += parseAsset(d.quantity);
+      }
+    }
+
+    if (actions.length < BATCH_SIZE) break;
+    skip += BATCH_SIZE;
+  }
+
+  return total;
+}
+
 // cheesepowerz stores its own stats on-chain (authoritative)
 async function fetchCheesepowerzNulled(): Promise<number> {
   for (const endpoint of WAX_RPC_ENDPOINTS) {
@@ -175,14 +214,19 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownEntry[]> {
   const after30d = getAgo(30);
 
   const results = await Promise.all(
-    NULL_CONTRACTS.map(async ({ account, displayName }) => ({
-      contract: account,
-      displayName,
-      amount: await fetchContractNulled(account),
-      amount24h: await fetchContractNulledFromHyperion(account, after24h),
-      amount7d: await fetchContractNulledFromHyperion(account, after7d),
-      amount30d: await fetchContractNulledFromHyperion(account, after30d),
-    }))
+    NULL_CONTRACTS.map(async ({ account, displayName }) => {
+      const windowFetch = account === 'cheesepowerz'
+        ? fetchCheesepowerzReceivedWindow
+        : (after: string) => fetchContractNulledFromHyperion(account, after);
+      return {
+        contract: account,
+        displayName,
+        amount: await fetchContractNulled(account),
+        amount24h: await windowFetch(after24h),
+        amount7d: await windowFetch(after7d),
+        amount30d: await windowFetch(after30d),
+      };
+    })
   );
 
   const grandTotal = results.reduce((sum, r) => sum + r.amount, 0);
