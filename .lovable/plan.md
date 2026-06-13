@@ -1,41 +1,26 @@
-## Goal
+# Harden daily-powerup reads with triple-scan + merge
 
-Make the "Null by contract" breakdown's 24h / 7d / 30d columns for `cheesepowerz` consistent with the lifetime column (and with what users see on the homepage total). Today the lifetime column reads `cheesepowerz::stats.total_cheese_received` (incoming CHEESE = nulled CHEESE, since 100% pass-through), but the window columns query Hyperion for outgoing `transfer cheesepowerz → eosio.null`, which misses nulls done via `cheeseburger::retire` and lags badly on indexer delay.
+## Why
+`scripts/daily-powerup/waxRpc.ts::fetchTableAll` already fails over across 4 RPC endpoints per page, but only does a single linear pass. If any endpoint returns an HTTP-200 page that's silently truncated (or `more=false` prematurely), eligible stakers get skipped until the next day's run. Arne's friend's "scan 3 times" suggestion is the right fix.
 
-## Change
+Action submission already has redundancy (`waxSign.ts` multi-endpoint `fetch` + `run.ts` batch bisect), so no changes needed there.
 
-In `src/lib/cheeseNullBreakdown.ts`, add a dedicated window fetcher for `cheesepowerz` that mirrors the lifetime semantics: query Hyperion for **incoming CHEESE transfers to `cheesepowerz`** in the window, instead of outgoing transfers to `eosio.null`.
+We do not persist `get_table_rows` output anywhere — the GitHub Actions runner is ephemeral and nothing is uploaded as an artifact or committed. Point 3 of the friend's advice does not apply.
 
-### Specifics
+## Changes
 
-1. Add `fetchCheesepowerzReceivedWindow(after: string)`:
-   - Same multi-endpoint + staleness probing as the existing helper (reuse `pickHyperionEndpoint()`).
-   - Query: `act.account=cheeseburger&act.name=transfer&transfer.to=cheesepowerz&limit=1000&skip=...&after=<iso>`.
-   - Sum `act.data.quantity` (CHEESE asset). Paginate with the existing `BATCH_SIZE` / `MAX_ACTIONS` guards.
+### `scripts/daily-powerup/run.ts`
+Replace the single `fetchTableAll(...)` read of `cheesecheese::staketable` with **three independent scans**, each starting from a different endpoint in the rotation so a bad endpoint cannot poison all three passes. Merge results by `staker` (dedup, keep highest `cheesestaked` seen across passes for safety).
 
-2. In `fetchNullBreakdown()`, branch per contract for the window fetches:
-   - For `cheesepowerz`: use `fetchCheesepowerzReceivedWindow(after)` for `amount24h` / `amount7d` / `amount30d`.
-   - For all other contracts: keep the existing `fetchContractNulledFromHyperion(account, after)`.
+- Log per-scan row counts and the merged distinct-staker count.
+- If any scan returns < 90% of the largest scan's count, log a `WARN` line (visible in Actions output) — does not abort, since the merged set is still the safest answer.
+- Total added latency: ~2-4s for two extra full table scans (staketable has a few thousand rows). Acceptable inside the 15-minute job timeout.
 
-3. Leave the lifetime path untouched (still `total_cheese_received` for cheesepowerz; still `total_cheese_burned` for cheeseburner; still Hyperion for the rest).
+### `scripts/daily-powerup/waxRpc.ts`
+Add an optional `startEndpointIndex` parameter to `fetchTableAll` so each of the three scans can start from a different endpoint in the `ENDPOINTS` array (round-robin: 0, 1, 2). Existing per-page fallback behavior is preserved — `startEndpointIndex` only rotates the *preferred* endpoint, the others still serve as fallback.
 
-4. No UI changes — the column already says "nulled". Because 100% of CHEESE received by `cheesepowerz` is nulled, "received in window" is a correct measure of "nulled in window" for this contract, with no end-user-visible terminology drift.
-
-### Why this is correct, not a workaround
-
-- The contract's own counter is the source of truth for cheesepowerz. The lifetime column already trusts it; the window columns should be derived from the same event stream (inflows), not from a second, divergent stream (outgoing eosio.null transfers) that can be implemented via `retire` and miss entirely.
-- This eliminates a class of silent drift: any future change in how cheesepowerz performs the null (retire vs. transfer-to-null vs. batched) will not break the windows.
-
-## Files touched
-
-- `src/lib/cheeseNullBreakdown.ts` — add helper, branch in `fetchNullBreakdown`.
-
-## Out of scope
-
-- Other contracts in the breakdown (cheeseburner, cheesefeefee, cheesebannad, cheesenftwax, liquidcheese) — they keep their current outgoing-to-`eosio.null` window query, which matches how they actually null.
-- Any UI/tooltip changes.
-- Caching changes (existing `useNullBreakdown` staleTime/enabled behavior is unchanged).
+No other files change. No workflow / cron / secrets / variables changes.
 
 ## Verification
-
-After deploy, trigger a fresh daily-powerup run (or wait for the next scheduled one). Within ~1 minute of the on-chain action being indexed, the cheesepowerz 24h column should increase by the CHEESE amount sent in that run (e.g. +13 CHEESE for a 13-account / 1 CHEESE-each run), matching the lifetime delta and the homepage total delta.
+- Run the workflow with `dry_run=1` and confirm the log shows three scans, their individual counts, the merged count, and the projected CHEESE spend matching the merged count.
+- Confirm `eligible (>= MIN_STAKED CHEESE): N` matches the merged distinct-staker count from the three passes.
