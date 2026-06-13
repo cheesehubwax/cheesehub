@@ -1,9 +1,8 @@
 name: Daily CHEESE Powerup
 
 on:
-  # Scheduled run paused until further notice. Re-enable by uncommenting below.
-  # schedule:
-  #   - cron: "0 0 * * *"
+  schedule:
+    - cron: "0 0 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
