@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   TEMPLATE_FETCH_CONCURRENCY,
-  fetchFarmTemplateCounts,
+  fetchFarmStakedCountsByTemplate,
   fetchTemplateStats,
   mapWithConcurrency,
 } from "@/lib/farmTemplateStats";
@@ -14,9 +14,12 @@ export interface TemplateDistributionRow {
   image: string;
   issuedSupply: number;
   maxSupply: number; // 0 = uncapped
+  burnedSupply: number;
+  circulatingSupply: number;
   stakedInFarm: number;
-  issuedPct: number | null; // null when issuedSupply === 0
-  maxPct: number | null;    // null when maxSupply === 0 (uncapped)
+  circulatingPct: number | null; // null when circulatingSupply === 0
+  issuedPct: number | null;      // null when issuedSupply === 0
+  maxPct: number | null;         // null when maxSupply === 0 (uncapped)
   countUnknown?: boolean;   // true when the accounts request failed
   error?: string;
 }
@@ -49,15 +52,15 @@ export function useFarmTemplateDistribution(
     staleTime: 10 * 60_000,
     gcTime: 30 * 60_000,
     queryFn: async (): Promise<TemplateDistributionRow[]> => {
-      // Resolve per-collection template counts in one request per collection.
+      // Resolve exact per-template staked counts from the farm's stakednfts
+      // rows + bulk asset metadata. One stakednfts pagination + one bulk
+      // assets fetch (chunked) for the whole farm.
       let countsMap = new Map<string, number>();
       let countsFailed = false;
       try {
-        countsMap = await fetchFarmTemplateCounts(
-          templates.map((t) => t.collection),
-        );
+        countsMap = await fetchFarmStakedCountsByTemplate(farmName);
       } catch (err) {
-        console.warn("[useFarmTemplateDistribution] accounts fetch failed:", err);
+        console.warn("[useFarmTemplateDistribution] staked-counts fetch failed:", err);
         countsFailed = true;
       }
 
@@ -68,6 +71,10 @@ export function useFarmTemplateDistribution(
           const stakedInFarm = countsMap.get(`${t.collection}:${t.template_id}`) ?? 0;
           try {
             const stats = await fetchTemplateStats(t.collection, t.template_id);
+            const circulatingPct =
+              stats.circulatingSupply > 0
+                ? (stakedInFarm / stats.circulatingSupply) * 100
+                : null;
             const issuedPct =
               stats.issuedSupply > 0 ? (stakedInFarm / stats.issuedSupply) * 100 : null;
             const maxPct =
@@ -79,7 +86,10 @@ export function useFarmTemplateDistribution(
               image: stats.image,
               issuedSupply: stats.issuedSupply,
               maxSupply: stats.maxSupply,
+              burnedSupply: stats.burnedSupply,
+              circulatingSupply: stats.circulatingSupply,
               stakedInFarm,
+              circulatingPct,
               issuedPct,
               maxPct,
               countUnknown: countsFailed,
@@ -92,7 +102,10 @@ export function useFarmTemplateDistribution(
               image: "/placeholder.svg",
               issuedSupply: 0,
               maxSupply: 0,
+              burnedSupply: 0,
+              circulatingSupply: 0,
               stakedInFarm,
+              circulatingPct: null,
               issuedPct: null,
               maxPct: null,
               countUnknown: countsFailed,
@@ -101,7 +114,7 @@ export function useFarmTemplateDistribution(
           }
         },
       );
-      rows.sort((a, b) => (b.issuedPct ?? -1) - (a.issuedPct ?? -1));
+      rows.sort((a, b) => (b.circulatingPct ?? -1) - (a.circulatingPct ?? -1));
       return rows;
     },
   });
