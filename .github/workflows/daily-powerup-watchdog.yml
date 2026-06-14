@@ -1,0 +1,35 @@
+name: Daily CHEESE Powerup Watchdog
+
+on:
+  schedule:
+    # 03:30 UTC — after both primary (00:17) and backup (02:17) ticks have had
+    # ample time to land on-chain. Fails the run if no powerup transfers from
+    # the signer to cheesepowerz are visible since 00:00 UTC today, which
+    # triggers the standard GitHub Actions failure email to repo admins.
+    - cron: "30 3 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: daily-powerup-watchdog
+  cancel-in-progress: false
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install deps
+        working-directory: scripts/daily-powerup
+        run: bun install
+
+      - name: Run watchdog
+        working-directory: scripts/daily-powerup
+        env:
+          WAX_SIGNER_ACCOUNT: ${{ vars.WAX_SIGNER_ACCOUNT }}
+        run: bun run watchdog.ts

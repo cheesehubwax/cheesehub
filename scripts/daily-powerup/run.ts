@@ -1,6 +1,6 @@
 // Daily CHEESE powerup runner.
 
-import { fetchTableAll, accountExists } from "./waxRpc";
+import { fetchTableAll, accountExists, getRecentInboundTransfers } from "./waxRpc";
 import { filterEligible, type StakeRow } from "./filterStakers";
 import { createSession, buildTransferAction, submitActions } from "./waxSign";
 
@@ -8,6 +8,7 @@ const SIGNER = process.env.WAX_SIGNER_ACCOUNT ?? "power.chz";
 const PERMISSION = process.env.WAX_SIGNER_PERMISSION ?? "dailypower";
 const PRIVATE_KEY = (process.env.WAX_DAILYPOWER_KEY ?? "").trim();
 const DRY_RUN = process.env.DRY_RUN === "1";
+const FORCE = process.env.FORCE === "1";
 const ALLOWLIST = (process.env.ALLOWLIST ?? "")
   .split(",")
   .map(s => s.trim())
@@ -34,6 +35,9 @@ const BATCH_SIZE = 50;
 const MAX_BISECT_OPS = 20;
 const POWERUP_TARGET = "cheesepowerz";
 const TRANSFER_AMOUNT = `${POWERUP_AMOUNT.toFixed(4)} CHEESE`;
+const CHEESE_CONTRACT = "cheesecheese";
+const CHEESE_SYMBOL = "CHEESE";
+const ALREADY_RAN_THRESHOLD = 10; // distinct recipient memos since 00:00 UTC
 
 const log = (...args: unknown[]) => console.log("[powerup]", ...args);
 
@@ -111,6 +115,42 @@ async function main() {
 
   if (!DRY_RUN && !PRIVATE_KEY) {
     throw new Error("WAX_DAILYPOWER_KEY env var is required");
+  }
+
+  // Idempotency guard: if today's run already happened, the backup cron tick
+  // (and any extra manual trigger) should no-op. Bypass with FORCE=1.
+  if (!FORCE) {
+    try {
+      const startOfUtcDay = new Date();
+      startOfUtcDay.setUTCHours(0, 0, 0, 0);
+      const fromIso = startOfUtcDay.toISOString();
+      log(`idempotency check: inbound CHEESE to ${POWERUP_TARGET} from ${SIGNER} since ${fromIso}`);
+      const transfers = await getRecentInboundTransfers(
+        POWERUP_TARGET,
+        fromIso,
+        CHEESE_CONTRACT,
+        CHEESE_SYMBOL
+      );
+      const fromSigner = transfers.filter(t => t.from === SIGNER);
+      const distinctMemos = new Set(fromSigner.map(t => (t.memo ?? "").trim()).filter(Boolean));
+      log(
+        `idempotency: ${fromSigner.length} transfers from signer today, ${distinctMemos.size} distinct memo accounts`
+      );
+      if (distinctMemos.size >= ALREADY_RAN_THRESHOLD) {
+        log(
+          `already ran today (>= ${ALREADY_RAN_THRESHOLD} distinct memo accounts); exiting 0. ` +
+            `Use workflow_dispatch with force=1 to override.`
+        );
+        return;
+      }
+    } catch (e) {
+      log(
+        "idempotency check failed; proceeding with run anyway:",
+        e instanceof Error ? e.message : String(e)
+      );
+    }
+  } else {
+    log("FORCE=1 set; skipping idempotency check.");
   }
 
   log("reading cheesecheese::staketable (3 independent scans)...");
