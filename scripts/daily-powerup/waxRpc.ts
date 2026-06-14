@@ -7,6 +7,14 @@ export const ENDPOINTS = [
   "https://api.waxsweden.org",
 ];
 
+/** Hyperion v2 endpoints, used for transfer-history lookups. */
+export const HYPERION_ENDPOINTS = [
+  "https://wax.eosphere.io",
+  "https://wax.greymass.com",
+  "https://api.waxsweden.org",
+  "https://wax.cryptolions.io",
+];
+
 const TIMEOUT_MS = 8000;
 
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = TIMEOUT_MS) {
