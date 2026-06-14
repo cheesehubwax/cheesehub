@@ -2,11 +2,20 @@ name: Daily CHEESE Powerup
 
 on:
   schedule:
-    - cron: "0 0 * * *"
+    # Primary: 00:17 UTC. Off the top of the hour to avoid GitHub Actions
+    # scheduler congestion that frequently delays or drops :00 ticks.
+    - cron: "17 0 * * *"
+    # Backup: 02:17 UTC. Run.ts has an on-chain idempotency guard so this
+    # is a no-op when the primary tick already succeeded.
+    - cron: "17 2 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
         description: "Set to '1' to skip all transactions"
+        required: false
+        default: "0"
+      force:
+        description: "Set to '1' to bypass the 'already ran today' idempotency guard"
         required: false
         default: "0"
       allowlist:
@@ -48,6 +57,7 @@ jobs:
           WAX_SIGNER_PERMISSION: ${{ vars.WAX_SIGNER_PERMISSION }}
           WAX_DAILYPOWER_KEY: ${{ secrets.WAX_DAILYPOWER_KEY }}
           DRY_RUN: ${{ github.event.inputs.dry_run }}
+          FORCE: ${{ github.event.inputs.force }}
           ALLOWLIST: ${{ github.event.inputs.allowlist }}
           MIN_STAKED: ${{ github.event.inputs.min_staked || vars.MIN_STAKED }}
           POWERUP_AMOUNT: ${{ github.event.inputs.powerup_amount || vars.POWERUP_AMOUNT }}
