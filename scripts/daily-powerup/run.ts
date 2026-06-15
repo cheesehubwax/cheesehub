@@ -37,9 +37,78 @@ const POWERUP_TARGET = "cheesepowerz";
 const TRANSFER_AMOUNT = `${POWERUP_AMOUNT.toFixed(4)} CHEESE`;
 const CHEESE_CONTRACT = "cheesecheese";
 const CHEESE_SYMBOL = "CHEESE";
-const ALREADY_RAN_THRESHOLD = 10; // distinct recipient memos since 00:00 UTC
+// Any visible prior payout today blocks a re-run. The Actions run-history
+// guard is the primary defense; this is defense-in-depth against Hyperion
+// lag (~60m on some endpoints) so 1 is the safest threshold.
+const ALREADY_RAN_THRESHOLD = 1;
 
 const log = (...args: unknown[]) => console.log("[powerup]", ...args);
+
+/**
+ * Lag-free idempotency: ask GitHub itself whether this workflow already
+ * ran successfully today. Returns true if a *different* successful run
+ * of the same workflow exists with created >= start-of-UTC-day.
+ * Returns false (don't block) if we can't reach the API or aren't in CI.
+ */
+async function alreadyRanViaActionsHistory(fromIso: string): Promise<boolean> {
+  const token = process.env.GITHUB_TOKEN;
+  const repo = process.env.GITHUB_REPOSITORY; // "owner/name"
+  const runId = process.env.GITHUB_RUN_ID;
+  const workflowRef = process.env.GITHUB_WORKFLOW_REF ?? "";
+
+  if (!token || !repo) {
+    log("actions-history guard: GITHUB_TOKEN/REPOSITORY missing; skipping");
+    return false;
+  }
+
+  // Derive the workflow file name (e.g. "daily-powerup.yml") from
+  // GITHUB_WORKFLOW_REF like "owner/repo/.github/workflows/daily-powerup.yml@refs/heads/main".
+  const m = workflowRef.match(/\.github\/workflows\/([^@]+)/);
+  const workflowFile = m ? m[1] : "daily-powerup.yml";
+
+  const url =
+    `https://api.github.com/repos/${repo}/actions/workflows/${workflowFile}/runs` +
+    `?status=success&created=%3E%3D${encodeURIComponent(fromIso)}&per_page=20`;
+
+  try {
+    const r = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "daily-powerup-guard",
+      },
+    });
+    if (!r.ok) {
+      log(`actions-history guard: HTTP ${r.status}; skipping (not blocking)`);
+      return false;
+    }
+    const data: {
+      workflow_runs?: Array<{ id: number; conclusion: string | null; created_at: string }>;
+    } = await r.json();
+    const runs = data.workflow_runs ?? [];
+    const others = runs.filter(
+      run => String(run.id) !== String(runId) && run.conclusion === "success"
+    );
+    log(
+      `actions-history guard: ${runs.length} success runs today, ${others.length} from prior ticks`
+    );
+    if (others.length > 0) {
+      const earliest = others.reduce((a, b) =>
+        a.created_at < b.created_at ? a : b
+      );
+      log(`prior successful run id=${earliest.id} at ${earliest.created_at}`);
+      return true;
+    }
+    return false;
+  } catch (e) {
+    log(
+      "actions-history guard: fetch failed; skipping (not blocking):",
+      e instanceof Error ? e.message : String(e)
+    );
+    return false;
+  }
+}
 
 function chunk<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
@@ -120,10 +189,21 @@ async function main() {
   // Idempotency guard: if today's run already happened, the backup cron tick
   // (and any extra manual trigger) should no-op. Bypass with FORCE=1.
   if (!FORCE) {
+    const startOfUtcDay = new Date();
+    startOfUtcDay.setUTCHours(0, 0, 0, 0);
+    const fromIso = startOfUtcDay.toISOString();
+
+    // Primary guard: GitHub Actions run history. Lag-free.
+    if (await alreadyRanViaActionsHistory(fromIso)) {
+      log(
+        "already ran today (Actions run-history shows a prior success); exiting 0. " +
+          "Use workflow_dispatch with force=1 to override."
+      );
+      return;
+    }
+
+    // Secondary guard: on-chain transfer history via Hyperion (may lag).
     try {
-      const startOfUtcDay = new Date();
-      startOfUtcDay.setUTCHours(0, 0, 0, 0);
-      const fromIso = startOfUtcDay.toISOString();
       log(`idempotency check: inbound CHEESE to ${POWERUP_TARGET} from ${SIGNER} since ${fromIso}`);
       const transfers = await getRecentInboundTransfers(
         POWERUP_TARGET,
@@ -145,7 +225,7 @@ async function main() {
       }
     } catch (e) {
       log(
-        "idempotency check failed; proceeding with run anyway:",
+        "hyperion idempotency check failed; proceeding with run anyway:",
         e instanceof Error ? e.message : String(e)
       );
     }
