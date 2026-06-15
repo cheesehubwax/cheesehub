@@ -2,12 +2,15 @@ name: Daily CHEESE Powerup
 
 on:
   schedule:
-    # Primary: 00:17 UTC. Off the top of the hour to avoid GitHub Actions
-    # scheduler congestion that frequently delays or drops :00 ticks.
-    - cron: "17 0 * * *"
-    # Backup: 02:17 UTC. Run.ts has an on-chain idempotency guard so this
-    # is a no-op when the primary tick already succeeded.
-    - cron: "17 2 * * *"
+    # Cluster of attempts near 00:17 UTC. The first tick that actually
+    # dispatches and succeeds performs the payout; every later tick exits
+    # immediately via the GitHub-Actions run-history guard in run.ts.
+    - cron: "17 0 * * *"   # primary
+    - cron: "32 0 * * *"   # retry +15m
+    - cron: "47 0 * * *"   # retry +30m
+    - cron: "17 1 * * *"   # retry +1h
+    - cron: "17 2 * * *"   # retry +2h
+    - cron: "17 4 * * *"   # last-chance for badly delayed scheduler days
   workflow_dispatch:
     inputs:
       dry_run:
@@ -35,6 +38,10 @@ concurrency:
   group: daily-powerup
   cancel-in-progress: false
 
+permissions:
+  actions: read
+  contents: read
+
 jobs:
   powerup:
     runs-on: ubuntu-latest
@@ -61,4 +68,8 @@ jobs:
           ALLOWLIST: ${{ github.event.inputs.allowlist }}
           MIN_STAKED: ${{ github.event.inputs.min_staked || vars.MIN_STAKED }}
           POWERUP_AMOUNT: ${{ github.event.inputs.powerup_amount || vars.POWERUP_AMOUNT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_WORKFLOW_REF: ${{ github.workflow_ref }}
         run: bun run run.ts
