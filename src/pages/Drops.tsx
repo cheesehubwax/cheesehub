@@ -306,6 +306,7 @@ const Drops = () => {
           totalSold={cheeseStats?.totalSold ?? 0}
           cheeseNulled={cheeseStats?.cheeseNulled ?? 0}
           xCheeseValue={cheeseStats?.xCheeseValue ?? 0}
+          cheeseReserve={cheeseStats?.cheeseReserve ?? 0}
           isLoading={isLoading || isLoadingStats}
         />
         <p className="text-sm text-muted-foreground">

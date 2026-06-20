@@ -907,11 +907,12 @@ export interface CheeseDropStats {
   totalSold: number;
   cheeseNulled: number;
   xCheeseValue: number;
+  cheeseReserve: number;
 }
 
 export async function fetchCheeseDropStats(): Promise<CheeseDropStats> {
   try {
-    const [dropsResponse, totalSold, cheeseNulled, xCheeseValue] = await Promise.all([
+    const [dropsResponse, totalSold, cheeseNulled, xCheeseValue, cheeseReserve] = await Promise.all([
       fetch('https://wax.eosusa.io/v1/chain/get_table_rows', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -926,6 +927,7 @@ export async function fetchCheeseDropStats(): Promise<CheeseDropStats> {
       fetchCheeseTransfersHyperion({ from: 'nfthivedrops' }),
       fetchCheeseTransfersHyperion({ from: 'cheesenftwax', to: 'eosio.null' }),
       fetchCheeseTransfersHyperion({ from: 'cheesenftwax', to: 'xcheeseliqst' }),
+      fetchCheeseTransfersHyperion({ from: 'cheesenftwax', to: 'cheesereserv' }),
     ]);
 
     const dropsData = await dropsResponse.json();
@@ -979,10 +981,11 @@ export async function fetchCheeseDropStats(): Promise<CheeseDropStats> {
       totalSold: Math.floor(totalSold),
       cheeseNulled: Math.floor(cheeseNulled),
       xCheeseValue: Math.floor(xCheeseValue),
+      cheeseReserve: Math.floor(cheeseReserve),
     };
   } catch (error) {
     console.error('Error fetching CHEESE drop stats:', error);
-    return { activeDrops: 0, totalSold: 0, cheeseNulled: 0, xCheeseValue: 0 };
+    return { activeDrops: 0, totalSold: 0, cheeseNulled: 0, xCheeseValue: 0, cheeseReserve: 0 };
   }
 }
 
