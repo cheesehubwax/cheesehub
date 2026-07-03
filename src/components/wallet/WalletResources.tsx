@@ -129,9 +129,12 @@ export function WalletResources({ onResourcesUpdate, showTotalWaxBalance, waxUsd
           <div><span className="text-muted-foreground">Account: </span><span className="font-medium text-foreground">{accountName}</span></div>
           <div><span className="text-muted-foreground">Liquid: </span><span className="font-medium text-cheese">{waxBalance.toFixed(8)} WAX</span></div>
         </div>
-        <div className="text-sm text-center self-end">
-          <span className="text-muted-foreground">Staked: </span>
-          <span className="font-medium text-cheese">{stakedBalance.toFixed(8)} WAX</span>
+        <div className="text-sm text-center space-y-1">
+          <div className="invisible h-5" />
+          <div>
+            <span className="text-muted-foreground">Staked: </span>
+            <span className="font-medium text-cheese">{stakedBalance.toFixed(8)} WAX</span>
+          </div>
         </div>
         <div className="flex items-center gap-3 justify-self-end">
           {showTotalWaxBalance && resources && (
