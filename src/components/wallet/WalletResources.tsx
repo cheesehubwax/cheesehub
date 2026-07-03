@@ -120,15 +120,20 @@ export function WalletResources({ onResourcesUpdate, showTotalWaxBalance, waxUsd
   const selfNetStaked = parseStakedWeight(resources?.self_delegated_bandwidth?.net_weight);
   const totalWaxBalance = waxBalance + selfCpuStaked + selfNetStaked;
   const totalWaxUsd = totalWaxBalance * waxUsdPrice;
+  const stakedBalance = selfCpuStaked + selfNetStaked;
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+      <div className="grid grid-cols-3 items-center p-3 bg-muted/50 rounded-lg">
         <div className="text-sm space-y-1">
           <div><span className="text-muted-foreground">Account: </span><span className="font-medium text-foreground">{accountName}</span></div>
           <div><span className="text-muted-foreground">Liquid: </span><span className="font-medium text-cheese">{waxBalance.toFixed(8)} WAX</span></div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="text-center">
+          <div className="text-xs text-muted-foreground">Staked</div>
+          <div className="text-lg font-semibold text-cheese">{stakedBalance.toFixed(4)} WAX</div>
+        </div>
+        <div className="flex items-center gap-3 justify-self-end">
           {showTotalWaxBalance && resources && (
             <div className="text-right">
               <div className="text-xs text-muted-foreground">Total WAX Balance</div>

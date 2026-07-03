@@ -1,39 +1,20 @@
-## Goal
+### Add "Staked" balance to CHEESEWallet header bar
 
-Add a fifth "cheesereserv" metric to the Drops stats bar that totals all historical CHEESE sent from `cheesenftwax` → `cheesereserv`, and keeps growing automatically via the same Hyperion history paging used by the existing "Nulled" and "xCHEESE" totals.
+In `src/components/wallet/WalletResources.tsx`, the top `flex items-center justify-between` header bar currently shows:
+- **Left**: Account name + Liquid WAX balance
+- **Right**: Total WAX Balance
 
-## Where the existing totals come from
+### Changes
 
-`src/services/atomicApi.ts → fetchCheeseDropStats()` already computes the other two by paging through Hyperion action history:
+**`src/components/wallet/WalletResources.tsx`**
 
-- `cheeseNulled`  = sum of `cheesenftwax → eosio.null` CHEESE transfers
-- `xCheeseValue` = sum of `cheesenftwax → xcheeseliqst` CHEESE transfers
+1. Compute `stakedBalance = selfCpuStaked + selfNetStaked` (already available in component).
+2. Restructure the header flex row from 2 sections to 3:
+   - Left: Account + Liquid balance (unchanged)
+   - **Center (new)**: "Staked" label + `stakedBalance.toFixed(4) WAX` value
+   - Right: Total WAX Balance (unchanged)
+3. Use `flex-1` or `justify-around` / grid to evenly distribute the 3 sections so the center fills the gap.
 
-The function uses `fetchCheeseTransfersHyperion({ from, to })` which already paginates the full history and is cached via `useQuery` in `src/pages/Drops.tsx`. So "add up all past trx then keep adding from now on" is automatic — every refresh re-sums the full history from Hyperion.
+**No other files touched.** The staked total already sums both CPU and NET self-staked weight. Liquid + Staked will equal the existing Total WAX Balance by definition.
 
-## Changes
-
-### 1. `src/services/atomicApi.ts`
-- Extend `CheeseDropStats` with `cheeseReserve: number`.
-- Add a 5th parallel call inside `fetchCheeseDropStats`:
-  `fetchCheeseTransfersHyperion({ from: 'cheesenftwax', to: 'cheesereserv' })`
-- Include `cheeseReserve: Math.floor(...)` in both the success and the catch-block fallback returns.
-
-### 2. `src/components/drops/DropStatsBar.tsx`
-- Add `cheeseReserve: number` prop.
-- Add a new `statItems` entry:
-  - emoji: `🏦`
-  - label: `cheesereserv`
-  - value: `cheeseReserve.toLocaleString()`
-- Adjust grid classes so 5 columns wrap cleanly on mobile. Bump `max-w-2xl` → `max-w-3xl` so 5 columns breathe on desktop.
-
-### 3. `src/pages/Drops.tsx`
-- Pass `cheeseReserve={cheeseStats?.cheeseReserve ?? 0}` to `<DropStatsBar />`.
-
-## User preference
-- Emoji: 🏦 (bank / treasury)
-- Label: `cheesereserv` (exactly as requested)
-
-## Out of scope
-- No backend/contract changes.
-- No new hooks or files; this is a small extension to existing data flow and the stats bar UI.
+**Out of scope**: No new hooks, no data fetching changes, no logic changes — purely a layout addition using already-computed values.
