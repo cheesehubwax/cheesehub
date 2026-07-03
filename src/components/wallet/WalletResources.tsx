@@ -120,6 +120,7 @@ export function WalletResources({ onResourcesUpdate, showTotalWaxBalance, waxUsd
   const selfNetStaked = parseStakedWeight(resources?.self_delegated_bandwidth?.net_weight);
   const totalWaxBalance = waxBalance + selfCpuStaked + selfNetStaked;
   const totalWaxUsd = totalWaxBalance * waxUsdPrice;
+  const stakedBalance = selfCpuStaked + selfNetStaked;
 
   return (
     <div className="space-y-4">
