@@ -88,7 +88,7 @@ export function MultiRoutePanel({ route, tokenIn, tokenOut }: MultiRoutePanelPro
                   <div className="flex items-center gap-1.5">
                     <TokenLogo contract={tok.contract} symbol={tok.symbol} size="md" />
                     {label && (
-                      <span className="text-muted-foreground font-medium">{label}</span>
+                      <span className="text-white font-medium">{label}</span>
                     )}
                   </div>
                   {!isLast && (
