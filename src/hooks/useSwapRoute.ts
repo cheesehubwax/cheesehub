@@ -7,6 +7,26 @@ import { logger } from "@/lib/logger";
 export type TradeType = "EXACT_INPUT" | "EXACT_OUTPUT";
 
 const MAX_TRANSIENT_RETRIES = 6;
+const SDK_TIMEOUT_MS = 6000;
+
+function withTimeout<T>(p: Promise<T>, ms: number, ctrl: AbortController): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => {
+      ctrl.abort();
+      reject(new Error("SDK_TIMEOUT"));
+    }, ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      }
+    );
+  });
+}
 
 function isTransientError(err: unknown): boolean {
   if (err instanceof TypeError) return true;
@@ -51,16 +71,23 @@ export function useSwapRoute(
       // Phase 2: try SDK split router first; on any failure or empty result
       // fall back to Alcor's HTTP getRoute so users are never worse off than
       // Phase 0.
+      const sdkCtrl = new AbortController();
+      const onOuterAbort = () => sdkCtrl.abort();
+      signal?.addEventListener("abort", onOuterAbort);
       try {
-        const sdk = await computeAlcorTrade({
-          tokenIn: tokenIn!,
-          tokenOut: tokenOut!,
-          amount: debouncedAmount,
-          slippage,
-          receiver,
-          tradeType: debouncedTradeType,
-          signal,
-        });
+        const sdk = await withTimeout(
+          computeAlcorTrade({
+            tokenIn: tokenIn!,
+            tokenOut: tokenOut!,
+            amount: debouncedAmount,
+            slippage,
+            receiver,
+            tradeType: debouncedTradeType,
+            signal: sdkCtrl.signal,
+          }),
+          SDK_TIMEOUT_MS,
+          sdkCtrl
+        );
         if (sdk && sdk.swaps.length > 0 && sdk.output > 0) {
           logger.info("[alcor-router] SDK quote used", {
             splits: sdk.swaps.length,
@@ -71,8 +98,17 @@ export function useSwapRoute(
         }
         logger.warn("[alcor-router] SDK returned no route — falling back to HTTP");
       } catch (e) {
-        if ((e as any)?.name === "AbortError") throw e;
-        logger.warn("[alcor-router] SDK failed — falling back to HTTP", e);
+        // Only bail out if the outer (React Query) signal aborted. An internal
+        // AbortError from our timeout controller should fall through to HTTP.
+        if (signal?.aborted) throw e;
+        const msg = (e as any)?.message;
+        if (msg === "SDK_TIMEOUT") {
+          logger.warn("[alcor-router] SDK timed out — falling back to HTTP");
+        } else {
+          logger.warn("[alcor-router] SDK failed — falling back to HTTP", e);
+        }
+      } finally {
+        signal?.removeEventListener("abort", onOuterAbort);
       }
       return fetchSwapRoute(tokenIn!, tokenOut!, debouncedAmount, slippage, receiver, signal, debouncedTradeType);
     },

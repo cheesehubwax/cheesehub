@@ -100,6 +100,37 @@ export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Prom
   }
 }
 
+// ----- Public prefetch helper -----
+
+/**
+ * Warms the pool list + tick cache for a specific tokenIn/tokenOut pair so the
+ * first quote after the user types resolves from cache instead of triggering
+ * a burst of /ticks fetches. Safe to call repeatedly; respects TTLs.
+ */
+export async function prefetchAlcorRouterData(
+  tokenIn: SwapToken,
+  tokenOut: SwapToken,
+  maxHops = 3,
+  signal?: AbortSignal
+): Promise<void> {
+  try {
+    const pools = await fetchAllAlcorPools(signal);
+    const inKey = tokenKey(tokenIn.contract, tokenIn.ticker);
+    const outKey = tokenKey(tokenOut.contract, tokenOut.ticker);
+    const relevant = selectRelevantPools(pools, inKey, outKey, maxHops);
+    await mapLimit(relevant, 4, async (p) => {
+      try {
+        await fetchPoolTicks(p.id, signal);
+      } catch {
+        /* prefetch: swallow */
+      }
+    });
+  } catch (e) {
+    if ((e as any)?.name === "AbortError") return;
+    logger.warn("[alcor-router] prefetch failed", e);
+  }
+}
+
 // ----- Route graph filtering -----
 
 function tokenKey(contract: string, symbol: string): string {
@@ -122,10 +153,19 @@ function selectRelevantPools(
   inKey: string,
   outKey: string,
   maxHops: number,
-  cap = 120
+  cap = 60
 ): RawAlcorPool[] {
   const keyOf = (t: RawAlcorPool["tokenA"]) => tokenKey(t.contract, t.symbol);
-  const active = pools.filter((p) => p.active);
+  // Drop inactive and zero-liquidity pools before graph construction: they
+  // can never contribute an output but would still cost us a /ticks fetch.
+  const active = pools.filter((p) => {
+    if (!p.active) return false;
+    try {
+      return BigInt(p.liquidity || "0") > 0n;
+    } catch {
+      return false;
+    }
+  });
 
   // Build full-graph adjacency.
   const adj = new Map<string, RawAlcorPool[]>();
