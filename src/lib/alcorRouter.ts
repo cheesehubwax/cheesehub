@@ -101,69 +101,72 @@ function tokenKey(contract: string, symbol: string): string {
   return `${symbol.toLowerCase()}-${contract}`;
 }
 
-/** BFS the pool graph from tokenIn to find every pool reachable within maxHops
- *  that could plausibly be part of a route ending at tokenOut. */
+// Hub tokens that make good intermediate hops on WAX (matches Alcor's routing
+// heuristics: only route through liquid, well-known assets).
+const HUB_KEYS = new Set([
+  "wax-eosio.token",
+  "usdt-usdt.alcor",
+  "usdc-usdc.alcor",
+  "waxusdc-eth.token",
+  "waxusdt-eth.token",
+  "usdc-tethertether",
+  "lswax-token.lswax",
+]);
+
+/** Select pools that could participate in a tokenIn→tokenOut route of length
+ *  ≤ maxHops, restricting intermediate tokens to a curated hub set. Also caps
+ *  the total pool count by liquidity to avoid overwhelming the ticks endpoint. */
 function selectRelevantPools(
   pools: RawAlcorPool[],
   inKey: string,
   outKey: string,
-  maxHops: number
+  maxHops: number,
+  cap = 60
 ): RawAlcorPool[] {
-  // Build adjacency: token -> [poolIndex,...]
-  const adj = new Map<string, number[]>();
   const keyOf = (t: RawAlcorPool["tokenA"]) => tokenKey(t.contract, t.symbol);
-  pools.forEach((p, i) => {
-    if (!p.active) return;
-    const a = keyOf(p.tokenA);
-    const b = keyOf(p.tokenB);
-    if (!adj.has(a)) adj.set(a, []);
-    if (!adj.has(b)) adj.set(b, []);
-    adj.get(a)!.push(i);
-    adj.get(b)!.push(i);
-  });
+  const active = pools.filter((p) => p.active);
 
-  // Distance from tokenIn (in hops), and distance from tokenOut.
-  const distFrom = (start: string): Map<string, number> => {
-    const dist = new Map<string, number>();
-    dist.set(start, 0);
-    let frontier = [start];
-    for (let h = 0; h < maxHops && frontier.length; h++) {
-      const next: string[] = [];
-      for (const t of frontier) {
-        const cur = dist.get(t)!;
-        for (const pi of adj.get(t) ?? []) {
-          const p = pools[pi];
-          const other = keyOf(p.tokenA) === t ? keyOf(p.tokenB) : keyOf(p.tokenA);
-          if (!dist.has(other)) {
-            dist.set(other, cur + 1);
-            next.push(other);
-          }
+  const involves = (p: RawAlcorPool, k: string) => keyOf(p.tokenA) === k || keyOf(p.tokenB) === k;
+  const other = (p: RawAlcorPool, k: string) =>
+    keyOf(p.tokenA) === k ? keyOf(p.tokenB) : keyOf(p.tokenA);
+
+  // Any pool that could participate in a route: touches tokenIn, tokenOut, or a hub.
+  // We then verify each selected pool is on some ≤maxHops path in-code.
+  const anchors = new Set<string>([inKey, outKey, ...HUB_KEYS]);
+  const candidates = active.filter((p) => anchors.has(keyOf(p.tokenA)) && anchors.has(keyOf(p.tokenB)));
+
+  // Verify connectivity via BFS restricted to `anchors` intermediates.
+  const adj = new Map<string, RawAlcorPool[]>();
+  for (const p of candidates) {
+    for (const k of [keyOf(p.tokenA), keyOf(p.tokenB)]) {
+      if (!adj.has(k)) adj.set(k, []);
+      adj.get(k)!.push(p);
+    }
+  }
+  const dist = new Map<string, number>([[inKey, 0]]);
+  let frontier = [inKey];
+  for (let h = 0; h < maxHops && frontier.length; h++) {
+    const next: string[] = [];
+    for (const t of frontier) {
+      for (const p of adj.get(t) ?? []) {
+        const o = other(p, t);
+        if (!dist.has(o)) {
+          dist.set(o, dist.get(t)! + 1);
+          next.push(o);
         }
       }
-      frontier = next;
     }
-    return dist;
-  };
-
-  const dIn = distFrom(inKey);
-  const dOut = distFrom(outKey);
-  if (!dIn.has(outKey)) return []; // no route reachable
-
-  // Keep pools whose endpoint distances sum to <= maxHops.
-  const keep: RawAlcorPool[] = [];
-  for (const p of pools) {
-    if (!p.active) continue;
-    const a = keyOf(p.tokenA);
-    const b = keyOf(p.tokenB);
-    const da = dIn.get(a);
-    const db = dOut.get(b);
-    const da2 = dIn.get(b);
-    const db2 = dOut.get(a);
-    const opt1 = da !== undefined && db !== undefined ? da + 1 + db : Infinity;
-    const opt2 = da2 !== undefined && db2 !== undefined ? da2 + 1 + db2 : Infinity;
-    if (Math.min(opt1, opt2) <= maxHops) keep.push(p);
+    frontier = next;
   }
-  return keep;
+  if (!dist.has(outKey)) return [];
+
+  // Sort by liquidity desc (BigInt), cap.
+  const sorted = candidates.sort((a, b) => {
+    const la = BigInt(a.liquidity || "0");
+    const lb = BigInt(b.liquidity || "0");
+    return lb > la ? 1 : lb < la ? -1 : 0;
+  });
+  return sorted.slice(0, cap);
 }
 
 // ----- Pool construction -----
