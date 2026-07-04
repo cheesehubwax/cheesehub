@@ -1,29 +1,39 @@
-## Better routing parity with Alcor (drop hub allowlist)
+Yes — based on the console and current code, we are very likely overwhelming Alcor from the browser.
 
-Same 1000 WAX → CHEESE trade shows Alcor 3-way split (555.4163 CHEESE) vs. ours 2-way (554.4158). Root cause: `selectRelevantPools` restricts every intermediate hop to a hardcoded `HUB_KEYS` allowlist, so `computeAllRoutes` never sees the third path Alcor uses.
+What changed:
+- The working 85/15 split version used a smaller candidate pool set and completed a swap.
+- The next routing update removed the hub allowlist and expanded routing to the full graph.
+- Then we added background prefetching, but the live route query still fetches ticks too.
+- Result: the widget can issue dozens of `/swap/pools/:id/ticks` requests, plus `/swap/pools`, plus `/swapRouter/getRoute` fallback, often at the same time.
+- Alcor starts returning 502s; because those 502 responses do not include browser CORS headers, the browser reports them as CORS failures too.
 
-## Changes
+Plan to step back safely:
 
-### 1. `src/lib/alcorRouter.ts` — rewrite `selectRelevantPools`
-- Drop `HUB_KEYS` entirely.
-- Build adjacency over ALL active pools.
-- Forward BFS from `tokenIn` (dIn) and reverse BFS from `tokenOut` (dOut), each limited to `maxHops`.
-- A pool `(a,b)` is on some ≤maxHops path iff `dIn(a) + 1 + dOut(b) ≤ maxHops` OR the reverse — keep exactly those.
-- Cap: always keep pools directly touching `tokenIn`/`tokenOut`. Rank the rest by `volumeUSD24` (with `volumeUSDWeek/7` and log-scale liquidity as tiebreakers), cap at 120 (up from 60).
+1. Remove background tick prefetching
+   - Remove the `prefetchAlcorRouterData` mount/interval call from the swap widget.
+   - This immediately stops the app from fetching ticks before the user even has a quote.
 
-### 2. `src/lib/alcorRouter.ts` — throttle tick fanout
-- Add a `mapLimit(items, 8, fn)` helper.
-- Replace the `Promise.all` tick-fetch in both `computeAlcorTrade` and `computeShadowQuote` with the limited version so we never burst >8 concurrent `/pools/:id/ticks` requests.
-- Log the pool count (`relevant.length`) at info level so we can eyeball fanout in shadow logs.
+2. Restore the last known working route load profile
+   - Put routing back to a small, controlled candidate set similar to the successful 85/15 split version.
+   - Keep SDK split routing enabled, but stop full-graph tick fanout from running on every quote.
 
-### 3. `src/test/shadow.test.ts` — assertion
-- Add: for `1000 WAX → CHEESE` expect `splits.length >= 2` and `output` within 0.5% of a locally-recorded Alcor baseline (loose enough to survive normal market drift).
+3. Add a narrow CHEESE-specific route expansion instead of full-graph expansion
+   - For WAX → CHEESE, include the exact additional intermediate pools needed to discover Alcor’s 3-way route.
+   - Do not scan every possible 3-hop path across the whole Alcor graph.
+   - This aims for Alcor parity without API spam.
 
-## Safety
-- HTTP fallback stays. If SDK returns nothing (or throws), we still return the public HTTP quote.
-- No UI changes.
-- No new npm dependencies.
+4. Reduce hot-path tick concurrency and request volume
+   - Lower tick fetch concurrency from 8 to 2–3.
+   - Add a hard candidate cap that includes direct pools first, known high-liquidity hub pools second, and only a tiny number of extra CHEESE-relevant pools.
 
-## Files touched
-- `src/lib/alcorRouter.ts`
-- `src/test/shadow.test.ts`
+5. Stop retry loops from amplifying failures
+   - If both SDK routing and HTTP fallback fail once with a network/502-style failure, show `Route unavailable — retry` instead of retrying up to 6 times.
+   - Manual retry remains available.
+
+6. Fix the unrelated balance warning
+   - Update the disabled balance cache query so React Query no longer logs `No queryFn was passed`.
+
+Expected result:
+- The swap should work again like the successful 85/15 split version.
+- Alcor request volume drops sharply.
+- We can then compare WAX → CHEESE again and add only the missing route/pool needed for the 3-way split, instead of hammering the full graph.
