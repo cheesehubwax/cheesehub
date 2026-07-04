@@ -11,6 +11,7 @@ import { useSwapTokenBalance } from "@/hooks/useSwapTokenBalance";
 import { useWax } from "@/context/WaxContext";
 import { type SwapToken, formatTokenAmount, normalizeRouteActions, PREFERRED_CONTRACTS } from "@/lib/swapApi";
 import { getTransactPlugins } from "@/lib/wharfKit";
+import { prefetchAlcorRouterData } from "@/lib/alcorRouter";
 import { toast } from "sonner";
 
 interface CheeseSwapWidgetProps {
@@ -67,6 +68,23 @@ export function CheeseSwapWidget({
 
   const balanceIn = useSwapTokenBalance(accountName, tokenIn?.contract, tokenIn?.ticker);
   const balanceOut = useSwapTokenBalance(accountName, tokenOut?.contract, tokenOut?.ticker);
+
+  // Warm the Alcor router cache (pool list + relevant tick data) for the
+  // selected pair so the first quote after the user types resolves from
+  // cache instead of triggering a burst of /ticks fetches. Refreshes in the
+  // background every 60s. Cheap when the cache is already warm (TTL gated).
+  useEffect(() => {
+    if (!tokenIn || !tokenOut) return;
+    const ctrl = new AbortController();
+    prefetchAlcorRouterData(tokenIn, tokenOut, 3, ctrl.signal);
+    const iv = setInterval(() => {
+      prefetchAlcorRouterData(tokenIn, tokenOut, 3, ctrl.signal);
+    }, 60_000);
+    return () => {
+      clearInterval(iv);
+      ctrl.abort();
+    };
+  }, [tokenIn, tokenOut]);
 
   const tradeType: TradeType = activeField === "in" ? "EXACT_INPUT" : "EXACT_OUTPUT";
   const routeAmount = activeField === "in" ? amountIn : amountOut;
