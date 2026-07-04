@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect, useRef } from "react";
 import { fetchSwapRoute, type SwapToken, type SwapRoute } from "@/lib/swapApi";
+import { computeShadowQuote } from "@/lib/alcorRouter";
+import { logger } from "@/lib/logger";
 
 export type TradeType = "EXACT_INPUT" | "EXACT_OUTPUT";
 
@@ -65,6 +67,49 @@ export function useSwapRoute(
   const noRoute = enabled && !isLoading && !isFetching && !error && route === null;
 
   const transient = !!error && isTransientError(error);
+
+  // ---- Shadow: run the client-side Alcor SDK router alongside the HTTP quote
+  // and log both. No user-visible effect — used only to validate parity before
+  // switching execution to the multi-split router.
+  useEffect(() => {
+    if (!enabled || !tokenIn || !tokenOut) return;
+    if (!route || !route.output) return;
+    const controller = new AbortController();
+    let cancelled = false;
+    (async () => {
+      try {
+        const shadow = await computeShadowQuote({
+          tokenIn,
+          tokenOut,
+          amount: debouncedAmount,
+          tradeType: debouncedTradeType,
+          signal: controller.signal,
+        });
+        if (cancelled) return;
+        logger.info("[shadow-router]", {
+          pair: `${tokenIn.ticker} → ${tokenOut.ticker}`,
+          amount: debouncedAmount,
+          tradeType: debouncedTradeType,
+          http: {
+            output: route.output,
+            priceImpact: route.priceImpact,
+            hops: route.route?.length ?? 0,
+            splits: route.swaps?.length ?? 1,
+          },
+          sdk: shadow,
+        });
+      } catch (e) {
+        if ((e as any)?.name !== "AbortError") {
+          logger.warn("[shadow-router] failed", e);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [enabled, tokenIn, tokenOut, debouncedAmount, debouncedTradeType, route]);
+
   // Stay "retrying" for the full window so the gap between attempts (when
   // isFetching is briefly false) doesn't flash the red banner.
   const isRetrying = transient && failureCount < MAX_TRANSIENT_RETRIES;
