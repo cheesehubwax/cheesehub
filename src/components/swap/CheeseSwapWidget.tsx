@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SwapTokenInput } from "./SwapTokenInput";
 import { TokenSelector } from "./TokenSelector";
+import { MultiRoutePanel } from "./MultiRoutePanel";
 import { useSwapTokens } from "@/hooks/useSwapTokens";
 import { useSwapRoute, type TradeType } from "@/hooks/useSwapRoute";
 import { useSwapTokenBalance } from "@/hooks/useSwapTokenBalance";
@@ -289,6 +290,9 @@ export function CheeseSwapWidget({
                   {formatTokenAmount(route.minReceived, tokenOut?.precision ?? 8)} {tokenOut?.ticker}
                 </span>
               </div>
+              {tokenIn && tokenOut && route.swaps && route.swaps.length > 0 && (
+                <MultiRoutePanel route={route} tokenIn={tokenIn} tokenOut={tokenOut} />
+              )}
             </div>
           )}
         </div>
