@@ -319,17 +319,17 @@ export async function computeShadowQuote(args: ShadowQuoteArgs): Promise<ShadowQ
   const relevant = selectRelevantPools(allPools, inKey, outKey, maxHops);
   if (relevant.length === 0) return null;
 
-  // Fetch ticks for every relevant pool in parallel.
-  const tickResults = await Promise.all(
-    relevant.map(async (p) => {
-      try {
-        return { p, ticks: await fetchPoolTicks(p.id, signal) };
-      } catch (e) {
-        logger.warn(`shadow: tick fetch failed for pool ${p.id}`, e);
-        return { p, ticks: [] as RawAlcorTick[] };
-      }
-    })
-  );
+  logger.info(`[shadow-router] pools selected: ${relevant.length}`);
+
+  // Fetch ticks in parallel, capped concurrency to respect rate limits.
+  const tickResults = await mapLimit(relevant, 8, async (p) => {
+    try {
+      return { p, ticks: await fetchPoolTicks(p.id, signal) };
+    } catch (e) {
+      logger.warn(`shadow: tick fetch failed for pool ${p.id}`, e);
+      return { p, ticks: [] as RawAlcorTick[] };
+    }
+  });
 
   const sdkPools = tickResults
     .filter((r) => r.ticks.length > 0)
@@ -438,16 +438,16 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   const relevant = selectRelevantPools(allPools, inKey, outKey, maxHops);
   if (relevant.length === 0) return null;
 
-  const tickResults = await Promise.all(
-    relevant.map(async (p) => {
-      try {
-        return { p, ticks: await fetchPoolTicks(p.id, signal) };
-      } catch (e) {
-        logger.warn(`alcorTrade: tick fetch failed for pool ${p.id}`, e);
-        return { p, ticks: [] as RawAlcorTick[] };
-      }
-    })
-  );
+  logger.info(`[alcor-router] pools selected: ${relevant.length}`);
+
+  const tickResults = await mapLimit(relevant, 8, async (p) => {
+    try {
+      return { p, ticks: await fetchPoolTicks(p.id, signal) };
+    } catch (e) {
+      logger.warn(`alcorTrade: tick fetch failed for pool ${p.id}`, e);
+      return { p, ticks: [] as RawAlcorTick[] };
+    }
+  });
 
   const sdkPools = tickResults
     .filter((r) => r.ticks.length > 0)
