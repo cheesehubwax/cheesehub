@@ -75,21 +75,26 @@ export function MultiRoutePanel({ route, tokenIn, tokenOut }: MultiRoutePanelPro
       <div className="space-y-2">
         {rows.map((row, i) => (
           <div key={i} className="flex items-center gap-2 flex-wrap text-xs">
-            {row.chain.map((tok, idx) => {
-              const label =
-                idx === 0
-                  ? `${Math.round(row.split.percent)}%`
-                  : !row.broken
-                  ? formatFee(row.hopFees[idx - 1])
-                  : "";
-              const isLast = idx === row.chain.length - 1;
+            <span className="text-white font-medium">
+              {Math.round(row.split.percent)}%
+            </span>
+            {row.hopFees.map((fee, idx) => {
+              const a = row.chain[idx];
+              const b = row.chain[idx + 1];
+              const isLast = idx === row.hopFees.length - 1;
+              if (!a || !b) return null;
               return (
                 <div key={idx} className="flex items-center gap-2">
                   <div className="flex items-center gap-1.5">
-                    <TokenLogo contract={tok.contract} symbol={tok.symbol} size="md" />
-                    {label && (
-                      <span className="text-white font-medium">{label}</span>
-                    )}
+                    <div className="flex items-center">
+                      <TokenLogo contract={a.contract} symbol={a.symbol} size="md" />
+                      <div className="-ml-3 ring-2 ring-background rounded-full">
+                        <TokenLogo contract={b.contract} symbol={b.symbol} size="md" />
+                      </div>
+                    </div>
+                    <span className="text-white font-medium">
+                      {!row.broken ? formatFee(fee) : ""}
+                    </span>
                   </div>
                   {!isLast && (
                     <span
