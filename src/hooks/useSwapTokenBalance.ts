@@ -14,6 +14,7 @@ export function useSwapTokenBalance(
   // Try reading from the shared cache first (reactive via select)
   const { data: cachedBalance } = useQuery<{ tokens: TokenWithBalance[] }, Error, string | null>({
     queryKey: ["all-token-balances", accountName],
+    queryFn: async () => ({ tokens: [] }),
     enabled: false, // Don't trigger a fetch — just subscribe to existing cache
     select: (data) => {
       if (!contract || !ticker || !data?.tokens) return null;

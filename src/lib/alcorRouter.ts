@@ -138,22 +138,39 @@ function tokenKey(contract: string, symbol: string): string {
 }
 
 /**
- * Select every active pool that lies on at least one tokenIn → tokenOut path
- * of length ≤ `maxHops`. Uses forward BFS from tokenIn and reverse BFS from
- * tokenOut over the FULL pool graph (no hub-token allowlist) so we discover
- * the same set of routes Alcor's own UI feeds to `computeAllRoutes`.
- *
- * Cap semantics: pools directly touching tokenIn or tokenOut are always kept.
- * Only deeper intermediate-only pools are ranked and capped, using
- * volumeUSD24 (when the API provides it) with log-scale liquidity as a
- * tiebreaker.
+ * Select a small, route-relevant pool set. The full Alcor graph is far too
+ * large to hydrate from the browser: WAX alone touches thousands of pools, and
+ * fetching ticks for all of them causes 502/CORS failures. Keep the last known
+ * working profile (major hubs) and add only a narrow CHEESE bridge expansion.
  */
+const BASE_ROUTE_KEYS = new Set([
+  "wax-eosio.token",
+  "waxusdc-eth.token",
+  "waxusdt-eth.token",
+  "lswax-token.fusion",
+  "lsw-lsw.alcor",
+  "waxwbtc-eth.token",
+  "waxweth-eth.token",
+]);
+
+const CHEESE_KEY = "cheese-cheeseburger";
+
+// High-signal CHEESE bridges only. These are tokens with active WAX and CHEESE
+// pools and meaningful recent volume; do not expand to every shared token.
+const CHEESE_BRIDGE_KEYS = new Set([
+  "waxcash-graffitiking",
+  "tlm-alien.worlds",
+  "buzz-buzzingarden",
+  "wuf-wuffi",
+  "waxdao-token.waxdao",
+]);
+
 function selectRelevantPools(
   pools: RawAlcorPool[],
   inKey: string,
   outKey: string,
   maxHops: number,
-  cap = 60
+  cap = 42
 ): RawAlcorPool[] {
   const keyOf = (t: RawAlcorPool["tokenA"]) => tokenKey(t.contract, t.symbol);
   // Drop inactive and zero-liquidity pools before graph construction: they
@@ -167,9 +184,33 @@ function selectRelevantPools(
     }
   });
 
-  // Build full-graph adjacency.
+  const routeKeys = new Set(BASE_ROUTE_KEYS);
+  routeKeys.add(inKey);
+  routeKeys.add(outKey);
+  if (inKey === CHEESE_KEY || outKey === CHEESE_KEY) {
+    for (const k of CHEESE_BRIDGE_KEYS) routeKeys.add(k);
+  }
+
+  const isDirectPair = (a: string, b: string) =>
+    (a === inKey && b === outKey) || (a === outKey && b === inKey);
+
+  const isAllowedCandidate = (p: RawAlcorPool): boolean => {
+    const a = keyOf(p.tokenA);
+    const b = keyOf(p.tokenB);
+    if (isDirectPair(a, b)) return true;
+    if ((a === inKey && routeKeys.has(b)) || (b === inKey && routeKeys.has(a))) return true;
+    if ((a === outKey && routeKeys.has(b)) || (b === outKey && routeKeys.has(a))) return true;
+    // Allow a small number of hub↔hub pools so 3-hop hub bridges remain possible.
+    if (maxHops >= 3 && routeKeys.has(a) && routeKeys.has(b)) return true;
+    return false;
+  };
+
+  const candidates = active.filter(isAllowedCandidate);
+
+  // Build adjacency only from the controlled candidate set, then keep pools
+  // that actually lie on a ≤maxHops route.
   const adj = new Map<string, RawAlcorPool[]>();
-  for (const p of active) {
+  for (const p of candidates) {
     for (const k of [keyOf(p.tokenA), keyOf(p.tokenB)]) {
       let arr = adj.get(k);
       if (!arr) {
@@ -218,30 +259,15 @@ function selectRelevantPools(
     return false;
   };
 
-  const candidates = active.filter(onPath);
-
-  // Split into direct-hop pools (always kept) and deeper intermediate-only
-  // pools (ranked + capped).
-  const direct: RawAlcorPool[] = [];
-  const deep: RawAlcorPool[] = [];
-  for (const p of candidates) {
-    const a = keyOf(p.tokenA);
-    const b = keyOf(p.tokenB);
-    if (a === inKey || b === inKey || a === outKey || b === outKey) direct.push(p);
-    else deep.push(p);
-  }
-
-  if (direct.length + deep.length <= cap) return [...direct, ...deep];
+  const pathPools = candidates.filter(onPath);
+  if (pathPools.length <= cap) return pathPools;
 
   const num = (v: number | string | undefined): number => {
     if (v === undefined || v === null) return 0;
     const n = typeof v === "number" ? v : parseFloat(v);
     return Number.isFinite(n) ? n : 0;
   };
-  const rank = (p: RawAlcorPool): number => {
-    const vol = num(p.volumeUSD24) || num(p.volumeUSDWeek) / 7;
-    if (vol > 0) return vol;
-    // Log-scale fallback so mismatched decimal scales don't dominate.
+  const liquidityRank = (p: RawAlcorPool): number => {
     try {
       const l = BigInt(p.liquidity || "0");
       return l > 0n ? Math.log10(Number(l)) : 0;
@@ -249,9 +275,36 @@ function selectRelevantPools(
       return 0;
     }
   };
-  deep.sort((a, b) => rank(b) - rank(a));
-  const room = Math.max(0, cap - direct.length);
-  return [...direct, ...deep.slice(0, room)];
+  const tokenPriority = (k: string): number => {
+    if (k === "waxusdc-eth.token") return 100;
+    if (k === "wax-eosio.token") return 95;
+    if (k === "lswax-token.fusion") return 90;
+    if (k === "lsw-lsw.alcor") return 85;
+    if (k === "waxusdt-eth.token") return 80;
+    if (k === "waxcash-graffitiking") return 74;
+    if (k === "tlm-alien.worlds") return 72;
+    if (k === "buzz-buzzingarden") return 70;
+    if (k === "wuf-wuffi") return 68;
+    if (k === "waxdao-token.waxdao") return 66;
+    if (BASE_ROUTE_KEYS.has(k) || CHEESE_BRIDGE_KEYS.has(k)) return 50;
+    return 0;
+  };
+  const poolPriority = (p: RawAlcorPool): number => {
+    const a = keyOf(p.tokenA);
+    const b = keyOf(p.tokenB);
+    const vol = num(p.volumeUSD24) || num(p.volumeUSDWeek) / 7;
+    const otherFromIn = a === inKey ? b : b === inKey ? a : "";
+    const otherFromOut = a === outKey ? b : b === outKey ? a : "";
+    const endpointBonus = isDirectPair(a, b)
+      ? 10_000
+      : otherFromIn || otherFromOut
+      ? 5_000 + Math.max(tokenPriority(otherFromIn), tokenPriority(otherFromOut))
+      : 1_000 + Math.max(tokenPriority(a), tokenPriority(b));
+    // Small fee tiers can be critical for Alcor parity (e.g. WAX/WAXUSDC 0.05%).
+    const feeBonus = p.fee > 0 ? 1_000 / p.fee : 0;
+    return endpointBonus + feeBonus + Math.log10(vol + 1) * 10 + liquidityRank(p);
+  };
+  return pathPools.slice().sort((a, b) => poolPriority(b) - poolPriority(a)).slice(0, cap);
 }
 
 /**
@@ -361,8 +414,9 @@ export async function computeShadowQuote(args: ShadowQuoteArgs): Promise<ShadowQ
 
   logger.info(`[shadow-router] pools selected: ${relevant.length}`);
 
-  // Fetch ticks in parallel, capped concurrency to respect rate limits.
-  const tickResults = await mapLimit(relevant, 8, async (p) => {
+  // Fetch ticks with low concurrency; Alcor starts returning 502/CORS errors
+  // when browser clients hydrate too many pools at once.
+  const tickResults = await mapLimit(relevant, 3, async (p) => {
     try {
       return { p, ticks: await fetchPoolTicks(p.id, signal) };
     } catch (e) {
@@ -480,7 +534,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
 
   logger.info(`[alcor-router] pools selected: ${relevant.length}`);
 
-  const tickResults = await mapLimit(relevant, 8, async (p) => {
+  const tickResults = await mapLimit(relevant, 3, async (p) => {
     try {
       return { p, ticks: await fetchPoolTicks(p.id, signal) };
     } catch (e) {
