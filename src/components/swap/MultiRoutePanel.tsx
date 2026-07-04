@@ -28,8 +28,6 @@ export function MultiRoutePanel({ route, tokenIn, tokenOut }: MultiRoutePanelPro
 
   const { pools, isLoading, hasError } = useAlcorPools(allIds);
 
-  const isWoe = route.source === "woe";
-
   const startId = tokenInId(tokenIn);
 
   const rows = useMemo(() => {
@@ -60,9 +58,9 @@ export function MultiRoutePanel({ route, tokenIn, tokenOut }: MultiRoutePanelPro
     });
   }, [route.swaps, pools, startId, tokenIn.ticker, tokenIn.contract, tokenIn.precision]);
 
-  if (hasError && !isWoe) return null;
+  if (hasError) return null;
 
-  if (isLoading && !isWoe) {
+  if (isLoading) {
     return (
       <div className="mt-2 pt-2 border-t border-border/50">
         <div className="text-xs font-medium text-cheese mb-2">Multiroute</div>
@@ -73,28 +71,13 @@ export function MultiRoutePanel({ route, tokenIn, tokenOut }: MultiRoutePanelPro
 
   return (
     <div className="mt-2 pt-2 border-t border-border/50">
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-xs font-medium text-cheese">Multiroute</div>
-        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-          via {isWoe ? "WaxOnEdge" : "Alcor"}
-        </div>
-      </div>
+      <div className="text-xs font-medium text-cheese mb-2">Multiroute</div>
       <div className="space-y-2">
         {rows.map((row, i) => (
           <div key={i} className="flex items-center gap-2 flex-wrap text-xs">
             <span className="text-white font-medium">
               {Math.round(row.split.percent)}%
             </span>
-            {isWoe && row.hopFees.length === 0 && (
-              <div className="flex items-center gap-1.5">
-                <div className="flex items-center">
-                  <TokenLogo contract={tokenIn.contract} symbol={tokenIn.ticker} size="md" />
-                  <div className="-ml-3 ring-2 ring-background rounded-full">
-                    <TokenLogo contract={tokenOut.contract} symbol={tokenOut.ticker} size="md" />
-                  </div>
-                </div>
-              </div>
-            )}
             {row.hopFees.map((fee, idx) => {
               const a = row.chain[idx];
               const b = row.chain[idx + 1];

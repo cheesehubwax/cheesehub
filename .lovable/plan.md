@@ -1,82 +1,48 @@
-## Background
+## Why CheeseSwap only shows 100% routes
 
-- Current router: Alcor's public HTTP `/getRoute` — always 100% single-path, no splitting.
-- Previous alternative in `cheesehub` history: **WAX on Edge (WoE)** — a WAX-native DEX aggregator (`swap.we` contract, `waxonedge.app`) that does split routing across Alcor pools + spot markets. It was removed when WoE's public API went down.
-- WoE is back online (site + API link live at `waxonedge.app`, `@waxonedge/swap` still published on npm).
-- Approach chosen: **best-of-both** — quote from WoE and Alcor's HTTP router in parallel, pick the route with better output for the user.
+The network log confirms it: our call to
+`https://wax.alcor.exchange/api/v2/swapRouter/getRoute?...&maxHops=3`
+returns `"swaps": [{ "percent": 100, ... }]` — always one split. This is Alcor's **public HTTP router**, which only searches linear routes (single path, no aggregation across parallel pools).
 
-## Step 1: Archive the current SDK plan
+Alcor's own frontend does **not** use that HTTP endpoint for pricing. It uses the client-side SDK **`@alcorexchange/alcor-swap-sdk`** with the `Trade` class (Uniswap-style smart order router). That router supports **`maxSplits`** and **`distributionPercent`**, which is exactly what produces the "50% / 20% / …" multi-route quotes you see on Alcor.
 
-- Move `.lovable/plan.md` → `.lovable/archive/plan-alcor-swap-sdk-DEFERRED.md` (mirrors the existing `plan-token-farms-tf-waxdao-DROPPED.md` convention).
-- Uninstall `@alcorexchange/alcor-swap-sdk` from `package.json` (installed last session, unused). Removes bundle weight and stops appearing in dependency scans.
-- Delete any stub files created while investigating the SDK (none confirmed yet — check before uninstall).
+So the missing piece is: we call an endpoint Alcor themselves don't use for routing. To match Alcor, we need to run the same SDK client-side.
 
-## Step 2: Recover the old WoE integration from git history
+## Fix: adopt `@alcorexchange/alcor-swap-sdk` for routing
 
-Before writing anything new, look at how `cheesehub` did it originally so we don't re-invent the wire format. Two candidate sources:
-1. `bewbzz/cheesehub` git log — search for `waxonedge`, `swap.we`, `WoE`.
-2. `@waxonedge/swap` npm package internals — the Vue component's `config` type exposes `API`, `RATES_API`, `CHAIN_API`, and the `sign` event returns ready-to-sign `action[]`. Unpacking the tarball reveals the exact route/quote endpoints and the memo format the `swap.we` contract expects. This is the authoritative source.
+Replace the getRoute HTTP call in `fetchSwapRoute` (`src/lib/swapApi.ts`) with a client-side computation using the official Alcor SDK. The rest of the pipeline (memo → wharfkit transfer, `MultiRoutePanel`, min-received display) stays as-is because it already speaks the same `swaps[]` shape.
 
-Output of this step: a documented `WoE quote request → response → wharfkit actions` contract before any code changes.
+### Steps
 
-## Step 3: New router adapter `src/lib/woeRouter.ts`
+1. **Add dependency** `@alcorexchange/alcor-swap-sdk` (and `eos-common` if the SDK requires it as a peer).
+2. **Fetch pool state** for all active WAX pools once, cached via react-query:
+   - `GET https://wax.alcor.exchange/api/v2/swap/pools` (already used in `useAlcorPools` for single pools — extend to a "list all" query with `staleTime: 30s`).
+   - Map each pool row to the SDK's `Pool` constructor (`tokenA`, `tokenB`, `fee`, `sqrtPriceX64`, `tickCurrent`, `liquidity`, `tickSpacing`) using the same `parseToken` shape shown in the SDK README.
+3. **New router module** `src/lib/alcorRouter.ts`:
+   - Build `Token` instances for `tokenIn` / `tokenOut`.
+   - Call `Trade.bestTradeExactIn(pools, currencyAmountIn, tokenOut, { maxNumResults: 1, maxHops: 3, maxSplits: 4, distributionPercent: 5 })` (same defaults Alcor uses; we can tune after visual parity).
+   - Convert the `Trade` result into our existing `SwapRoute` shape:
+     - `route`: concatenation of pool IDs across splits (used for display fallback).
+     - `swaps[]`: one entry per split with `percent`, `route` (pool IDs), `input`, `output`, `minReceived`, `maxSent`, `memo`.
+     - `output`, `minReceived`, `maxSent`, `priceImpact`, `executionPrice` from the SDK's `Trade` fields.
+     - `memo`: build the multi-split memo Alcor's contract expects — `swapexactin#<pools_of_split_1>|<pools_of_split_2>|...#<receiver>#<total_min_out>@<contract>#<deadline>` (verify against Alcor's contract docs before shipping; if the contract does not accept splits in one memo, emit one `transfer` action per split, which is what Alcor's UI does).
+4. **Wire into `fetchSwapRoute`**: replace the HTTP call with `computeAlcorRoute(...)`. Keep `EXACT_INPUT` / `EXACT_OUTPUT` parity by branching to `bestTradeExactOut` for exact-output.
+5. **Transaction layer** (`CheeseSwapWidget` submit path): if routing returns multiple splits, push **one `transfer` action per split** in the same wharfkit transaction, each carrying its own `swapexactin#<poolIds>#…` memo. This matches Alcor's on-chain behavior and keeps min-received accurate per split.
+6. **Multiroute UI**: no changes needed — `MultiRoutePanel` already iterates `route.swaps` and shows per-split percent + per-hop pool pair, so as soon as `swaps.length > 1` you'll see the same "50% / 20% / …" rows Alcor shows.
 
-- `fetchWoeRoute(tokenIn, tokenOut, amount, slippage, receiver, tradeType, signal)` → returns our existing `SwapRoute` shape (so `MultiRoutePanel`, min-received UI, and the submit path all keep working unchanged).
-- Maps WoE's split routes into `route.swaps[]` — one entry per split with `percent`, per-hop `route` (pool IDs / market IDs), `input`, `output`, `minReceived`, `maxSent`, `memo`.
-- Supports both `EXACT_INPUT` and `EXACT_OUTPUT` if WoE exposes both; otherwise document the gap and fall back to Alcor for exact-output.
-- Emits `action[]` for `session.transact`. When WoE returns multiple splits, that will be multiple `transfer` actions to `swap.we` (or the routed contracts) in one transaction — same pattern the WoE npm component uses via its `sign` event.
+### Technical notes
 
-## Step 4: Best-of-both aggregation in `src/lib/swapApi.ts`
+- The SDK is ~pure TS and runs in the browser. Bundle cost is real but acceptable (Alcor ships it in their Nuxt UI).
+- Route computation is O(pools × splits × hops). Cap `maxSplits` at 4 and gate the compute behind a small debounce (150ms) tied to `amount` input to avoid recomputing on every keystroke.
+- Pool state can go stale between fetch and swap. Use `staleTime: 15–30s` and re-fetch on quote request. The min-received / slippage guard already protects users from bad execution.
+- Slippage stays a user setting; apply it to each split's output before summing `minReceived`.
+- Fallback: if SDK routing fails (empty pool set, throw, etc.), fall back to the current HTTP `/getRoute` call so the swap widget is never worse than today.
 
-Rewrite `fetchSwapRoute` to:
+### Files touched
 
-```text
-1. Kick off in parallel:
-     a. fetchWoeRoute(...)      (new)
-     b. fetchAlcorRoute(...)    (current HTTP /getRoute call)
-2. Wait for both with Promise.allSettled + a hard timeout (e.g. 4s).
-3. Selection:
-     - EXACT_INPUT  → pick the route with the higher `output`.
-     - EXACT_OUTPUT → pick the route with the lower `input`.
-     - Tie / one missing → prefer WoE (splits are typically better on realistic sizes).
-     - Both fail      → surface the error the way we do today.
-4. Tag the winning route with `route.source: "woe" | "alcor"` so the UI can display it (small badge under the route panel, matching how Alcor labels aggregator sources).
-```
-
-`useSwapRoute` needs no shape changes — it already consumes `SwapRoute`. Query cache key gains `source` implicitly via the returned data.
-
-## Step 5: UI additions (minimal)
-
-- `MultiRoutePanel` already renders `route.swaps[]` with overlapping token pairs and per-split % — it will "just work" once WoE returns splits.
-- Add a small "via WaxOnEdge" / "via Alcor" label next to the "1 X ≈ Y" summary row so the user knows which router won this quote.
-- No other UI changes.
-
-## Step 6: Submit path (`CheeseSwapWidget.handleSwap`)
-
-- `normalizeRouteActions(route, ...)` in `swapApi.ts` already normalizes single-transfer routes. Extend it to handle `route.source === "woe"` and emit **N transfer actions, one per split**, each with its own `swap.we` memo — matching WoE's on-chain contract. Alcor branch stays as-is.
-- Terms-confirmation gate and Greymass Fuel plugins remain untouched (per project memory).
-
-## Step 7: Verification checklist before shipping
-
-- Small WAX → CHEESE swap: WoE should return a single-hop route similar to Alcor's; outputs within a few basis points.
-- Large WAX → some low-liquidity token: WoE should split, Alcor should not; `MultiRoutePanel` should show 2+ rows with percents summing to 100.
-- WoE down (simulate by blocking the domain): Alcor fallback still produces a route, no user-visible degradation.
-- Both down: current error banner still fires; nothing regresses.
-
-## Files touched
-
-- `.lovable/plan.md` → moved to archive
-- `.lovable/plan.md` (new) — this plan while active
-- `package.json` — remove `@alcorexchange/alcor-swap-sdk`
-- `src/lib/woeRouter.ts` (new)
-- `src/lib/swapApi.ts` — `fetchSwapRoute` becomes best-of-both; `normalizeRouteActions` handles WoE splits
-- `src/components/swap/MultiRoutePanel.tsx` — optional "via ..." badge (single line)
-- No changes to `useSwapRoute`, `MultiRoutePanel` iteration logic, `CheeseSwapWidget` core flow, terms gate, or wharfkit setup
-
-## Open items to resolve during Step 2 (not blockers for approval)
-
-- Exact WoE quote endpoint URL and response schema (recovered from the npm tarball + old cheesehub commits).
-- Whether WoE requires an API key now that it's back (docs page says "WaxOnEdge API" in the nav — will confirm).
-- Memo format for multi-split `swap.we` transfers.
-
-If any of these turn out materially different from what's assumed above, I'll come back with a revision before implementing rather than papering over it.
+- `package.json` — add SDK.
+- `src/lib/alcorRouter.ts` (new) — SDK adapter + `SwapRoute` mapping.
+- `src/lib/swapApi.ts` — `fetchSwapRoute` delegates to `alcorRouter`, keeps HTTP fallback.
+- `src/hooks/useAlcorPools.ts` — add `useAllAlcorPools()` for the full pool list; keep existing per-ID query for `MultiRoutePanel`.
+- `src/components/swap/CheeseSwapWidget.tsx` — submit path emits one transfer per split when `route.swaps.length > 1`.
+- No changes to `MultiRoutePanel.tsx`.
