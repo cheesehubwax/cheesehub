@@ -94,7 +94,7 @@ export function MultiRoutePanel({ route, tokenIn, tokenOut }: MultiRoutePanelPro
                   {!isLast && (
                     <span
                       aria-hidden
-                      className="flex-1 min-w-[16px] border-t border-dashed border-muted-foreground/40"
+                      className="flex-1 min-w-[16px] border-t border-dashed border-white"
                     />
                   )}
                 </div>
