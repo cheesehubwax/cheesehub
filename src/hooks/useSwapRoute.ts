@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { fetchSwapRoute, type SwapToken, type SwapRoute } from "@/lib/swapApi";
 import { computeAlcorTrade } from "@/lib/alcorRouter";
 import { logger } from "@/lib/logger";
