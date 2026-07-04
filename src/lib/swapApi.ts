@@ -18,6 +18,14 @@ export interface SwapAction {
   data: Record<string, unknown>;
 }
 
+export interface SwapSplit {
+  percent: number;
+  route: number[];
+  input: string;
+  output: string;
+  minReceived: string;
+}
+
 export interface SwapRoute {
   output: number;
   minReceived: number;
@@ -26,6 +34,21 @@ export interface SwapRoute {
   route: number[];
   executionPrice: { numerator: string; denominator: string };
   input?: number;
+  swaps: SwapSplit[];
+}
+
+export interface AlcorPoolToken {
+  id: string;
+  symbol: string;
+  contract: string;
+  decimals: number;
+}
+
+export interface AlcorPool {
+  id: number;
+  fee: number;
+  tokenA: AlcorPoolToken;
+  tokenB: AlcorPoolToken;
 }
 
 const ALCOR_API = "https://wax.alcor.exchange/api/v2";
@@ -116,6 +139,25 @@ export async function fetchSwapRoute(
 
   if (!data || !data.route || data.route.length === 0) return null;
 
+  const rawSwaps = Array.isArray(data.swaps) ? data.swaps : [];
+  const swaps: SwapSplit[] = rawSwaps.length
+    ? rawSwaps.map((s: any) => ({
+        percent: typeof s.percent === "number" ? s.percent : parseFloat(s.percent ?? "0"),
+        route: Array.isArray(s.route) ? s.route : [],
+        input: String(s.input ?? ""),
+        output: String(s.output ?? ""),
+        minReceived: String(s.minReceived ?? ""),
+      }))
+    : [
+        {
+          percent: 100,
+          route: data.route,
+          input: String(data.input ?? ""),
+          output: String(data.output ?? ""),
+          minReceived: String(data.minReceived ?? ""),
+        },
+      ];
+
   return {
     output: parseFloat(data.output),
     minReceived: parseFloat(data.minReceived),
@@ -124,6 +166,25 @@ export async function fetchSwapRoute(
     route: data.route,
     executionPrice: data.executionPrice,
     input: data.input ? parseFloat(data.input) : undefined,
+    swaps,
+  };
+}
+
+export async function fetchAlcorPool(id: number, signal?: AbortSignal): Promise<AlcorPool> {
+  const res = await fetch(`${ALCOR_API}/swap/pools/${id}`, { signal });
+  if (!res.ok) throw new Error(`Failed to fetch pool ${id}`);
+  const data = await res.json();
+  const pickToken = (t: any): AlcorPoolToken => ({
+    id: String(t?.id ?? `${(t?.symbol ?? "").toLowerCase()}-${t?.contract ?? ""}`),
+    symbol: String(t?.symbol ?? ""),
+    contract: String(t?.contract ?? ""),
+    decimals: Number(t?.decimals ?? 0),
+  });
+  return {
+    id: Number(data.id),
+    fee: Number(data.fee ?? 0),
+    tokenA: pickToken(data.tokenA),
+    tokenB: pickToken(data.tokenB),
   };
 }
 
