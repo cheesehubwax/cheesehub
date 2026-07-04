@@ -449,7 +449,6 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   });
 
   const aggMin = exactIn ? trade.minimumAmountOut(slip) : trade.outputAmount;
-  const aggMax = exactIn ? trade.inputAmount : trade.maximumAmountIn(slip);
   const aggRoute: number[] = trade.swaps[0].route.pools.map((p: Pool) => p.id);
   const aggMemo = `${opWord}#${aggRoute.join(",")}#${receiver}#${aggMin.toExtendedAsset()}#0`;
 
