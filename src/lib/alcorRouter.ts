@@ -14,8 +14,9 @@ import {
   CurrencyAmount,
   computeAllRoutes,
   TradeType,
+  Percent,
 } from "@alcorexchange/alcor-swap-sdk";
-import type { SwapToken } from "./swapApi";
+import type { SwapToken, SwapRoute, SwapSplit } from "./swapApi";
 import { logger } from "./logger";
 
 const ALCOR_API = "https://wax.alcor.exchange/api/v2";
@@ -328,4 +329,144 @@ function toRawAmount(human: string, decimals: number): string {
   const raw = (whole || "0") + fracPadded;
   const trimmed = raw.replace(/^0+(?=\d)/, "");
   return trimmed || "0";
+}
+
+// ----- Split-trade -> SwapRoute adapter -----
+
+export interface AlcorTradeArgs {
+  tokenIn: SwapToken;
+  tokenOut: SwapToken;
+  amount: string;
+  slippage: number; // percent (e.g. 1 = 1%)
+  receiver: string;
+  tradeType: "EXACT_INPUT" | "EXACT_OUTPUT";
+  maxHops?: number;
+  distributionPercent?: number;
+  signal?: AbortSignal;
+}
+
+/**
+ * Runs the Alcor SDK smart order router and returns a SwapRoute in the exact
+ * shape the widget already consumes, INCLUDING per-split memos for multi-
+ * transfer execution. Returns null when no route is found (caller should fall
+ * back to the HTTP endpoint).
+ */
+export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute | null> {
+  const {
+    tokenIn,
+    tokenOut,
+    amount,
+    slippage,
+    receiver,
+    tradeType,
+    maxHops = 3,
+    distributionPercent = 5,
+    signal,
+  } = args;
+
+  const inKey = tokenKey(tokenIn.contract, tokenIn.ticker);
+  const outKey = tokenKey(tokenOut.contract, tokenOut.ticker);
+
+  const allPools = await fetchAllAlcorPools(signal);
+  const relevant = selectRelevantPools(allPools, inKey, outKey, maxHops);
+  if (relevant.length === 0) return null;
+
+  const tickResults = await Promise.all(
+    relevant.map(async (p) => {
+      try {
+        return { p, ticks: await fetchPoolTicks(p.id, signal) };
+      } catch (e) {
+        logger.warn(`alcorTrade: tick fetch failed for pool ${p.id}`, e);
+        return { p, ticks: [] as RawAlcorTick[] };
+      }
+    })
+  );
+
+  const sdkPools = tickResults
+    .filter((r) => r.ticks.length > 0)
+    .map((r) => {
+      try {
+        return buildPool(r.p, r.ticks);
+      } catch (e) {
+        logger.warn(`alcorTrade: pool build failed for pool ${r.p.id}`, e);
+        return null;
+      }
+    })
+    .filter((p): p is Pool => p !== null);
+  if (sdkPools.length === 0) return null;
+
+  const inTok = new Token(tokenIn.contract, tokenIn.precision, tokenIn.ticker);
+  const outTok = new Token(tokenOut.contract, tokenOut.precision, tokenOut.ticker);
+
+  const routes = computeAllRoutes(inTok, outTok, sdkPools, maxHops);
+  if (routes.length === 0) return null;
+
+  const percents: number[] = [];
+  for (let p = distributionPercent; p <= 100; p += distributionPercent) percents.push(p);
+
+  const rawAmount = toRawAmount(
+    amount,
+    tradeType === "EXACT_INPUT" ? tokenIn.precision : tokenOut.precision
+  );
+  const currencyAmount = CurrencyAmount.fromRawAmount(
+    tradeType === "EXACT_INPUT" ? inTok : outTok,
+    rawAmount
+  );
+
+  const sdkTradeType = tradeType === "EXACT_INPUT" ? TradeType.EXACT_INPUT : TradeType.EXACT_OUTPUT;
+  const trade = (Trade as any).bestTradeWithSplit(
+    routes,
+    currencyAmount,
+    percents,
+    sdkTradeType,
+    { minSplits: 1, maxSplits: 4 }
+  );
+  if (!trade) return null;
+
+  // Slippage as SDK Percent: e.g. 1% => Percent(100, 10_000).
+  const bps = Math.round(slippage * 100); // 1% -> 100bps
+  const slip = new Percent(bps, 10_000);
+
+  const exactIn = tradeType === "EXACT_INPUT";
+  const opWord = exactIn ? "swapexactin" : "swapexactout";
+
+  // Per-split shape mirrors Alcor's own parseTrade so the memo is byte-identical
+  // to what wax.alcor.exchange sends today.
+  const splits: SwapSplit[] = trade.swaps.map((s: any) => {
+    const poolIds: number[] = s.route.pools.map((p: Pool) => p.id);
+    const maxSent = exactIn ? s.inputAmount : trade.maximumAmountIn(slip, s.inputAmount);
+    const minReceived = exactIn ? trade.minimumAmountOut(slip, s.outputAmount) : s.outputAmount;
+    const memo = `${opWord}#${poolIds.join(",")}#${receiver}#${minReceived.toExtendedAsset()}#0`;
+    return {
+      percent: s.percent,
+      route: poolIds,
+      input: s.inputAmount.toFixed(),
+      output: s.outputAmount.toFixed(),
+      minReceived: minReceived.toFixed(),
+      maxSent: maxSent.toFixed(),
+      memo,
+    };
+  });
+
+  const aggMin = exactIn ? trade.minimumAmountOut(slip) : trade.outputAmount;
+  const aggMax = exactIn ? trade.inputAmount : trade.maximumAmountIn(slip);
+  const aggRoute: number[] = trade.swaps[0].route.pools.map((p: Pool) => p.id);
+  const aggMemo = `${opWord}#${aggRoute.join(",")}#${receiver}#${aggMin.toExtendedAsset()}#0`;
+
+  return {
+    output: parseFloat(trade.outputAmount.toFixed()),
+    minReceived: parseFloat(aggMin.toFixed()),
+    priceImpact: parseFloat(trade.priceImpact.toFixed(4)),
+    memo: aggMemo,
+    route: aggRoute,
+    executionPrice: {
+      numerator: trade.executionPrice.numerator.toString(),
+      denominator: trade.executionPrice.denominator.toString(),
+    },
+    input: parseFloat(trade.inputAmount.toFixed()),
+    swaps: splits,
+    // Non-standard extra field ignored by consumers; kept for debugging.
+    // @ts-expect-error — augment for debugging
+    _maxSent: parseFloat(aggMax.toFixed()),
+  } as SwapRoute;
 }
