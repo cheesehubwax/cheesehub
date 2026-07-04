@@ -2,8 +2,6 @@ import { useState } from 'react';
 import { getTokenLogoUrl } from '@/lib/tokenLogos';
 import { cn } from '@/lib/utils';
 
-const TOKEN_LOGO_PLACEHOLDER = '/placeholder.svg';
-
 interface TokenLogoProps {
   contract: string;
   symbol: string;
@@ -17,13 +15,34 @@ const sizeClasses = {
   lg: 'h-8 w-8',
 };
 
+const fontSizeClasses = {
+  sm: 'text-[8px]',
+  md: 'text-xs',
+  lg: 'text-sm',
+};
+
 export function TokenLogo({ contract, symbol, className, size = 'md' }: TokenLogoProps) {
   const [hasError, setHasError] = useState(false);
   const logoUrl = getTokenLogoUrl(contract, symbol);
 
+  if (hasError) {
+    return (
+      <div
+        className={cn(
+          sizeClasses[size],
+          fontSizeClasses[size],
+          'rounded-full bg-cheese/20 flex items-center justify-center text-cheese font-bold',
+          className
+        )}
+      >
+        {symbol.charAt(0).toUpperCase()}
+      </div>
+    );
+  }
+
   return (
     <img
-      src={hasError ? TOKEN_LOGO_PLACEHOLDER : logoUrl}
+      src={logoUrl}
       alt={symbol}
       className={cn(sizeClasses[size], 'rounded-full object-cover', className)}
       onError={() => setHasError(true)}
