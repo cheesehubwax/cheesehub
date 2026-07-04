@@ -465,8 +465,5 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     },
     input: parseFloat(trade.inputAmount.toFixed()),
     swaps: splits,
-    // Non-standard extra field ignored by consumers; kept for debugging.
-    // @ts-expect-error — augment for debugging
-    _maxSent: parseFloat(aggMax.toFixed()),
   } as SwapRoute;
 }
