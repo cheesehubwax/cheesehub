@@ -1,5 +1,6 @@
 // Alcor Exchange API layer for CHEESESwap
 import { waxRpcCall } from "./waxRpcFallback";
+import { fetchWoeRoute, buildWoeActions } from "./woeRouter";
 
 export interface SwapToken {
   contract: string;
@@ -35,6 +36,14 @@ export interface SwapRoute {
   executionPrice: { numerator: string; denominator: string };
   input?: number;
   swaps: SwapSplit[];
+  /** Which router produced this quote. Missing = legacy/Alcor for backwards compat. */
+  source?: "woe" | "alcor";
+  /** WoE-only: raw transfer actions (to/quantity/memo) exactly as returned by WoE. */
+  woeActions?: Array<{ to: string; quantity: string; memo: string }>;
+  /** WoE-only: aggregator fees, in the output token's units. */
+  fees?: number;
+  /** WoE-only: platform fees, in the output token's units. */
+  platformFees?: number;
 }
 
 export interface AlcorPoolToken {
@@ -88,7 +97,8 @@ export async function fetchSwapTokenList(signal?: AbortSignal): Promise<SwapToke
     }));
 }
 
-export async function fetchSwapRoute(
+/** Alcor's public HTTP router. Single-path (no splitting). Kept as a fallback / co-quote. */
+async function fetchAlcorRoute(
   tokenIn: SwapToken,
   tokenOut: SwapToken,
   amount: string,
@@ -159,6 +169,7 @@ export async function fetchSwapRoute(
       ];
 
   return {
+    source: "alcor",
     output: parseFloat(data.output),
     minReceived: parseFloat(data.minReceived),
     priceImpact: parseFloat(data.priceImpact),
@@ -168,6 +179,54 @@ export async function fetchSwapRoute(
     input: data.input ? parseFloat(data.input) : undefined,
     swaps,
   };
+}
+
+/**
+ * Best-of-both router: quote WoE and Alcor in parallel, pick the better route
+ * for the user (higher output for exact-input, lower input for exact-output).
+ *
+ * Failure semantics:
+ * - If both throw, re-throw one so the retry classifier in useSwapRoute stays intact.
+ * - If both return null, return null (no route).
+ * - If exactly one wins, use it silently.
+ */
+export async function fetchSwapRoute(
+  tokenIn: SwapToken,
+  tokenOut: SwapToken,
+  amount: string,
+  slippage: number,
+  receiver: string,
+  signal?: AbortSignal,
+  tradeType: "EXACT_INPUT" | "EXACT_OUTPUT" = "EXACT_INPUT"
+): Promise<SwapRoute | null> {
+  const [woeSettled, alcorSettled] = await Promise.allSettled([
+    fetchWoeRoute(tokenIn, tokenOut, amount, slippage, receiver, signal, tradeType),
+    fetchAlcorRoute(tokenIn, tokenOut, amount, slippage, receiver, signal, tradeType),
+  ]);
+
+  const woe = woeSettled.status === "fulfilled" ? woeSettled.value : null;
+  const alcor = alcorSettled.status === "fulfilled" ? alcorSettled.value : null;
+
+  if (!woe && !alcor) {
+    // If both failed with the same transient error, surface it so retries work.
+    if (woeSettled.status === "rejected" && alcorSettled.status === "rejected") {
+      throw alcorSettled.reason;
+    }
+    return null;
+  }
+  if (!woe) return alcor;
+  if (!alcor) return woe;
+
+  if (tradeType === "EXACT_OUTPUT") {
+    // For exact-output, WoE currently returns null (unsupported), so this branch
+    // is effectively unreachable — but keep it correct for future support.
+    const woeIn = woe.input ?? Number.POSITIVE_INFINITY;
+    const alcorIn = alcor.input ?? Number.POSITIVE_INFINITY;
+    return woeIn <= alcorIn ? woe : alcor;
+  }
+
+  // EXACT_INPUT: higher output wins. Ties break to WoE (better splitting on realistic sizes).
+  return woe.output >= alcor.output ? woe : alcor;
 }
 
 export async function fetchAlcorPool(id: number, signal?: AbortSignal): Promise<AlcorPool> {
@@ -188,7 +247,12 @@ export async function fetchAlcorPool(id: number, signal?: AbortSignal): Promise<
   };
 }
 
-/** Build a single transfer action to swap.alcor with the routing memo */
+/**
+ * Build the signable actions for a swap route.
+ * - Alcor: a single `transfer` to `swap.alcor` carrying the routing memo.
+ * - WoE: `swap.we::madeonwoe` marker + one `transfer` per split, using the
+ *   quantities and memos WoE returned directly (do NOT re-derive them).
+ */
 export function normalizeRouteActions(
   route: SwapRoute,
   accountName: string,
@@ -196,6 +260,9 @@ export function normalizeRouteActions(
   amount: string,
   tokenIn: SwapToken
 ): SwapAction[] {
+  if (route.source === "woe") {
+    return buildWoeActions(route, accountName, inputTokenContract);
+  }
   const formattedQuantity = `${formatTokenAmount(amount, tokenIn.precision)} ${tokenIn.ticker}`;
   return [
     {
