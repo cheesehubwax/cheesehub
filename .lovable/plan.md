@@ -1,48 +1,51 @@
-## Why CheeseSwap only shows 100% routes
+## Why the Multiroute panel still shows 100%
 
-The network log confirms it: our call to
-`https://wax.alcor.exchange/api/v2/swapRouter/getRoute?...&maxHops=3`
-returns `"swaps": [{ "percent": 100, ... }]` — always one split. This is Alcor's **public HTTP router**, which only searches linear routes (single path, no aggregation across parallel pools).
+Phase 1 only wired the SDK router as a **shadow observer** — it logs `[shadow-router]` in the console but the actual quote powering the UI still comes from Alcor's public HTTP `getRoute` endpoint, which returns a single 100% linear route. That's why your screenshot shows `100% [pool] 0.3%` while Alcor's own UI shows 50/25/25.
 
-Alcor's own frontend does **not** use that HTTP endpoint for pricing. It uses the client-side SDK **`@alcorexchange/alcor-swap-sdk`** with the `Trade` class (Uniswap-style smart order router). That router supports **`maxSplits`** and **`distributionPercent`**, which is exactly what produces the "50% / 20% / …" multi-route quotes you see on Alcor.
+To make the panel split like Alcor's, we need Phase 2: use the SDK-computed split trade as the source of truth for both **display** and **execution**.
 
-So the missing piece is: we call an endpoint Alcor themselves don't use for routing. To match Alcor, we need to run the same SDK client-side.
+## Phase 2 plan
 
-## Fix: adopt `@alcorexchange/alcor-swap-sdk` for routing
+### 1. Promote the shadow router to primary quote source
+- `src/hooks/useSwapRoute.ts`: replace the effect-based shadow log with a real query that awaits `computeShadowQuote` first, then falls back to `fetchSwapRoute` only if the SDK returns nothing or throws.
+- Adapt the SDK result into the existing `SwapRoute` shape so `MultiRoutePanel` renders unchanged:
+  - `swaps[]`: one entry per SDK split, each with `percent`, `route` (pool-id array), `input`, `output`, `minReceived` (apply user slippage per split).
+  - `route[]`: concat of every split's pool ids (used elsewhere for pool lookups).
+  - `output`, `minReceived`, `priceImpact`: aggregated across splits.
+  - `memo`: **not** used in Phase 2 — we build one memo per split at execution time (see step 3).
 
-Replace the getRoute HTTP call in `fetchSwapRoute` (`src/lib/swapApi.ts`) with a client-side computation using the official Alcor SDK. The rest of the pipeline (memo → wharfkit transfer, `MultiRoutePanel`, min-received display) stays as-is because it already speaks the same `swaps[]` shape.
+### 2. Per-split memo builder
+- New helper in `src/lib/alcorRouter.ts`: `buildSplitMemo(split, tokenOut, slippage, receiver, tradeType)` producing the exact `swapexactin#poolId,poolId,...#minOut TICKER@contract#receiver` (and `swapexactout#…` for exact-output) string Alcor's own UI emits.
+- Verified against Alcor's `alcor-ui` swap store — this is the format `swap.alcor` accepts today.
 
-### Steps
+### 3. Multi-transfer execution
+- `src/lib/swapApi.ts` → `normalizeRouteActions`: when `route.swaps.length > 1`, emit **one `transfer` action per split**, each with:
+  - `quantity` = split's fractional input formatted to `tokenIn.precision`
+  - `memo` = the per-split memo from step 2
+  - All actions bundled into the same wharfkit transaction (atomic; if any split fails the whole tx reverts).
+- Rounding: last split absorbs the remainder so the sum equals the user's typed amount to the last decimal.
+- Single-split (100%) path stays exactly as it is today — same one-action transfer, same memo.
 
-1. **Add dependency** `@alcorexchange/alcor-swap-sdk` (and `eos-common` if the SDK requires it as a peer).
-2. **Fetch pool state** for all active WAX pools once, cached via react-query:
-   - `GET https://wax.alcor.exchange/api/v2/swap/pools` (already used in `useAlcorPools` for single pools — extend to a "list all" query with `staleTime: 30s`).
-   - Map each pool row to the SDK's `Pool` constructor (`tokenA`, `tokenB`, `fee`, `sqrtPriceX64`, `tickCurrent`, `liquidity`, `tickSpacing`) using the same `parseToken` shape shown in the SDK README.
-3. **New router module** `src/lib/alcorRouter.ts`:
-   - Build `Token` instances for `tokenIn` / `tokenOut`.
-   - Call `Trade.bestTradeExactIn(pools, currencyAmountIn, tokenOut, { maxNumResults: 1, maxHops: 3, maxSplits: 4, distributionPercent: 5 })` (same defaults Alcor uses; we can tune after visual parity).
-   - Convert the `Trade` result into our existing `SwapRoute` shape:
-     - `route`: concatenation of pool IDs across splits (used for display fallback).
-     - `swaps[]`: one entry per split with `percent`, `route` (pool IDs), `input`, `output`, `minReceived`, `maxSent`, `memo`.
-     - `output`, `minReceived`, `maxSent`, `priceImpact`, `executionPrice` from the SDK's `Trade` fields.
-     - `memo`: build the multi-split memo Alcor's contract expects — `swapexactin#<pools_of_split_1>|<pools_of_split_2>|...#<receiver>#<total_min_out>@<contract>#<deadline>` (verify against Alcor's contract docs before shipping; if the contract does not accept splits in one memo, emit one `transfer` action per split, which is what Alcor's UI does).
-4. **Wire into `fetchSwapRoute`**: replace the HTTP call with `computeAlcorRoute(...)`. Keep `EXACT_INPUT` / `EXACT_OUTPUT` parity by branching to `bestTradeExactOut` for exact-output.
-5. **Transaction layer** (`CheeseSwapWidget` submit path): if routing returns multiple splits, push **one `transfer` action per split** in the same wharfkit transaction, each carrying its own `swapexactin#<poolIds>#…` memo. This matches Alcor's on-chain behavior and keeps min-received accurate per split.
-6. **Multiroute UI**: no changes needed — `MultiRoutePanel` already iterates `route.swaps` and shows per-split percent + per-hop pool pair, so as soon as `swaps.length > 1` you'll see the same "50% / 20% / …" rows Alcor shows.
+### 4. Safety rails
+- If SDK returns a split whose aggregated `minReceived` is worse than the HTTP route's `minReceived`, fall back to the HTTP route and log a warning. Guarantees Phase 2 never gives a user a worse quote than Phase 0.
+- Keep the 20s stale-quote debounce; add a hard "quote age > 30s" guard before submit to avoid stale-tick execution failures.
+- Leave the shadow smoke test in place, add an assertion that at least one WAX→CHEESE quote produces `splits.length > 1`.
 
-### Technical notes
+### 5. UI
+- No component changes required. `MultiRoutePanel` already iterates `route.swaps` and renders per-split percent + hop pairs — it just hasn't been receiving multi-split data.
+- `Price Impact`, `Min. Received`, and `Expected Output` in the widget already read the aggregated fields, so they update automatically.
 
-- The SDK is ~pure TS and runs in the browser. Bundle cost is real but acceptable (Alcor ships it in their Nuxt UI).
-- Route computation is O(pools × splits × hops). Cap `maxSplits` at 4 and gate the compute behind a small debounce (150ms) tied to `amount` input to avoid recomputing on every keystroke.
-- Pool state can go stale between fetch and swap. Use `staleTime: 15–30s` and re-fetch on quote request. The min-received / slippage guard already protects users from bad execution.
-- Slippage stays a user setting; apply it to each split's output before summing `minReceived`.
-- Fallback: if SDK routing fails (empty pool set, throw, etc.), fall back to the current HTTP `/getRoute` call so the swap widget is never worse than today.
+## Files touched
 
-### Files touched
+- `src/lib/alcorRouter.ts` — add `buildSplitMemo`, add `toSwapRoute(shadowQuote, slippage)` adapter.
+- `src/hooks/useSwapRoute.ts` — SDK-first, HTTP-fallback query; remove the shadow-only effect.
+- `src/lib/swapApi.ts` — extend `normalizeRouteActions` to emit N transfers when `swaps.length > 1`.
+- `src/test/shadow.test.ts` — add split-count assertion.
 
-- `package.json` — add SDK.
-- `src/lib/alcorRouter.ts` (new) — SDK adapter + `SwapRoute` mapping.
-- `src/lib/swapApi.ts` — `fetchSwapRoute` delegates to `alcorRouter`, keeps HTTP fallback.
-- `src/hooks/useAlcorPools.ts` — add `useAllAlcorPools()` for the full pool list; keep existing per-ID query for `MultiRoutePanel`.
-- `src/components/swap/CheeseSwapWidget.tsx` — submit path emits one transfer per split when `route.swaps.length > 1`.
-- No changes to `MultiRoutePanel.tsx`.
+## Risks / open questions
+
+- **Memo format parity**: Alcor recently added an optional deadline field. I'll cross-check the exact template against a live Alcor tx before we ship — if it differs from what's in `alcorRouter.ts`, we adjust before enabling.
+- **Tick staleness**: SDK math uses ticks that can move between quote and submit. Mitigated by the 30s guard + slippage; a worst-case stale quote just reverts on-chain (no fund loss).
+- **Bundle cost**: SDK is already installed and shipping in Phase 1 — no new weight.
+
+Once you approve, I'll implement and verify by running a real WAX→CHEESE quote in the widget and confirming the Multiroute panel shows the same split percentages as Alcor's UI.
