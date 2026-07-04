@@ -24,6 +24,10 @@ export interface SwapSplit {
   input: string;
   output: string;
   minReceived: string;
+  /** Optional per-split memo. Present when quote comes from the split router. */
+  memo?: string;
+  /** Optional per-split maxSent (used for EXACT_OUTPUT). */
+  maxSent?: string;
 }
 
 export interface SwapRoute {
