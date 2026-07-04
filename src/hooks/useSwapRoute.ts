@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect, useRef } from "react";
 import { fetchSwapRoute, type SwapToken, type SwapRoute } from "@/lib/swapApi";
-import { computeShadowQuote } from "@/lib/alcorRouter";
+import { computeAlcorTrade } from "@/lib/alcorRouter";
 import { logger } from "@/lib/logger";
 
 export type TradeType = "EXACT_INPUT" | "EXACT_OUTPUT";
@@ -47,7 +47,35 @@ export function useSwapRoute(
 
   const { data: route, isLoading, error, isFetching, failureCount, refetch } = useQuery<SwapRoute | null>({
     queryKey: ["swap-route", tokenIn?.ticker, tokenIn?.contract, tokenOut?.ticker, tokenOut?.contract, debouncedAmount, slippage, receiver, debouncedTradeType],
-    queryFn: ({ signal }) => fetchSwapRoute(tokenIn!, tokenOut!, debouncedAmount, slippage, receiver, signal, debouncedTradeType),
+    queryFn: async ({ signal }) => {
+      // Phase 2: try SDK split router first; on any failure or empty result
+      // fall back to Alcor's HTTP getRoute so users are never worse off than
+      // Phase 0.
+      try {
+        const sdk = await computeAlcorTrade({
+          tokenIn: tokenIn!,
+          tokenOut: tokenOut!,
+          amount: debouncedAmount,
+          slippage,
+          receiver,
+          tradeType: debouncedTradeType,
+          signal,
+        });
+        if (sdk && sdk.swaps.length > 0 && sdk.output > 0) {
+          logger.info("[alcor-router] SDK quote used", {
+            splits: sdk.swaps.length,
+            output: sdk.output,
+            priceImpact: sdk.priceImpact,
+          });
+          return sdk;
+        }
+        logger.warn("[alcor-router] SDK returned no route — falling back to HTTP");
+      } catch (e) {
+        if ((e as any)?.name === "AbortError") throw e;
+        logger.warn("[alcor-router] SDK failed — falling back to HTTP", e);
+      }
+      return fetchSwapRoute(tokenIn!, tokenOut!, debouncedAmount, slippage, receiver, signal, debouncedTradeType);
+    },
     enabled,
     staleTime: 15_000,
     gcTime: 30_000,
@@ -67,48 +95,6 @@ export function useSwapRoute(
   const noRoute = enabled && !isLoading && !isFetching && !error && route === null;
 
   const transient = !!error && isTransientError(error);
-
-  // ---- Shadow: run the client-side Alcor SDK router alongside the HTTP quote
-  // and log both. No user-visible effect — used only to validate parity before
-  // switching execution to the multi-split router.
-  useEffect(() => {
-    if (!enabled || !tokenIn || !tokenOut) return;
-    if (!route || !route.output) return;
-    const controller = new AbortController();
-    let cancelled = false;
-    (async () => {
-      try {
-        const shadow = await computeShadowQuote({
-          tokenIn,
-          tokenOut,
-          amount: debouncedAmount,
-          tradeType: debouncedTradeType,
-          signal: controller.signal,
-        });
-        if (cancelled) return;
-        logger.info("[shadow-router]", {
-          pair: `${tokenIn.ticker} → ${tokenOut.ticker}`,
-          amount: debouncedAmount,
-          tradeType: debouncedTradeType,
-          http: {
-            output: route.output,
-            priceImpact: route.priceImpact,
-            hops: route.route?.length ?? 0,
-            splits: route.swaps?.length ?? 1,
-          },
-          sdk: shadow,
-        });
-      } catch (e) {
-        if ((e as any)?.name !== "AbortError") {
-          logger.warn("[shadow-router] failed", e);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [enabled, tokenIn, tokenOut, debouncedAmount, debouncedTradeType, route]);
 
   // Stay "retrying" for the full window so the gap between attempts (when
   // isFetching is briefly false) doesn't flash the red banner.

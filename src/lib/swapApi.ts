@@ -24,6 +24,10 @@ export interface SwapSplit {
   input: string;
   output: string;
   minReceived: string;
+  /** Optional per-split memo. Present when quote comes from the split router. */
+  memo?: string;
+  /** Optional per-split maxSent (used for EXACT_OUTPUT). */
+  maxSent?: string;
 }
 
 export interface SwapRoute {
@@ -196,12 +200,47 @@ export function normalizeRouteActions(
   amount: string,
   tokenIn: SwapToken
 ): SwapAction[] {
+  const auth = [{ actor: accountName, permission: "active" }];
+
+  // Multi-split path: one transfer action per split, each with its own memo.
+  // Only used when every split carries a memo (i.e. quote came from the SDK
+  // split router). Falls through to the legacy single-transfer path otherwise.
+  const splits = route.swaps ?? [];
+  const allHaveMemos = splits.length > 1 && splits.every((s) => !!s.memo && !!s.input);
+
+  if (allHaveMemos) {
+    // Preserve raw-integer sum: format each split's `input` to precision, then
+    // route any rounding remainder into the last split so the on-chain total
+    // equals the user's typed amount exactly.
+    const precision = tokenIn.precision;
+    const scale = 10 ** precision;
+    const totalRaw = Math.round(parseFloat(amount) * scale);
+    const rawParts = splits.map((s) => Math.round(parseFloat(s.input) * scale));
+    const sumFirst = rawParts.slice(0, -1).reduce((a, b) => a + b, 0);
+    rawParts[rawParts.length - 1] = totalRaw - sumFirst;
+
+    return splits.map((split, i) => {
+      const human = (rawParts[i] / scale).toFixed(precision);
+      return {
+        account: inputTokenContract,
+        name: "transfer",
+        authorization: auth,
+        data: {
+          from: accountName,
+          to: "swap.alcor",
+          quantity: `${human} ${tokenIn.ticker}`,
+          memo: split.memo!,
+        },
+      };
+    });
+  }
+
   const formattedQuantity = `${formatTokenAmount(amount, tokenIn.precision)} ${tokenIn.ticker}`;
   return [
     {
       account: inputTokenContract,
       name: "transfer",
-      authorization: [{ actor: accountName, permission: "active" }],
+      authorization: auth,
       data: {
         from: accountName,
         to: "swap.alcor",
