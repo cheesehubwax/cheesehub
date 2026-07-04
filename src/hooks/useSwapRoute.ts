@@ -6,7 +6,7 @@ import { logger } from "@/lib/logger";
 
 export type TradeType = "EXACT_INPUT" | "EXACT_OUTPUT";
 
-const MAX_TRANSIENT_RETRIES = 6;
+const MAX_TRANSIENT_RETRIES = 1;
 const SDK_TIMEOUT_MS = 6000;
 
 function withTimeout<T>(p: Promise<T>, ms: number, ctrl: AbortController): Promise<T> {
@@ -68,9 +68,9 @@ export function useSwapRoute(
   const { data: route, isLoading, error, isFetching, failureCount, refetch } = useQuery<SwapRoute | null>({
     queryKey: ["swap-route", tokenIn?.ticker, tokenIn?.contract, tokenOut?.ticker, tokenOut?.contract, debouncedAmount, slippage, receiver, debouncedTradeType],
     queryFn: async ({ signal }) => {
-      // Phase 2: try SDK split router first; on any failure or empty result
-      // fall back to Alcor's HTTP getRoute so users are never worse off than
-      // Phase 0.
+      // Try SDK split router first; on failure or empty result fall back to
+      // Alcor's HTTP getRoute. Keep this to one attempt so Alcor 502/CORS
+      // failures don't amplify into a request storm.
       const sdkCtrl = new AbortController();
       const onOuterAbort = () => sdkCtrl.abort();
       signal?.addEventListener("abort", onOuterAbort);
@@ -115,7 +115,7 @@ export function useSwapRoute(
     enabled,
     staleTime: 15_000,
     gcTime: 30_000,
-    retryOnMount: true,
+    retryOnMount: false,
     retry: (count, err) => {
       if (isTransientError(err)) return count < MAX_TRANSIENT_RETRIES;
       return count < 1;
@@ -123,8 +123,7 @@ export function useSwapRoute(
     retryDelay: (attemptIndex, err) => {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("Rate limited")) return Math.min(5000 * 2 ** attemptIndex, 30000);
-      // 1s, 2s, 4s, 8s, 12s, 15s (cap)
-      return Math.min(1000 * 2 ** attemptIndex, 15000);
+      return Math.min(1000 * 2 ** attemptIndex, 5000);
     },
   });
 
@@ -137,20 +136,6 @@ export function useSwapRoute(
   const isRetrying = transient && failureCount < MAX_TRANSIENT_RETRIES;
   const finalError = error && !transient ? error : null;
   const exhaustedTransient = transient && failureCount >= MAX_TRANSIENT_RETRIES;
-
-  // Self-heal: after exhausting retries on a transient failure, schedule a
-  // single delayed refetch so the widget recovers without user input.
-  const healTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (!exhaustedTransient || !enabled) return;
-    healTimerRef.current = setTimeout(() => {
-      refetch();
-    }, 20_000);
-    return () => {
-      if (healTimerRef.current) clearTimeout(healTimerRef.current);
-      healTimerRef.current = null;
-    };
-  }, [exhaustedTransient, enabled, refetch]);
 
   return {
     route: route ?? undefined,

@@ -414,8 +414,9 @@ export async function computeShadowQuote(args: ShadowQuoteArgs): Promise<ShadowQ
 
   logger.info(`[shadow-router] pools selected: ${relevant.length}`);
 
-  // Fetch ticks in parallel, capped concurrency to respect rate limits.
-  const tickResults = await mapLimit(relevant, 8, async (p) => {
+  // Fetch ticks with low concurrency; Alcor starts returning 502/CORS errors
+  // when browser clients hydrate too many pools at once.
+  const tickResults = await mapLimit(relevant, 3, async (p) => {
     try {
       return { p, ticks: await fetchPoolTicks(p.id, signal) };
     } catch (e) {
@@ -533,7 +534,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
 
   logger.info(`[alcor-router] pools selected: ${relevant.length}`);
 
-  const tickResults = await mapLimit(relevant, 8, async (p) => {
+  const tickResults = await mapLimit(relevant, 3, async (p) => {
     try {
       return { p, ticks: await fetchPoolTicks(p.id, signal) };
     } catch (e) {
