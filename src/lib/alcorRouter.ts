@@ -122,10 +122,19 @@ function selectRelevantPools(
   inKey: string,
   outKey: string,
   maxHops: number,
-  cap = 120
+  cap = 60
 ): RawAlcorPool[] {
   const keyOf = (t: RawAlcorPool["tokenA"]) => tokenKey(t.contract, t.symbol);
-  const active = pools.filter((p) => p.active);
+  // Drop inactive and zero-liquidity pools before graph construction: they
+  // can never contribute an output but would still cost us a /ticks fetch.
+  const active = pools.filter((p) => {
+    if (!p.active) return false;
+    try {
+      return BigInt(p.liquidity || "0") > 0n;
+    } catch {
+      return false;
+    }
+  });
 
   // Build full-graph adjacency.
   const adj = new Map<string, RawAlcorPool[]>();
