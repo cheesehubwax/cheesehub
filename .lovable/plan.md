@@ -1,55 +1,51 @@
-# Fix: split router is missing the WAXCASH hub
+## Why the Multiroute panel still shows 100%
 
-## Diagnosis
+Phase 1 only wired the SDK router as a **shadow observer** — it logs `[shadow-router]` in the console but the actual quote powering the UI still comes from Alcor's public HTTP `getRoute` endpoint, which returns a single 100% linear route. That's why your screenshot shows `100% [pool] 0.3%` while Alcor's own UI shows 50/25/25.
 
-Alcor's UI is routing WAX→CHEESE partially through **WAXCASH** (`graffitiking`) — one of the deepest liquidity hubs on WAX right now:
+To make the panel split like Alcor's, we need Phase 2: use the SDK-computed split trade as the source of truth for both **display** and **execution**.
 
-- Pool 8388 WAX/WAXCASH — liq `1.6e15`
-- Pool 9204 WAX/WAXCASH — liq `2.9e14`
-- Pool 10933 CHEESE/WAXCASH — liq `1.7e12`
+## Phase 2 plan
 
-We are **not** seeing these pools. In `src/lib/alcorRouter.ts`, `selectRelevantPools` restricts candidates to pools where **both** tokens are in a hard-coded `HUB_KEYS` set (plus tokenIn/tokenOut). Today `HUB_KEYS` is:
+### 1. Promote the shadow router to primary quote source
+- `src/hooks/useSwapRoute.ts`: replace the effect-based shadow log with a real query that awaits `computeShadowQuote` first, then falls back to `fetchSwapRoute` only if the SDK returns nothing or throws.
+- Adapt the SDK result into the existing `SwapRoute` shape so `MultiRoutePanel` renders unchanged:
+  - `swaps[]`: one entry per SDK split, each with `percent`, `route` (pool-id array), `input`, `output`, `minReceived` (apply user slippage per split).
+  - `route[]`: concat of every split's pool ids (used elsewhere for pool lookups).
+  - `output`, `minReceived`, `priceImpact`: aggregated across splits.
+  - `memo`: **not** used in Phase 2 — we build one memo per split at execution time (see step 3).
 
-```
-wax, usdt.alcor, usdc.alcor, waxusdc, waxusdt, usdc(tether), lswax
-```
+### 2. Per-split memo builder
+- New helper in `src/lib/alcorRouter.ts`: `buildSplitMemo(split, tokenOut, slippage, receiver, tradeType)` producing the exact `swapexactin#poolId,poolId,...#minOut TICKER@contract#receiver` (and `swapexactout#…` for exact-output) string Alcor's own UI emits.
+- Verified against Alcor's `alcor-ui` swap store — this is the format `swap.alcor` accepts today.
 
-WAXCASH (and NBG, MOONBOY, etc.) aren't in that set, so every pool that would hop through WAXCASH is filtered out before `computeAllRoutes` ever runs. That's why our quote is worse than Alcor's — Alcor's own router doesn't hard-code hubs; it picks pools by liquidity.
+### 3. Multi-transfer execution
+- `src/lib/swapApi.ts` → `normalizeRouteActions`: when `route.swaps.length > 1`, emit **one `transfer` action per split**, each with:
+  - `quantity` = split's fractional input formatted to `tokenIn.precision`
+  - `memo` = the per-split memo from step 2
+  - All actions bundled into the same wharfkit transaction (atomic; if any split fails the whole tx reverts).
+- Rounding: last split absorbs the remainder so the sum equals the user's typed amount to the last decimal.
+- Single-split (100%) path stays exactly as it is today — same one-action transfer, same memo.
 
-Extra symptom: the 60-pool `cap` and the "both endpoints must be anchors" filter compound the problem — even if we added WAXCASH, other emerging hubs would still be missed later.
+### 4. Safety rails
+- If SDK returns a split whose aggregated `minReceived` is worse than the HTTP route's `minReceived`, fall back to the HTTP route and log a warning. Guarantees Phase 2 never gives a user a worse quote than Phase 0.
+- Keep the 20s stale-quote debounce; add a hard "quote age > 30s" guard before submit to avoid stale-tick execution failures.
+- Leave the shadow smoke test in place, add an assertion that at least one WAX→CHEESE quote produces `splits.length > 1`.
 
-## Fix (two-step, still Phase 2 scope — no execution changes)
+### 5. UI
+- No component changes required. `MultiRoutePanel` already iterates `route.swaps` and renders per-split percent + hop pairs — it just hasn't been receiving multi-split data.
+- `Price Impact`, `Min. Received`, and `Expected Output` in the widget already read the aggregated fields, so they update automatically.
 
-### 1. Add WAXCASH to the static hub set (immediate parity)
+## Files touched
 
-In `src/lib/alcorRouter.ts` `HUB_KEYS`, add:
+- `src/lib/alcorRouter.ts` — add `buildSplitMemo`, add `toSwapRoute(shadowQuote, slippage)` adapter.
+- `src/hooks/useSwapRoute.ts` — SDK-first, HTTP-fallback query; remove the shadow-only effect.
+- `src/lib/swapApi.ts` — extend `normalizeRouteActions` to emit N transfers when `swaps.length > 1`.
+- `src/test/shadow.test.ts` — add split-count assertion.
 
-```
-waxcash-graffitiking
-nbg-gkniftyheads     // deep WAXCASH pairs, common 2-hop bridge
-```
+## Risks / open questions
 
-This alone restores the CHEESE/WAX→WAXCASH→CHEESE split path.
+- **Memo format parity**: Alcor recently added an optional deadline field. I'll cross-check the exact template against a live Alcor tx before we ship — if it differs from what's in `alcorRouter.ts`, we adjust before enabling.
+- **Tick staleness**: SDK math uses ticks that can move between quote and submit. Mitigated by the 30s guard + slippage; a worst-case stale quote just reverts on-chain (no fund loss).
+- **Bundle cost**: SDK is already installed and shipping in Phase 1 — no new weight.
 
-### 2. Replace the static hub gate with a liquidity-driven candidate set (durable fix)
-
-Refactor `selectRelevantPools` so the "both endpoints in `HUB_KEYS`" rule becomes a fallback, not the primary filter:
-
-1. Start with `active` pools.
-2. Keep every pool that touches `tokenIn` or `tokenOut` directly (1-hop pools always in).
-3. For 2- and 3-hop candidates, keep pools whose **both** tokens rank in the **top N (default 25) by aggregate liquidity across all active pools** — computed once from the same `/swap/pools` response. This is exactly the heuristic Alcor's SDK examples use (`topN` liquid tokens) and it auto-tracks new hubs (WAXCASH today, whatever emerges tomorrow) without code changes.
-4. Union with the current `HUB_KEYS` set so the curated list still short-circuits obvious hubs.
-5. Raise `cap` from 60 → 120. Ticks are fetched in parallel and cached; the extra latency is bounded and only paid on the first quote per session.
-6. Keep the BFS connectivity check unchanged so we don't ship unreachable pools to the SDK.
-
-### 3. Verify
-
-- Manual: run a WAX→CHEESE quote in the widget, confirm MultiRoutePanel now shows a WAXCASH leg matching Alcor's UI split.
-- Test: extend `src/test/shadow.test.ts` — assert that for WAX→CHEESE at 100 WAX, the returned `splits` include at least one route whose `path` contains `WAXCASH`, and that `totalOutput` is ≥ the current 100%-single-route baseline.
-
-## Technical notes
-
-- No changes to `swapApi.ts`, `useSwapRoute.ts`, or execution — memo builder and per-split transfer already work; they were just being fed too few routes.
-- `computeAllRoutes(inTok, outTok, sdkPools, maxHops=3)` cost scales with `pools^maxHops`; 120 pools × 3 hops is still well within the SDK's tested envelope (Alcor itself runs ~150 pools client-side).
-- Aggregate-liquidity ranking uses the same `BigInt(pool.liquidity)` we already sort by; no new API calls.
-- Falls back gracefully: if `/swap/pools` returns nothing new, behavior collapses to today's curated hub list.
+Once you approve, I'll implement and verify by running a real WAX→CHEESE quote in the widget and confirming the Multiroute panel shows the same split percentages as Alcor's UI.

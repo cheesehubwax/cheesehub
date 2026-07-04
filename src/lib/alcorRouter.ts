@@ -112,63 +112,29 @@ const HUB_KEYS = new Set([
   "waxusdt-eth.token",
   "usdc-tethertether",
   "lswax-token.lswax",
-  // Emerging deep-liquidity hubs on WAX. WAXCASH in particular currently
-  // holds >1e15 liquidity against WAX and is a required intermediate for
-  // parity with Alcor's UI on many pairs (e.g. WAX↔CHEESE splits).
-  "waxcash-graffitiking",
-  "nbg-gkniftyheads",
-  "lswax-token.fusion",
-  "lsw-lsw.alcor",
 ]);
 
 /** Select pools that could participate in a tokenIn→tokenOut route of length
- *  ≤ maxHops. Intermediate tokens are drawn from the union of:
- *   (a) tokenIn / tokenOut themselves (1-hop pools are always kept),
- *   (b) the curated `HUB_KEYS` set (well-known hubs),
- *   (c) the top-N tokens ranked by aggregate liquidity across all active
- *       pools — this auto-tracks new hubs (WAXCASH today, whatever emerges
- *       tomorrow) without code changes, matching Alcor's own topN heuristic.
- *  Pool count is capped to avoid overwhelming the ticks endpoint. */
+ *  ≤ maxHops, restricting intermediate tokens to a curated hub set. Also caps
+ *  the total pool count by liquidity to avoid overwhelming the ticks endpoint. */
 function selectRelevantPools(
   pools: RawAlcorPool[],
   inKey: string,
   outKey: string,
   maxHops: number,
-  cap = 120,
-  topN = 25
+  cap = 60
 ): RawAlcorPool[] {
   const keyOf = (t: RawAlcorPool["tokenA"]) => tokenKey(t.contract, t.symbol);
   const active = pools.filter((p) => p.active);
 
+  const involves = (p: RawAlcorPool, k: string) => keyOf(p.tokenA) === k || keyOf(p.tokenB) === k;
   const other = (p: RawAlcorPool, k: string) =>
     keyOf(p.tokenA) === k ? keyOf(p.tokenB) : keyOf(p.tokenA);
 
-  // Rank tokens by aggregate liquidity across all active pools. BigInt-safe.
-  const liqByToken = new Map<string, bigint>();
-  for (const p of active) {
-    const liq = BigInt(p.liquidity || "0");
-    for (const k of [keyOf(p.tokenA), keyOf(p.tokenB)]) {
-      liqByToken.set(k, (liqByToken.get(k) ?? 0n) + liq);
-    }
-  }
-  const topLiquid = [...liqByToken.entries()]
-    .sort((a, b) => (b[1] > a[1] ? 1 : b[1] < a[1] ? -1 : 0))
-    .slice(0, topN)
-    .map(([k]) => k);
-
-  // Anchors = endpoints ∪ curated hubs ∪ dynamic top-N liquid tokens.
-  const anchors = new Set<string>([inKey, outKey, ...HUB_KEYS, ...topLiquid]);
-
-  // Always keep direct pools (touching tokenIn or tokenOut), regardless of
-  // the other side — some low-liquidity direct pools still win at small sizes.
-  const candidates = active.filter((p) => {
-    const a = keyOf(p.tokenA);
-    const b = keyOf(p.tokenB);
-    const directIn = a === inKey || b === inKey;
-    const directOut = a === outKey || b === outKey;
-    if (directIn || directOut) return true;
-    return anchors.has(a) && anchors.has(b);
-  });
+  // Any pool that could participate in a route: touches tokenIn, tokenOut, or a hub.
+  // We then verify each selected pool is on some ≤maxHops path in-code.
+  const anchors = new Set<string>([inKey, outKey, ...HUB_KEYS]);
+  const candidates = active.filter((p) => anchors.has(keyOf(p.tokenA)) && anchors.has(keyOf(p.tokenB)));
 
   // Verify connectivity via BFS restricted to `anchors` intermediates.
   const adj = new Map<string, RawAlcorPool[]>();
