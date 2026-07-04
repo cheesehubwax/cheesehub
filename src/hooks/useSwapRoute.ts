@@ -98,7 +98,9 @@ export function useSwapRoute(
         }
         logger.warn("[alcor-router] SDK returned no route — falling back to HTTP");
       } catch (e) {
-        if ((e as any)?.name === "AbortError") throw e;
+        // Only bail out if the outer (React Query) signal aborted. An internal
+        // AbortError from our timeout controller should fall through to HTTP.
+        if (signal?.aborted) throw e;
         const msg = (e as any)?.message;
         if (msg === "SDK_TIMEOUT") {
           logger.warn("[alcor-router] SDK timed out — falling back to HTTP");
