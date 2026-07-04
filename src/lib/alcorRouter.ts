@@ -35,6 +35,10 @@ interface RawAlcorPool {
   feeGrowthGlobalBX64: string;
   tokenA: { contract: string; decimals: number; symbol: string; id: string };
   tokenB: { contract: string; decimals: number; symbol: string; id: string };
+  // Optional volume field — some /swap/pools responses include it. Used for
+  // ranking when we need to cap the candidate set.
+  volumeUSD24?: number | string;
+  volumeUSDWeek?: number | string;
 }
 
 interface RawAlcorTick {
@@ -102,72 +106,135 @@ function tokenKey(contract: string, symbol: string): string {
   return `${symbol.toLowerCase()}-${contract}`;
 }
 
-// Hub tokens that make good intermediate hops on WAX (matches Alcor's routing
-// heuristics: only route through liquid, well-known assets).
-const HUB_KEYS = new Set([
-  "wax-eosio.token",
-  "usdt-usdt.alcor",
-  "usdc-usdc.alcor",
-  "waxusdc-eth.token",
-  "waxusdt-eth.token",
-  "usdc-tethertether",
-  "lswax-token.lswax",
-]);
-
-/** Select pools that could participate in a tokenIn→tokenOut route of length
- *  ≤ maxHops, restricting intermediate tokens to a curated hub set. Also caps
- *  the total pool count by liquidity to avoid overwhelming the ticks endpoint. */
+/**
+ * Select every active pool that lies on at least one tokenIn → tokenOut path
+ * of length ≤ `maxHops`. Uses forward BFS from tokenIn and reverse BFS from
+ * tokenOut over the FULL pool graph (no hub-token allowlist) so we discover
+ * the same set of routes Alcor's own UI feeds to `computeAllRoutes`.
+ *
+ * Cap semantics: pools directly touching tokenIn or tokenOut are always kept.
+ * Only deeper intermediate-only pools are ranked and capped, using
+ * volumeUSD24 (when the API provides it) with log-scale liquidity as a
+ * tiebreaker.
+ */
 function selectRelevantPools(
   pools: RawAlcorPool[],
   inKey: string,
   outKey: string,
   maxHops: number,
-  cap = 60
+  cap = 120
 ): RawAlcorPool[] {
   const keyOf = (t: RawAlcorPool["tokenA"]) => tokenKey(t.contract, t.symbol);
   const active = pools.filter((p) => p.active);
 
-  const involves = (p: RawAlcorPool, k: string) => keyOf(p.tokenA) === k || keyOf(p.tokenB) === k;
-  const other = (p: RawAlcorPool, k: string) =>
-    keyOf(p.tokenA) === k ? keyOf(p.tokenB) : keyOf(p.tokenA);
-
-  // Any pool that could participate in a route: touches tokenIn, tokenOut, or a hub.
-  // We then verify each selected pool is on some ≤maxHops path in-code.
-  const anchors = new Set<string>([inKey, outKey, ...HUB_KEYS]);
-  const candidates = active.filter((p) => anchors.has(keyOf(p.tokenA)) && anchors.has(keyOf(p.tokenB)));
-
-  // Verify connectivity via BFS restricted to `anchors` intermediates.
+  // Build full-graph adjacency.
   const adj = new Map<string, RawAlcorPool[]>();
-  for (const p of candidates) {
+  for (const p of active) {
     for (const k of [keyOf(p.tokenA), keyOf(p.tokenB)]) {
-      if (!adj.has(k)) adj.set(k, []);
-      adj.get(k)!.push(p);
+      let arr = adj.get(k);
+      if (!arr) {
+        arr = [];
+        adj.set(k, arr);
+      }
+      arr.push(p);
     }
   }
-  const dist = new Map<string, number>([[inKey, 0]]);
-  let frontier = [inKey];
-  for (let h = 0; h < maxHops && frontier.length; h++) {
-    const next: string[] = [];
-    for (const t of frontier) {
-      for (const p of adj.get(t) ?? []) {
-        const o = other(p, t);
-        if (!dist.has(o)) {
-          dist.set(o, dist.get(t)! + 1);
-          next.push(o);
+
+  const bfs = (start: string, limit: number): Map<string, number> => {
+    const dist = new Map<string, number>([[start, 0]]);
+    let frontier = [start];
+    for (let h = 0; h < limit && frontier.length; h++) {
+      const next: string[] = [];
+      for (const t of frontier) {
+        const d = dist.get(t)!;
+        for (const p of adj.get(t) ?? []) {
+          const o = keyOf(p.tokenA) === t ? keyOf(p.tokenB) : keyOf(p.tokenA);
+          if (!dist.has(o)) {
+            dist.set(o, d + 1);
+            next.push(o);
+          }
         }
       }
+      frontier = next;
     }
-    frontier = next;
-  }
-  if (!dist.has(outKey)) return [];
+    return dist;
+  };
 
-  // Sort by liquidity desc (BigInt), cap.
-  const sorted = candidates.sort((a, b) => {
-    const la = BigInt(a.liquidity || "0");
-    const lb = BigInt(b.liquidity || "0");
-    return lb > la ? 1 : lb < la ? -1 : 0;
-  });
-  return sorted.slice(0, cap);
+  const dIn = bfs(inKey, maxHops);
+  const dOut = bfs(outKey, maxHops);
+  if (!dIn.has(outKey)) return [];
+
+  // A pool (a,b) lies on a ≤maxHops in→out path iff
+  //   dIn(a) + 1 + dOut(b) ≤ maxHops  OR  dIn(b) + 1 + dOut(a) ≤ maxHops.
+  const onPath = (p: RawAlcorPool): boolean => {
+    const a = keyOf(p.tokenA);
+    const b = keyOf(p.tokenB);
+    const da = dIn.get(a);
+    const db = dIn.get(b);
+    const ea = dOut.get(a);
+    const eb = dOut.get(b);
+    if (da !== undefined && eb !== undefined && da + 1 + eb <= maxHops) return true;
+    if (db !== undefined && ea !== undefined && db + 1 + ea <= maxHops) return true;
+    return false;
+  };
+
+  const candidates = active.filter(onPath);
+
+  // Split into direct-hop pools (always kept) and deeper intermediate-only
+  // pools (ranked + capped).
+  const direct: RawAlcorPool[] = [];
+  const deep: RawAlcorPool[] = [];
+  for (const p of candidates) {
+    const a = keyOf(p.tokenA);
+    const b = keyOf(p.tokenB);
+    if (a === inKey || b === inKey || a === outKey || b === outKey) direct.push(p);
+    else deep.push(p);
+  }
+
+  if (direct.length + deep.length <= cap) return [...direct, ...deep];
+
+  const num = (v: number | string | undefined): number => {
+    if (v === undefined || v === null) return 0;
+    const n = typeof v === "number" ? v : parseFloat(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const rank = (p: RawAlcorPool): number => {
+    const vol = num(p.volumeUSD24) || num(p.volumeUSDWeek) / 7;
+    if (vol > 0) return vol;
+    // Log-scale fallback so mismatched decimal scales don't dominate.
+    try {
+      const l = BigInt(p.liquidity || "0");
+      return l > 0n ? Math.log10(Number(l)) : 0;
+    } catch {
+      return 0;
+    }
+  };
+  deep.sort((a, b) => rank(b) - rank(a));
+  const room = Math.max(0, cap - direct.length);
+  return [...direct, ...deep.slice(0, room)];
+}
+
+/**
+ * Lightweight concurrency limiter. Keeps tick fanout well under the
+ * /pools/:id/ticks rate limit while still parallelising.
+ */
+async function mapLimit<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+  const worker = async () => {
+    while (true) {
+      const i = cursor++;
+      if (i >= items.length) return;
+      results[i] = await fn(items[i], i);
+    }
+  };
+  const n = Math.max(1, Math.min(limit, items.length));
+  await Promise.all(Array.from({ length: n }, worker));
+  return results;
 }
 
 // ----- Pool construction -----
@@ -252,17 +319,17 @@ export async function computeShadowQuote(args: ShadowQuoteArgs): Promise<ShadowQ
   const relevant = selectRelevantPools(allPools, inKey, outKey, maxHops);
   if (relevant.length === 0) return null;
 
-  // Fetch ticks for every relevant pool in parallel.
-  const tickResults = await Promise.all(
-    relevant.map(async (p) => {
-      try {
-        return { p, ticks: await fetchPoolTicks(p.id, signal) };
-      } catch (e) {
-        logger.warn(`shadow: tick fetch failed for pool ${p.id}`, e);
-        return { p, ticks: [] as RawAlcorTick[] };
-      }
-    })
-  );
+  logger.info(`[shadow-router] pools selected: ${relevant.length}`);
+
+  // Fetch ticks in parallel, capped concurrency to respect rate limits.
+  const tickResults = await mapLimit(relevant, 8, async (p) => {
+    try {
+      return { p, ticks: await fetchPoolTicks(p.id, signal) };
+    } catch (e) {
+      logger.warn(`shadow: tick fetch failed for pool ${p.id}`, e);
+      return { p, ticks: [] as RawAlcorTick[] };
+    }
+  });
 
   const sdkPools = tickResults
     .filter((r) => r.ticks.length > 0)
@@ -371,16 +438,16 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   const relevant = selectRelevantPools(allPools, inKey, outKey, maxHops);
   if (relevant.length === 0) return null;
 
-  const tickResults = await Promise.all(
-    relevant.map(async (p) => {
-      try {
-        return { p, ticks: await fetchPoolTicks(p.id, signal) };
-      } catch (e) {
-        logger.warn(`alcorTrade: tick fetch failed for pool ${p.id}`, e);
-        return { p, ticks: [] as RawAlcorTick[] };
-      }
-    })
-  );
+  logger.info(`[alcor-router] pools selected: ${relevant.length}`);
+
+  const tickResults = await mapLimit(relevant, 8, async (p) => {
+    try {
+      return { p, ticks: await fetchPoolTicks(p.id, signal) };
+    } catch (e) {
+      logger.warn(`alcorTrade: tick fetch failed for pool ${p.id}`, e);
+      return { p, ticks: [] as RawAlcorTick[] };
+    }
+  });
 
   const sdkPools = tickResults
     .filter((r) => r.ticks.length > 0)
