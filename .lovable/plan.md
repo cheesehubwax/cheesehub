@@ -1,23 +1,22 @@
 ## Bug
 
-`src/components/swap/SwapTokenInput.tsx` holds `imgError` in local state but never resets it when the selected token changes. When the "You receive" side auto-fills a token whose Alcor logo 404s (or when tokens are flipped/switched), the failed state carries over and the panel keeps rendering the fallback tile instead of trying the new token's logo.
+`SwapTokenInput` renders the 25/50/75/Max percent buttons whenever `balance && onAmountChange` are both truthy. In `CheeseSwapWidget` both panels receive `balance` and `onAmountChange`, so the buttons currently appear under whichever panel happens to hold the balance-bearing token. After flipping WAX↔CHEESE the WAX balance moves to the "You receive" panel and the percent buttons drag along with it.
 
-The `<img>` element also isn't keyed to the token, so React reuses the same DOM node across token changes — a browser that has already cached the failed request won't re-issue it, cementing the placeholder.
+The percent buttons are only meaningful for the input side (they set the amount you're paying), so they should be locked to the top "You pay" panel regardless of which token is selected.
 
-## Fix (one file)
+## Fix
 
-`src/components/swap/SwapTokenInput.tsx`:
+Two small changes, both frontend-only:
 
-1. Add `useEffect(() => setImgError(false), [token?.contract, token?.ticker])` so each token gets a fresh attempt.
-2. Add `key={`${token.contract}-${token.ticker}`}` on the `<img>` so React remounts it on token change and the browser re-requests the logo.
+1. `src/components/swap/SwapTokenInput.tsx` — add optional `showPercentButtons?: boolean` prop (default `false`). Gate the percent-buttons row on `showPercentButtons && !readOnly && balance && onAmountChange`.
+2. `src/components/swap/CheeseSwapWidget.tsx` — pass `showPercentButtons` only on the top `SwapTokenInput` (the "You pay" panel). The bottom panel stays as-is.
 
-No changes to logic, styling, or any other file. The existing letter-circle fallback (yellow `bg-cheese/20` with the ticker's first letter) is kept for tokens Alcor genuinely doesn't have a logo for.
+No changes to logic, routing, or execution.
 
 ## Verification
 
-- Load `/`, open CheeseSwap, set input to WAX, receive to CHEESE → both logos render.
-- Change receive to a token Alcor has no logo for (e.g. WAXCASH) → letter fallback shows immediately.
-- Change receive back to CHEESE → real logo renders (previously stayed on fallback).
-- Flip tokens → both sides show correct logos.
+- Open `/`, CheeseSwap, WAX→CHEESE: percent buttons under the top WAX panel. ✅
+- Flip to CHEESE→WAX: percent buttons stay under the top CHEESE panel (previously moved to the bottom WAX panel). ✅
+- Verify percent buttons only show when the top panel has a balance and a live `onAmountChange` handler.
 
-Approve and I'll apply the two-line change and verify in the preview.
+Approve and I'll apply the two-file change.
