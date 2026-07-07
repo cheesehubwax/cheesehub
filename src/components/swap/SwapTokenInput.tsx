@@ -108,12 +108,13 @@ export function SwapTokenInput({
         </div>
       </div>
 
-      {showPercentButtons && !readOnly && balance && onAmountChange && (
+      {showPercentButtons && !readOnly && onAmountChange && (
         <div className="flex gap-1.5 justify-end">
           {PERCENT_BUTTONS.map((pct) => (
             <button
               key={pct}
               onClick={() => handlePercentClick(pct)}
+              disabled={!balance}
               className="px-2.5 py-1 text-xs font-medium rounded-md bg-background/80 text-muted-foreground hover:text-foreground hover:bg-cheese/10 hover:text-cheese transition-colors"
             >
               {pct === 100 ? "Max" : `${pct}%`}
