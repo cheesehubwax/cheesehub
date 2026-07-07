@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { type SwapToken, getTokenLogoUrl, formatTokenAmount } from "@/lib/swapApi";
 import { ChevronDown } from "lucide-react";
@@ -31,6 +31,13 @@ export function SwapTokenInput({
   const decimals = precision ?? token?.precision ?? 8;
   const [imgError, setImgError] = useState(false);
 
+  // Reset image error state whenever the selected token changes so a new
+  // token's logo gets a fresh chance to load instead of inheriting a prior
+  // token's failed state.
+  useEffect(() => {
+    setImgError(false);
+  }, [token?.contract, token?.ticker]);
+
   const handlePercentClick = (pct: number) => {
     if (!balance || !onAmountChange) return;
     const val = parseFloat(balance) * (pct / 100);
@@ -59,6 +66,7 @@ export function SwapTokenInput({
             <>
               {!imgError ? (
                 <img
+                  key={`${token.contract}-${token.ticker}`}
                   src={getTokenLogoUrl(token.contract, token.ticker)}
                   alt={token.ticker}
                   className="w-6 h-6 rounded-full"
