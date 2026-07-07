@@ -13,6 +13,7 @@ interface SwapTokenInputProps {
   readOnly?: boolean;
   loading?: boolean;
   precision?: number;
+  showPercentButtons?: boolean;
 }
 
 const PERCENT_BUTTONS = [25, 50, 75, 100] as const;
@@ -27,6 +28,7 @@ export function SwapTokenInput({
   readOnly = false,
   loading = false,
   precision,
+  showPercentButtons = false,
 }: SwapTokenInputProps) {
   const decimals = precision ?? token?.precision ?? 8;
   const [imgError, setImgError] = useState(false);
@@ -106,7 +108,7 @@ export function SwapTokenInput({
         </div>
       </div>
 
-      {!readOnly && balance && onAmountChange && (
+      {showPercentButtons && !readOnly && balance && onAmountChange && (
         <div className="flex gap-1.5 justify-end">
           {PERCENT_BUTTONS.map((pct) => (
             <button
