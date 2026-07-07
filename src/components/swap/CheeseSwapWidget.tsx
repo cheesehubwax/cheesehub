@@ -212,6 +212,7 @@ export function CheeseSwapWidget({
           onTokenClick={() => setSelectorSide("in")}
           balance={balanceIn ?? undefined}
           loading={activeField === "out" && isLoading}
+          showPercentButtons
         />
 
         {/* Flip button */}
