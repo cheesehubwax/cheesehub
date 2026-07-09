@@ -1,5 +1,6 @@
 // Alcor Exchange API layer for CHEESESwap
 import { waxRpcCall } from "./waxRpcFallback";
+import { markAlcorRateLimited } from "./alcorRouter";
 
 export interface SwapToken {
   contract: string;
@@ -67,6 +68,7 @@ export async function fetchSwapTokenList(signal?: AbortSignal): Promise<SwapToke
   const res = await fetch(`${ALCOR_API}/tokens`, { signal });
   if (!res.ok) {
     if (res.status === 429) {
+      markAlcorRateLimited();
       throw new Error("Rate limited — please wait a moment and try again");
     }
     throw new Error("Failed to fetch token list");
@@ -127,6 +129,7 @@ export async function fetchSwapRoute(
   }
   if (!res.ok) {
     if (res.status === 429) {
+      markAlcorRateLimited();
       throw new Error("Rate limited — please wait a moment and try again");
     }
     const text = await res.text().catch(() => "");
@@ -176,7 +179,10 @@ export async function fetchSwapRoute(
 
 export async function fetchAlcorPool(id: number, signal?: AbortSignal): Promise<AlcorPool> {
   const res = await fetch(`${ALCOR_API}/swap/pools/${id}`, { signal });
-  if (!res.ok) throw new Error(`Failed to fetch pool ${id}`);
+  if (!res.ok) {
+    if (res.status === 429) markAlcorRateLimited();
+    throw new Error(`Failed to fetch pool ${id}`);
+  }
   const data = await res.json();
   const pickToken = (t: any): AlcorPoolToken => ({
     id: String(t?.id ?? `${(t?.symbol ?? "").toLowerCase()}-${t?.contract ?? ""}`),
