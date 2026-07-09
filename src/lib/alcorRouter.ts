@@ -53,14 +53,17 @@ interface RawAlcorTick {
 
 let poolsCache: { at: number; data: RawAlcorPool[] } | null = null;
 let poolsInflight: Promise<RawAlcorPool[]> | null = null;
-const POOLS_TTL_MS = 10_000;
+const POOLS_TTL_MS = 20_000;
 
 export async function fetchAllAlcorPools(signal?: AbortSignal): Promise<RawAlcorPool[]> {
   if (poolsCache && Date.now() - poolsCache.at < POOLS_TTL_MS) return poolsCache.data;
   if (poolsInflight) return poolsInflight;
   poolsInflight = (async () => {
     const res = await fetch(`${ALCOR_API}/swap/pools`, { signal });
-    if (!res.ok) throw new Error(`Failed to fetch Alcor pools (${res.status})`);
+    if (!res.ok) {
+      if (res.status === 429) throw new Error("Rate limited — please wait a moment and try again");
+      throw new Error(`Failed to fetch Alcor pools (${res.status})`);
+    }
     const data = (await res.json()) as RawAlcorPool[];
     poolsCache = { at: Date.now(), data };
     return data;
@@ -74,7 +77,7 @@ export async function fetchAllAlcorPools(signal?: AbortSignal): Promise<RawAlcor
 
 const ticksCache = new Map<number, { at: number; data: RawAlcorTick[] }>();
 const ticksInflight = new Map<number, Promise<RawAlcorTick[]>>();
-const TICKS_TTL_MS = 5_000;
+const TICKS_TTL_MS = 15_000;
 
 export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Promise<RawAlcorTick[]> {
   const cached = ticksCache.get(poolId);
@@ -83,7 +86,10 @@ export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Prom
   if (inflight) return inflight;
   const p = (async () => {
     const res = await fetch(`${ALCOR_API}/swap/pools/${poolId}/ticks`, { signal });
-    if (!res.ok) throw new Error(`Failed to fetch ticks for pool ${poolId} (${res.status})`);
+    if (!res.ok) {
+      if (res.status === 429) throw new Error("Rate limited — please wait a moment and try again");
+      throw new Error(`Failed to fetch ticks for pool ${poolId} (${res.status})`);
+    }
     const data = (await res.json()) as RawAlcorTick[];
     ticksCache.set(poolId, { at: Date.now(), data });
     return data;
