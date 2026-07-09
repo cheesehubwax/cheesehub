@@ -156,9 +156,19 @@ export function CheeseSwapWidget({
   const canSwap = !!route && !!route.memo && !!accountName && hasAmount && !routeLoading;
 
   const handleTokenSelect = useCallback((token: SwapToken) => {
+    const prev = selectorSide === "in" ? tokenIn : tokenOut;
+    const changed =
+      !prev || prev.contract !== token.contract || prev.ticker !== token.ticker;
+
     if (selectorSide === "in") setTokenIn(token);
     else if (selectorSide === "out") setTokenOut(token);
-  }, [selectorSide]);
+
+    if (changed) {
+      setAmountIn("");
+      setAmountOut("");
+      setActiveField("in");
+    }
+  }, [selectorSide, tokenIn, tokenOut]);
 
   const isLoading = routeLoading && hasAmount;
 
