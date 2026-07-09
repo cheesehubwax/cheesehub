@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect, useRef } from "react";
 import { fetchSwapRoute, type SwapToken, type SwapRoute } from "@/lib/swapApi";
-import { computeAlcorTrade } from "@/lib/alcorRouter";
+import { computeAlcorTrade, isAlcorCoolingDown } from "@/lib/alcorRouter";
 import { logger } from "@/lib/logger";
 
 export type TradeType = "EXACT_INPUT" | "EXACT_OUTPUT";
@@ -48,95 +48,47 @@ export function useSwapRoute(
   const { data: route, isLoading, error, isFetching, failureCount, refetch } = useQuery<SwapRoute | null>({
     queryKey: ["swap-route", tokenIn?.ticker, tokenIn?.contract, tokenOut?.ticker, tokenOut?.contract, debouncedAmount, slippage, receiver, debouncedTradeType],
     queryFn: async ({ signal }) => {
-      // Race the SDK split router against Alcor's canonical HTTP router and
-      // pick the better result. HTTP runs against Alcor's live pool state and
-      // is the upper-bound quote; SDK can sometimes beat it by exploring
-      // finer splits, so we don't want to blindly use either.
-      const sdkPromise = computeAlcorTrade({
-        tokenIn: tokenIn!,
-        tokenOut: tokenOut!,
-        amount: debouncedAmount,
-        slippage,
-        receiver,
-        tradeType: debouncedTradeType,
-        signal,
-      });
-      const httpPromise = fetchSwapRoute(
+      // Primary quote: Alcor's HTTP router — one request, cheap, uses live
+      // pool state. This is the only path that runs on the hot input loop.
+      const http = await fetchSwapRoute(
         tokenIn!,
         tokenOut!,
         debouncedAmount,
         slippage,
         receiver,
         signal,
-        debouncedTradeType
+        debouncedTradeType,
       );
 
-      const [sdkSettled, httpSettled] = await Promise.allSettled([sdkPromise, httpPromise]);
-
-      // AbortErrors always bubble so React Query can cancel cleanly.
-      for (const s of [sdkSettled, httpSettled]) {
-        if (s.status === "rejected" && (s.reason as any)?.name === "AbortError") {
-          throw s.reason;
-        }
-      }
-
-      const sdk = sdkSettled.status === "fulfilled" ? sdkSettled.value : null;
-      const http = httpSettled.status === "fulfilled" ? httpSettled.value : null;
-      const sdkErr = sdkSettled.status === "rejected" ? sdkSettled.reason : null;
-      const httpErr = httpSettled.status === "rejected" ? httpSettled.reason : null;
-      if (sdkErr) logger.warn("[alcor-router] SDK failed", sdkErr);
-      if (httpErr) logger.warn("[alcor-router] HTTP failed", httpErr);
-
-      const sdkValid = !!sdk && sdk.swaps.length > 0 && sdk.output > 0;
       const httpValid = !!http && !!http.memo && http.output > 0;
+      if (httpValid) return http!;
 
-      if (!sdkValid && !httpValid) {
-        // If either side failed with a transient network/rate-limit error,
-        // throw so React Query retries with backoff instead of showing "no route".
-        if (sdkErr && isTransientError(sdkErr)) throw sdkErr;
-        if (httpErr && isTransientError(httpErr)) throw httpErr;
-        if (sdkErr) throw sdkErr;
-        if (httpErr) throw httpErr;
-        // Both empty/null with no error → genuine "no route".
-        return null;
-      }
-      if (!sdkValid) return http!;
-      if (!httpValid) return sdk!;
+      // HTTP returned an empty/no-route response with no error. Try the SDK
+      // split router as a fallback — but only if we're not in an Alcor
+      // cooldown, otherwise we'd fan out dozens of /ticks requests and make
+      // rate limiting worse.
+      if (isAlcorCoolingDown()) return null;
 
-      const exactIn = debouncedTradeType === "EXACT_INPUT";
-      // Pick the user-better side.
-      let winner: SwapRoute;
-      let winnerName: "SDK" | "HTTP";
-      if (exactIn) {
-        if (sdk!.output >= http!.output) {
-          winner = sdk!;
-          winnerName = "SDK";
-        } else {
-          winner = http!;
-          winnerName = "HTTP";
+      try {
+        const sdk = await computeAlcorTrade({
+          tokenIn: tokenIn!,
+          tokenOut: tokenOut!,
+          amount: debouncedAmount,
+          slippage,
+          receiver,
+          tradeType: debouncedTradeType,
+          signal,
+        });
+        if (sdk && sdk.swaps.length > 0 && sdk.output > 0) {
+          logger.info("[alcor-router] SDK fallback produced route");
+          return sdk;
         }
-      } else {
-        // EXACT_OUTPUT: lower input wins. Fall back to output-max if input is missing.
-        const sdkIn = sdk!.input ?? Number.POSITIVE_INFINITY;
-        const httpIn = http!.input ?? Number.POSITIVE_INFINITY;
-        if (sdkIn <= httpIn) {
-          winner = sdk!;
-          winnerName = "SDK";
-        } else {
-          winner = http!;
-          winnerName = "HTTP";
-        }
+      } catch (e) {
+        if ((e as any)?.name === "AbortError") throw e;
+        logger.warn("[alcor-router] SDK fallback failed", e);
+        if (isTransientError(e)) throw e;
       }
-
-      const delta = exactIn
-        ? ((winner.output - Math.min(sdk!.output, http!.output)) /
-            Math.max(1e-12, Math.min(sdk!.output, http!.output))) *
-          100
-        : 0;
-      logger.info(
-        `[alcor-router] winner=${winnerName} sdkOut=${sdk!.output} httpOut=${http!.output} Δ=${delta.toFixed(4)}%`
-      );
-      return winner;
+      return null;
     },
     enabled,
     staleTime: 15_000,
