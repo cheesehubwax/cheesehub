@@ -48,33 +48,83 @@ export function useSwapRoute(
   const { data: route, isLoading, error, isFetching, failureCount, refetch } = useQuery<SwapRoute | null>({
     queryKey: ["swap-route", tokenIn?.ticker, tokenIn?.contract, tokenOut?.ticker, tokenOut?.contract, debouncedAmount, slippage, receiver, debouncedTradeType],
     queryFn: async ({ signal }) => {
-      // Phase 2: try SDK split router first; on any failure or empty result
-      // fall back to Alcor's HTTP getRoute so users are never worse off than
-      // Phase 0.
-      try {
-        const sdk = await computeAlcorTrade({
-          tokenIn: tokenIn!,
-          tokenOut: tokenOut!,
-          amount: debouncedAmount,
-          slippage,
-          receiver,
-          tradeType: debouncedTradeType,
-          signal,
-        });
-        if (sdk && sdk.swaps.length > 0 && sdk.output > 0) {
-          logger.info("[alcor-router] SDK quote used", {
-            splits: sdk.swaps.length,
-            output: sdk.output,
-            priceImpact: sdk.priceImpact,
-          });
-          return sdk;
-        }
-        logger.warn("[alcor-router] SDK returned no route — falling back to HTTP");
-      } catch (e) {
+      // Race the SDK split router against Alcor's canonical HTTP router and
+      // pick the better result. HTTP runs against Alcor's live pool state and
+      // is the upper-bound quote; SDK can sometimes beat it by exploring
+      // finer splits, so we don't want to blindly use either.
+      const sdkPromise = computeAlcorTrade({
+        tokenIn: tokenIn!,
+        tokenOut: tokenOut!,
+        amount: debouncedAmount,
+        slippage,
+        receiver,
+        tradeType: debouncedTradeType,
+        signal,
+      }).catch((e) => {
         if ((e as any)?.name === "AbortError") throw e;
-        logger.warn("[alcor-router] SDK failed — falling back to HTTP", e);
+        logger.warn("[alcor-router] SDK failed", e);
+        return null;
+      });
+      const httpPromise = fetchSwapRoute(
+        tokenIn!,
+        tokenOut!,
+        debouncedAmount,
+        slippage,
+        receiver,
+        signal,
+        debouncedTradeType
+      ).catch((e) => {
+        if ((e as any)?.name === "AbortError") throw e;
+        logger.warn("[alcor-router] HTTP failed", e);
+        return null;
+      });
+
+      const [sdk, http] = await Promise.all([sdkPromise, httpPromise]);
+
+      const sdkValid = !!sdk && sdk.swaps.length > 0 && sdk.output > 0;
+      const httpValid = !!http && !!http.memo && http.output > 0;
+
+      if (!sdkValid && !httpValid) {
+        // Both empty/null → surface as "no route" (React Query treats null as success).
+        return null;
       }
-      return fetchSwapRoute(tokenIn!, tokenOut!, debouncedAmount, slippage, receiver, signal, debouncedTradeType);
+      if (!sdkValid) return http!;
+      if (!httpValid) return sdk!;
+
+      const exactIn = debouncedTradeType === "EXACT_INPUT";
+      // Pick the user-better side.
+      let winner: SwapRoute;
+      let winnerName: "SDK" | "HTTP";
+      if (exactIn) {
+        if (sdk!.output >= http!.output) {
+          winner = sdk!;
+          winnerName = "SDK";
+        } else {
+          winner = http!;
+          winnerName = "HTTP";
+        }
+      } else {
+        // EXACT_OUTPUT: lower input wins. Fall back to output-max if input is missing.
+        const sdkIn = sdk!.input ?? Number.POSITIVE_INFINITY;
+        const httpIn = http!.input ?? Number.POSITIVE_INFINITY;
+        if (sdkIn <= httpIn) {
+          winner = sdk!;
+          winnerName = "SDK";
+        } else {
+          winner = http!;
+          winnerName = "HTTP";
+        }
+      }
+
+      const delta = exactIn
+        ? ((winner.output - Math.min(sdk!.output, http!.output)) /
+            Math.max(1e-12, Math.min(sdk!.output, http!.output))) *
+          100
+        : 0;
+      logger.info(
+        `[alcor-router] winner=${winnerName} sdkOut=${sdk!.output} httpOut=${http!.output} Δ=${delta.toFixed(4)}%`
+      );
+      return winner;
     },
     enabled,
     staleTime: 15_000,
