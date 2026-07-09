@@ -204,6 +204,36 @@ function selectRelevantPools(
 
 // ----- Pool construction -----
 
+// ----- Router entry: prefer WASM (matches Alcor's UI) then fall back to JS -----
+
+async function runBestTradeWithSplit(
+  routes: any[],
+  currencyAmount: any,
+  percents: number[],
+  sdkTradeType: any,
+  sdkPools: Pool[],
+  swapConfig: { minSplits: number; maxSplits: number }
+): Promise<any> {
+  const T = Trade as any;
+  if (typeof T.bestTradeWithSplitWASM === "function") {
+    try {
+      const wasmTrade = await T.bestTradeWithSplitWASM(
+        routes,
+        currencyAmount,
+        percents,
+        sdkTradeType,
+        sdkPools,
+        swapConfig
+      );
+      if (wasmTrade) return wasmTrade;
+      logger.warn("[alcor-router] WASM router returned null — falling back to JS");
+    } catch (e) {
+      logger.warn("[alcor-router] WASM router threw — falling back to JS", e);
+    }
+  }
+  return T.bestTradeWithSplit(routes, currencyAmount, percents, sdkTradeType, swapConfig);
+}
+
 function buildPool(raw: RawAlcorPool, ticks: RawAlcorTick[]): Pool {
   // Match the exact JSON shape Pool.fromJSON expects. The tick shape from
   // /pools/:id/ticks already matches Tick.fromJSON.
