@@ -302,7 +302,7 @@ export async function computeShadowQuote(args: ShadowQuoteArgs): Promise<ShadowQ
     amount,
     tradeType,
     maxHops = 3,
-    distributionPercent = 5,
+    distributionPercent = 2,
     signal,
   } = args;
 
@@ -356,12 +356,13 @@ export async function computeShadowQuote(args: ShadowQuoteArgs): Promise<ShadowQ
     rawAmount
   );
 
-  const trade = (Trade as any).bestTradeWithSplit(
+  const trade = await runBestTradeWithSplit(
     routes,
     currencyAmount,
     percents,
     tradeType === "EXACT_INPUT" ? TradeType.EXACT_INPUT : TradeType.EXACT_OUTPUT,
-    { minSplits: 1, maxSplits: 4 }
+    sdkPools,
+    { minSplits: 1, maxSplits: 10 }
   );
   if (!trade) return null;
 
