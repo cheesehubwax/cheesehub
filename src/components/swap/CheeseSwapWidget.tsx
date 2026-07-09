@@ -255,7 +255,7 @@ export function CheeseSwapWidget({
       )}
 
       {/* Route details */}
-      {route && (
+      {route && hasAmount && (
         <div className="space-y-1">
           <button
             onClick={() => setShowRouteDetails(!showRouteDetails)}
