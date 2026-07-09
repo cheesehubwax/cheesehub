@@ -53,7 +53,7 @@ interface RawAlcorTick {
 
 let poolsCache: { at: number; data: RawAlcorPool[] } | null = null;
 let poolsInflight: Promise<RawAlcorPool[]> | null = null;
-const POOLS_TTL_MS = 30_000;
+const POOLS_TTL_MS = 10_000;
 
 export async function fetchAllAlcorPools(signal?: AbortSignal): Promise<RawAlcorPool[]> {
   if (poolsCache && Date.now() - poolsCache.at < POOLS_TTL_MS) return poolsCache.data;
@@ -74,7 +74,7 @@ export async function fetchAllAlcorPools(signal?: AbortSignal): Promise<RawAlcor
 
 const ticksCache = new Map<number, { at: number; data: RawAlcorTick[] }>();
 const ticksInflight = new Map<number, Promise<RawAlcorTick[]>>();
-const TICKS_TTL_MS = 30_000;
+const TICKS_TTL_MS = 5_000;
 
 export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Promise<RawAlcorTick[]> {
   const cached = ticksCache.get(poolId);
