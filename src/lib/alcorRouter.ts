@@ -370,7 +370,7 @@ export async function computeShadowQuote(args: ShadowQuoteArgs): Promise<ShadowQ
 
   // Fetch ticks for every relevant pool in parallel.
   // Fetch ticks with bounded concurrency so we don't hammer Alcor into 429s.
-  const tickResults = await mapWithConcurrency(relevant, 4, async (p) => {
+  const tickResults = await mapWithConcurrency(relevant, 10, async (p) => {
     try {
       return { p, ticks: await fetchPoolTicks(p.id, signal) };
     } catch (e) {
@@ -487,7 +487,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   const relevant = selectRelevantPools(allPools, inKey, outKey, maxHops);
   if (relevant.length === 0) return null;
 
-  const tickResults = await mapWithConcurrency(relevant, 4, async (p) => {
+  const tickResults = await mapWithConcurrency(relevant, 10, async (p) => {
     try {
       return { p, ticks: await fetchPoolTicks(p.id, signal) };
     } catch (e) {
