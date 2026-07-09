@@ -80,13 +80,15 @@ export function CheeseSwapWidget({
     tradeType
   );
 
-  // Derive the non-active field from route
+  // Derive the non-active field from route. Guard against stale placeholderData
+  // — when the active field is empty, force the derived field to empty too.
+  const hasActiveAmount = parseFloat(routeAmount) > 0;
   const displayAmountIn = activeField === "in"
     ? amountIn
-    : (route?.input ? formatTokenAmount(route.input, tokenIn?.precision ?? 8) : "");
+    : (hasActiveAmount && route?.input ? formatTokenAmount(route.input, tokenIn?.precision ?? 8) : "");
   const displayAmountOut = activeField === "out"
     ? amountOut
-    : (route?.output ? formatTokenAmount(route.output, tokenOut?.precision ?? 8) : "");
+    : (hasActiveAmount && route?.output ? formatTokenAmount(route.output, tokenOut?.precision ?? 8) : "");
 
   const handleAmountInChange = (val: string) => {
     setAmountIn(val);
