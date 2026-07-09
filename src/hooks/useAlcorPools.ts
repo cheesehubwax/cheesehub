@@ -16,6 +16,7 @@ export function useAlcorPools(ids: number[]) {
       // must never contribute to the 429 storm.
       enabled: !isAlcorCoolingDown(),
       retry: 0,
+      placeholderData: (prev: AlcorPool | undefined) => prev,
     })),
   });
 

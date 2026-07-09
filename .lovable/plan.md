@@ -1,55 +1,61 @@
-## Goal
-Stop CHEESESwap from triggering the Alcor 429 storm that is breaking swaps on the published GitHub Pages build (and also happens in preview, just less often because Alcor's rate limit is per-IP and the preview keeps fewer live pages open).
+# Speed up swap quoting
 
-## Confirmed cause
-`useSwapRoute` races two quote systems on every input change:
+Goal: reduce perceived time-to-quote from 20+s to ~1–2s on the happy path, without weakening the 429 protections we just added or losing SDK-fallback correctness.
+
+## Where the time actually goes today
+
+For a normal quote the current path is:
 
 ```text
-CHEESESwap quote (on every debounce tick)
-├─ Alcor HTTP router  → /swapRouter/getRoute        (1 request)
-└─ Alcor SDK router   → /swap/pools + /swap/pools/{id}/ticks   (dozens–hundreds)
+user types → 1200ms debounce → HTTP /swapRouter/getRoute
+             (if that fails transiently) → 1s,2s,4s,8s,12s,15s backoff × up to 6 tries
+             (if HTTP returns null) → fetch ALL pools + ticks for up to 400 pools
+                                       at concurrency 4 → SDK route calc
 ```
 
-The SDK path fans out `Promise.all` fetches to every candidate pool's `/ticks` endpoint. That is exactly what your network log shows: many parallel `/swap/pools/{id}/ticks` → 429s and "Failed to fetch". Once Alcor rate-limits the IP, even the HTTP router call gets 429, so the widget shows retrying / no route.
+The three real latency sources are:
+1. The 1200ms debounce runs on **every keystroke**, so simple retypes stall for >1s before any network request starts.
+2. Transient-retry ladder can add 30s on a flaky network even when the next call would have succeeded fast.
+3. When HTTP returns an empty route, the SDK fallback fetches ticks for up to 400 pools with only 4-way concurrency — that alone can be 8–12s. Between quotes the widget also blanks the previous route while a new fetch is in flight.
 
-The published site hits this harder because it stays open longer per session and doesn't share Vite's dev cache warm-ups.
+## Fix
 
-## Plan
+All changes are in the swap frontend/data layer. No contract, UX, or 429-protection changes.
 
-### 1. Make Alcor's HTTP router the primary quote path
-- In `src/hooks/useSwapRoute.ts`, stop racing `computeAlcorTrade` and `fetchSwapRoute` in parallel.
-- Call `fetchSwapRoute` first. If it returns a usable route, use it directly — no SDK call, no tick fan-out.
+### 1. `useSwapRoute.ts` — quicker start, keep previous route on screen
+- Drop the debounce from **1200ms → 350ms**. This is the single biggest win: quotes start ~850ms sooner on every input.
+- Use React Query `placeholderData: (prev) => prev` so the previously-fetched route stays visible while a new quote is fetching. The widget already shows a loader on the affected input — the route panel just won't blank/flicker anymore, and the swap button doesn't drop back to "Enter amount" mid-refresh.
+- Tighten the transient-retry ladder:
+  - `MAX_TRANSIENT_RETRIES: 6 → 3`
+  - Non-rate-limit backoff: start at **300ms** and cap at **4s** (was 1s → 15s). Rate-limit backoff stays at 5s→30s so we don't provoke Alcor.
+  - Self-heal timer after exhausted retries: **20s → 8s**.
 
-### 2. Use the SDK router only as a controlled fallback
-- Only invoke `computeAlcorTrade` when the HTTP router returns a genuine empty route (not a 429 / network error).
-- Skip SDK fallback entirely while a global Alcor cooldown is active (see step 3), so we never make the 429 problem worse.
+### 2. `alcorRouter.ts` — make the SDK fallback fast enough to actually help
+- Raise tick-fetch concurrency **4 → 10** (still well below what triggers 429s in practice; if it does, `markAlcorRateLimited` short-circuits the fallback exactly like today).
+- Lower `selectRelevantPools` cap **400 → 120**. The endpoint-touching + hub-touching + liquidity-desc ranking already puts the useful pools first; the tail is almost always irrelevant to a 3-hop route.
+- Warm start: on the module's first import, kick off `fetchAllAlcorPools()` in the background (fire-and-forget, respects cooldown). The pool list is the same 20s-TTL cache the SDK fallback and `useAlcorPools` already use, so when either one actually needs it the response is instant.
 
-### 3. Global Alcor cooldown after any 429
-- Add a shared cooldown flag in `src/lib/alcorRouter.ts` / `swapApi.ts`.
-- On any Alcor 429 (route, pools, or ticks), set the cooldown for ~30s.
-- During cooldown: HTTP router requests still run (they're cheap and singular), but SDK tick fan-out and pool-detail fetches short-circuit instead of piling on.
+### 3. `useAlcorPools.ts` — don't block the route panel on it
+- Keep `enabled` gated by cooldown (already done), but add `placeholderData: (prev) => prev` and reduce `staleTime`/`gcTime` so route detail chips render immediately from cache after the first quote instead of showing a skeleton on every requote.
 
-### 4. Throttle SDK tick fetching (defensive)
-- In `fetchPoolTicks` / `computeAlcorTrade`, replace the current `Promise.all` over every relevant pool with a small concurrency pool (e.g. 4 at a time).
-- Briefly cache tick failures (a few seconds) so the same pool doesn't get retried immediately.
-- Keep the existing successful-tick cache untouched.
+### 4. `swapApi.ts` — no behavior change
+- No changes needed; `fetchSwapRoute` already normalizes network errors and marks 429s.
 
-### 5. Softer multiroute details
-- `MultiRoutePanel` currently drives `useAlcorPools` which requests `/swap/pools/{id}` per hop. Keep this, but:
-  - Skip fetching pool details while the Alcor cooldown is active — show a compact "route unavailable" line instead of retrying.
-  - Reduce React Query retries on those calls so a 429 doesn't cascade into more requests.
-- Never block quoting or swapping on pool-detail metadata (already true; verify).
+## Expected result
 
-### 6. Keep the good UX behaviors already in place
-- Retain the existing `useSwapRoute` transient-error handling: retry backoff, "Route unavailable — retry" button, self-heal timer. These already handle 429 correctly once the fan-out is gone.
+- Happy path: keystroke → ~350ms debounce → 1 HTTP call → route rendered. Typical total ~700ms–1.5s.
+- Transient failure path: worst case ~300 + 600 + 1200 ≈ 2.1s of retries before self-heal kicks in, vs. ~30s today.
+- Rate-limited path: unchanged — cooldown still suppresses SDK fan-out.
+- Refetches never blank the current route or the multi-route detail chips.
 
-### 7. Verify
-- Reproduce a WAX → CHEESE quote on the preview and on the published site.
-- Network tab: only a single `/swapRouter/getRoute` per debounced input change, with no `/swap/pools/{id}/ticks` storm.
-- Swap button reflects real state: "Finding best route…" → "Swap", or "Route unavailable — retry" only on genuine failures.
-- CHEESESwap dialog title and Alcor attribution stay unchanged.
+## Files touched
 
-## What this does NOT change
-- No changes to CHEESESwap branding, dialog title, disclaimer, terms, or the Alcor smart-contract attribution.
-- No change to how transactions are actually built and signed (`normalizeRouteActions`, memo shape, per-split transfers).
-- No new dependencies.
+- `src/hooks/useSwapRoute.ts`
+- `src/lib/alcorRouter.ts`
+- `src/hooks/useAlcorPools.ts`
+
+## Verification
+
+- Open swap widget, type an amount, confirm one `/swapRouter/getRoute` per debounced change and a visible route within ~1s on a warm cache.
+- Change the amount rapidly; confirm the previous route + multi-route panel stays on screen while the new quote is fetching.
+- Simulate offline for 2s then back online; confirm the widget self-heals within ~8s without a red error banner flash.

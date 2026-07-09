@@ -6,7 +6,7 @@ import { logger } from "@/lib/logger";
 
 export type TradeType = "EXACT_INPUT" | "EXACT_OUTPUT";
 
-const MAX_TRANSIENT_RETRIES = 6;
+const MAX_TRANSIENT_RETRIES = 3;
 
 function isTransientError(err: unknown): boolean {
   if (err instanceof TypeError) return true;
@@ -35,7 +35,7 @@ export function useSwapRoute(
     const timer = setTimeout(() => {
       setDebouncedAmount(amount);
       setDebouncedTradeType(tradeType);
-    }, 1200);
+    }, 350);
     return () => clearTimeout(timer);
   }, [amount, tradeType]);
 
@@ -94,6 +94,7 @@ export function useSwapRoute(
     staleTime: 15_000,
     gcTime: 30_000,
     retryOnMount: true,
+    placeholderData: (prev) => prev,
     retry: (count, err) => {
       if (isTransientError(err)) return count < MAX_TRANSIENT_RETRIES;
       return count < 1;
@@ -101,8 +102,8 @@ export function useSwapRoute(
     retryDelay: (attemptIndex, err) => {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("Rate limited")) return Math.min(5000 * 2 ** attemptIndex, 30000);
-      // 1s, 2s, 4s, 8s, 12s, 15s (cap)
-      return Math.min(1000 * 2 ** attemptIndex, 15000);
+      // 300ms, 600ms, 1.2s, cap 4s — fast recovery on flaky networks.
+      return Math.min(300 * 2 ** attemptIndex, 4000);
     },
   });
 
@@ -123,7 +124,7 @@ export function useSwapRoute(
     if (!exhaustedTransient || !enabled) return;
     healTimerRef.current = setTimeout(() => {
       refetch();
-    }, 20_000);
+    }, 8_000);
     return () => {
       if (healTimerRef.current) clearTimeout(healTimerRef.current);
       healTimerRef.current = null;

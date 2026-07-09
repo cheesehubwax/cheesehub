@@ -177,7 +177,7 @@ function selectRelevantPools(
   inKey: string,
   outKey: string,
   maxHops: number,
-  cap = 400
+  cap = 120
 ): RawAlcorPool[] {
   const keyOf = (t: RawAlcorPool["tokenA"]) => tokenKey(t.contract, t.symbol);
   const active = pools.filter((p) => p.active);
@@ -370,7 +370,7 @@ export async function computeShadowQuote(args: ShadowQuoteArgs): Promise<ShadowQ
 
   // Fetch ticks for every relevant pool in parallel.
   // Fetch ticks with bounded concurrency so we don't hammer Alcor into 429s.
-  const tickResults = await mapWithConcurrency(relevant, 4, async (p) => {
+  const tickResults = await mapWithConcurrency(relevant, 10, async (p) => {
     try {
       return { p, ticks: await fetchPoolTicks(p.id, signal) };
     } catch (e) {
@@ -487,7 +487,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   const relevant = selectRelevantPools(allPools, inKey, outKey, maxHops);
   if (relevant.length === 0) return null;
 
-  const tickResults = await mapWithConcurrency(relevant, 4, async (p) => {
+  const tickResults = await mapWithConcurrency(relevant, 10, async (p) => {
     try {
       return { p, ticks: await fetchPoolTicks(p.id, signal) };
     } catch (e) {
@@ -592,4 +592,14 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     input: parseFloat(trade.inputAmount.toFixed()),
     swaps: splits,
   } as SwapRoute;
+}
+
+// Warm the pool-list cache on module import so the first quote (or route
+// detail lookup) doesn't pay for the /swap/pools round-trip. Respects the
+// global cooldown and swallows errors — this is best-effort.
+if (typeof window !== "undefined") {
+  setTimeout(() => {
+    if (isAlcorCoolingDown()) return;
+    fetchAllAlcorPools().catch(() => {});
+  }, 0);
 }
