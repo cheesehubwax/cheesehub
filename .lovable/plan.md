@@ -1,72 +1,58 @@
-# Close the SDK↔Alcor output gap
+# Fix: "No route available" on every swap
 
-## Observation
-Same query (100 WAX → LSWAX, 1% slippage, same instant):
-- Alcor: **83.82339120** LSWAX
-- Ours: **83.62655131** LSWAX (Δ ≈ 0.2 LSWAX / 0.24% worse)
+## Diagnosis
 
-Our price impact (0.25%) is *lower* than Alcor's (0.64%) despite worse output. That signature means the routing math is fine — our pool state is stale, and/or our SDK-selected paths differ from what Alcor's live server sees.
+Console shows both sides of the router race failing with HTTP 429 (rate limited) on `wax.alcor.exchange`:
 
-## Root causes
+- SDK: `Error: Failed to fetch Alcor pools (429)` (from `fetchAllAlcorPools` in `src/lib/alcorRouter.ts`)
+- HTTP: `Error: Rate limited — please wait a moment and try again` (from `fetchSwapRoute` in `src/lib/swapApi.ts`)
 
-1. **Stale pool + tick caches.** `POOLS_TTL_MS` and `TICKS_TTL_MS` are both `30_000 ms` in `src/lib/alcorRouter.ts`. WAX produces a block every 0.5s → up to ~60 blocks of state drift.
-2. **We prefer SDK output even when the HTTP route is better.** In `src/hooks/useSwapRoute.ts` we return the SDK quote whenever it produces a route, and only fall back to `fetchSwapRoute` (Alcor's live HTTP router) on error/empty. Alcor's HTTP endpoint always runs against fresh state and is effectively the upper-bound quote.
+Both are caught in `useSwapRoute.queryFn` and converted to `null`. Because `Promise.all` resolves with two nulls, `queryFn` returns `null` (no route) — a **success** from React Query's perspective. So the widget shows "no route available" instead of retrying with the existing 5s·2^n backoff configured in `retryDelay`.
 
-## Fix
+The recent TTL reduction (pools 30s→10s, ticks 30s→5s) plus the SDK+HTTP race doubling per-quote network fanout is what's driving the 429s. We need to (a) recover gracefully when we hit them, and (b) reduce how often we hit them.
 
-### 1. Race SDK vs HTTP, pick better (`src/hooks/useSwapRoute.ts`)
+## Changes
 
-Change `queryFn` to run both in parallel:
+### 1. `src/lib/alcorRouter.ts` — surface 429 as a transient "Rate limited" error
 
-```text
-const [sdk, http] = await Promise.allSettled([
-  computeAlcorTrade({...}),
-  fetchSwapRoute(tokenIn, tokenOut, ..., tradeType),
-]);
+In `fetchAllAlcorPools` and `fetchPoolTicks`, when `res.status === 429`, throw:
+
+```
+throw new Error("Rate limited — please wait a moment and try again");
 ```
 
-Then pick:
-- If only one succeeded with a non-null route → use it.
-- If both succeeded, compare on the *user-visible* axis:
-  - `EXACT_INPUT`: prefer the higher `output`.
-  - `EXACT_OUTPUT`: prefer the lower `input`.
-- Preserve the loser only for diagnostics; return the winner exactly as today so the widget consumes it unchanged.
+for non-429 non-ok responses keep the existing "Failed to fetch …" message. This aligns SDK errors with `swapApi.fetchSwapRoute` so the retry-delay branch (`5000 * 2 ** attemptIndex`, capped 30 s) applies to SDK failures too.
 
-Both branches already return `SwapRoute` — no shape adapter needed. Memo compatibility is preserved because we return the winner's own memo(s):
-- HTTP winner → single aggregate memo, one transfer action (already works — `normalizeRouteActions` falls through to the legacy single-transfer path when splits lack memos).
-- SDK winner → per-split memos, multi-transfer actions (already works — see `normalizeRouteActions`'s `allHaveMemos` branch).
+### 2. `src/lib/alcorRouter.ts` — soften TTLs to reduce 429 pressure
 
-Log which side won and by how much so we can measure parity in the console:
-```text
-[alcor-router] winner=SDK|HTTP output(sdk)=X output(http)=Y Δ=Z%
-```
+- `POOLS_TTL_MS`: `10_000` → `20_000`
+- `TICKS_TTL_MS`: `5_000` → `15_000`
 
-Abort handling: propagate `AbortError` from either branch untouched. If both fail with transient errors, throw the first (existing retry classifier will kick in).
+Still fresher than the pre-change 30 s but half the request rate we're generating now. Pool membership and tick state don't move fast enough to justify aggressive re-fetching once the widget is quoting steadily.
 
-### 2. Freshen pool/tick caches (`src/lib/alcorRouter.ts`)
+### 3. `src/hooks/useSwapRoute.ts` — propagate transient failures so retry kicks in
 
-- Drop `POOLS_TTL_MS` from `30_000` → `10_000`. Pool list membership rarely changes; state on each pool does.
-- Drop `TICKS_TTL_MS` from `30_000` → `5_000`. Ticks are the fast-moving state.
-- Keep the in-flight dedupe (`poolsInflight`/`ticksInflight`) so concurrent quote calls in the same debounce window still share a single fetch.
+Inside `queryFn`, capture each side as `Promise.allSettled` instead of `.catch(() => null)`:
 
-These caps still shield the API from over-fetching (React Query's own `staleTime: 15_000` in `useSwapRoute` is unchanged, so we're not multiplying request volume — just letting the first fetch inside a fresh window see newer state).
+- Track `sdkErr` / `httpErr` (rejection reasons, excluding `AbortError` which is rethrown as today).
+- Compute `sdkResult` / `httpResult` from fulfilled values.
+- After validity checks:
+  - If `!sdkValid && !httpValid`:
+    - If either error is transient (via the existing `isTransientError` helper — export or duplicate it locally), **throw the transient error** so React Query's `retry` + `retryDelay` handle it with the 5 s→30 s backoff.
+    - Otherwise return `null` (genuine "no route", not a network glitch).
+- Winner-selection logic when at least one side is valid stays unchanged.
 
-### 3. No changes to
-- `selectRelevantPools` / pool universe (last turn's widening is fine).
-- Router config (`maxSplits: 10`, `distributionPercent: 2`, WASM-first).
-- `MultiRoutePanel` visual.
-- `normalizeRouteActions`, transaction execution, swap button, retry logic.
+Move `isTransientError` above `useSwapRoute` (already there) and reuse it inside `queryFn`.
+
+### 4. Out of scope
+
+- Router config (`maxSplits`, `distributionPercent`, WASM-first), pool selection, `MultiRoutePanel`, `normalizeRouteActions`, transaction execution, min-received clamp — untouched.
 
 ## Verification
 
-1. Load `/testfarm2` → open swap → WAX → LSWAX @ 100. Compare our output to Alcor's UI at the same instant; expect equality within a few basis points (should now match Alcor exactly when HTTP wins, or beat it when SDK wins on splitting).
-2. Open the console, watch for `[alcor-router] winner=…` lines. Try a few pairs:
-   - WAX ↔ LSWAX (deep, multi-pool — expect either side can win)
-   - WAX ↔ CHEESE (single pool — expect SDK==HTTP)
-   - LSWAX ↔ CHEESE (multi-hop — expect SDK often wins with better splits)
-3. Confirm `Min. Received` ≤ `You receive` on every quote (existing clamp from last turn holds).
+1. Preview → `/testfarm2`, enter WAX→LSWAX @ 100.
+2. Watch console:
+   - If 429s occur: warnings appear, widget stays in "retrying" state (no red error banner, no "no route"), and a quote lands within ~10–30 s.
+   - Otherwise: `[alcor-router] winner=SDK|HTTP …` logs as before.
+3. Confirm quote is comparable to Alcor UI within a few basis points.
 4. `bunx vitest run src/test/shadow.test.ts` still passes.
-
-## Out of scope
-- No memo format changes, no execution path changes, no UI changes beyond the console log.
-- No new endpoints or connectors — Alcor's public HTTP router is already in the codebase (`fetchSwapRoute`).

@@ -60,10 +60,6 @@ export function useSwapRoute(
         receiver,
         tradeType: debouncedTradeType,
         signal,
-      }).catch((e) => {
-        if ((e as any)?.name === "AbortError") throw e;
-        logger.warn("[alcor-router] SDK failed", e);
-        return null;
       });
       const httpPromise = fetchSwapRoute(
         tokenIn!,
@@ -73,19 +69,35 @@ export function useSwapRoute(
         receiver,
         signal,
         debouncedTradeType
-      ).catch((e) => {
-        if ((e as any)?.name === "AbortError") throw e;
-        logger.warn("[alcor-router] HTTP failed", e);
-        return null;
-      });
+      );
 
-      const [sdk, http] = await Promise.all([sdkPromise, httpPromise]);
+      const [sdkSettled, httpSettled] = await Promise.allSettled([sdkPromise, httpPromise]);
+
+      // AbortErrors always bubble so React Query can cancel cleanly.
+      for (const s of [sdkSettled, httpSettled]) {
+        if (s.status === "rejected" && (s.reason as any)?.name === "AbortError") {
+          throw s.reason;
+        }
+      }
+
+      const sdk = sdkSettled.status === "fulfilled" ? sdkSettled.value : null;
+      const http = httpSettled.status === "fulfilled" ? httpSettled.value : null;
+      const sdkErr = sdkSettled.status === "rejected" ? sdkSettled.reason : null;
+      const httpErr = httpSettled.status === "rejected" ? httpSettled.reason : null;
+      if (sdkErr) logger.warn("[alcor-router] SDK failed", sdkErr);
+      if (httpErr) logger.warn("[alcor-router] HTTP failed", httpErr);
 
       const sdkValid = !!sdk && sdk.swaps.length > 0 && sdk.output > 0;
       const httpValid = !!http && !!http.memo && http.output > 0;
 
       if (!sdkValid && !httpValid) {
-        // Both empty/null → surface as "no route" (React Query treats null as success).
+        // If either side failed with a transient network/rate-limit error,
+        // throw so React Query retries with backoff instead of showing "no route".
+        if (sdkErr && isTransientError(sdkErr)) throw sdkErr;
+        if (httpErr && isTransientError(httpErr)) throw httpErr;
+        if (sdkErr) throw sdkErr;
+        if (httpErr) throw httpErr;
+        // Both empty/null with no error → genuine "no route".
         return null;
       }
       if (!sdkValid) return http!;
