@@ -75,7 +75,10 @@ export async function fetchAllAlcorPools(signal?: AbortSignal): Promise<RawAlcor
   poolsInflight = (async () => {
     const res = await fetch(`${ALCOR_API}/swap/pools`, { signal });
     if (!res.ok) {
-      if (res.status === 429) throw new Error("Rate limited — please wait a moment and try again");
+      if (res.status === 429) {
+        markAlcorRateLimited();
+        throw new Error("Rate limited — please wait a moment and try again");
+      }
       throw new Error(`Failed to fetch Alcor pools (${res.status})`);
     }
     const data = (await res.json()) as RawAlcorPool[];
