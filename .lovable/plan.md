@@ -1,50 +1,72 @@
-# Close the quality gap with Alcor + Multiroute visual + Min. Received sanity
+# Close the SDK↔Alcor output gap
 
-## 1. Better routing quality (`src/lib/alcorRouter.ts`)
+## Observation
+Same query (100 WAX → LSWAX, 1% slippage, same instant):
+- Alcor: **83.82339120** LSWAX
+- Ours: **83.62655131** LSWAX (Δ ≈ 0.2 LSWAX / 0.24% worse)
 
-Diff vs. Alcor after inspecting the SDK source (`@alcorexchange/alcor-swap-sdk`):
+Our price impact (0.25%) is *lower* than Alcor's (0.64%) despite worse output. That signature means the routing math is fine — our pool state is stale, and/or our SDK-selected paths differ from what Alcor's live server sees.
 
-- **maxSplits**: we pass `4`, Alcor SDK default is `10`. Alcor's screenshots show up to 6 splits; ours is hard-capped at 4. Raise to `10` in both `computeShadowQuote` and `computeAlcorTrade`.
-- **distributionPercent**: we use `5` (grid: 5,10,…,100). Alcor's UI uses `2` (grid: 2,4,…,100), which is why their splits land on exact percentages like 30/25/25/20 rather than getting quantized to 5% steps. Change default to `2`.
-- **Pool cap**: raise from `200` to `400`. WAX has ~250–350 active pools; `200` may still truncate hot pairs like WAX↔LSWAX. `400` effectively removes the cap while keeping a safety ceiling on ticks fan-out.
-- **Prefer the WASM router when available**: `Trade.bestTradeWithSplitWASM` exists in the SDK and is what Alcor's own UI runs. Signature: `(routes, amount, percents, tradeType, pools, swapConfig)`. Try it first; fall back to the JS `bestTradeWithSplit` if the WASM module isn't loadable in this build. Pure quality+performance win — lets the finer distribution grid + higher maxSplits actually run to completion.
+## Root causes
 
-No changes to `selectRelevantPools` beyond the cap bump.
+1. **Stale pool + tick caches.** `POOLS_TTL_MS` and `TICKS_TTL_MS` are both `30_000 ms` in `src/lib/alcorRouter.ts`. WAX produces a block every 0.5s → up to ~60 blocks of state drift.
+2. **We prefer SDK output even when the HTTP route is better.** In `src/hooks/useSwapRoute.ts` we return the SDK quote whenever it produces a route, and only fall back to `fetchSwapRoute` (Alcor's live HTTP router) on error/empty. Alcor's HTTP endpoint always runs against fresh state and is effectively the upper-bound quote.
 
-## 2. Multiroute visual: show start + end tokens (`src/components/swap/MultiRoutePanel.tsx`)
+## Fix
 
-Today each row is: `{percent} {pair-icon fee} … {pair-icon fee}`. Alcor's row is: `{percent} {startToken} {hop fee} … {hop fee} {endToken}`.
+### 1. Race SDK vs HTTP, pick better (`src/hooks/useSwapRoute.ts`)
 
-Change each row to:
+Change `queryFn` to run both in parallel:
 
 ```text
-{percent%}  [tokenIn]  ─  [pairA↔B fee]  ─  [pairB↔C fee]  ─  [tokenOut]
+const [sdk, http] = await Promise.allSettled([
+  computeAlcorTrade({...}),
+  fetchSwapRoute(tokenIn, tokenOut, ..., tradeType),
+]);
 ```
 
-- Prepend a solo `TokenLogo` for `tokenIn` after the percent.
-- Append a solo `TokenLogo` for `tokenOut` at the end.
-- Keep the existing overlapping pair icons + fee for each hop, joined by the existing dashed connector.
-- Endpoint chips use `size="md"` with a subtle `ring-1 ring-border/50` so they read as endpoints, not hops.
-- For a single-hop route, still render solo endpoints on either side — matches Alcor's layout.
-- No changes to data flow (`useAlcorPools`, chain building) or to loading/error states.
+Then pick:
+- If only one succeeded with a non-null route → use it.
+- If both succeeded, compare on the *user-visible* axis:
+  - `EXACT_INPUT`: prefer the higher `output`.
+  - `EXACT_OUTPUT`: prefer the lower `input`.
+- Preserve the loser only for diagnostics; return the winner exactly as today so the widget consumes it unchanged.
 
-## 3. "Min. Received" sanity (verify, not change)
+Both branches already return `SwapRoute` — no shape adapter needed. Memo compatibility is preserved because we return the winner's own memo(s):
+- HTTP winner → single aggregate memo, one transfer action (already works — `normalizeRouteActions` falls through to the legacy single-transfer path when splits lack memos).
+- SDK winner → per-split memos, multi-transfer actions (already works — see `normalizeRouteActions`'s `allHaveMemos` branch).
 
-User reports: "You receive 83.66055322, Min. Received 82.83223091 — min should be less than the output shown."
+Log which side won and by how much so we can measure parity in the console:
+```text
+[alcor-router] winner=SDK|HTTP output(sdk)=X output(http)=Y Δ=Z%
+```
 
-Numerically, `82.83223091 < 83.66055322`, so the currently displayed values are already in the correct relationship (min < output). What the user is likely reacting to is the *gap*: at 1% slippage the min should be ~`output × 0.99 = 82.824…`, and we're showing `82.832`, which is very close but not identical.
+Abort handling: propagate `AbortError` from either branch untouched. If both fail with transient errors, throw the first (existing retry classifier will kick in).
 
-- Trace this: in `computeAlcorTrade` we set `aggMin = trade.minimumAmountOut(slip)` for EXACT_INPUT, then `route.output = trade.outputAmount.toFixed()` and `route.minReceived = aggMin.toFixed()`. Both go through the SDK's fixed-point math so tiny sub-basis-point deltas vs. a naive `output * 0.99` are expected and harmless.
-- Add a defensive guard in `computeAlcorTrade`: if `parseFloat(aggMin.toFixed()) > parseFloat(trade.outputAmount.toFixed())` (which should never happen at positive slippage), log a warning and clamp `minReceived` to `output`. Cheap invariant check; catches any future SDK-version regressions.
-- No UI change beyond that — the widget already renders both fields correctly. If after the fix the user still perceives an inversion, we'll ask for the exact numbers to debug the specific pair.
+### 2. Freshen pool/tick caches (`src/lib/alcorRouter.ts`)
+
+- Drop `POOLS_TTL_MS` from `30_000` → `10_000`. Pool list membership rarely changes; state on each pool does.
+- Drop `TICKS_TTL_MS` from `30_000` → `5_000`. Ticks are the fast-moving state.
+- Keep the in-flight dedupe (`poolsInflight`/`ticksInflight`) so concurrent quote calls in the same debounce window still share a single fetch.
+
+These caps still shield the API from over-fetching (React Query's own `staleTime: 15_000` in `useSwapRoute` is unchanged, so we're not multiplying request volume — just letting the first fetch inside a fresh window see newer state).
+
+### 3. No changes to
+- `selectRelevantPools` / pool universe (last turn's widening is fine).
+- Router config (`maxSplits: 10`, `distributionPercent: 2`, WASM-first).
+- `MultiRoutePanel` visual.
+- `normalizeRouteActions`, transaction execution, swap button, retry logic.
 
 ## Verification
 
-- Load `/testfarm2` → open swap dialog → WAX → LSWAX @ 100. Output should now be within a few basis points of Alcor's UI, with 3–6 splits.
-- Multiroute row 1 starts with the WAX icon and ends with the LSWAX icon; middle hops render as overlapping pair icons.
-- Confirm `Min. Received` (LSWAX) is always ≤ `You receive` (LSWAX). At 1% slippage the ratio should be ≈ 0.99.
-- Sanity: single-hop pair (WAX ↔ CHEESE) still renders one hop with WAX on left, CHEESE on right.
-- `bunx vitest run src/test/shadow.test.ts` still passes (or improves parity vs. the HTTP endpoint).
+1. Load `/testfarm2` → open swap → WAX → LSWAX @ 100. Compare our output to Alcor's UI at the same instant; expect equality within a few basis points (should now match Alcor exactly when HTTP wins, or beat it when SDK wins on splitting).
+2. Open the console, watch for `[alcor-router] winner=…` lines. Try a few pairs:
+   - WAX ↔ LSWAX (deep, multi-pool — expect either side can win)
+   - WAX ↔ CHEESE (single pool — expect SDK==HTTP)
+   - LSWAX ↔ CHEESE (multi-hop — expect SDK often wins with better splits)
+3. Confirm `Min. Received` ≤ `You receive` on every quote (existing clamp from last turn holds).
+4. `bunx vitest run src/test/shadow.test.ts` still passes.
 
 ## Out of scope
-- No changes to memo format, `normalizeRouteActions`, transaction execution, swap button, or HTTP fallback.
+- No memo format changes, no execution path changes, no UI changes beyond the console log.
+- No new endpoints or connectors — Alcor's public HTTP router is already in the codebase (`fetchSwapRoute`).
