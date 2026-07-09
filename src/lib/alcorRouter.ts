@@ -423,7 +423,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     receiver,
     tradeType,
     maxHops = 3,
-    distributionPercent = 5,
+    distributionPercent = 2,
     signal,
   } = args;
 
@@ -477,12 +477,13 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   );
 
   const sdkTradeType = tradeType === "EXACT_INPUT" ? TradeType.EXACT_INPUT : TradeType.EXACT_OUTPUT;
-  const trade = (Trade as any).bestTradeWithSplit(
+  const trade = await runBestTradeWithSplit(
     routes,
     currencyAmount,
     percents,
     sdkTradeType,
-    { minSplits: 1, maxSplits: 4 }
+    sdkPools,
+    { minSplits: 1, maxSplits: 10 }
   );
   if (!trade) return null;
 
@@ -515,9 +516,21 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   const aggRoute: number[] = trade.swaps[0].route.pools.map((p: Pool) => p.id);
   const aggMemo = `${opWord}#${aggRoute.join(",")}#${receiver}#${aggMin.toExtendedAsset()}#0`;
 
+  // Defensive invariant: at positive slippage, minReceived must never exceed
+  // output. Clamp + warn if a future SDK version ever violates this.
+  const outputNum = parseFloat(trade.outputAmount.toFixed());
+  let minReceivedNum = parseFloat(aggMin.toFixed());
+  if (exactIn && minReceivedNum > outputNum) {
+    logger.warn("[alcor-router] minReceived > output; clamping", {
+      output: outputNum,
+      minReceived: minReceivedNum,
+    });
+    minReceivedNum = outputNum;
+  }
+
   return {
-    output: parseFloat(trade.outputAmount.toFixed()),
-    minReceived: parseFloat(aggMin.toFixed()),
+    output: outputNum,
+    minReceived: minReceivedNum,
     priceImpact: parseFloat(trade.priceImpact.toFixed(4)),
     memo: aggMemo,
     route: aggRoute,
