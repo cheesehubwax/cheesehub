@@ -177,7 +177,7 @@ function selectRelevantPools(
   inKey: string,
   outKey: string,
   maxHops: number,
-  cap = 400
+  cap = 120
 ): RawAlcorPool[] {
   const keyOf = (t: RawAlcorPool["tokenA"]) => tokenKey(t.contract, t.symbol);
   const active = pools.filter((p) => p.active);
