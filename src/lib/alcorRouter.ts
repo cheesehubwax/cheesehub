@@ -593,3 +593,13 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     swaps: splits,
   } as SwapRoute;
 }
+
+// Warm the pool-list cache on module import so the first quote (or route
+// detail lookup) doesn't pay for the /swap/pools round-trip. Respects the
+// global cooldown and swallows errors — this is best-effort.
+if (typeof window !== "undefined") {
+  setTimeout(() => {
+    if (isAlcorCoolingDown()) return;
+    fetchAllAlcorPools().catch(() => {});
+  }, 0);
+}
