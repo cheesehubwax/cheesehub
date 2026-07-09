@@ -1,53 +1,50 @@
-# Match Alcor's multi-route output in CHEESESwap
+# Close the quality gap with Alcor + Multiroute visual + Min. Received sanity
 
-## Problem
-Our SDK router (`src/lib/alcorRouter.ts`) is quoting from a tiny slice of the pool universe, so it returns fewer/worse splits than wax.alcor.exchange. The Alcor UI screenshot shows a 3-way split through several non-hub tokens; ours picks a single 100% path because those pools are filtered out before quoting.
+## 1. Better routing quality (`src/lib/alcorRouter.ts`)
 
-Root cause is in `selectRelevantPools`: it only keeps a pool when **both** sides are in a hardcoded 7-token `HUB_KEYS` set (plus tokenIn/tokenOut). Alcor's real router has no such whitelist — it considers every active pool and lets `computeAllRoutes` + `bestTradeWithSplit` prune.
+Diff vs. Alcor after inspecting the SDK source (`@alcorexchange/alcor-swap-sdk`):
 
-## Fix (single file: `src/lib/alcorRouter.ts`)
+- **maxSplits**: we pass `4`, Alcor SDK default is `10`. Alcor's screenshots show up to 6 splits; ours is hard-capped at 4. Raise to `10` in both `computeShadowQuote` and `computeAlcorTrade`.
+- **distributionPercent**: we use `5` (grid: 5,10,…,100). Alcor's UI uses `2` (grid: 2,4,…,100), which is why their splits land on exact percentages like 30/25/25/20 rather than getting quantized to 5% steps. Change default to `2`.
+- **Pool cap**: raise from `200` to `400`. WAX has ~250–350 active pools; `200` may still truncate hot pairs like WAX↔LSWAX. `400` effectively removes the cap while keeping a safety ceiling on ticks fan-out.
+- **Prefer the WASM router when available**: `Trade.bestTradeWithSplitWASM` exists in the SDK and is what Alcor's own UI runs. Signature: `(routes, amount, percents, tradeType, pools, swapConfig)`. Try it first; fall back to the JS `bestTradeWithSplit` if the WASM module isn't loadable in this build. Pure quality+performance win — lets the finer distribution grid + higher maxSplits actually run to completion.
 
-1. **Drop the hub whitelist for pool selection.** Replace the `anchors`-based filter with: keep every active pool, then run the existing BFS (bounded by `maxHops`) starting from `tokenIn` to find every token reachable within `maxHops` hops. Keep only pools whose both endpoints are reachable and where at least one endpoint sits on some tokenIn→…→tokenOut path of length ≤ maxHops. This mirrors Alcor's approach: the SDK's `computeAllRoutes` does the real pruning; our job is just to feed it the right pool set.
+No changes to `selectRelevantPools` beyond the cap bump.
 
-2. **Increase the pool cap.** Bump `cap` from `60` to `200` (Alcor typically has ~150–250 active pools total, so this effectively removes the cap while keeping a safety ceiling for the ticks fan-out).
+## 2. Multiroute visual: show start + end tokens (`src/components/swap/MultiRoutePanel.tsx`)
 
-3. **Keep `HUB_KEYS` only as a tiebreaker for the cap.** When we do have to truncate to `cap`, prefer pools that (a) touch tokenIn or tokenOut directly, then (b) touch a known hub, then (c) fall back to liquidity-desc. This preserves connectivity when the universe is huge.
+Today each row is: `{percent} {pair-icon fee} … {pair-icon fee}`. Alcor's row is: `{percent} {startToken} {hop fee} … {hop fee} {endToken}`.
 
-4. **No changes to** `maxHops` (3), `distributionPercent` (5), or `maxSplits` (4) — these already match Alcor's defaults.
-
-5. **No changes to** `computeShadowQuote`, `computeAlcorTrade` return shape, `useSwapRoute`, `normalizeRouteActions`, or the widget. The fix is a pure pool-selection widening.
-
-## Technical detail
-
-In `selectRelevantPools`:
+Change each row to:
 
 ```text
-before:
-  anchors = {tokenIn, tokenOut} ∪ HUB_KEYS
-  candidates = active pools where BOTH sides ∈ anchors
-  BFS over candidates to verify tokenIn→tokenOut reachable in ≤maxHops
-  sort by liquidity, slice to 60
-
-after:
-  candidates = all active pools
-  BFS from tokenIn over the full graph, bounded by maxHops, to compute
-    dist(token) for every token reachable ≤maxHops from tokenIn
-  keep pools where dist(a) + dist(b, from tokenOut side via reverse BFS) fits
-    within maxHops (i.e. the pool can lie on some ≤maxHops path)
-  if pools.length > 200:
-    rank by (touches tokenIn/out ? 0 : touches hub ? 1 : 2), then by liquidity desc
-    slice to 200
+{percent%}  [tokenIn]  ─  [pairA↔B fee]  ─  [pairB↔C fee]  ─  [tokenOut]
 ```
 
-Reverse BFS from `tokenOut` is cheap (same graph) and lets us keep only pools that plausibly participate in a tokenIn→tokenOut route, not every pool the SDK would otherwise enumerate.
+- Prepend a solo `TokenLogo` for `tokenIn` after the percent.
+- Append a solo `TokenLogo` for `tokenOut` at the end.
+- Keep the existing overlapping pair icons + fee for each hop, joined by the existing dashed connector.
+- Endpoint chips use `size="md"` with a subtle `ring-1 ring-border/50` so they read as endpoints, not hops.
+- For a single-hop route, still render solo endpoints on either side — matches Alcor's layout.
+- No changes to data flow (`useAlcorPools`, chain building) or to loading/error states.
+
+## 3. "Min. Received" sanity (verify, not change)
+
+User reports: "You receive 83.66055322, Min. Received 82.83223091 — min should be less than the output shown."
+
+Numerically, `82.83223091 < 83.66055322`, so the currently displayed values are already in the correct relationship (min < output). What the user is likely reacting to is the *gap*: at 1% slippage the min should be ~`output × 0.99 = 82.824…`, and we're showing `82.832`, which is very close but not identical.
+
+- Trace this: in `computeAlcorTrade` we set `aggMin = trade.minimumAmountOut(slip)` for EXACT_INPUT, then `route.output = trade.outputAmount.toFixed()` and `route.minReceived = aggMin.toFixed()`. Both go through the SDK's fixed-point math so tiny sub-basis-point deltas vs. a naive `output * 0.99` are expected and harmless.
+- Add a defensive guard in `computeAlcorTrade`: if `parseFloat(aggMin.toFixed()) > parseFloat(trade.outputAmount.toFixed())` (which should never happen at positive slippage), log a warning and clamp `minReceived` to `output`. Cheap invariant check; catches any future SDK-version regressions.
+- No UI change beyond that — the widget already renders both fields correctly. If after the fix the user still perceives an inversion, we'll ask for the exact numbers to debug the specific pair.
 
 ## Verification
 
-- Load `/testfarm2`, open the swap dialog with LSWAX → WAX at amount 100, and confirm the `MultiRoutePanel` shows multiple splits with fees comparable to Alcor's UI (`0.05%` / `0.3%` tiers, 2–3 splits).
-- Check console: `[alcor-router] SDK quote used` should log `splits: >1` for pairs where Alcor's UI also splits.
-- Run `bunx vitest run src/test/shadow.test.ts` — the shadow test compares SDK output vs Alcor's HTTP endpoint; parity should improve, not regress.
-- Sanity: WAX ↔ CHEESE (single deep pool) should still return `splits: 1` and the same output as today.
+- Load `/testfarm2` → open swap dialog → WAX → LSWAX @ 100. Output should now be within a few basis points of Alcor's UI, with 3–6 splits.
+- Multiroute row 1 starts with the WAX icon and ends with the LSWAX icon; middle hops render as overlapping pair icons.
+- Confirm `Min. Received` (LSWAX) is always ≤ `You receive` (LSWAX). At 1% slippage the ratio should be ≈ 0.99.
+- Sanity: single-hop pair (WAX ↔ CHEESE) still renders one hop with WAX on left, CHEESE on right.
+- `bunx vitest run src/test/shadow.test.ts` still passes (or improves parity vs. the HTTP endpoint).
 
 ## Out of scope
-- No changes to memo format, action normalization, or transaction execution — those already handle multi-split correctly (see `normalizeRouteActions`).
-- No UI changes.
+- No changes to memo format, `normalizeRouteActions`, transaction execution, swap button, or HTTP fallback.

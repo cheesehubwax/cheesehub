@@ -123,7 +123,7 @@ function selectRelevantPools(
   inKey: string,
   outKey: string,
   maxHops: number,
-  cap = 200
+  cap = 400
 ): RawAlcorPool[] {
   const keyOf = (t: RawAlcorPool["tokenA"]) => tokenKey(t.contract, t.symbol);
   const active = pools.filter((p) => p.active);
@@ -204,6 +204,36 @@ function selectRelevantPools(
 
 // ----- Pool construction -----
 
+// ----- Router entry: prefer WASM (matches Alcor's UI) then fall back to JS -----
+
+async function runBestTradeWithSplit(
+  routes: any[],
+  currencyAmount: any,
+  percents: number[],
+  sdkTradeType: any,
+  sdkPools: Pool[],
+  swapConfig: { minSplits: number; maxSplits: number }
+): Promise<any> {
+  const T = Trade as any;
+  if (typeof T.bestTradeWithSplitWASM === "function") {
+    try {
+      const wasmTrade = await T.bestTradeWithSplitWASM(
+        routes,
+        currencyAmount,
+        percents,
+        sdkTradeType,
+        sdkPools,
+        swapConfig
+      );
+      if (wasmTrade) return wasmTrade;
+      logger.warn("[alcor-router] WASM router returned null — falling back to JS");
+    } catch (e) {
+      logger.warn("[alcor-router] WASM router threw — falling back to JS", e);
+    }
+  }
+  return T.bestTradeWithSplit(routes, currencyAmount, percents, sdkTradeType, swapConfig);
+}
+
 function buildPool(raw: RawAlcorPool, ticks: RawAlcorTick[]): Pool {
   // Match the exact JSON shape Pool.fromJSON expects. The tick shape from
   // /pools/:id/ticks already matches Tick.fromJSON.
@@ -272,7 +302,7 @@ export async function computeShadowQuote(args: ShadowQuoteArgs): Promise<ShadowQ
     amount,
     tradeType,
     maxHops = 3,
-    distributionPercent = 5,
+    distributionPercent = 2,
     signal,
   } = args;
 
@@ -326,12 +356,13 @@ export async function computeShadowQuote(args: ShadowQuoteArgs): Promise<ShadowQ
     rawAmount
   );
 
-  const trade = (Trade as any).bestTradeWithSplit(
+  const trade = await runBestTradeWithSplit(
     routes,
     currencyAmount,
     percents,
     tradeType === "EXACT_INPUT" ? TradeType.EXACT_INPUT : TradeType.EXACT_OUTPUT,
-    { minSplits: 1, maxSplits: 4 }
+    sdkPools,
+    { minSplits: 1, maxSplits: 10 }
   );
   if (!trade) return null;
 
@@ -392,7 +423,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     receiver,
     tradeType,
     maxHops = 3,
-    distributionPercent = 5,
+    distributionPercent = 2,
     signal,
   } = args;
 
@@ -446,12 +477,13 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   );
 
   const sdkTradeType = tradeType === "EXACT_INPUT" ? TradeType.EXACT_INPUT : TradeType.EXACT_OUTPUT;
-  const trade = (Trade as any).bestTradeWithSplit(
+  const trade = await runBestTradeWithSplit(
     routes,
     currencyAmount,
     percents,
     sdkTradeType,
-    { minSplits: 1, maxSplits: 4 }
+    sdkPools,
+    { minSplits: 1, maxSplits: 10 }
   );
   if (!trade) return null;
 
@@ -484,9 +516,21 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   const aggRoute: number[] = trade.swaps[0].route.pools.map((p: Pool) => p.id);
   const aggMemo = `${opWord}#${aggRoute.join(",")}#${receiver}#${aggMin.toExtendedAsset()}#0`;
 
+  // Defensive invariant: at positive slippage, minReceived must never exceed
+  // output. Clamp + warn if a future SDK version ever violates this.
+  const outputNum = parseFloat(trade.outputAmount.toFixed());
+  let minReceivedNum = parseFloat(aggMin.toFixed());
+  if (exactIn && minReceivedNum > outputNum) {
+    logger.warn("[alcor-router] minReceived > output; clamping", {
+      output: outputNum,
+      minReceived: minReceivedNum,
+    });
+    minReceivedNum = outputNum;
+  }
+
   return {
-    output: parseFloat(trade.outputAmount.toFixed()),
-    minReceived: parseFloat(aggMin.toFixed()),
+    output: outputNum,
+    minReceived: minReceivedNum,
     priceImpact: parseFloat(trade.priceImpact.toFixed(4)),
     memo: aggMemo,
     route: aggRoute,

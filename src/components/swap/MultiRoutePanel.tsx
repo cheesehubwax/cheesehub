@@ -78,6 +78,14 @@ export function MultiRoutePanel({ route, tokenIn, tokenOut }: MultiRoutePanelPro
             <span className="text-white font-medium">
               {Math.round(row.split.percent)}%
             </span>
+            {/* Start-token chip */}
+            <div className="ring-1 ring-border/50 rounded-full">
+              <TokenLogo contract={tokenIn.contract} symbol={tokenIn.ticker} size="md" />
+            </div>
+            <span
+              aria-hidden
+              className="flex-1 min-w-[12px] border-t border-dashed border-white/60"
+            />
             {row.hopFees.map((fee, idx) => {
               const a = row.chain[idx];
               const b = row.chain[idx + 1];
@@ -105,6 +113,14 @@ export function MultiRoutePanel({ route, tokenIn, tokenOut }: MultiRoutePanelPro
                 </div>
               );
             })}
+            {/* End-token chip */}
+            <span
+              aria-hidden
+              className="flex-1 min-w-[12px] border-t border-dashed border-white/60"
+            />
+            <div className="ring-1 ring-border/50 rounded-full">
+              <TokenLogo contract={tokenOut.contract} symbol={tokenOut.ticker} size="md" />
+            </div>
           </div>
         ))}
       </div>
