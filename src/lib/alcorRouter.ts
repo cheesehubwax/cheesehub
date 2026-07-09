@@ -21,6 +21,20 @@ import { logger } from "./logger";
 
 const ALCOR_API = "https://wax.alcor.exchange/api/v2";
 
+// ----- Global Alcor cooldown -----
+// After any 429 anywhere in the app, back off all NON-essential Alcor fanout
+// (SDK tick fetches, per-pool detail fetches) for a while. The single HTTP
+// router call is still allowed since it's one request and it's what the
+// widget actually needs to quote.
+let alcorCooldownUntil = 0;
+const ALCOR_COOLDOWN_MS = 30_000;
+export function markAlcorRateLimited() {
+  alcorCooldownUntil = Date.now() + ALCOR_COOLDOWN_MS;
+}
+export function isAlcorCoolingDown(): boolean {
+  return Date.now() < alcorCooldownUntil;
+}
+
 // ----- Raw API shapes -----
 
 interface RawAlcorPool {
@@ -78,16 +92,28 @@ export async function fetchAllAlcorPools(signal?: AbortSignal): Promise<RawAlcor
 const ticksCache = new Map<number, { at: number; data: RawAlcorTick[] }>();
 const ticksInflight = new Map<number, Promise<RawAlcorTick[]>>();
 const TICKS_TTL_MS = 15_000;
+// Negative cache for failed tick fetches so we don't hammer the same pool.
+const ticksFailCache = new Map<number, number>();
+const TICKS_FAIL_TTL_MS = 20_000;
 
 export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Promise<RawAlcorTick[]> {
   const cached = ticksCache.get(poolId);
   if (cached && Date.now() - cached.at < TICKS_TTL_MS) return cached.data;
+  const failedAt = ticksFailCache.get(poolId);
+  if (failedAt && Date.now() - failedAt < TICKS_FAIL_TTL_MS) {
+    throw new Error(`ticks recently failed for pool ${poolId}`);
+  }
   const inflight = ticksInflight.get(poolId);
   if (inflight) return inflight;
   const p = (async () => {
     const res = await fetch(`${ALCOR_API}/swap/pools/${poolId}/ticks`, { signal });
     if (!res.ok) {
-      if (res.status === 429) throw new Error("Rate limited — please wait a moment and try again");
+      if (res.status === 429) {
+        markAlcorRateLimited();
+        ticksFailCache.set(poolId, Date.now());
+        throw new Error("Rate limited — please wait a moment and try again");
+      }
+      ticksFailCache.set(poolId, Date.now());
       throw new Error(`Failed to fetch ticks for pool ${poolId} (${res.status})`);
     }
     const data = (await res.json()) as RawAlcorTick[];
@@ -100,6 +126,25 @@ export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Prom
   } finally {
     ticksInflight.delete(poolId);
   }
+}
+
+// Run promises with a fixed concurrency limit.
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (true) {
+      const i = cursor++;
+      if (i >= items.length) return;
+      results[i] = await worker(items[i], i);
+    }
+  });
+  await Promise.all(runners);
+  return results;
 }
 
 // ----- Route graph filtering -----
