@@ -1,7 +1,9 @@
 import { useMemo } from "react";
 import { TokenLogo } from "@/components/TokenLogo";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useAlcorPools } from "@/hooks/useAlcorPools";
 import type { SwapRoute, SwapToken, AlcorPoolToken } from "@/lib/swapApi";
+
 
 interface MultiRoutePanelProps {
   route: SwapRoute;
