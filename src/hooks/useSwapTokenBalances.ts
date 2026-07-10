@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, skipToken } from "@tanstack/react-query";
 import type { SwapToken } from "@/lib/swapApi";
 import type { TokenWithBalance } from "@/hooks/useAllTokenBalances";
 
@@ -13,7 +13,7 @@ export function useSwapTokenBalances(
 ) {
   const { data: balances } = useQuery<{ tokens: TokenWithBalance[] }, Error, Map<string, string>>({
     queryKey: ["all-token-balances", accountName],
-    enabled: false, // Don't trigger a fetch — just subscribe to existing cache
+    queryFn: skipToken, // Never fetches — only subscribes to the shared cache
     select: (data) => {
       const map = new Map<string, string>();
       if (!data?.tokens) return map;
