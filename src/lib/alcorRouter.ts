@@ -806,6 +806,14 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
       );
       break;
     }
+    if (rateLimitedTickFailures > rateLimitsBeforeBatch) {
+      completedAllTicks = false;
+      logger.warn(
+        `[alcor-router] stopping tick fetch early after rate limit; no SDK quote yet (${sdkPools.length}/${relevant.length} pools built)`,
+        getTickQueueStats(),
+      );
+      break;
+    }
   }
 
   const diagnostics: SwapRoute["quoteDiagnostics"] = {
@@ -884,7 +892,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     input: parseFloat(trade.inputAmount.toFixed()),
     swaps: splits,
     quoteSource: "sdk",
-    quoteComplete: tickFailures === 0,
+    quoteComplete: diagnostics.quotePartial !== true,
     quoteDiagnostics: diagnostics,
   } as SwapRoute;
 
