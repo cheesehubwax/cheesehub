@@ -104,6 +104,8 @@ const TICKS_FAIL_TTL_MS = 1_500;
 // quote — the outer react-query retry is still the hammer guard.
 const TICKS_FETCH_RETRIES = 2;
 const TICKS_FETCH_BACKOFF_MS = [400, 900];
+const QUOTE_TICK_CONCURRENCY = 4;
+const PREWARM_TICK_CONCURRENCY = 2;
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -435,7 +437,7 @@ export async function computeShadowQuote(args: ShadowQuoteArgs): Promise<ShadowQ
 
   // Fetch ticks for every relevant pool in parallel.
   // Fetch ticks with bounded concurrency so we don't hammer Alcor into 429s.
-  const tickResults = await mapWithConcurrency(relevant, 10, async (p) => {
+  const tickResults = await mapWithConcurrency(relevant, QUOTE_TICK_CONCURRENCY, async (p) => {
     try {
       return { p, ticks: await fetchPoolTicks(p.id, signal) };
     } catch (e) {
@@ -556,7 +558,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
 
   let tickFailures = 0;
   let rateLimitedTickFailures = 0;
-  const tickResults = await mapWithConcurrency(relevant, 10, async (p) => {
+  const tickResults = await mapWithConcurrency(relevant, QUOTE_TICK_CONCURRENCY, async (p) => {
     try {
       return { p, ticks: await fetchPoolTicks(p.id, signal) };
     } catch (e) {
@@ -588,8 +590,14 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     tookMs: Math.round(performance.now() - started),
   });
 
+  // Never route against a partial cold-cache pool set. A 47/56 pool build can
+  // look valid but produces the bad first multiroute the user reported. Force
+  // the hook retry loop to wait until every selected pool has ticks.
+  if (tickFailures > 0) {
+    throw incompleteSdkRouteError(earlyDiagnostics());
+  }
+
   if (sdkPools.length === 0) {
-    if (rateLimitedTickFailures > 0 || tickFailures > 0) throw incompleteSdkRouteError(earlyDiagnostics());
     return null;
   }
 
@@ -734,7 +742,7 @@ export async function prewarmTicksForPair(
     if (relevant.length === 0) return;
     // Lower concurrency than the quote fan-out so we don't compete with an
     // in-flight quote. Swallow all errors — this is best-effort.
-    await mapWithConcurrency(relevant, 4, async (p) => {
+    await mapWithConcurrency(relevant, PREWARM_TICK_CONCURRENCY, async (p) => {
       try {
         await fetchPoolTicks(p.id, signal);
       } catch {
