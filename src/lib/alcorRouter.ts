@@ -401,6 +401,38 @@ function selectRelevantPools(
   return [...endpointPools, ...filler.slice(0, remaining)];
 }
 
+function poolStage(p: RawAlcorPool, inKey: string, outKey: string): number {
+  const a = tokenKey(p.tokenA.contract, p.tokenA.symbol);
+  const b = tokenKey(p.tokenB.contract, p.tokenB.symbol);
+  const direct = (a === inKey && b === outKey) || (a === outKey && b === inKey);
+  if (direct) return 0;
+  const touchesEndpoint = a === inKey || b === inKey || a === outKey || b === outKey;
+  const touchesHub = HUB_KEYS.has(a) || HUB_KEYS.has(b);
+  if (touchesEndpoint && touchesHub) return 1;
+  if (touchesEndpoint) return 2;
+  if (touchesHub) return 3;
+  return 4;
+}
+
+function orderPoolsForTickFetch(pools: RawAlcorPool[], inKey: string, outKey: string): RawAlcorPool[] {
+  return pools.slice().sort((a, b) => {
+    const stageA = poolStage(a, inKey, outKey);
+    const stageB = poolStage(b, inKey, outKey);
+    if (stageA !== stageB) return stageA - stageB;
+    const la = BigInt(a.liquidity || "0");
+    const lb = BigInt(b.liquidity || "0");
+    return lb > la ? 1 : lb < la ? -1 : 0;
+  });
+}
+
+function getTickQueueStats() {
+  return {
+    active: tickQueueActive,
+    queued: tickQueue.length,
+    cooldownMs: Math.max(0, alcorCooldownUntil - Date.now()),
+  };
+}
+
 function formatSdkDiagnostics(diag?: SwapRoute["quoteDiagnostics"]): string {
   if (!diag) return "";
   return ` (${diag.routesConsidered ?? "?"} routes, ${diag.poolsBuilt ?? "?"}/${diag.relevantPools ?? "?"} pools, tickFailures=${diag.tickFailures ?? 0}, rateLimited=${diag.rateLimitedTickFailures ?? 0}, ${diag.tookMs ?? "?"}ms)`;
