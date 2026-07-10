@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { getTokenLogoUrl } from '@/lib/tokenLogos';
+import { hasMissingLogo, markMissingLogo } from '@/lib/tokenLogoMisses';
 import { cn } from '@/lib/utils';
 
 interface TokenLogoProps {
@@ -22,7 +23,7 @@ const fontSizeClasses = {
 };
 
 export function TokenLogo({ contract, symbol, className, size = 'md' }: TokenLogoProps) {
-  const [hasError, setHasError] = useState(false);
+  const [hasError, setHasError] = useState(() => hasMissingLogo(contract, symbol));
   const logoUrl = getTokenLogoUrl(contract, symbol);
 
   if (hasError) {
@@ -45,7 +46,12 @@ export function TokenLogo({ contract, symbol, className, size = 'md' }: TokenLog
       src={logoUrl}
       alt={symbol}
       className={cn(sizeClasses[size], 'rounded-full object-cover', className)}
-      onError={() => setHasError(true)}
+      loading="lazy"
+      decoding="async"
+      onError={() => {
+        markMissingLogo(contract, symbol);
+        setHasError(true);
+      }}
     />
   );
 }
