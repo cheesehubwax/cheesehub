@@ -1,54 +1,46 @@
-## Goal
-Make CHEESESwap show the best multiroute split on the first quote attempt for cases like `10 WAXUSDC -> ROOK`, instead of first showing Alcor HTTP's 100% single-route quote and only switching to the better split after several refreshes.
+## Problem
 
-## What is wrong now
-The current code can still expose the worse single-route quote because the HTTP route is treated as valid immediately whenever the SDK split route is unavailable, delayed, or skipped during Alcor cooldown. This creates a timing problem: users see a complete-looking 100% route even though the SDK route may become much better a few checks later.
+After the WASM router correctly falls back to JS (single log confirms it), the query hangs on "finding best quote". Two compounding causes:
 
-## Plan
+1. **`useSwapRoute` waits for both engines.** `Promise.allSettled([http, sdk])` blocks until the SDK resolves. When the SDK is slow, the fast HTTP quote can't render.
+2. **The JS split router is heavy.** With the recent changes we now call `T.bestTradeWithSplit` up to 2× (fine + coarse grid) per staged tick batch (up to 8 batches × 12 pools). On ~96 pools with up to 10-hop routes, the JS solver can run for tens of seconds and starves the UI.
 
-1. **Make SDK split routing first-class for quote finality**
-   - Keep running HTTP and SDK quote paths in parallel.
-   - For routes where SDK routing is expected/possible, do not finalize the HTTP 100% route until the SDK split router has actually completed, failed definitively, or timed out.
-   - Use a bounded wait window for the SDK leg so the UI does not hang forever.
+## Fix
 
-2. **Stop skipping SDK purely because global Alcor cooldown is active for active user quotes**
-   - The cooldown currently protects against fanout, but it can also prevent the split router from running exactly when the user needs the best quote.
-   - Adjust cooldown behavior so active swap quotes can still use cached pool/tick data and only avoid fresh fanout when necessary.
-   - If SDK cannot run because required data is not cached, keep the HTTP route marked as provisional instead of silently presenting it as the final best route.
+Introduce a hard time budget for the SDK and let HTTP fill the UI when SDK exceeds it. Also trim redundant work inside the SDK path.
 
-3. **Add a quote-quality state internally**
-   - Distinguish:
-     - final SDK split route
-     - final HTTP-only route after SDK was checked
-     - provisional HTTP route while SDK is still warming/checking
-   - The widget should only show the route as normal/final once best-route checking is complete.
+### `src/lib/alcorRouter.ts`
 
-4. **Prefer the SDK split whenever it materially improves output**
-   - For `EXACT_INPUT`, choose SDK when it has 2+ splits and better output than HTTP.
-   - For `EXACT_OUTPUT`, choose SDK when it has 2+ splits and lower required input.
-   - Reduce or remove the current 0.05% threshold if needed, because your screenshot shows even small route differences can be user-visible and Alcor itself chooses the split.
+1. **Overall SDK time budget.** At the top of `computeAlcorTrade` capture `started`; add `const SDK_BUDGET_MS = 8_000`. In the staged tick-batch loop, break as soon as `performance.now() - started > SDK_BUDGET_MS`, marking `completedAllTicks = false`. If we already have a `bestEval`, return that partial quote (`quoteComplete: false`); if not, return `null` (so HTTP wins) — do NOT throw.
+2. **Per-`runBestTradeWithSplit` timeout.** Wrap each grid call in a `Promise.race` with a 3.5s per-call timeout that resolves to `null` (not reject) so `evaluatePools` still returns any grid winner that did finish. Log once per timeout with `logger.warn`.
+3. **Drop the coarse grid until the fine grid succeeds at least once.** Only run the second (5%) grid on the final batch when we have time budget remaining — the dual-grid comparison is a safety net, not needed inside every intermediate batch.
+4. **Reduce intermediate `evaluatePools` cost.** Only call `evaluatePools` after (a) the first batch that produced at least one built pool and (b) the final batch. Intermediate batches just accumulate pools. This preserves early-exit under rate-limits without paying for a full solve per batch.
+5. **Do not throw on incomplete SDK when HTTP can win.** Change the "no bestEval + tickFailures>0" path to return `null` (with diagnostics attached to a warn log) instead of `throw incompleteSdkRouteError`. `useSwapRoute` already handles `null` by falling back to HTTP.
 
-5. **Improve diagnostics**
-   - Log why a quote chose HTTP or SDK:
-     - SDK pending timeout
-     - SDK skipped due missing cached data
-     - SDK failed due 429/ticks/pools
-     - SDK won with split count and output delta
-     - HTTP won only after SDK was actually checked
-   - This makes it clear whether future 100% routes are genuinely optimal or just fallback behavior.
+### `src/hooks/useSwapRoute.ts`
 
-6. **Keep execution safety**
-   - Preserve per-split memos and multi-transfer execution.
-   - Do not change token selection, slippage UI, signing, or transaction plugins.
-   - Keep Alcor rate-limit protections, but avoid letting rate-limit fallback masquerade as best execution.
+6. **Race SDK against a small grace window.** Keep both promises but wrap the SDK in a race: if `http` resolves and the SDK hasn't after `HTTP_GRACE_MS = 1_500`, proceed with what we have (SDK slot becomes `null`). If HTTP fails, wait full SDK budget. Concretely:
+   - Start both.
+   - `await Promise.race([httpPromise, timeout(HTTP_GRACE_MS)])`.
+   - If HTTP resolved valid, `await Promise.race([sdkPromise, timeout(HTTP_GRACE_MS)])` — accept whatever SDK has by then; if not resolved treat as `null`.
+   - If HTTP not valid yet, `await Promise.allSettled([...])` as today (bounded by the SDK's own 8s budget from step 1).
+7. **Keep existing selection logic.** Once both slots are known (valid or `null`), the current pickSdk / splitLosesToSingleLeg / HTTP-fallback path stays unchanged. The result set for the UI is the same; only the waiting behavior changes.
+8. **Do not abort in-flight SDK on grace timeout.** Let it keep computing so subsequent refreshes benefit from cached ticks and warm pool objects, but ignore its result for this query.
 
-## Files to update
-- `src/hooks/useSwapRoute.ts` — route selection, provisional/final quote behavior, SDK wait policy, logging.
-- `src/lib/alcorRouter.ts` — cached-data/cooldown handling for active SDK quotes if needed.
-- `src/components/swap/CheeseSwapWidget.tsx` — only if needed to show loading/provisional state instead of a final-looking worse quote.
+### Deliberately unchanged
 
-## Validation
-- Test the user-provided case: `10 WAXUSDC -> ROOK`.
-- Confirm first settled quote shows the split route comparable to Alcor’s UI, not the 100% route.
-- Confirm single-pool routes still work when SDK checks and finds no better split.
-- Confirm swap execution still uses one transfer per split when multiroute wins.
+- Split-search "best result wins" semantics: fine grid 1% remains the default; coarse grid still competes when reached.
+- Rate-limit queue and cooldown behavior in `fetchPoolTicks`.
+- Multi-transfer memo generation and HTTP fallback selection in `swapApi.ts`.
+
+## Verification
+
+1. Type-check clean.
+2. Reproduce the stuck-loading case: quote should appear within ~1.5s (HTTP) even if SDK is still working. Console shows exactly one WASM fallback line, then either `SDK won (…)` or `HTTP won after SDK check` — never silent for 10+ seconds.
+3. On slow/rate-limited runs, confirm `SDK budget exceeded — using HTTP fallback` warning and that the UI still renders a valid quote.
+4. Confirm the multi-route panel still displays when the SDK does beat HTTP.
+
+## Technical notes
+
+- The WASM error message text has changed (`TextEncoder2 is not a constructor` instead of `require is not defined`) but the `wasmDisabled` gate already catches any throw, so no additional handling is needed there.
+- No new dependencies. All timeouts use `setTimeout` inside a small `withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T>` helper co-located in `alcorRouter.ts`.

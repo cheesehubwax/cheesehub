@@ -84,6 +84,10 @@ export function useSwapRoute(
         signal,
       });
 
+      // Wait for both engines. The SDK enforces its own internal ~8s budget
+      // (see computeAlcorTrade), so this can no longer hang — and letting
+      // the split solver actually finish is what makes multi-route splits
+      // appear in the UI instead of always showing HTTP's 100% single leg.
       const [httpSettled, sdkSettled] = await Promise.allSettled([httpPromise, sdkPromise]);
 
       // Abort propagation
@@ -104,12 +108,16 @@ export function useSwapRoute(
       const sdkError = sdkSettled.status === "rejected" ? sdkSettled.reason : null;
       const sdkTransient = sdkError ? isTransientError(sdkError) : false;
 
-      if (sdkError && sdkTransient) {
-        logger.warn("[alcor-router] SDK quote not final; retrying before accepting HTTP fallback", sdkError);
+      if (sdkError && sdkTransient && !httpValid) {
+        logger.warn("[alcor-router] SDK quote not final and HTTP unavailable; retrying", sdkError);
         throw sdkError;
       }
 
-      if (sdkError) {
+      if (sdkError && sdkTransient && httpValid) {
+        logger.warn("[alcor-router] SDK quote rate-limited; using HTTP fallback instead of crashing", sdkError);
+      }
+
+      if (sdkError && !sdkTransient) {
         logger.warn("[alcor-router] SDK failed definitively; HTTP fallback allowed", sdkError);
       }
 
@@ -118,9 +126,41 @@ export function useSwapRoute(
       // avoid a threshold that keeps a worse 100% route on screen.
       const exactIn = debouncedTradeType === "EXACT_INPUT";
 
+      // Extrapolate what each leg would produce (EXACT_INPUT) or require
+      // (EXACT_OUTPUT) if it were routed at 100% — linear approximation, but
+      // good enough to detect the "greedy split landed worse than one of its
+      // own legs" pathology. If the split total loses to a single leg, the
+      // split is objectively worse and we fall back to HTTP.
+      const splitLosesToSingleLeg = (r: SwapRoute): boolean => {
+        if (!r.swaps.length) return false;
+        if (exactIn) {
+          const best = r.swaps.reduce((m, s) => {
+            const pct = s.percent > 0 ? s.percent / 100 : 0;
+            if (!pct) return m;
+            const scaled = parseFloat(s.output as unknown as string) / pct;
+            return scaled > m ? scaled : m;
+          }, 0);
+          return best > r.output * 1.0001; // require a meaningful loss
+        }
+        if (r.input == null) return false;
+        const best = r.swaps.reduce((m, s) => {
+          const pct = s.percent > 0 ? s.percent / 100 : 0;
+          if (!pct) return m === Infinity ? m : m;
+          const scaled = parseFloat(s.input as unknown as string) / pct;
+          return scaled < m ? scaled : m;
+        }, Infinity);
+        return best < (r.input as number) / 1.0001;
+      };
+
       const pickSdk = (): boolean => {
         if (!sdkValid) return false;
         if (sdk!.swaps.length < 2) return false;
+        if (splitLosesToSingleLeg(sdk!)) {
+          logger.warn(
+            `[alcor-router] SDK split rejected: worse than its own best single leg (splits=${sdk!.swaps.length}, out=${sdk!.output})`,
+          );
+          return false;
+        }
         if (!httpValid) return true;
         if (exactIn) {
           // Larger output wins.
@@ -136,18 +176,23 @@ export function useSwapRoute(
           ? (sdk!.output - (http?.output ?? 0)) / Math.max(http?.output ?? 1, 1e-9)
           : ((http?.input ?? 0) - (sdk!.input ?? 0)) / Math.max(http?.input ?? 1, 1e-9);
         logger.info(
-          `[alcor-router] SDK won (${sdk!.swaps.length} splits, +${(delta * 100).toFixed(4)}%, ${sdk!.quoteDiagnostics?.routesConsidered ?? "?"} routes, ${sdk!.quoteDiagnostics?.poolsBuilt ?? "?"}/${sdk!.quoteDiagnostics?.relevantPools ?? "?"} pools, ${sdk!.quoteDiagnostics?.tookMs ?? "?"}ms)`,
+          `[alcor-router] SDK won (${sdk!.swaps.length} splits, +${(delta * 100).toFixed(4)}%, complete=${sdk!.quoteComplete !== false}, ${sdk!.quoteDiagnostics?.routesConsidered ?? "?"} routes, ${sdk!.quoteDiagnostics?.poolsBuilt ?? "?"}/${sdk!.quoteDiagnostics?.relevantPools ?? "?"} pools, ${sdk!.quoteDiagnostics?.ticksSucceeded ?? "?"}/${sdk!.quoteDiagnostics?.tickRequests ?? "?"} ticks, rateLimited=${sdk!.quoteDiagnostics?.rateLimitedTickFailures ?? 0}, ${sdk!.quoteDiagnostics?.tookMs ?? "?"}ms)`,
         );
-        return { ...sdk!, quoteComplete: true };
+        return { ...sdk!, quoteComplete: sdk!.quoteComplete !== false };
       }
 
       if (sdk && sdk.quoteComplete === false) {
         const diag = sdk.quoteDiagnostics;
-        const retryError = new Error(
-          `Failed to fetch complete split route — retrying (${diag?.routesConsidered ?? "?"} routes, ${diag?.poolsBuilt ?? "?"}/${diag?.relevantPools ?? "?"} pools, tickFailures=${diag?.tickFailures ?? 0})`,
+        if (!httpValid) {
+          const retryError = new Error(
+            `Failed to fetch complete split route — retrying (${diag?.routesConsidered ?? "?"} routes, ${diag?.poolsBuilt ?? "?"}/${diag?.relevantPools ?? "?"} pools, tickFailures=${diag?.tickFailures ?? 0})`,
+          );
+          logger.warn("[alcor-router] SDK route incomplete and HTTP unavailable; retrying", retryError);
+          throw retryError;
+        }
+        logger.warn(
+          `[alcor-router] SDK route incomplete and did not beat HTTP; using HTTP fallback (sdk splits=${sdk.swaps.length}, sdk out=${sdk.output}, http out=${http!.output}, tickFailures=${diag?.tickFailures ?? 0}, rateLimited=${diag?.rateLimitedTickFailures ?? 0})`,
         );
-        logger.warn("[alcor-router] SDK route incomplete; retrying before accepting HTTP fallback", retryError);
-        throw retryError;
       }
 
       if (httpValid) {
