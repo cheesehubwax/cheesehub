@@ -668,56 +668,11 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   const outKey = tokenKey(tokenOut.contract, tokenOut.ticker);
 
   const allPools = await fetchAllAlcorPools(signal);
-  const relevant = selectRelevantPools(allPools, inKey, outKey, maxHops);
+  const relevant = orderPoolsForTickFetch(selectRelevantPools(allPools, inKey, outKey, maxHops), inKey, outKey);
   if (relevant.length === 0) return null;
-
-  let tickFailures = 0;
-  let rateLimitedTickFailures = 0;
-  const tickResults = await mapWithConcurrency(relevant, 10, async (p) => {
-    try {
-      return { p, ticks: await fetchPoolTicks(p.id, signal) };
-    } catch (e) {
-      if ((e as any)?.name === "AbortError") throw e;
-      tickFailures += 1;
-      if (isRateLimitError(e)) rateLimitedTickFailures += 1;
-      logger.warn(`alcorTrade: tick fetch failed for pool ${p.id}`, e);
-      return { p, ticks: [] as RawAlcorTick[] };
-    }
-  });
-
-  const sdkPools = tickResults
-    .filter((r) => r.ticks.length > 0)
-    .map((r) => {
-      try {
-        return buildPool(r.p, r.ticks);
-      } catch (e) {
-        logger.warn(`alcorTrade: pool build failed for pool ${r.p.id}`, e);
-        return null;
-      }
-    })
-    .filter((p): p is Pool => p !== null);
-  const earlyDiagnostics = (): SwapRoute["quoteDiagnostics"] => ({
-    relevantPools: relevant.length,
-    poolsBuilt: sdkPools.length,
-    routesConsidered: 0,
-    tickFailures,
-    rateLimitedTickFailures,
-    tookMs: Math.round(performance.now() - started),
-  });
-
-  if (sdkPools.length === 0) {
-    if (rateLimitedTickFailures > 0 || tickFailures > 0) throw incompleteSdkRouteError(earlyDiagnostics());
-    return null;
-  }
 
   const inTok = new Token(tokenIn.contract, tokenIn.precision, tokenIn.ticker);
   const outTok = new Token(tokenOut.contract, tokenOut.precision, tokenOut.ticker);
-
-  const routes = computeAllRoutes(inTok, outTok, sdkPools, maxHops);
-  if (routes.length === 0) {
-    if (rateLimitedTickFailures > 0) throw incompleteSdkRouteError(earlyDiagnostics());
-    return null;
-  }
 
   const rawAmount = toRawAmount(
     amount,
@@ -729,6 +684,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   );
 
   const sdkTradeType = tradeType === "EXACT_INPUT" ? TradeType.EXACT_INPUT : TradeType.EXACT_OUTPUT;
+  const exactInEval = tradeType === "EXACT_INPUT";
 
   // Run the split optimizer at both a fine (1%) and coarse (5%) grid and keep
   // whichever trade is objectively better. `bestTradeWithSplit` is a greedy
@@ -746,64 +702,133 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   ];
   if (coarseStep !== fineStep) gridConfigs.push({ step: coarseStep, maxSplits: 6 });
 
-  const gridTrades = await Promise.all(
-    gridConfigs.map((cfg) =>
-      runBestTradeWithSplit(
-        routes,
-        currencyAmount,
-        buildPercents(cfg.step),
-        sdkTradeType,
-        sdkPools,
-        { minSplits: 1, maxSplits: cfg.maxSplits }
-      ).catch((e) => {
-        logger.warn(`[alcor-router] split search failed at step=${cfg.step}`, e);
-        return null;
-      })
-    )
-  );
-
-  const exactInEval = tradeType === "EXACT_INPUT";
-  let trade: any = null;
-  let bestGrid: { step: number; maxSplits: number } | null = null;
-  gridTrades.forEach((t, i) => {
-    if (!t) return;
-    if (!trade) {
-      trade = t;
-      bestGrid = gridConfigs[i];
-      return;
-    }
+  const isBetterTrade = (candidate: any, current: any | null) => {
+    if (!current) return true;
     const cur = exactInEval
-      ? parseFloat(trade.outputAmount.toFixed())
-      : parseFloat(trade.inputAmount.toFixed());
+      ? parseFloat(current.outputAmount.toFixed())
+      : parseFloat(current.inputAmount.toFixed());
     const cand = exactInEval
-      ? parseFloat(t.outputAmount.toFixed())
-      : parseFloat(t.inputAmount.toFixed());
-    const better = exactInEval ? cand > cur : cand < cur;
-    if (better) {
-      trade = t;
-      bestGrid = gridConfigs[i];
+      ? parseFloat(candidate.outputAmount.toFixed())
+      : parseFloat(candidate.inputAmount.toFixed());
+    return exactInEval ? cand > cur : cand < cur;
+  };
+
+  const evaluatePools = async (sdkPools: Pool[]) => {
+    if (sdkPools.length === 0) return null;
+    const routes = computeAllRoutes(inTok, outTok, sdkPools, maxHops);
+    if (routes.length === 0) return null;
+
+    const gridTrades = await Promise.all(
+      gridConfigs.map((cfg) =>
+        runBestTradeWithSplit(
+          routes,
+          currencyAmount,
+          buildPercents(cfg.step),
+          sdkTradeType,
+          sdkPools,
+          { minSplits: 1, maxSplits: cfg.maxSplits }
+        ).catch((e) => {
+          logger.warn(`[alcor-router] split search failed at step=${cfg.step}`, e);
+          return null;
+        })
+      )
+    );
+
+    let trade: any = null;
+    let bestGrid: { step: number; maxSplits: number } | null = null;
+    gridTrades.forEach((t, i) => {
+      if (!t) return;
+      if (isBetterTrade(t, trade)) {
+        trade = t;
+        bestGrid = gridConfigs[i];
+      }
+    });
+
+    return {
+      trade,
+      bestGrid,
+      routesConsidered: routes.length,
+      gridOutputs: gridTrades.map((t, i) => ({
+        step: gridConfigs[i].step,
+        output: t ? parseFloat(t.outputAmount.toFixed()) : null,
+        input: t ? parseFloat(t.inputAmount.toFixed()) : null,
+        splits: t ? t.swaps.length : 0,
+      })),
+    };
+  };
+
+  let tickFailures = 0;
+  let rateLimitedTickFailures = 0;
+  let tickRequests = 0;
+  let ticksSucceeded = 0;
+  let completedAllTicks = true;
+  const sdkPools: Pool[] = [];
+  let bestEval: Awaited<ReturnType<typeof evaluatePools>> | null = null;
+
+  const TICK_BATCH_SIZE = 12;
+  for (let start = 0; start < relevant.length; start += TICK_BATCH_SIZE) {
+    const batch = relevant.slice(start, start + TICK_BATCH_SIZE);
+    const rateLimitsBeforeBatch = rateLimitedTickFailures;
+    const batchResults = await mapWithConcurrency(batch, 4, async (p) => {
+      try {
+        tickRequests += 1;
+        return { p, ticks: await fetchPoolTicks(p.id, signal) };
+      } catch (e) {
+        if ((e as any)?.name === "AbortError") throw e;
+        tickFailures += 1;
+        if (isRateLimitError(e)) rateLimitedTickFailures += 1;
+        logger.warn(`alcorTrade: tick fetch failed for pool ${p.id}`, e);
+        return { p, ticks: [] as RawAlcorTick[] };
+      }
+    });
+
+    for (const r of batchResults) {
+      if (r.ticks.length === 0) continue;
+      ticksSucceeded += 1;
+      try {
+        sdkPools.push(buildPool(r.p, r.ticks));
+      } catch (e) {
+        tickFailures += 1;
+        logger.warn(`alcorTrade: pool build failed for pool ${r.p.id}`, e);
+      }
     }
-  });
-  const gridOutputs = gridTrades.map((t, i) => ({
-    step: gridConfigs[i].step,
-    output: t ? parseFloat(t.outputAmount.toFixed()) : null,
-    input: t ? parseFloat(t.inputAmount.toFixed()) : null,
-    splits: t ? t.swaps.length : 0,
-  }));
+
+    const candidate = await evaluatePools(sdkPools);
+    if (candidate?.trade && isBetterTrade(candidate.trade, bestEval?.trade ?? null)) {
+      bestEval = candidate;
+    }
+
+    if (rateLimitedTickFailures > rateLimitsBeforeBatch && bestEval?.trade) {
+      completedAllTicks = false;
+      logger.warn(
+        `[alcor-router] stopping tick fetch early after rate limit; using best partial quote (${sdkPools.length}/${relevant.length} pools built)`,
+        getTickQueueStats(),
+      );
+      break;
+    }
+  }
 
   const diagnostics: SwapRoute["quoteDiagnostics"] = {
     relevantPools: relevant.length,
     poolsBuilt: sdkPools.length,
-    routesConsidered: routes.length,
+    routesConsidered: bestEval?.routesConsidered ?? 0,
     tickFailures,
     rateLimitedTickFailures,
+    tickRequests,
+    ticksSucceeded,
+    queueDepth: getTickQueueStats().active + getTickQueueStats().queued,
+    quotePartial: !completedAllTicks || tickFailures > 0,
     tookMs: Math.round(performance.now() - started),
   };
 
-  if (!trade) {
+  if (!bestEval?.trade) {
     if (tickFailures > 0) throw incompleteSdkRouteError(diagnostics);
     return null;
   }
+
+  const trade = bestEval.trade;
+  const bestGrid = bestEval.bestGrid;
+  const gridOutputs = bestEval.gridOutputs;
 
   // Slippage as SDK Percent: e.g. 1% => Percent(100, 10_000).
   const bps = Math.round(slippage * 100); // 1% -> 100bps
