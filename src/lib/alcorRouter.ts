@@ -606,6 +606,13 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   // to what wax.alcor.exchange sends today.
   const splits: SwapSplit[] = trade.swaps.map((s: any) => {
     const poolIds: number[] = s.route.pools.map((p: Pool) => p.id);
+    const visualPath = s.route.tokenPath.map((t: Token) => ({
+      id: tokenKey(t.contract, t.symbol),
+      symbol: t.symbol,
+      contract: t.contract,
+      decimals: t.decimals,
+    }));
+    const visualFees = s.route.pools.map((p: Pool) => p.fee);
     const maxSent = exactIn ? s.inputAmount : trade.maximumAmountIn(slip, s.inputAmount);
     const minReceived = exactIn ? trade.minimumAmountOut(slip, s.outputAmount) : s.outputAmount;
     const memo = `${opWord}#${poolIds.join(",")}#${receiver}#${minReceived.toExtendedAsset()}#0`;
@@ -617,6 +624,8 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
       minReceived: minReceived.toFixed(),
       maxSent: maxSent.toFixed(),
       memo,
+      visualPath,
+      visualFees,
     };
   });
 

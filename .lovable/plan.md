@@ -1,26 +1,21 @@
-## Root cause
+Plan to fix the first-quote multiroute visual only:
 
-The multiroute panel loads slowly on the first quote because `useAlcorPools` fires one HTTP request per pool id (`/swap/pools/{id}`), gated by `isAlcorCoolingDown()`. Meanwhile the router that already produced the quote calls `fetchAllAlcorPools()` (`/swap/pools`) — a single bulk endpoint that returns every pool with the exact same `{id, fee, tokenA, tokenB}` shape and caches the result in memory for 20s. So the data the panel needs is already in the browser the moment the quote resolves; we're just re-fetching each pool one-by-one for no reason.
+1. Embed route visual metadata in the SDK quote
+   - Extend each SDK split with the token path and pool fees already available while `computeAlcorTrade` builds the winning trade.
+   - This avoids needing a second pool lookup just to display token symbols/fees.
 
-Resetting the amount "fixes" it only because by then those N per-pool requests have finally completed and populated the react-query cache.
+2. Render embedded metadata first
+   - Update `MultiRoutePanel` to use split-provided token path + fees immediately when present.
+   - Keep the existing pool lookup only as a fallback for HTTP/API routes that do not include embedded visual metadata.
 
-## Fix (visual-only, no router/hook changes)
+3. Remove the “blank until all pools load” failure mode
+   - Only show the skeleton when a route truly lacks embedded metadata and the fallback pool details are still loading.
+   - This prevents cooldown/rate-limit state from blocking the visual when the actual quote already contains everything needed.
 
-### `src/hooks/useAlcorPools.ts`
-Replace the `useQueries` fan-out with a single `useQuery`:
+4. Keep swap math and execution untouched
+   - Do not change quote selection, output amounts, SDK routing, memos, slippage, transaction construction, retries, or cooldown logic.
+   - This is strictly a display-data fix for the multiroute box.
 
-- Query key: `["alcor-all-pools"]`.
-- Query fn: `fetchAllAlcorPools(signal)` (already exported from `src/lib/alcorRouter.ts`).
-- `staleTime: 20_000` (matches the in-memory cache TTL), `gcTime: 5 * 60_000`, `retry: 2`, `placeholderData: (prev) => prev`.
-- Keep `enabled: !isAlcorCoolingDown()` so we don't add pressure during a 429 storm, but since `fetchAllAlcorPools` is already called by the router on every quote, its promise is typically resolved by the time the panel mounts — react-query will hydrate synchronously from the shared cache.
-- Build the returned `pools` map by filtering the bulk list down to the requested ids. `RawAlcorPool` and `AlcorPool` are structurally identical for the fields the panel reads (`id`, `fee`, `tokenA/tokenB.{id,symbol,contract,decimals}`), so no shape conversion is needed beyond a light cast.
-- Recompute `isReady` as `uniqueIds.length > 0 && uniqueIds.every((id) => map.has(id))`, `hasError` from the single query, `isLoading` from `query.isLoading`.
-
-### No other files change
-`MultiRoutePanel.tsx` already gates rendering on `isReady`, so once the hook returns the fully populated map on the first pass the visual paints immediately with correct symbols and fees. `alcorRouter.ts`, `useSwapRoute.ts`, and the swap widget are untouched.
-
-## Why this is safe
-
-- The bulk endpoint is the same one the router already hits; we're piggy-backing on a request that has to happen anyway. No extra load on Alcor.
-- The router's `poolsCache` (in `alcorRouter.ts`) and react-query's cache are independent, but both hydrate from the same fetch — react-query's version just gives the UI a reactive handle on it.
-- No changes to swap math, retry logic, cooldowns, or the actual on-chain trade.
+Validation:
+- Verify TypeScript passes.
+- Use the preview to hard refresh, request the first quote, and confirm the multiroute row shows token icons/fees immediately instead of the blank skeleton.
