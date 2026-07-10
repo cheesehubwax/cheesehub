@@ -97,8 +97,8 @@ const ticksInflight = new Map<number, Promise<RawAlcorTick[]>>();
 const TICKS_TTL_MS = 5 * 60_000;
 // Negative cache for failed tick fetches so we don't hammer the same pool.
 const ticksFailCache = new Map<number, number>();
-const TICKS_FAIL_TTL_MS = 8_000;
-const TICK_CONCURRENCY = 10;
+const TICKS_FAIL_TTL_MS = 60_000;
+const TICK_CONCURRENCY = 2;
 
 export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Promise<RawAlcorTick[]> {
   const cached = ticksCache.get(poolId);
@@ -291,7 +291,7 @@ function formatSdkDiagnostics(diag?: SwapRoute["quoteDiagnostics"]): string {
 
 // ----- Pool construction -----
 
-// ----- Router entry: prefer WASM (matches Alcor's UI) then fall back to JS -----
+// ----- Router entry: browser-safe JS split router -----
 
 async function runBestTradeWithSplit(
   routes: any[],
@@ -302,22 +302,10 @@ async function runBestTradeWithSplit(
   swapConfig: { minSplits: number; maxSplits: number }
 ): Promise<any> {
   const T = Trade as any;
-  if (typeof T.bestTradeWithSplitWASM === "function") {
-    try {
-      const wasmTrade = await T.bestTradeWithSplitWASM(
-        routes,
-        currencyAmount,
-        percents,
-        sdkTradeType,
-        sdkPools,
-        swapConfig
-      );
-      if (wasmTrade) return wasmTrade;
-      logger.warn("[alcor-router] WASM router returned null — falling back to JS");
-    } catch (e) {
-      logger.warn("[alcor-router] WASM router threw — falling back to JS", e);
-    }
-  }
+  // The SDK's WASM helper currently tries to use CommonJS `require()` in the
+  // browser bundle, which fails under Vite and creates noisy first-quote errors.
+  // Use the SDK's JS implementation directly; route math/execution inputs are
+  // otherwise unchanged.
   return T.bestTradeWithSplit(routes, currencyAmount, percents, sdkTradeType, swapConfig);
 }
 
@@ -405,6 +393,7 @@ export async function computeShadowQuote(args: ShadowQuoteArgs): Promise<ShadowQ
   // Fetch ticks with bounded concurrency so we don't hammer Alcor into 429s.
   const tickResults = await mapWithConcurrency(relevant, TICK_CONCURRENCY, async (p) => {
     try {
+      if (isAlcorCoolingDown()) return { p, ticks: [] as RawAlcorTick[] };
       return { p, ticks: await fetchPoolTicks(p.id, signal) };
     } catch (e) {
       logger.warn(`shadow: tick fetch failed for pool ${p.id}`, e);
@@ -526,6 +515,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   let rateLimitedTickFailures = 0;
   const tickResults = await mapWithConcurrency(relevant, TICK_CONCURRENCY, async (p) => {
     try {
+      if (isAlcorCoolingDown()) return { p, ticks: [] as RawAlcorTick[] };
       return { p, ticks: await fetchPoolTicks(p.id, signal) };
     } catch (e) {
       if ((e as any)?.name === "AbortError") throw e;
