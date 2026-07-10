@@ -516,6 +516,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   const tickResults = await mapWithConcurrency(relevant, TICK_CONCURRENCY, async (p) => {
     try {
       if (isAlcorCoolingDown()) return { p, ticks: [] as RawAlcorTick[] };
+      if (rateLimitedTickFailures >= 2) return { p, ticks: [] as RawAlcorTick[] };
       return { p, ticks: await fetchPoolTicks(p.id, signal) };
     } catch (e) {
       if ((e as any)?.name === "AbortError") throw e;
@@ -545,7 +546,13 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   const inTok = new Token(tokenIn.contract, tokenIn.precision, tokenIn.ticker);
   const outTok = new Token(tokenOut.contract, tokenOut.precision, tokenOut.ticker);
 
-  const routes = computeAllRoutes(inTok, outTok, sdkPools, maxHops);
+  let routes: any[] = [];
+  try {
+    routes = computeAllRoutes(inTok, outTok, sdkPools, maxHops);
+  } catch (e) {
+    logger.warn("[alcor-router] computeAllRoutes failed; skipping SDK quote", e);
+    return null;
+  }
   if (routes.length === 0) {
     return null;
   }
@@ -563,14 +570,20 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   );
 
   const sdkTradeType = tradeType === "EXACT_INPUT" ? TradeType.EXACT_INPUT : TradeType.EXACT_OUTPUT;
-  const trade = await runBestTradeWithSplit(
-    routes,
-    currencyAmount,
-    percents,
-    sdkTradeType,
-    sdkPools,
-    { minSplits: 1, maxSplits: 10 }
-  );
+  let trade: any = null;
+  try {
+    trade = await runBestTradeWithSplit(
+      routes,
+      currencyAmount,
+      percents,
+      sdkTradeType,
+      sdkPools,
+      { minSplits: 1, maxSplits: 10 }
+    );
+  } catch (e) {
+    logger.warn("[alcor-router] bestTradeWithSplit failed; falling back to HTTP route", e);
+    return null;
+  }
 
   const diagnostics: SwapRoute["quoteDiagnostics"] = {
     relevantPools: relevant.length,
@@ -666,6 +679,6 @@ if (typeof window !== "undefined") {
   setTimeout(() => {
     if (isAlcorCoolingDown()) return;
     fetchAllAlcorPools().catch(() => {});
-  }, 0);
+  }, 1500);
 }
 
