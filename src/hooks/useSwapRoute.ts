@@ -122,6 +122,22 @@ export function useSwapRoute(
         logger.warn("[alcor-router] SDK failed definitively; HTTP fallback allowed", sdkError);
       }
 
+      // If the SDK produced a trade but some ticks failed, its splits are
+      // known to be suboptimal (partial pool set). Retry so the tick cache
+      // warms and the next attempt returns the full routing — regardless of
+      // whether this partial result happens to beat the 100% HTTP route.
+      if (sdk && sdk.quoteComplete === false) {
+        const diag = sdk.quoteDiagnostics;
+        const retryError = new Error(
+          `Failed to fetch complete split route — retrying (${diag?.routesConsidered ?? "?"} routes, ${diag?.poolsBuilt ?? "?"}/${diag?.relevantPools ?? "?"} pools, tickFailures=${diag?.tickFailures ?? 0})`,
+        );
+        logger.warn(
+          "[alcor-router] SDK route incomplete; retrying regardless of HTTP comparison",
+          retryError,
+        );
+        throw retryError;
+      }
+
       // Prefer the SDK whenever its real multi-split improves the quote at all.
       // Alcor's own UI can pick splits whose edge is user-visible but small, so
       // avoid a threshold that keeps a worse 100% route on screen.
@@ -148,15 +164,6 @@ export function useSwapRoute(
           `[alcor-router] SDK won (${sdk!.swaps.length} splits, +${(delta * 100).toFixed(4)}%, ${sdk!.quoteDiagnostics?.routesConsidered ?? "?"} routes, ${sdk!.quoteDiagnostics?.poolsBuilt ?? "?"}/${sdk!.quoteDiagnostics?.relevantPools ?? "?"} pools, ${sdk!.quoteDiagnostics?.tookMs ?? "?"}ms)`,
         );
         return { ...sdk!, quoteComplete: true };
-      }
-
-      if (sdk && sdk.quoteComplete === false) {
-        const diag = sdk.quoteDiagnostics;
-        const retryError = new Error(
-          `Failed to fetch complete split route — retrying (${diag?.routesConsidered ?? "?"} routes, ${diag?.poolsBuilt ?? "?"}/${diag?.relevantPools ?? "?"} pools, tickFailures=${diag?.tickFailures ?? 0})`,
-        );
-        logger.warn("[alcor-router] SDK route incomplete; retrying before accepting HTTP fallback", retryError);
-        throw retryError;
       }
 
       if (httpValid) {

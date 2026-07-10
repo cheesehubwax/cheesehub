@@ -1,39 +1,61 @@
-Gate the SDK split router's `distributionPercent` on the USD size of the trade so small trades use a coarser grid (faster, still-good quote) and larger trades keep the fine 1% grid.
+## Root cause
 
-## Rule
+On the very first quote for a fresh pair, `computeAlcorTrade` fans out tick requests for every relevant pool in parallel. Some of those tick fetches fail on the first attempt (429 rate limits, negative-cache TTL, transient network). The SDK still produces *a* trade from whichever pools did build, and sets `quoteComplete: false` + `tickFailures > 0` on the result.
 
+In `useSwapRoute.ts`, the "retry until complete" gate is only reached when SDK **loses** to HTTP:
+
+```ts
+if (pickSdk()) {
+  // ...
+  return { ...sdk!, quoteComplete: true };   // ← forced true, even if tickFailures>0
+}
+
+if (sdk && sdk.quoteComplete === false) {    // ← only checked in the losing branch
+  throw retryError;
+}
 ```
-inputUsd = |amount| * (usd price of the token being spent)
-distributionPercent = inputUsd < 30 ? 5 : 1
+
+So when the incomplete SDK trade happens to beat HTTP (common — even a partial split usually beats the 100% HTTP route), we return it immediately and stamp `quoteComplete: true`. The widget renders the coarse/wrong multiroute. ~15–30s later react-query goes stale, the tick cache is now warm from the first attempt, the retry produces a *complete* split, and the widget "self-heals" to the proper routing.
+
+## Fix
+
+Treat an incomplete SDK trade as retry-worthy regardless of whether it beats HTTP. Only accept the SDK immediately when its `tickFailures === 0` (i.e. `quoteComplete !== false`).
+
+### Change in `src/hooks/useSwapRoute.ts`
+
+Reorder the decision so completeness is checked *before* the pickSdk short-circuit:
+
+```ts
+// If the SDK produced a trade but some ticks failed, its splits are known
+// to be suboptimal — retry so the cache warms and we get the full routing.
+if (sdk && sdk.quoteComplete === false) {
+  const diag = sdk.quoteDiagnostics;
+  const retryError = new Error(
+    `Failed to fetch complete split route — retrying (${diag?.routesConsidered ?? "?"} routes, ${diag?.poolsBuilt ?? "?"}/${diag?.relevantPools ?? "?"} pools, tickFailures=${diag?.tickFailures ?? 0})`,
+  );
+  logger.warn("[alcor-router] SDK route incomplete; retrying regardless of HTTP comparison", retryError);
+  throw retryError;
+}
+
+if (pickSdk()) { ... return SDK ... }
 ```
 
-- For `EXACT_INPUT`, "the token being spent" is `tokenIn`.
-- For `EXACT_OUTPUT`, we don't know the input amount yet, so use `tokenOut.usd_price * amount` (output-value-based) — same $30 USD boundary applied to the trade's economic size.
-- If the relevant USD price is missing/0, fall back to `1` (current, safest behavior).
+The existing transient-retry machinery (`MAX_TRANSIENT_RETRIES=3`, exponential backoff 300ms→4s cap) handles this — `isTransientError` already matches "Failed to fetch complete split route" via the "Failed to fetch" substring.
 
-## Where the switch lives
+### Why this is safe
 
-The knob is already threaded end-to-end. It just needs to be computed once and passed in.
-
-- `src/hooks/useSwapRoute.ts` — compute `distributionPercent` from the amount and token prices, pass it to `computeAlcorTrade`.
-- `src/lib/alcorRouter.ts` — `computeAlcorTrade` already accepts `distributionPercent` and forwards it into the percent grid; no signature change needed.
-- No change to `swapApi.ts` (HTTP endpoint has its own grid we don't control).
-
-## Logging
-
-Include the chosen `distributionPercent` and computed `inputUsd` in the existing SDK quote log line so we can verify in the console which grid was applied to a given trade. This piggybacks on the observability line already produced by `computeAlcorTrade`.
+- If `tickFailures === 0` on the first attempt (common when the pool list is small or cache is warm), nothing changes.
+- If retries exhaust (`MAX_TRANSIENT_RETRIES`), the existing `exhaustedTransient` path already kicks in: the button becomes "Route unavailable — retry" and the self-heal timer schedules another attempt in 8s. In practice the tick cache warms up in one or two retries.
+- HTTP fallback is still available: after we exhaust SDK retries, the query has failed transiently — but the same flow that shows the retry button will re-run and the retry will find a healthy SDK trade (or fall through to HTTP naturally the next time SDK produces `quoteComplete: true` but worse than HTTP).
 
 ## Non-goals
 
-- No change to `maxHops`, pool cap, or `minSplits`/`maxSplits`.
-- No graduated tiers beyond the binary $30 boundary.
-- No change to the HTTP fallback path.
+- No change to the $30 grid gating.
+- No change to `maxHops`, pool cap, `minSplits`/`maxSplits`.
+- No change to `alcorRouter.ts`; this is a routing-decision fix in the hook.
 
 ## Validation
 
-After the change:
-1. Quote a ~$5 WAX→CHEESE swap → console should show `distributionPercent=5`.
-2. Quote a ~$100 WAX→CHEESE swap → console should show `distributionPercent=1`.
-3. Quote a token with no `usd_price` → console should show `distributionPercent=1`.
-
-Behavior parity check: the small-trade case should still return a valid multi-split quote and remain competitive with the HTTP router; if not, we revisit the threshold.
+1. Hard-reload the widget, quote a fresh pair (e.g. LSW → CHEESE with 1000 LSW). First rendered quote should already show the correct multi-split (not the 80/10/5/5 placeholder-looking split).
+2. Console should show one `[alcor-router] SDK route incomplete; retrying …` warning followed by `[alcor-router] SDK won …` — no user-visible flicker beyond the normal loading spinner.
+3. Second and subsequent quotes of the same pair should still be instant (tick cache warm, no retries triggered).
