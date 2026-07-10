@@ -131,15 +131,15 @@ export function useSwapRoute(
         logger.warn("[alcor-router] SDK failed definitively; HTTP fallback allowed", sdkError);
       }
 
-      // Prefer the SDK whenever its real multi-split improves the quote at all.
+      // Prefer the SDK whenever its real route improves the quote at all.
       // Alcor's own UI can pick splits whose edge is user-visible but small, so
       // avoid a threshold that keeps a worse 100% route on screen.
       const exactIn = debouncedTradeType === "EXACT_INPUT";
 
       const pickSdk = (): boolean => {
         if (!sdkValid) return false;
-        if (sdk!.swaps.length < 2) return false;
         if (!httpValid) return true;
+
         if (exactIn) {
           // Larger output wins.
           return sdk!.output > http!.output;
