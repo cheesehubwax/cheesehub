@@ -7,6 +7,18 @@ import { logger } from "@/lib/logger";
 export type TradeType = "EXACT_INPUT" | "EXACT_OUTPUT";
 
 const MAX_TRANSIENT_RETRIES = 3;
+const HTTP_GRACE_MS = 1_500;
+
+function delay(ms: number): Promise<"__timeout__"> {
+  return new Promise((resolve) => setTimeout(() => resolve("__timeout__"), ms));
+}
+
+async function raceWithGrace<T>(p: Promise<T>, ms: number): Promise<{ ready: true; value: T } | { ready: false }> {
+  const result = await Promise.race([p.then((v) => ({ v }), (e) => ({ e })), delay(ms)]);
+  if (result === "__timeout__") return { ready: false };
+  if ("e" in result) throw result.e;
+  return { ready: true, value: result.v };
+}
 
 function isTransientError(err: unknown): boolean {
   if (err instanceof TypeError) return true;
@@ -84,7 +96,38 @@ export function useSwapRoute(
         signal,
       });
 
-      const [httpSettled, sdkSettled] = await Promise.allSettled([httpPromise, sdkPromise]);
+      // Race the HTTP result against a short grace window. If HTTP arrives
+      // with a valid quote quickly, only give the SDK a matching grace to
+      // catch up before we ignore it for this query — the JS split solver
+      // can otherwise run for tens of seconds and starve the UI.
+      let httpSettled: PromiseSettledResult<SwapRoute | null>;
+      let sdkSettled: PromiseSettledResult<SwapRoute | null>;
+
+      // Convert both into always-settling promises so we can inspect either
+      // after any grace expires without swallowing abort errors.
+      const wrap = <T>(p: Promise<T>): Promise<PromiseSettledResult<T>> =>
+        p.then(
+          (value) => ({ status: "fulfilled", value }) as PromiseSettledResult<T>,
+          (reason) => ({ status: "rejected", reason }) as PromiseSettledResult<T>,
+        );
+      const httpWrapped = wrap(httpPromise);
+      const sdkWrapped = wrap(sdkPromise);
+
+      // Wait for HTTP up to the grace window.
+      const httpEarly = await raceWithGrace(httpWrapped, HTTP_GRACE_MS);
+      if (httpEarly.ready && httpEarly.value.status === "fulfilled" && isValidHttpRoute(httpEarly.value.value)) {
+        // Give SDK a matching grace to beat HTTP; if it doesn't, treat as null.
+        const sdkEarly = await raceWithGrace(sdkWrapped, HTTP_GRACE_MS);
+        httpSettled = httpEarly.value;
+        sdkSettled = sdkEarly.ready
+          ? sdkEarly.value
+          : { status: "fulfilled", value: null };
+      } else {
+        // HTTP not ready or invalid; wait for both (SDK has its own 8s budget).
+        const [h, s] = await Promise.all([httpWrapped, sdkWrapped]);
+        httpSettled = h;
+        sdkSettled = s;
+      }
 
       // Abort propagation
       for (const s of [httpSettled, sdkSettled]) {
