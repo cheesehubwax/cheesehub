@@ -40,6 +40,16 @@ export interface SwapRoute {
   executionPrice: { numerator: string; denominator: string };
   input?: number;
   swaps: SwapSplit[];
+  quoteSource?: "http" | "sdk";
+  quoteComplete?: boolean;
+  quoteDiagnostics?: {
+    relevantPools?: number;
+    poolsBuilt?: number;
+    routesConsidered?: number;
+    tickFailures?: number;
+    rateLimitedTickFailures?: number;
+    tookMs?: number;
+  };
 }
 
 export interface AlcorPoolToken {
@@ -176,6 +186,8 @@ export async function fetchSwapRoute(
     executionPrice: data.executionPrice,
     input: data.input ? parseFloat(data.input) : undefined,
     swaps,
+    quoteSource: "http",
+    quoteComplete: true,
   };
 }
 
