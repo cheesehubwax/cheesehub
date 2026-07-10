@@ -74,13 +74,22 @@ export function useSwapRoute(
         debouncedTradeType,
       );
 
-      // Coarser grid for small trades: <$30 uses 5% steps, ≥$30 uses 1%.
-      // Falls back to 1% when USD price is unavailable.
+      // Coarser grid, bounded so the SDK's pure-JS bestTradeWithSplit
+      // (the WASM router is Node-only and never loads in the browser)
+      // stays responsive even on high-connectivity tokens like USDC.
+      //   inputUsd < $30      → 10% steps
+      //   $30–$300            → 5% steps
+      //   ≥ $300              → 2% steps
+      //   usd_price unknown   → 5% (safe default)
       const priceToken = debouncedTradeType === "EXACT_INPUT" ? tokenIn! : tokenOut!;
       const usdPrice = priceToken.usd_price ?? 0;
       const parsedAmount = parseFloat(debouncedAmount) || 0;
       const inputUsd = usdPrice > 0 ? parsedAmount * usdPrice : null;
-      const distributionPercent = inputUsd !== null && inputUsd < 30 ? 5 : 1;
+      let distributionPercent: number;
+      if (inputUsd === null) distributionPercent = 5;
+      else if (inputUsd < 30) distributionPercent = 10;
+      else if (inputUsd < 300) distributionPercent = 5;
+      else distributionPercent = 2;
 
       const sdkPromise = computeAlcorTrade({
         tokenIn: tokenIn!,
