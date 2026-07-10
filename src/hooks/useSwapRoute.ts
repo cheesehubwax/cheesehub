@@ -118,9 +118,41 @@ export function useSwapRoute(
       // avoid a threshold that keeps a worse 100% route on screen.
       const exactIn = debouncedTradeType === "EXACT_INPUT";
 
+      // Extrapolate what each leg would produce (EXACT_INPUT) or require
+      // (EXACT_OUTPUT) if it were routed at 100% — linear approximation, but
+      // good enough to detect the "greedy split landed worse than one of its
+      // own legs" pathology. If the split total loses to a single leg, the
+      // split is objectively worse and we fall back to HTTP.
+      const splitLosesToSingleLeg = (r: SwapRoute): boolean => {
+        if (!r.swaps.length) return false;
+        if (exactIn) {
+          const best = r.swaps.reduce((m, s) => {
+            const pct = s.percent > 0 ? s.percent / 100 : 0;
+            if (!pct) return m;
+            const scaled = parseFloat(s.output as unknown as string) / pct;
+            return scaled > m ? scaled : m;
+          }, 0);
+          return best > r.output * 1.0001; // require a meaningful loss
+        }
+        if (r.input == null) return false;
+        const best = r.swaps.reduce((m, s) => {
+          const pct = s.percent > 0 ? s.percent / 100 : 0;
+          if (!pct) return m === Infinity ? m : m;
+          const scaled = parseFloat(s.input as unknown as string) / pct;
+          return scaled < m ? scaled : m;
+        }, Infinity);
+        return best < (r.input as number) / 1.0001;
+      };
+
       const pickSdk = (): boolean => {
         if (!sdkValid) return false;
         if (sdk!.swaps.length < 2) return false;
+        if (splitLosesToSingleLeg(sdk!)) {
+          logger.warn(
+            `[alcor-router] SDK split rejected: worse than its own best single leg (splits=${sdk!.swaps.length}, out=${sdk!.output})`,
+          );
+          return false;
+        }
         if (!httpValid) return true;
         if (exactIn) {
           // Larger output wins.

@@ -190,7 +190,7 @@ function selectRelevantPools(
   inKey: string,
   outKey: string,
   maxHops: number,
-  cap = 56
+  cap = 96
 ): RawAlcorPool[] {
   const keyOf = (t: RawAlcorPool["tokenA"]) => tokenKey(t.contract, t.symbol);
   const active = pools.filter((p) => p.active);
@@ -281,7 +281,22 @@ function selectRelevantPools(
     const lb = BigInt(b.liquidity || "0");
     return lb > la ? 1 : lb < la ? -1 : 0;
   });
-  return ranked.slice(0, cap);
+
+  // Endpoint-touching pools (any active pool with tokenIn or tokenOut on
+  // either side) must never be dropped: every final leg of any split routes
+  // through one of them, so trimming them here directly costs output. Include
+  // them unconditionally, then fill the remaining slots from the ranked list
+  // up to `cap`.
+  const touchesEndpoint = (p: RawAlcorPool) => {
+    const a = keyOf(p.tokenA);
+    const b = keyOf(p.tokenB);
+    return a === inKey || b === inKey || a === outKey || b === outKey;
+  };
+  const endpointPools = active.filter(touchesEndpoint);
+  const endpointIds = new Set(endpointPools.map((p) => p.id));
+  const filler = ranked.filter((p) => !endpointIds.has(p.id));
+  const remaining = Math.max(0, cap - endpointPools.length);
+  return [...endpointPools, ...filler.slice(0, remaining)];
 }
 
 function formatSdkDiagnostics(diag?: SwapRoute["quoteDiagnostics"]): string {
@@ -570,9 +585,6 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     return null;
   }
 
-  const percents: number[] = [];
-  for (let p = distributionPercent; p <= 100; p += distributionPercent) percents.push(p);
-
   const rawAmount = toRawAmount(
     amount,
     tradeType === "EXACT_INPUT" ? tokenIn.precision : tokenOut.precision
@@ -583,14 +595,67 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   );
 
   const sdkTradeType = tradeType === "EXACT_INPUT" ? TradeType.EXACT_INPUT : TradeType.EXACT_OUTPUT;
-  const trade = await runBestTradeWithSplit(
-    routes,
-    currencyAmount,
-    percents,
-    sdkTradeType,
-    sdkPools,
-    { minSplits: 1, maxSplits: 10 }
+
+  // Run the split optimizer at both a fine (1%) and coarse (5%) grid and keep
+  // whichever trade is objectively better. `bestTradeWithSplit` is a greedy
+  // heuristic; finer granularity is usually better but can occasionally land
+  // in a worse local optimum, so we defend against it cheaply here.
+  const buildPercents = (step: number) => {
+    const out: number[] = [];
+    for (let p = step; p <= 100; p += step) out.push(p);
+    return out;
+  };
+  const fineStep = distributionPercent;
+  const coarseStep = 5;
+  const gridConfigs: { step: number; maxSplits: number }[] = [
+    { step: fineStep, maxSplits: 10 },
+  ];
+  if (coarseStep !== fineStep) gridConfigs.push({ step: coarseStep, maxSplits: 6 });
+
+  const gridTrades = await Promise.all(
+    gridConfigs.map((cfg) =>
+      runBestTradeWithSplit(
+        routes,
+        currencyAmount,
+        buildPercents(cfg.step),
+        sdkTradeType,
+        sdkPools,
+        { minSplits: 1, maxSplits: cfg.maxSplits }
+      ).catch((e) => {
+        logger.warn(`[alcor-router] split search failed at step=${cfg.step}`, e);
+        return null;
+      })
+    )
   );
+
+  const exactInEval = tradeType === "EXACT_INPUT";
+  let trade: any = null;
+  let bestGrid: { step: number; maxSplits: number } | null = null;
+  gridTrades.forEach((t, i) => {
+    if (!t) return;
+    if (!trade) {
+      trade = t;
+      bestGrid = gridConfigs[i];
+      return;
+    }
+    const cur = exactInEval
+      ? parseFloat(trade.outputAmount.toFixed())
+      : parseFloat(trade.inputAmount.toFixed());
+    const cand = exactInEval
+      ? parseFloat(t.outputAmount.toFixed())
+      : parseFloat(t.inputAmount.toFixed());
+    const better = exactInEval ? cand > cur : cand < cur;
+    if (better) {
+      trade = t;
+      bestGrid = gridConfigs[i];
+    }
+  });
+  const gridOutputs = gridTrades.map((t, i) => ({
+    step: gridConfigs[i].step,
+    output: t ? parseFloat(t.outputAmount.toFixed()) : null,
+    input: t ? parseFloat(t.inputAmount.toFixed()) : null,
+    splits: t ? t.swaps.length : 0,
+  }));
 
   const diagnostics: SwapRoute["quoteDiagnostics"] = {
     relevantPools: relevant.length,
@@ -665,7 +730,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   } as SwapRoute;
 
   logger.info(
-    `[alcor-router] SDK quote produced ${splits.length} split(s)${formatSdkDiagnostics(diagnostics)}`,
+    `[alcor-router] SDK quote produced ${splits.length} split(s) winner=step${bestGrid?.step ?? "?"} grids=${JSON.stringify(gridOutputs)}${formatSdkDiagnostics(diagnostics)}`,
   );
 
   return result;
