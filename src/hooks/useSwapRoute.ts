@@ -13,6 +13,8 @@ function isTransientError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : "";
   return (
     msg.includes("Rate limited") ||
+    msg.includes("complete split route") ||
+    msg.includes("ticks recently failed") ||
     msg.includes("Failed to fetch") ||
     msg.includes("NetworkError") ||
     msg.includes("Load failed") ||
@@ -203,6 +205,9 @@ export function useSwapRoute(
     retryDelay: (attemptIndex, err) => {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("Rate limited")) return Math.min(5000 * 2 ** attemptIndex, 30000);
+      if (msg.includes("complete split route") || msg.includes("ticks recently failed")) {
+        return Math.min(1200 * 2 ** attemptIndex, 6000);
+      }
       // 500ms, 1s, 2s, 3s, 4s, 4s — ~14s total budget, longer than Alcor's
       // typical 429 recovery and the 1.5s tick negative-cache window so an
       // incomplete SDK trade gets a real refetch instead of surfacing.
