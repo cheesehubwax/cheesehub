@@ -150,15 +150,6 @@ export function useSwapRoute(
         return { ...sdk!, quoteComplete: true };
       }
 
-      if (sdk && sdk.quoteComplete === false) {
-        const diag = sdk.quoteDiagnostics;
-        const retryError = new Error(
-          `Failed to fetch complete split route — retrying (${diag?.routesConsidered ?? "?"} routes, ${diag?.poolsBuilt ?? "?"}/${diag?.relevantPools ?? "?"} pools, tickFailures=${diag?.tickFailures ?? 0})`,
-        );
-        logger.warn("[alcor-router] SDK route incomplete; retrying before accepting HTTP fallback", retryError);
-        throw retryError;
-      }
-
       if (httpValid) {
         if (sdkValid) {
           logger.info(
@@ -185,7 +176,6 @@ export function useSwapRoute(
     retryDelay: (attemptIndex, err) => {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("Rate limited")) return Math.min(5000 * 2 ** attemptIndex, 30000);
-      // 300ms, 600ms, 1.2s, cap 4s — fast recovery on flaky networks.
       return Math.min(300 * 2 ** attemptIndex, 4000);
     },
   });
