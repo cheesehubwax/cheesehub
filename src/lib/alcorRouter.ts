@@ -510,6 +510,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     try {
       return { p, ticks: await fetchPoolTicks(p.id, signal) };
     } catch (e) {
+      if ((e as any)?.name === "AbortError") throw e;
       tickFailures += 1;
       if (isRateLimitError(e)) rateLimitedTickFailures += 1;
       logger.warn(`alcorTrade: tick fetch failed for pool ${p.id}`, e);
@@ -572,7 +573,6 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     sdkPools,
     { minSplits: 1, maxSplits: 10 }
   );
-  if (!trade) return null;
 
   const diagnostics: SwapRoute["quoteDiagnostics"] = {
     relevantPools: relevant.length,
@@ -582,6 +582,11 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     rateLimitedTickFailures,
     tookMs: Math.round(performance.now() - started),
   };
+
+  if (!trade) {
+    if (tickFailures > 0) throw incompleteSdkRouteError(diagnostics);
+    return null;
+  }
 
   // Slippage as SDK Percent: e.g. 1% => Percent(100, 10_000).
   const bps = Math.round(slippage * 100); // 1% -> 100bps
