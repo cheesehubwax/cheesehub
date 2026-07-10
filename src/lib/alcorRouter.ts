@@ -389,7 +389,7 @@ export async function computeShadowQuote(args: ShadowQuoteArgs): Promise<ShadowQ
     amount,
     tradeType,
     maxHops = 3,
-    distributionPercent = 2,
+    distributionPercent = 1,
     signal,
   } = args;
 
@@ -509,7 +509,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     receiver,
     tradeType,
     maxHops = 3,
-    distributionPercent = 2,
+    distributionPercent = 1,
     signal,
   } = args;
 
