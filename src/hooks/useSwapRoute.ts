@@ -111,15 +111,16 @@ export function useSwapRoute(
       const sdkValid = isValidSdkRoute(sdk);
 
       const sdkError = sdkSettled.status === "rejected" ? sdkSettled.reason : null;
-      const sdkTransient = sdkError ? isTransientError(sdkError) : false;
-
-      if (sdkError && sdkTransient) {
-        logger.warn("[alcor-router] SDK quote not final; retrying before accepting HTTP fallback", sdkError);
-        throw sdkError;
-      }
-
+      // Only retry the whole quote when the SDK path fails AND the HTTP path
+      // has no valid answer either. Otherwise the HTTP fallback is fine and
+      // retrying just burns Alcor rate limit budget.
       if (sdkError) {
-        logger.warn("[alcor-router] SDK failed definitively; HTTP fallback allowed", sdkError);
+        const sdkTransient = isTransientError(sdkError);
+        if (sdkTransient && !isValidHttpRoute(http)) {
+          logger.warn("[alcor-router] SDK transient failure and no HTTP fallback; retrying", sdkError);
+          throw sdkError;
+        }
+        logger.warn("[alcor-router] SDK failed; using HTTP fallback", sdkError);
       }
 
       // Prefer the SDK whenever its real multi-split improves the quote at all.
