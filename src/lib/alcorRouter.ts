@@ -21,35 +21,6 @@ import { logger } from "./logger";
 
 const ALCOR_API = "https://wax.alcor.exchange/api/v2";
 
-// SDK compute budgets. If we exceed these we bail out and let HTTP win.
-const SDK_BUDGET_MS = 8_000;
-const SPLIT_CALL_TIMEOUT_MS = 3_500;
-
-function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
-  return new Promise<T>((resolve) => {
-    let done = false;
-    const timer = setTimeout(() => {
-      if (done) return;
-      done = true;
-      resolve(fallback);
-    }, ms);
-    p.then(
-      (v) => {
-        if (done) return;
-        done = true;
-        clearTimeout(timer);
-        resolve(v);
-      },
-      () => {
-        if (done) return;
-        done = true;
-        clearTimeout(timer);
-        resolve(fallback);
-      }
-    );
-  });
-}
-
 // ----- Global Alcor cooldown -----
 // After any 429 anywhere in the app, back off all NON-essential Alcor fanout
 // (SDK tick fetches, per-pool detail fetches) for a while. The single HTTP
@@ -125,146 +96,32 @@ const ticksCache = new Map<number, { at: number; data: RawAlcorTick[] }>();
 const ticksInflight = new Map<number, Promise<RawAlcorTick[]>>();
 const TICKS_TTL_MS = 5 * 60_000;
 // Negative cache for failed tick fetches so we don't hammer the same pool.
-const ticksFailCache = new Map<number, { at: number; rateLimited: boolean }>();
-const TICKS_FAIL_TTL_MS = 12_000;
-const TICKS_RATE_LIMIT_FAIL_TTL_MS = 60_000;
-
-// Alcor's tick endpoint rate-limits hard when the browser fans out dozens of
-// /ticks requests. Keep one global queue so overlapping quote attempts share a
-// slow lane instead of stampeding the API.
-const TICK_QUEUE_CONCURRENCY = 2;
-const TICK_QUEUE_SPACING_MS = 90;
-const TICK_RETRY_DELAYS_MS = [900, 2_200];
-type TickQueueJob = {
-  run: () => Promise<void>;
-  signal?: AbortSignal;
-};
-const tickQueue: TickQueueJob[] = [];
-let tickQueueActive = 0;
-let tickQueueTimer: ReturnType<typeof setTimeout> | null = null;
-let tickQueueLastStart = 0;
-
-function makeAbortError(): DOMException {
-  return new DOMException("Aborted", "AbortError");
-}
-
-function delay(ms: number, signal?: AbortSignal): Promise<void> {
-  if (signal?.aborted) return Promise.reject(makeAbortError());
-  return new Promise((resolve, reject) => {
-    const cleanup = () => signal?.removeEventListener("abort", onAbort);
-    const timer = setTimeout(() => {
-      cleanup();
-      resolve();
-    }, ms);
-    const onAbort = () => {
-      clearTimeout(timer);
-      cleanup();
-      reject(makeAbortError());
-    };
-    signal?.addEventListener("abort", onAbort, { once: true });
-  });
-}
-
-function pumpTickQueue() {
-  if (tickQueueTimer) {
-    clearTimeout(tickQueueTimer);
-    tickQueueTimer = null;
-  }
-  while (tickQueueActive < TICK_QUEUE_CONCURRENCY && tickQueue.length > 0) {
-    const wait = Math.max(0, TICK_QUEUE_SPACING_MS - (Date.now() - tickQueueLastStart));
-    if (wait > 0) {
-      tickQueueTimer = setTimeout(pumpTickQueue, wait);
-      return;
-    }
-    const job = tickQueue.shift()!;
-    if (job.signal?.aborted) continue;
-    tickQueueActive += 1;
-    tickQueueLastStart = Date.now();
-    job.run().finally(() => {
-      tickQueueActive -= 1;
-      pumpTickQueue();
-    });
-  }
-}
-
-function enqueueTickFetch<T>(task: () => Promise<T>, signal?: AbortSignal): Promise<T> {
-  if (signal?.aborted) return Promise.reject(makeAbortError());
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const job: TickQueueJob = {
-      signal,
-      run: async () => {
-        if (settled) return;
-        signal?.removeEventListener("abort", onAbort);
-        if (signal?.aborted) {
-          settled = true;
-          reject(makeAbortError());
-          return;
-        }
-        try {
-          const result = await task();
-          settled = true;
-          resolve(result);
-        } catch (e) {
-          settled = true;
-          reject(e);
-        }
-      },
-    };
-    const onAbort = () => {
-      if (settled) return;
-      const idx = tickQueue.indexOf(job);
-      if (idx >= 0) tickQueue.splice(idx, 1);
-      settled = true;
-      reject(makeAbortError());
-    };
-    signal?.addEventListener("abort", onAbort, { once: true });
-    tickQueue.push(job);
-    pumpTickQueue();
-  });
-}
+const ticksFailCache = new Map<number, number>();
+const TICKS_FAIL_TTL_MS = 8_000;
 
 export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Promise<RawAlcorTick[]> {
   const cached = ticksCache.get(poolId);
   if (cached && Date.now() - cached.at < TICKS_TTL_MS) return cached.data;
-  const failed = ticksFailCache.get(poolId);
-  if (failed) {
-    const ttl = failed.rateLimited ? TICKS_RATE_LIMIT_FAIL_TTL_MS : TICKS_FAIL_TTL_MS;
-    if (Date.now() - failed.at < ttl) {
-      throw new Error(
-        failed.rateLimited
-          ? "Rate limited — please wait a moment and try again"
-          : `ticks recently failed for pool ${poolId}`,
-      );
-    }
+  const failedAt = ticksFailCache.get(poolId);
+  if (failedAt && Date.now() - failedAt < TICKS_FAIL_TTL_MS) {
+    throw new Error(`ticks recently failed for pool ${poolId}`);
   }
   const inflight = ticksInflight.get(poolId);
   if (inflight) return inflight;
   const p = (async () => {
-    for (let attempt = 0; attempt <= TICK_RETRY_DELAYS_MS.length; attempt++) {
-      const res = await enqueueTickFetch(
-        () => fetch(`${ALCOR_API}/swap/pools/${poolId}/ticks`, { signal }),
-        signal,
-      );
-      if (res.ok) {
-        const data = (await res.json()) as RawAlcorTick[];
-        ticksCache.set(poolId, { at: Date.now(), data });
-        ticksFailCache.delete(poolId);
-        return data;
-      }
+    const res = await fetch(`${ALCOR_API}/swap/pools/${poolId}/ticks`, { signal });
+    if (!res.ok) {
       if (res.status === 429) {
         markAlcorRateLimited();
-        if (attempt < TICK_RETRY_DELAYS_MS.length) {
-          await delay(TICK_RETRY_DELAYS_MS[attempt], signal);
-          continue;
-        }
-        ticksFailCache.set(poolId, { at: Date.now(), rateLimited: true });
+        ticksFailCache.set(poolId, Date.now());
         throw new Error("Rate limited — please wait a moment and try again");
       }
-      ticksFailCache.set(poolId, { at: Date.now(), rateLimited: false });
+      ticksFailCache.set(poolId, Date.now());
       throw new Error(`Failed to fetch ticks for pool ${poolId} (${res.status})`);
     }
-    throw new Error(`Failed to fetch ticks for pool ${poolId}`);
+    const data = (await res.json()) as RawAlcorTick[];
+    ticksCache.set(poolId, { at: Date.now(), data });
+    return data;
   })();
   ticksInflight.set(poolId, p);
   try {
@@ -333,7 +190,7 @@ function selectRelevantPools(
   inKey: string,
   outKey: string,
   maxHops: number,
-  cap = 96
+  cap = 56
 ): RawAlcorPool[] {
   const keyOf = (t: RawAlcorPool["tokenA"]) => tokenKey(t.contract, t.symbol);
   const active = pools.filter((p) => p.active);
@@ -424,67 +281,17 @@ function selectRelevantPools(
     const lb = BigInt(b.liquidity || "0");
     return lb > la ? 1 : lb < la ? -1 : 0;
   });
-
-  // Endpoint-touching pools (any active pool with tokenIn or tokenOut on
-  // either side) must never be dropped: every final leg of any split routes
-  // through one of them, so trimming them here directly costs output. Include
-  // them unconditionally, then fill the remaining slots from the ranked list
-  // up to `cap`.
-  const touchesEndpoint = (p: RawAlcorPool) => {
-    const a = keyOf(p.tokenA);
-    const b = keyOf(p.tokenB);
-    return a === inKey || b === inKey || a === outKey || b === outKey;
-  };
-  const endpointPools = active.filter(touchesEndpoint);
-  const endpointIds = new Set(endpointPools.map((p) => p.id));
-  const filler = ranked.filter((p) => !endpointIds.has(p.id));
-  const remaining = Math.max(0, cap - endpointPools.length);
-  return [...endpointPools, ...filler.slice(0, remaining)];
-}
-
-function poolStage(p: RawAlcorPool, inKey: string, outKey: string): number {
-  const a = tokenKey(p.tokenA.contract, p.tokenA.symbol);
-  const b = tokenKey(p.tokenB.contract, p.tokenB.symbol);
-  const direct = (a === inKey && b === outKey) || (a === outKey && b === inKey);
-  if (direct) return 0;
-  const touchesEndpoint = a === inKey || b === inKey || a === outKey || b === outKey;
-  const touchesHub = HUB_KEYS.has(a) || HUB_KEYS.has(b);
-  if (touchesEndpoint && touchesHub) return 1;
-  if (touchesEndpoint) return 2;
-  if (touchesHub) return 3;
-  return 4;
-}
-
-function orderPoolsForTickFetch(pools: RawAlcorPool[], inKey: string, outKey: string): RawAlcorPool[] {
-  return pools.slice().sort((a, b) => {
-    const stageA = poolStage(a, inKey, outKey);
-    const stageB = poolStage(b, inKey, outKey);
-    if (stageA !== stageB) return stageA - stageB;
-    const la = BigInt(a.liquidity || "0");
-    const lb = BigInt(b.liquidity || "0");
-    return lb > la ? 1 : lb < la ? -1 : 0;
-  });
-}
-
-function getTickQueueStats() {
-  return {
-    active: tickQueueActive,
-    queued: tickQueue.length,
-    cooldownMs: Math.max(0, alcorCooldownUntil - Date.now()),
-  };
+  return ranked.slice(0, cap);
 }
 
 function formatSdkDiagnostics(diag?: SwapRoute["quoteDiagnostics"]): string {
   if (!diag) return "";
-  return ` (${diag.routesConsidered ?? "?"} routes, ${diag.poolsBuilt ?? "?"}/${diag.relevantPools ?? "?"} pools, ticks=${diag.ticksSucceeded ?? "?"}/${diag.tickRequests ?? "?"}, tickFailures=${diag.tickFailures ?? 0}, rateLimited=${diag.rateLimitedTickFailures ?? 0}, partial=${diag.quotePartial === true}, queue=${diag.queueDepth ?? 0}, ${diag.tookMs ?? "?"}ms)`;
+  return ` (${diag.routesConsidered ?? "?"} routes, ${diag.poolsBuilt ?? "?"}/${diag.relevantPools ?? "?"} pools, tickFailures=${diag.tickFailures ?? 0}, rateLimited=${diag.rateLimitedTickFailures ?? 0}, ${diag.tookMs ?? "?"}ms)`;
 }
 
 // ----- Pool construction -----
 
 // ----- Router entry: prefer WASM (matches Alcor's UI) then fall back to JS -----
-
-let wasmDisabled = false;
-let wasmDisabledLogged = false;
 
 async function runBestTradeWithSplit(
   routes: any[],
@@ -495,7 +302,7 @@ async function runBestTradeWithSplit(
   swapConfig: { minSplits: number; maxSplits: number }
 ): Promise<any> {
   const T = Trade as any;
-  if (!wasmDisabled && typeof T.bestTradeWithSplitWASM === "function") {
+  if (typeof T.bestTradeWithSplitWASM === "function") {
     try {
       const wasmTrade = await T.bestTradeWithSplitWASM(
         routes,
@@ -506,13 +313,9 @@ async function runBestTradeWithSplit(
         swapConfig
       );
       if (wasmTrade) return wasmTrade;
-      wasmDisabled = true;
-    } catch {
-      wasmDisabled = true;
-    }
-    if (wasmDisabled && !wasmDisabledLogged) {
-      wasmDisabledLogged = true;
-      logger.info("[alcor-router] WASM router unavailable in browser — using JS router");
+      logger.warn("[alcor-router] WASM router returned null — falling back to JS");
+    } catch (e) {
+      logger.warn("[alcor-router] WASM router threw — falling back to JS", e);
     }
   }
   return T.bestTradeWithSplit(routes, currencyAmount, percents, sdkTradeType, swapConfig);
@@ -716,11 +519,59 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   const outKey = tokenKey(tokenOut.contract, tokenOut.ticker);
 
   const allPools = await fetchAllAlcorPools(signal);
-  const relevant = orderPoolsForTickFetch(selectRelevantPools(allPools, inKey, outKey, maxHops), inKey, outKey);
+  const relevant = selectRelevantPools(allPools, inKey, outKey, maxHops);
   if (relevant.length === 0) return null;
+
+  let tickFailures = 0;
+  let rateLimitedTickFailures = 0;
+  const tickResults = await mapWithConcurrency(relevant, 10, async (p) => {
+    try {
+      return { p, ticks: await fetchPoolTicks(p.id, signal) };
+    } catch (e) {
+      if ((e as any)?.name === "AbortError") throw e;
+      tickFailures += 1;
+      if (isRateLimitError(e)) rateLimitedTickFailures += 1;
+      logger.warn(`alcorTrade: tick fetch failed for pool ${p.id}`, e);
+      return { p, ticks: [] as RawAlcorTick[] };
+    }
+  });
+
+  const sdkPools = tickResults
+    .filter((r) => r.ticks.length > 0)
+    .map((r) => {
+      try {
+        return buildPool(r.p, r.ticks);
+      } catch (e) {
+        logger.warn(`alcorTrade: pool build failed for pool ${r.p.id}`, e);
+        return null;
+      }
+    })
+    .filter((p): p is Pool => p !== null);
+  const earlyDiagnostics = (): SwapRoute["quoteDiagnostics"] => ({
+    relevantPools: relevant.length,
+    poolsBuilt: sdkPools.length,
+    routesConsidered: 0,
+    tickFailures,
+    rateLimitedTickFailures,
+    tookMs: Math.round(performance.now() - started),
+  });
+
+  if (sdkPools.length === 0) {
+    if (rateLimitedTickFailures > 0 || tickFailures > 0) throw incompleteSdkRouteError(earlyDiagnostics());
+    return null;
+  }
 
   const inTok = new Token(tokenIn.contract, tokenIn.precision, tokenIn.ticker);
   const outTok = new Token(tokenOut.contract, tokenOut.precision, tokenOut.ticker);
+
+  const routes = computeAllRoutes(inTok, outTok, sdkPools, maxHops);
+  if (routes.length === 0) {
+    if (rateLimitedTickFailures > 0) throw incompleteSdkRouteError(earlyDiagnostics());
+    return null;
+  }
+
+  const percents: number[] = [];
+  for (let p = distributionPercent; p <= 100; p += distributionPercent) percents.push(p);
 
   const rawAmount = toRawAmount(
     amount,
@@ -732,191 +583,28 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   );
 
   const sdkTradeType = tradeType === "EXACT_INPUT" ? TradeType.EXACT_INPUT : TradeType.EXACT_OUTPUT;
-  const exactInEval = tradeType === "EXACT_INPUT";
-
-  // Run the split optimizer at both a fine (1%) and coarse (5%) grid and keep
-  // whichever trade is objectively better. `bestTradeWithSplit` is a greedy
-  // heuristic; finer granularity is usually better but can occasionally land
-  // in a worse local optimum, so we defend against it cheaply here.
-  const buildPercents = (step: number) => {
-    const out: number[] = [];
-    for (let p = step; p <= 100; p += step) out.push(p);
-    return out;
-  };
-  const fineStep = distributionPercent;
-  const coarseStep = 5;
-  const gridConfigs: { step: number; maxSplits: number }[] = [
-    { step: fineStep, maxSplits: 10 },
-  ];
-  if (coarseStep !== fineStep) gridConfigs.push({ step: coarseStep, maxSplits: 6 });
-
-  const isBetterTrade = (candidate: any, current: any | null) => {
-    if (!current) return true;
-    const cur = exactInEval
-      ? parseFloat(current.outputAmount.toFixed())
-      : parseFloat(current.inputAmount.toFixed());
-    const cand = exactInEval
-      ? parseFloat(candidate.outputAmount.toFixed())
-      : parseFloat(candidate.inputAmount.toFixed());
-    return exactInEval ? cand > cur : cand < cur;
-  };
-
-  const evaluatePools = async (sdkPools: Pool[], includeCoarse: boolean) => {
-    if (sdkPools.length === 0) return null;
-    const routes = computeAllRoutes(inTok, outTok, sdkPools, maxHops);
-    if (routes.length === 0) return null;
-
-    const activeConfigs = includeCoarse
-      ? gridConfigs
-      : gridConfigs.slice(0, 1);
-
-    const gridTrades = await Promise.all(
-      activeConfigs.map((cfg) =>
-        withTimeout(
-          runBestTradeWithSplit(
-          routes,
-          currencyAmount,
-          buildPercents(cfg.step),
-          sdkTradeType,
-          sdkPools,
-          { minSplits: 1, maxSplits: cfg.maxSplits }
-          ).catch((e) => {
-            logger.warn(`[alcor-router] split search failed at step=${cfg.step}`, e);
-            return null;
-          }),
-          SPLIT_CALL_TIMEOUT_MS,
-          null
-        )
-      )
-    );
-
-    let trade: any = null;
-    let bestGrid: { step: number; maxSplits: number } | null = null;
-    gridTrades.forEach((t, i) => {
-      if (!t) return;
-      if (isBetterTrade(t, trade)) {
-        trade = t;
-        bestGrid = activeConfigs[i];
-      }
-    });
-
-    return {
-      trade,
-      bestGrid,
-      routesConsidered: routes.length,
-      gridOutputs: gridTrades.map((t, i) => ({
-        step: activeConfigs[i].step,
-        output: t ? parseFloat(t.outputAmount.toFixed()) : null,
-        input: t ? parseFloat(t.inputAmount.toFixed()) : null,
-        splits: t ? t.swaps.length : 0,
-      })),
-    };
-  };
-
-  let tickFailures = 0;
-  let rateLimitedTickFailures = 0;
-  let tickRequests = 0;
-  let ticksSucceeded = 0;
-  let completedAllTicks = true;
-  const sdkPools: Pool[] = [];
-  let bestEval: Awaited<ReturnType<typeof evaluatePools>> | null = null;
-
-  const TICK_BATCH_SIZE = 12;
-  const totalBatches = Math.ceil(relevant.length / TICK_BATCH_SIZE);
-  for (let start = 0, batchIdx = 0; start < relevant.length; start += TICK_BATCH_SIZE, batchIdx += 1) {
-    const batch = relevant.slice(start, start + TICK_BATCH_SIZE);
-    const rateLimitsBeforeBatch = rateLimitedTickFailures;
-    const batchResults = await mapWithConcurrency(batch, 4, async (p) => {
-      try {
-        tickRequests += 1;
-        return { p, ticks: await fetchPoolTicks(p.id, signal) };
-      } catch (e) {
-        if ((e as any)?.name === "AbortError") throw e;
-        tickFailures += 1;
-        if (isRateLimitError(e)) rateLimitedTickFailures += 1;
-        logger.warn(`alcorTrade: tick fetch failed for pool ${p.id}`, e);
-        return { p, ticks: [] as RawAlcorTick[] };
-      }
-    });
-
-    for (const r of batchResults) {
-      if (r.ticks.length === 0) continue;
-      ticksSucceeded += 1;
-      try {
-        sdkPools.push(buildPool(r.p, r.ticks));
-      } catch (e) {
-        tickFailures += 1;
-        logger.warn(`alcorTrade: pool build failed for pool ${r.p.id}`, e);
-      }
-    }
-
-    const isLastBatch = batchIdx === totalBatches - 1;
-    const rateLimited = rateLimitedTickFailures > rateLimitsBeforeBatch;
-    const budgetExceeded = performance.now() - started > SDK_BUDGET_MS;
-    // Only run the (expensive) split solver on the first productive batch,
-    // the final batch, or when we're about to bail out due to rate limits or
-    // the SDK time budget. Intermediate batches just accumulate pools.
-    const shouldEvaluate =
-      sdkPools.length > 0 &&
-      (!bestEval || isLastBatch || rateLimited || budgetExceeded);
-    if (shouldEvaluate) {
-      const candidate = await evaluatePools(sdkPools, isLastBatch || budgetExceeded);
-      if (candidate?.trade && isBetterTrade(candidate.trade, bestEval?.trade ?? null)) {
-        bestEval = candidate;
-      }
-    }
-
-    if (budgetExceeded) {
-      completedAllTicks = false;
-      logger.warn(
-        `[alcor-router] SDK time budget exceeded; ${bestEval?.trade ? "using best partial quote" : "no quote — HTTP will win"} (${sdkPools.length}/${relevant.length} pools built)`,
-      );
-      break;
-    }
-
-    if (rateLimited && bestEval?.trade) {
-      completedAllTicks = false;
-      logger.warn(
-        `[alcor-router] stopping tick fetch early after rate limit; using best partial quote (${sdkPools.length}/${relevant.length} pools built)`,
-        getTickQueueStats(),
-      );
-      break;
-    }
-    if (rateLimited) {
-      completedAllTicks = false;
-      logger.warn(
-        `[alcor-router] stopping tick fetch early after rate limit; no SDK quote yet (${sdkPools.length}/${relevant.length} pools built)`,
-        getTickQueueStats(),
-      );
-      break;
-    }
-  }
+  const trade = await runBestTradeWithSplit(
+    routes,
+    currencyAmount,
+    percents,
+    sdkTradeType,
+    sdkPools,
+    { minSplits: 1, maxSplits: 10 }
+  );
 
   const diagnostics: SwapRoute["quoteDiagnostics"] = {
     relevantPools: relevant.length,
     poolsBuilt: sdkPools.length,
-    routesConsidered: bestEval?.routesConsidered ?? 0,
+    routesConsidered: routes.length,
     tickFailures,
     rateLimitedTickFailures,
-    tickRequests,
-    ticksSucceeded,
-    queueDepth: getTickQueueStats().active + getTickQueueStats().queued,
-    quotePartial: !completedAllTicks || tickFailures > 0,
     tookMs: Math.round(performance.now() - started),
   };
 
-  if (!bestEval?.trade) {
-    if (tickFailures > 0) {
-      logger.warn(
-        `[alcor-router] SDK returned no trade; HTTP will win${formatSdkDiagnostics(diagnostics)}`,
-      );
-    }
+  if (!trade) {
+    if (tickFailures > 0) throw incompleteSdkRouteError(diagnostics);
     return null;
   }
-
-  const trade = bestEval.trade;
-  const bestGrid = bestEval.bestGrid;
-  const gridOutputs = bestEval.gridOutputs;
 
   // Slippage as SDK Percent: e.g. 1% => Percent(100, 10_000).
   const bps = Math.round(slippage * 100); // 1% -> 100bps
@@ -972,12 +660,12 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     input: parseFloat(trade.inputAmount.toFixed()),
     swaps: splits,
     quoteSource: "sdk",
-    quoteComplete: diagnostics.quotePartial !== true,
+    quoteComplete: tickFailures === 0,
     quoteDiagnostics: diagnostics,
   } as SwapRoute;
 
   logger.info(
-    `[alcor-router] SDK quote produced ${splits.length} split(s) winner=step${bestGrid?.step ?? "?"} grids=${JSON.stringify(gridOutputs)}${formatSdkDiagnostics(diagnostics)}`,
+    `[alcor-router] SDK quote produced ${splits.length} split(s)${formatSdkDiagnostics(diagnostics)}`,
   );
 
   return result;
