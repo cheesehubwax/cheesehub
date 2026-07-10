@@ -113,7 +113,7 @@ export function useSwapRoute(
         logger.warn("[alcor-router] SDK quote rate-limited; using HTTP fallback instead of crashing", sdkError);
       }
 
-      if (sdkError) {
+      if (sdkError && !sdkTransient) {
         logger.warn("[alcor-router] SDK failed definitively; HTTP fallback allowed", sdkError);
       }
 
