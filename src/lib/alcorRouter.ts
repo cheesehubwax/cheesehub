@@ -97,7 +97,27 @@ const ticksInflight = new Map<number, Promise<RawAlcorTick[]>>();
 const TICKS_TTL_MS = 5 * 60_000;
 // Negative cache for failed tick fetches so we don't hammer the same pool.
 const ticksFailCache = new Map<number, number>();
-const TICKS_FAIL_TTL_MS = 8_000;
+const TICKS_FAIL_TTL_MS = 1_500;
+
+// Per-request retry budget for a single tick fetch. Small, tight backoff so a
+// stray 429 inside the fan-out doesn't poison the pool for the rest of the
+// quote — the outer react-query retry is still the hammer guard.
+const TICKS_FETCH_RETRIES = 2;
+const TICKS_FETCH_BACKOFF_MS = [400, 900];
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(resolve, ms);
+    if (signal) {
+      const onAbort = () => {
+        clearTimeout(t);
+        reject(new DOMException("Aborted", "AbortError"));
+      };
+      if (signal.aborted) onAbort();
+      else signal.addEventListener("abort", onAbort, { once: true });
+    }
+  });
+}
 
 export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Promise<RawAlcorTick[]> {
   const cached = ticksCache.get(poolId);
@@ -109,19 +129,31 @@ export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Prom
   const inflight = ticksInflight.get(poolId);
   if (inflight) return inflight;
   const p = (async () => {
-    const res = await fetch(`${ALCOR_API}/swap/pools/${poolId}/ticks`, { signal });
-    if (!res.ok) {
-      if (res.status === 429) {
-        markAlcorRateLimited();
-        ticksFailCache.set(poolId, Date.now());
-        throw new Error("Rate limited — please wait a moment and try again");
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt <= TICKS_FETCH_RETRIES; attempt++) {
+      try {
+        const res = await fetch(`${ALCOR_API}/swap/pools/${poolId}/ticks`, { signal });
+        if (!res.ok) {
+          if (res.status === 429) markAlcorRateLimited();
+          throw new Error(
+            res.status === 429
+              ? "Rate limited — please wait a moment and try again"
+              : `Failed to fetch ticks for pool ${poolId} (${res.status})`,
+          );
+        }
+        const data = (await res.json()) as RawAlcorTick[];
+        ticksCache.set(poolId, { at: Date.now(), data });
+        return data;
+      } catch (e) {
+        if ((e as any)?.name === "AbortError") throw e;
+        lastErr = e;
+        if (attempt < TICKS_FETCH_RETRIES) {
+          await sleep(TICKS_FETCH_BACKOFF_MS[attempt] ?? 900, signal);
+        }
       }
-      ticksFailCache.set(poolId, Date.now());
-      throw new Error(`Failed to fetch ticks for pool ${poolId} (${res.status})`);
     }
-    const data = (await res.json()) as RawAlcorTick[];
-    ticksCache.set(poolId, { at: Date.now(), data });
-    return data;
+    ticksFailCache.set(poolId, Date.now());
+    throw lastErr instanceof Error ? lastErr : new Error(`Failed to fetch ticks for pool ${poolId}`);
   })();
   ticksInflight.set(poolId, p);
   try {
