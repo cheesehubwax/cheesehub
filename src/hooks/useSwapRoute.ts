@@ -74,6 +74,14 @@ export function useSwapRoute(
         debouncedTradeType,
       );
 
+      // Coarser grid for small trades: <$30 uses 5% steps, ≥$30 uses 1%.
+      // Falls back to 1% when USD price is unavailable.
+      const priceToken = debouncedTradeType === "EXACT_INPUT" ? tokenIn! : tokenOut!;
+      const usdPrice = priceToken.usd_price ?? 0;
+      const parsedAmount = parseFloat(debouncedAmount) || 0;
+      const inputUsd = usdPrice > 0 ? parsedAmount * usdPrice : null;
+      const distributionPercent = inputUsd !== null && inputUsd < 30 ? 5 : 1;
+
       const sdkPromise = computeAlcorTrade({
         tokenIn: tokenIn!,
         tokenOut: tokenOut!,
@@ -81,6 +89,7 @@ export function useSwapRoute(
         slippage,
         receiver,
         tradeType: debouncedTradeType,
+        distributionPercent,
         signal,
       });
 
