@@ -104,12 +104,16 @@ export function useSwapRoute(
       const sdkError = sdkSettled.status === "rejected" ? sdkSettled.reason : null;
       const sdkTransient = sdkError ? isTransientError(sdkError) : false;
 
-      if (sdkError && sdkTransient) {
-        logger.warn("[alcor-router] SDK quote not final; retrying before accepting HTTP fallback", sdkError);
+      if (sdkError && sdkTransient && !httpValid) {
+        logger.warn("[alcor-router] SDK quote not final and HTTP unavailable; retrying", sdkError);
         throw sdkError;
       }
 
-      if (sdkError) {
+      if (sdkError && sdkTransient && httpValid) {
+        logger.warn("[alcor-router] SDK quote rate-limited; using HTTP fallback instead of crashing", sdkError);
+      }
+
+      if (sdkError && !sdkTransient) {
         logger.warn("[alcor-router] SDK failed definitively; HTTP fallback allowed", sdkError);
       }
 
@@ -168,18 +172,23 @@ export function useSwapRoute(
           ? (sdk!.output - (http?.output ?? 0)) / Math.max(http?.output ?? 1, 1e-9)
           : ((http?.input ?? 0) - (sdk!.input ?? 0)) / Math.max(http?.input ?? 1, 1e-9);
         logger.info(
-          `[alcor-router] SDK won (${sdk!.swaps.length} splits, +${(delta * 100).toFixed(4)}%, ${sdk!.quoteDiagnostics?.routesConsidered ?? "?"} routes, ${sdk!.quoteDiagnostics?.poolsBuilt ?? "?"}/${sdk!.quoteDiagnostics?.relevantPools ?? "?"} pools, ${sdk!.quoteDiagnostics?.tookMs ?? "?"}ms)`,
+          `[alcor-router] SDK won (${sdk!.swaps.length} splits, +${(delta * 100).toFixed(4)}%, complete=${sdk!.quoteComplete !== false}, ${sdk!.quoteDiagnostics?.routesConsidered ?? "?"} routes, ${sdk!.quoteDiagnostics?.poolsBuilt ?? "?"}/${sdk!.quoteDiagnostics?.relevantPools ?? "?"} pools, ${sdk!.quoteDiagnostics?.ticksSucceeded ?? "?"}/${sdk!.quoteDiagnostics?.tickRequests ?? "?"} ticks, rateLimited=${sdk!.quoteDiagnostics?.rateLimitedTickFailures ?? 0}, ${sdk!.quoteDiagnostics?.tookMs ?? "?"}ms)`,
         );
-        return { ...sdk!, quoteComplete: true };
+        return { ...sdk!, quoteComplete: sdk!.quoteComplete !== false };
       }
 
       if (sdk && sdk.quoteComplete === false) {
         const diag = sdk.quoteDiagnostics;
-        const retryError = new Error(
-          `Failed to fetch complete split route — retrying (${diag?.routesConsidered ?? "?"} routes, ${diag?.poolsBuilt ?? "?"}/${diag?.relevantPools ?? "?"} pools, tickFailures=${diag?.tickFailures ?? 0})`,
+        if (!httpValid) {
+          const retryError = new Error(
+            `Failed to fetch complete split route — retrying (${diag?.routesConsidered ?? "?"} routes, ${diag?.poolsBuilt ?? "?"}/${diag?.relevantPools ?? "?"} pools, tickFailures=${diag?.tickFailures ?? 0})`,
+          );
+          logger.warn("[alcor-router] SDK route incomplete and HTTP unavailable; retrying", retryError);
+          throw retryError;
+        }
+        logger.warn(
+          `[alcor-router] SDK route incomplete and did not beat HTTP; using HTTP fallback (sdk splits=${sdk.swaps.length}, sdk out=${sdk.output}, http out=${http!.output}, tickFailures=${diag?.tickFailures ?? 0}, rateLimited=${diag?.rateLimitedTickFailures ?? 0})`,
         );
-        logger.warn("[alcor-router] SDK route incomplete; retrying before accepting HTTP fallback", retryError);
-        throw retryError;
       }
 
       if (httpValid) {
