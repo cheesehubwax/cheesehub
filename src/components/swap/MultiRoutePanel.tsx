@@ -1,7 +1,11 @@
 import { useMemo } from "react";
 import { TokenLogo } from "@/components/TokenLogo";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useAlcorPools } from "@/hooks/useAlcorPools";
 import type { SwapRoute, SwapToken, AlcorPoolToken } from "@/lib/swapApi";
+
+
+
 
 interface MultiRoutePanelProps {
   route: SwapRoute;
@@ -94,16 +98,24 @@ export function MultiRoutePanel({ route, tokenIn, tokenOut }: MultiRoutePanelPro
               return (
                 <div key={idx} className="flex items-center gap-2">
                   <div className="flex items-center gap-1.5">
-                    <div className="flex items-center">
-                      <TokenLogo contract={a.contract} symbol={a.symbol} size="md" />
-                      <div className="-ml-3 ring-2 ring-background rounded-full">
-                        <TokenLogo contract={b.contract} symbol={b.symbol} size="md" />
-                      </div>
-                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center cursor-help">
+                          <TokenLogo contract={a.contract} symbol={a.symbol} size="md" />
+                          <div className="-ml-3 ring-2 ring-background rounded-full">
+                            <TokenLogo contract={b.contract} symbol={b.symbol} size="md" />
+                          </div>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs">
+                        {`${a.symbol} (${a.contract}) / ${b.symbol} (${b.contract})`}
+                      </TooltipContent>
+                    </Tooltip>
                     <span className="text-white font-medium">
                       {!row.broken ? formatFee(fee) : ""}
                     </span>
                   </div>
+
                   {!isLast && (
                     <span
                       aria-hidden
