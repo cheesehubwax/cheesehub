@@ -94,10 +94,10 @@ export async function fetchAllAlcorPools(signal?: AbortSignal): Promise<RawAlcor
 
 const ticksCache = new Map<number, { at: number; data: RawAlcorTick[] }>();
 const ticksInflight = new Map<number, Promise<RawAlcorTick[]>>();
-const TICKS_TTL_MS = 15_000;
+const TICKS_TTL_MS = 5 * 60_000;
 // Negative cache for failed tick fetches so we don't hammer the same pool.
 const ticksFailCache = new Map<number, number>();
-const TICKS_FAIL_TTL_MS = 20_000;
+const TICKS_FAIL_TTL_MS = 8_000;
 
 export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Promise<RawAlcorTick[]> {
   const cached = ticksCache.get(poolId);
@@ -176,6 +176,8 @@ const HUB_KEYS = new Set([
   "waxusdt-eth.token",
   "usdc-tethertether",
   "lswax-token.lswax",
+  "lswax-token.fusion",
+  "cheese-cheeseburger",
 ]);
 
 /** Select pools that could participate in a tokenIn→tokenOut route of length
@@ -187,7 +189,7 @@ function selectRelevantPools(
   inKey: string,
   outKey: string,
   maxHops: number,
-  cap = 120
+  cap = 56
 ): RawAlcorPool[] {
   const keyOf = (t: RawAlcorPool["tokenA"]) => tokenKey(t.contract, t.symbol);
   const active = pools.filter((p) => p.active);
@@ -243,22 +245,36 @@ function selectRelevantPools(
     return forward || reverse;
   });
 
-  if (candidates.length <= cap) return candidates;
-
-  // Truncation ranking: prefer pools that (0) touch tokenIn/out directly,
-  // (1) touch a known hub, (2) fall back to liquidity desc.
-  const touchesEndpoint = (p: RawAlcorPool) => {
+  // Ranking matters because every selected pool needs a tick request. Keep the
+  // shortest plausible routes first, then liquid endpoint/hub pools. This avoids
+  // burning the first quote on dozens of obscure endpoint pools and hitting 429s
+  // before the split router has the pools Alcor's UI actually uses.
+  const poolRank = (p: RawAlcorPool) => {
     const a = keyOf(p.tokenA);
     const b = keyOf(p.tokenB);
-    return a === inKey || a === outKey || b === inKey || b === outKey;
+    const da = distIn.get(a);
+    const db = distIn.get(b);
+    const ea = distOut.get(a);
+    const eb = distOut.get(b);
+    const pathLen = Math.min(
+      da !== undefined && eb !== undefined ? da + 1 + eb : Number.POSITIVE_INFINITY,
+      db !== undefined && ea !== undefined ? db + 1 + ea : Number.POSITIVE_INFINITY,
+    );
+    const direct = (a === inKey && b === outKey) || (a === outKey && b === inKey);
+    const touchesIn = a === inKey || b === inKey;
+    const touchesOut = a === outKey || b === outKey;
+    const touchesEndpoint = touchesIn || touchesOut;
+    const touchesHub = HUB_KEYS.has(a) || HUB_KEYS.has(b);
+    const endpointHub = touchesEndpoint && touchesHub;
+    const classRank = direct ? 0 : endpointHub ? 1 : touchesEndpoint ? 2 : touchesHub ? 3 : 4;
+    return { pathLen, classRank };
   };
-  const touchesHub = (p: RawAlcorPool) =>
-    HUB_KEYS.has(keyOf(p.tokenA)) || HUB_KEYS.has(keyOf(p.tokenB));
 
   const ranked = candidates.slice().sort((a, b) => {
-    const ta = touchesEndpoint(a) ? 0 : touchesHub(a) ? 1 : 2;
-    const tb = touchesEndpoint(b) ? 0 : touchesHub(b) ? 1 : 2;
-    if (ta !== tb) return ta - tb;
+    const ra = poolRank(a);
+    const rb = poolRank(b);
+    if (ra.pathLen !== rb.pathLen) return ra.pathLen - rb.pathLen;
+    if (ra.classRank !== rb.classRank) return ra.classRank - rb.classRank;
     const la = BigInt(a.liquidity || "0");
     const lb = BigInt(b.liquidity || "0");
     return lb > la ? 1 : lb < la ? -1 : 0;
