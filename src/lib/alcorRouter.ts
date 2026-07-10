@@ -98,7 +98,6 @@ const TICKS_TTL_MS = 5 * 60_000;
 // Negative cache for failed tick fetches so we don't hammer the same pool.
 const ticksFailCache = new Map<number, number>();
 const TICKS_FAIL_TTL_MS = 8_000;
-const TICK_CONCURRENCY = 10;
 
 export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Promise<RawAlcorTick[]> {
   const cached = ticksCache.get(poolId);
@@ -110,24 +109,19 @@ export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Prom
   const inflight = ticksInflight.get(poolId);
   if (inflight) return inflight;
   const p = (async () => {
-    try {
-      const res = await fetch(`${ALCOR_API}/swap/pools/${poolId}/ticks`, { signal });
-      if (!res.ok) {
-        if (res.status === 429) markAlcorRateLimited();
+    const res = await fetch(`${ALCOR_API}/swap/pools/${poolId}/ticks`, { signal });
+    if (!res.ok) {
+      if (res.status === 429) {
+        markAlcorRateLimited();
         ticksFailCache.set(poolId, Date.now());
-        throw new Error(
-          res.status === 429
-            ? "Rate limited — please wait a moment and try again"
-            : `Failed to fetch ticks for pool ${poolId} (${res.status})`,
-        );
+        throw new Error("Rate limited — please wait a moment and try again");
       }
-      const data = (await res.json()) as RawAlcorTick[];
-      ticksCache.set(poolId, { at: Date.now(), data });
-      return data;
-    } catch (e) {
-      if ((e as any)?.name !== "AbortError") ticksFailCache.set(poolId, Date.now());
-      throw e;
+      ticksFailCache.set(poolId, Date.now());
+      throw new Error(`Failed to fetch ticks for pool ${poolId} (${res.status})`);
     }
+    const data = (await res.json()) as RawAlcorTick[];
+    ticksCache.set(poolId, { at: Date.now(), data });
+    return data;
   })();
   ticksInflight.set(poolId, p);
   try {
@@ -139,6 +133,12 @@ export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Prom
 
 function isRateLimitError(err: unknown): boolean {
   return err instanceof Error && err.message.includes("Rate limited");
+}
+
+function incompleteSdkRouteError(diagnostics: SwapRoute["quoteDiagnostics"]): Error {
+  return new Error(
+    `Failed to fetch complete split route — retrying${formatSdkDiagnostics(diagnostics)}`,
+  );
 }
 
 // Run promises with a fixed concurrency limit.
@@ -403,7 +403,7 @@ export async function computeShadowQuote(args: ShadowQuoteArgs): Promise<ShadowQ
 
   // Fetch ticks for every relevant pool in parallel.
   // Fetch ticks with bounded concurrency so we don't hammer Alcor into 429s.
-  const tickResults = await mapWithConcurrency(relevant, TICK_CONCURRENCY, async (p) => {
+  const tickResults = await mapWithConcurrency(relevant, 10, async (p) => {
     try {
       return { p, ticks: await fetchPoolTicks(p.id, signal) };
     } catch (e) {
@@ -524,7 +524,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
 
   let tickFailures = 0;
   let rateLimitedTickFailures = 0;
-  const tickResults = await mapWithConcurrency(relevant, TICK_CONCURRENCY, async (p) => {
+  const tickResults = await mapWithConcurrency(relevant, 10, async (p) => {
     try {
       return { p, ticks: await fetchPoolTicks(p.id, signal) };
     } catch (e) {
@@ -547,8 +547,17 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
       }
     })
     .filter((p): p is Pool => p !== null);
+  const earlyDiagnostics = (): SwapRoute["quoteDiagnostics"] => ({
+    relevantPools: relevant.length,
+    poolsBuilt: sdkPools.length,
+    routesConsidered: 0,
+    tickFailures,
+    rateLimitedTickFailures,
+    tookMs: Math.round(performance.now() - started),
+  });
 
   if (sdkPools.length === 0) {
+    if (rateLimitedTickFailures > 0 || tickFailures > 0) throw incompleteSdkRouteError(earlyDiagnostics());
     return null;
   }
 
@@ -557,6 +566,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
 
   const routes = computeAllRoutes(inTok, outTok, sdkPools, maxHops);
   if (routes.length === 0) {
+    if (rateLimitedTickFailures > 0) throw incompleteSdkRouteError(earlyDiagnostics());
     return null;
   }
 
@@ -592,6 +602,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   };
 
   if (!trade) {
+    if (tickFailures > 0) throw incompleteSdkRouteError(diagnostics);
     return null;
   }
 
@@ -669,4 +680,3 @@ if (typeof window !== "undefined") {
     fetchAllAlcorPools().catch(() => {});
   }, 0);
 }
-
