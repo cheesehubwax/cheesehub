@@ -97,31 +97,133 @@ const ticksInflight = new Map<number, Promise<RawAlcorTick[]>>();
 const TICKS_TTL_MS = 5 * 60_000;
 // Negative cache for failed tick fetches so we don't hammer the same pool.
 const ticksFailCache = new Map<number, number>();
-const TICKS_FAIL_TTL_MS = 8_000;
+const TICKS_FAIL_TTL_MS = 12_000;
+const TICKS_RATE_LIMIT_FAIL_TTL_MS = 60_000;
+
+// Alcor's tick endpoint rate-limits hard when the browser fans out dozens of
+// /ticks requests. Keep one global queue so overlapping quote attempts share a
+// slow lane instead of stampeding the API.
+const TICK_QUEUE_CONCURRENCY = 2;
+const TICK_QUEUE_SPACING_MS = 180;
+const TICK_RETRY_DELAYS_MS = [900, 2_200];
+type TickQueueJob = {
+  run: () => Promise<void>;
+  signal?: AbortSignal;
+};
+const tickQueue: TickQueueJob[] = [];
+let tickQueueActive = 0;
+let tickQueueTimer: ReturnType<typeof setTimeout> | null = null;
+let tickQueueLastStart = 0;
+
+function makeAbortError(): DOMException {
+  return new DOMException("Aborted", "AbortError");
+}
+
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.reject(makeAbortError());
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(resolve, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(makeAbortError());
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+function pumpTickQueue() {
+  if (tickQueueTimer) {
+    clearTimeout(tickQueueTimer);
+    tickQueueTimer = null;
+  }
+  while (tickQueueActive < TICK_QUEUE_CONCURRENCY && tickQueue.length > 0) {
+    const wait = Math.max(0, TICK_QUEUE_SPACING_MS - (Date.now() - tickQueueLastStart));
+    if (wait > 0) {
+      tickQueueTimer = setTimeout(pumpTickQueue, wait);
+      return;
+    }
+    const job = tickQueue.shift()!;
+    if (job.signal?.aborted) continue;
+    tickQueueActive += 1;
+    tickQueueLastStart = Date.now();
+    job.run().finally(() => {
+      tickQueueActive -= 1;
+      pumpTickQueue();
+    });
+  }
+}
+
+function enqueueTickFetch<T>(task: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (signal?.aborted) return Promise.reject(makeAbortError());
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const job: TickQueueJob = {
+      signal,
+      run: async () => {
+        if (settled) return;
+        signal?.removeEventListener("abort", onAbort);
+        if (signal?.aborted) {
+          settled = true;
+          reject(makeAbortError());
+          return;
+        }
+        try {
+          const result = await task();
+          settled = true;
+          resolve(result);
+        } catch (e) {
+          settled = true;
+          reject(e);
+        }
+      },
+    };
+    const onAbort = () => {
+      if (settled) return;
+      const idx = tickQueue.indexOf(job);
+      if (idx >= 0) tickQueue.splice(idx, 1);
+      settled = true;
+      reject(makeAbortError());
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+    tickQueue.push(job);
+    pumpTickQueue();
+  });
+}
 
 export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Promise<RawAlcorTick[]> {
   const cached = ticksCache.get(poolId);
   if (cached && Date.now() - cached.at < TICKS_TTL_MS) return cached.data;
   const failedAt = ticksFailCache.get(poolId);
-  if (failedAt && Date.now() - failedAt < TICKS_FAIL_TTL_MS) {
+  if (failedAt && Date.now() - failedAt < TICKS_RATE_LIMIT_FAIL_TTL_MS) {
     throw new Error(`ticks recently failed for pool ${poolId}`);
   }
   const inflight = ticksInflight.get(poolId);
   if (inflight) return inflight;
   const p = (async () => {
-    const res = await fetch(`${ALCOR_API}/swap/pools/${poolId}/ticks`, { signal });
-    if (!res.ok) {
+    for (let attempt = 0; attempt <= TICK_RETRY_DELAYS_MS.length; attempt++) {
+      const res = await enqueueTickFetch(
+        () => fetch(`${ALCOR_API}/swap/pools/${poolId}/ticks`, { signal }),
+        signal,
+      );
+      if (res.ok) {
+        const data = (await res.json()) as RawAlcorTick[];
+        ticksCache.set(poolId, { at: Date.now(), data });
+        ticksFailCache.delete(poolId);
+        return data;
+      }
       if (res.status === 429) {
         markAlcorRateLimited();
+        if (attempt < TICK_RETRY_DELAYS_MS.length) {
+          await delay(TICK_RETRY_DELAYS_MS[attempt], signal);
+          continue;
+        }
         ticksFailCache.set(poolId, Date.now());
         throw new Error("Rate limited — please wait a moment and try again");
       }
-      ticksFailCache.set(poolId, Date.now());
+      ticksFailCache.set(poolId, Date.now() - (TICKS_RATE_LIMIT_FAIL_TTL_MS - TICKS_FAIL_TTL_MS));
       throw new Error(`Failed to fetch ticks for pool ${poolId} (${res.status})`);
     }
-    const data = (await res.json()) as RawAlcorTick[];
-    ticksCache.set(poolId, { at: Date.now(), data });
-    return data;
+    throw new Error(`Failed to fetch ticks for pool ${poolId}`);
   })();
   ticksInflight.set(poolId, p);
   try {
