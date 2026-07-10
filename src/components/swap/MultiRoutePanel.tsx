@@ -13,6 +13,15 @@ interface MultiRoutePanelProps {
   tokenOut: SwapToken;
 }
 
+function hasVisualRoute(split: SwapRoute["swaps"][number]): boolean {
+  return (
+    Array.isArray(split.visualPath) &&
+    Array.isArray(split.visualFees) &&
+    split.visualPath.length === split.route.length + 1 &&
+    split.visualFees.length === split.route.length
+  );
+}
+
 function formatFee(fee: number): string {
   // Alcor stores fee as basis-points * 10 (e.g. 3000 → 0.3%, 500 → 0.05%)
   const pct = fee / 10000;
@@ -26,7 +35,9 @@ function tokenInId(t: SwapToken): string {
 export function MultiRoutePanel({ route, tokenIn, tokenOut }: MultiRoutePanelProps) {
   const allIds = useMemo(() => {
     const ids: number[] = [];
-    route.swaps.forEach((s) => s.route.forEach((id) => ids.push(id)));
+    route.swaps.forEach((s) => {
+      if (!hasVisualRoute(s)) s.route.forEach((id) => ids.push(id));
+    });
     return ids;
   }, [route.swaps]);
 
@@ -36,6 +47,15 @@ export function MultiRoutePanel({ route, tokenIn, tokenOut }: MultiRoutePanelPro
 
   const rows = useMemo(() => {
     return route.swaps.map((split) => {
+      if (hasVisualRoute(split)) {
+        return {
+          split,
+          chain: split.visualPath!,
+          hopFees: split.visualFees!,
+          broken: false,
+        };
+      }
+
       const chain: AlcorPoolToken[] = [
         {
           id: startId,
@@ -62,10 +82,12 @@ export function MultiRoutePanel({ route, tokenIn, tokenOut }: MultiRoutePanelPro
     });
   }, [route.swaps, pools, startId, tokenIn.ticker, tokenIn.contract, tokenIn.precision]);
 
-  // Only render the chain once every pool along every split is loaded. This
-  // avoids the first-quote flash where a partial pool map produces a truncated
-  // "broken" multiroute even though the underlying trade is correct.
-  if (!isReady) {
+  const needsPoolLookup = allIds.length > 0;
+
+  // SDK quotes include display-ready token/fee metadata, so they can render on
+  // the first quote without waiting for a second pool-detail lookup. HTTP routes
+  // still fall back to the shared pool lookup and keep the skeleton until ready.
+  if (needsPoolLookup && !isReady) {
     if (hasError) return null;
     return (
       <div className="mt-2 pt-2 border-t border-border/50">
