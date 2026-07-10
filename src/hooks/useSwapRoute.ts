@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect, useRef } from "react";
 import { fetchSwapRoute, type SwapToken, type SwapRoute } from "@/lib/swapApi";
-import { computeAlcorTrade } from "@/lib/alcorRouter";
+import { computeAlcorTrade, prewarmTicksForPair } from "@/lib/alcorRouter";
 import { logger } from "@/lib/logger";
 
 export type TradeType = "EXACT_INPUT" | "EXACT_OUTPUT";
 
-const MAX_TRANSIENT_RETRIES = 3;
+const MAX_TRANSIENT_RETRIES = 6;
 
 function isTransientError(err: unknown): boolean {
   if (err instanceof TypeError) return true;
@@ -50,6 +50,17 @@ export function useSwapRoute(
     }, 350);
     return () => clearTimeout(timer);
   }, [amount, tradeType]);
+
+  // Prewarm the tick cache as soon as both tokens are picked, before the user
+  // finishes typing. This makes the very first quote's SDK fan-out cache-warm
+  // instead of racing a 429 storm.
+  useEffect(() => {
+    if (!tokenIn || !tokenOut) return;
+    if (tokenIn.ticker === tokenOut.ticker && tokenIn.contract === tokenOut.contract) return;
+    const ac = new AbortController();
+    prewarmTicksForPair(tokenIn, tokenOut, 3, ac.signal).catch(() => {});
+    return () => ac.abort();
+  }, [tokenIn?.ticker, tokenIn?.contract, tokenOut?.ticker, tokenOut?.contract]);
 
   const tokensIdentical =
     !!tokenIn && !!tokenOut && tokenIn.ticker === tokenOut.ticker && tokenIn.contract === tokenOut.contract;
@@ -192,8 +203,10 @@ export function useSwapRoute(
     retryDelay: (attemptIndex, err) => {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("Rate limited")) return Math.min(5000 * 2 ** attemptIndex, 30000);
-      // 300ms, 600ms, 1.2s, cap 4s — fast recovery on flaky networks.
-      return Math.min(300 * 2 ** attemptIndex, 4000);
+      // 500ms, 1s, 2s, 3s, 4s, 4s — ~14s total budget, longer than Alcor's
+      // typical 429 recovery and the 1.5s tick negative-cache window so an
+      // incomplete SDK trade gets a real refetch instead of surfacing.
+      return Math.min(500 * 2 ** attemptIndex, 4000);
     },
   });
 

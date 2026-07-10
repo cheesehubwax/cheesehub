@@ -1,61 +1,69 @@
+## Symptom
+
+1. First quote → red "Route unavailable — retry" banner (SDK retries exhausted).
+2. User clicks retry → renders a partial split (image 1: direct-only pools, no intermediate hops).
+3. User changes the amount and puts it back → correct multi-hop split (image 2).
+
+We should show image 2 on the first render, without user intervention.
+
 ## Root cause
 
-On the very first quote for a fresh pair, `computeAlcorTrade` fans out tick requests for every relevant pool in parallel. Some of those tick fetches fail on the first attempt (429 rate limits, negative-cache TTL, transient network). The SDK still produces *a* trade from whichever pools did build, and sets `quoteComplete: false` + `tickFailures > 0` on the result.
+The plan we just shipped correctly throws when `sdk.quoteComplete === false`, but the react-query retry budget can't outlast Alcor's 429 storm on a cold fresh-pair quote:
 
-In `useSwapRoute.ts`, the "retry until complete" gate is only reached when SDK **loses** to HTTP:
+1. `computeAlcorTrade` fans out ~40–56 tick requests at concurrency=10. Alcor rate-limits several of them.
+2. Each 429 stamps the pool in `ticksFailCache` for **`TICKS_FAIL_TTL_MS = 8s`** (`src/lib/alcorRouter.ts`). During that 8 s window every retry immediately throws `"ticks recently failed for pool N"` **without hitting the network** — the negative cache short-circuits the recovery we're relying on.
+3. React-query retries with backoff 300 ms → 600 ms → 1.2 s (total < 2.1 s) then declares `exhaustedTransient`. The 8 s negative cache hasn't even expired yet, so all three retries return the *same* partial pool set. Banner flips to "Route unavailable — retry".
+4. The 8 s self-heal timer eventually fires (or the user clicks retry). By then some — but not all — negative-cached pools have expired, so we get a *different* partial (image 1: only the direct LSWAX↔CHEESE pools built, no intermediate hops). That partial still fails the completeness check, so it either throws again or, if the surviving `tickFailures === 0` by coincidence for the reduced pool set, renders as image 1.
+5. Changing the amount forces a fresh query key. By this time the negative cache has fully expired, ticks refetch cleanly, and image 2 lands.
 
-```ts
-if (pickSdk()) {
-  // ...
-  return { ...sdk!, quoteComplete: true };   // ← forced true, even if tickFailures>0
-}
-
-if (sdk && sdk.quoteComplete === false) {    // ← only checked in the losing branch
-  throw retryError;
-}
-```
-
-So when the incomplete SDK trade happens to beat HTTP (common — even a partial split usually beats the 100% HTTP route), we return it immediately and stamp `quoteComplete: true`. The widget renders the coarse/wrong multiroute. ~15–30s later react-query goes stale, the tick cache is now warm from the first attempt, the retry produces a *complete* split, and the widget "self-heals" to the proper routing.
+The retry loop is racing an 8 s cooldown with a ~2 s budget. It can't win.
 
 ## Fix
 
-Treat an incomplete SDK trade as retry-worthy regardless of whether it beats HTTP. Only accept the SDK immediately when its `tickFailures === 0` (i.e. `quoteComplete !== false`).
+Three coordinated changes so the first quote returns the complete route without the user seeing the retry banner. All in `src/lib/alcorRouter.ts` and `src/hooks/useSwapRoute.ts`. No changes to routing math, grid, or executed transaction.
 
-### Change in `src/hooks/useSwapRoute.ts`
+### 1. Shorten the tick negative cache and add in-request retries
 
-Reorder the decision so completeness is checked *before* the pickSdk short-circuit:
+In `src/lib/alcorRouter.ts`:
 
-```ts
-// If the SDK produced a trade but some ticks failed, its splits are known
-// to be suboptimal — retry so the cache warms and we get the full routing.
-if (sdk && sdk.quoteComplete === false) {
-  const diag = sdk.quoteDiagnostics;
-  const retryError = new Error(
-    `Failed to fetch complete split route — retrying (${diag?.routesConsidered ?? "?"} routes, ${diag?.poolsBuilt ?? "?"}/${diag?.relevantPools ?? "?"} pools, tickFailures=${diag?.tickFailures ?? 0})`,
-  );
-  logger.warn("[alcor-router] SDK route incomplete; retrying regardless of HTTP comparison", retryError);
-  throw retryError;
-}
+- Drop `TICKS_FAIL_TTL_MS` from `8_000` to `1_500`. 8 s made sense as a hammer guard; 1.5 s is enough to break a tight retry loop but still avoids re-hitting the same pool inside one fan-out.
+- In `fetchPoolTicks`, on a non-abort failure (429 or transient), retry the fetch up to **2 times** with 400 ms / 900 ms backoff **before** stamping `ticksFailCache` and throwing. This turns each tick fetch into its own small retry budget so a single 429 in the fan-out no longer poisons a pool for the rest of the query.
+- Keep 429 → `markAlcorRateLimited()` behavior; the global cooldown still throttles *new* SDK fan-outs, but individual tick recovery inside an already-in-flight fan-out is allowed.
 
-if (pickSdk()) { ... return SDK ... }
-```
+### 2. Give the hook enough retry budget to outlast a 429 burst
 
-The existing transient-retry machinery (`MAX_TRANSIENT_RETRIES=3`, exponential backoff 300ms→4s cap) handles this — `isTransientError` already matches "Failed to fetch complete split route" via the "Failed to fetch" substring.
+In `src/hooks/useSwapRoute.ts`:
 
-### Why this is safe
+- Raise `MAX_TRANSIENT_RETRIES` from `3` to `6`.
+- Adjust `retryDelay` so the non-rate-limit path is `500 ms → 1 s → 2 s → 3 s → 4 s → 4 s` (cap 4 s). Total budget ~14 s — comfortably longer than Alcor's typical 429 recovery and longer than the new 1.5 s negative-cache window, so a genuinely incomplete SDK trade gets refetched instead of surfacing as image 1.
+- Leave the rate-limit branch (`msg.includes("Rate limited")`) with its longer `5000 * 2^n` backoff untouched.
 
-- If `tickFailures === 0` on the first attempt (common when the pool list is small or cache is warm), nothing changes.
-- If retries exhaust (`MAX_TRANSIENT_RETRIES`), the existing `exhaustedTransient` path already kicks in: the button becomes "Route unavailable — retry" and the self-heal timer schedules another attempt in 8s. In practice the tick cache warms up in one or two retries.
-- HTTP fallback is still available: after we exhaust SDK retries, the query has failed transiently — but the same flow that shows the retry button will re-run and the retry will find a healthy SDK trade (or fall through to HTTP naturally the next time SDK produces `quoteComplete: true` but worse than HTTP).
+### 3. Prewarm tick cache on token selection
 
-## Non-goals
+Also in `src/lib/alcorRouter.ts`, export a `prewarmTicksForPair(tokenIn, tokenOut, maxHops)` helper that:
 
-- No change to the $30 grid gating.
-- No change to `maxHops`, pool cap, `minSplits`/`maxSplits`.
-- No change to `alcorRouter.ts`; this is a routing-decision fix in the hook.
+- Skips work if `isAlcorCoolingDown()`.
+- Runs `selectRelevantPools` on the cached `poolsCache` (does nothing if pools aren't cached yet — the module-import warm-up handles that).
+- Fires tick fetches at concurrency=4 (lower than the quote's 10 to avoid stealing from an in-flight quote) and swallows errors. This is best-effort cache warm-up, not a quote.
+
+Call it from `useSwapRoute.ts` inside a `useEffect` keyed on `tokenIn?.contract`, `tokenIn?.ticker`, `tokenOut?.contract`, `tokenOut?.ticker` (fires as soon as both tokens are picked, before the user finishes typing an amount). By the time the debounced amount hits `queryFn`, most tick data is already in `ticksCache` and the SDK returns `quoteComplete: true` on the first attempt.
+
+## Why this is safe
+
+- No change to `computeAlcorTrade`'s decision logic, the $30 grid, `maxHops`, pool cap, `minSplits`/`maxSplits`, or the memo/transaction shape.
+- If Alcor is genuinely down, the hook still exits via `exhaustedTransient` after 6 retries and the existing 8 s self-heal timer kicks in — same UX as today, just later.
+- The prewarm effect is idempotent and swallows errors, so it can't produce a user-visible failure.
+- Negative-cache-window shrink from 8 s → 1.5 s: worst case is one extra 429 on a genuinely broken pool inside a single fan-out, and the new per-request retry already cushions that.
 
 ## Validation
 
-1. Hard-reload the widget, quote a fresh pair (e.g. LSW → CHEESE with 1000 LSW). First rendered quote should already show the correct multi-split (not the 80/10/5/5 placeholder-looking split).
-2. Console should show one `[alcor-router] SDK route incomplete; retrying …` warning followed by `[alcor-router] SDK won …` — no user-visible flicker beyond the normal loading spinner.
-3. Second and subsequent quotes of the same pair should still be instant (tick cache warm, no retries triggered).
+1. Hard-reload the widget. Pick LSWAX → CHEESE, enter 1000. The first rendered quote should already be image 2 (multi-hop with 0.3% intermediate fees), with no red "Route unavailable" banner in the interim.
+2. Console should show either zero `SDK route incomplete; retrying` warnings, or at most one before `SDK won …` lands.
+3. Change tokens to a different fresh pair — same behavior: complete route on first render.
+4. Manually trigger a 429 storm (throttle Alcor) and confirm the hook still eventually falls back to `exhaustedTransient` → 8 s self-heal, not an infinite spinner.
+
+## Non-goals
+
+- Not touching `alcorRouter.ts` routing logic, pool selection, or trade construction.
+- Not changing the executed transaction shape or slippage handling.
+- Not changing the multiroute UI rendering (`MultiRoutePanel`).
