@@ -175,6 +175,7 @@ const HUB_KEYS = new Set([
   "waxusdc-eth.token",
   "waxusdt-eth.token",
   "usdc-tethertether",
+  "lsw-lsw.alcor",
   "lswax-token.lswax",
   "lswax-token.fusion",
   "cheese-cheeseburger",
