@@ -585,9 +585,6 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     return null;
   }
 
-  const percents: number[] = [];
-  for (let p = distributionPercent; p <= 100; p += distributionPercent) percents.push(p);
-
   const rawAmount = toRawAmount(
     amount,
     tradeType === "EXACT_INPUT" ? tokenIn.precision : tokenOut.precision
@@ -598,14 +595,67 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   );
 
   const sdkTradeType = tradeType === "EXACT_INPUT" ? TradeType.EXACT_INPUT : TradeType.EXACT_OUTPUT;
-  const trade = await runBestTradeWithSplit(
-    routes,
-    currencyAmount,
-    percents,
-    sdkTradeType,
-    sdkPools,
-    { minSplits: 1, maxSplits: 10 }
+
+  // Run the split optimizer at both a fine (1%) and coarse (5%) grid and keep
+  // whichever trade is objectively better. `bestTradeWithSplit` is a greedy
+  // heuristic; finer granularity is usually better but can occasionally land
+  // in a worse local optimum, so we defend against it cheaply here.
+  const buildPercents = (step: number) => {
+    const out: number[] = [];
+    for (let p = step; p <= 100; p += step) out.push(p);
+    return out;
+  };
+  const fineStep = distributionPercent;
+  const coarseStep = 5;
+  const gridConfigs: { step: number; maxSplits: number }[] = [
+    { step: fineStep, maxSplits: 10 },
+  ];
+  if (coarseStep !== fineStep) gridConfigs.push({ step: coarseStep, maxSplits: 6 });
+
+  const gridTrades = await Promise.all(
+    gridConfigs.map((cfg) =>
+      runBestTradeWithSplit(
+        routes,
+        currencyAmount,
+        buildPercents(cfg.step),
+        sdkTradeType,
+        sdkPools,
+        { minSplits: 1, maxSplits: cfg.maxSplits }
+      ).catch((e) => {
+        logger.warn(`[alcor-router] split search failed at step=${cfg.step}`, e);
+        return null;
+      })
+    )
   );
+
+  const exactInEval = tradeType === "EXACT_INPUT";
+  let trade: any = null;
+  let bestGrid: { step: number; maxSplits: number } | null = null;
+  gridTrades.forEach((t, i) => {
+    if (!t) return;
+    if (!trade) {
+      trade = t;
+      bestGrid = gridConfigs[i];
+      return;
+    }
+    const cur = exactInEval
+      ? parseFloat(trade.outputAmount.toFixed())
+      : parseFloat(trade.inputAmount.toFixed());
+    const cand = exactInEval
+      ? parseFloat(t.outputAmount.toFixed())
+      : parseFloat(t.inputAmount.toFixed());
+    const better = exactInEval ? cand > cur : cand < cur;
+    if (better) {
+      trade = t;
+      bestGrid = gridConfigs[i];
+    }
+  });
+  const gridOutputs = gridTrades.map((t, i) => ({
+    step: gridConfigs[i].step,
+    output: t ? parseFloat(t.outputAmount.toFixed()) : null,
+    input: t ? parseFloat(t.inputAmount.toFixed()) : null,
+    splits: t ? t.swaps.length : 0,
+  }));
 
   const diagnostics: SwapRoute["quoteDiagnostics"] = {
     relevantPools: relevant.length,
