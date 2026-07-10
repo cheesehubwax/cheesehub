@@ -454,6 +454,9 @@ function formatSdkDiagnostics(diag?: SwapRoute["quoteDiagnostics"]): string {
 
 // ----- Router entry: prefer WASM (matches Alcor's UI) then fall back to JS -----
 
+let wasmDisabled = false;
+let wasmDisabledLogged = false;
+
 async function runBestTradeWithSplit(
   routes: any[],
   currencyAmount: any,
@@ -463,7 +466,7 @@ async function runBestTradeWithSplit(
   swapConfig: { minSplits: number; maxSplits: number }
 ): Promise<any> {
   const T = Trade as any;
-  if (typeof T.bestTradeWithSplitWASM === "function") {
+  if (!wasmDisabled && typeof T.bestTradeWithSplitWASM === "function") {
     try {
       const wasmTrade = await T.bestTradeWithSplitWASM(
         routes,
@@ -474,9 +477,13 @@ async function runBestTradeWithSplit(
         swapConfig
       );
       if (wasmTrade) return wasmTrade;
-      logger.warn("[alcor-router] WASM router returned null — falling back to JS");
-    } catch (e) {
-      logger.warn("[alcor-router] WASM router threw — falling back to JS", e);
+      wasmDisabled = true;
+    } catch {
+      wasmDisabled = true;
+    }
+    if (wasmDisabled && !wasmDisabledLogged) {
+      wasmDisabledLogged = true;
+      logger.info("[alcor-router] WASM router unavailable in browser — using JS router");
     }
   }
   return T.bestTradeWithSplit(routes, currencyAmount, percents, sdkTradeType, swapConfig);
