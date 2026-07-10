@@ -7,18 +7,6 @@ import { logger } from "@/lib/logger";
 export type TradeType = "EXACT_INPUT" | "EXACT_OUTPUT";
 
 const MAX_TRANSIENT_RETRIES = 3;
-const HTTP_GRACE_MS = 1_500;
-
-function delay(ms: number): Promise<"__timeout__"> {
-  return new Promise((resolve) => setTimeout(() => resolve("__timeout__"), ms));
-}
-
-async function raceWithGrace<T>(p: Promise<T>, ms: number): Promise<{ ready: true; value: T } | { ready: false }> {
-  const result = await Promise.race([p.then((v) => ({ v }), (e) => ({ e })), delay(ms)]);
-  if (result === "__timeout__") return { ready: false };
-  if ("e" in result) throw result.e;
-  return { ready: true, value: result.v };
-}
 
 function isTransientError(err: unknown): boolean {
   if (err instanceof TypeError) return true;
