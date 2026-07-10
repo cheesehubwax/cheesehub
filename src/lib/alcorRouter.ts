@@ -190,7 +190,7 @@ function selectRelevantPools(
   inKey: string,
   outKey: string,
   maxHops: number,
-  cap = 56
+  cap = 96
 ): RawAlcorPool[] {
   const keyOf = (t: RawAlcorPool["tokenA"]) => tokenKey(t.contract, t.symbol);
   const active = pools.filter((p) => p.active);
@@ -281,7 +281,22 @@ function selectRelevantPools(
     const lb = BigInt(b.liquidity || "0");
     return lb > la ? 1 : lb < la ? -1 : 0;
   });
-  return ranked.slice(0, cap);
+
+  // Endpoint-touching pools (any active pool with tokenIn or tokenOut on
+  // either side) must never be dropped: every final leg of any split routes
+  // through one of them, so trimming them here directly costs output. Include
+  // them unconditionally, then fill the remaining slots from the ranked list
+  // up to `cap`.
+  const touchesEndpoint = (p: RawAlcorPool) => {
+    const a = keyOf(p.tokenA);
+    const b = keyOf(p.tokenB);
+    return a === inKey || b === inKey || a === outKey || b === outKey;
+  };
+  const endpointPools = active.filter(touchesEndpoint);
+  const endpointIds = new Set(endpointPools.map((p) => p.id));
+  const filler = ranked.filter((p) => !endpointIds.has(p.id));
+  const remaining = Math.max(0, cap - endpointPools.length);
+  return [...endpointPools, ...filler.slice(0, remaining)];
 }
 
 function formatSdkDiagnostics(diag?: SwapRoute["quoteDiagnostics"]): string {
