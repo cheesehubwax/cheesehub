@@ -48,9 +48,12 @@ export function useSwapRoute(
   const { data: route, isLoading, error, isFetching, failureCount, refetch } = useQuery<SwapRoute | null>({
     queryKey: ["swap-route", tokenIn?.ticker, tokenIn?.contract, tokenOut?.ticker, tokenOut?.contract, debouncedAmount, slippage, receiver, debouncedTradeType],
     queryFn: async ({ signal }) => {
-      // Primary quote: Alcor's HTTP router — one request, cheap, uses live
-      // pool state. This is the only path that runs on the hot input loop.
-      const http = await fetchSwapRoute(
+      // Race Alcor's HTTP router against the SDK split router and pick the
+      // better quote. HTTP is cheap and usually single-path; the SDK can
+      // produce multi-split routes that beat HTTP on larger sizes. During an
+      // Alcor 429 cooldown we skip the SDK leg so we don't worsen rate
+      // limiting (matches previous fallback behavior).
+      const httpPromise = fetchSwapRoute(
         tokenIn!,
         tokenOut!,
         debouncedAmount,
@@ -60,34 +63,79 @@ export function useSwapRoute(
         debouncedTradeType,
       );
 
-      const httpValid = !!http && !!http.memo && http.output > 0;
-      if (httpValid) return http!;
+      const sdkPromise = isAlcorCoolingDown()
+        ? Promise.resolve(null as SwapRoute | null)
+        : computeAlcorTrade({
+            tokenIn: tokenIn!,
+            tokenOut: tokenOut!,
+            amount: debouncedAmount,
+            slippage,
+            receiver,
+            tradeType: debouncedTradeType,
+            signal,
+          }).catch((e) => {
+            if ((e as any)?.name === "AbortError") throw e;
+            logger.warn("[alcor-router] SDK leg failed", e);
+            return null;
+          });
 
-      // HTTP returned an empty/no-route response with no error. Try the SDK
-      // split router as a fallback — but only if we're not in an Alcor
-      // cooldown, otherwise we'd fan out dozens of /ticks requests and make
-      // rate limiting worse.
-      if (isAlcorCoolingDown()) return null;
+      const [httpSettled, sdkSettled] = await Promise.allSettled([httpPromise, sdkPromise]);
 
-      try {
-        const sdk = await computeAlcorTrade({
-          tokenIn: tokenIn!,
-          tokenOut: tokenOut!,
-          amount: debouncedAmount,
-          slippage,
-          receiver,
-          tradeType: debouncedTradeType,
-          signal,
-        });
-        if (sdk && sdk.swaps.length > 0 && sdk.output > 0) {
-          logger.info("[alcor-router] SDK fallback produced route");
-          return sdk;
+      // Abort propagation
+      for (const s of [httpSettled, sdkSettled]) {
+        if (s.status === "rejected" && (s.reason as any)?.name === "AbortError") {
+          throw s.reason;
         }
-      } catch (e) {
-        if ((e as any)?.name === "AbortError") throw e;
-        logger.warn("[alcor-router] SDK fallback failed", e);
-        if (isTransientError(e)) throw e;
       }
+
+      const http =
+        httpSettled.status === "fulfilled" ? (httpSettled.value as SwapRoute | null) : null;
+      const sdk =
+        sdkSettled.status === "fulfilled" ? (sdkSettled.value as SwapRoute | null) : null;
+
+      const httpValid = !!http && !!http.memo && http.output > 0;
+      const sdkValid = !!sdk && sdk.swaps.length > 0 && sdk.output > 0 && !!sdk.memo;
+
+      // Prefer SDK only when it's a real multi-split AND strictly better than
+      // HTTP by a small threshold, to avoid flip-flopping on ties.
+      const IMPROVEMENT_THRESHOLD = 0.0005; // 0.05%
+      const exactIn = debouncedTradeType === "EXACT_INPUT";
+
+      const pickSdk = (): boolean => {
+        if (!sdkValid) return false;
+        if (sdk!.swaps.length < 2) return false;
+        if (!httpValid) return true;
+        if (exactIn) {
+          // Larger output wins.
+          return sdk!.output > http!.output * (1 + IMPROVEMENT_THRESHOLD);
+        }
+        // EXACT_OUTPUT: smaller input wins. Fall back to HTTP if either input missing.
+        if (sdk!.input == null || http!.input == null) return false;
+        return sdk!.input < http!.input * (1 - IMPROVEMENT_THRESHOLD);
+      };
+
+      if (pickSdk()) {
+        const delta = exactIn
+          ? (sdk!.output - (http?.output ?? 0)) / Math.max(http?.output ?? 1, 1e-9)
+          : ((http?.input ?? 0) - (sdk!.input ?? 0)) / Math.max(http?.input ?? 1, 1e-9);
+        logger.info(
+          `[alcor-router] SDK won (${sdk!.swaps.length} splits, +${(delta * 100).toFixed(3)}%)`,
+        );
+        return sdk!;
+      }
+
+      if (httpValid) {
+        if (sdkValid) {
+          logger.info(
+            `[alcor-router] HTTP won (sdk splits=${sdk!.swaps.length}, sdk out=${sdk!.output}, http out=${http!.output})`,
+          );
+        }
+        return http!;
+      }
+
+      // Neither valid — propagate errors if any, else null.
+      if (httpSettled.status === "rejected") throw httpSettled.reason;
+      if (sdkSettled.status === "rejected") throw sdkSettled.reason;
       return null;
     },
     enabled,
