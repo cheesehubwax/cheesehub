@@ -48,6 +48,10 @@ export interface SwapRoute {
     routesConsidered?: number;
     tickFailures?: number;
     rateLimitedTickFailures?: number;
+    tickRequests?: number;
+    ticksSucceeded?: number;
+    queueDepth?: number;
+    quotePartial?: boolean;
     tookMs?: number;
   };
 }
