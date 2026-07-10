@@ -1,43 +1,26 @@
-## Plan: fix the visual, revert the routing churn
+## Root cause
 
-You're right — if the actual on-chain trade result was identical, the SDK route was correct on the very first quote. What's wrong is only the `MultiRoutePanel` rendering. The recent `alcorRouter.ts` / `useSwapRoute.ts` changes were treating a cosmetic issue as a routing bug and now add real cost (lower concurrency, extra retry storms, prewarm fan-out, `incompleteSdkRouteError` throws that keep a valid quote off screen).
+The multiroute panel loads slowly on the first quote because `useAlcorPools` fires one HTTP request per pool id (`/swap/pools/{id}`), gated by `isAlcorCoolingDown()`. Meanwhile the router that already produced the quote calls `fetchAllAlcorPools()` (`/swap/pools`) — a single bulk endpoint that returns every pool with the exact same `{id, fee, tokenA, tokenB}` shape and caches the result in memory for 20s. So the data the panel needs is already in the browser the moment the quote resolves; we're just re-fetching each pool one-by-one for no reason.
 
-### Root cause of the visual glitch
+Resetting the amount "fixes" it only because by then those N per-pool requests have finally completed and populated the react-query cache.
 
-`MultiRoutePanel` walks each split's `route: number[]` and calls `pools.get(poolId)` from `useAlcorPools`. On the first quote:
+## Fix (visual-only, no router/hook changes)
 
-- Pool metadata for some of those IDs isn't in the react-query cache yet.
-- `useAlcorPools` has `enabled: !isAlcorCoolingDown()` and `retry: 0`, so some queries can be idle/loading/errored.
-- The render loop hits a missing pool, sets `broken = true`, and stops mid-chain — producing the "wrong looking" multiroute.
-- Its `isLoading` gate is `results.some(r => r.isLoading)`, which is false for disabled/idle/errored queries, so the skeleton doesn't cover this case.
-- Seconds later the pool queries resolve, the map fills in, and the same underlying route renders correctly.
+### `src/hooks/useAlcorPools.ts`
+Replace the `useQueries` fan-out with a single `useQuery`:
 
-### Changes
+- Query key: `["alcor-all-pools"]`.
+- Query fn: `fetchAllAlcorPools(signal)` (already exported from `src/lib/alcorRouter.ts`).
+- `staleTime: 20_000` (matches the in-memory cache TTL), `gcTime: 5 * 60_000`, `retry: 2`, `placeholderData: (prev) => prev`.
+- Keep `enabled: !isAlcorCoolingDown()` so we don't add pressure during a 429 storm, but since `fetchAllAlcorPools` is already called by the router on every quote, its promise is typically resolved by the time the panel mounts — react-query will hydrate synchronously from the shared cache.
+- Build the returned `pools` map by filtering the bulk list down to the requested ids. `RawAlcorPool` and `AlcorPool` are structurally identical for the fields the panel reads (`id`, `fee`, `tokenA/tokenB.{id,symbol,contract,decimals}`), so no shape conversion is needed beyond a light cast.
+- Recompute `isReady` as `uniqueIds.length > 0 && uniqueIds.every((id) => map.has(id))`, `hasError` from the single query, `isLoading` from `query.isLoading`.
 
-1. **`src/components/swap/MultiRoutePanel.tsx`** — only render the chain once every pool in `allIds` is present in the `pools` map. While any pool is missing, show the existing skeleton (or nothing) instead of a broken chain. Don't render partial rows with `broken = true`.
+### No other files change
+`MultiRoutePanel.tsx` already gates rendering on `isReady`, so once the hook returns the fully populated map on the first pass the visual paints immediately with correct symbols and fees. `alcorRouter.ts`, `useSwapRoute.ts`, and the swap widget are untouched.
 
-2. **`src/hooks/useAlcorPools.ts`** — expose a stricter readiness flag:
-   - `isReady = uniqueIds.every(id => pools.has(id))`
-   - Keep `enabled: !isAlcorCoolingDown()` but give the pool metadata queries a small retry (e.g. `retry: 2`) so a single 429 doesn't leave the chain permanently broken.
-   - Keep `placeholderData: prev` so a good render survives refetches.
+## Why this is safe
 
-3. **Revert the router/hook churn to the pre-issue behavior** (they were solving a problem that didn't exist):
-   - `src/lib/alcorRouter.ts`
-     - Restore tick-fetch concurrency to its previous value (10) — remove `QUOTE_TICK_CONCURRENCY=4` / `PREWARM_TICK_CONCURRENCY=2`.
-     - Restore `TICKS_FAIL_TTL_MS` and remove the `TICKS_FETCH_RETRIES` retry loop unless it was already present before this issue.
-     - Remove the `incompleteSdkRouteError()` guard in `computeAlcorTrade`. A route with `tickFailures > 0` but a valid output is still the correct quote; do not throw.
-     - Remove `prewarmTicksForPair` if it was only added for this issue (and its export).
-   - `src/hooks/useSwapRoute.ts`
-     - Drop the `prewarmTicksForPair` effect.
-     - Remove `"complete split route"` and `"ticks recently failed"` from `isTransientError`.
-     - Remove the `sdk.quoteComplete === false` → throw branch. Accept the SDK quote as-is when it's valid.
-     - Restore `MAX_TRANSIENT_RETRIES` and `retryDelay` to their pre-issue values (revert 6 → 3, restore original backoff).
-
-4. **`.lovable/plan.md`** — replace with a short note that the previous plan misdiagnosed a visual-only issue.
-
-### Verification
-
-- Hard refresh, pick the same pair/amount you tested before.
-- First rendered quote: output amount matches the "second" (correct-looking) render exactly. ✅ already confirmed by you.
-- `MultiRoutePanel` shows a skeleton until all pool metadata for the route is fetched, then renders the full chain in one shot — no truncated/broken variant is ever visible.
-- No first-quote "route unavailable" flashes, no `incompleteSdkRouteError` thrown, and normal tick-fetch concurrency is restored.
+- The bulk endpoint is the same one the router already hits; we're piggy-backing on a request that has to happen anyway. No extra load on Alcor.
+- The router's `poolsCache` (in `alcorRouter.ts`) and react-query's cache are independent, but both hydrate from the same fetch — react-query's version just gives the UI a reactive handle on it.
+- No changes to swap math, retry logic, cooldowns, or the actual on-chain trade.
