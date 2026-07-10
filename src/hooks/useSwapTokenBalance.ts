@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, skipToken } from "@tanstack/react-query";
 import type { TokenWithBalance } from "@/hooks/useAllTokenBalances";
 import { fetchSingleTokenBalance } from "@/lib/waxRpcFallback";
 
@@ -14,7 +14,7 @@ export function useSwapTokenBalance(
   // Try reading from the shared cache first (reactive via select)
   const { data: cachedBalance } = useQuery<{ tokens: TokenWithBalance[] }, Error, string | null>({
     queryKey: ["all-token-balances", accountName],
-    enabled: false, // Don't trigger a fetch — just subscribe to existing cache
+    queryFn: skipToken, // Never fetches — only subscribes to the shared cache
     select: (data) => {
       if (!contract || !ticker || !data?.tokens) return null;
       const match = data.tokens.find(
