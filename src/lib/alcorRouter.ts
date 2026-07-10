@@ -96,7 +96,7 @@ const ticksCache = new Map<number, { at: number; data: RawAlcorTick[] }>();
 const ticksInflight = new Map<number, Promise<RawAlcorTick[]>>();
 const TICKS_TTL_MS = 5 * 60_000;
 // Negative cache for failed tick fetches so we don't hammer the same pool.
-const ticksFailCache = new Map<number, number>();
+const ticksFailCache = new Map<number, { at: number; rateLimited: boolean }>();
 const TICKS_FAIL_TTL_MS = 12_000;
 const TICKS_RATE_LIMIT_FAIL_TTL_MS = 60_000;
 
@@ -193,9 +193,16 @@ function enqueueTickFetch<T>(task: () => Promise<T>, signal?: AbortSignal): Prom
 export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Promise<RawAlcorTick[]> {
   const cached = ticksCache.get(poolId);
   if (cached && Date.now() - cached.at < TICKS_TTL_MS) return cached.data;
-  const failedAt = ticksFailCache.get(poolId);
-  if (failedAt && Date.now() - failedAt < TICKS_RATE_LIMIT_FAIL_TTL_MS) {
-    throw new Error(`ticks recently failed for pool ${poolId}`);
+  const failed = ticksFailCache.get(poolId);
+  if (failed) {
+    const ttl = failed.rateLimited ? TICKS_RATE_LIMIT_FAIL_TTL_MS : TICKS_FAIL_TTL_MS;
+    if (Date.now() - failed.at < ttl) {
+      throw new Error(
+        failed.rateLimited
+          ? "Rate limited — please wait a moment and try again"
+          : `ticks recently failed for pool ${poolId}`,
+      );
+    }
   }
   const inflight = ticksInflight.get(poolId);
   if (inflight) return inflight;
@@ -217,10 +224,10 @@ export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Prom
           await delay(TICK_RETRY_DELAYS_MS[attempt], signal);
           continue;
         }
-        ticksFailCache.set(poolId, Date.now());
+        ticksFailCache.set(poolId, { at: Date.now(), rateLimited: true });
         throw new Error("Rate limited — please wait a moment and try again");
       }
-      ticksFailCache.set(poolId, Date.now() - (TICKS_RATE_LIMIT_FAIL_TTL_MS - TICKS_FAIL_TTL_MS));
+      ticksFailCache.set(poolId, { at: Date.now(), rateLimited: false });
       throw new Error(`Failed to fetch ticks for pool ${poolId} (${res.status})`);
     }
     throw new Error(`Failed to fetch ticks for pool ${poolId}`);
