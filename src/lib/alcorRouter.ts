@@ -302,7 +302,12 @@ async function runBestTradeWithSplit(
   swapConfig: { minSplits: number; maxSplits: number }
 ): Promise<any> {
   const T = Trade as any;
-  if (typeof T.bestTradeWithSplitWASM === "function") {
+  // The SDK's WASM router ships as a Node-only build (uses `require('util')`
+  // and CJS `module.exports`), so it cannot load in the browser and always
+  // throws "require is not defined". Skip it entirely in browser contexts to
+  // avoid the noisy console error and wasted dynamic import on every quote.
+  const isBrowser = typeof window !== "undefined";
+  if (!isBrowser && typeof T.bestTradeWithSplitWASM === "function") {
     try {
       const wasmTrade = await T.bestTradeWithSplitWASM(
         routes,
