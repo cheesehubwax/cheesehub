@@ -298,6 +298,12 @@ export function CheeseSwapWidget({
                 <span className="text-foreground">{slippage}%</span>
               </div>
               <div className="flex justify-between">
+                <span className="text-muted-foreground">Expected Output</span>
+                <span className="text-foreground">
+                  {formatTokenAmount(route.output, tokenOut?.precision ?? 8)} {tokenOut?.ticker}
+                </span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-muted-foreground">Min. Received</span>
                 <span className="text-foreground">
                   {formatTokenAmount(route.minReceived, tokenOut?.precision ?? 8)} {tokenOut?.ticker}
