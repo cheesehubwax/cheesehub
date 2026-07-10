@@ -104,7 +104,7 @@ const TICKS_RATE_LIMIT_FAIL_TTL_MS = 60_000;
 // /ticks requests. Keep one global queue so overlapping quote attempts share a
 // slow lane instead of stampeding the API.
 const TICK_QUEUE_CONCURRENCY = 2;
-const TICK_QUEUE_SPACING_MS = 180;
+const TICK_QUEUE_SPACING_MS = 90;
 const TICK_RETRY_DELAYS_MS = [900, 2_200];
 type TickQueueJob = {
   run: () => Promise<void>;
