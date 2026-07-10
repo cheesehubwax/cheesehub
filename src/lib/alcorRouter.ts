@@ -266,8 +266,9 @@ function selectRelevantPools(
     const touchesOut = a === outKey || b === outKey;
     const touchesEndpoint = touchesIn || touchesOut;
     const touchesHub = HUB_KEYS.has(a) || HUB_KEYS.has(b);
+    const hubHub = HUB_KEYS.has(a) && HUB_KEYS.has(b);
     const endpointHub = touchesEndpoint && touchesHub;
-    const classRank = direct ? 0 : endpointHub ? 1 : touchesEndpoint ? 2 : touchesHub ? 3 : 4;
+    const classRank = direct ? 0 : endpointHub ? 1 : hubHub ? 2 : touchesEndpoint ? 3 : touchesHub ? 4 : 5;
     return { pathLen, classRank };
   };
 
