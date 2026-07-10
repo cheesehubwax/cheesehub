@@ -453,7 +453,7 @@ export async function computeShadowQuote(args: ShadowQuoteArgs): Promise<ShadowQ
     percents,
     tradeType === "EXACT_INPUT" ? TradeType.EXACT_INPUT : TradeType.EXACT_OUTPUT,
     sdkPools,
-    { minSplits: 1, maxSplits: 10 }
+    { minSplits: 1, maxSplits: 4 }
   );
   if (!trade) return null;
 
@@ -584,7 +584,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     percents,
     sdkTradeType,
     sdkPools,
-    { minSplits: 1, maxSplits: 10 }
+    { minSplits: 1, maxSplits: 4 }
   );
 
   const diagnostics: SwapRoute["quoteDiagnostics"] = {
