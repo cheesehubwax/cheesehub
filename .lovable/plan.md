@@ -1,52 +1,32 @@
-## What's happening
+## What's causing it
 
-Every row in the token selector renders an `<img src="https://wax.alcor.exchange/api/v2/tokens/{ticker}-{contract}/logo">`. For tokens Alcor doesn't have a logo file for, the request 404s, `onError` fires, and we swap in the letter-avatar fallback. That's the flood of red 404s you see.
+Two hooks subscribe to the shared `["all-token-balances", accountName]` cache without providing a `queryFn`:
 
-It's not "spamming" Alcor in a harmful way — each missing logo is requested at most once per token per page load, and the browser caches the 404 for the session so scrolling/reopening doesn't re-hit. But two real problems remain:
+- `src/hooks/useSwapTokenBalances.ts`
+- `src/hooks/useSwapTokenBalance.ts`
 
-1. **Console noise.** Every scroll into new rows produces new 404s. Browsers won't let us silence `<img>` 404s from JS, but we can stop *issuing* the request for tokens we already know are missing.
-2. **Wasted requests on first open.** ~hundreds of tokens = ~hundreds of GETs, most of which will 404. `<img loading="lazy">` isn't set, so every row fetches immediately even before the user scrolls to it.
+Both intentionally set `enabled: false` — they only want to read/select from whatever `useAllTokenBalances` already put in cache. But TanStack Query v5 still warns on mount ("No queryFn was passed…") even when the observer is disabled, because it can't guarantee a future re-enable won't try to fetch.
 
-## Plan
+Functionally harmless (nothing actually refetches, balances still work), but it's noise in the console.
 
-Two small, surgical changes in the token-selector rendering path — no logic changes elsewhere.
+## Fix
 
-### 1. Persist a "known-missing logo" set across the session
+Give both hooks a placeholder `queryFn` that would never realistically run, since `enabled: false` prevents execution. Using `skipToken` from `@tanstack/react-query` is the idiomatic v5 way to say "this observer never fetches" — it silences the warning without changing behavior.
 
-Add a tiny module (e.g. `src/lib/tokenLogoMisses.ts`) that:
+### Changes
 
-- Holds an in-memory `Set<string>` of `contract:ticker` keys whose logo already 404'd.
-- Hydrates from `sessionStorage` on load, persists on write.
-- Exposes `hasMissingLogo(contract, ticker)` and `markMissingLogo(contract, ticker)`.
+**`src/hooks/useSwapTokenBalances.ts`**
+- Import `skipToken` from `@tanstack/react-query`.
+- Replace `enabled: false` with `queryFn: skipToken` (drop the `enabled` line — `skipToken` disables fetching by itself).
 
-Then in the two logo renderers:
+**`src/hooks/useSwapTokenBalance.ts`**
+- Same treatment on the cached-balance `useQuery` (the RPC-fallback `useQuery` below it already has a real `queryFn` and is fine).
+- Keep the `enabled` guard on the fallback query as-is (it depends on `cachedBalance === undefined`).
 
-- `src/components/swap/TokenSelector.tsx` (inner `TokenLogo`)
-- `src/components/TokenLogo.tsx`
-
-Before rendering the `<img>`, check `hasMissingLogo(...)`. If true, render the letter-avatar directly and skip the network request entirely. In the existing `onError` handler, additionally call `markMissingLogo(...)`.
-
-Effect: first session-load still probes each token once (unavoidable — we don't know which are missing), but every subsequent open of the selector renders instantly with zero 404s for tokens already known bad.
-
-### 2. Lazy-load logos so offscreen rows don't fetch
-
-Add `loading="lazy"` and `decoding="async"` to both `<img>` tags. Combined with the existing `ScrollArea` (`h-[320px]`), this means only the ~10 visible rows fetch on open; the rest fetch as the user scrolls. On sessions where the user only wants a popular token, we avoid hundreds of speculative requests.
-
-### Files touched
-
-- `src/lib/tokenLogoMisses.ts` — new, ~30 lines
-- `src/components/swap/TokenSelector.tsx` — guard + `loading="lazy"` on the inner `TokenLogo`
-- `src/components/TokenLogo.tsx` — guard + `loading="lazy"`
-
-### Explicitly not doing
-
-- No pre-flight HEAD probe (would double requests on first open).
-- No change to `tokenLogos.ts` cache or Alcor API calls.
-- No change to swap/quote logic.
+No changes to `useAllTokenBalances`, no changes to any component, no behavioral change to balance loading.
 
 ### Validation
 
-- Open token selector cold → 404s appear once for missing-logo tokens (unavoidable), letter avatars render.
-- Close and reopen → no new 404s for those same tokens; letter avatars render immediately.
-- Scroll: previously-offscreen rows fetch their logo only when scrolled into view.
-- Popular-token chips (WAX, CHEESE, etc.) still render logos as before.
+- Open the app / token selector — the "No queryFn was passed" warning for `["all-token-balances", …]` disappears.
+- Balances still display correctly for connected accounts (WAX, CHEESE rows in swap selector still show amounts).
+- Swap single-balance display (input token available balance) still populates from the shared cache, and still falls back to RPC when the cache is empty.
