@@ -19,7 +19,7 @@ export function useAlcorPools(ids: number[]) {
     queryFn: ({ signal }) => fetchAllAlcorPools(signal),
     staleTime: 20_000,
     gcTime: 5 * 60_000,
-    enabled: !isAlcorCoolingDown(),
+    enabled: uniqueIds.length > 0 && !isAlcorCoolingDown(),
     retry: 2,
     retryDelay: (attempt: number) => Math.min(500 * 2 ** attempt, 3000),
     placeholderData: (prev) => prev,
@@ -40,7 +40,7 @@ export function useAlcorPools(ids: number[]) {
   }, [query.data, uniqueIds]);
 
   const isLoading = query.isLoading;
-  const isReady = uniqueIds.length > 0 && uniqueIds.every((id) => pools.has(id));
+  const isReady = uniqueIds.length === 0 || uniqueIds.every((id) => pools.has(id));
   const hasError = query.isError;
 
   return { pools, isLoading, isReady, hasError };
