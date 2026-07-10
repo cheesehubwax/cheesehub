@@ -122,9 +122,14 @@ function makeAbortError(): DOMException {
 function delay(ms: number, signal?: AbortSignal): Promise<void> {
   if (signal?.aborted) return Promise.reject(makeAbortError());
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(resolve, ms);
+    const cleanup = () => signal?.removeEventListener("abort", onAbort);
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, ms);
     const onAbort = () => {
       clearTimeout(timer);
+      cleanup();
       reject(makeAbortError());
     };
     signal?.addEventListener("abort", onAbort, { once: true });
