@@ -7,6 +7,7 @@ import { useSwapTokenBalances } from "@/hooks/useSwapTokenBalances";
 import { useAlcorTokenPrices } from "@/hooks/useAlcorTokenPrices";
 import { useWax } from "@/context/WaxContext";
 import { type SwapToken, getTokenLogoUrl } from "@/lib/swapApi";
+import { hasMissingLogo, markMissingLogo } from "@/lib/tokenLogoMisses";
 
 interface TokenSelectorProps {
   open: boolean;
@@ -150,7 +151,7 @@ function TokenLogo({
   size: number;
 }) {
   const key = `${token.ticker}_${token.contract}`;
-  const hasError = imgErrors.has(key);
+  const hasError = imgErrors.has(key) || hasMissingLogo(token.contract, token.ticker);
 
   return hasError ? (
     <div
@@ -165,7 +166,12 @@ function TokenLogo({
       alt={token.ticker}
       className="rounded-full"
       style={{ width: size, height: size }}
-      onError={() => setImgErrors((prev) => new Set(prev).add(key))}
+      loading="lazy"
+      decoding="async"
+      onError={() => {
+        markMissingLogo(token.contract, token.ticker);
+        setImgErrors((prev) => new Set(prev).add(key));
+      }}
     />
   );
 }
