@@ -403,7 +403,7 @@ export async function computeShadowQuote(args: ShadowQuoteArgs): Promise<ShadowQ
 
   // Fetch ticks for every relevant pool in parallel.
   // Fetch ticks with bounded concurrency so we don't hammer Alcor into 429s.
-  const tickResults = await mapWithConcurrency(relevant, QUOTE_TICK_CONCURRENCY, async (p) => {
+  const tickResults = await mapWithConcurrency(relevant, TICK_CONCURRENCY, async (p) => {
     try {
       return { p, ticks: await fetchPoolTicks(p.id, signal) };
     } catch (e) {
@@ -524,7 +524,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
 
   let tickFailures = 0;
   let rateLimitedTickFailures = 0;
-  const tickResults = await mapWithConcurrency(relevant, QUOTE_TICK_CONCURRENCY, async (p) => {
+  const tickResults = await mapWithConcurrency(relevant, TICK_CONCURRENCY, async (p) => {
     try {
       return { p, ticks: await fetchPoolTicks(p.id, signal) };
     } catch (e) {
@@ -547,21 +547,6 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
       }
     })
     .filter((p): p is Pool => p !== null);
-  const earlyDiagnostics = (): SwapRoute["quoteDiagnostics"] => ({
-    relevantPools: relevant.length,
-    poolsBuilt: sdkPools.length,
-    routesConsidered: 0,
-    tickFailures,
-    rateLimitedTickFailures,
-    tookMs: Math.round(performance.now() - started),
-  });
-
-  // Never route against a partial cold-cache pool set. A 47/56 pool build can
-  // look valid but produces the bad first multiroute the user reported. Force
-  // the hook retry loop to wait until every selected pool has ticks.
-  if (tickFailures > 0) {
-    throw incompleteSdkRouteError(earlyDiagnostics());
-  }
 
   if (sdkPools.length === 0) {
     return null;
@@ -572,7 +557,6 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
 
   const routes = computeAllRoutes(inTok, outTok, sdkPools, maxHops);
   if (routes.length === 0) {
-    if (rateLimitedTickFailures > 0) throw incompleteSdkRouteError(earlyDiagnostics());
     return null;
   }
 
@@ -608,7 +592,6 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   };
 
   if (!trade) {
-    if (tickFailures > 0) throw incompleteSdkRouteError(diagnostics);
     return null;
   }
 
