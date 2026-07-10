@@ -84,38 +84,11 @@ export function useSwapRoute(
         signal,
       });
 
-      // Race the HTTP result against a short grace window. If HTTP arrives
-      // with a valid quote quickly, only give the SDK a matching grace to
-      // catch up before we ignore it for this query — the JS split solver
-      // can otherwise run for tens of seconds and starve the UI.
-      let httpSettled: PromiseSettledResult<SwapRoute | null>;
-      let sdkSettled: PromiseSettledResult<SwapRoute | null>;
-
-      // Convert both into always-settling promises so we can inspect either
-      // after any grace expires without swallowing abort errors.
-      const wrap = <T>(p: Promise<T>): Promise<PromiseSettledResult<T>> =>
-        p.then(
-          (value) => ({ status: "fulfilled", value }) as PromiseSettledResult<T>,
-          (reason) => ({ status: "rejected", reason }) as PromiseSettledResult<T>,
-        );
-      const httpWrapped = wrap(httpPromise);
-      const sdkWrapped = wrap(sdkPromise);
-
-      // Wait for HTTP up to the grace window.
-      const httpEarly = await raceWithGrace(httpWrapped, HTTP_GRACE_MS);
-      if (httpEarly.ready && httpEarly.value.status === "fulfilled" && isValidHttpRoute(httpEarly.value.value)) {
-        // Give SDK a matching grace to beat HTTP; if it doesn't, treat as null.
-        const sdkEarly = await raceWithGrace(sdkWrapped, HTTP_GRACE_MS);
-        httpSettled = httpEarly.value;
-        sdkSettled = sdkEarly.ready
-          ? sdkEarly.value
-          : { status: "fulfilled", value: null };
-      } else {
-        // HTTP not ready or invalid; wait for both (SDK has its own 8s budget).
-        const [h, s] = await Promise.all([httpWrapped, sdkWrapped]);
-        httpSettled = h;
-        sdkSettled = s;
-      }
+      // Wait for both engines. The SDK enforces its own internal ~8s budget
+      // (see computeAlcorTrade), so this can no longer hang — and letting
+      // the split solver actually finish is what makes multi-route splits
+      // appear in the UI instead of always showing HTTP's 100% single leg.
+      const [httpSettled, sdkSettled] = await Promise.allSettled([httpPromise, sdkPromise]);
 
       // Abort propagation
       for (const s of [httpSettled, sdkSettled]) {
