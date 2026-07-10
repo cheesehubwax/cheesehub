@@ -761,24 +761,32 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     return exactInEval ? cand > cur : cand < cur;
   };
 
-  const evaluatePools = async (sdkPools: Pool[]) => {
+  const evaluatePools = async (sdkPools: Pool[], includeCoarse: boolean) => {
     if (sdkPools.length === 0) return null;
     const routes = computeAllRoutes(inTok, outTok, sdkPools, maxHops);
     if (routes.length === 0) return null;
 
+    const activeConfigs = includeCoarse
+      ? gridConfigs
+      : gridConfigs.slice(0, 1);
+
     const gridTrades = await Promise.all(
-      gridConfigs.map((cfg) =>
-        runBestTradeWithSplit(
+      activeConfigs.map((cfg) =>
+        withTimeout(
+          runBestTradeWithSplit(
           routes,
           currencyAmount,
           buildPercents(cfg.step),
           sdkTradeType,
           sdkPools,
           { minSplits: 1, maxSplits: cfg.maxSplits }
-        ).catch((e) => {
-          logger.warn(`[alcor-router] split search failed at step=${cfg.step}`, e);
-          return null;
-        })
+          ).catch((e) => {
+            logger.warn(`[alcor-router] split search failed at step=${cfg.step}`, e);
+            return null;
+          }),
+          SPLIT_CALL_TIMEOUT_MS,
+          null
+        )
       )
     );
 
@@ -788,7 +796,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
       if (!t) return;
       if (isBetterTrade(t, trade)) {
         trade = t;
-        bestGrid = gridConfigs[i];
+        bestGrid = activeConfigs[i];
       }
     });
 
@@ -797,7 +805,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
       bestGrid,
       routesConsidered: routes.length,
       gridOutputs: gridTrades.map((t, i) => ({
-        step: gridConfigs[i].step,
+        step: activeConfigs[i].step,
         output: t ? parseFloat(t.outputAmount.toFixed()) : null,
         input: t ? parseFloat(t.inputAmount.toFixed()) : null,
         splits: t ? t.swaps.length : 0,
