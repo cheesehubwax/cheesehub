@@ -21,6 +21,35 @@ import { logger } from "./logger";
 
 const ALCOR_API = "https://wax.alcor.exchange/api/v2";
 
+// SDK compute budgets. If we exceed these we bail out and let HTTP win.
+const SDK_BUDGET_MS = 8_000;
+const SPLIT_CALL_TIMEOUT_MS = 3_500;
+
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise<T>((resolve) => {
+    let done = false;
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      resolve(fallback);
+    }, ms);
+    p.then(
+      (v) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        resolve(v);
+      },
+      () => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        resolve(fallback);
+      }
+    );
+  });
+}
+
 // ----- Global Alcor cooldown -----
 // After any 429 anywhere in the app, back off all NON-essential Alcor fanout
 // (SDK tick fetches, per-pool detail fetches) for a while. The single HTTP
@@ -732,24 +761,32 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     return exactInEval ? cand > cur : cand < cur;
   };
 
-  const evaluatePools = async (sdkPools: Pool[]) => {
+  const evaluatePools = async (sdkPools: Pool[], includeCoarse: boolean) => {
     if (sdkPools.length === 0) return null;
     const routes = computeAllRoutes(inTok, outTok, sdkPools, maxHops);
     if (routes.length === 0) return null;
 
+    const activeConfigs = includeCoarse
+      ? gridConfigs
+      : gridConfigs.slice(0, 1);
+
     const gridTrades = await Promise.all(
-      gridConfigs.map((cfg) =>
-        runBestTradeWithSplit(
+      activeConfigs.map((cfg) =>
+        withTimeout(
+          runBestTradeWithSplit(
           routes,
           currencyAmount,
           buildPercents(cfg.step),
           sdkTradeType,
           sdkPools,
           { minSplits: 1, maxSplits: cfg.maxSplits }
-        ).catch((e) => {
-          logger.warn(`[alcor-router] split search failed at step=${cfg.step}`, e);
-          return null;
-        })
+          ).catch((e) => {
+            logger.warn(`[alcor-router] split search failed at step=${cfg.step}`, e);
+            return null;
+          }),
+          SPLIT_CALL_TIMEOUT_MS,
+          null
+        )
       )
     );
 
@@ -759,7 +796,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
       if (!t) return;
       if (isBetterTrade(t, trade)) {
         trade = t;
-        bestGrid = gridConfigs[i];
+        bestGrid = activeConfigs[i];
       }
     });
 
@@ -768,7 +805,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
       bestGrid,
       routesConsidered: routes.length,
       gridOutputs: gridTrades.map((t, i) => ({
-        step: gridConfigs[i].step,
+        step: activeConfigs[i].step,
         output: t ? parseFloat(t.outputAmount.toFixed()) : null,
         input: t ? parseFloat(t.inputAmount.toFixed()) : null,
         splits: t ? t.swaps.length : 0,
@@ -785,7 +822,8 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   let bestEval: Awaited<ReturnType<typeof evaluatePools>> | null = null;
 
   const TICK_BATCH_SIZE = 12;
-  for (let start = 0; start < relevant.length; start += TICK_BATCH_SIZE) {
+  const totalBatches = Math.ceil(relevant.length / TICK_BATCH_SIZE);
+  for (let start = 0, batchIdx = 0; start < relevant.length; start += TICK_BATCH_SIZE, batchIdx += 1) {
     const batch = relevant.slice(start, start + TICK_BATCH_SIZE);
     const rateLimitsBeforeBatch = rateLimitedTickFailures;
     const batchResults = await mapWithConcurrency(batch, 4, async (p) => {
@@ -812,12 +850,31 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
       }
     }
 
-    const candidate = await evaluatePools(sdkPools);
-    if (candidate?.trade && isBetterTrade(candidate.trade, bestEval?.trade ?? null)) {
-      bestEval = candidate;
+    const isLastBatch = batchIdx === totalBatches - 1;
+    const rateLimited = rateLimitedTickFailures > rateLimitsBeforeBatch;
+    const budgetExceeded = performance.now() - started > SDK_BUDGET_MS;
+    // Only run the (expensive) split solver on the first productive batch,
+    // the final batch, or when we're about to bail out due to rate limits or
+    // the SDK time budget. Intermediate batches just accumulate pools.
+    const shouldEvaluate =
+      sdkPools.length > 0 &&
+      (!bestEval || isLastBatch || rateLimited || budgetExceeded);
+    if (shouldEvaluate) {
+      const candidate = await evaluatePools(sdkPools, isLastBatch || budgetExceeded);
+      if (candidate?.trade && isBetterTrade(candidate.trade, bestEval?.trade ?? null)) {
+        bestEval = candidate;
+      }
     }
 
-    if (rateLimitedTickFailures > rateLimitsBeforeBatch && bestEval?.trade) {
+    if (budgetExceeded) {
+      completedAllTicks = false;
+      logger.warn(
+        `[alcor-router] SDK time budget exceeded; ${bestEval?.trade ? "using best partial quote" : "no quote — HTTP will win"} (${sdkPools.length}/${relevant.length} pools built)`,
+      );
+      break;
+    }
+
+    if (rateLimited && bestEval?.trade) {
       completedAllTicks = false;
       logger.warn(
         `[alcor-router] stopping tick fetch early after rate limit; using best partial quote (${sdkPools.length}/${relevant.length} pools built)`,
@@ -825,7 +882,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
       );
       break;
     }
-    if (rateLimitedTickFailures > rateLimitsBeforeBatch) {
+    if (rateLimited) {
       completedAllTicks = false;
       logger.warn(
         `[alcor-router] stopping tick fetch early after rate limit; no SDK quote yet (${sdkPools.length}/${relevant.length} pools built)`,
@@ -849,7 +906,11 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   };
 
   if (!bestEval?.trade) {
-    if (tickFailures > 0) throw incompleteSdkRouteError(diagnostics);
+    if (tickFailures > 0) {
+      logger.warn(
+        `[alcor-router] SDK returned no trade; HTTP will win${formatSdkDiagnostics(diagnostics)}`,
+      );
+    }
     return null;
   }
 

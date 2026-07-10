@@ -1,43 +1,46 @@
 ## Problem
 
-`tradeCalculatorWASM` (from `@alcorexchange/alcor-swap-sdk`) is compiled as a CommonJS module that calls `require(...)` at init. In the browser bundle `require` is undefined, so every call to `Trade.bestTradeWithSplitWASM(...)` throws `ReferenceError: require is not defined` and the SDK logs `Failed to load WASM module` as an error.
+After the WASM router correctly falls back to JS (single log confirms it), the query hangs on "finding best quote". Two compounding causes:
 
-Our current router in `src/lib/alcorRouter.ts` calls `bestTradeWithSplitWASM` first inside `runBestTradeWithSplit`, catches the throw, and falls back to the JS `bestTradeWithSplit`. With the recent changes we now call this multiple times per quote (dual-grid 1% + 5%, and per staged tick batch), which:
-
-- Spams the console with WASM errors.
-- Wastes time attempting a codepath that can never work in this environment.
-- Contributes to the "crashing when trying to find best route" symptom.
+1. **`useSwapRoute` waits for both engines.** `Promise.allSettled([http, sdk])` blocks until the SDK resolves. When the SDK is slow, the fast HTTP quote can't render.
+2. **The JS split router is heavy.** With the recent changes we now call `T.bestTradeWithSplit` up to 2× (fine + coarse grid) per staged tick batch (up to 8 batches × 12 pools). On ~96 pools with up to 10-hop routes, the JS solver can run for tens of seconds and starves the UI.
 
 ## Fix
 
-Stop attempting the WASM path in the browser and always use the JS implementation.
+Introduce a hard time budget for the SDK and let HTTP fill the UI when SDK exceeds it. Also trim redundant work inside the SDK path.
 
-### Changes (single file: `src/lib/alcorRouter.ts`)
+### `src/lib/alcorRouter.ts`
 
-1. **Feature-detect once, cache the result.** At module scope add:
-   - `let wasmDisabled = false;`
-   - No probing call — we simply skip WASM after the first failure and never retry within the session.
+1. **Overall SDK time budget.** At the top of `computeAlcorTrade` capture `started`; add `const SDK_BUDGET_MS = 8_000`. In the staged tick-batch loop, break as soon as `performance.now() - started > SDK_BUDGET_MS`, marking `completedAllTicks = false`. If we already have a `bestEval`, return that partial quote (`quoteComplete: false`); if not, return `null` (so HTTP wins) — do NOT throw.
+2. **Per-`runBestTradeWithSplit` timeout.** Wrap each grid call in a `Promise.race` with a 3.5s per-call timeout that resolves to `null` (not reject) so `evaluatePools` still returns any grid winner that did finish. Log once per timeout with `logger.warn`.
+3. **Drop the coarse grid until the fine grid succeeds at least once.** Only run the second (5%) grid on the final batch when we have time budget remaining — the dual-grid comparison is a safety net, not needed inside every intermediate batch.
+4. **Reduce intermediate `evaluatePools` cost.** Only call `evaluatePools` after (a) the first batch that produced at least one built pool and (b) the final batch. Intermediate batches just accumulate pools. This preserves early-exit under rate-limits without paying for a full solve per batch.
+5. **Do not throw on incomplete SDK when HTTP can win.** Change the "no bestEval + tickFailures>0" path to return `null` (with diagnostics attached to a warn log) instead of `throw incompleteSdkRouteError`. `useSwapRoute` already handles `null` by falling back to HTTP.
 
-2. **Rewrite `runBestTradeWithSplit`:**
-   - If `wasmDisabled` is true, immediately call `T.bestTradeWithSplit(...)` (JS).
-   - Otherwise attempt `T.bestTradeWithSplitWASM(...)` inside try/catch as today, but on any throw OR null result set `wasmDisabled = true` and log a single `logger.info("[alcor-router] WASM router unavailable in browser — using JS router")` message (guarded so we only log once).
-   - Always fall back to `T.bestTradeWithSplit(...)` when WASM is unavailable or returned null.
+### `src/hooks/useSwapRoute.ts`
 
-3. **Suppress duplicate warnings.** Remove the per-call `logger.warn` lines inside `runBestTradeWithSplit` (they now fire N times per quote). Keep only the single one-time info log.
+6. **Race SDK against a small grace window.** Keep both promises but wrap the SDK in a race: if `http` resolves and the SDK hasn't after `HTTP_GRACE_MS = 1_500`, proceed with what we have (SDK slot becomes `null`). If HTTP fails, wait full SDK budget. Concretely:
+   - Start both.
+   - `await Promise.race([httpPromise, timeout(HTTP_GRACE_MS)])`.
+   - If HTTP resolved valid, `await Promise.race([sdkPromise, timeout(HTTP_GRACE_MS)])` — accept whatever SDK has by then; if not resolved treat as `null`.
+   - If HTTP not valid yet, `await Promise.allSettled([...])` as today (bounded by the SDK's own 8s budget from step 1).
+7. **Keep existing selection logic.** Once both slots are known (valid or `null`), the current pickSdk / splitLosesToSingleLeg / HTTP-fallback path stays unchanged. The result set for the UI is the same; only the waiting behavior changes.
+8. **Do not abort in-flight SDK on grace timeout.** Let it keep computing so subsequent refreshes benefit from cached ticks and warm pool objects, but ignore its result for this query.
 
-### Why this is the right scope
+### Deliberately unchanged
 
-- The SDK's own `console.error("Failed to load WASM module", ...)` originates inside the SDK and can't be silenced from our code, but skipping the WASM call after the first failure prevents it from firing again in the same session.
-- No behavioral change to routing math — the JS implementation is already the fallback we've been using.
-- No changes needed in `useSwapRoute.ts` or `swapApi.ts`.
+- Split-search "best result wins" semantics: fine grid 1% remains the default; coarse grid still competes when reached.
+- Rate-limit queue and cooldown behavior in `fetchPoolTicks`.
+- Multi-transfer memo generation and HTTP fallback selection in `swapApi.ts`.
 
 ## Verification
 
 1. Type-check clean.
-2. Load the swap widget, enter an amount, and confirm the console shows the one-time `WASM router unavailable in browser — using JS router` info log and no repeated `Failed to load WASM module` errors from subsequent quote refreshes.
-3. Confirm the multi-route panel still populates and picks the better of HTTP vs SDK split.
+2. Reproduce the stuck-loading case: quote should appear within ~1.5s (HTTP) even if SDK is still working. Console shows exactly one WASM fallback line, then either `SDK won (…)` or `HTTP won after SDK check` — never silent for 10+ seconds.
+3. On slow/rate-limited runs, confirm `SDK budget exceeded — using HTTP fallback` warning and that the UI still renders a valid quote.
+4. Confirm the multi-route panel still displays when the SDK does beat HTTP.
 
-## Out of scope
+## Technical notes
 
-- Actually shipping a browser-compatible WASM build of the Alcor trade calculator (would require bundling the `.wasm` under `public/wasm/` and shimming the SDK's loader — much larger change, not needed for correctness).
-- Any changes to the tick-fetch queue, dual-grid split search, or HTTP fallback logic from the previous turn.
+- The WASM error message text has changed (`TextEncoder2 is not a constructor` instead of `require is not defined`) but the `wasmDisabled` gate already catches any throw, so no additional handling is needed there.
+- No new dependencies. All timeouts use `setTimeout` inside a small `withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T>` helper co-located in `alcorRouter.ts`.
