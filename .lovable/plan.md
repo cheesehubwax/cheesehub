@@ -1,15 +1,39 @@
-Goal: In the multiroute panel, when the user hovers over a hop's overlapping token-logo pair, show a popup (tooltip) describing the pool pair in the format requested: e.g. "buzz (buzzingarden) / cheese(cheeseburger)".
+Gate the SDK split router's `distributionPercent` on the USD size of the trade so small trades use a coarser grid (faster, still-good quote) and larger trades keep the fine 1% grid.
 
-Scope: Small UI-only change in the existing multiroute component.
+## Rule
 
-Changes:
-1. Edit `src/components/swap/MultiRoutePanel.tsx`.
-   - Import `Tooltip`, `TooltipTrigger`, and `TooltipContent` from `@/components/ui/tooltip`.
-   - For each hop, derive the two pool tokens (`a` and `b`) already available in `row.chain`.
-   - Build a label string: `${a.symbol} (${a.contract}) / ${b.symbol} (${b.contract})`.
-   - Wrap the hop's overlapping logo group (the `<div className="flex items-center">` containing the two `TokenLogo` components) with the tooltip, using `TooltipTrigger asChild` so the flex layout and negative-margin overlap remain unchanged.
-   - Render the label inside `TooltipContent` positioned above the pair.
+```
+inputUsd = |amount| * (usd price of the token being spent)
+distributionPercent = inputUsd < 30 ? 5 : 1
+```
 
-No other files need to change. The app already has a top-level `TooltipProvider` in `App.tsx`, so no extra provider is needed.
+- For `EXACT_INPUT`, "the token being spent" is `tokenIn`.
+- For `EXACT_OUTPUT`, we don't know the input amount yet, so use `tokenOut.usd_price * amount` (output-value-based) — same $30 USD boundary applied to the trade's economic size.
+- If the relevant USD price is missing/0, fall back to `1` (current, safest behavior).
 
-Validation: After implementation, hover over any pair logo in the multiroute panel and verify the popup shows the correct symbols and contracts.
+## Where the switch lives
+
+The knob is already threaded end-to-end. It just needs to be computed once and passed in.
+
+- `src/hooks/useSwapRoute.ts` — compute `distributionPercent` from the amount and token prices, pass it to `computeAlcorTrade`.
+- `src/lib/alcorRouter.ts` — `computeAlcorTrade` already accepts `distributionPercent` and forwards it into the percent grid; no signature change needed.
+- No change to `swapApi.ts` (HTTP endpoint has its own grid we don't control).
+
+## Logging
+
+Include the chosen `distributionPercent` and computed `inputUsd` in the existing SDK quote log line so we can verify in the console which grid was applied to a given trade. This piggybacks on the observability line already produced by `computeAlcorTrade`.
+
+## Non-goals
+
+- No change to `maxHops`, pool cap, or `minSplits`/`maxSplits`.
+- No graduated tiers beyond the binary $30 boundary.
+- No change to the HTTP fallback path.
+
+## Validation
+
+After the change:
+1. Quote a ~$5 WAX→CHEESE swap → console should show `distributionPercent=5`.
+2. Quote a ~$100 WAX→CHEESE swap → console should show `distributionPercent=1`.
+3. Quote a token with no `usd_price` → console should show `distributionPercent=1`.
+
+Behavior parity check: the small-trade case should still return a valid multi-split quote and remain competitive with the HTTP router; if not, we revisit the threshold.
