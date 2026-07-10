@@ -1,57 +1,52 @@
-# Why 100 USDC → CHEESE crashes
+## What's happening
 
-The Alcor swap SDK ships two routers:
+Every row in the token selector renders an `<img src="https://wax.alcor.exchange/api/v2/tokens/{ticker}-{contract}/logo">`. For tokens Alcor doesn't have a logo file for, the request 404s, `onError` fires, and we swap in the letter-avatar fallback. That's the flood of red 404s you see.
 
-- `bestTradeWithSplitWASM` — fast, but the shipped `wasm_route_finder.js` is a **Node-only** build (uses `require('util')` and `module.exports`). In a browser it throws `require is not defined`, which is exactly the "Failed to load WASM module" error in the console.
-- `bestTradeWithSplit` (pure JS) — always used in our app because WASM never loads. Its cost grows fast with the percent-grid × number of candidate routes × `maxSplits`.
+It's not "spamming" Alcor in a harmful way — each missing logo is requested at most once per token per page load, and the browser caches the 404 for the session so scrolling/reopening doesn't re-hit. But two real problems remain:
 
-Our grid in `useSwapRoute.ts` is:
+1. **Console noise.** Every scroll into new rows produces new 404s. Browsers won't let us silence `<img>` 404s from JS, but we can stop *issuing* the request for tokens we already know are missing.
+2. **Wasted requests on first open.** ~hundreds of tokens = ~hundreds of GETs, most of which will 404. `<img loading="lazy">` isn't set, so every row fetches immediately even before the user scrolls to it.
 
-- `inputUsd < $30` → 5% steps (20 percents)
-- `inputUsd ≥ $30` → 1% steps (100 percents)
+## Plan
 
-At **10 USDC** we use 20 percents → fine. At **100 USDC** we jump to 100 percents, and USDC has many multi-hop routes to CHEESE → the JS splitter combinatorially explodes and locks up / crashes the tab. 10k WAX works because WAX↔CHEESE has far fewer viable routes to combine.
+Two small, surgical changes in the token-selector rendering path — no logic changes elsewhere.
 
-So the recent quote/visual changes were not the cause; the JS splitter is the bottleneck whenever we hand it a fine grid on a high-connectivity token like USDC.
+### 1. Persist a "known-missing logo" set across the session
 
-## Fix (visual + logic, minimal)
+Add a tiny module (e.g. `src/lib/tokenLogoMisses.ts`) that:
 
-Two small, targeted changes. No swap-math changes.
+- Holds an in-memory `Set<string>` of `contract:ticker` keys whose logo already 404'd.
+- Hydrates from `sessionStorage` on load, persists on write.
+- Exposes `hasMissingLogo(contract, ticker)` and `markMissingLogo(contract, ticker)`.
 
-### 1. `src/lib/alcorRouter.ts` — skip WASM in the browser
+Then in the two logo renderers:
 
-- Detect browser once (`typeof window !== "undefined"`) and short-circuit `runBestTradeWithSplit` to the JS path directly.
-- Removes the noisy `console.error("Failed to load WASM module")` and the wasted async import on every quote.
-- Do the same guard for any `fromRouteWASM` / `createTradeFromRouteWASM` call sites if present.
+- `src/components/swap/TokenSelector.tsx` (inner `TokenLogo`)
+- `src/components/TokenLogo.tsx`
 
-### 2. `src/hooks/useSwapRoute.ts` — coarser, bounded grid
+Before rendering the `<img>`, check `hasMissingLogo(...)`. If true, render the letter-avatar directly and skip the network request entirely. In the existing `onError` handler, additionally call `markMissingLogo(...)`.
 
-Replace the two-bucket grid with a monotonic ramp that never gets fine enough to hang the JS splitter:
+Effect: first session-load still probes each token once (unavoidable — we don't know which are missing), but every subsequent open of the selector renders instantly with zero 404s for tokens already known bad.
 
-```text
-inputUsd < $30      → 10% steps  (10 percents)
-$30 ≤ inputUsd < $300 → 5% steps  (20 percents)
-inputUsd ≥ $300     → 2% steps  (50 percents)
-usdPrice unknown    → 5% steps  (safe default)
-```
+### 2. Lazy-load logos so offscreen rows don't fetch
 
-Rationale: Alcor's own UI runs the WASM splitter, which can afford 1% steps. Our JS fallback cannot. 2% is still finer than what most user-visible splits benefit from, and it keeps the worst case bounded.
+Add `loading="lazy"` and `decoding="async"` to both `<img>` tags. Combined with the existing `ScrollArea` (`h-[320px]`), this means only the ~10 visible rows fetch on open; the rest fetch as the user scrolls. On sessions where the user only wants a popular token, we avoid hundreds of speculative requests.
 
-### 3. `src/lib/alcorRouter.ts` — cap `maxSplits` for JS
+### Files touched
 
-When the JS path is taken, pass `swapConfig = { minSplits: 1, maxSplits: 4 }` (down from 10). Split counts above ~3–4 rarely improve quote quality but multiply cost.
+- `src/lib/tokenLogoMisses.ts` — new, ~30 lines
+- `src/components/swap/TokenSelector.tsx` — guard + `loading="lazy"` on the inner `TokenLogo`
+- `src/components/TokenLogo.tsx` — guard + `loading="lazy"`
 
-## Validation
+### Explicitly not doing
 
-- Hard refresh, quote 10 USDC → CHEESE: still works, same output as before.
-- Quote 100 USDC → CHEESE: returns a route without freezing; multiroute panel renders (embedded `visualPath`/`visualFees` already handles the first-quote visual from the previous fix).
-- Quote 10k WAX → CHEESE: unchanged.
-- Console no longer shows "Failed to load WASM module".
-- Compare final output against Alcor's UI for 100 USDC to confirm no regression from the coarser grid; if Alcor is meaningfully better on a specific size, we can tune the thresholds.
+- No pre-flight HEAD probe (would double requests on first open).
+- No change to `tokenLogos.ts` cache or Alcor API calls.
+- No change to swap/quote logic.
 
-## Files touched
+### Validation
 
-- `src/lib/alcorRouter.ts` — skip WASM branch in browser, lower `maxSplits` for JS path.
-- `src/hooks/useSwapRoute.ts` — new 3-tier `distributionPercent` selection.
-
-No changes to `MultiRoutePanel.tsx`, `useAlcorPools.ts`, `swapApi.ts`, or transaction construction.
+- Open token selector cold → 404s appear once for missing-logo tokens (unavoidable), letter avatars render.
+- Close and reopen → no new 404s for those same tokens; letter avatars render immediately.
+- Scroll: previously-offscreen rows fetch their logo only when scrolled into view.
+- Popular-token chips (WAX, CHEESE, etc.) still render logos as before.
