@@ -131,11 +131,6 @@ export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Prom
   }
 }
 
-function hasFreshTicks(poolId: number): boolean {
-  const cached = ticksCache.get(poolId);
-  return !!cached && Date.now() - cached.at < TICKS_TTL_MS && cached.data.length > 0;
-}
-
 function isRateLimitError(err: unknown): boolean {
   return err instanceof Error && err.message.includes("Rate limited");
 }
