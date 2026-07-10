@@ -94,10 +94,10 @@ export async function fetchAllAlcorPools(signal?: AbortSignal): Promise<RawAlcor
 
 const ticksCache = new Map<number, { at: number; data: RawAlcorTick[] }>();
 const ticksInflight = new Map<number, Promise<RawAlcorTick[]>>();
-const TICKS_TTL_MS = 15_000;
+const TICKS_TTL_MS = 5 * 60_000;
 // Negative cache for failed tick fetches so we don't hammer the same pool.
 const ticksFailCache = new Map<number, number>();
-const TICKS_FAIL_TTL_MS = 20_000;
+const TICKS_FAIL_TTL_MS = 8_000;
 
 export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Promise<RawAlcorTick[]> {
   const cached = ticksCache.get(poolId);
@@ -129,6 +129,16 @@ export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Prom
   } finally {
     ticksInflight.delete(poolId);
   }
+}
+
+function isRateLimitError(err: unknown): boolean {
+  return err instanceof Error && err.message.includes("Rate limited");
+}
+
+function incompleteSdkRouteError(diagnostics: SwapRoute["quoteDiagnostics"]): Error {
+  return new Error(
+    `Failed to fetch complete split route — retrying${formatSdkDiagnostics(diagnostics)}`,
+  );
 }
 
 // Run promises with a fixed concurrency limit.
@@ -165,7 +175,10 @@ const HUB_KEYS = new Set([
   "waxusdc-eth.token",
   "waxusdt-eth.token",
   "usdc-tethertether",
+  "lsw-lsw.alcor",
   "lswax-token.lswax",
+  "lswax-token.fusion",
+  "cheese-cheeseburger",
 ]);
 
 /** Select pools that could participate in a tokenIn→tokenOut route of length
@@ -177,7 +190,7 @@ function selectRelevantPools(
   inKey: string,
   outKey: string,
   maxHops: number,
-  cap = 120
+  cap = 56
 ): RawAlcorPool[] {
   const keyOf = (t: RawAlcorPool["tokenA"]) => tokenKey(t.contract, t.symbol);
   const active = pools.filter((p) => p.active);
@@ -233,27 +246,47 @@ function selectRelevantPools(
     return forward || reverse;
   });
 
-  if (candidates.length <= cap) return candidates;
-
-  // Truncation ranking: prefer pools that (0) touch tokenIn/out directly,
-  // (1) touch a known hub, (2) fall back to liquidity desc.
-  const touchesEndpoint = (p: RawAlcorPool) => {
+  // Ranking matters because every selected pool needs a tick request. Keep the
+  // shortest plausible routes first, then liquid endpoint/hub pools. This avoids
+  // burning the first quote on dozens of obscure endpoint pools and hitting 429s
+  // before the split router has the pools Alcor's UI actually uses.
+  const poolRank = (p: RawAlcorPool) => {
     const a = keyOf(p.tokenA);
     const b = keyOf(p.tokenB);
-    return a === inKey || a === outKey || b === inKey || b === outKey;
+    const da = distIn.get(a);
+    const db = distIn.get(b);
+    const ea = distOut.get(a);
+    const eb = distOut.get(b);
+    const pathLen = Math.min(
+      da !== undefined && eb !== undefined ? da + 1 + eb : Number.POSITIVE_INFINITY,
+      db !== undefined && ea !== undefined ? db + 1 + ea : Number.POSITIVE_INFINITY,
+    );
+    const direct = (a === inKey && b === outKey) || (a === outKey && b === inKey);
+    const touchesIn = a === inKey || b === inKey;
+    const touchesOut = a === outKey || b === outKey;
+    const touchesEndpoint = touchesIn || touchesOut;
+    const touchesHub = HUB_KEYS.has(a) || HUB_KEYS.has(b);
+    const hubHub = HUB_KEYS.has(a) && HUB_KEYS.has(b);
+    const endpointHub = touchesEndpoint && touchesHub;
+    const classRank = direct ? 0 : endpointHub ? 1 : hubHub ? 2 : touchesEndpoint ? 3 : touchesHub ? 4 : 5;
+    return { pathLen, classRank };
   };
-  const touchesHub = (p: RawAlcorPool) =>
-    HUB_KEYS.has(keyOf(p.tokenA)) || HUB_KEYS.has(keyOf(p.tokenB));
 
   const ranked = candidates.slice().sort((a, b) => {
-    const ta = touchesEndpoint(a) ? 0 : touchesHub(a) ? 1 : 2;
-    const tb = touchesEndpoint(b) ? 0 : touchesHub(b) ? 1 : 2;
-    if (ta !== tb) return ta - tb;
+    const ra = poolRank(a);
+    const rb = poolRank(b);
+    if (ra.pathLen !== rb.pathLen) return ra.pathLen - rb.pathLen;
+    if (ra.classRank !== rb.classRank) return ra.classRank - rb.classRank;
     const la = BigInt(a.liquidity || "0");
     const lb = BigInt(b.liquidity || "0");
     return lb > la ? 1 : lb < la ? -1 : 0;
   });
   return ranked.slice(0, cap);
+}
+
+function formatSdkDiagnostics(diag?: SwapRoute["quoteDiagnostics"]): string {
+  if (!diag) return "";
+  return ` (${diag.routesConsidered ?? "?"} routes, ${diag.poolsBuilt ?? "?"}/${diag.relevantPools ?? "?"} pools, tickFailures=${diag.tickFailures ?? 0}, rateLimited=${diag.rateLimitedTickFailures ?? 0}, ${diag.tookMs ?? "?"}ms)`;
 }
 
 // ----- Pool construction -----
@@ -356,7 +389,7 @@ export async function computeShadowQuote(args: ShadowQuoteArgs): Promise<ShadowQ
     amount,
     tradeType,
     maxHops = 3,
-    distributionPercent = 2,
+    distributionPercent = 1,
     signal,
   } = args;
 
@@ -476,9 +509,11 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     receiver,
     tradeType,
     maxHops = 3,
-    distributionPercent = 2,
+    distributionPercent = 1,
     signal,
   } = args;
+
+  const started = performance.now();
 
   const inKey = tokenKey(tokenIn.contract, tokenIn.ticker);
   const outKey = tokenKey(tokenOut.contract, tokenOut.ticker);
@@ -487,10 +522,15 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   const relevant = selectRelevantPools(allPools, inKey, outKey, maxHops);
   if (relevant.length === 0) return null;
 
+  let tickFailures = 0;
+  let rateLimitedTickFailures = 0;
   const tickResults = await mapWithConcurrency(relevant, 10, async (p) => {
     try {
       return { p, ticks: await fetchPoolTicks(p.id, signal) };
     } catch (e) {
+      if ((e as any)?.name === "AbortError") throw e;
+      tickFailures += 1;
+      if (isRateLimitError(e)) rateLimitedTickFailures += 1;
       logger.warn(`alcorTrade: tick fetch failed for pool ${p.id}`, e);
       return { p, ticks: [] as RawAlcorTick[] };
     }
@@ -507,13 +547,28 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
       }
     })
     .filter((p): p is Pool => p !== null);
-  if (sdkPools.length === 0) return null;
+  const earlyDiagnostics = (): SwapRoute["quoteDiagnostics"] => ({
+    relevantPools: relevant.length,
+    poolsBuilt: sdkPools.length,
+    routesConsidered: 0,
+    tickFailures,
+    rateLimitedTickFailures,
+    tookMs: Math.round(performance.now() - started),
+  });
+
+  if (sdkPools.length === 0) {
+    if (rateLimitedTickFailures > 0 || tickFailures > 0) throw incompleteSdkRouteError(earlyDiagnostics());
+    return null;
+  }
 
   const inTok = new Token(tokenIn.contract, tokenIn.precision, tokenIn.ticker);
   const outTok = new Token(tokenOut.contract, tokenOut.precision, tokenOut.ticker);
 
   const routes = computeAllRoutes(inTok, outTok, sdkPools, maxHops);
-  if (routes.length === 0) return null;
+  if (routes.length === 0) {
+    if (rateLimitedTickFailures > 0) throw incompleteSdkRouteError(earlyDiagnostics());
+    return null;
+  }
 
   const percents: number[] = [];
   for (let p = distributionPercent; p <= 100; p += distributionPercent) percents.push(p);
@@ -536,7 +591,20 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     sdkPools,
     { minSplits: 1, maxSplits: 10 }
   );
-  if (!trade) return null;
+
+  const diagnostics: SwapRoute["quoteDiagnostics"] = {
+    relevantPools: relevant.length,
+    poolsBuilt: sdkPools.length,
+    routesConsidered: routes.length,
+    tickFailures,
+    rateLimitedTickFailures,
+    tookMs: Math.round(performance.now() - started),
+  };
+
+  if (!trade) {
+    if (tickFailures > 0) throw incompleteSdkRouteError(diagnostics);
+    return null;
+  }
 
   // Slippage as SDK Percent: e.g. 1% => Percent(100, 10_000).
   const bps = Math.round(slippage * 100); // 1% -> 100bps
@@ -579,7 +647,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     minReceivedNum = outputNum;
   }
 
-  return {
+  const result = {
     output: outputNum,
     minReceived: minReceivedNum,
     priceImpact: parseFloat(trade.priceImpact.toFixed(4)),
@@ -591,7 +659,16 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     },
     input: parseFloat(trade.inputAmount.toFixed()),
     swaps: splits,
+    quoteSource: "sdk",
+    quoteComplete: tickFailures === 0,
+    quoteDiagnostics: diagnostics,
   } as SwapRoute;
+
+  logger.info(
+    `[alcor-router] SDK quote produced ${splits.length} split(s)${formatSdkDiagnostics(diagnostics)}`,
+  );
+
+  return result;
 }
 
 // Warm the pool-list cache on module import so the first quote (or route

@@ -1,53 +1,54 @@
-# Restore CHEESESwap multi-routing
+## Goal
+Make CHEESESwap show the best multiroute split on the first quote attempt for cases like `10 WAXUSDC -> ROOK`, instead of first showing Alcor HTTP's 100% single-route quote and only switching to the better split after several refreshes.
 
-## What I found
+## What is wrong now
+The current code can still expose the worse single-route quote because the HTTP route is treated as valid immediately whenever the SDK split route is unavailable, delayed, or skipped during Alcor cooldown. This creates a timing problem: users see a complete-looking 100% route even though the SDK route may become much better a few checks later.
 
-Multi-routing code is fully wired end-to-end (SDK split router → `SwapSplit[]` with per-split memos → `MultiRoutePanel` UI → `normalizeRouteActions` emitting one transfer per split). It just almost never runs.
+## Plan
 
-In `src/hooks/useSwapRoute.ts` the query does this:
+1. **Make SDK split routing first-class for quote finality**
+   - Keep running HTTP and SDK quote paths in parallel.
+   - For routes where SDK routing is expected/possible, do not finalize the HTTP 100% route until the SDK split router has actually completed, failed definitively, or timed out.
+   - Use a bounded wait window for the SDK leg so the UI does not hang forever.
 
-1. Call Alcor's HTTP `/swapRouter/getRoute` (`fetchSwapRoute`).
-2. If it returns any non-empty route with `memo` and `output > 0`, **return it immediately**.
-3. Only if HTTP returns null/empty, fall back to `computeAlcorTrade` (the SDK split router).
+2. **Stop skipping SDK purely because global Alcor cooldown is active for active user quotes**
+   - The cooldown currently protects against fanout, but it can also prevent the split router from running exactly when the user needs the best quote.
+   - Adjust cooldown behavior so active swap quotes can still use cached pool/tick data and only avoid fresh fanout when necessary.
+   - If SDK cannot run because required data is not cached, keep the HTTP route marked as provisional instead of silently presenting it as the final best route.
 
-Alcor's HTTP endpoint almost always returns a single-path route (its `swaps` array is usually one entry at 100%), so step 2 short-circuits and the split router never runs. That's why every quote appears to go 100% through one pair.
+3. **Add a quote-quality state internally**
+   - Distinguish:
+     - final SDK split route
+     - final HTTP-only route after SDK was checked
+     - provisional HTTP route while SDK is still warming/checking
+   - The widget should only show the route as normal/final once best-route checking is complete.
 
-Additionally, `fetchSwapRoute` maps HTTP `swaps` without copying `memo`/`maxSent`, so even if HTTP ever did return multiple splits, `normalizeRouteActions` would fall back to the single-transfer path (its `allHaveMemos` check requires per-split memos).
+4. **Prefer the SDK split whenever it materially improves output**
+   - For `EXACT_INPUT`, choose SDK when it has 2+ splits and better output than HTTP.
+   - For `EXACT_OUTPUT`, choose SDK when it has 2+ splits and lower required input.
+   - Reduce or remove the current 0.05% threshold if needed, because your screenshot shows even small route differences can be user-visible and Alcor itself chooses the split.
 
-## What to change
+5. **Improve diagnostics**
+   - Log why a quote chose HTTP or SDK:
+     - SDK pending timeout
+     - SDK skipped due missing cached data
+     - SDK failed due 429/ticks/pools
+     - SDK won with split count and output delta
+     - HTTP won only after SDK was actually checked
+   - This makes it clear whether future 100% routes are genuinely optimal or just fallback behavior.
 
-Goal: get true multi-split quotes back on the hot path when they meaningfully beat the single-pool HTTP quote, without regressing latency/rate-limiting for simple pairs.
+6. **Keep execution safety**
+   - Preserve per-split memos and multi-transfer execution.
+   - Do not change token selection, slippage UI, signing, or transaction plugins.
+   - Keep Alcor rate-limit protections, but avoid letting rate-limit fallback masquerade as best execution.
 
-### 1. `src/hooks/useSwapRoute.ts` — race HTTP and SDK, pick the better output
+## Files to update
+- `src/hooks/useSwapRoute.ts` — route selection, provisional/final quote behavior, SDK wait policy, logging.
+- `src/lib/alcorRouter.ts` — cached-data/cooldown handling for active SDK quotes if needed.
+- `src/components/swap/CheeseSwapWidget.tsx` — only if needed to show loading/provisional state instead of a final-looking worse quote.
 
-- Replace the "HTTP first, SDK only on null" logic with a bounded race:
-  - Kick off `fetchSwapRoute(...)` and `computeAlcorTrade(...)` in parallel (both respecting the same `signal`).
-  - Skip the SDK leg when `isAlcorCoolingDown()` is true (unchanged behavior during 429 backoff), so we don't worsen rate limiting.
-  - `Promise.allSettled` both; then choose:
-    - EXACT_INPUT: whichever has the larger `output` (and valid `memo`(s)).
-    - EXACT_OUTPUT: whichever has the smaller `input` (fall back to HTTP if SDK doesn't return `input`).
-  - Prefer the SDK result only when it has ≥2 splits AND is strictly better than HTTP by a small threshold (e.g. > 0.05% improvement) to avoid flip-flopping on ties.
-  - If SDK errors/aborts, use HTTP. If HTTP errors and SDK is valid, use SDK. If both fail, propagate the error (transient classifier unchanged).
-
-### 2. `src/lib/swapApi.ts` — preserve `memo`/`maxSent` on HTTP splits
-
-In `fetchSwapRoute`, when mapping `rawSwaps`, also copy `memo` and `maxSent` if the endpoint provides them. This lets `normalizeRouteActions` emit multi-transfer execution when the HTTP router itself ever returns real splits.
-
-### 3. Small guardrails
-
-- Keep the debounce (350ms) and `staleTime` (15s) as-is.
-- Keep `maxHops: 3` for both routers so quotes are comparable.
-- Log (via `logger.info`) which router won and by how much, so we can confirm multi-splits are actually being selected in practice.
-
-## Technical details
-
-- No new deps; SDK router already imported.
-- `computeAlcorTrade` already returns per-split `memo`, so `normalizeRouteActions`'s `allHaveMemos` branch (one transfer per split) will fire automatically when the SDK result wins.
-- `MultiRoutePanel` already renders when `route.swaps.length > 1`, so the UI needs no change.
-- Rate-limit safety: SDK leg is skipped during cooldown, matching current behavior; the pools/ticks caches (`POOLS_TTL_MS=20s`, `TICKS_TTL_MS=15s`) mean repeat quotes for the same pair reuse data without new fetches.
-
-## Out of scope
-
-- Changing `maxHops`, `distributionPercent`, or `minSplits/maxSplits` tuning.
-- Touching WASM router selection (`runBestTradeWithSplit`).
-- Any transaction-signing changes — multi-transfer path already exists and is exercised as soon as a multi-split route is chosen.
+## Validation
+- Test the user-provided case: `10 WAXUSDC -> ROOK`.
+- Confirm first settled quote shows the split route comparable to Alcor’s UI, not the 100% route.
+- Confirm single-pool routes still work when SDK checks and finds no better split.
+- Confirm swap execution still uses one transfer per split when multiroute wins.
