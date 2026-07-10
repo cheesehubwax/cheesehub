@@ -1,36 +1,21 @@
+Plan to fix the first-quote multiroute visual only:
 
-## What's actually happening
+1. Embed route visual metadata in the SDK quote
+   - Extend each SDK split with the token path and pool fees already available while `computeAlcorTrade` builds the winning trade.
+   - This avoids needing a second pool lookup just to display token symbols/fees.
 
-Two independent problems combine to make the whole widget/site fall over on the very first quote:
+2. Render embedded metadata first
+   - Update `MultiRoutePanel` to use split-provided token path + fees immediately when present.
+   - Keep the existing pool lookup only as a fallback for HTTP/API routes that do not include embedded visual metadata.
 
-1. **The Alcor SDK's own `Trade.bestTradeWithSplit` still loads the WASM helper (`tradeCalculatorWASM-*.js`) internally.** Removing our direct WASM call didn't help — the SDK itself calls it, and in the Vite browser bundle it throws `ReferenceError: require is not defined`. That exception bubbles up as a rejected promise inside `Promise.allSettled` in `useSwapRoute`.
+3. Remove the “blank until all pools load” failure mode
+   - Only show the skeleton when a route truly lacks embedded metadata and the fallback pool details are still loading.
+   - This prevents cooldown/rate-limit state from blocking the visual when the actual quote already contains everything needed.
 
-2. **`useSwapRoute` classifies SDK exceptions as "transient" and re-throws them**, which triggers React Query retries. Each retry re-enters `computeAlcorTrade`, which re-runs `selectRelevantPools` and fires another burst of `/swap/pools/:id/ticks`. Alcor immediately returns 429, we retry again, and the whole quote path spirals until it either freezes the UI thread or React Query bails out.
+4. Keep swap math and execution untouched
+   - Do not change quote selection, output amounts, SDK routing, memos, slippage, transaction construction, retries, or cooldown logic.
+   - This is strictly a display-data fix for the multiroute box.
 
-The HTTP `/swapRouter/getRoute` fallback works fine and should be answering these quotes on its own. It isn't, because we keep insisting the SDK must succeed first.
-
-## Fix plan (frontend only, no swap-execution math changes)
-
-1. **Contain SDK failures inside `computeAlcorTrade`.**
-   - Wrap the `runBestTradeWithSplit` call in try/catch. On any error (WASM `require`, rate-limit, SDK internal) log once and `return null` instead of throwing.
-   - Do the same around `computeAllRoutes` so a bad pool set can't crash the quote either.
-
-2. **Kill the tick-fanout as soon as Alcor rate-limits.**
-   - Track `rateLimitedTickFailures` inside the concurrency loop; once it hits 2, short-circuit remaining workers to return `{ticks: []}` immediately (no more `fetch`).
-   - Lower the first-quote pool cap in `selectRelevantPools` from 56 → 24 so a cold cache can't launch dozens of tick requests in one go.
-   - Keep the existing 60s negative cache and the global `alcorCooldownUntil` gate.
-
-3. **Make `useSwapRoute` treat SDK failure as non-transient, not a retry trigger.**
-   - Because `computeAlcorTrade` will now `return null` instead of throwing on WASM/rate-limit, `sdkSettled.status` will be `"fulfilled"` with `null` and the HTTP route will be accepted immediately — no retry storm.
-   - Leave HTTP-side transient handling intact so real network blips still self-heal.
-
-4. **Don't warm the pool cache while cooling down or on very first paint.**
-   - Move the `setTimeout(fetchAllAlcorPools)` warm-up behind a short delay (e.g. 1500 ms) so it doesn't compete with the user's first quote request for Alcor's rate-limit budget.
-
-5. **Keep the multi-route visual metadata and all execution/memo/slippage code untouched.**
-
-## Validation
-
-- Reload with a cold cache, request a first quote.
-- Expect: no `require is not defined` crash bubbling to React, no burst of 429s, quote appears from HTTP fallback within one retry window even if the SDK path returns null.
-- Confirm the "Finding best route…" state resolves to a real quote instead of the widget locking up.
+Validation:
+- Verify TypeScript passes.
+- Use the preview to hard refresh, request the first quote, and confirm the multiroute row shows token icons/fees immediately instead of the blank skeleton.
