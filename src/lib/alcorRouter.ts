@@ -21,6 +21,35 @@ import { logger } from "./logger";
 
 const ALCOR_API = "https://wax.alcor.exchange/api/v2";
 
+// SDK compute budgets. If we exceed these we bail out and let HTTP win.
+const SDK_BUDGET_MS = 8_000;
+const SPLIT_CALL_TIMEOUT_MS = 3_500;
+
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise<T>((resolve) => {
+    let done = false;
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      resolve(fallback);
+    }, ms);
+    p.then(
+      (v) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        resolve(v);
+      },
+      () => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        resolve(fallback);
+      }
+    );
+  });
+}
+
 // ----- Global Alcor cooldown -----
 // After any 429 anywhere in the app, back off all NON-essential Alcor fanout
 // (SDK tick fetches, per-pool detail fetches) for a while. The single HTTP
