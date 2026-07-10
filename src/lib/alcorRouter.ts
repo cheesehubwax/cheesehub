@@ -131,6 +131,15 @@ export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Prom
   }
 }
 
+function hasFreshTicks(poolId: number): boolean {
+  const cached = ticksCache.get(poolId);
+  return !!cached && Date.now() - cached.at < TICKS_TTL_MS && cached.data.length > 0;
+}
+
+function isRateLimitError(err: unknown): boolean {
+  return err instanceof Error && err.message.includes("Rate limited");
+}
+
 // Run promises with a fixed concurrency limit.
 async function mapWithConcurrency<T, R>(
   items: T[],
@@ -254,6 +263,11 @@ function selectRelevantPools(
     return lb > la ? 1 : lb < la ? -1 : 0;
   });
   return ranked.slice(0, cap);
+}
+
+function formatSdkDiagnostics(diag?: SwapRoute["quoteDiagnostics"]): string {
+  if (!diag) return "";
+  return ` (${diag.routesConsidered ?? "?"} routes, ${diag.poolsBuilt ?? "?"}/${diag.relevantPools ?? "?"} pools, tickFailures=${diag.tickFailures ?? 0}, rateLimited=${diag.rateLimitedTickFailures ?? 0}, ${diag.tookMs ?? "?"}ms)`;
 }
 
 // ----- Pool construction -----
@@ -480,6 +494,8 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     signal,
   } = args;
 
+  const started = performance.now();
+
   const inKey = tokenKey(tokenIn.contract, tokenIn.ticker);
   const outKey = tokenKey(tokenOut.contract, tokenOut.ticker);
 
@@ -487,12 +503,16 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   const relevant = selectRelevantPools(allPools, inKey, outKey, maxHops);
   if (relevant.length === 0) return null;
 
+  let tickFailures = 0;
+  let rateLimitedTickFailures = 0;
   const tickResults = await mapWithConcurrency(relevant, 10, async (p) => {
     try {
       return { p, ticks: await fetchPoolTicks(p.id, signal) };
     } catch (e) {
+      tickFailures += 1;
+      if (isRateLimitError(e)) rateLimitedTickFailures += 1;
       logger.warn(`alcorTrade: tick fetch failed for pool ${p.id}`, e);
-      return { p, ticks: [] as RawAlcorTick[] };
+      return { p, ticks: [] as RawAlcorTick[], hadFreshTicks: hasFreshTicks(p.id) };
     }
   });
 
@@ -538,6 +558,15 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   );
   if (!trade) return null;
 
+  const diagnostics: SwapRoute["quoteDiagnostics"] = {
+    relevantPools: relevant.length,
+    poolsBuilt: sdkPools.length,
+    routesConsidered: routes.length,
+    tickFailures,
+    rateLimitedTickFailures,
+    tookMs: Math.round(performance.now() - started),
+  };
+
   // Slippage as SDK Percent: e.g. 1% => Percent(100, 10_000).
   const bps = Math.round(slippage * 100); // 1% -> 100bps
   const slip = new Percent(bps, 10_000);
@@ -579,7 +608,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     minReceivedNum = outputNum;
   }
 
-  return {
+  const result = {
     output: outputNum,
     minReceived: minReceivedNum,
     priceImpact: parseFloat(trade.priceImpact.toFixed(4)),
@@ -591,7 +620,16 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     },
     input: parseFloat(trade.inputAmount.toFixed()),
     swaps: splits,
+    quoteSource: "sdk",
+    quoteComplete: tickFailures === 0,
+    quoteDiagnostics: diagnostics,
   } as SwapRoute;
+
+  logger.info(
+    `[alcor-router] SDK quote produced ${splits.length} split(s)${formatSdkDiagnostics(diagnostics)}`,
+  );
+
+  return result;
 }
 
 // Warm the pool-list cache on module import so the first quote (or route
