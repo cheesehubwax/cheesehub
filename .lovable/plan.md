@@ -1,32 +1,43 @@
-Plan to fix the crash without intentionally hiding better splits:
+## Problem
 
-1. Add an Alcor tick request scheduler
-   - Route every `/swap/pools/:id/ticks` fetch through one shared client-side queue.
-   - Limit tick concurrency much lower than today and add a small spacing delay between tick requests.
-   - On 429, mark global cooldown, retry that pool with exponential backoff once or twice, then negative-cache it longer so repeated quote attempts do not hammer the same pool again.
+`tradeCalculatorWASM` (from `@alcorexchange/alcor-swap-sdk`) is compiled as a CommonJS module that calls `require(...)` at init. In the browser bundle `require` is undefined, so every call to `Trade.bestTradeWithSplitWASM(...)` throws `ReferenceError: require is not defined` and the SDK logs `Failed to load WASM module` as an error.
 
-2. Make route discovery staged instead of all-at-once
-   - Keep broad pool coverage, but fetch ticks in priority batches:
-     - direct pools first
-     - endpoint/hub pools next
-     - remaining candidate pools last
-   - After each batch, build routes from the pools already available and keep the best trade found so far.
-   - Stop early when later batches cannot safely complete due to rate limits instead of failing the whole quote.
+Our current router in `src/lib/alcorRouter.ts` calls `bestTradeWithSplitWASM` first inside `runBestTradeWithSplit`, catches the throw, and falls back to the JS `bestTradeWithSplit`. With the recent changes we now call this multiple times per quote (dual-grid 1% + 5%, and per staged tick batch), which:
 
-3. Make SDK route failures non-crashing
-   - If tick fetching is rate-limited but a valid partial SDK route exists, return it only if it beats HTTP.
-   - If SDK cannot complete and HTTP has a valid route, return HTTP as a safe fallback instead of throwing until React Query exhausts retries.
-   - Keep diagnostics so logs show whether the displayed quote is complete, partial, HTTP fallback, or rate-limited.
+- Spams the console with WASM errors.
+- Wastes time attempting a codepath that can never work in this environment.
+- Contributes to the "crashing when trying to find best route" symptom.
 
-4. Preserve “best result wins” behavior
-   - Keep the fine 1% split search and coarse 5% comparison.
-   - Do not block 2% or other small split improvements.
-   - Only add splits when the resulting total quote beats the competing route/fallback.
+## Fix
 
-5. Improve logging for this exact issue
-   - Log selected pool count, ticks requested, ticks succeeded, 429 count, queue/backoff state, best partial quote, and final selected quote source.
-   - This will make it clear whether a quote is worse because Alcor rate-limited tick data or because the optimizer genuinely selected it.
+Stop attempting the WASM path in the browser and always use the JS implementation.
 
-Technical details:
-- Primary files: `src/lib/alcorRouter.ts`, with a small fallback-selection adjustment in `src/hooks/useSwapRoute.ts`.
-- The main cause is the current bounded concurrency still firing many tick requests quickly across up to ~96+ pools, which Alcor rate-limits. The fix is to throttle and stage tick fetches rather than retrying the whole quote loop aggressively.
+### Changes (single file: `src/lib/alcorRouter.ts`)
+
+1. **Feature-detect once, cache the result.** At module scope add:
+   - `let wasmDisabled = false;`
+   - No probing call — we simply skip WASM after the first failure and never retry within the session.
+
+2. **Rewrite `runBestTradeWithSplit`:**
+   - If `wasmDisabled` is true, immediately call `T.bestTradeWithSplit(...)` (JS).
+   - Otherwise attempt `T.bestTradeWithSplitWASM(...)` inside try/catch as today, but on any throw OR null result set `wasmDisabled = true` and log a single `logger.info("[alcor-router] WASM router unavailable in browser — using JS router")` message (guarded so we only log once).
+   - Always fall back to `T.bestTradeWithSplit(...)` when WASM is unavailable or returned null.
+
+3. **Suppress duplicate warnings.** Remove the per-call `logger.warn` lines inside `runBestTradeWithSplit` (they now fire N times per quote). Keep only the single one-time info log.
+
+### Why this is the right scope
+
+- The SDK's own `console.error("Failed to load WASM module", ...)` originates inside the SDK and can't be silenced from our code, but skipping the WASM call after the first failure prevents it from firing again in the same session.
+- No behavioral change to routing math — the JS implementation is already the fallback we've been using.
+- No changes needed in `useSwapRoute.ts` or `swapApi.ts`.
+
+## Verification
+
+1. Type-check clean.
+2. Load the swap widget, enter an amount, and confirm the console shows the one-time `WASM router unavailable in browser — using JS router` info log and no repeated `Failed to load WASM module` errors from subsequent quote refreshes.
+3. Confirm the multi-route panel still populates and picks the better of HTTP vs SDK split.
+
+## Out of scope
+
+- Actually shipping a browser-compatible WASM build of the Alcor trade calculator (would require bundling the `.wasm` under `public/wasm/` and shimming the SDK's loader — much larger change, not needed for correctness).
+- Any changes to the tick-fetch queue, dual-grid split search, or HTTP fallback logic from the previous turn.
