@@ -15,7 +15,8 @@ export function useAlcorPools(ids: number[]) {
       // Skip while Alcor is rate-limiting us; route details are cosmetic and
       // must never contribute to the 429 storm.
       enabled: !isAlcorCoolingDown(),
-      retry: 0,
+      retry: 2,
+      retryDelay: (attempt: number) => Math.min(500 * 2 ** attempt, 3000),
       placeholderData: (prev: AlcorPool | undefined) => prev,
     })),
   });
@@ -29,7 +30,8 @@ export function useAlcorPools(ids: number[]) {
   }, [results, uniqueIds]);
 
   const isLoading = results.some((r) => r.isLoading);
+  const isReady = uniqueIds.length > 0 && uniqueIds.every((id) => pools.has(id));
   const hasError = results.some((r) => r.isError);
 
-  return { pools, isLoading, hasError };
+  return { pools, isLoading, isReady, hasError };
 }

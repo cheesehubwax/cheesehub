@@ -30,7 +30,7 @@ export function MultiRoutePanel({ route, tokenIn, tokenOut }: MultiRoutePanelPro
     return ids;
   }, [route.swaps]);
 
-  const { pools, isLoading, hasError } = useAlcorPools(allIds);
+  const { pools, isReady, hasError } = useAlcorPools(allIds);
 
   const startId = tokenInId(tokenIn);
 
@@ -62,9 +62,11 @@ export function MultiRoutePanel({ route, tokenIn, tokenOut }: MultiRoutePanelPro
     });
   }, [route.swaps, pools, startId, tokenIn.ticker, tokenIn.contract, tokenIn.precision]);
 
-  if (hasError) return null;
-
-  if (isLoading) {
+  // Only render the chain once every pool along every split is loaded. This
+  // avoids the first-quote flash where a partial pool map produces a truncated
+  // "broken" multiroute even though the underlying trade is correct.
+  if (!isReady) {
+    if (hasError) return null;
     return (
       <div className="mt-2 pt-2 border-t border-border/50">
         <div className="text-xs font-medium text-cheese mb-2">Multiroute</div>

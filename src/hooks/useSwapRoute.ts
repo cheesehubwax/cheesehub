@@ -1,20 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect, useRef } from "react";
 import { fetchSwapRoute, type SwapToken, type SwapRoute } from "@/lib/swapApi";
-import { computeAlcorTrade, prewarmTicksForPair } from "@/lib/alcorRouter";
+import { computeAlcorTrade } from "@/lib/alcorRouter";
 import { logger } from "@/lib/logger";
 
 export type TradeType = "EXACT_INPUT" | "EXACT_OUTPUT";
 
-const MAX_TRANSIENT_RETRIES = 6;
+const MAX_TRANSIENT_RETRIES = 3;
 
 function isTransientError(err: unknown): boolean {
   if (err instanceof TypeError) return true;
   const msg = err instanceof Error ? err.message : "";
   return (
     msg.includes("Rate limited") ||
-    msg.includes("complete split route") ||
-    msg.includes("ticks recently failed") ||
     msg.includes("Failed to fetch") ||
     msg.includes("NetworkError") ||
     msg.includes("Load failed") ||
@@ -52,17 +50,6 @@ export function useSwapRoute(
     }, 350);
     return () => clearTimeout(timer);
   }, [amount, tradeType]);
-
-  // Prewarm the tick cache as soon as both tokens are picked, before the user
-  // finishes typing. This makes the very first quote's SDK fan-out cache-warm
-  // instead of racing a 429 storm.
-  useEffect(() => {
-    if (!tokenIn || !tokenOut) return;
-    if (tokenIn.ticker === tokenOut.ticker && tokenIn.contract === tokenOut.contract) return;
-    const ac = new AbortController();
-    prewarmTicksForPair(tokenIn, tokenOut, 3, ac.signal).catch(() => {});
-    return () => ac.abort();
-  }, [tokenIn?.ticker, tokenIn?.contract, tokenOut?.ticker, tokenOut?.contract]);
 
   const tokensIdentical =
     !!tokenIn && !!tokenOut && tokenIn.ticker === tokenOut.ticker && tokenIn.contract === tokenOut.contract;
@@ -135,22 +122,6 @@ export function useSwapRoute(
         logger.warn("[alcor-router] SDK failed definitively; HTTP fallback allowed", sdkError);
       }
 
-      // If the SDK produced a trade but some ticks failed, its splits are
-      // known to be suboptimal (partial pool set). Retry so the tick cache
-      // warms and the next attempt returns the full routing — regardless of
-      // whether this partial result happens to beat the 100% HTTP route.
-      if (sdk && sdk.quoteComplete === false) {
-        const diag = sdk.quoteDiagnostics;
-        const retryError = new Error(
-          `Failed to fetch complete split route — retrying (${diag?.routesConsidered ?? "?"} routes, ${diag?.poolsBuilt ?? "?"}/${diag?.relevantPools ?? "?"} pools, tickFailures=${diag?.tickFailures ?? 0})`,
-        );
-        logger.warn(
-          "[alcor-router] SDK route incomplete; retrying regardless of HTTP comparison",
-          retryError,
-        );
-        throw retryError;
-      }
-
       // Prefer the SDK whenever its real multi-split improves the quote at all.
       // Alcor's own UI can pick splits whose edge is user-visible but small, so
       // avoid a threshold that keeps a worse 100% route on screen.
@@ -205,13 +176,7 @@ export function useSwapRoute(
     retryDelay: (attemptIndex, err) => {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("Rate limited")) return Math.min(5000 * 2 ** attemptIndex, 30000);
-      if (msg.includes("complete split route") || msg.includes("ticks recently failed")) {
-        return Math.min(1200 * 2 ** attemptIndex, 6000);
-      }
-      // 500ms, 1s, 2s, 3s, 4s, 4s — ~14s total budget, longer than Alcor's
-      // typical 429 recovery and the 1.5s tick negative-cache window so an
-      // incomplete SDK trade gets a real refetch instead of surfacing.
-      return Math.min(500 * 2 ** attemptIndex, 4000);
+      return Math.min(300 * 2 ** attemptIndex, 4000);
     },
   });
 

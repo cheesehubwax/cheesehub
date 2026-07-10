@@ -97,29 +97,8 @@ const ticksInflight = new Map<number, Promise<RawAlcorTick[]>>();
 const TICKS_TTL_MS = 5 * 60_000;
 // Negative cache for failed tick fetches so we don't hammer the same pool.
 const ticksFailCache = new Map<number, number>();
-const TICKS_FAIL_TTL_MS = 1_500;
-
-// Per-request retry budget for a single tick fetch. Small, tight backoff so a
-// stray 429 inside the fan-out doesn't poison the pool for the rest of the
-// quote — the outer react-query retry is still the hammer guard.
-const TICKS_FETCH_RETRIES = 2;
-const TICKS_FETCH_BACKOFF_MS = [400, 900];
-const QUOTE_TICK_CONCURRENCY = 4;
-const PREWARM_TICK_CONCURRENCY = 2;
-
-function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const t = setTimeout(resolve, ms);
-    if (signal) {
-      const onAbort = () => {
-        clearTimeout(t);
-        reject(new DOMException("Aborted", "AbortError"));
-      };
-      if (signal.aborted) onAbort();
-      else signal.addEventListener("abort", onAbort, { once: true });
-    }
-  });
-}
+const TICKS_FAIL_TTL_MS = 8_000;
+const TICK_CONCURRENCY = 10;
 
 export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Promise<RawAlcorTick[]> {
   const cached = ticksCache.get(poolId);
@@ -131,31 +110,24 @@ export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Prom
   const inflight = ticksInflight.get(poolId);
   if (inflight) return inflight;
   const p = (async () => {
-    let lastErr: unknown = null;
-    for (let attempt = 0; attempt <= TICKS_FETCH_RETRIES; attempt++) {
-      try {
-        const res = await fetch(`${ALCOR_API}/swap/pools/${poolId}/ticks`, { signal });
-        if (!res.ok) {
-          if (res.status === 429) markAlcorRateLimited();
-          throw new Error(
-            res.status === 429
-              ? "Rate limited — please wait a moment and try again"
-              : `Failed to fetch ticks for pool ${poolId} (${res.status})`,
-          );
-        }
-        const data = (await res.json()) as RawAlcorTick[];
-        ticksCache.set(poolId, { at: Date.now(), data });
-        return data;
-      } catch (e) {
-        if ((e as any)?.name === "AbortError") throw e;
-        lastErr = e;
-        if (attempt < TICKS_FETCH_RETRIES) {
-          await sleep(TICKS_FETCH_BACKOFF_MS[attempt] ?? 900, signal);
-        }
+    try {
+      const res = await fetch(`${ALCOR_API}/swap/pools/${poolId}/ticks`, { signal });
+      if (!res.ok) {
+        if (res.status === 429) markAlcorRateLimited();
+        ticksFailCache.set(poolId, Date.now());
+        throw new Error(
+          res.status === 429
+            ? "Rate limited — please wait a moment and try again"
+            : `Failed to fetch ticks for pool ${poolId} (${res.status})`,
+        );
       }
+      const data = (await res.json()) as RawAlcorTick[];
+      ticksCache.set(poolId, { at: Date.now(), data });
+      return data;
+    } catch (e) {
+      if ((e as any)?.name !== "AbortError") ticksFailCache.set(poolId, Date.now());
+      throw e;
     }
-    ticksFailCache.set(poolId, Date.now());
-    throw lastErr instanceof Error ? lastErr : new Error(`Failed to fetch ticks for pool ${poolId}`);
   })();
   ticksInflight.set(poolId, p);
   try {
@@ -167,12 +139,6 @@ export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Prom
 
 function isRateLimitError(err: unknown): boolean {
   return err instanceof Error && err.message.includes("Rate limited");
-}
-
-function incompleteSdkRouteError(diagnostics: SwapRoute["quoteDiagnostics"]): Error {
-  return new Error(
-    `Failed to fetch complete split route — retrying${formatSdkDiagnostics(diagnostics)}`,
-  );
 }
 
 // Run promises with a fixed concurrency limit.
@@ -437,7 +403,7 @@ export async function computeShadowQuote(args: ShadowQuoteArgs): Promise<ShadowQ
 
   // Fetch ticks for every relevant pool in parallel.
   // Fetch ticks with bounded concurrency so we don't hammer Alcor into 429s.
-  const tickResults = await mapWithConcurrency(relevant, QUOTE_TICK_CONCURRENCY, async (p) => {
+  const tickResults = await mapWithConcurrency(relevant, TICK_CONCURRENCY, async (p) => {
     try {
       return { p, ticks: await fetchPoolTicks(p.id, signal) };
     } catch (e) {
@@ -558,7 +524,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
 
   let tickFailures = 0;
   let rateLimitedTickFailures = 0;
-  const tickResults = await mapWithConcurrency(relevant, QUOTE_TICK_CONCURRENCY, async (p) => {
+  const tickResults = await mapWithConcurrency(relevant, TICK_CONCURRENCY, async (p) => {
     try {
       return { p, ticks: await fetchPoolTicks(p.id, signal) };
     } catch (e) {
@@ -581,21 +547,6 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
       }
     })
     .filter((p): p is Pool => p !== null);
-  const earlyDiagnostics = (): SwapRoute["quoteDiagnostics"] => ({
-    relevantPools: relevant.length,
-    poolsBuilt: sdkPools.length,
-    routesConsidered: 0,
-    tickFailures,
-    rateLimitedTickFailures,
-    tookMs: Math.round(performance.now() - started),
-  });
-
-  // Never route against a partial cold-cache pool set. A 47/56 pool build can
-  // look valid but produces the bad first multiroute the user reported. Force
-  // the hook retry loop to wait until every selected pool has ticks.
-  if (tickFailures > 0) {
-    throw incompleteSdkRouteError(earlyDiagnostics());
-  }
 
   if (sdkPools.length === 0) {
     return null;
@@ -606,7 +557,6 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
 
   const routes = computeAllRoutes(inTok, outTok, sdkPools, maxHops);
   if (routes.length === 0) {
-    if (rateLimitedTickFailures > 0) throw incompleteSdkRouteError(earlyDiagnostics());
     return null;
   }
 
@@ -642,7 +592,6 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   };
 
   if (!trade) {
-    if (tickFailures > 0) throw incompleteSdkRouteError(diagnostics);
     return null;
   }
 
@@ -721,35 +670,3 @@ if (typeof window !== "undefined") {
   }, 0);
 }
 
-/**
- * Best-effort tick cache warm-up for a token pair. Fires as soon as the user
- * has picked both tokens so that by the time the debounced amount hits the
- * SDK fan-out, most tick data is already in `ticksCache` and the first quote
- * comes back `quoteComplete: true`.
- */
-export async function prewarmTicksForPair(
-  tokenIn: SwapToken,
-  tokenOut: SwapToken,
-  maxHops = 3,
-  signal?: AbortSignal,
-): Promise<void> {
-  if (isAlcorCoolingDown()) return;
-  try {
-    const allPools = poolsCache?.data ?? (await fetchAllAlcorPools(signal));
-    const inKey = tokenKey(tokenIn.contract, tokenIn.ticker);
-    const outKey = tokenKey(tokenOut.contract, tokenOut.ticker);
-    const relevant = selectRelevantPools(allPools, inKey, outKey, maxHops);
-    if (relevant.length === 0) return;
-    // Lower concurrency than the quote fan-out so we don't compete with an
-    // in-flight quote. Swallow all errors — this is best-effort.
-    await mapWithConcurrency(relevant, PREWARM_TICK_CONCURRENCY, async (p) => {
-      try {
-        await fetchPoolTicks(p.id, signal);
-      } catch {
-        /* ignore — the real quote will surface any hard failure */
-      }
-    });
-  } catch {
-    /* ignore */
-  }
-}
