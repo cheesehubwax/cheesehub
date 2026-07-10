@@ -435,7 +435,7 @@ function getTickQueueStats() {
 
 function formatSdkDiagnostics(diag?: SwapRoute["quoteDiagnostics"]): string {
   if (!diag) return "";
-  return ` (${diag.routesConsidered ?? "?"} routes, ${diag.poolsBuilt ?? "?"}/${diag.relevantPools ?? "?"} pools, tickFailures=${diag.tickFailures ?? 0}, rateLimited=${diag.rateLimitedTickFailures ?? 0}, ${diag.tookMs ?? "?"}ms)`;
+  return ` (${diag.routesConsidered ?? "?"} routes, ${diag.poolsBuilt ?? "?"}/${diag.relevantPools ?? "?"} pools, ticks=${diag.ticksSucceeded ?? "?"}/${diag.tickRequests ?? "?"}, tickFailures=${diag.tickFailures ?? 0}, rateLimited=${diag.rateLimitedTickFailures ?? 0}, partial=${diag.quotePartial === true}, queue=${diag.queueDepth ?? 0}, ${diag.tookMs ?? "?"}ms)`;
 }
 
 // ----- Pool construction -----
