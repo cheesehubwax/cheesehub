@@ -140,6 +140,12 @@ function isRateLimitError(err: unknown): boolean {
   return err instanceof Error && err.message.includes("Rate limited");
 }
 
+function incompleteSdkRouteError(diagnostics: SwapRoute["quoteDiagnostics"]): Error {
+  return new Error(
+    `Failed to fetch complete split route — retrying${formatSdkDiagnostics(diagnostics)}`,
+  );
+}
+
 // Run promises with a fixed concurrency limit.
 async function mapWithConcurrency<T, R>(
   items: T[],
@@ -512,7 +518,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
       tickFailures += 1;
       if (isRateLimitError(e)) rateLimitedTickFailures += 1;
       logger.warn(`alcorTrade: tick fetch failed for pool ${p.id}`, e);
-      return { p, ticks: [] as RawAlcorTick[], hadFreshTicks: hasFreshTicks(p.id) };
+      return { p, ticks: [] as RawAlcorTick[] };
     }
   });
 
@@ -527,13 +533,28 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
       }
     })
     .filter((p): p is Pool => p !== null);
-  if (sdkPools.length === 0) return null;
+  const earlyDiagnostics = (): SwapRoute["quoteDiagnostics"] => ({
+    relevantPools: relevant.length,
+    poolsBuilt: sdkPools.length,
+    routesConsidered: 0,
+    tickFailures,
+    rateLimitedTickFailures,
+    tookMs: Math.round(performance.now() - started),
+  });
+
+  if (sdkPools.length === 0) {
+    if (rateLimitedTickFailures > 0 || tickFailures > 0) throw incompleteSdkRouteError(earlyDiagnostics());
+    return null;
+  }
 
   const inTok = new Token(tokenIn.contract, tokenIn.precision, tokenIn.ticker);
   const outTok = new Token(tokenOut.contract, tokenOut.precision, tokenOut.ticker);
 
   const routes = computeAllRoutes(inTok, outTok, sdkPools, maxHops);
-  if (routes.length === 0) return null;
+  if (routes.length === 0) {
+    if (rateLimitedTickFailures > 0) throw incompleteSdkRouteError(earlyDiagnostics());
+    return null;
+  }
 
   const percents: number[] = [];
   for (let p = distributionPercent; p <= 100; p += distributionPercent) percents.push(p);
