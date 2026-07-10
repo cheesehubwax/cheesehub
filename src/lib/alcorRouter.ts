@@ -712,3 +712,36 @@ if (typeof window !== "undefined") {
     fetchAllAlcorPools().catch(() => {});
   }, 0);
 }
+
+/**
+ * Best-effort tick cache warm-up for a token pair. Fires as soon as the user
+ * has picked both tokens so that by the time the debounced amount hits the
+ * SDK fan-out, most tick data is already in `ticksCache` and the first quote
+ * comes back `quoteComplete: true`.
+ */
+export async function prewarmTicksForPair(
+  tokenIn: SwapToken,
+  tokenOut: SwapToken,
+  maxHops = 3,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (isAlcorCoolingDown()) return;
+  try {
+    const allPools = poolsCache?.data ?? (await fetchAllAlcorPools(signal));
+    const inKey = tokenKey(tokenIn.contract, tokenIn.ticker);
+    const outKey = tokenKey(tokenOut.contract, tokenOut.ticker);
+    const relevant = selectRelevantPools(allPools, inKey, outKey, maxHops);
+    if (relevant.length === 0) return;
+    // Lower concurrency than the quote fan-out so we don't compete with an
+    // in-flight quote. Swallow all errors — this is best-effort.
+    await mapWithConcurrency(relevant, 4, async (p) => {
+      try {
+        await fetchPoolTicks(p.id, signal);
+      } catch {
+        /* ignore — the real quote will surface any hard failure */
+      }
+    });
+  } catch {
+    /* ignore */
+  }
+}
