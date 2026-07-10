@@ -822,7 +822,8 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   let bestEval: Awaited<ReturnType<typeof evaluatePools>> | null = null;
 
   const TICK_BATCH_SIZE = 12;
-  for (let start = 0; start < relevant.length; start += TICK_BATCH_SIZE) {
+  const totalBatches = Math.ceil(relevant.length / TICK_BATCH_SIZE);
+  for (let start = 0, batchIdx = 0; start < relevant.length; start += TICK_BATCH_SIZE, batchIdx += 1) {
     const batch = relevant.slice(start, start + TICK_BATCH_SIZE);
     const rateLimitsBeforeBatch = rateLimitedTickFailures;
     const batchResults = await mapWithConcurrency(batch, 4, async (p) => {
@@ -849,12 +850,31 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
       }
     }
 
-    const candidate = await evaluatePools(sdkPools);
-    if (candidate?.trade && isBetterTrade(candidate.trade, bestEval?.trade ?? null)) {
-      bestEval = candidate;
+    const isLastBatch = batchIdx === totalBatches - 1;
+    const rateLimited = rateLimitedTickFailures > rateLimitsBeforeBatch;
+    const budgetExceeded = performance.now() - started > SDK_BUDGET_MS;
+    // Only run the (expensive) split solver on the first productive batch,
+    // the final batch, or when we're about to bail out due to rate limits or
+    // the SDK time budget. Intermediate batches just accumulate pools.
+    const shouldEvaluate =
+      sdkPools.length > 0 &&
+      (!bestEval || isLastBatch || rateLimited || budgetExceeded);
+    if (shouldEvaluate) {
+      const candidate = await evaluatePools(sdkPools, isLastBatch || budgetExceeded);
+      if (candidate?.trade && isBetterTrade(candidate.trade, bestEval?.trade ?? null)) {
+        bestEval = candidate;
+      }
     }
 
-    if (rateLimitedTickFailures > rateLimitsBeforeBatch && bestEval?.trade) {
+    if (budgetExceeded) {
+      completedAllTicks = false;
+      logger.warn(
+        `[alcor-router] SDK time budget exceeded; ${bestEval?.trade ? "using best partial quote" : "no quote — HTTP will win"} (${sdkPools.length}/${relevant.length} pools built)`,
+      );
+      break;
+    }
+
+    if (rateLimited && bestEval?.trade) {
       completedAllTicks = false;
       logger.warn(
         `[alcor-router] stopping tick fetch early after rate limit; using best partial quote (${sdkPools.length}/${relevant.length} pools built)`,
@@ -862,7 +882,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
       );
       break;
     }
-    if (rateLimitedTickFailures > rateLimitsBeforeBatch) {
+    if (rateLimited) {
       completedAllTicks = false;
       logger.warn(
         `[alcor-router] stopping tick fetch early after rate limit; no SDK quote yet (${sdkPools.length}/${relevant.length} pools built)`,
@@ -886,7 +906,11 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   };
 
   if (!bestEval?.trade) {
-    if (tickFailures > 0) throw incompleteSdkRouteError(diagnostics);
+    if (tickFailures > 0) {
+      logger.warn(
+        `[alcor-router] SDK returned no trade; HTTP will win${formatSdkDiagnostics(diagnostics)}`,
+      );
+    }
     return null;
   }
 
