@@ -141,6 +141,15 @@ export function useSwapRoute(
         return { ...sdk!, quoteComplete: true };
       }
 
+      if (sdk && sdk.quoteComplete === false) {
+        const diag = sdk.quoteDiagnostics;
+        const retryError = new Error(
+          `Failed to fetch complete split route — retrying (${diag?.routesConsidered ?? "?"} routes, ${diag?.poolsBuilt ?? "?"}/${diag?.relevantPools ?? "?"} pools, tickFailures=${diag?.tickFailures ?? 0})`,
+        );
+        logger.warn("[alcor-router] SDK route incomplete; retrying before accepting HTTP fallback", retryError);
+        throw retryError;
+      }
+
       if (httpValid) {
         if (sdkValid) {
           logger.info(
