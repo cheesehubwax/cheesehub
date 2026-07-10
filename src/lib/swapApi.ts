@@ -29,6 +29,10 @@ export interface SwapSplit {
   memo?: string;
   /** Optional per-split maxSent (used for EXACT_OUTPUT). */
   maxSent?: string;
+  /** Optional display-only token path emitted by the SDK quote. */
+  visualPath?: AlcorPoolToken[];
+  /** Optional display-only pool fees aligned with `route`. */
+  visualFees?: number[];
 }
 
 export interface SwapRoute {
