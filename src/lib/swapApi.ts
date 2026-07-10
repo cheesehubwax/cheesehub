@@ -154,6 +154,8 @@ export async function fetchSwapRoute(
         input: String(s.input ?? ""),
         output: String(s.output ?? ""),
         minReceived: String(s.minReceived ?? ""),
+        memo: s.memo ? String(s.memo) : undefined,
+        maxSent: s.maxSent != null ? String(s.maxSent) : undefined,
       }))
     : [
         {
