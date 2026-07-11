@@ -170,6 +170,10 @@ export function WalletConnect() {
             <img src={walletIcon} alt="Wallet" className="mr-2 h-4 w-4 object-contain" />
             <span><span className="text-cheese">CHEESE</span>Wallet</span>
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setSwapOpen(true)} className="cursor-pointer">
+            <span className="mr-2 text-base leading-none">🔄</span>
+            <span><span className="text-cheese">CHEESE</span>Swap</span>
+          </DropdownMenuItem>
           
           {/* Account Switching Submenu */}
           {allSessions.length > 0 && (
