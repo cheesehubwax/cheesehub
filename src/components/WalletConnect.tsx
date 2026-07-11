@@ -26,6 +26,7 @@ import walletIcon from "@/assets/wallet-icon.png";
 import { WalletTransferDialog } from "./wallet/WalletTransferDialog";
 import { CheeseAmpDialog } from "./music/CheeseAmpDialog";
 import { CheeseAmpMiniPlayer } from "./music/CheeseAmpMiniPlayer";
+import { CheeseSwapDialog } from "./swap/CheeseSwapDialog";
 import { useCheeseAmpAutoAdvance } from "@/hooks/useCheeseAmpAutoAdvance";
 import { getAudioPlayer } from "@/lib/musicPlayer";
 import { useCheeseAmpStore } from "@/stores/cheeseAmpStore";
@@ -47,6 +48,7 @@ export function WalletConnect() {
   const [open, setOpen] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
   const [cheeseAmpOpen, setCheeseAmpOpen] = useState(false);
+  const [swapOpen, setSwapOpen] = useState(false);
   const cheeseAmpMinimized = useCheeseAmpStore((state) => state.isMinimized);
   const setCheeseAmpMinimized = useCheeseAmpStore((state) => state.setMinimized);
 
@@ -168,6 +170,10 @@ export function WalletConnect() {
             <img src={walletIcon} alt="Wallet" className="mr-2 h-4 w-4 object-contain" />
             <span><span className="text-cheese">CHEESE</span>Wallet</span>
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setSwapOpen(true)} className="cursor-pointer">
+            <span className="mr-2 text-base leading-none">🔄</span>
+            <span><span className="text-cheese">CHEESE</span>Swap</span>
+          </DropdownMenuItem>
           
           {/* Account Switching Submenu */}
           {allSessions.length > 0 && (
@@ -227,6 +233,7 @@ export function WalletConnect() {
         </DropdownMenuContent>
       </DropdownMenu>
       <WalletTransferDialog open={walletOpen} onOpenChange={setWalletOpen} />
+      <CheeseSwapDialog open={swapOpen} onOpenChange={setSwapOpen} />
       <CheeseAmpDialog 
         open={cheeseAmpOpen} 
         onOpenChange={setCheeseAmpOpen} 
