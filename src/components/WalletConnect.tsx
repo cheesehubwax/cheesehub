@@ -86,6 +86,19 @@ export function WalletConnect() {
     return () => window.removeEventListener('open-cheese-amp', handleOpenCheeseAmp);
   }, [isConnected, cheeseAmpMinimized]);
 
+  // Listen for custom event to open CHEESESwap
+  useEffect(() => {
+    const handleOpenCheeseSwap = () => {
+      if (isConnected) {
+        setSwapOpen(true);
+      } else {
+        setOpen(true);
+      }
+    };
+    window.addEventListener('open-cheese-swap', handleOpenCheeseSwap);
+    return () => window.removeEventListener('open-cheese-swap', handleOpenCheeseSwap);
+  }, [isConnected]);
+
   // Close mini player when user logs out
   useEffect(() => {
     if (!isConnected) {
