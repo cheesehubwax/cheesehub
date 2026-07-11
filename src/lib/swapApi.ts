@@ -128,7 +128,7 @@ export async function fetchSwapRoute(
     input: inputId,
     output: outputId,
     amount: formattedAmount,
-    slippage: (slippage / 100).toFixed(2),
+    slippage: String(slippage),
     receiver,
     maxHops: "3",
   });
