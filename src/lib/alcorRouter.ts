@@ -627,6 +627,9 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
 
   // Per-split shape mirrors Alcor's own parseTrade so the memo is byte-identical
   // to what wax.alcor.exchange sends today.
+  const splitCount = trade.swaps.length;
+  const perSplitBps = splitSlipBps(bps, splitCount);
+  const splitSlip = new Percent(perSplitBps, 10_000);
   const splits: SwapSplit[] = trade.swaps.map((s: any) => {
     const poolIds: number[] = s.route.pools.map((p: Pool) => p.id);
     const visualPath = s.route.tokenPath.map((t: Token) => ({
@@ -637,7 +640,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     }));
     const visualFees = s.route.pools.map((p: Pool) => p.fee);
     const maxSent = exactIn ? s.inputAmount : trade.maximumAmountIn(slip, s.inputAmount);
-    const minReceived = exactIn ? trade.minimumAmountOut(slip, s.outputAmount) : s.outputAmount;
+    const minReceived = exactIn ? trade.minimumAmountOut(splitSlip, s.outputAmount) : s.outputAmount;
     const memo = `${opWord}#${poolIds.join(",")}#${receiver}#${minReceived.toExtendedAsset()}#0`;
     return {
       percent: s.percent,
