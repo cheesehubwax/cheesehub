@@ -48,6 +48,7 @@ export function WalletConnect() {
   const [open, setOpen] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
   const [cheeseAmpOpen, setCheeseAmpOpen] = useState(false);
+  const [swapOpen, setSwapOpen] = useState(false);
   const cheeseAmpMinimized = useCheeseAmpStore((state) => state.isMinimized);
   const setCheeseAmpMinimized = useCheeseAmpStore((state) => state.setMinimized);
 
