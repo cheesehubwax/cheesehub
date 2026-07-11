@@ -35,6 +35,24 @@ export function isAlcorCoolingDown(): boolean {
   return Date.now() < alcorCooldownUntil;
 }
 
+// ----- Per-split slippage widening -----
+// On-chain, swap.alcor enforces `minTokenOut` per transfer. When the router
+// splits a trade across multiple pools, one leg can drift more than the user's
+// aggregate slippage even when the aggregate output is still inside slippage —
+// aborting the whole tx. We widen only the per-split memo min; the aggregate
+// `minReceived` shown to the user is unchanged.
+const SPLIT_SLIPPAGE_MULTIPLIER = 3;
+const SPLIT_SLIPPAGE_FLOOR_BPS = 50; // 0.5%
+const SPLIT_SLIPPAGE_MAX_BPS = 1000; // 10%
+function splitSlipBps(userBps: number, splitCount: number): number {
+  if (splitCount <= 1) return userBps;
+  const widened = Math.max(
+    userBps * SPLIT_SLIPPAGE_MULTIPLIER,
+    userBps + SPLIT_SLIPPAGE_FLOOR_BPS,
+  );
+  return Math.min(widened, SPLIT_SLIPPAGE_MAX_BPS);
+}
+
 // ----- Raw API shapes -----
 
 interface RawAlcorPool {
@@ -609,6 +627,9 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
 
   // Per-split shape mirrors Alcor's own parseTrade so the memo is byte-identical
   // to what wax.alcor.exchange sends today.
+  const splitCount = trade.swaps.length;
+  const perSplitBps = splitSlipBps(bps, splitCount);
+  const splitSlip = new Percent(perSplitBps, 10_000);
   const splits: SwapSplit[] = trade.swaps.map((s: any) => {
     const poolIds: number[] = s.route.pools.map((p: Pool) => p.id);
     const visualPath = s.route.tokenPath.map((t: Token) => ({
@@ -619,7 +640,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     }));
     const visualFees = s.route.pools.map((p: Pool) => p.fee);
     const maxSent = exactIn ? s.inputAmount : trade.maximumAmountIn(slip, s.inputAmount);
-    const minReceived = exactIn ? trade.minimumAmountOut(slip, s.outputAmount) : s.outputAmount;
+    const minReceived = exactIn ? trade.minimumAmountOut(splitSlip, s.outputAmount) : s.outputAmount;
     const memo = `${opWord}#${poolIds.join(",")}#${receiver}#${minReceived.toExtendedAsset()}#0`;
     return {
       percent: s.percent,
@@ -668,7 +689,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   } as SwapRoute;
 
   logger.info(
-    `[alcor-router] SDK quote produced ${splits.length} split(s) [grid=${distributionPercent}%, maxHops=${maxHops}]${formatSdkDiagnostics(diagnostics)}`,
+    `[alcor-router] SDK quote produced ${splits.length} split(s) [grid=${distributionPercent}%, maxHops=${maxHops}, per-split slip=${perSplitBps / 100}%]${formatSdkDiagnostics(diagnostics)}`,
   );
 
   return result;
