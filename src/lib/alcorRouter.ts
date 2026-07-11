@@ -689,7 +689,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   } as SwapRoute;
 
   logger.info(
-    `[alcor-router] SDK quote produced ${splits.length} split(s) [grid=${distributionPercent}%, maxHops=${maxHops}]${formatSdkDiagnostics(diagnostics)}`,
+    `[alcor-router] SDK quote produced ${splits.length} split(s) [grid=${distributionPercent}%, maxHops=${maxHops}, per-split slip=${perSplitBps / 100}%]${formatSdkDiagnostics(diagnostics)}`,
   );
 
   return result;
