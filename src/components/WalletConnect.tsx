@@ -233,6 +233,7 @@ export function WalletConnect() {
         </DropdownMenuContent>
       </DropdownMenu>
       <WalletTransferDialog open={walletOpen} onOpenChange={setWalletOpen} />
+      <CheeseSwapDialog open={swapOpen} onOpenChange={setSwapOpen} />
       <CheeseAmpDialog 
         open={cheeseAmpOpen} 
         onOpenChange={setCheeseAmpOpen} 
