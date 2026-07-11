@@ -42,8 +42,8 @@ export function DepositRewardsDialog({ farm, open, onOpenChange, onSuccess, isCr
       if (actions.length === 0) return;
 
       const result = await executeTransaction(actions, {
-        successTitle: "Rewards Deposited! 💰",
-        successDescription: "Reward tokens have been deposited into the farm",
+        successTitle: "Reward pool funded",
+        successDescription: "Reward tokens have been deposited into the farm's reward pool for stakers to later claim.",
       });
       if (result.success) {
         setAmounts({});

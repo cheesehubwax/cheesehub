@@ -211,7 +211,7 @@ const dapps: DApp[] = [
     name: 'CHEESEFarm',
     contracts: ['farms.waxdao'],
     owner: 'WaxDAO',
-    description: 'NFT staking farms for earning token rewards. Farm creation costs 265 WAX (or CHEESE equivalent via cheesefeefee). Uses WaxDAO\'s non-custodial V2 staking — NFTs stay in the user\'s wallet.',
+    description: 'Non-custodial NFT staking farms where users lock NFTs and farm creators fund a reward pool that stakers may later claim. Farm creation costs 265 WAX (or CHEESE equivalent via cheesefeefee). Uses WaxDAO\'s V2 staking — NFTs stay in the user\'s wallet.',
     feeNote: 'Creation fee: 265 WAX or CHEESE equivalent (routed through cheesefeefee).',
   },
   {

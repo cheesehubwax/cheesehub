@@ -540,8 +540,8 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
                       </div>
                     </div>
 
-                    <div className="w-[60px] shrink-0 text-center">
-                      <div className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-1"><Percent className="h-3 w-3" />APR</div>
+                    <div className="w-[70px] shrink-0 text-center" title="Live estimate derived from current pool reward rate and TVL. Not a promised return.">
+                      <div className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-1"><Percent className="h-3 w-3" />Est.</div>
                       <div className="space-y-0.5">
                         {position.incentives.map((incentive) => {
                           const key = getIncentiveKey(incentive);
@@ -550,6 +550,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
                           return <div key={key} className="font-mono text-xs text-green-400">{apr > 0 ? `${apr.toFixed(1)}%` : '—'}</div>;
                         })}
                       </div>
+                      <div className="text-[9px] text-muted-foreground/70 mt-1 leading-tight">estimate only</div>
                     </div>
 
                     <div className="w-[120px] shrink-0 text-center">
