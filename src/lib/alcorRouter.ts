@@ -35,6 +35,24 @@ export function isAlcorCoolingDown(): boolean {
   return Date.now() < alcorCooldownUntil;
 }
 
+// ----- Per-split slippage widening -----
+// On-chain, swap.alcor enforces `minTokenOut` per transfer. When the router
+// splits a trade across multiple pools, one leg can drift more than the user's
+// aggregate slippage even when the aggregate output is still inside slippage —
+// aborting the whole tx. We widen only the per-split memo min; the aggregate
+// `minReceived` shown to the user is unchanged.
+const SPLIT_SLIPPAGE_MULTIPLIER = 3;
+const SPLIT_SLIPPAGE_FLOOR_BPS = 50; // 0.5%
+const SPLIT_SLIPPAGE_MAX_BPS = 1000; // 10%
+function splitSlipBps(userBps: number, splitCount: number): number {
+  if (splitCount <= 1) return userBps;
+  const widened = Math.max(
+    userBps * SPLIT_SLIPPAGE_MULTIPLIER,
+    userBps + SPLIT_SLIPPAGE_FLOOR_BPS,
+  );
+  return Math.min(widened, SPLIT_SLIPPAGE_MAX_BPS);
+}
+
 // ----- Raw API shapes -----
 
 interface RawAlcorPool {
