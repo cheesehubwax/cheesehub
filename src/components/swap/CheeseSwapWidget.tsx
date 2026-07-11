@@ -11,6 +11,8 @@ import { useSwapTokenBalance } from "@/hooks/useSwapTokenBalance";
 import { useWax } from "@/context/WaxContext";
 import { type SwapToken, formatTokenAmount, normalizeRouteActions, PREFERRED_CONTRACTS } from "@/lib/swapApi";
 import { getTransactPlugins } from "@/lib/wharfKit";
+import { fetchSingleTokenBalance } from "@/lib/waxRpcFallback";
+import type { TokenWithBalance } from "@/hooks/useAllTokenBalances";
 import { toast } from "sonner";
 
 interface CheeseSwapWidgetProps {
@@ -140,10 +142,49 @@ export function CheeseSwapWidget({
       setAmountIn("");
       setAmountOut("");
       setActiveField("in");
-      // Refresh shared balance cache after swap
+      // Refresh balances immediately using authoritative RPC reads, then
+      // reconcile with Hyperion in the background.
+      const balancesKey = ["all-token-balances", accountName] as const;
+      const patchToken = (t: SwapToken, amount: number) => {
+        queryClient.setQueryData<{ tokens: TokenWithBalance[]; usedFallback: boolean }>(
+          balancesKey,
+          (prev) => {
+            const prevTokens = prev?.tokens ?? [];
+            const idx = prevTokens.findIndex(
+              (x) => x.contract === t.contract && x.symbol === t.ticker
+            );
+            const entry: TokenWithBalance = idx >= 0
+              ? { ...prevTokens[idx], balance: amount }
+              : {
+                  symbol: t.ticker,
+                  contract: t.contract,
+                  precision: t.precision ?? 8,
+                  displayName: t.ticker,
+                  balance: amount,
+                  isLpToken: false,
+                };
+            const nextTokens = idx >= 0
+              ? prevTokens.map((x, i) => (i === idx ? entry : x))
+              : [...prevTokens, entry];
+            return { tokens: nextTokens, usedFallback: prev?.usedFallback ?? false };
+          }
+        );
+      };
+      if (tokenIn && tokenOut) {
+        const inTok = tokenIn;
+        const outTok = tokenOut;
+        Promise.allSettled([
+          fetchSingleTokenBalance(accountName, inTok.contract, inTok.ticker),
+          fetchSingleTokenBalance(accountName, outTok.contract, outTok.ticker),
+        ]).then((results) => {
+          if (results[0].status === "fulfilled") patchToken(inTok, results[0].value);
+          if (results[1].status === "fulfilled") patchToken(outTok, results[1].value);
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["all-token-balances", accountName] });
       setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["all-token-balances"] });
-      }, 1500);
+        queryClient.invalidateQueries({ queryKey: ["all-token-balances", accountName] });
+      }, 4000);
     } catch (e: any) {
       const msg = e?.message || "Swap failed";
       if (!msg.includes("cancel") && !msg.includes("reject")) {

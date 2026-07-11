@@ -1,42 +1,29 @@
-## Problem
+## Goal
+After a swap transaction succeeds, both the "You pay" and "You receive" balances in the CHEESESwap widget must update immediately, not after a 1.5s delay.
 
-Section 7.10 of the Disclaimer currently states:
+## Current behavior
+In `src/components/swap/CheeseSwapWidget.tsx` `handleSwap()` waits 1500ms then invalidates `["all-token-balances"]`. Because Hyperion (the primary balance source in `useAllTokenBalances`) typically lags a few seconds behind chain state, a single delayed refetch often still returns pre-swap balances, and the user sees stale numbers.
 
-> "Swap routing, price calculations, and minimum received amounts are determined by Alcor's public API and on-chain pool liquidity — CHEESEHub merely displays this information for convenience."
+Also, `useSwapTokenBalance` prefers the shared cache value over its RPC fallback, so simply refetching the fallback query won't move the displayed number unless the shared cache is updated too.
 
-This is no longer accurate. `useSwapRoute` now runs two independent quote engines in parallel:
+## Fix — `src/components/swap/CheeseSwapWidget.tsx` only
 
-1. **Alcor HTTP API** (`fetchSwapRoute`) — Alcor's public `/swapRouter/getRoute` endpoint.
-2. **Custom browser SDK router** (`computeAlcorTrade` in `src/lib/alcorRouter.ts`) — fetches on-chain Alcor pool and tick data directly, then runs `@alcorexchange/alcor-swap-sdk`'s `bestTradeWithSplit` client-side to build split routes.
+Replace the single delayed invalidation in `handleSwap()`'s success branch with an immediate + resilient refresh sequence that reads authoritative on-chain state via RPC (which reflects the new balances the instant the tx is included) and writes it into the shared `all-token-balances` cache so both `SwapTokenInput` panels re-render right away:
 
-The widget picks whichever route produces the better output (or input, for exact-output). CHEESEHub is therefore no longer "merely displaying" Alcor's API data; it is actively computing competing routes and selecting one.
+1. Immediately after `session.transact(...)` resolves:
+   - Fire two direct RPC balance reads in parallel using the existing `fetchSingleTokenBalance` helper from `src/lib/waxRpcFallback.ts`, one for `tokenIn` and one for `tokenOut`.
+   - When each resolves, use `queryClient.setQueryData(["all-token-balances", accountName], ...)` to patch the matching `{contract, symbol}` entry inside `data.tokens` with the fresh amount (add the token entry if it wasn't previously in the list, e.g. first-time receive). Keep all other tokens untouched.
+   - This makes the two displayed balances update within one render, using authoritative RPC data.
 
-## Proposed change
+2. In parallel, call `queryClient.invalidateQueries({ queryKey: ["all-token-balances", accountName] })` right away so Hyperion is refetched for the full token list.
 
-Update section 7.10 in `src/pages/Disclaimer.tsx` to:
+3. Schedule one more `invalidateQueries` at ~4000ms to reconcile with Hyperion once its indexer catches up (guards against the RPC patch drifting from Hyperion's eventual value).
 
-- Rename the subsection from "CHEESESwap (Alcor Swap Widget)" to "CHEESESwap (Smart Router)".
-- Explain that CHEESESwap compares Alcor's public HTTP quote against a custom client-side router that reads the same on-chain Alcor pools.
-- Clarify that the displayed route is the better of the two computed quotes, but is still indicative and subject to slippage / pool changes.
-- Keep all existing legal protections: non-custodial, user-signed, Alcor contracts, no execution/intermediation guarantees.
+4. Remove the old `setTimeout(..., 1500)` block.
 
-### Suggested new wording
+No changes to `useSwapTokenBalance`, `useAllTokenBalances`, the SDK, route logic, or any other component. Purely a post-transaction refresh improvement scoped to the swap widget.
 
-```text
-7.10 CHEESESwap (Smart Router)
-
-CHEESESwap provides an embedded interface for token swaps executed against Alcor Exchange's smart contracts (including swap.alcor) deployed on the WAX blockchain. Alcor Exchange is a third-party decentralised exchange not affiliated with, owned by, or controlled by CHEESEHub or the CHEESE DAO. CHEESEHub does not custody, hold, pool, or have access to any user funds at any point during a swap. All swap transactions are constructed in the user's browser, signed by the user's own wallet provider, and executed directly against Alcor's on-chain smart contracts. CHEESEHub does not execute, intermediate, settle, match, or arrange any swap on behalf of any user.
-
-CHEESESwap quotes are produced by comparing two independent route computations in the user's browser: (a) Alcor Exchange's public HTTP quote API, and (b) a custom client-side router that fetches the same public Alcor pool and tick data and calculates split-route trades using the Alcor swap SDK. CHEESESwap displays and proposes whichever of these two computed routes returns the better expected output (or, for exact-output swaps, the lower required input). Because both engines use the same underlying on-chain liquidity, neither CHEESEHub nor any third party controls or sets the price.
-
-Price quotes, price impact estimates, expected output, minimum received amounts, and route details shown in the interface are indicative only and may differ from the final on-chain execution due to slippage, pool depth changes, concurrent transactions, or differences between the quoted block and the execution block. CHEESEHub makes no guarantee regarding swap execution, pricing accuracy, or availability of the Alcor API or on-chain data. Users are solely responsible for reviewing and confirming all transaction details before signing.
-```
-
-## Files changed
-
-- `src/pages/Disclaimer.tsx` — update section 7.10 heading and paragraph.
-
-## Out of scope
-
-- No logic changes to the swap widget or SDK.
-- No changes to other disclaimer sections unless requested.
+## Technical notes
+- `fetchSingleTokenBalance(account, contract, symbol)` already exists and is used by `useSwapTokenBalance`'s fallback path — reusing it keeps behavior consistent.
+- `setQueryData` on `["all-token-balances", accountName]` is safe: the shape is `{ tokens: TokenWithBalance[], usedFallback: boolean }`; we preserve `usedFallback` and only mutate the two token rows.
+- RPC failures for one/both tokens are non-fatal — we still fall back to the invalidation path, matching current behavior.
