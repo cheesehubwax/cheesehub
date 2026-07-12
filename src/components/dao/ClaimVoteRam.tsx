@@ -35,7 +35,7 @@ export function ClaimVoteRam({ daoName }: ClaimVoteRamProps) {
 
     const action = buildClaimVoteRamAction(accountName, daoName, proposalId);
     const result = await executeTransaction([action], {
-      successTitle: "RAM Reclaimed! 🧀",
+      successTitle: "RAM Reclaimed! ",
       successDescription: `Vote RAM reclaimed from proposal #${proposalId}`,
     });
 

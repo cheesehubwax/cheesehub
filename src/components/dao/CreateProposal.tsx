@@ -164,7 +164,7 @@ export function CreateProposal({ daoName, dao, treasuryNFTs = [], onClose, onCre
     }
 
     const result = await executeTransaction(actions, {
-      successTitle: "Proposal Created! 🧀",
+      successTitle: "Proposal Created! ",
       successDescription: `"${title}" has been submitted`,
     });
     if (result.success) onCreated();

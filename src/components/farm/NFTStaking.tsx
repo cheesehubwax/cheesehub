@@ -122,7 +122,7 @@ const FarmNFTCard = React.memo(function FarmNFTCard({ nft, isSelected, onToggle,
             </>
           }
           extraHoverContent={
-            <div className="flex justify-between text-amber-500"><OpenMojiIcon emoji="⚠️" size={18} /> Staked in<span className="font-semibold">{stakedInFarm}</span></div>
+            <div className="flex justify-between text-amber-500"><OpenMojiIcon emoji="" size={18} /> Staked in<span className="font-semibold">{stakedInFarm}</span></div>
           }
         />
       </div>
@@ -795,7 +795,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
         ? [buildClaimRewardsAction(accountName, farm.farm_name), stakeAction]
         : [stakeAction];
       const result = await executeTransaction(actions, {
-        successTitle: "NFTs Staked! 🌱",
+        successTitle: "NFTs Staked! ",
         successDescription: hasPendingClaim
           ? `Claimed pending rewards and staked ${ids.length} NFT(s)`
           : `Staked ${ids.length} NFT(s)`,
@@ -891,7 +891,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
           : [];
       const action = buildClaimRewardsAction(accountName, farm.farm_name);
       const result = await executeTransaction([action], {
-        successTitle: "Rewards Claimed! 💰",
+        successTitle: "Rewards Claimed! ",
         successDescription: `Successfully claimed from ${farm.farm_name}`,
       });
       if (result.success) {

@@ -252,11 +252,11 @@ export const PowerUpCard = ({
       <Tabs value={paymentMode} onValueChange={(v) => setPaymentMode(v as "cheese" | "wax")} className="w-full">
         <TabsList className="w-full">
           <TabsTrigger value="cheese" className="flex-1 gap-2">
-            <OpenMojiIcon emoji="🧀" size={18} />
+            <OpenMojiIcon emoji="" size={18} />
             CHEESEUp
           </TabsTrigger>
           <TabsTrigger value="wax" className="flex-1 gap-2">
-            <OpenMojiIcon emoji="⚡" size={18} />
+            <OpenMojiIcon emoji="" size={18} />
             WAX PowerUp
           </TabsTrigger>
         </TabsList>
@@ -267,7 +267,7 @@ export const PowerUpCard = ({
             onChange={setCpuAmount}
             balance={walletConnected ? cheeseBalance : 0}
             label="CPU Power"
-            icon={<OpenMojiIcon emoji="🖥️" size={18} className="text-lg" />}
+            icon={<OpenMojiIcon emoji="" size={18} className="text-lg" />}
             accentColor="cpu"
           />
 
@@ -276,7 +276,7 @@ export const PowerUpCard = ({
             onChange={setNetAmount}
             balance={walletConnected ? cheeseBalance : 0}
             label="NET Bandwidth"
-            icon={<OpenMojiIcon emoji="📡" size={18} className="text-lg" />}
+            icon={<OpenMojiIcon emoji="" size={18} className="text-lg" />}
             accentColor="net"
           />
         </TabsContent>
@@ -286,7 +286,7 @@ export const PowerUpCard = ({
             value={waxCpuAmount}
             onChange={setWaxCpuAmount}
             label="CPU Power"
-            icon={<OpenMojiIcon emoji="🖥️" size={18} className="text-lg" />}
+            icon={<OpenMojiIcon emoji="" size={18} className="text-lg" />}
             accentColor="cpu"
             tokenSymbol="WAX"
             tokenLogo={waxCoin}
@@ -297,7 +297,7 @@ export const PowerUpCard = ({
             value={waxNetAmount}
             onChange={setWaxNetAmount}
             label="NET Bandwidth"
-            icon={<OpenMojiIcon emoji="📡" size={18} className="text-lg" />}
+            icon={<OpenMojiIcon emoji="" size={18} className="text-lg" />}
             accentColor="net"
             tokenSymbol="WAX"
             tokenLogo={waxCoin}
@@ -320,12 +320,12 @@ export const PowerUpCard = ({
       >
         {isTransacting ? (
           <>
-            <OpenMojiIcon emoji="⏳" size={18} className="animate-spin inline-block" />
+            <OpenMojiIcon emoji="" size={18} className="animate-spin inline-block" />
             Processing...
           </>
         ) : (
           <>
-            <OpenMojiIcon emoji="⚡" size={18} />
+            <OpenMojiIcon emoji="" size={18} />
             {!walletConnected
               ? "Connect Wallet"
               : canPowerUp
@@ -358,13 +358,13 @@ export const PowerUpCard = ({
             <div className="space-y-3">
               {successDetails && successDetails.cpuMs > 0 && (
                 <div className="flex items-center gap-3 text-foreground bg-amber-500/10 p-3 rounded-lg">
-                  <OpenMojiIcon emoji="🖥️" size={20} className="text-xl" />
+                  <OpenMojiIcon emoji="" size={20} className="text-xl" />
                   <span>~{successDetails.cpuMs.toFixed(2)} ms CPU (estimate)</span>
                 </div>
               )}
               {successDetails && successDetails.netBytes > 0 && (
                 <div className="flex items-center gap-3 text-foreground bg-orange-400/10 p-3 rounded-lg">
-                  <OpenMojiIcon emoji="📡" size={20} className="text-xl" />
+                  <OpenMojiIcon emoji="" size={20} className="text-xl" />
                   <span>~{formatBytes(successDetails.netBytes)} NET (estimate)</span>
                 </div>
               )}

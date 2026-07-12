@@ -51,11 +51,11 @@ export function PowerupLeaderboard({ rawActions, isLoading, isError, onRefresh }
       <CardContent className="p-5 space-y-4">
         <div className="text-center space-y-1">
           <div className="flex items-center justify-center gap-2">
-            <OpenMojiIcon emoji="🏆" size={18} />
+            <OpenMojiIcon emoji="" size={18} />
             <h3 className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
               CHEESEBoard
             </h3>
-            <OpenMojiIcon emoji="🏆" size={18} />
+            <OpenMojiIcon emoji="" size={18} />
             {onRefresh && (
               <button
                 onClick={onRefresh}

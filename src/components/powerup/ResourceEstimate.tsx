@@ -29,7 +29,7 @@ export const ResourceEstimate = ({
   if (isLoading) {
     return (
       <div className="rounded-xl p-6 bg-card border border-border/50 flex items-center justify-center gap-3">
-        <OpenMojiIcon emoji="⏳" size={20} className="text-xl animate-spin inline-block" />
+        <OpenMojiIcon emoji="" size={20} className="text-xl animate-spin inline-block" />
         <span className="text-muted-foreground">Fetching current rates...</span>
       </div>
     );
@@ -40,7 +40,7 @@ export const ResourceEstimate = ({
       <div className="rounded-xl p-4 border border-red-500/30 bg-red-500/10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <OpenMojiIcon emoji="⚠️" size={18} />
+            <OpenMojiIcon emoji="" size={18} />
             <span className="text-red-300 text-sm">Failed to fetch rates</span>
           </div>
           <button
@@ -69,7 +69,7 @@ export const ResourceEstimate = ({
         </h3>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <OpenMojiIcon emoji="⏰" size={18} />
+            <OpenMojiIcon emoji="" size={18} />
             <span>{estimate.powerupDays} day rental</span>
           </div>
           <button
@@ -88,7 +88,7 @@ export const ResourceEstimate = ({
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
-                  <OpenMojiIcon emoji="🖥️" size={20} className="text-xl" />
+                  <OpenMojiIcon emoji="" size={20} className="text-xl" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">CPU Time</p>
@@ -99,7 +99,7 @@ export const ResourceEstimate = ({
               </div>
               <div className="text-right">
                 <div className="flex items-center gap-1 text-amber-500 text-sm font-semibold">
-                  <OpenMojiIcon emoji="📈" size={18} />
+                  <OpenMojiIcon emoji="" size={18} />
                   <span>{estimate.cpuWaxAmount.toFixed(4)} WAX</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -115,7 +115,7 @@ export const ResourceEstimate = ({
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center">
-                  <OpenMojiIcon emoji="📡" size={20} className="text-xl" />
+                  <OpenMojiIcon emoji="" size={20} className="text-xl" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">NET Bandwidth</p>
@@ -126,7 +126,7 @@ export const ResourceEstimate = ({
               </div>
               <div className="text-right">
                 <div className="flex items-center gap-1 text-orange-400 text-sm font-semibold">
-                  <OpenMojiIcon emoji="📈" size={18} />
+                  <OpenMojiIcon emoji="" size={18} />
                   <span>{estimate.netWaxAmount.toFixed(4)} WAX</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">

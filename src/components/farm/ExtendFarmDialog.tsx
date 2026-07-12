@@ -50,7 +50,7 @@ export function ExtendFarmDialog({ farm, open, onOpenChange, onSuccess }: Extend
       const expiration = Math.floor(newDate.getTime() / 1000);
       const action = buildExtendFarmAction(accountName, farm.farm_name, expiration);
       const result = await executeTransaction([action], {
-        successTitle: "Farm Extended! 📅",
+        successTitle: "Farm Extended! ",
         successDescription: `Farm extended to ${newDate.toLocaleDateString()}`,
       });
       if (result.success) {

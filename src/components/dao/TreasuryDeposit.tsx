@@ -131,7 +131,7 @@ export function TreasuryDeposit({ daoName, onDeposited }: TreasuryDepositProps) 
     ));
 
     const result = await executeTransaction(actions, {
-      successTitle: "Treasury Deposit! 🧀🏦",
+      successTitle: "Treasury Deposit! ",
       successDescription: `Deposited ${formattedAmount} to ${daoName} treasury`,
     });
 

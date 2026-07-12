@@ -17,7 +17,7 @@ const NotFound = () => {
     <Layout>
       <div className="container py-16 text-center">
         <div className="h-24 w-24 rounded-full bg-cheese/20 flex items-center justify-center mx-auto mb-8">
-          <OpenMojiIcon emoji="🧀" size={48} className="text-6xl" />
+          <OpenMojiIcon emoji="" size={48} className="text-6xl" />
         </div>
         <h1 className="text-4xl font-bold mb-4">
           <span className="text-cheese">404</span>

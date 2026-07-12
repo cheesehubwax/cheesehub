@@ -482,7 +482,7 @@ export function WaxProvider({ children }: { children: ReactNode }) {
       const txId = result.resolved?.transaction.id?.toString() || null;
 
       toast({
-        title: 'Claim Successful! 🧀',
+        title: 'Claim Successful! ',
         description: 'Your free NFT has been claimed!',
       });
 

@@ -31,7 +31,7 @@ export function CartDrawer() {
     }
     clearCart();
     showSuccess(
-      "All items purchased! 🧀",
+      "All items purchased! ",
       `${totalItems} item${totalItems !== 1 ? 's' : ''} claimed successfully`,
       lastTxId ?? null
     );

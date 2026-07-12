@@ -78,13 +78,13 @@ export function DaoCard({ dao, onClick }: DaoCardProps) {
         <div className="space-y-1.5 text-sm">
           {isNftType ? (
             <div className="flex items-center gap-2">
-              <OpenMojiIcon emoji="🖼️" size={14} className="text-sm shrink-0" />
+              <OpenMojiIcon emoji="" size={14} className="text-sm shrink-0" />
               <span className="text-muted-foreground">NFT Collections:</span>
               <span className="font-medium text-foreground">{dao.gov_schemas?.length || 0}</span>
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <OpenMojiIcon emoji="💰" size={14} className="text-sm shrink-0" />
+              <OpenMojiIcon emoji="" size={14} className="text-sm shrink-0" />
               <span className="text-muted-foreground">Gov Token:</span>
               <TokenLogo
                 contract={dao.token_contract}
@@ -98,7 +98,7 @@ export function DaoCard({ dao, onClick }: DaoCardProps) {
             </div>
           )}
           <div className="flex items-center gap-2">
-            <OpenMojiIcon emoji="📜" size={14} className="text-sm shrink-0" />
+            <OpenMojiIcon emoji="" size={14} className="text-sm shrink-0" />
             <span className="text-muted-foreground">Proposal Cost:</span>
             <span className="font-medium text-foreground">
               {dao.proposal_cost && dao.proposal_cost !== "0" ? dao.proposal_cost : "Free"}

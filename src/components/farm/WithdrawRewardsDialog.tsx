@@ -38,7 +38,7 @@ export function WithdrawRewardsDialog({ farm, open, onOpenChange, onSuccess }: W
       if (actions.length === 0) return;
 
       const result = await executeTransaction(actions, {
-        successTitle: "Rewards Withdrawn! 💸",
+        successTitle: "Rewards Withdrawn! ",
         successDescription: "Reward tokens have been withdrawn from the farm",
       });
       if (result.success) {

@@ -121,7 +121,7 @@ export function buildCreateDropAction(
         tokens_to_back: tokensToBack
       }];
 
-  console.log('🧀 Building drop action:', {
+  console.log(' Building drop action:', {
     dropType: data.dropType,
     templateId,
     collectionName: data.collectionName,

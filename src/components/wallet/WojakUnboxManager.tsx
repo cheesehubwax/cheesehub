@@ -45,7 +45,7 @@ export function WojakUnboxManager({ onTransactionComplete, onTransactionSuccess 
       });
       if (result.success) {
         onTransactionSuccess?.(
-          'Pack Opened! 📦🧀',
+          'Pack Opened! ',
           `Your Waxy Wojak should arrive shortly from ${WAXDAO_UNBOX_CONTRACT}.`,
           result.txId,
         );
@@ -77,7 +77,7 @@ export function WojakUnboxManager({ onTransactionComplete, onTransactionSuccess 
         <div className="flex-1 min-w-0">
           <h3 className="text-base font-semibold flex items-center gap-2">
             <Package className="h-4 w-4 text-cheese" />
-            <OpenMojiIcon emoji="📦" size={18} /> Open Wojak Pack
+            <OpenMojiIcon emoji="" size={18} /> Open Wojak Pack
           </h3>
           <p className="text-xs text-muted-foreground mt-1">
             Open Waxy Wojak Packs through WaxDAO unbox pool #{WOJAK_UNBOX_POOL_ID}.

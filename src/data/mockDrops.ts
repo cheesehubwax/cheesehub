@@ -58,7 +58,7 @@ export const mockDrops: NFTDrop[] = [
     attributes: [
       { trait: "Rarity", value: "Uncommon" },
       { trait: "State", value: "Molten" },
-      { trait: "Temperature", value: "🔥" },
+      { trait: "Temperature", value: "" },
     ],
   },
   {

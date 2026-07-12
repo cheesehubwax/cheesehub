@@ -183,11 +183,11 @@ export function CreateLiquidityLock() {
           <Tabs value={selectedDex} onValueChange={handleDexChange} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value={DEX.DEFIBOX} className="gap-2">
-                <OpenMojiIcon emoji="📦" size={18} className="text-lg" />
+                <OpenMojiIcon emoji="" size={18} className="text-lg" />
                 Defibox
               </TabsTrigger>
               <TabsTrigger value={DEX.TACO} className="gap-2">
-                <OpenMojiIcon emoji="🌮" size={18} className="text-lg" />
+                <OpenMojiIcon emoji="" size={18} className="text-lg" />
                 TacoSwap
               </TabsTrigger>
             </TabsList>
