@@ -7,6 +7,7 @@ import { RefreshCw } from 'lucide-react';
 import waxSealAsset from '@/assets/wax-seal.png.asset.json';
 import usdcAsset from '@/assets/usdc.png.asset.json';
 import marketcapAsset from '@/assets/marketcap.png.asset.json';
+import tvlAsset from '@/assets/tvl.png.asset.json';
 import { CheeseSwapDialog } from '@/components/swap/CheeseSwapDialog';
 
 function formatPrice(price: number, decimals: number = 8): string {
@@ -139,7 +140,7 @@ export function CheesePriceBar() {
 
       {/* TVL */}
       <div className="flex items-center gap-2 bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border border-cheese/20 rounded-lg px-4 py-2">
-        <span className="text-lg">💰</span>
+        <img src={tvlAsset.url} alt="TVL" className="w-7 h-7 object-contain" />
         <div className="flex flex-col">
           <span className="text-xs text-muted-foreground">TVL (All DEXs)</span>
           {tvlLoading || !tvlData ? (
