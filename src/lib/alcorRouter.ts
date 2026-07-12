@@ -245,6 +245,16 @@ const ROUTE_COVERAGE_HUB_KEYS = new Set([
   "lswax-token.fusion",
 ]);
 
+// Controlled first-party exception: Alcor's current best WAX→WAXWETH path uses
+// WAX→CHEESE→WAXWETH. Keep this scoped to WAXWETH so WAXWBTC selection remains
+// governed by the stable/base hub set above.
+function routeCoverageHubKeys(inKey: string, outKey: string): Set<string> {
+  if (inKey === "waxweth-eth.token" || outKey === "waxweth-eth.token") {
+    return new Set([...ROUTE_COVERAGE_HUB_KEYS, "cheese-cheeseburger"]);
+  }
+  return ROUTE_COVERAGE_HUB_KEYS;
+}
+
 /** Select pools that could participate in a tokenIn→tokenOut route of length
  *  ≤ maxHops. Considers every active pool (matching Alcor's own router), uses
  *  forward+reverse BFS over the full graph to keep only pools that plausibly
@@ -258,6 +268,7 @@ function selectRelevantPools(
 ): RawAlcorPool[] {
   const keyOf = (t: RawAlcorPool["tokenA"]) => tokenKey(t.contract, t.symbol);
   const active = pools.filter((p) => p.active);
+  const coverageHubKeys = routeCoverageHubKeys(inKey, outKey);
   const liquidityOf = (p: RawAlcorPool): bigint => {
     try {
       return BigInt(p.liquidity || "0");
@@ -407,7 +418,7 @@ function selectRelevantPools(
       const touchesIn = a === inKey || b === inKey;
       const touchesOut = a === outKey || b === outKey;
       const intermediate = touchesIn ? other(p, inKey) : other(p, outKey);
-      if (!ROUTE_COVERAGE_HUB_KEYS.has(intermediate)) return false;
+      if (!coverageHubKeys.has(intermediate)) return false;
       if (touchesIn && !touchesOut) return pairPools(intermediate, outKey).length > 0;
       if (touchesOut && !touchesIn) return pairPools(inKey, intermediate).length > 0;
       return false;
@@ -415,8 +426,8 @@ function selectRelevantPools(
     .sort((a, b) => {
       const aKey = keyOf(a.tokenA) === inKey || keyOf(a.tokenB) === inKey ? other(a, inKey) : other(a, outKey);
       const bKey = keyOf(b.tokenA) === inKey || keyOf(b.tokenB) === inKey ? other(b, inKey) : other(b, outKey);
-      const aHub = ROUTE_COVERAGE_HUB_KEYS.has(aKey) ? 0 : 1;
-      const bHub = ROUTE_COVERAGE_HUB_KEYS.has(bKey) ? 0 : 1;
+      const aHub = coverageHubKeys.has(aKey) ? 0 : 1;
+      const bHub = coverageHubKeys.has(bKey) ? 0 : 1;
       if (aHub !== bHub) return aHub - bHub;
       if (a.fee !== b.fee) return a.fee - b.fee;
       const la = liquidityOf(a);
