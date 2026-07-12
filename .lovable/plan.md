@@ -1,23 +1,25 @@
-## Plan: make the WAXWBTC split route reachable
+## Fix WAX→WAXWETH split routing
 
-The 1% grid change was correct, but the live route is still missing the split because the SDK pool selector caps relevant pools at 56. For WAX -> WAXWBTC, pool `4950` (`WAXUSDC -> WAXWBTC`, 0.05%) ranks around #99, so it is never fetched/built. Alcor’s UI can split because it has that endpoint pool available.
+Same root cause as the WAXWBTC fix: Alcor's WAX→WAXWETH split routes through **WAXUSDC** and **WAXWBTC** as intermediaries, but the low-liquidity endpoint pools (WAXUSDC↔WAXWETH, WAXWBTC↔WAXWETH) rank below the 56-pool selection cap, so our SDK only sees the direct WAX↔WAXWETH pool and misses the split.
 
-### Changes
+Investigation confirmed:
+- WAXUSDC↔WAXWETH pools (ids 4435, 4947) — WAXUSDC is already in `ROUTE_COVERAGE_HUB_KEYS`, so this leg is already seeded ✓
+- WAXWBTC↔WAXWETH pools (ids 8568, 4941) — WAXWBTC (`waxwbtc-eth.token`) is **not** a hub key, so this endpoint pool is dropped and the WAXWBTC-intermediary split leg is never built
+- WAX↔WAXWBTC connector (pool 1239) already exists and would be seeded by the connector logic once the endpoint is seeded
 
-1. **Update `src/lib/alcorRouter.ts` pool selection**
-   - Keep direct pools first.
-   - Add deterministic route-completion coverage for each liquid endpoint pool: when a candidate touches `tokenOut`, also include the best connector pool from `tokenIn` to that intermediate token; and vice versa.
-   - This ensures pairs like `WAX -> WAXUSDC` plus `WAXUSDC -> WAXWBTC` are included even when the endpoint pool ranks below the current cap.
-   - Preserve the existing cap/ranking behavior for the broader graph so we do not explode tick requests.
+### Change
 
-2. **Add focused diagnostics**
-   - Log whether key two-hop endpoint routes were included in the SDK graph.
-   - Keep existing `poolsDroppedNoTicks`, `tickFailures`, and route counts.
+In `src/lib/alcorRouter.ts`, add `waxwbtc-eth.token` to `ROUTE_COVERAGE_HUB_KEYS`. This is the same deterministic-coverage mechanism we used for the WAXWBTC fix — extending the hub set to include WAXWBTC lets the seeder include the WAXWBTC↔WAXWETH endpoint pool plus its WAX-side connector before the ranked cap fills, so the WASM router can consider the 50/25/25 Alcor-style split.
 
-3. **Keep existing quote selection logic**
-   - Leave `distributionPercent: 1` in place.
-   - Continue requiring the SDK quote to beat the HTTP fallback before using it.
+### Verify
 
-4. **Verify**
-   - Check that WAX -> WAXWBTC with 1000 WAX includes pool `4950` and can produce the Alcor-style split.
-   - Confirm existing routes still quote normally and tick fanout remains bounded.
+Run the existing WAX→WAXWETH quote through the router and confirm:
+1. Pool 8568 (or 4941) is present in `poolsBuilt` diagnostics
+2. Endpoint route seeding log fires with ≥1 route
+3. The returned route is a multi-hop split (not 100% single route) and beats the HTTP fallback
+
+Keep WAX→WAXWBTC verification passing (regression check).
+
+### Notes
+
+Not adding any social/app tokens to hubs — WAXWBTC is a legitimate base-asset intermediary on Alcor, matching the existing hub philosophy (WAX, USDT, USDC, WAXUSDC, WAXUSDT, LSW, LSWAX). No changes to grid/percent, HTTP fallback, or SDK selection logic.

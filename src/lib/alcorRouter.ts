@@ -239,6 +239,7 @@ const ROUTE_COVERAGE_HUB_KEYS = new Set([
   "waxusdc-eth.token",
   "waxusdt-eth.token",
   "usdc-tethertether",
+  "waxwbtc-eth.token",
   "lsw-lsw.alcor",
   "lswax-token.lswax",
   "lswax-token.fusion",
