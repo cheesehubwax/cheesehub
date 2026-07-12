@@ -241,6 +241,18 @@ function selectRelevantPools(
 ): RawAlcorPool[] {
   const keyOf = (t: RawAlcorPool["tokenA"]) => tokenKey(t.contract, t.symbol);
   const active = pools.filter((p) => p.active);
+  const liquidityOf = (p: RawAlcorPool): bigint => {
+    try {
+      return BigInt(p.liquidity || "0");
+    } catch {
+      return 0n;
+    }
+  };
+  const isDirectPair = (p: RawAlcorPool, aKey: string, bKey: string) => {
+    const a = keyOf(p.tokenA);
+    const b = keyOf(p.tokenB);
+    return (a === aKey && b === bKey) || (a === bKey && b === aKey);
+  };
 
   const other = (p: RawAlcorPool, k: string) =>
     keyOf(p.tokenA) === k ? keyOf(p.tokenB) : keyOf(p.tokenA);
@@ -324,11 +336,92 @@ function selectRelevantPools(
     const rb = poolRank(b);
     if (ra.pathLen !== rb.pathLen) return ra.pathLen - rb.pathLen;
     if (ra.classRank !== rb.classRank) return ra.classRank - rb.classRank;
-    const la = BigInt(a.liquidity || "0");
-    const lb = BigInt(b.liquidity || "0");
+    const la = liquidityOf(a);
+    const lb = liquidityOf(b);
     return lb > la ? 1 : lb < la ? -1 : 0;
   });
-  return ranked.slice(0, cap);
+
+  // Deterministic two-hop coverage: the broad graph can contain thousands of
+  // plausible pools, so a simple ranked cap can drop the endpoint leg of a real
+  // Alcor split (notably WAXUSDC→WAXWBTC). Seed the selected set with liquid
+  // endpoint pools plus their best direct connector before filling by rank.
+  const selected: RawAlcorPool[] = [];
+  const selectedIds = new Set<number>();
+  const addPool = (p: RawAlcorPool | undefined) => {
+    if (!p || selectedIds.has(p.id) || selected.length >= cap) return;
+    selectedIds.add(p.id);
+    selected.push(p);
+  };
+  const pairPools = (aKey: string, bKey: string) =>
+    active
+      .filter((p) => isDirectPair(p, aKey, bKey) && liquidityOf(p) > 0n)
+      .sort((a, b) => {
+        // Keep more than one fee tier available, but prefer the most liquid
+        // connector first. The router will decide the final allocation.
+        const la = liquidityOf(a);
+        const lb = liquidityOf(b);
+        if (la !== lb) return lb > la ? 1 : -1;
+        return a.fee - b.fee;
+      });
+
+  // Direct pools remain first so the cheapest/simplest route is never delayed
+  // behind wider split-route coverage.
+  for (const p of ranked) {
+    if (isDirectPair(p, inKey, outKey)) addPool(p);
+  }
+
+  const endpointCandidates = ranked
+    .filter((p) => {
+      const a = keyOf(p.tokenA);
+      const b = keyOf(p.tokenB);
+      if (liquidityOf(p) <= 0n) return false;
+      const touchesIn = a === inKey || b === inKey;
+      const touchesOut = a === outKey || b === outKey;
+      if (touchesIn && !touchesOut) return pairPools(other(p, inKey), outKey).length > 0;
+      if (touchesOut && !touchesIn) return pairPools(inKey, other(p, outKey)).length > 0;
+      return false;
+    })
+    .sort((a, b) => {
+      const aKey = keyOf(a.tokenA) === inKey || keyOf(a.tokenB) === inKey ? other(a, inKey) : other(a, outKey);
+      const bKey = keyOf(b.tokenA) === inKey || keyOf(b.tokenB) === inKey ? other(b, inKey) : other(b, outKey);
+      const aHub = HUB_KEYS.has(aKey) ? 0 : 1;
+      const bHub = HUB_KEYS.has(bKey) ? 0 : 1;
+      if (aHub !== bHub) return aHub - bHub;
+      if (a.fee !== b.fee) return a.fee - b.fee;
+      const la = liquidityOf(a);
+      const lb = liquidityOf(b);
+      return lb > la ? 1 : lb < la ? -1 : 0;
+    });
+
+  let endpointRoutesSeeded = 0;
+  for (const endpointPool of endpointCandidates) {
+    if (selected.length >= cap) break;
+    const a = keyOf(endpointPool.tokenA);
+    const b = keyOf(endpointPool.tokenB);
+    const touchesIn = a === inKey || b === inKey;
+    const intermediate = touchesIn ? other(endpointPool, inKey) : other(endpointPool, outKey);
+    const connectors = touchesIn ? pairPools(intermediate, outKey) : pairPools(inKey, intermediate);
+    const before = selected.length;
+    addPool(endpointPool);
+    // Include the top two direct connector fee/liquidity choices. This keeps
+    // WAX→WAXUSDC plus WAXUSDC→WAXWBTC available without unbounded fan-out.
+    addPool(connectors[0]);
+    addPool(connectors[1]);
+    if (selected.length > before) endpointRoutesSeeded += 1;
+  }
+
+  for (const p of ranked) {
+    if (selected.length >= cap) break;
+    addPool(p);
+  }
+
+  if (endpointRoutesSeeded > 0) {
+    logger.info(
+      `[alcor-router] endpoint route coverage seeded ${endpointRoutesSeeded} route(s), selected ${selected.length}/${ranked.length} pools`,
+    );
+  }
+
+  return selected;
 }
 
 function formatSdkDiagnostics(diag?: SwapRoute["quoteDiagnostics"]): string {

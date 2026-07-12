@@ -1,23 +1,23 @@
-## Plan
+## Plan: make the WAXWBTC split route reachable
 
-Fix the missing WAX → WAXWBTC split by making the SDK router evaluate the same fine-grained allocation grid Alcor uses.
+The 1% grid change was correct, but the live route is still missing the split because the SDK pool selector caps relevant pools at 56. For WAX -> WAXWBTC, pool `4950` (`WAXUSDC -> WAXWBTC`, 0.05%) ranks around #99, so it is never fetched/built. Alcor’s UI can split because it has that endpoint pool available.
 
 ### Changes
 
-1. Update `src/hooks/useSwapRoute.ts`
-   - Remove the USD-based tiered split grid (`10%`, `5%`, `2%`).
-   - Always pass `distributionPercent: 1` into `computeAlcorTrade`.
-   - Remove the now-unused `priceToken`, `usdPrice`, `parsedAmount`, and `inputUsd` locals.
+1. **Update `src/lib/alcorRouter.ts` pool selection**
+   - Keep direct pools first.
+   - Add deterministic route-completion coverage for each liquid endpoint pool: when a candidate touches `tokenOut`, also include the best connector pool from `tokenIn` to that intermediate token; and vice versa.
+   - This ensures pairs like `WAX -> WAXUSDC` plus `WAXUSDC -> WAXWBTC` are included even when the endpoint pool ranks below the current cap.
+   - Preserve the existing cap/ranking behavior for the broader graph so we do not explode tick requests.
 
-2. Keep the prior WAXBTC tick retry diagnostics in place
-   - The retry/logging change is still useful for transient pool/tick fetch failures.
-   - This change addresses the remaining issue: the router is still searching too coarsely for small trades like 500–1000 WAX.
+2. **Add focused diagnostics**
+   - Log whether key two-hop endpoint routes were included in the SDK graph.
+   - Keep existing `poolsDroppedNoTicks`, `tickFailures`, and route counts.
 
-3. Verify behavior
-   - Confirm WAX → WAXWBTC now returns an SDK quote with two split legs when it beats HTTP.
-   - Confirm existing split routes such as WAX → CHEESE / USDC / LSWAX still work.
-   - Watch console diagnostics for `[alcor-router] SDK quote produced ... [grid=1%]` and whether SDK or HTTP wins.
+3. **Keep existing quote selection logic**
+   - Leave `distributionPercent: 1` in place.
+   - Continue requiring the SDK quote to beat the HTTP fallback before using it.
 
-### Technical notes
-
-The current `useSwapRoute` logic still uses `10%` steps for trades under about `$30`. Alcor’s visible route is a 50/50 split, but the SDK’s optimizer can still miss or collapse split candidates when all candidate allocations are constrained to coarse buckets and the HTTP fallback wins on a strict output comparison. Using a fixed `1%` grid aligns CheeseHub with Alcor’s routing behavior and is the narrowest remaining fix.
+4. **Verify**
+   - Check that WAX -> WAXWBTC with 1000 WAX includes pool `4950` and can produce the Alcor-style split.
+   - Confirm existing routes still quote normally and tick fanout remains bounded.
