@@ -8,6 +8,7 @@ import { useCart } from "@/context/CartContext";
 import cheeseLogo from "@/assets/cheese-logo.png";
 import waxLogoUrl from "@/assets/wax-logo.png";
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
+import { OpenMojiIcon } from "@/components/OpenMojiIcon";
 
 const NAV_ITEMS = [
   { to: "/", label: "Home", emoji: "🏠", prefix: "", suffix: "Home" },
