@@ -22,6 +22,7 @@ import Terms from "./pages/Terms";
 import Admin from "./pages/Admin";
 import AdminGuide from "./pages/AdminGuide";
 import NotFound from "./pages/NotFound";
+import ScrollToTop from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +42,7 @@ const App = () => {
             <Sonner />
             <CartDrawer />
             <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '') || '/'}>
+              <ScrollToTop />
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/powerup" element={<PowerUp />} />
