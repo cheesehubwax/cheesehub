@@ -288,7 +288,10 @@ export function TokenStatsBanner() {
                           : "border-yellow-500/50 bg-yellow-500/10 text-yellow-500 font-semibold"
                         }
                       >
-                        🔒 {stats?.status}
+                        <span className="flex items-center gap-1">
+                          <OpenMojiIcon emoji="🔒" size={14} />
+                          {stats?.status}
+                        </span>
                       </Badge>
                       {stats?.isNulled && (
                         <span className="text-xs text-muted-foreground">(Nulled Keys)</span>
