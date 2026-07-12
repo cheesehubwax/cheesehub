@@ -80,8 +80,9 @@ const Farm = () => {
       {featuredFarm && (
         <div className="container pb-8 flex justify-center">
           <div className="w-full max-w-md">
-            <p className="text-center text-cheese text-xs uppercase tracking-wider mb-3">
-              ⭐ Featured Farm
+            <p className="text-center text-cheese text-xs uppercase tracking-wider mb-3 flex items-center justify-center gap-1.5">
+              <OpenMojiIcon emoji="⭐" size={14} />
+              Featured Farm
             </p>
             <div className="rounded-xl p-[2px] bg-gradient-to-br from-cheese/60 via-cheese/20 to-cheese/60 shadow-[0_0_30px_-5px_hsl(var(--cheese)/0.4)]">
               <FarmCard farm={featuredFarm} userClaimed={claimTotals[featuredFarm.farm_name]} />
