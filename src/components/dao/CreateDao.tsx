@@ -13,11 +13,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger as AccordionTriggerUI } from "@/components/ui/accordion";
 import {
-import { OpenMojiIcon } from '@/components/OpenMojiIcon';
   DAO_TYPES, CREATABLE_DAO_TYPES, PROPOSER_TYPES,
   buildAssertPointAction, buildCreateDaoAction,
   buildSetProfileActionWithSocials, DaoSocials,
 } from "@/lib/dao";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { ProposalFeeInput, ProposalFeeValue } from "@/components/dao/ProposalFeeInput";
 import { GovSchemaRow, GovSchemaCheck } from "@/components/dao/GovSchemaRow";
 import { buildCheesePaymentAction, buildWaxPaymentAction, buildWaxdaoFeeAction } from "@/lib/cheeseFees";
