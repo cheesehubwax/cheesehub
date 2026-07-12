@@ -58,7 +58,7 @@ function NavLink({ item }: { item: typeof NAV_ITEMS[number] }) {
           : "text-foreground hover:text-cheese hover:bg-muted"
       )}
     >
-      <span>{item.emoji}</span>
+      <OpenMojiIcon emoji={item.emoji} size={18} />
       <NavLabel item={item} />
     </Link>
   );
