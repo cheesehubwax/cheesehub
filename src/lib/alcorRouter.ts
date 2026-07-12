@@ -229,9 +229,9 @@ const HUB_KEYS = new Set([
 ]);
 
 // Narrower intermediary set for deterministic route coverage. These are the
-// base assets Alcor commonly uses for cross-token routes; excluding app/social
-// tokens here prevents the split seeding from manufacturing odd detours while
-// still keeping WAXUSDC→WAXWBTC reachable.
+// base assets Alcor commonly uses for cross-token routes. CHEESE is included as
+// a controlled first-party exception because Alcor currently uses the liquid
+// WAX→CHEESE→WAXWETH path; arbitrary app/social tokens remain excluded.
 const ROUTE_COVERAGE_HUB_KEYS = new Set([
   "wax-eosio.token",
   "usdt-usdt.alcor",
@@ -240,6 +240,7 @@ const ROUTE_COVERAGE_HUB_KEYS = new Set([
   "waxusdt-eth.token",
   "usdc-tethertether",
   "waxwbtc-eth.token",
+  "cheese-cheeseburger",
   "lsw-lsw.alcor",
   "lswax-token.lswax",
   "lswax-token.fusion",
