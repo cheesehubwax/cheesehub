@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import { FarmInfo, buildOpenFarmAction } from "@/lib/farm";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
+import { OpenMojiIcon } from "@/components/OpenMojiIcon";
 
 interface OpenFarmDialogProps {
   farm: FarmInfo;
