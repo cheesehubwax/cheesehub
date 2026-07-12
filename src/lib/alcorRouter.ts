@@ -228,6 +228,22 @@ const HUB_KEYS = new Set([
   "cheese-cheeseburger",
 ]);
 
+// Narrower intermediary set for deterministic route coverage. These are the
+// base assets Alcor commonly uses for cross-token routes; excluding app/social
+// tokens here prevents the split seeding from manufacturing odd detours while
+// still keeping WAXUSDC→WAXWBTC reachable.
+const ROUTE_COVERAGE_HUB_KEYS = new Set([
+  "wax-eosio.token",
+  "usdt-usdt.alcor",
+  "usdc-usdc.alcor",
+  "waxusdc-eth.token",
+  "waxusdt-eth.token",
+  "usdc-tethertether",
+  "lsw-lsw.alcor",
+  "lswax-token.lswax",
+  "lswax-token.fusion",
+]);
+
 /** Select pools that could participate in a tokenIn→tokenOut route of length
  *  ≤ maxHops. Considers every active pool (matching Alcor's own router), uses
  *  forward+reverse BFS over the full graph to keep only pools that plausibly
@@ -389,15 +405,17 @@ function selectRelevantPools(
       if (liquidityOf(p) <= 0n) return false;
       const touchesIn = a === inKey || b === inKey;
       const touchesOut = a === outKey || b === outKey;
-      if (touchesIn && !touchesOut) return pairPools(other(p, inKey), outKey).length > 0;
-      if (touchesOut && !touchesIn) return pairPools(inKey, other(p, outKey)).length > 0;
+      const intermediate = touchesIn ? other(p, inKey) : other(p, outKey);
+      if (!ROUTE_COVERAGE_HUB_KEYS.has(intermediate)) return false;
+      if (touchesIn && !touchesOut) return pairPools(intermediate, outKey).length > 0;
+      if (touchesOut && !touchesIn) return pairPools(inKey, intermediate).length > 0;
       return false;
     })
     .sort((a, b) => {
       const aKey = keyOf(a.tokenA) === inKey || keyOf(a.tokenB) === inKey ? other(a, inKey) : other(a, outKey);
       const bKey = keyOf(b.tokenA) === inKey || keyOf(b.tokenB) === inKey ? other(b, inKey) : other(b, outKey);
-      const aHub = HUB_KEYS.has(aKey) ? 0 : 1;
-      const bHub = HUB_KEYS.has(bKey) ? 0 : 1;
+      const aHub = ROUTE_COVERAGE_HUB_KEYS.has(aKey) ? 0 : 1;
+      const bHub = ROUTE_COVERAGE_HUB_KEYS.has(bKey) ? 0 : 1;
       if (aHub !== bHub) return aHub - bHub;
       if (a.fee !== b.fee) return a.fee - b.fee;
       const la = liquidityOf(a);
