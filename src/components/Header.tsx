@@ -129,7 +129,7 @@ export function Header() {
             only on
           </span>
           <img
-            src={waxLogoAsset.url}
+            src={waxLogoUrl}
             alt="WAX"
             className="h-10 w-auto object-contain"
           />

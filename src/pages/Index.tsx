@@ -31,7 +31,7 @@ const Index = () => {
             <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto flex items-center justify-center gap-1.5 flex-wrap">
               <span>Unlocking Meme-Fi on the</span>
               <img
-                src={waxLogoAsset.url}
+                src={waxLogoUrl}
                 alt="WAX"
                 className="h-10 w-auto object-contain inline-block"
               />
