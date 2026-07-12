@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, ShoppingCart } from "lucide-react";
 import cheeseCoin from "@/assets/cheese-coin.png";
 import walletIcon from "@/assets/wallet-icon.png";
+import waxLogoAsset from "@/assets/wax-logo.png.asset.json";
 import { TokenStatsBanner } from "@/components/home/TokenStatsBanner";
 import { CheesePriceBar } from "@/components/home/CheesePriceBar";
 import { CheeseHistorySection } from "@/components/home/CheeseHistorySection";
@@ -27,8 +28,14 @@ const Index = () => {
               <span><span className="text-cheese">CHEESE</span><span className="text-foreground">Hub</span></span>
               <span className="text-sm font-bold px-2 py-1 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
             </h1>
-            <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Unlocking Meme-Fi on the WAX Blockchain
+            <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto flex items-center justify-center gap-1.5 flex-wrap">
+              <span>Unlocking Meme-Fi on the</span>
+              <img
+                src={waxLogoAsset.url}
+                alt="WAX"
+                className="h-6 md:h-7 w-auto object-contain inline-block"
+              />
+              <span>Blockchain</span>
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button asChild size="lg" className="bg-cheese hover:bg-cheese-dark text-primary-foreground font-semibold">
