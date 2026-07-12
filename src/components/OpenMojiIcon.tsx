@@ -49,6 +49,7 @@ import svg47 from 'openmoji/color/svg/274C.svg';
 import svg48 from 'openmoji/color/svg/1F5DE.svg';
 import svg49 from 'openmoji/color/svg/1F50D.svg';
 import svg50 from 'openmoji/color/svg/1F4C2.svg';
+import svg51 from 'openmoji/color/svg/1F45B.svg';
 
 export const openMojiMap: Record<string, string> = {
   "🏠": svg1,

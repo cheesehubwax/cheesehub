@@ -22,7 +22,7 @@ import {
   DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 import cheeseLogo from "@/assets/cheese-logo.png";
-import walletIcon from "@/assets/wallet-icon.png";
+
 import { WalletTransferDialog } from "./wallet/WalletTransferDialog";
 import { CheeseAmpDialog } from "./music/CheeseAmpDialog";
 import { CheeseAmpMiniPlayer } from "./music/CheeseAmpMiniPlayer";
