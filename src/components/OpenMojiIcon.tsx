@@ -25,31 +25,30 @@ import svg23 from 'openmoji/color/svg/1F3C6.svg';
 import svg24 from 'openmoji/color/svg/1F5BC.svg';
 import svg25 from 'openmoji/color/svg/1F4B0.svg';
 import svg26 from 'openmoji/color/svg/1F4DC.svg';
-import svg27 from 'openmoji/color/svg/2139.svg';
-import svg28 from 'openmoji/color/svg/26CF.svg';
-import svg29 from 'openmoji/color/svg/270D.svg';
-import svg30 from 'openmoji/color/svg/1F4E2.svg';
-import svg31 from 'openmoji/color/svg/1F570.svg';
-import svg32 from 'openmoji/color/svg/1F48E.svg';
-import svg33 from 'openmoji/color/svg/1F3E6.svg';
-import svg34 from 'openmoji/color/svg/2B50.svg';
-import svg35 from 'openmoji/color/svg/1F4C5.svg';
-import svg36 from 'openmoji/color/svg/1F550.svg';
-import svg37 from 'openmoji/color/svg/1F4B5.svg';
-import svg38 from 'openmoji/color/svg/1F389.svg';
-import svg39 from 'openmoji/color/svg/1F4B8.svg';
-import svg40 from 'openmoji/color/svg/1F512.svg';
-import svg41 from 'openmoji/color/svg/23F3.svg';
-import svg42 from 'openmoji/color/svg/1F6E1.svg';
-import svg43 from 'openmoji/color/svg/1F4E6.svg';
-import svg44 from 'openmoji/color/svg/1F32E.svg';
-import svg45 from 'openmoji/color/svg/1F5A5.svg';
-import svg46 from 'openmoji/color/svg/1F4E1.svg';
-import svg47 from 'openmoji/color/svg/1F464.svg';
-import svg48 from 'openmoji/color/svg/274C.svg';
-import svg49 from 'openmoji/color/svg/1F5DE.svg';
-import svg50 from 'openmoji/color/svg/1F50D.svg';
-import svg51 from 'openmoji/color/svg/1F4C2.svg';
+import svg27 from 'openmoji/color/svg/26CF.svg';
+import svg28 from 'openmoji/color/svg/270D.svg';
+import svg29 from 'openmoji/color/svg/1F4E2.svg';
+import svg30 from 'openmoji/color/svg/1F570.svg';
+import svg31 from 'openmoji/color/svg/1F48E.svg';
+import svg32 from 'openmoji/color/svg/1F3E6.svg';
+import svg33 from 'openmoji/color/svg/2B50.svg';
+import svg34 from 'openmoji/color/svg/1F4C5.svg';
+import svg35 from 'openmoji/color/svg/1F550.svg';
+import svg36 from 'openmoji/color/svg/1F4B5.svg';
+import svg37 from 'openmoji/color/svg/1F389.svg';
+import svg38 from 'openmoji/color/svg/1F4B8.svg';
+import svg39 from 'openmoji/color/svg/1F512.svg';
+import svg40 from 'openmoji/color/svg/23F3.svg';
+import svg41 from 'openmoji/color/svg/1F6E1.svg';
+import svg42 from 'openmoji/color/svg/1F4E6.svg';
+import svg43 from 'openmoji/color/svg/1F32E.svg';
+import svg44 from 'openmoji/color/svg/1F5A5.svg';
+import svg45 from 'openmoji/color/svg/1F4E1.svg';
+import svg46 from 'openmoji/color/svg/1F464.svg';
+import svg47 from 'openmoji/color/svg/274C.svg';
+import svg48 from 'openmoji/color/svg/1F5DE.svg';
+import svg49 from 'openmoji/color/svg/1F50D.svg';
+import svg50 from 'openmoji/color/svg/1F4C2.svg';
 
 export const openMojiMap: Record<string, string> = {
   "🏠": svg1,
@@ -78,31 +77,30 @@ export const openMojiMap: Record<string, string> = {
   "🖼": svg24,
   "💰": svg25,
   "📜": svg26,
-  "ℹ": svg27,
-  "⛏": svg28,
-  "✍": svg29,
-  "📢": svg30,
-  "🕰": svg31,
-  "💎": svg32,
-  "🏦": svg33,
-  "⭐": svg34,
-  "📅": svg35,
-  "🕐": svg36,
-  "💵": svg37,
-  "🎉": svg38,
-  "💸": svg39,
-  "🔒": svg40,
-  "⏳": svg41,
-  "🛡": svg42,
-  "📦": svg43,
-  "🌮": svg44,
-  "🖥": svg45,
-  "📡": svg46,
-  "👤": svg47,
-  "❌": svg48,
-  "🗞": svg49,
-  "🔍": svg50,
-  "📂": svg51,
+  "⛏": svg27,
+  "✍": svg28,
+  "📢": svg29,
+  "🕰": svg30,
+  "💎": svg31,
+  "🏦": svg32,
+  "⭐": svg33,
+  "📅": svg34,
+  "🕐": svg35,
+  "💵": svg36,
+  "🎉": svg37,
+  "💸": svg38,
+  "🔒": svg39,
+  "⏳": svg40,
+  "🛡": svg41,
+  "📦": svg42,
+  "🌮": svg43,
+  "🖥": svg44,
+  "📡": svg45,
+  "👤": svg46,
+  "❌": svg47,
+  "🗞": svg48,
+  "🔍": svg49,
+  "📂": svg50,
 };
 
 export interface OpenMojiIconProps {
