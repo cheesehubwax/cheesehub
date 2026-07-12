@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, ShoppingCart } from "lucide-react";
 import cheeseCoin from "@/assets/cheese-coin.png";
 import walletIcon from "@/assets/wallet-icon.png";
-import waxLogoAsset from "@/assets/wax-logo.png.asset.json";
+import waxLogoUrl from "@/assets/wax-logo.png";
 import { TokenStatsBanner } from "@/components/home/TokenStatsBanner";
 import { CheesePriceBar } from "@/components/home/CheesePriceBar";
 import { CheeseHistorySection } from "@/components/home/CheeseHistorySection";
@@ -31,7 +31,7 @@ const Index = () => {
             <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto flex items-center justify-center gap-1.5 flex-wrap">
               <span>Unlocking Meme-Fi on the</span>
               <img
-                src={waxLogoAsset.url}
+                src={waxLogoUrl}
                 alt="WAX"
                 className="h-10 w-auto object-contain inline-block"
               />
