@@ -9,7 +9,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-import { OpenMojiIcon } from '@/components/OpenMojiIcon';
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -19,6 +18,7 @@ import { OpenMojiIcon } from '@/components/OpenMojiIcon';
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
