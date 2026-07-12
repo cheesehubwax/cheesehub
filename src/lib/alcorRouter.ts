@@ -155,6 +155,35 @@ export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Prom
   }
 }
 
+/**
+ * Fetch pool ticks with a single bounded retry. Endpoint pools for
+ * low-liquidity tokens (e.g. WAXBTC) are the most likely victims of a
+ * transient 429 or network blip during the concurrent fan-out. If the first
+ * attempt lands in the negative cache or throws, we clear the negative-cache
+ * entry and try once more after a jittered delay. Abort errors are propagated
+ * immediately.
+ */
+export async function fetchPoolTicksWithRetry(
+  poolId: number,
+  signal?: AbortSignal,
+): Promise<RawAlcorTick[]> {
+  try {
+    return await fetchPoolTicks(poolId, signal);
+  } catch (e) {
+    if ((e as any)?.name === "AbortError") throw e;
+    // Bust the 8s negative cache so the retry actually hits the network.
+    ticksFailCache.delete(poolId);
+    // Jittered backoff to avoid re-entering the same 429 window.
+    await new Promise((r) => setTimeout(r, 300 + Math.random() * 400));
+    if (signal?.aborted) {
+      const err = new Error("aborted");
+      (err as any).name = "AbortError";
+      throw err;
+    }
+    return await fetchPoolTicks(poolId, signal);
+  }
+}
+
 function isRateLimitError(err: unknown): boolean {
   return err instanceof Error && err.message.includes("Rate limited");
 }
