@@ -61,13 +61,13 @@ const Dao = () => {
           <div className="flex justify-center mb-6">
             <TabsList className="bg-card/80 border border-border/50 h-10">
               <TabsTrigger value="browse" className="gap-1.5 text-sm px-4">
-                <span className="text-sm">🔍</span> Browse DAOs
+                <OpenMojiIcon emoji="🔍" size={14} className="text-sm" /> Browse DAOs
               </TabsTrigger>
               <TabsTrigger value="create" className="gap-1.5 text-sm px-4">
                 <span className="text-sm">✍️</span> Create DAO
               </TabsTrigger>
               <TabsTrigger value="my-daos" className="gap-1.5 text-sm px-4">
-                <span className="text-sm">📂</span> My DAOs
+                <OpenMojiIcon emoji="📂" size={14} className="text-sm" /> My DAOs
               </TabsTrigger>
             </TabsList>
           </div>

@@ -75,7 +75,7 @@ export function WojakUnboxManager({ onTransactionComplete, onTransactionSuccess 
         <div className="flex-1 min-w-0">
           <h3 className="text-base font-semibold flex items-center gap-2">
             <Package className="h-4 w-4 text-cheese" />
-            <span>📦 Open Wojak Pack</span>
+            <OpenMojiIcon emoji="📦" size={18} /> Open Wojak Pack
           </h3>
           <p className="text-xs text-muted-foreground mt-1">
             Open Waxy Wojak Packs through WaxDAO unbox pool #{WOJAK_UNBOX_POOL_ID}.

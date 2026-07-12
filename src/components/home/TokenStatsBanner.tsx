@@ -79,7 +79,7 @@ export function TokenStatsBanner() {
             {/* Locked Supply */}
             <div className="flex items-center gap-4 justify-center">
               <div className="h-12 w-12 rounded-full bg-cheese/20 flex items-center justify-center shrink-0">
-                <span className="text-2xl">🔒</span>
+                <OpenMojiIcon emoji="🔒" size={24} className="text-2xl" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground font-medium">Locked Supply</p>
@@ -111,7 +111,7 @@ export function TokenStatsBanner() {
             {/* Circulating Supply */}
             <div className="flex items-center gap-4 justify-center">
               <div className="h-12 w-12 rounded-full bg-cheese/20 flex items-center justify-center shrink-0">
-                <span className="text-2xl">🔄</span>
+                <OpenMojiIcon emoji="🔄" size={24} className="text-2xl" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground font-medium">Circulating Supply</p>
@@ -133,7 +133,7 @@ export function TokenStatsBanner() {
             {/* Next Unlock */}
             <div className="flex items-center gap-4 justify-center">
               <div className="h-12 w-12 rounded-full bg-cheese/20 flex items-center justify-center shrink-0">
-                <span className="text-2xl">⏳</span>
+                <OpenMojiIcon emoji="⏳" size={24} className="text-2xl" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground font-medium">Next Unlock</p>
@@ -169,7 +169,7 @@ export function TokenStatsBanner() {
               <PopoverTrigger asChild>
                 <div className="flex items-center gap-4 justify-center md:justify-end cursor-pointer group">
                   <div className="h-12 w-12 rounded-full bg-cheese/20 flex items-center justify-center shrink-0">
-                    <span className="text-2xl">⛔</span>
+                    <OpenMojiIcon emoji="⛔" size={24} className="text-2xl" />
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground font-medium group-hover:text-cheese transition-colors">CHEESE Nulled ▾</p>

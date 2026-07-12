@@ -99,7 +99,7 @@ export function FarmCard({ farm, userClaimed }: { farm: FarmInfo; userClaimed?: 
 
         {/* Payout Interval */}
         <div className="mt-2 text-xs text-foreground flex items-center gap-1">
-          <span>💵 Payout every {formatPayoutInterval(farm.payout_interval)}</span>
+          <OpenMojiIcon emoji="💵" size={18} /> Payout every {formatPayoutInterval(farm.payout_interval)}
         </div>
 
         {/* Reward pools */}

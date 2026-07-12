@@ -251,11 +251,11 @@ export const PowerUpCard = ({
       <Tabs value={paymentMode} onValueChange={(v) => setPaymentMode(v as "cheese" | "wax")} className="w-full">
         <TabsList className="w-full">
           <TabsTrigger value="cheese" className="flex-1 gap-2">
-            <span>🧀</span>
+            <OpenMojiIcon emoji="🧀" size={18} />
             CHEESEUp
           </TabsTrigger>
           <TabsTrigger value="wax" className="flex-1 gap-2">
-            <span>⚡</span>
+            <OpenMojiIcon emoji="⚡" size={18} />
             WAX PowerUp
           </TabsTrigger>
         </TabsList>
@@ -275,7 +275,7 @@ export const PowerUpCard = ({
             onChange={setNetAmount}
             balance={walletConnected ? cheeseBalance : 0}
             label="NET Bandwidth"
-            icon={<span className="text-lg">📡</span>}
+            icon={<OpenMojiIcon emoji="📡" size={18} className="text-lg" />}
             accentColor="net"
           />
         </TabsContent>
@@ -296,7 +296,7 @@ export const PowerUpCard = ({
             value={waxNetAmount}
             onChange={setWaxNetAmount}
             label="NET Bandwidth"
-            icon={<span className="text-lg">📡</span>}
+            icon={<OpenMojiIcon emoji="📡" size={18} className="text-lg" />}
             accentColor="net"
             tokenSymbol="WAX"
             tokenLogo={waxCoin}
@@ -319,12 +319,12 @@ export const PowerUpCard = ({
       >
         {isTransacting ? (
           <>
-            <span className="animate-spin inline-block">⏳</span>
+            <OpenMojiIcon emoji="⏳" size={18} className="animate-spin inline-block" />
             Processing...
           </>
         ) : (
           <>
-            <span>⚡</span>
+            <OpenMojiIcon emoji="⚡" size={18} />
             {!walletConnected
               ? "Connect Wallet"
               : canPowerUp
@@ -363,7 +363,7 @@ export const PowerUpCard = ({
               )}
               {successDetails && successDetails.netBytes > 0 && (
                 <div className="flex items-center gap-3 text-foreground bg-orange-400/10 p-3 rounded-lg">
-                  <span className="text-xl">📡</span>
+                  <OpenMojiIcon emoji="📡" size={20} className="text-xl" />
                   <span>~{formatBytes(successDetails.netBytes)} NET (estimate)</span>
                 </div>
               )}

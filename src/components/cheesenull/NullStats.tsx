@@ -58,14 +58,14 @@ export function NullStats({ onCanClaimChange }: NullStatsProps) {
               </div>
               <div className="text-center space-y-0.5">
                 <div className="flex items-center justify-center gap-1 text-muted-foreground">
-                  <span className="text-xs">⚡</span>
+                  <OpenMojiIcon emoji="⚡" size={12} className="text-xs" />
                   <span className="text-[10px] font-medium">CheesePowerz</span>
                 </div>
                 <p className="text-sm font-semibold text-cheese">{formatWaxAmount(waxCheesepowerzAmount)} <span className="text-[11px] text-muted-foreground">WAX</span></p>
               </div>
               <div className="text-center space-y-0.5">
                 <div className="flex items-center justify-center gap-1 text-muted-foreground">
-                  <span className="text-xs">📈</span>
+                  <OpenMojiIcon emoji="📈" size={12} className="text-xs" />
                   <span className="text-[10px] font-medium">Compound</span>
                 </div>
                 <p className="text-sm font-semibold text-cheese">{formatWaxAmount(waxStakeAmount)} <span className="text-[11px] text-muted-foreground">WAX</span></p>
@@ -82,12 +82,12 @@ export function NullStats({ onCanClaimChange }: NullStatsProps) {
             <Skeleton className="h-6 w-40 mx-auto bg-muted" />
           ) : canClaim ? (
             <div className="flex items-center justify-center gap-2 text-green-500">
-              <span>✅</span>
+              <OpenMojiIcon emoji="✅" size={18} />
               <span className="text-sm font-semibold">Ready!</span>
             </div>
           ) : (
             <div className="flex items-center justify-center gap-2 text-muted-foreground">
-              <span>⏰</span>
+              <OpenMojiIcon emoji="⏰" size={18} />
               <span className="text-sm">
                 Next null in: <span className="font-mono font-semibold text-cheese">{formatCountdown(timeUntilNextClaim)}</span>
               </span>

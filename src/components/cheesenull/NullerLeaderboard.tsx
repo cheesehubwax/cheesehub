@@ -62,11 +62,11 @@ export function NullerLeaderboard({ rawActions, isLoading, isError, onRefresh }:
         {/* Header */}
         <div className="text-center space-y-1">
           <div className="flex items-center justify-center gap-2">
-            <span>🏆</span>
+            <OpenMojiIcon emoji="🏆" size={18} />
             <h3 className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
               CHEESEBoard
             </h3>
-            <span>🏆</span>
+            <OpenMojiIcon emoji="🏆" size={18} />
             {onRefresh && (
               <button
                 onClick={onRefresh}

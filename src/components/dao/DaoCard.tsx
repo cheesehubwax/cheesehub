@@ -83,7 +83,7 @@ export function DaoCard({ dao, onClick }: DaoCardProps) {
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <span className="text-sm shrink-0">💰</span>
+              <OpenMojiIcon emoji="💰" size={14} className="text-sm shrink-0" />
               <span className="text-muted-foreground">Gov Token:</span>
               <TokenLogo
                 contract={dao.token_contract}
@@ -97,7 +97,7 @@ export function DaoCard({ dao, onClick }: DaoCardProps) {
             </div>
           )}
           <div className="flex items-center gap-2">
-            <span className="text-sm shrink-0">📜</span>
+            <OpenMojiIcon emoji="📜" size={14} className="text-sm shrink-0" />
             <span className="text-muted-foreground">Proposal Cost:</span>
             <span className="font-medium text-foreground">
               {dao.proposal_cost && dao.proposal_cost !== "0" ? dao.proposal_cost : "Free"}

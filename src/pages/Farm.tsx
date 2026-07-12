@@ -60,13 +60,13 @@ const Farm = () => {
             </div>
             <div className="text-center space-y-2">
               <div className="flex items-center justify-center gap-2">
-                <span className="text-2xl">🌱</span>
+                <OpenMojiIcon emoji="🌱" size={24} className="text-2xl" />
                 <h1 className="text-3xl md:text-4xl font-bold">
                   <span className="text-cheese">CHEESE</span>
                   <span className="text-foreground">Farm</span>
                 </h1>
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
-                <span className="text-2xl">🌱</span>
+                <OpenMojiIcon emoji="🌱" size={24} className="text-2xl" />
               </div>
               <p className="text-muted-foreground max-w-2xl mx-auto">
                 Create and participate in non-custodial NFT staking farms using the WaxDAO V2 smart contracts.
@@ -94,13 +94,13 @@ const Farm = () => {
           <div className="flex justify-center mb-6">
             <TabsList className="bg-card/80 border border-border/50 h-10">
               <TabsTrigger value="browse" className="gap-1.5 text-sm px-4">
-                <span className="text-sm">🔍</span> Browse Farms
+                <OpenMojiIcon emoji="🔍" size={14} className="text-sm" /> Browse Farms
               </TabsTrigger>
               <TabsTrigger value="create" className="gap-1.5 text-sm px-4">
                 <span className="text-sm">✍️</span> Create Farm
               </TabsTrigger>
               <TabsTrigger value="my-farms" className="gap-1.5 text-sm px-4">
-                <span className="text-sm">📂</span> My Farms
+                <OpenMojiIcon emoji="📂" size={14} className="text-sm" /> My Farms
               </TabsTrigger>
             </TabsList>
           </div>

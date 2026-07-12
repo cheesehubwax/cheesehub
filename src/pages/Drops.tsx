@@ -131,13 +131,13 @@ const Drops = () => {
             </div>
             <div className="text-center space-y-2">
               <div className="flex items-center justify-center gap-2">
-                <span className="text-2xl">🛒</span>
+                <OpenMojiIcon emoji="🛒" size={24} className="text-2xl" />
                 <h1 className="text-3xl md:text-4xl font-bold">
                   <span className="text-cheese">CHEESE</span>
                   <span className="text-foreground">Drop</span>
                 </h1>
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
-                <span className="text-2xl">🛒</span>
+                <OpenMojiIcon emoji="🛒" size={24} className="text-2xl" />
               </div>
               <p className="text-muted-foreground">Official and unofficial NFT Drops purchasable with $CHEESE tokens</p>
             </div>
@@ -150,15 +150,15 @@ const Drops = () => {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
             <TabsList className="bg-card/80 border border-border/50 h-10">
               <TabsTrigger value="official" className="gap-1.5 text-sm px-4">
-                <span className="text-sm">⭐</span>
+                <OpenMojiIcon emoji="⭐" size={14} className="text-sm" />
                 <span className="hidden sm:inline">Official</span>
               </TabsTrigger>
               <TabsTrigger value="cheese" className="gap-1.5 text-sm px-4">
-                <span className="text-sm">🧀</span>
+                <OpenMojiIcon emoji="🧀" size={14} className="text-sm" />
                 <span className="hidden sm:inline">CHEESE</span>
               </TabsTrigger>
               <TabsTrigger value="my-drops" className="gap-1.5 text-sm px-4">
-                <span className="text-sm">📂</span>
+                <OpenMojiIcon emoji="📂" size={14} className="text-sm" />
                 <span className="hidden sm:inline">My Drops</span>
               </TabsTrigger>
               <TabsTrigger value="create" className="gap-1.5 text-sm px-4">
@@ -206,7 +206,7 @@ const Drops = () => {
                       </span>
                     </TabsTrigger>
                     <TabsTrigger value="accountnames" className="gap-1.5 text-sm px-4">
-                      <span className="text-sm">👤</span>
+                      <OpenMojiIcon emoji="👤" size={14} className="text-sm" />
                       <span>Account Names</span>
                       <span className="ml-1 rounded bg-primary/15 text-primary text-[10px] font-bold px-1.5 py-0.5 leading-none">
                         {accountNamesDrops.length}

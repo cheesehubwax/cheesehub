@@ -142,9 +142,9 @@ export function DaoDetail({ daoName, onBack }: DaoDetailProps) {
     { key: "info", label: "DAO Info", icon: <span className="text-sm">ℹ️</span> },
     { key: "stake", label: "Stake", icon: <span className="text-sm">⛏️</span>, hidden: dao?.dao_type === 5 },
     { key: "new-proposal", label: "New Proposal", icon: <span className="text-sm">✍️</span>, hidden: !canPropose },
-    { key: "active", label: "Active Proposals", icon: <span className="text-sm">📢</span>, badge: activeProposals.length, pulse: unvotedCount > 0 },
+    { key: "active", label: "Active Proposals", icon: <OpenMojiIcon emoji="📢" size={14} className="text-sm" />, badge: activeProposals.length, pulse: unvotedCount > 0 },
     { key: "past", label: "Past Proposals", icon: <span className="text-sm">🕰️</span>, badge: pastProposals.length },
-    { key: "treasury", label: "Treasury", icon: <span className="text-sm">💎</span> },
+    { key: "treasury", label: "Treasury", icon: <OpenMojiIcon emoji="💎" size={14} className="text-sm" /> },
   ];
 
   const socialEntries = useMemo(() => {

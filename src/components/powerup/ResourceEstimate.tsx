@@ -28,7 +28,7 @@ export const ResourceEstimate = ({
   if (isLoading) {
     return (
       <div className="rounded-xl p-6 bg-card border border-border/50 flex items-center justify-center gap-3">
-        <span className="text-xl animate-spin inline-block">⏳</span>
+        <OpenMojiIcon emoji="⏳" size={20} className="text-xl animate-spin inline-block" />
         <span className="text-muted-foreground">Fetching current rates...</span>
       </div>
     );
@@ -68,7 +68,7 @@ export const ResourceEstimate = ({
         </h3>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span>⏰</span>
+            <OpenMojiIcon emoji="⏰" size={18} />
             <span>{estimate.powerupDays} day rental</span>
           </div>
           <button
@@ -98,7 +98,7 @@ export const ResourceEstimate = ({
               </div>
               <div className="text-right">
                 <div className="flex items-center gap-1 text-amber-500 text-sm font-semibold">
-                  <span>📈</span>
+                  <OpenMojiIcon emoji="📈" size={18} />
                   <span>{estimate.cpuWaxAmount.toFixed(4)} WAX</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -114,7 +114,7 @@ export const ResourceEstimate = ({
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center">
-                  <span className="text-xl">📡</span>
+                  <OpenMojiIcon emoji="📡" size={20} className="text-xl" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">NET Bandwidth</p>
@@ -125,7 +125,7 @@ export const ResourceEstimate = ({
               </div>
               <div className="text-right">
                 <div className="flex items-center gap-1 text-orange-400 text-sm font-semibold">
-                  <span>📈</span>
+                  <OpenMojiIcon emoji="📈" size={18} />
                   <span>{estimate.netWaxAmount.toFixed(4)} WAX</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
