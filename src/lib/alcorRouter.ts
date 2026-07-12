@@ -352,17 +352,29 @@ function selectRelevantPools(
     selectedIds.add(p.id);
     selected.push(p);
   };
+  const pairKey = (aKey: string, bKey: string) =>
+    aKey < bKey ? `${aKey}|${bKey}` : `${bKey}|${aKey}`;
+  const pairIndex = new Map<string, RawAlcorPool[]>();
+  for (const p of active) {
+    if (liquidityOf(p) <= 0n) continue;
+    const a = keyOf(p.tokenA);
+    const b = keyOf(p.tokenB);
+    const k = pairKey(a, b);
+    if (!pairIndex.has(k)) pairIndex.set(k, []);
+    pairIndex.get(k)!.push(p);
+  }
+  for (const list of pairIndex.values()) {
+    list.sort((a, b) => {
+      // Keep more than one fee tier available, but prefer the most liquid
+      // connector first. The router will decide the final allocation.
+      const la = liquidityOf(a);
+      const lb = liquidityOf(b);
+      if (la !== lb) return lb > la ? 1 : -1;
+      return a.fee - b.fee;
+    });
+  }
   const pairPools = (aKey: string, bKey: string) =>
-    active
-      .filter((p) => isDirectPair(p, aKey, bKey) && liquidityOf(p) > 0n)
-      .sort((a, b) => {
-        // Keep more than one fee tier available, but prefer the most liquid
-        // connector first. The router will decide the final allocation.
-        const la = liquidityOf(a);
-        const lb = liquidityOf(b);
-        if (la !== lb) return lb > la ? 1 : -1;
-        return a.fee - b.fee;
-      });
+    pairIndex.get(pairKey(aKey, bKey)) ?? [];
 
   // Direct pools remain first so the cheapest/simplest route is never delayed
   // behind wider split-route coverage.
@@ -370,7 +382,7 @@ function selectRelevantPools(
     if (isDirectPair(p, inKey, outKey)) addPool(p);
   }
 
-  const endpointCandidates = ranked
+  const endpointCandidates = maxHops >= 2 ? ranked
     .filter((p) => {
       const a = keyOf(p.tokenA);
       const b = keyOf(p.tokenB);
@@ -391,11 +403,12 @@ function selectRelevantPools(
       const la = liquidityOf(a);
       const lb = liquidityOf(b);
       return lb > la ? 1 : lb < la ? -1 : 0;
-    });
+    }) : [];
 
   let endpointRoutesSeeded = 0;
+  const endpointCoverageLimit = Math.min(cap, Math.max(12, Math.floor(cap * 0.6)));
   for (const endpointPool of endpointCandidates) {
-    if (selected.length >= cap) break;
+    if (selected.length >= endpointCoverageLimit) break;
     const a = keyOf(endpointPool.tokenA);
     const b = keyOf(endpointPool.tokenB);
     const touchesIn = a === inKey || b === inKey;
