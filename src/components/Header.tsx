@@ -133,7 +133,7 @@ export function Header() {
           <img
             src={waxLogoAsset.url}
             alt="WAX"
-            className="h-5 w-auto object-contain"
+            className="h-6 w-auto object-contain"
           />
         </div>
 
