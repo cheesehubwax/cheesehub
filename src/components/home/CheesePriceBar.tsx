@@ -3,11 +3,11 @@ import { useCheesePriceData } from '@/hooks/useCheesePriceData';
 import { useCheeseStats } from '@/hooks/useCheeseStats';
 import { useCheeseTVL } from '@/hooks/useCheeseTVL';
 import { Skeleton } from '@/components/ui/skeleton';
-import waxSealAsset from '@/assets/wax-seal.png.asset.json';
-import usdcAsset from '@/assets/usdc.png.asset.json';
-import marketcapAsset from '@/assets/marketcap.png.asset.json';
-import tvlAsset from '@/assets/tvl.png.asset.json';
-import refreshIconAsset from '@/assets/refresh-icon.png.asset.json';
+import waxSealUrl from '@/assets/wax-seal.png';
+import usdcUrl from '@/assets/usdc.png';
+import marketcapUrl from '@/assets/marketcap.png';
+import tvlUrl from '@/assets/tvl.png';
+import refreshIconUrl from '@/assets/refresh-icon.png';
 import { CheeseSwapDialog } from '@/components/swap/CheeseSwapDialog';
 
 function formatPrice(price: number, decimals: number = 8): string {
@@ -83,7 +83,7 @@ export function CheesePriceBar() {
       <div className="flex flex-wrap justify-center gap-4 md:gap-8 mt-6 mb-2">
         {/* CHEESE/WAX Price */}
         <div className="flex items-center gap-2 bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border border-cheese/20 rounded-lg px-4 py-2">
-          <img src={waxSealAsset.url} alt="WAX" className="w-7 h-7 object-contain" />
+          <img src={waxSealUrl} alt="WAX" className="w-7 h-7 object-contain" />
           <div className="flex flex-col items-start">
             <span className="text-xs text-muted-foreground">CHEESE/WAX</span>
             {isLoading ? (
@@ -104,7 +104,7 @@ export function CheesePriceBar() {
 
         {/* CHEESE/USD Price */}
         <div className="flex items-center gap-2 bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border border-cheese/20 rounded-lg px-4 py-2">
-          <img src={usdcAsset.url} alt="USD" className="w-7 h-7 object-contain" />
+          <img src={usdcUrl} alt="USD" className="w-7 h-7 object-contain" />
           <div className="flex flex-col items-start">
             <span className="text-xs text-muted-foreground">CHEESE/USD</span>
             {isLoading ? (
@@ -125,7 +125,7 @@ export function CheesePriceBar() {
 
       {/* Market Cap */}
       <div className="flex items-center gap-2 bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border border-cheese/20 rounded-lg px-4 py-2">
-        <img src={marketcapAsset.url} alt="Market Cap" className="w-7 h-7 object-contain" />
+        <img src={marketcapUrl} alt="Market Cap" className="w-7 h-7 object-contain" />
         <div className="flex flex-col">
           <span className="text-xs text-muted-foreground">Market Cap</span>
           {isLoading ? (
@@ -140,7 +140,7 @@ export function CheesePriceBar() {
 
       {/* TVL */}
       <div className="flex items-center gap-2 bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border border-cheese/20 rounded-lg px-4 py-2">
-        <img src={tvlAsset.url} alt="TVL" className="w-7 h-7 object-contain" />
+        <img src={tvlUrl} alt="TVL" className="w-7 h-7 object-contain" />
         <div className="flex flex-col">
           <span className="text-xs text-muted-foreground">TVL (All DEXs)</span>
           {tvlLoading || !tvlData ? (
@@ -166,7 +166,7 @@ export function CheesePriceBar() {
         title="Refresh all price data"
       >
         <img
-          src={refreshIconAsset.url}
+          src={refreshIconUrl}
           alt="Refresh"
           className={`w-7 h-7 object-contain ${isAnyFetching ? 'animate-spin' : ''}`}
         />
