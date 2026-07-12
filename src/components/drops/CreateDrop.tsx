@@ -19,6 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { OpenMojiIcon } from "@/components/OpenMojiIcon";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fetchUserCollections, fetchTemplateById } from "@/services/atomicApi";
 import { useQuery } from "@tanstack/react-query";
@@ -371,8 +372,9 @@ export function CreateDrop() {
                         </>
                       )}
                       {!ramShortage && (formData.dropType === 'premint' ? formData.assetIds.length : formData.maxClaimable) > 0 && (
-                        <p className="text-xs text-primary font-medium">
-                          ✓ Enough RAM for {formData.dropType === 'premint' ? formData.assetIds.length : formData.maxClaimable} NFTs
+                        <p className="text-xs text-primary font-medium flex items-center gap-1">
+                          <OpenMojiIcon emoji="✅" size={14} />
+                          Enough RAM for {formData.dropType === 'premint' ? formData.assetIds.length : formData.maxClaimable} NFTs
                           {existingClaims && existingClaims.totalRemaining > 0 && (
                             <span className="text-muted-foreground font-normal"> (incl. {existingClaims.totalRemaining} from {existingClaims.dropCount} existing drop{existingClaims.dropCount !== 1 ? 's' : ''})</span>
                           )}

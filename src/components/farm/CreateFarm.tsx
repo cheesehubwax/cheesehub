@@ -212,7 +212,7 @@ export function CreateFarm() {
       ));
 
       const result = await executeTransaction(actions, {
-        successTitle: "Farm Created! 🌱",
+        successTitle: "Farm Created! ",
         successDescription: `${formData.farmName} has been created successfully. You can now add stakable assets via the farm detail page.`,
       });
 

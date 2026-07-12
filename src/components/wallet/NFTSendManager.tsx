@@ -14,6 +14,7 @@ import { closeWharfkitModals } from '@/lib/wharfKit';
 import { toast } from 'sonner';
 import { useSquareGridRowHeight } from '@/hooks/useSquareGridRowHeight';
 import { NFTGridCard } from '@/components/shared/NFTGridCard';
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 interface NFTSendManagerProps {
   onTransactionSuccess: (title: string, description: string, txId: string | null) => void;
@@ -233,7 +234,7 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
       <AlertDialog open={confirmBurn} onOpenChange={setConfirmBurn}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>🔥 Burn {selectedNFTs.size} NFT{selectedNFTs.size !== 1 ? 's' : ''}?</AlertDialogTitle>
+            <AlertDialogTitle><OpenMojiIcon emoji="🔥" size={14} /> Burn {selectedNFTs.size} NFT{selectedNFTs.size !== 1 ? 's' : ''}?</AlertDialogTitle>
             <AlertDialogDescription>
               This action is <strong>permanent and irreversible</strong>. The selected NFT{selectedNFTs.size !== 1 ? 's' : ''} will be destroyed forever and cannot be recovered. Are you sure you want to continue?
             </AlertDialogDescription>
@@ -249,7 +250,7 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
                   const assetIds = Array.from(selectedNFTs);
                   const txId = await burnNFTs(assetIds);
                   if (txId) {
-                    onTransactionSuccess('NFTs Burned! 🔥', `Burned ${assetIds.length} NFT(s)`, txId);
+                    onTransactionSuccess('NFTs Burned! ', `Burned ${assetIds.length} NFT(s)`, txId);
                     setSelectedNFTs(new Set());
                   }
                 } catch (error) {

@@ -79,7 +79,7 @@ export function DaoStaking({ daoName, dao }: DaoStakingProps) {
 
     const actions = buildStakeTokenActions(accountName, daoName, formatted, dao.token_contract);
     const result = await executeTransaction(actions, {
-      successTitle: "Tokens Staked! 🧀",
+      successTitle: "Tokens Staked! ",
       successDescription: `Staked ${formatted} to ${daoName}`,
     });
     if (result.success) {
@@ -100,7 +100,7 @@ export function DaoStaking({ daoName, dao }: DaoStakingProps) {
 
     const action = buildUnstakeTokenAction(accountName, daoName, formatted);
     const result = await executeTransaction([action], {
-      successTitle: "Tokens Unstaked! 🧀",
+      successTitle: "Tokens Unstaked! ",
       successDescription: `Unstaked ${formatted} from ${daoName}`,
     });
     if (result.success) {
@@ -115,7 +115,7 @@ export function DaoStaking({ daoName, dao }: DaoStakingProps) {
     setTxLoading(true);
     const action = buildUnstakeNFTAction(accountName, daoName, [assetId]);
     const result = await executeTransaction([action], {
-      successTitle: "NFT Unstaked! 🧀",
+      successTitle: "NFT Unstaked! ",
     });
     if (result.success) loadStakingData();
     setTxLoading(false);

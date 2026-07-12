@@ -30,6 +30,8 @@ import { CheeseSwapDialog } from "./swap/CheeseSwapDialog";
 import { useCheeseAmpAutoAdvance } from "@/hooks/useCheeseAmpAutoAdvance";
 import { getAudioPlayer } from "@/lib/musicPlayer";
 import { useCheeseAmpStore } from "@/stores/cheeseAmpStore";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+
 
 export function WalletConnect() {
   const { 
@@ -176,7 +178,7 @@ export function WalletConnect() {
             }} 
             className="cursor-pointer"
           >
-            <span className="mr-2 text-base leading-none">🎧</span>
+            <OpenMojiIcon emoji="🎧" size={16} className="mr-2 text-base leading-none" />
             <span><span className="text-cheese">CHEESE</span>Amp</span>
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setWalletOpen(true)} className="cursor-pointer">
@@ -184,7 +186,7 @@ export function WalletConnect() {
             <span><span className="text-cheese">CHEESE</span>Wallet</span>
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setSwapOpen(true)} className="cursor-pointer">
-            <span className="mr-2 text-base leading-none">🔄</span>
+            <OpenMojiIcon emoji="🔄" size={16} className="mr-2 text-base leading-none" />
             <span><span className="text-cheese">CHEESE</span>Swap</span>
           </DropdownMenuItem>
           
@@ -194,7 +196,7 @@ export function WalletConnect() {
               <DropdownMenuSeparator />
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger className="cursor-pointer">
-                  <span className="mr-2 text-sm leading-none">👥</span>
+                  <OpenMojiIcon emoji="👥" size={14} className="mr-2 text-sm leading-none" />
                   Switch Account
                 </DropdownMenuSubTrigger>
                 <DropdownMenuPortal>
@@ -229,7 +231,7 @@ export function WalletConnect() {
                     
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleAddAccount} className="cursor-pointer">
-                      <span className="mr-2 text-sm leading-none">➕</span>
+                      <OpenMojiIcon emoji="➕" size={14} className="mr-2 text-sm leading-none" />
                       Add Account
                     </DropdownMenuItem>
                   </DropdownMenuSubContent>
@@ -240,7 +242,7 @@ export function WalletConnect() {
           
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={logout} className="cursor-pointer">
-            <span className="mr-2 text-sm leading-none">🔌</span>
+            <OpenMojiIcon emoji="🔌" size={14} className="mr-2 text-sm leading-none" />
             Disconnect
           </DropdownMenuItem>
         </DropdownMenuContent>

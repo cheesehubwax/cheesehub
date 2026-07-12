@@ -33,7 +33,7 @@ export function EditProposalCost({ open, onOpenChange, daoName, currentCost, onU
     const formatted = `${feeToken.amount.toFixed(8)} WAX`;
     const action = buildEditPropCostAction(accountName, daoName, formatted);
     const result = await executeTransaction([action], {
-      successTitle: "Proposal Cost Updated! 🧀",
+      successTitle: "Proposal Cost Updated! ",
       successDescription: `New cost: ${formatted}`,
     });
 

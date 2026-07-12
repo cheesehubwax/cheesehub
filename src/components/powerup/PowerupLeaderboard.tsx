@@ -9,6 +9,8 @@ import {
 import { cn } from '@/lib/utils';
 import { type PowerupLeaderStats, type PowerupSortMode, type PowerupTransferAction, aggregatePowerupStats } from '@/lib/fetchPowerupLeaderboard';
 import { formatCheeseAmount } from '@/lib/cheeseNullApi';
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+
 
 interface PowerupLeaderboardProps {
   rawActions: PowerupTransferAction[];
@@ -49,11 +51,11 @@ export function PowerupLeaderboard({ rawActions, isLoading, isError, onRefresh }
       <CardContent className="p-5 space-y-4">
         <div className="text-center space-y-1">
           <div className="flex items-center justify-center gap-2">
-            <span>🏆</span>
+            <OpenMojiIcon emoji="🏆" size={18} />
             <h3 className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
               CHEESEBoard
             </h3>
-            <span>🏆</span>
+            <OpenMojiIcon emoji="🏆" size={18} />
             {onRefresh && (
               <button
                 onClick={onRefresh}
@@ -79,7 +81,7 @@ export function PowerupLeaderboard({ rawActions, isLoading, isError, onRefresh }
                   : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent'
               )}
             >
-              <span>{opt.emoji}</span>
+              <OpenMojiIcon emoji={opt.emoji} size={14} />
               {opt.label}
             </button>
           ))}

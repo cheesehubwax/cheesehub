@@ -4,6 +4,7 @@ import { formatWaxAmount, formatCheeseAmount, formatCountdown } from '@/lib/chee
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 interface NullStatsProps {
   onCanClaimChange?: (canClaim: boolean) => void;
@@ -51,21 +52,21 @@ export function NullStats({ onCanClaimChange }: NullStatsProps) {
             <div className="flex items-center justify-center gap-4 pt-2">
               <div className="text-center space-y-0.5">
                 <div className="flex items-center justify-center gap-1 text-muted-foreground">
-                  <span className="text-xs">✖️</span>
+                  <OpenMojiIcon emoji="✖️" size={12} className="text-xs" />
                   <span className="text-[10px] font-medium">xCHEESE</span>
                 </div>
                 <p className="text-sm font-semibold text-cheese">{formatCheeseAmount(cheeseLiquidityAmount)} <span className="text-[11px] text-muted-foreground">CHEESE</span></p>
               </div>
               <div className="text-center space-y-0.5">
                 <div className="flex items-center justify-center gap-1 text-muted-foreground">
-                  <span className="text-xs">⚡</span>
+                  <OpenMojiIcon emoji="⚡" size={12} className="text-xs" />
                   <span className="text-[10px] font-medium">CheesePowerz</span>
                 </div>
                 <p className="text-sm font-semibold text-cheese">{formatWaxAmount(waxCheesepowerzAmount)} <span className="text-[11px] text-muted-foreground">WAX</span></p>
               </div>
               <div className="text-center space-y-0.5">
                 <div className="flex items-center justify-center gap-1 text-muted-foreground">
-                  <span className="text-xs">📈</span>
+                  <OpenMojiIcon emoji="📈" size={12} className="text-xs" />
                   <span className="text-[10px] font-medium">Compound</span>
                 </div>
                 <p className="text-sm font-semibold text-cheese">{formatWaxAmount(waxStakeAmount)} <span className="text-[11px] text-muted-foreground">WAX</span></p>
@@ -82,12 +83,12 @@ export function NullStats({ onCanClaimChange }: NullStatsProps) {
             <Skeleton className="h-6 w-40 mx-auto bg-muted" />
           ) : canClaim ? (
             <div className="flex items-center justify-center gap-2 text-green-500">
-              <span>✅</span>
+              <OpenMojiIcon emoji="✅" size={18} />
               <span className="text-sm font-semibold">Ready!</span>
             </div>
           ) : (
             <div className="flex items-center justify-center gap-2 text-muted-foreground">
-              <span>⏰</span>
+              <OpenMojiIcon emoji="⏰" size={18} />
               <span className="text-sm">
                 Next null in: <span className="font-mono font-semibold text-cheese">{formatCountdown(timeUntilNextClaim)}</span>
               </span>

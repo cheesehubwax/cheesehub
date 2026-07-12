@@ -38,7 +38,7 @@ export function EditDaoProfile({ open, onOpenChange, dao, onUpdated }: EditDaoPr
       accountName, dao.dao_name, description, avatar, coverImage, socials
     );
     const result = await executeTransaction([action], {
-      successTitle: "Profile Updated! 🧀",
+      successTitle: "Profile Updated! ",
       successDescription: `${dao.dao_name} profile has been updated`,
     });
 

@@ -98,7 +98,7 @@ export function RentResourcesManager({ onTransactionComplete, onTransactionSucce
 
       const result = await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       const txId = result.resolved?.transaction.id?.toString() || null;
-      onTransactionSuccess?.('CHEESEUp Successful! 🧀⚡', `Powered up ${targetRecipient} with ${totalCheese.toFixed(4)} CHEESE`, txId);
+      onTransactionSuccess?.('CHEESEUp Successful! ', `Powered up ${targetRecipient} with ${totalCheese.toFixed(4)} CHEESE`, txId);
       setCheeseCpu('');
       setCheeseNet('');
       onTransactionComplete?.();

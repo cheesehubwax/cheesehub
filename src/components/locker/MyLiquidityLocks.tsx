@@ -18,6 +18,7 @@ import {
 } from "@/lib/liqlocker";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { OpenMojiIcon } from "@/components/OpenMojiIcon";
 import { Badge } from "@/components/ui/badge";
 import { Lock, Unlock, RefreshCw, Clock, Droplets } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -148,7 +149,7 @@ export function MyLiquidityLocks() {
                   <CardDescription className="font-mono text-xs flex items-center justify-between">
                     <span>ID: {lock.ID}</span>
                     <Badge variant="outline" className="text-xs">
-                      {lock.token_contract === LP_CONTRACTS[DEX.DEFIBOX] ? "📦" : "🌮"} {dex ? getDexDisplayName(dex) : lock.token_contract}
+                      {lock.token_contract === LP_CONTRACTS[DEX.DEFIBOX] ? <OpenMojiIcon emoji="📦" size={14} /> : <OpenMojiIcon emoji="🌮" size={14} />} {dex ? getDexDisplayName(dex) : lock.token_contract}
                     </Badge>
                   </CardDescription>
                 </CardHeader>

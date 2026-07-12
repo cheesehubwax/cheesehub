@@ -45,7 +45,7 @@ export function TokenSendManager({ onTransactionSuccess }: TokenSendManagerProps
       );
       if (txId) {
         onTransactionSuccess(
-          'Transfer Successful! 🧀',
+          'Transfer Successful! ',
           `Sent ${amount} ${selectedBalance.symbol} to ${recipient}`,
           txId
         );

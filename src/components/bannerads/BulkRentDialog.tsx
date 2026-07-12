@@ -12,6 +12,7 @@ import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 import { closeWharfkitModals, getTransactPlugins } from "@/lib/wharfKit";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TermsDialog } from "@/components/shared/TermsDialog";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 export interface BulkSlotSelection {
   time: number;
@@ -70,7 +71,7 @@ export function BulkRentDialog({ open, onOpenChange, selections, waxPricePerDay,
         }
       }
       await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
-      toast({ title: "Slots Rented! 🧀", description: `${selections.length} slot${selections.length > 1 ? "s" : ""} rented successfully` });
+      toast({ title: "Slots Rented! ", description: `${selections.length} slot${selections.length > 1 ? "s" : ""} rented successfully` });
       refreshBalance?.();
       onSuccess();
       onOpenChange(false);
@@ -114,9 +115,9 @@ export function BulkRentDialog({ open, onOpenChange, selections, waxPricePerDay,
           </div>
           <div><Label>IPFS Hash <span className="text-xs text-muted-foreground">(applied to all slots)</span></Label><Input value={ipfsHash} onChange={(e) => setIpfsHash(e.target.value.replace(/^https?:\/\/.*$/i, ""))} placeholder="QmXyz... or bafyabc..." maxLength={128} className="mt-1" /></div>
           <div><Label>Website URL <span className="text-xs text-muted-foreground">(applied to all slots)</span></Label><Input value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} placeholder="https://example.com" maxLength={256} className="mt-1" /></div>
-          <div className="rounded-lg border border-border/30 bg-muted/30 p-3 text-xs text-muted-foreground space-y-1"><p className="font-medium text-foreground text-sm">📐 Required Dimensions</p><p><strong>580 × 150 px</strong> — exact size required</p></div>
+          <div className="rounded-lg border border-border/30 bg-muted/30 p-3 text-xs text-muted-foreground space-y-1"><p className="font-medium text-foreground text-sm"><OpenMojiIcon emoji="📐" size={14} /> Required Dimensions</p><p><strong>580 × 150 px</strong> — exact size required</p></div>
           {previewUrl && <div><Label className="text-muted-foreground">Preview</Label><div className="mt-2 rounded-lg overflow-hidden border border-border/30"><img src={previewUrl} alt="Banner preview" className="w-full h-auto max-h-40 object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} /></div></div>}
-          <div className="rounded-lg bg-muted/50 p-3 text-sm"><p className="font-medium">{totalWax.toFixed(2)} WAX total</p><p className="text-xs text-muted-foreground">{selections.length} slot{selections.length > 1 ? "s" : ""} × avg {(totalWax / selections.length).toFixed(2)} WAX each</p>{isPromoz && <p className="text-xs font-medium mt-1" style={{ color: 'hsl(142 71% 45%)' }}>🧀 Promoz 50% discount applied</p>}</div>
+          <div className="rounded-lg bg-muted/50 p-3 text-sm"><p className="font-medium">{totalWax.toFixed(2)} WAX total</p><p className="text-xs text-muted-foreground">{selections.length} slot{selections.length > 1 ? "s" : ""} × avg {(totalWax / selections.length).toFixed(2)} WAX each</p>{isPromoz && <p className="text-xs font-medium mt-1" style={{ color: 'hsl(142 71% 45%)' }}><OpenMojiIcon emoji="🧀" size={14} /> Promoz 50% discount applied</p>}</div>
         </div>
         <div className="flex items-start gap-3 py-2">
           <Checkbox id="terms-bulkrent" checked={termsAgreed} onCheckedChange={(v) => setTermsAgreed(v === true)} className="mt-0.5" />

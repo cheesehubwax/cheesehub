@@ -17,6 +17,7 @@ import {
   buildAssertPointAction, buildCreateDaoAction,
   buildSetProfileActionWithSocials, DaoSocials,
 } from "@/lib/dao";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { ProposalFeeInput, ProposalFeeValue } from "@/components/dao/ProposalFeeInput";
 import { GovSchemaRow, GovSchemaCheck } from "@/components/dao/GovSchemaRow";
 import { buildCheesePaymentAction, buildWaxPaymentAction, buildWaxdaoFeeAction } from "@/lib/cheeseFees";
@@ -203,7 +204,7 @@ export function CreateDao() {
     }
 
     await executeTransaction(actions, {
-      successTitle: "DAO Created! 🧀🏛️",
+      successTitle: "DAO Created! ",
       successDescription: `${daoName} has been created on WaxDAO`,
     });
     setLoading(false);
@@ -224,7 +225,7 @@ export function CreateDao() {
         {/* Header */}
         <div className="space-y-2">
           <h2 className="text-xl font-bold flex items-center gap-2">
-            <span className="text-primary">🏛️</span> Create a New DAO
+            <OpenMojiIcon emoji="🏛️" size={18} className="text-primary" /> Create a New DAO
             <Dialog open={helpOpen} onOpenChange={(open) => {
               setHelpOpen(open);
               if (!open) {
@@ -762,7 +763,7 @@ export function CreateDao() {
 
         {/* Submit */}
         <Button onClick={handleCreate} disabled={loading || !paymentMethod || !termsAgreed} className="w-full bg-primary text-primary-foreground" size="lg">
-          {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Creating DAO...</> : paymentMethod === "cheese" ? "🏛️ Create DAO (Pay with CHEESE)" : paymentMethod === "wax" ? "🏛️ Create DAO (265 WAX)" : "🏛️ Select Payment Method"}
+          {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Creating DAO...</> : paymentMethod === "cheese" ? <><OpenMojiIcon emoji="🏛️" size={18} /> Create DAO (Pay with CHEESE)</> : paymentMethod === "wax" ? <><OpenMojiIcon emoji="🏛️" size={18} /> Create DAO (265 WAX)</> : <><OpenMojiIcon emoji="🏛️" size={18} /> Select Payment Method</>}
         </Button>
 
         {/* Footer */}

@@ -8,6 +8,8 @@ import { usePowerupLeaderboard } from "@/hooks/usePowerupLeaderboard";
 import { PowerupLeaderboard } from "@/components/powerup/PowerupLeaderboard";
 import cheeseUpOrb from "@/assets/cheeseup.png";
 import { playRandomFart } from "@/lib/fartSounds";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+
 
 const PowerUp = () => {
   const { isConnected, accountName, isLoading, session, cheeseBalance, login, logout, refreshBalance } = useWax();
@@ -39,13 +41,13 @@ const PowerUp = () => {
 
             <div className="text-center space-y-2">
               <div className="flex items-center justify-center gap-2">
-                <span className="text-2xl">⚡</span>
+                <OpenMojiIcon emoji="⚡" size={24} className="text-2xl" />
                 <h1 className="text-3xl md:text-4xl font-bold">
                   <span className="text-cheese">CHEESE</span>
                   <span className="text-foreground">Up</span>
                 </h1>
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
-                <span className="text-2xl">⚡</span>
+                <OpenMojiIcon emoji="⚡" size={24} className="text-2xl" />
               </div>
               <p className="text-muted-foreground max-w-2xl mx-auto">
                 Power Up your CPU and NET resources using $CHEESE. The $CHEESE is sent to eosio.null and leaves circulation forever

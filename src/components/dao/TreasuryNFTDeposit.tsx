@@ -170,7 +170,7 @@ export function TreasuryNFTDeposit({ daoName, onDeposited }: TreasuryNFTDepositP
     ];
 
     const result = await executeTransaction(actions, {
-      successTitle: "NFTs Deposited! 🧀🖼️",
+      successTitle: "NFTs Deposited! ",
       successDescription: `${assetIds.length} NFT(s) deposited to ${daoName} treasury`,
     });
 

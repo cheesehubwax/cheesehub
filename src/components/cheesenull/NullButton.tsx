@@ -31,7 +31,7 @@ export function NullButton({ disabled = false, onBurnSuccess }: NullButtonProps)
       };
 
       const result = await executeTransaction([burnAction], {
-        successTitle: 'NULL Successful! 🔥',
+        successTitle: 'NULL Successful! ',
         successDescription: 'Vote rewards claimed, CHEESE burned, and WAX compounded.',
         errorTitle: 'NULL Failed',
       });

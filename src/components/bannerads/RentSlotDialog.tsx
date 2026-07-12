@@ -13,6 +13,7 @@ import { closeWharfkitModals, getTransactPlugins } from "@/lib/wharfKit";
 import { isDomainBlocked } from "@/lib/bannerBlocklist";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TermsDialog } from "@/components/shared/TermsDialog";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 interface RentSlotDialogProps {
   open: boolean;
@@ -58,7 +59,7 @@ export function RentSlotDialog({ open, onOpenChange, startTime, position, waxPri
         }
       }
       await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
-      toast({ title: "Slot Rented! 🧀", description: `Position ${position} rented for ${numDays} day(s)` });
+      toast({ title: "Slot Rented! ", description: `Position ${position} rented for ${numDays} day(s)` });
       refreshBalance?.();
       onSuccess();
       onOpenChange(false);
@@ -91,9 +92,9 @@ export function RentSlotDialog({ open, onOpenChange, startTime, position, waxPri
           )}
           <div><Label>IPFS Hash</Label><Input value={ipfsHash} onChange={(e) => setIpfsHash(e.target.value.replace(/^https?:\/\/.*$/i, ""))} placeholder="QmXyz... or bafyabc..." maxLength={128} className="mt-1" /><p className="text-xs text-muted-foreground mt-1">IPFS hash only (no URLs). Max 128 characters.</p></div>
           <div><Label>Website URL</Label><Input value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} placeholder="https://example.com" maxLength={256} className="mt-1" />{isDomainBlocked(websiteUrl) && <p className="text-xs text-destructive mt-1 font-medium">This domain is not allowed.</p>}<p className="text-xs text-muted-foreground mt-1">Max 256 characters</p></div>
-          <div className="rounded-lg border border-border/30 bg-muted/30 p-3 text-xs text-muted-foreground space-y-1"><p className="font-medium text-foreground text-sm">📐 Required Dimensions</p><p><strong>580 × 150 px</strong> — exact size required</p><p>Upload your image to IPFS and paste the hash here.</p></div>
+          <div className="rounded-lg border border-border/30 bg-muted/30 p-3 text-xs text-muted-foreground space-y-1"><p className="font-medium text-foreground text-sm"><OpenMojiIcon emoji="📐" size={14} /> Required Dimensions</p><p><strong>580 × 150 px</strong> — exact size required</p><p>Upload your image to IPFS and paste the hash here.</p></div>
           {previewUrl && <div><Label className="text-muted-foreground">Preview</Label><div className="mt-2 rounded-lg overflow-hidden border border-border/30"><img src={previewUrl} alt="Banner preview" className="w-full h-auto max-h-40 object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} /></div></div>}
-          <div className="rounded-lg bg-muted/50 p-3 text-sm"><p className="font-medium">{totalWax.toFixed(2)} WAX</p><p className="text-xs text-muted-foreground">{(waxPricePerDay * priceMultiplier).toFixed(2)} WAX × {numDays} day{numDays > 1 ? "s" : ""}</p>{isPromoz && <p className="text-xs font-medium mt-1" style={{color: 'hsl(142 71% 45%)'}}>🧀 Promoz 50% discount applied</p>}</div>
+          <div className="rounded-lg bg-muted/50 p-3 text-sm"><p className="font-medium">{totalWax.toFixed(2)} WAX</p><p className="text-xs text-muted-foreground">{(waxPricePerDay * priceMultiplier).toFixed(2)} WAX × {numDays} day{numDays > 1 ? "s" : ""}</p>{isPromoz && <p className="text-xs font-medium mt-1" style={{color: 'hsl(142 71% 45%)'}}><OpenMojiIcon emoji="🧀" size={14} /> Promoz 50% discount applied</p>}</div>
           <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground"><p>Memo: <code className="text-foreground">{memo}</code></p></div>
         </div>
         <div className="flex items-start gap-3 py-2">

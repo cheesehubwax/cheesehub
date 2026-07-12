@@ -211,7 +211,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
       );
       if (txId) {
         handleTransactionSuccess(
-          "Transfer Successful! 🧀",
+          "Transfer Successful! ",
           `Sent ${amount} ${selectedToken.symbol} to ${recipient}`,
           txId
         );

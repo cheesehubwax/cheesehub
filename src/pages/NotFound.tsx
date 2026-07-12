@@ -3,6 +3,8 @@ import { useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Home } from "lucide-react";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+
 
 const NotFound = () => {
   const location = useLocation();
@@ -15,7 +17,7 @@ const NotFound = () => {
     <Layout>
       <div className="container py-16 text-center">
         <div className="h-24 w-24 rounded-full bg-cheese/20 flex items-center justify-center mx-auto mb-8">
-          <span className="text-6xl">🧀</span>
+          <OpenMojiIcon emoji="🧀" size={48} className="text-6xl" />
         </div>
         <h1 className="text-4xl font-bold mb-4">
           <span className="text-cheese">404</span>

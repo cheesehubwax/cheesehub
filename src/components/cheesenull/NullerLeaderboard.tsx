@@ -13,6 +13,8 @@ import {
 import { cn } from '@/lib/utils';
 import { type NullerStats, type SortMode, type LogburnAction, aggregateNullerStats } from '@/lib/fetchLeaderboard';
 import { formatCheeseAmount } from '@/lib/cheeseNullApi';
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+
 
 
 interface NullerLeaderboardProps {
@@ -62,11 +64,11 @@ export function NullerLeaderboard({ rawActions, isLoading, isError, onRefresh }:
         {/* Header */}
         <div className="text-center space-y-1">
           <div className="flex items-center justify-center gap-2">
-            <span>🏆</span>
+            <OpenMojiIcon emoji="🏆" size={18} />
             <h3 className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
               CHEESEBoard
             </h3>
-            <span>🏆</span>
+            <OpenMojiIcon emoji="🏆" size={18} />
             {onRefresh && (
               <button
                 onClick={onRefresh}
@@ -93,7 +95,7 @@ export function NullerLeaderboard({ rawActions, isLoading, isError, onRefresh }:
                   : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent'
               )}
             >
-              <span>{opt.emoji}</span>
+              <OpenMojiIcon emoji={opt.emoji} size={14} />
               {opt.label}
             </button>
           ))}

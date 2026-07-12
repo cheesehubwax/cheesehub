@@ -2,6 +2,7 @@ import { useCheeseNullStats } from '@/hooks/useCheeseNullStats';
 import { formatWaxAmount, formatCheeseAmount } from '@/lib/cheeseNullApi';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 
 export function NullTotalStats() {
@@ -27,7 +28,7 @@ export function NullTotalStats() {
         {/* Total CHEESE Nulled */}
         <div className="text-center space-y-1">
           <div className="flex items-center justify-center gap-1.5 text-muted-foreground">
-            <span className="text-sm">⛔</span>
+            <OpenMojiIcon emoji="⛔" size={14} className="text-sm" />
             <span className="text-xs font-medium">Total CHEESE Nulled</span>
           </div>
           {isLoading ? (
@@ -46,21 +47,21 @@ export function NullTotalStats() {
           <div className="flex items-center justify-center gap-4 pt-1">
             <div className="text-center space-y-0.5">
               <div className="flex items-center justify-center gap-1 text-muted-foreground">
-                <span className="text-xs">✖️</span>
+                <OpenMojiIcon emoji="✖️" size={12} className="text-xs" />
                 <span className="text-[10px] font-medium">xCHEESE</span>
               </div>
               <p className="text-sm font-semibold text-cheese">{formatCheeseAmount(totalCheeseLiquidity)} <span className="text-[11px] text-muted-foreground">CHEESE</span></p>
             </div>
             <div className="text-center space-y-0.5">
               <div className="flex items-center justify-center gap-1 text-muted-foreground">
-                <span className="text-xs">⚡</span>
+                <OpenMojiIcon emoji="⚡" size={12} className="text-xs" />
                 <span className="text-[10px] font-medium">CheesePowerz</span>
               </div>
               <p className="text-sm font-semibold text-cheese">{formatWaxAmount(totalWaxCheesepowerz)} <span className="text-[11px] text-muted-foreground">WAX</span></p>
             </div>
             <div className="text-center space-y-0.5">
               <div className="flex items-center justify-center gap-1 text-muted-foreground">
-                <span className="text-xs">📈</span>
+                <OpenMojiIcon emoji="📈" size={12} className="text-xs" />
                 <span className="text-[10px] font-medium">Compound</span>
               </div>
               <p className="text-sm font-semibold text-cheese">{formatWaxAmount(totalWaxCompounded)} <span className="text-[11px] text-muted-foreground">WAX</span></p>

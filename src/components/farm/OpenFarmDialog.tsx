@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import { FarmInfo, buildOpenFarmAction } from "@/lib/farm";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
+import { OpenMojiIcon } from "@/components/OpenMojiIcon";
 
 interface OpenFarmDialogProps {
   farm: FarmInfo;
@@ -44,7 +45,7 @@ export function OpenFarmDialog({ farm, open, onOpenChange, onSuccess }: OpenFarm
       const expiration = Math.floor(expirationDate.getTime() / 1000);
       const action = buildOpenFarmAction(accountName, farm.farm_name, expiration);
       const result = await executeTransaction([action], {
-        successTitle: "Farm Opened! 🎉",
+        successTitle: "Farm Opened! ",
         successDescription: `${farm.farm_name} is now accepting stakers`,
       });
       if (result.success) {
@@ -64,8 +65,9 @@ export function OpenFarmDialog({ farm, open, onOpenChange, onSuccess }: OpenFarm
         </DialogHeader>
         <div className="space-y-4">
           {!hasRewards && (
-            <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-sm text-orange-400">
-              ⚠️ Your farm has no rewards deposited. Consider depositing rewards before opening.
+            <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 text-sm text-orange-400 flex items-center gap-1.5">
+              <OpenMojiIcon emoji="⚠️" size={16} />
+              Your farm has no rewards deposited. Consider depositing rewards before opening.
             </div>
           )}
           <div>
