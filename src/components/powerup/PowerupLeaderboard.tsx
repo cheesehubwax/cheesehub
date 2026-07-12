@@ -9,6 +9,8 @@ import {
 import { cn } from '@/lib/utils';
 import { type PowerupLeaderStats, type PowerupSortMode, type PowerupTransferAction, aggregatePowerupStats } from '@/lib/fetchPowerupLeaderboard';
 import { formatCheeseAmount } from '@/lib/cheeseNullApi';
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+
 
 interface PowerupLeaderboardProps {
   rawActions: PowerupTransferAction[];

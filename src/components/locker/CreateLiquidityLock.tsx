@@ -25,6 +25,8 @@ import { Lock, Calendar, AlertCircle, Droplets } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TermsDialog } from "@/components/shared/TermsDialog";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+
 
 export function CreateLiquidityLock() {
   const waxContext = useWax();

@@ -7,6 +7,8 @@ import { NullerLeaderboard } from '@/components/cheesenull/NullerLeaderboard';
 import { useNullerLeaderboard } from '@/hooks/useNullerLeaderboard';
 import cheeseNullLogo from '@/assets/cheesenull-orb.png';
 import { playRandomFart } from '@/lib/fartSounds';
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+
 
 export default function CheeseNull() {
   const [canClaim, setCanClaim] = useState(false);

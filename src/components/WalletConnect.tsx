@@ -30,6 +30,8 @@ import { CheeseSwapDialog } from "./swap/CheeseSwapDialog";
 import { useCheeseAmpAutoAdvance } from "@/hooks/useCheeseAmpAutoAdvance";
 import { getAudioPlayer } from "@/lib/musicPlayer";
 import { useCheeseAmpStore } from "@/stores/cheeseAmpStore";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+
 
 export function WalletConnect() {
   const { 

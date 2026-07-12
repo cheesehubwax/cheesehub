@@ -13,6 +13,8 @@ import {
 import { cn } from '@/lib/utils';
 import { type NullerStats, type SortMode, type LogburnAction, aggregateNullerStats } from '@/lib/fetchLeaderboard';
 import { formatCheeseAmount } from '@/lib/cheeseNullApi';
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+
 
 
 interface NullerLeaderboardProps {

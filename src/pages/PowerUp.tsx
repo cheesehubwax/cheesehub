@@ -8,6 +8,8 @@ import { usePowerupLeaderboard } from "@/hooks/usePowerupLeaderboard";
 import { PowerupLeaderboard } from "@/components/powerup/PowerupLeaderboard";
 import cheeseUpOrb from "@/assets/cheeseup.png";
 import { playRandomFart } from "@/lib/fartSounds";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+
 
 const PowerUp = () => {
   const { isConnected, accountName, isLoading, session, cheeseBalance, login, logout, refreshBalance } = useWax();

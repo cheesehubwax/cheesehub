@@ -9,6 +9,8 @@ import { buildUnboxAction, WAXDAO_UNBOX_CONTRACT, WOJAK_UNBOX_POOL_ID, WOJAK_PAC
 import { getImageUrl } from '@/services/atomicApi';
 import { TermsDialog } from '@/components/shared/TermsDialog';
 import { toast } from 'sonner';
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+
 
 interface WojakUnboxManagerProps {
   onTransactionComplete?: () => void;

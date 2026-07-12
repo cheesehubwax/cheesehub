@@ -3,6 +3,8 @@ import { useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Home } from "lucide-react";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+
 
 const NotFound = () => {
   const location = useLocation();

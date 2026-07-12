@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+
 
 interface RecipientInputProps {
   value: string;
