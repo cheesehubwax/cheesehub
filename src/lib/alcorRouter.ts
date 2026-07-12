@@ -654,6 +654,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     routesConsidered: routes.length,
     tickFailures,
     rateLimitedTickFailures,
+    poolsDroppedNoTicks: droppedForTicks.length,
     tookMs: Math.round(performance.now() - started),
   };
 
