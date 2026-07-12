@@ -3,11 +3,11 @@ import { useCheesePriceData } from '@/hooks/useCheesePriceData';
 import { useCheeseStats } from '@/hooks/useCheeseStats';
 import { useCheeseTVL } from '@/hooks/useCheeseTVL';
 import { Skeleton } from '@/components/ui/skeleton';
-import { RefreshCw } from 'lucide-react';
 import waxSealAsset from '@/assets/wax-seal.png.asset.json';
 import usdcAsset from '@/assets/usdc.png.asset.json';
 import marketcapAsset from '@/assets/marketcap.png.asset.json';
 import tvlAsset from '@/assets/tvl.png.asset.json';
+import refreshIconAsset from '@/assets/refresh-icon.png.asset.json';
 import { CheeseSwapDialog } from '@/components/swap/CheeseSwapDialog';
 
 function formatPrice(price: number, decimals: number = 8): string {
@@ -165,7 +165,11 @@ export function CheesePriceBar() {
         className="flex items-center gap-1.5 bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border border-cheese/20 rounded-lg px-3 py-2 hover:bg-cheese/20 transition-colors disabled:opacity-50"
         title="Refresh all price data"
       >
-        <RefreshCw className={`w-4 h-4 text-muted-foreground ${isAnyFetching ? 'animate-spin' : ''}`} />
+        <img
+          src={refreshIconAsset.url}
+          alt="Refresh"
+          className={`w-7 h-7 object-contain ${isAnyFetching ? 'animate-spin' : ''}`}
+        />
         <span className="text-xs text-muted-foreground hidden sm:inline">Refresh</span>
       </button>
     </div>
