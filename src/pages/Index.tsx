@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, ShoppingCart } from "lucide-react";
 import cheeseCoin from "@/assets/cheese-coin.png";
 import walletIcon from "@/assets/wallet-icon.png";
+import waxLogoAsset from "@/assets/wax-logo.png.asset.json";
 import { TokenStatsBanner } from "@/components/home/TokenStatsBanner";
 import { CheesePriceBar } from "@/components/home/CheesePriceBar";
 import { CheeseHistorySection } from "@/components/home/CheeseHistorySection";
