@@ -57,7 +57,7 @@ const Farm = () => {
               className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer"
               onClick={playRandomFart}
             >
-              <img src={cheeseFarmLogo} alt="CHEESEFarm" className="w-24 h-24 object-contain" />
+              <OpenMojiIcon emoji="🌱" size={96} alt="CHEESEFarm" />
             </div>
             <div className="text-center space-y-2">
               <div className="flex items-center justify-center gap-2">
