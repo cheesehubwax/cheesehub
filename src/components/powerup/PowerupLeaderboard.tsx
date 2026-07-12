@@ -81,7 +81,7 @@ export function PowerupLeaderboard({ rawActions, isLoading, isError, onRefresh }
                   : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent'
               )}
             >
-              <span>{opt.emoji}</span>
+              <OpenMojiIcon emoji={opt.emoji} size={14} />
               {opt.label}
             </button>
           ))}
