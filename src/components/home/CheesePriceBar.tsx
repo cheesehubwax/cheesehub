@@ -3,11 +3,11 @@ import { useCheesePriceData } from '@/hooks/useCheesePriceData';
 import { useCheeseStats } from '@/hooks/useCheeseStats';
 import { useCheeseTVL } from '@/hooks/useCheeseTVL';
 import { Skeleton } from '@/components/ui/skeleton';
-import { RefreshCw } from 'lucide-react';
 import waxSealAsset from '@/assets/wax-seal.png.asset.json';
 import usdcAsset from '@/assets/usdc.png.asset.json';
 import marketcapAsset from '@/assets/marketcap.png.asset.json';
 import tvlAsset from '@/assets/tvl.png.asset.json';
+import refreshIconAsset from '@/assets/refresh-icon.png.asset.json';
 import { CheeseSwapDialog } from '@/components/swap/CheeseSwapDialog';
 
 function formatPrice(price: number, decimals: number = 8): string {
