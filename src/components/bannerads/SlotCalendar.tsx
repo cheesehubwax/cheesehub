@@ -76,7 +76,7 @@ function SlotBadge({ slot, accountName }: { slot: BannerSlot; accountName: strin
   const isLive = slot.time <= nowSec;
   const isPending = !isLive && !isWithinBuffer(slot.time, MIN_RENT_BUFFER_HOURS);
 
-  if (isLive && slot.isOnChain) return <Badge className="bg-red-500/20 text-red-500 border-red-500/30 text-xs animate-pulse">🔴 Live</Badge>;
+  if (isLive && slot.isOnChain) return <Badge className="bg-red-500/20 text-red-500 border-red-500/30 text-xs animate-pulse"><OpenMojiIcon emoji="🔴" size={14} /> Live</Badge>;
   if (!slot.isOnChain) {
     if (isPending) return <Badge className="bg-orange-500/20 text-orange-500 border-orange-500/30 text-xs">Pending</Badge>;
     return <Badge className="bg-green-500/20 text-green-600 border-green-500/30 text-xs">Available</Badge>;

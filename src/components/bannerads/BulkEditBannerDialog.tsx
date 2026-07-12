@@ -12,6 +12,7 @@ import { BannerSlot } from "@/hooks/useBannerSlots";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 import { isDomainBlocked } from "@/lib/bannerBlocklist";
 import { formatSlotDateUTC } from "./SlotCalendar";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 interface BulkEditBannerDialogProps {
   open: boolean;
@@ -124,7 +125,7 @@ export function BulkEditBannerDialog({ open, onOpenChange, slots, onRemoveSlot, 
 
             {/* Dimensions reminder */}
             <div className="rounded-lg border border-border/30 bg-muted/30 p-3 text-xs text-muted-foreground space-y-1">
-              <p className="font-medium text-foreground text-sm">📐 Required Dimensions</p>
+              <p className="font-medium text-foreground text-sm"><OpenMojiIcon emoji="📐" size={14} /> Required Dimensions</p>
               <p><strong>580 × 150 px</strong> — exact size required</p>
             </div>
 

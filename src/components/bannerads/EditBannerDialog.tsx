@@ -10,6 +10,7 @@ import { Loader2 } from "lucide-react";
 import { BannerSlot } from "@/hooks/useBannerSlots";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 import { isDomainBlocked } from "@/lib/bannerBlocklist";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 interface EditBannerDialogProps {
   open: boolean;
@@ -56,7 +57,7 @@ export function EditBannerDialog({ open, onOpenChange, slot, onSuccess }: EditBa
         <div className="space-y-4 py-4">
           <div><Label>IPFS Hash</Label><Input value={ipfsHash} onChange={(e) => setIpfsHash(e.target.value.replace(/^https?:\/\/.*$/i, ""))} placeholder="QmXyz... or bafyabc..." maxLength={128} className="mt-1" /></div>
           <div><Label>Website URL</Label><Input value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} placeholder="https://example.com" maxLength={256} className="mt-1" />{isDomainBlocked(websiteUrl) && <p className="text-xs text-destructive mt-1 font-medium">This domain is not allowed.</p>}</div>
-          <div className="rounded-lg border border-border/30 bg-muted/30 p-3 text-xs text-muted-foreground space-y-1"><p className="font-medium text-foreground text-sm">📐 Required Dimensions</p><p><strong>580 × 150 px</strong> — exact size required</p></div>
+          <div className="rounded-lg border border-border/30 bg-muted/30 p-3 text-xs text-muted-foreground space-y-1"><p className="font-medium text-foreground text-sm"><OpenMojiIcon emoji="📐" size={14} /> Required Dimensions</p><p><strong>580 × 150 px</strong> — exact size required</p></div>
           {previewUrl && <div><Label className="text-muted-foreground">Preview</Label><div className="mt-2 rounded-lg overflow-hidden border border-border/30"><img src={previewUrl} alt="Banner preview" className="w-full h-auto max-h-40 object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} /></div></div>}
         </div>
         <DialogFooter>
