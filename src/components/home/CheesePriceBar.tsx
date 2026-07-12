@@ -124,7 +124,7 @@ export function CheesePriceBar() {
 
       {/* Market Cap */}
       <div className="flex items-center gap-2 bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border border-cheese/20 rounded-lg px-4 py-2">
-        <img src={cmcAsset.url} alt="Market Cap" className="w-7 h-7 object-contain" />
+        <img src={marketcapAsset.url} alt="Market Cap" className="w-7 h-7 object-contain" />
         <div className="flex flex-col">
           <span className="text-xs text-muted-foreground">Market Cap</span>
           {isLoading ? (
