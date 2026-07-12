@@ -18,6 +18,7 @@ import {
 } from "@/lib/liqlocker";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { OpenMojiIcon } from "@/components/OpenMojiIcon";
 import { Badge } from "@/components/ui/badge";
 import { Lock, Unlock, RefreshCw, Clock, Droplets } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
