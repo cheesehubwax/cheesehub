@@ -1,43 +1,115 @@
-# Marketing Copy Audit — Findings & Plan
+# Fix: CheeseSwap missing WAXBTC leg in WAX → WAXWBTC split
 
-## Summary
+## Symptom
 
-Good news: a full sweep of pages, components, hero copy, stats banners, tool cards, success dialogs, empty states, and homepage sections found **zero promotional language that implies investment character, price appreciation, yield, or speculative profit**. The codebase is unusually clean on this front — the vocabulary is functional/mechanical throughout (null, stake, claim, deposit), and every place where "investment"/"return"/"yield" appears is inside `Disclaimer.tsx` or `TermsContent.tsx`, used *defensively* to disclaim, not promote.
+Trades that pass through hub tokens (CHEESE, USDC, LSWAX) split correctly and often beat Alcor slightly. Only **WAX → WAXWBTC** collapses to a single 100% route (0.00003247) instead of Alcor's 50/50 split (0.00003252).
 
-That means the substance-vs-form argument you were worried about is already in your favour: **the Terms say "not a financial product" and the UI does not contradict that with return-implying marketing.** This is exactly the alignment INFO 225 looks for.
+Alcor's split goes:
 
-## What the audit flagged (only 3 minor items)
+- 50% WAX → **CHEESE** → WAXWBTC
+- 50% WAX → **WAXBTC** → WAXWBTC
 
-1. **`src/pages/AdminGuide.tsx` line 214** — copy reads *"NFT staking farms for earning token rewards."* Internal admin-only page, not public marketing. Low risk today, but if `/adminguide` is ever made public, "earning… rewards" is INFO 225 §2 language. → **Soften to functional wording.**
+CheeseHub only ever sees the first leg.
 
-2. **`src/components/wallet/AlcorFarmManager.tsx` lines 544–550** — displays a computed **APR** figure for the user's existing Alcor LP position. This is a wallet utility showing live position data (not a promise), but the label "APR" is on ASIC's watch-list of terms. → **Keep the number, retitle the label (e.g. "Current pool yield estimate") and add an inline "estimate only, not a return promise" caption.**
+## Root cause
 
-3. **`src/components/farm/DepositRewardsDialog.tsx` line 45** — success toast *"Rewards Deposited! 💰"* refers to the sponsor depositing reward-pool tokens (correct meaning) but is easily misread as a payout to the user. → **Retitle to "Reward pool funded" (or similar) to remove ambiguity.**
+In `src/lib/alcorRouter.ts` → `computeAlcorTrade`:
 
-## What is explicitly clean (no action)
+```ts
+const tickResults = await mapWithConcurrency(relevant, TICK_CONCURRENCY, async (p) => {
+  try { return { p, ticks: await fetchPoolTicks(p.id, signal) }; }
+  catch (e) { tickFailures++; ...; return { p, ticks: [] as RawAlcorTick[] }; }
+});
 
-- `src/pages/Index.tsx` — hero, all 10 CHEESETools cards
-- `src/components/home/TokenStatsBanner.tsx`, `CheesePriceBar.tsx`, `QuickLinksSection.tsx`, `CheeseHistorySection.tsx`
-- `src/pages/CheeseNull.tsx` + `src/components/cheesenull/*` — no "backed by"/"value support" framing
-- `src/pages/Drops.tsx` + `src/components/drops/*` — consumer-purchase framing intact
-- `src/pages/Farm.tsx`, `Drip.tsx`, `Dao.tsx` — mechanical descriptions only
-- `NullButton.tsx` success toast — describes the action, not a return
-- `TransactionSuccessDialog.tsx`, empty states across drops/farms — neutral
+const sdkPools = tickResults
+  .filter((r) => r.ticks.length > 0)   // ← silently drops pools with 0 ticks
+  ...
+```
 
-## Plan of changes (only if you want them applied)
+WAXBTC pools (WAX/WAXBTC and WAXBTC/WAXWBTC) are the least resilient link in the graph:
 
-Three tiny, purely-textual edits — no logic, no layout, no components:
+- Low TVL → sparse initialized-tick table.
+- Endpoint pools (not hubs) → they're fetched at the tail of the concurrency queue, so more likely to hit a 429.
+- Any single tick-fetch failure or rate-limit → `ticks = []` → the pool is filtered out entirely → the WAXBTC route vanishes → SDK returns a 1-route quote → strict `>` tiebreak against HTTP fails → HTTP's 100% route renders.
 
-1. `src/pages/AdminGuide.tsx:214` — rewrite line to describe farms functionally (staking mechanics) instead of "earning rewards".
-2. `src/components/wallet/AlcorFarmManager.tsx:544–550` — rename the APR label and add a one-line caption clarifying it is a real-time pool-derived estimate, not a promise.
-3. `src/components/farm/DepositRewardsDialog.tsx:45` — change toast title from "Rewards Deposited! 💰" to unambiguous sponsor-side wording (e.g. "Reward pool funded").
+Hub-routed trades never hit this because CHEESE/USDC/LSWAX pools always return non-empty ticks.
 
-## Optional follow-ups (not part of this plan)
+## Fix
 
-- Exhaustive verbatim pass through every toast/tooltip in `MyFarms.tsx`, `BrowseFarms.tsx`, `NFTVotePicker.tsx` (audit was targeted, not line-by-line for every dialog).
-- Confirm `index.html` meta description contains no investment-implying phrasing.
+Three surgical changes in `src/lib/alcorRouter.ts`, all inside `computeAlcorTrade` and its shared helpers. No smart-contract, memo, or UI changes.
 
-## Technical notes
+### 1. Retry tick fetches once before giving up
 
-- All three edits are single-string changes in JSX. No component structure, no routing, no state, no smart-contract interaction is touched.
-- The existing Terms of Use (§13, §16) and Disclaimer already cover the semantic backstop for all three surfaces — these edits just remove the *residual* ambiguity so the UI reinforces (rather than mildly contradicts) the Terms.
+Wrap the per-pool tick fetch in a bounded retry so a transient 429/network error doesn't permanently drop a pool from the graph. Add a small jittered delay before the retry so we don't immediately re-trigger the same rate-limit window.
+
+```ts
+async function fetchPoolTicksWithRetry(id: number, signal?: AbortSignal): Promise<RawAlcorTick[]> {
+  try {
+    return await fetchPoolTicks(id, signal);
+  } catch (e) {
+    if ((e as any)?.name === "AbortError") throw e;
+    // Small jittered backoff, then a single retry.
+    await new Promise((r) => setTimeout(r, 300 + Math.random() * 300));
+    return await fetchPoolTicks(id, signal);
+  }
+}
+```
+
+Use it in place of `fetchPoolTicks` inside both `computeAlcorTrade` and `computeShadowQuote`.
+
+### 2. Prioritise low-liquidity endpoint pools in the fetch queue
+
+`selectRelevantPools` already returns pools in a good ranking order (direct → endpoint-hub → hub-hub → endpoint → hub → other). `mapWithConcurrency` consumes in that order, so endpoint pools with a non-hub partner (WAX/WAXBTC, WAXBTC/WAXWBTC) currently sit in the classRank=3 tier — behind endpoint-hub pools. That's already fine, but we should confirm the concurrency limit isn't starving them.
+
+- Keep `TICK_CONCURRENCY` as-is (don't raise — that's what triggers 429s).
+- No code change needed here beyond confirming with the diagnostic logs.
+
+### 3. Log when a route was dropped due to missing ticks
+
+Add a diagnostic so future WAXBTC-style regressions are visible immediately instead of manifesting as "quote is a bit worse."
+
+After building `sdkPools`, compare the tokens present in `sdkPools` against `relevant` and log the delta:
+
+```ts
+const droppedForTicks = tickResults.filter((r) => r.ticks.length === 0).map((r) => r.p.id);
+if (droppedForTicks.length > 0) {
+  logger.warn(`[alcor-router] Dropped ${droppedForTicks.length} pool(s) with 0 ticks after retry`, droppedForTicks);
+}
+```
+
+Also surface `droppedForTicks.length` in `quoteDiagnostics`:
+
+```ts
+const diagnostics: SwapRoute["quoteDiagnostics"] = {
+  relevantPools: relevant.length,
+  poolsBuilt: sdkPools.length,
+  routesConsidered: routes.length,
+  tickFailures,
+  rateLimitedTickFailures,
+  poolsDroppedNoTicks: droppedForTicks.length, // new
+  tookMs: Math.round(performance.now() - started),
+};
+```
+
+Add the field to the `SwapRoute["quoteDiagnostics"]` type in `src/lib/swapApi.ts`.
+
+### 4. (Optional, only if step 1 doesn't fully fix WAXBTC) Loosen the SDK-vs-HTTP tiebreak
+
+Currently `useSwapRoute` picks SDK only when `sdk.output > http.output`. If the retry succeeds but the split's improvement is smaller than one unit of the output token's precision (WAXWBTC is 8 decimals — very fine, so this shouldn't trigger), the tie would still go to HTTP.
+
+**Do not change this yet.** The strict `>` is correct behaviour when both quotes are trustworthy. We only reconsider if diagnostics show the retry landed a valid WAXBTC route but its output still ties HTTP.
+
+## Verification
+
+1. Open CheeseSwap, WAX → WAXWBTC, 500 WAX.
+2. Console should show either:
+   - `[alcor-router] SDK won (2 splits, +…%, …)` with output ≈ 0.00003252, **or**
+   - `[alcor-router] Dropped N pool(s) with 0 ticks after retry` — if this appears, WAXBTC is genuinely returning empty ticks and the retry couldn't recover; escalate.
+3. Re-test WAX → CHEESE, WAX → USDC, WAX → LSWAX — must continue to split as before (no regression).
+4. Re-test a large trade (100k WAX → CHEESE) — quote latency should stay under ~1 s.
+
+## Out of scope
+
+- No change to `distributionPercent` tiering (other trades split fine, so the grid is already adequate).
+- No change to pool selection cap, memo shape, or execution path.
+- No change to the HTTP fallback or SDK-vs-HTTP tiebreak.
