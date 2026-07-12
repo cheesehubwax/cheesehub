@@ -8,6 +8,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ExternalLink } from 'lucide-react';
 import { CHEESE_CONFIG } from '@/lib/waxConfig';
 import cheeseLogo from '@/assets/cheese-logo.png';
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 // Format large numbers with abbreviations
 function formatLargeNumber(num: number, decimals: number = 1): string {
@@ -269,7 +270,7 @@ export function TokenStatsBanner() {
           <div className="mt-6 flex justify-center">
             <div className="flex items-center gap-4">
               <div className="h-12 w-12 rounded-full bg-green-500/20 flex items-center justify-center shrink-0">
-                <span className="text-2xl">🛡️</span>
+                <OpenMojiIcon emoji="🛡️" size={24} className="text-2xl" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground font-medium">Contract Status</p>

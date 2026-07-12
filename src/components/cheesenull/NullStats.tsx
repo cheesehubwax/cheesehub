@@ -4,6 +4,7 @@ import { formatWaxAmount, formatCheeseAmount, formatCountdown } from '@/lib/chee
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 interface NullStatsProps {
   onCanClaimChange?: (canClaim: boolean) => void;
@@ -51,7 +52,7 @@ export function NullStats({ onCanClaimChange }: NullStatsProps) {
             <div className="flex items-center justify-center gap-4 pt-2">
               <div className="text-center space-y-0.5">
                 <div className="flex items-center justify-center gap-1 text-muted-foreground">
-                  <span className="text-xs">✖️</span>
+                  <OpenMojiIcon emoji="✖️" size={12} className="text-xs" />
                   <span className="text-[10px] font-medium">xCHEESE</span>
                 </div>
                 <p className="text-sm font-semibold text-cheese">{formatCheeseAmount(cheeseLiquidityAmount)} <span className="text-[11px] text-muted-foreground">CHEESE</span></p>

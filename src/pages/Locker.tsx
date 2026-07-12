@@ -6,6 +6,7 @@ import { CreateLiquidityLock } from "@/components/locker/CreateLiquidityLock";
 import { MyLiquidityLocks } from "@/components/locker/MyLiquidityLocks";
 import cheeseLockOrb from "@/assets/cheeselock.png";
 import { playRandomFart } from "@/lib/fartSounds";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 const Locker = () => {
   return (
@@ -43,9 +44,9 @@ const Locker = () => {
         <Tabs defaultValue="create" className="w-full max-w-xl mx-auto">
           <div className="flex justify-center mb-6">
             <TabsList className="bg-card/80 border border-border/50 h-10">
-              <TabsTrigger value="create" className="gap-1.5 text-sm px-4"><span className="text-sm">✍️</span> Create Lock</TabsTrigger>
+              <TabsTrigger value="create" className="gap-1.5 text-sm px-4"><OpenMojiIcon emoji="✍️" size={14} className="text-sm" /> Create Lock</TabsTrigger>
               <TabsTrigger value="my-locks" className="gap-1.5 text-sm px-4"><OpenMojiIcon emoji="📂" size={14} className="text-sm" /> My Locks</TabsTrigger>
-              <TabsTrigger value="lp-lock" className="gap-1.5 text-sm px-4"><span className="text-sm">✍️</span> LP Lock</TabsTrigger>
+              <TabsTrigger value="lp-lock" className="gap-1.5 text-sm px-4"><OpenMojiIcon emoji="✍️" size={14} className="text-sm" /> LP Lock</TabsTrigger>
               <TabsTrigger value="my-lp" className="gap-1.5 text-sm px-4"><OpenMojiIcon emoji="📂" size={14} className="text-sm" /> My LP Locks</TabsTrigger>
             </TabsList>
           </div>

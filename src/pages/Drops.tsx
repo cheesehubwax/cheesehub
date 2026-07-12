@@ -1,5 +1,6 @@
 import { Layout } from "@/components/Layout";
 import { DropStatsBar } from "@/components/drops/DropStatsBar";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 import { CreateDrop } from "@/components/drops/CreateDrop";
 import { MyDrops } from "@/components/drops/MyDrops";
@@ -162,7 +163,7 @@ const Drops = () => {
                 <span className="hidden sm:inline">My Drops</span>
               </TabsTrigger>
               <TabsTrigger value="create" className="gap-1.5 text-sm px-4">
-                <span className="text-sm">✍️</span>
+                <OpenMojiIcon emoji="✍️" size={14} className="text-sm" />
                 <span className="hidden sm:inline">Create</span>
               </TabsTrigger>
             </TabsList>
@@ -199,7 +200,7 @@ const Drops = () => {
                 <div className="flex justify-center mb-6">
                   <TabsList className="bg-card/80 border border-border/50 h-9">
                     <TabsTrigger value="collectibles" className="gap-1.5 text-sm px-4">
-                      <span className="text-sm">🖼️</span>
+                      <OpenMojiIcon emoji="🖼️" size={14} className="text-sm" />
                       <span>Collectibles</span>
                       <span className="ml-1 rounded bg-primary/15 text-primary text-[10px] font-bold px-1.5 py-0.5 leading-none">
                         {sortedCollectibles.length}

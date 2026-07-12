@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -121,7 +122,7 @@ const FarmNFTCard = React.memo(function FarmNFTCard({ nft, isSelected, onToggle,
             </>
           }
           extraHoverContent={
-            <div className="flex justify-between text-amber-500"><span>⚠️ Staked in</span><span className="font-semibold">{stakedInFarm}</span></div>
+            <div className="flex justify-between text-amber-500"><OpenMojiIcon emoji="⚠️" size={18} /> Staked in<span className="font-semibold">{stakedInFarm}</span></div>
           }
         />
       </div>

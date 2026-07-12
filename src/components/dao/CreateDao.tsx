@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger as AccordionTriggerUI } from "@/components/ui/accordion";
 import {
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
   DAO_TYPES, CREATABLE_DAO_TYPES, PROPOSER_TYPES,
   buildAssertPointAction, buildCreateDaoAction,
   buildSetProfileActionWithSocials, DaoSocials,
@@ -224,7 +225,7 @@ export function CreateDao() {
         {/* Header */}
         <div className="space-y-2">
           <h2 className="text-xl font-bold flex items-center gap-2">
-            <span className="text-primary">🏛️</span> Create a New DAO
+            <OpenMojiIcon emoji="🏛️" size={18} className="text-primary" /> Create a New DAO
             <Dialog open={helpOpen} onOpenChange={(open) => {
               setHelpOpen(open);
               if (!open) {

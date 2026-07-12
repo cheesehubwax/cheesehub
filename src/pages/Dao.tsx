@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BrowseDaos } from "@/components/dao/BrowseDaos";
@@ -39,13 +40,13 @@ const Dao = () => {
             </div>
             <div className="text-center space-y-2">
               <div className="flex items-center justify-center gap-2">
-                <span className="text-2xl">🏛️</span>
+                <OpenMojiIcon emoji="🏛️" size={24} className="text-2xl" />
                 <h1 className="text-3xl md:text-4xl font-bold">
                   <span className="text-cheese">CHEESE</span>
                   <span className="text-foreground">Dao</span>
                 </h1>
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
-                <span className="text-2xl">🏛️</span>
+                <OpenMojiIcon emoji="🏛️" size={24} className="text-2xl" />
               </div>
               <p className="text-muted-foreground max-w-xl mx-auto text-sm leading-relaxed">
                 Create and Manage DAOs (Decentralized Autonomous Organizations) on WAX Utilizing WAXDAOs Battle Tested Smart Contract. Propose, Vote, Govern and Manage Token and NFT Treasuries with On-Chain Transparency.
@@ -64,7 +65,7 @@ const Dao = () => {
                 <OpenMojiIcon emoji="🔍" size={14} className="text-sm" /> Browse DAOs
               </TabsTrigger>
               <TabsTrigger value="create" className="gap-1.5 text-sm px-4">
-                <span className="text-sm">✍️</span> Create DAO
+                <OpenMojiIcon emoji="✍️" size={14} className="text-sm" /> Create DAO
               </TabsTrigger>
               <TabsTrigger value="my-daos" className="gap-1.5 text-sm px-4">
                 <OpenMojiIcon emoji="📂" size={14} className="text-sm" /> My DAOs

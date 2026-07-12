@@ -10,6 +10,7 @@ import { usePowerupEstimate } from "@/hooks/usePowerupEstimate";
 import { useCheesePriceData } from "@/hooks/useCheesePriceData";
 import { closeWharfkitModals, getTransactPlugins, parseTransactError } from "@/lib/wharfKit";
 import {
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
   Dialog,
   DialogContent,
   DialogHeader,
@@ -266,7 +267,7 @@ export const PowerUpCard = ({
             onChange={setCpuAmount}
             balance={walletConnected ? cheeseBalance : 0}
             label="CPU Power"
-            icon={<span className="text-lg">🖥️</span>}
+            icon={<OpenMojiIcon emoji="🖥️" size={18} className="text-lg" />}
             accentColor="cpu"
           />
 
@@ -285,7 +286,7 @@ export const PowerUpCard = ({
             value={waxCpuAmount}
             onChange={setWaxCpuAmount}
             label="CPU Power"
-            icon={<span className="text-lg">🖥️</span>}
+            icon={<OpenMojiIcon emoji="🖥️" size={18} className="text-lg" />}
             accentColor="cpu"
             tokenSymbol="WAX"
             tokenLogo={waxCoin}
@@ -357,7 +358,7 @@ export const PowerUpCard = ({
             <div className="space-y-3">
               {successDetails && successDetails.cpuMs > 0 && (
                 <div className="flex items-center gap-3 text-foreground bg-amber-500/10 p-3 rounded-lg">
-                  <span className="text-xl">🖥️</span>
+                  <OpenMojiIcon emoji="🖥️" size={20} className="text-xl" />
                   <span>~{successDetails.cpuMs.toFixed(2)} ms CPU (estimate)</span>
                 </div>
               )}

@@ -18,6 +18,7 @@ import { RemoveBannerDialog } from "./RemoveBannerDialog";
 import { ReinstateBannerDialog } from "./ReinstateBannerDialog";
 import { useAdminAccess } from "@/hooks/useAdminAccess";
 import { getContentFingerprint, isReviewValid, toggleReview } from "@/lib/adReviewStorage";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 function PreviewBannerImage({ ipfsHash, label }: { ipfsHash: string; label: string }) {
   const [gatewayIdx, setGatewayIdx] = useState(0);
@@ -247,7 +248,7 @@ export function SlotCalendar() {
       </div>
 
       <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
-        <span className="font-semibold">⚠️ Warning:</span> Content is moderated and if deemed offensive may be removed without warning. However you may question this decision in the{" "}
+        <OpenMojiIcon emoji="⚠️" size={18} className="font-semibold" /> Warning: Content is moderated and if deemed offensive may be removed without warning. However you may question this decision in the{" "}
         <a href="https://t.me/cheeseonwaxofficial" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-amber-600 dark:hover:text-amber-300 transition-colors">$CHEESE Telegram group</a>{" "}
         and have it reviewed and possibly reinstated.
       </div>

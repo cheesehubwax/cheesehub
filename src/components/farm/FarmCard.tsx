@@ -7,6 +7,7 @@ import { FarmInfo, FARM_TYPE_LABELS, FarmType } from "@/lib/farm";
 import { useNavigate } from "react-router-dom";
 import { useIpfsImageSrc } from "@/hooks/useIpfsImageSrc";
 import type { ClaimedToken } from "@/lib/farmClaimHistory";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 function formatAmount(val: string | number): string {
   const num = typeof val === "string" ? parseFloat(val) : val;
@@ -91,7 +92,7 @@ export function FarmCard({ farm, userClaimed }: { farm: FarmInfo; userClaimed?: 
 
         {/* Stats */}
         <div className="flex items-center justify-between mt-3 text-xs text-foreground">
-          <span>🖼️ {farm.staked_count} NFTs Staked</span>
+          <OpenMojiIcon emoji="🖼️" size={18} /> {farm.staked_count} NFTs Staked
           <span className="flex items-center gap-1">
             🕐 {getDaysRemaining(farm.expiration)}
           </span>

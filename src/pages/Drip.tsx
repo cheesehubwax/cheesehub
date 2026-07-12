@@ -2,6 +2,7 @@ import { Layout } from "@/components/Layout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreateDrip } from "@/components/drip/CreateDrip";
 import { MyDrips } from "@/components/drip/MyDrips";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 import cheeseDripOrb from "@/assets/cheesedrop2.png";
 import { playRandomFart } from "@/lib/fartSounds";
@@ -46,7 +47,7 @@ export default function Drip() {
           <div className="flex justify-center mb-6">
             <TabsList className="bg-card/80 border border-border/50 h-10">
               <TabsTrigger value="create" className="gap-1.5 text-sm px-4">
-                <span className="text-sm">✍️</span> Create Drip
+                <OpenMojiIcon emoji="✍️" size={14} className="text-sm" /> Create Drip
               </TabsTrigger>
               <TabsTrigger value="my-drips" className="gap-1.5 text-sm px-4">
                 <OpenMojiIcon emoji="📂" size={14} className="text-sm" /> My Drips

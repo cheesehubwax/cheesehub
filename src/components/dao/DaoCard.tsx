@@ -6,6 +6,7 @@ import { Users, BarChart3, Clock, Coins, Tag, ExternalLink } from "lucide-react"
 import { DaoInfo, DAO_TYPES, PROPOSER_TYPES } from "@/lib/dao";
 import { TokenLogo } from "@/components/TokenLogo";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 interface DaoCardProps {
   dao: DaoInfo;
@@ -77,7 +78,7 @@ export function DaoCard({ dao, onClick }: DaoCardProps) {
         <div className="space-y-1.5 text-sm">
           {isNftType ? (
             <div className="flex items-center gap-2">
-              <span className="text-sm shrink-0">🖼️</span>
+              <OpenMojiIcon emoji="🖼️" size={14} className="text-sm shrink-0" />
               <span className="text-muted-foreground">NFT Collections:</span>
               <span className="font-medium text-foreground">{dao.gov_schemas?.length || 0}</span>
             </div>

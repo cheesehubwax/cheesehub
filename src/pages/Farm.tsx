@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Layout } from "@/components/Layout";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useParams, useNavigate } from "react-router-dom";
@@ -97,7 +98,7 @@ const Farm = () => {
                 <OpenMojiIcon emoji="🔍" size={14} className="text-sm" /> Browse Farms
               </TabsTrigger>
               <TabsTrigger value="create" className="gap-1.5 text-sm px-4">
-                <span className="text-sm">✍️</span> Create Farm
+                <OpenMojiIcon emoji="✍️" size={14} className="text-sm" /> Create Farm
               </TabsTrigger>
               <TabsTrigger value="my-farms" className="gap-1.5 text-sm px-4">
                 <OpenMojiIcon emoji="📂" size={14} className="text-sm" /> My Farms

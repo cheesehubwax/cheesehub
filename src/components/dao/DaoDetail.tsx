@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
   ArrowLeft, Loader2, Users, Vote, Plus, Settings, Coins, Image as ImageIcon,
   ExternalLink, ChevronRight, Info, Layers, Archive, Clock, BarChart3, Tag, RefreshCw, Wallet,
 } from "lucide-react";
@@ -140,10 +141,10 @@ export function DaoDetail({ daoName, onBack }: DaoDetailProps) {
 
   const menuItems: { key: Section; label: string; icon: React.ReactNode; badge?: number; pulse?: boolean; hidden?: boolean }[] = [
     { key: "info", label: "DAO Info", icon: <span className="text-sm">ℹ️</span> },
-    { key: "stake", label: "Stake", icon: <span className="text-sm">⛏️</span>, hidden: dao?.dao_type === 5 },
-    { key: "new-proposal", label: "New Proposal", icon: <span className="text-sm">✍️</span>, hidden: !canPropose },
+    { key: "stake", label: "Stake", icon: <OpenMojiIcon emoji="⛏️" size={14} className="text-sm" />, hidden: dao?.dao_type === 5 },
+    { key: "new-proposal", label: "New Proposal", icon: <OpenMojiIcon emoji="✍️" size={14} className="text-sm" />, hidden: !canPropose },
     { key: "active", label: "Active Proposals", icon: <OpenMojiIcon emoji="📢" size={14} className="text-sm" />, badge: activeProposals.length, pulse: unvotedCount > 0 },
-    { key: "past", label: "Past Proposals", icon: <span className="text-sm">🕰️</span>, badge: pastProposals.length },
+    { key: "past", label: "Past Proposals", icon: <OpenMojiIcon emoji="🕰️" size={14} className="text-sm" />, badge: pastProposals.length },
     { key: "treasury", label: "Treasury", icon: <OpenMojiIcon emoji="💎" size={14} className="text-sm" /> },
   ];
 

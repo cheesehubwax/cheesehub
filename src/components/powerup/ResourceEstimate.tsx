@@ -1,5 +1,6 @@
 import { RefreshCw } from "lucide-react";
 import { PowerUpEstimate } from "@/hooks/usePowerupEstimate";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 interface ResourceEstimateProps {
   estimate: PowerUpEstimate | null;
@@ -39,7 +40,7 @@ export const ResourceEstimate = ({
       <div className="rounded-xl p-4 border border-red-500/30 bg-red-500/10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span>⚠️</span>
+            <OpenMojiIcon emoji="⚠️" size={18} />
             <span className="text-red-300 text-sm">Failed to fetch rates</span>
           </div>
           <button
@@ -87,7 +88,7 @@ export const ResourceEstimate = ({
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
-                  <span className="text-xl">🖥️</span>
+                  <OpenMojiIcon emoji="🖥️" size={20} className="text-xl" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">CPU Time</p>
