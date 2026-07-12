@@ -33,7 +33,7 @@ const Index = () => {
               <img
                 src={waxLogoAsset.url}
                 alt="WAX"
-                className="h-6 md:h-7 w-auto object-contain inline-block"
+                className="h-10 w-auto object-contain inline-block"
               />
               <span>Blockchain</span>
             </p>
