@@ -52,6 +52,7 @@ export interface SwapRoute {
     routesConsidered?: number;
     tickFailures?: number;
     rateLimitedTickFailures?: number;
+    poolsDroppedNoTicks?: number;
     tookMs?: number;
   };
 }

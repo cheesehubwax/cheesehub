@@ -155,6 +155,35 @@ export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Prom
   }
 }
 
+/**
+ * Fetch pool ticks with a single bounded retry. Endpoint pools for
+ * low-liquidity tokens (e.g. WAXBTC) are the most likely victims of a
+ * transient 429 or network blip during the concurrent fan-out. If the first
+ * attempt lands in the negative cache or throws, we clear the negative-cache
+ * entry and try once more after a jittered delay. Abort errors are propagated
+ * immediately.
+ */
+export async function fetchPoolTicksWithRetry(
+  poolId: number,
+  signal?: AbortSignal,
+): Promise<RawAlcorTick[]> {
+  try {
+    return await fetchPoolTicks(poolId, signal);
+  } catch (e) {
+    if ((e as any)?.name === "AbortError") throw e;
+    // Bust the 8s negative cache so the retry actually hits the network.
+    ticksFailCache.delete(poolId);
+    // Jittered backoff to avoid re-entering the same 429 window.
+    await new Promise((r) => setTimeout(r, 300 + Math.random() * 400));
+    if (signal?.aborted) {
+      const err = new Error("aborted");
+      (err as any).name = "AbortError";
+      throw err;
+    }
+    return await fetchPoolTicks(poolId, signal);
+  }
+}
+
 function isRateLimitError(err: unknown): boolean {
   return err instanceof Error && err.message.includes("Rate limited");
 }
@@ -428,7 +457,7 @@ export async function computeShadowQuote(args: ShadowQuoteArgs): Promise<ShadowQ
   // Fetch ticks with bounded concurrency so we don't hammer Alcor into 429s.
   const tickResults = await mapWithConcurrency(relevant, TICK_CONCURRENCY, async (p) => {
     try {
-      return { p, ticks: await fetchPoolTicks(p.id, signal) };
+      return { p, ticks: await fetchPoolTicksWithRetry(p.id, signal) };
     } catch (e) {
       logger.warn(`shadow: tick fetch failed for pool ${p.id}`, e);
       return { p, ticks: [] as RawAlcorTick[] };
@@ -549,7 +578,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   let rateLimitedTickFailures = 0;
   const tickResults = await mapWithConcurrency(relevant, TICK_CONCURRENCY, async (p) => {
     try {
-      return { p, ticks: await fetchPoolTicks(p.id, signal) };
+      return { p, ticks: await fetchPoolTicksWithRetry(p.id, signal) };
     } catch (e) {
       if ((e as any)?.name === "AbortError") throw e;
       tickFailures += 1;
@@ -570,6 +599,20 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
       }
     })
     .filter((p): p is Pool => p !== null);
+
+  // Diagnostic: log which pools were excluded from the SDK graph because they
+  // returned no ticks after retry. This is the mechanism that historically
+  // caused the WAX→WAXWBTC split to collapse to a single route when a WAXBTC
+  // endpoint pool was silently dropped.
+  const droppedForTicks = tickResults
+    .filter((r) => r.ticks.length === 0)
+    .map((r) => r.p.id);
+  if (droppedForTicks.length > 0) {
+    logger.warn(
+      `[alcor-router] Dropped ${droppedForTicks.length} pool(s) with 0 ticks after retry`,
+      droppedForTicks,
+    );
+  }
 
   if (sdkPools.length === 0) {
     return null;
@@ -611,6 +654,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     routesConsidered: routes.length,
     tickFailures,
     rateLimitedTickFailures,
+    poolsDroppedNoTicks: droppedForTicks.length,
     tookMs: Math.round(performance.now() - started),
   };
 
