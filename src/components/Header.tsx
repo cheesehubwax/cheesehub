@@ -123,17 +123,15 @@ export function Header() {
       {/* Desktop header */}
       <div className="container hidden md:grid grid-cols-[auto_1fr] items-stretch">
         {/* Brand column */}
-        <div className="flex flex-col justify-between py-2 pr-8">
-          <div>
-            <BrandLink />
-            <span className="block mt-1 text-[10px] font-medium text-foreground/80 uppercase tracking-wider">
-              only on
-            </span>
-          </div>
+        <div className="flex flex-col items-center justify-between py-2 pr-8">
+          <BrandLink />
+          <span className="text-sm font-script text-foreground/90">
+            only on
+          </span>
           <img
             src={waxLogoAsset.url}
             alt="WAX"
-            className="h-6 w-auto object-contain"
+            className="h-10 w-auto object-contain"
           />
         </div>
 
