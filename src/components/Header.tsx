@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/context/CartContext";
 import cheeseLogo from "@/assets/cheese-logo.png";
-import waxLogoAsset from "@/assets/wax-logo.png.asset.json";
+import waxLogoUrl from "@/assets/wax-logo.png";
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 
 const NAV_ITEMS = [
