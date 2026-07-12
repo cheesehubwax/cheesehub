@@ -234,7 +234,7 @@ export function NFTSendManager({ onTransactionSuccess }: NFTSendManagerProps) {
       <AlertDialog open={confirmBurn} onOpenChange={setConfirmBurn}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle><OpenMojiIcon emoji="" size={14} /> Burn {selectedNFTs.size} NFT{selectedNFTs.size !== 1 ? 's' : ''}?</AlertDialogTitle>
+            <AlertDialogTitle><OpenMojiIcon emoji="🔥" size={14} /> Burn {selectedNFTs.size} NFT{selectedNFTs.size !== 1 ? 's' : ''}?</AlertDialogTitle>
             <AlertDialogDescription>
               This action is <strong>permanent and irreversible</strong>. The selected NFT{selectedNFTs.size !== 1 ? 's' : ''} will be destroyed forever and cannot be recovered. Are you sure you want to continue?
             </AlertDialogDescription>

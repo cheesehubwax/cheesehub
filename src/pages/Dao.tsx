@@ -40,13 +40,13 @@ const Dao = () => {
             </div>
             <div className="text-center space-y-2">
               <div className="flex items-center justify-center gap-2">
-                <OpenMojiIcon emoji="" size={24} className="text-2xl" />
+                <OpenMojiIcon emoji="🏛️" size={24} className="text-2xl" />
                 <h1 className="text-3xl md:text-4xl font-bold">
                   <span className="text-cheese">CHEESE</span>
                   <span className="text-foreground">Dao</span>
                 </h1>
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
-                <OpenMojiIcon emoji="" size={24} className="text-2xl" />
+                <OpenMojiIcon emoji="🏛️" size={24} className="text-2xl" />
               </div>
               <p className="text-muted-foreground max-w-xl mx-auto text-sm leading-relaxed">
                 Create and Manage DAOs (Decentralized Autonomous Organizations) on WAX Utilizing WAXDAOs Battle Tested Smart Contract. Propose, Vote, Govern and Manage Token and NFT Treasuries with On-Chain Transparency.
@@ -62,13 +62,13 @@ const Dao = () => {
           <div className="flex justify-center mb-6">
             <TabsList className="bg-card/80 border border-border/50 h-10">
               <TabsTrigger value="browse" className="gap-1.5 text-sm px-4">
-                <OpenMojiIcon emoji="" size={14} className="text-sm" /> Browse DAOs
+                <OpenMojiIcon emoji="🔍" size={14} className="text-sm" /> Browse DAOs
               </TabsTrigger>
               <TabsTrigger value="create" className="gap-1.5 text-sm px-4">
-                <OpenMojiIcon emoji="" size={14} className="text-sm" /> Create DAO
+                <OpenMojiIcon emoji="✍️" size={14} className="text-sm" /> Create DAO
               </TabsTrigger>
               <TabsTrigger value="my-daos" className="gap-1.5 text-sm px-4">
-                <OpenMojiIcon emoji="" size={14} className="text-sm" /> My DAOs
+                <OpenMojiIcon emoji="📂" size={14} className="text-sm" /> My DAOs
               </TabsTrigger>
             </TabsList>
           </div>

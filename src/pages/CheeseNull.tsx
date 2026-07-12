@@ -35,13 +35,13 @@ export default function CheeseNull() {
           {/* Title */}
           <div className="text-center space-y-2">
             <div className="flex items-center justify-center gap-2">
-              <OpenMojiIcon emoji="" size={24} className="text-2xl" />
+              <OpenMojiIcon emoji="⛔" size={24} className="text-2xl" />
               <h1 className="text-3xl md:text-4xl font-bold">
                 <span className="text-cheese">CHEESE</span>
                 <span className="text-foreground">Null</span>
               </h1>
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
-              <OpenMojiIcon emoji="" size={24} className="text-2xl" />
+              <OpenMojiIcon emoji="⛔" size={24} className="text-2xl" />
             </div>
             <p className="text-muted-foreground max-w-lg mx-auto">
               Null $CHEESE and fund CHEESEUp and xCHEESE. A dapp for pure CHEESELovers

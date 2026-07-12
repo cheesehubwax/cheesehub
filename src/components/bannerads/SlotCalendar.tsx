@@ -76,7 +76,7 @@ function SlotBadge({ slot, accountName }: { slot: BannerSlot; accountName: strin
   const isLive = slot.time <= nowSec;
   const isPending = !isLive && !isWithinBuffer(slot.time, MIN_RENT_BUFFER_HOURS);
 
-  if (isLive && slot.isOnChain) return <Badge className="bg-red-500/20 text-red-500 border-red-500/30 text-xs animate-pulse"><OpenMojiIcon emoji="" size={14} /> Live</Badge>;
+  if (isLive && slot.isOnChain) return <Badge className="bg-red-500/20 text-red-500 border-red-500/30 text-xs animate-pulse"><OpenMojiIcon emoji="🔴" size={14} /> Live</Badge>;
   if (!slot.isOnChain) {
     if (isPending) return <Badge className="bg-orange-500/20 text-orange-500 border-orange-500/30 text-xs">Pending</Badge>;
     return <Badge className="bg-green-500/20 text-green-600 border-green-500/30 text-xs">Available</Badge>;
@@ -248,7 +248,7 @@ export function SlotCalendar() {
       </div>
 
       <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
-        <OpenMojiIcon emoji="" size={18} className="font-semibold" /> Warning: Content is moderated and if deemed offensive may be removed without warning. However you may question this decision in the{" "}
+        <OpenMojiIcon emoji="⚠️" size={18} className="font-semibold" /> Warning: Content is moderated and if deemed offensive may be removed without warning. However you may question this decision in the{" "}
         <a href="https://t.me/cheeseonwaxofficial" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-amber-600 dark:hover:text-amber-300 transition-colors">$CHEESE Telegram group</a>{" "}
         and have it reviewed and possibly reinstated.
       </div>

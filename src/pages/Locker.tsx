@@ -24,13 +24,13 @@ const Locker = () => {
             </div>
             <div className="text-center space-y-2">
               <div className="flex items-center justify-center gap-2">
-                <OpenMojiIcon emoji="" size={24} className="text-2xl" />
+                <OpenMojiIcon emoji="🔐" size={24} className="text-2xl" />
                 <h1 className="text-3xl md:text-4xl font-bold">
                   <span className="text-cheese">CHEESE</span>
                   <span className="text-foreground">Lock</span>
                 </h1>
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
-                <OpenMojiIcon emoji="" size={24} className="text-2xl" />
+                <OpenMojiIcon emoji="🔐" size={24} className="text-2xl" />
               </div>
               <p className="text-muted-foreground max-w-lg mx-auto">
                 Time-lock tokens and LP tokens using the WaxDAO Locker smart contract.
@@ -44,10 +44,10 @@ const Locker = () => {
         <Tabs defaultValue="create" className="w-full max-w-xl mx-auto">
           <div className="flex justify-center mb-6">
             <TabsList className="bg-card/80 border border-border/50 h-10">
-              <TabsTrigger value="create" className="gap-1.5 text-sm px-4"><OpenMojiIcon emoji="" size={14} className="text-sm" /> Create Lock</TabsTrigger>
-              <TabsTrigger value="my-locks" className="gap-1.5 text-sm px-4"><OpenMojiIcon emoji="" size={14} className="text-sm" /> My Locks</TabsTrigger>
-              <TabsTrigger value="lp-lock" className="gap-1.5 text-sm px-4"><OpenMojiIcon emoji="" size={14} className="text-sm" /> LP Lock</TabsTrigger>
-              <TabsTrigger value="my-lp" className="gap-1.5 text-sm px-4"><OpenMojiIcon emoji="" size={14} className="text-sm" /> My LP Locks</TabsTrigger>
+              <TabsTrigger value="create" className="gap-1.5 text-sm px-4"><OpenMojiIcon emoji="✍️" size={14} className="text-sm" /> Create Lock</TabsTrigger>
+              <TabsTrigger value="my-locks" className="gap-1.5 text-sm px-4"><OpenMojiIcon emoji="📂" size={14} className="text-sm" /> My Locks</TabsTrigger>
+              <TabsTrigger value="lp-lock" className="gap-1.5 text-sm px-4"><OpenMojiIcon emoji="✍️" size={14} className="text-sm" /> LP Lock</TabsTrigger>
+              <TabsTrigger value="my-lp" className="gap-1.5 text-sm px-4"><OpenMojiIcon emoji="📂" size={14} className="text-sm" /> My LP Locks</TabsTrigger>
             </TabsList>
           </div>
           <TabsContent value="create">

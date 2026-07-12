@@ -149,7 +149,7 @@ export function MyLiquidityLocks() {
                   <CardDescription className="font-mono text-xs flex items-center justify-between">
                     <span>ID: {lock.ID}</span>
                     <Badge variant="outline" className="text-xs">
-                      {lock.token_contract === LP_CONTRACTS[DEX.DEFIBOX] ? <OpenMojiIcon emoji="" size={14} /> : <OpenMojiIcon emoji="" size={14} />} {dex ? getDexDisplayName(dex) : lock.token_contract}
+                      {lock.token_contract === LP_CONTRACTS[DEX.DEFIBOX] ? <OpenMojiIcon emoji="📦" size={14} /> : <OpenMojiIcon emoji="🌮" size={14} />} {dex ? getDexDisplayName(dex) : lock.token_contract}
                     </Badge>
                   </CardDescription>
                 </CardHeader>

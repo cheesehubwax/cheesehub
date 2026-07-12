@@ -28,7 +28,7 @@ export const RecipientInput = ({
   return (
     <div className="space-y-2">
       <label className="text-sm font-medium text-foreground flex items-center gap-2">
-        <OpenMojiIcon emoji="" size={18} />
+        <OpenMojiIcon emoji="👤" size={18} />
         Recipient Account
       </label>
 
@@ -54,9 +54,9 @@ export const RecipientInput = ({
         {value && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2">
             {isValid ? (
-              <OpenMojiIcon emoji="" size={18} />
+              <OpenMojiIcon emoji="✅" size={18} />
             ) : (
-              <OpenMojiIcon emoji="" size={18} />
+              <OpenMojiIcon emoji="❌" size={18} />
             )}
           </div>
         )}

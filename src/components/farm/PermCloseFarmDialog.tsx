@@ -43,7 +43,7 @@ export function PermCloseFarmDialog({ farm, open, onOpenChange, onSuccess }: Per
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle className="text-destructive"><OpenMojiIcon emoji="" size={14} /> Permanently Close Farm</AlertDialogTitle>
+          <AlertDialogTitle className="text-destructive"><OpenMojiIcon emoji="⚠️" size={14} /> Permanently Close Farm</AlertDialogTitle>
           <AlertDialogDescription>
             <strong>This action cannot be undone.</strong> The farm will be permanently closed.
             You will need to kick all remaining stakers before you can retrieve any remaining reward tokens.

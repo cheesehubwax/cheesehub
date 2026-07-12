@@ -92,16 +92,16 @@ export function FarmCard({ farm, userClaimed }: { farm: FarmInfo; userClaimed?: 
 
         {/* Stats */}
         <div className="flex items-center justify-between mt-3 text-xs text-foreground">
-          <OpenMojiIcon emoji="" size={18} /> {farm.staked_count} NFTs Staked
+          <OpenMojiIcon emoji="🖼️" size={18} /> {farm.staked_count} NFTs Staked
           <span className="flex items-center gap-1">
-            <OpenMojiIcon emoji="" size={14} />
+            <OpenMojiIcon emoji="🕐" size={14} />
             {getDaysRemaining(farm.expiration)}
           </span>
         </div>
 
         {/* Payout Interval */}
         <div className="mt-2 text-xs text-foreground flex items-center gap-1">
-          <OpenMojiIcon emoji="" size={18} /> Payout every {formatPayoutInterval(farm.payout_interval)}
+          <OpenMojiIcon emoji="💵" size={18} /> Payout every {formatPayoutInterval(farm.payout_interval)}
         </div>
 
         {/* Reward pools */}

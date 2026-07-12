@@ -61,13 +61,13 @@ const Farm = () => {
             </div>
             <div className="text-center space-y-2">
               <div className="flex items-center justify-center gap-2">
-                <OpenMojiIcon emoji="" size={24} className="text-2xl" />
+                <OpenMojiIcon emoji="🌱" size={24} className="text-2xl" />
                 <h1 className="text-3xl md:text-4xl font-bold">
                   <span className="text-cheese">CHEESE</span>
                   <span className="text-foreground">Farm</span>
                 </h1>
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
-                <OpenMojiIcon emoji="" size={24} className="text-2xl" />
+                <OpenMojiIcon emoji="🌱" size={24} className="text-2xl" />
               </div>
               <p className="text-muted-foreground max-w-2xl mx-auto">
                 Create and participate in non-custodial NFT staking farms using the WaxDAO V2 smart contracts.
@@ -81,7 +81,7 @@ const Farm = () => {
         <div className="container pb-8 flex justify-center">
           <div className="w-full max-w-md">
             <p className="text-center text-cheese text-xs uppercase tracking-wider mb-3 flex items-center justify-center gap-1.5">
-              <OpenMojiIcon emoji="" size={14} />
+              <OpenMojiIcon emoji="⭐" size={14} />
               Featured Farm
             </p>
             <div className="rounded-xl p-[2px] bg-gradient-to-br from-cheese/60 via-cheese/20 to-cheese/60 shadow-[0_0_30px_-5px_hsl(var(--cheese)/0.4)]">
@@ -96,13 +96,13 @@ const Farm = () => {
           <div className="flex justify-center mb-6">
             <TabsList className="bg-card/80 border border-border/50 h-10">
               <TabsTrigger value="browse" className="gap-1.5 text-sm px-4">
-                <OpenMojiIcon emoji="" size={14} className="text-sm" /> Browse Farms
+                <OpenMojiIcon emoji="🔍" size={14} className="text-sm" /> Browse Farms
               </TabsTrigger>
               <TabsTrigger value="create" className="gap-1.5 text-sm px-4">
-                <OpenMojiIcon emoji="" size={14} className="text-sm" /> Create Farm
+                <OpenMojiIcon emoji="✍️" size={14} className="text-sm" /> Create Farm
               </TabsTrigger>
               <TabsTrigger value="my-farms" className="gap-1.5 text-sm px-4">
-                <OpenMojiIcon emoji="" size={14} className="text-sm" /> My Farms
+                <OpenMojiIcon emoji="📂" size={14} className="text-sm" /> My Farms
               </TabsTrigger>
             </TabsList>
           </div>

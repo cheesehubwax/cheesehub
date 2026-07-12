@@ -122,7 +122,7 @@ const FarmNFTCard = React.memo(function FarmNFTCard({ nft, isSelected, onToggle,
             </>
           }
           extraHoverContent={
-            <div className="flex justify-between text-amber-500"><OpenMojiIcon emoji="" size={18} /> Staked in<span className="font-semibold">{stakedInFarm}</span></div>
+            <div className="flex justify-between text-amber-500"><OpenMojiIcon emoji="⚠️" size={18} /> Staked in<span className="font-semibold">{stakedInFarm}</span></div>
           }
         />
       </div>
