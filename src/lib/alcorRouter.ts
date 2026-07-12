@@ -228,6 +228,22 @@ const HUB_KEYS = new Set([
   "cheese-cheeseburger",
 ]);
 
+// Narrower intermediary set for deterministic route coverage. These are the
+// base assets Alcor commonly uses for cross-token routes; excluding app/social
+// tokens here prevents the split seeding from manufacturing odd detours while
+// still keeping WAXUSDC→WAXWBTC reachable.
+const ROUTE_COVERAGE_HUB_KEYS = new Set([
+  "wax-eosio.token",
+  "usdt-usdt.alcor",
+  "usdc-usdc.alcor",
+  "waxusdc-eth.token",
+  "waxusdt-eth.token",
+  "usdc-tethertether",
+  "lsw-lsw.alcor",
+  "lswax-token.lswax",
+  "lswax-token.fusion",
+]);
+
 /** Select pools that could participate in a tokenIn→tokenOut route of length
  *  ≤ maxHops. Considers every active pool (matching Alcor's own router), uses
  *  forward+reverse BFS over the full graph to keep only pools that plausibly
@@ -241,6 +257,18 @@ function selectRelevantPools(
 ): RawAlcorPool[] {
   const keyOf = (t: RawAlcorPool["tokenA"]) => tokenKey(t.contract, t.symbol);
   const active = pools.filter((p) => p.active);
+  const liquidityOf = (p: RawAlcorPool): bigint => {
+    try {
+      return BigInt(p.liquidity || "0");
+    } catch {
+      return 0n;
+    }
+  };
+  const isDirectPair = (p: RawAlcorPool, aKey: string, bKey: string) => {
+    const a = keyOf(p.tokenA);
+    const b = keyOf(p.tokenB);
+    return (a === aKey && b === bKey) || (a === bKey && b === aKey);
+  };
 
   const other = (p: RawAlcorPool, k: string) =>
     keyOf(p.tokenA) === k ? keyOf(p.tokenB) : keyOf(p.tokenA);
@@ -324,11 +352,107 @@ function selectRelevantPools(
     const rb = poolRank(b);
     if (ra.pathLen !== rb.pathLen) return ra.pathLen - rb.pathLen;
     if (ra.classRank !== rb.classRank) return ra.classRank - rb.classRank;
-    const la = BigInt(a.liquidity || "0");
-    const lb = BigInt(b.liquidity || "0");
+    const la = liquidityOf(a);
+    const lb = liquidityOf(b);
     return lb > la ? 1 : lb < la ? -1 : 0;
   });
-  return ranked.slice(0, cap);
+
+  // Deterministic two-hop coverage: the broad graph can contain thousands of
+  // plausible pools, so a simple ranked cap can drop the endpoint leg of a real
+  // Alcor split (notably WAXUSDC→WAXWBTC). Seed the selected set with liquid
+  // endpoint pools plus their best direct connector before filling by rank.
+  const selected: RawAlcorPool[] = [];
+  const selectedIds = new Set<number>();
+  const addPool = (p: RawAlcorPool | undefined) => {
+    if (!p || selectedIds.has(p.id) || selected.length >= cap) return;
+    selectedIds.add(p.id);
+    selected.push(p);
+  };
+  const pairKey = (aKey: string, bKey: string) =>
+    aKey < bKey ? `${aKey}|${bKey}` : `${bKey}|${aKey}`;
+  const pairIndex = new Map<string, RawAlcorPool[]>();
+  for (const p of active) {
+    if (liquidityOf(p) <= 0n) continue;
+    const a = keyOf(p.tokenA);
+    const b = keyOf(p.tokenB);
+    const k = pairKey(a, b);
+    if (!pairIndex.has(k)) pairIndex.set(k, []);
+    pairIndex.get(k)!.push(p);
+  }
+  for (const list of pairIndex.values()) {
+    list.sort((a, b) => {
+      // Keep more than one fee tier available, but prefer the most liquid
+      // connector first. The router will decide the final allocation.
+      const la = liquidityOf(a);
+      const lb = liquidityOf(b);
+      if (la !== lb) return lb > la ? 1 : -1;
+      return a.fee - b.fee;
+    });
+  }
+  const pairPools = (aKey: string, bKey: string) =>
+    pairIndex.get(pairKey(aKey, bKey)) ?? [];
+
+  // Direct pools remain first so the cheapest/simplest route is never delayed
+  // behind wider split-route coverage.
+  for (const p of ranked) {
+    if (isDirectPair(p, inKey, outKey)) addPool(p);
+  }
+
+  const endpointCandidates = maxHops >= 2 ? ranked
+    .filter((p) => {
+      const a = keyOf(p.tokenA);
+      const b = keyOf(p.tokenB);
+      if (liquidityOf(p) <= 0n) return false;
+      const touchesIn = a === inKey || b === inKey;
+      const touchesOut = a === outKey || b === outKey;
+      const intermediate = touchesIn ? other(p, inKey) : other(p, outKey);
+      if (!ROUTE_COVERAGE_HUB_KEYS.has(intermediate)) return false;
+      if (touchesIn && !touchesOut) return pairPools(intermediate, outKey).length > 0;
+      if (touchesOut && !touchesIn) return pairPools(inKey, intermediate).length > 0;
+      return false;
+    })
+    .sort((a, b) => {
+      const aKey = keyOf(a.tokenA) === inKey || keyOf(a.tokenB) === inKey ? other(a, inKey) : other(a, outKey);
+      const bKey = keyOf(b.tokenA) === inKey || keyOf(b.tokenB) === inKey ? other(b, inKey) : other(b, outKey);
+      const aHub = ROUTE_COVERAGE_HUB_KEYS.has(aKey) ? 0 : 1;
+      const bHub = ROUTE_COVERAGE_HUB_KEYS.has(bKey) ? 0 : 1;
+      if (aHub !== bHub) return aHub - bHub;
+      if (a.fee !== b.fee) return a.fee - b.fee;
+      const la = liquidityOf(a);
+      const lb = liquidityOf(b);
+      return lb > la ? 1 : lb < la ? -1 : 0;
+    }) : [];
+
+  let endpointRoutesSeeded = 0;
+  const endpointCoverageLimit = Math.min(cap, Math.max(12, Math.floor(cap * 0.6)));
+  for (const endpointPool of endpointCandidates) {
+    if (selected.length >= endpointCoverageLimit) break;
+    const a = keyOf(endpointPool.tokenA);
+    const b = keyOf(endpointPool.tokenB);
+    const touchesIn = a === inKey || b === inKey;
+    const intermediate = touchesIn ? other(endpointPool, inKey) : other(endpointPool, outKey);
+    const connectors = touchesIn ? pairPools(intermediate, outKey) : pairPools(inKey, intermediate);
+    const before = selected.length;
+    addPool(endpointPool);
+    // Include the top two direct connector fee/liquidity choices. This keeps
+    // WAX→WAXUSDC plus WAXUSDC→WAXWBTC available without unbounded fan-out.
+    addPool(connectors[0]);
+    addPool(connectors[1]);
+    if (selected.length > before) endpointRoutesSeeded += 1;
+  }
+
+  for (const p of ranked) {
+    if (selected.length >= cap) break;
+    addPool(p);
+  }
+
+  if (endpointRoutesSeeded > 0) {
+    logger.info(
+      `[alcor-router] endpoint route coverage seeded ${endpointRoutesSeeded} route(s), selected ${selected.length}/${ranked.length} pools`,
+    );
+  }
+
+  return selected;
 }
 
 function formatSdkDiagnostics(diag?: SwapRoute["quoteDiagnostics"]): string {
