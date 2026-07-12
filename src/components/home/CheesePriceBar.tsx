@@ -5,6 +5,8 @@ import { useCheeseTVL } from '@/hooks/useCheeseTVL';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RefreshCw } from 'lucide-react';
 import waxSealAsset from '@/assets/wax-seal.png.asset.json';
+import usdcAsset from '@/assets/usdc.png.asset.json';
+import cmcAsset from '@/assets/coinmarketcap.png.asset.json';
 import { CheeseSwapDialog } from '@/components/swap/CheeseSwapDialog';
 
 function formatPrice(price: number, decimals: number = 8): string {
@@ -101,7 +103,7 @@ export function CheesePriceBar() {
 
         {/* CHEESE/USD Price */}
         <div className="flex items-center gap-2 bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border border-cheese/20 rounded-lg px-4 py-2">
-          <span className="text-lg">💲</span>
+          <img src={usdcAsset.url} alt="USD" className="w-7 h-7 object-contain" />
           <div className="flex flex-col items-start">
             <span className="text-xs text-muted-foreground">CHEESE/USD</span>
             {isLoading ? (
@@ -122,7 +124,7 @@ export function CheesePriceBar() {
 
       {/* Market Cap */}
       <div className="flex items-center gap-2 bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border border-cheese/20 rounded-lg px-4 py-2">
-        <span className="text-lg">📊</span>
+        <img src={cmcAsset.url} alt="Market Cap" className="w-7 h-7 object-contain" />
         <div className="flex flex-col">
           <span className="text-xs text-muted-foreground">Market Cap</span>
           {isLoading ? (
