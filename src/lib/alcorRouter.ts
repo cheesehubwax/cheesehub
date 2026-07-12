@@ -457,7 +457,7 @@ export async function computeShadowQuote(args: ShadowQuoteArgs): Promise<ShadowQ
   // Fetch ticks with bounded concurrency so we don't hammer Alcor into 429s.
   const tickResults = await mapWithConcurrency(relevant, TICK_CONCURRENCY, async (p) => {
     try {
-      return { p, ticks: await fetchPoolTicks(p.id, signal) };
+      return { p, ticks: await fetchPoolTicksWithRetry(p.id, signal) };
     } catch (e) {
       logger.warn(`shadow: tick fetch failed for pool ${p.id}`, e);
       return { p, ticks: [] as RawAlcorTick[] };
