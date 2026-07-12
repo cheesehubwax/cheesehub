@@ -1,5 +1,6 @@
 import { Megaphone, Lightning, TrendUp } from "@phosphor-icons/react";
 import { useBannerAdStats } from "@/hooks/useBannerAdStats";
+import { OpenMojiIcon } from "@/components/OpenMojiIcon";
 
 const formatNumber = (num: number, decimals: number = 2) =>
   num.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });

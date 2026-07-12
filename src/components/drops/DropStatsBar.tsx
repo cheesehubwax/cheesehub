@@ -1,3 +1,5 @@
+import { OpenMojiIcon } from "@/components/OpenMojiIcon";
+
 interface DropStatsBarProps {
   activeOfficialDrops: number;
   totalSold: number;

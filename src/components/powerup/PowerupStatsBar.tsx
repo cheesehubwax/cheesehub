@@ -1,5 +1,5 @@
 import { PowerupStats } from "@/hooks/usePowerupStats";
-
+import { OpenMojiIcon } from "@/components/OpenMojiIcon";
 
 interface PowerupStatsBarProps {
   stats: PowerupStats | null;
