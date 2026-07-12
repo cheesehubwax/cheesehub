@@ -10,13 +10,13 @@ import { usePowerupEstimate } from "@/hooks/usePowerupEstimate";
 import { useCheesePriceData } from "@/hooks/useCheesePriceData";
 import { closeWharfkitModals, getTransactPlugins, parseTransactError } from "@/lib/wharfKit";
 import {
-import { OpenMojiIcon } from '@/components/OpenMojiIcon';
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { TokenLogo } from "@/components/TokenLogo";
 import cheeseUpOrb from "@/assets/cheeseup.png";
 import waxCoin from "@/assets/wax-coin.png";
