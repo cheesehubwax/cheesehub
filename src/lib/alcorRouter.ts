@@ -578,7 +578,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   let rateLimitedTickFailures = 0;
   const tickResults = await mapWithConcurrency(relevant, TICK_CONCURRENCY, async (p) => {
     try {
-      return { p, ticks: await fetchPoolTicks(p.id, signal) };
+      return { p, ticks: await fetchPoolTicksWithRetry(p.id, signal) };
     } catch (e) {
       if ((e as any)?.name === "AbortError") throw e;
       tickFailures += 1;
@@ -599,6 +599,20 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
       }
     })
     .filter((p): p is Pool => p !== null);
+
+  // Diagnostic: log which pools were excluded from the SDK graph because they
+  // returned no ticks after retry. This is the mechanism that historically
+  // caused the WAX→WAXWBTC split to collapse to a single route when a WAXBTC
+  // endpoint pool was silently dropped.
+  const droppedForTicks = tickResults
+    .filter((r) => r.ticks.length === 0)
+    .map((r) => r.p.id);
+  if (droppedForTicks.length > 0) {
+    logger.warn(
+      `[alcor-router] Dropped ${droppedForTicks.length} pool(s) with 0 ticks after retry`,
+      droppedForTicks,
+    );
+  }
 
   if (sdkPools.length === 0) {
     return null;
