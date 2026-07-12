@@ -44,7 +44,7 @@ export function DropStatsBar({ activeOfficialDrops, totalSold, cheeseNulled, xCh
         {statItems.map((stat) => (
           <div key={stat.label} className="text-center">
             <div className="flex items-center justify-center gap-2 mb-1">
-              <span className="text-base">{stat.emoji}</span>
+              <OpenMojiIcon emoji={stat.emoji} size={16} />
               <span className="text-lg font-bold font-mono text-foreground">{stat.value}</span>
             </div>
             <p className="text-xs text-muted-foreground">{stat.label}</p>
