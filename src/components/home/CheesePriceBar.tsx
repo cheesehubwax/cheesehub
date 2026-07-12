@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { RefreshCw } from 'lucide-react';
 import waxSealAsset from '@/assets/wax-seal.png.asset.json';
 import usdcAsset from '@/assets/usdc.png.asset.json';
-import cmcAsset from '@/assets/coinmarketcap.png.asset.json';
+import marketcapAsset from '@/assets/marketcap.png.asset.json';
 import { CheeseSwapDialog } from '@/components/swap/CheeseSwapDialog';
 
 function formatPrice(price: number, decimals: number = 8): string {
