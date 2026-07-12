@@ -92,7 +92,10 @@ export function FarmCard({ farm, userClaimed }: { farm: FarmInfo; userClaimed?: 
 
         {/* Stats */}
         <div className="flex items-center justify-between mt-3 text-xs text-foreground">
-          <OpenMojiIcon emoji="🖼️" size={18} /> {farm.staked_count} NFTs Staked
+          <span className="flex items-center gap-1">
+            <OpenMojiIcon emoji="🖼️" size={18} />
+            {farm.staked_count} NFTs Staked
+          </span>
           <span className="flex items-center gap-1">
             <OpenMojiIcon emoji="🕐" size={14} />
             {getDaysRemaining(farm.expiration)}
