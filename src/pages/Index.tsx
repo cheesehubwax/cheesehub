@@ -263,7 +263,7 @@ const Index = () => {
               </div>
               <h2 className="text-2xl font-bold mb-4 flex items-center justify-center gap-2"><span><span className="text-cheese">CHEESE</span><span className="text-foreground">Amp</span></span><span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span></h2>
               <p className="text-muted-foreground max-w-sm mx-auto mb-4">
-                Partially powered by the CHEESEAMPHUB smart contract CHEESEAmp is a simple, clean NFT music player that populates a list automatically with your music NFTS allowing you to play videos, create playlists and shuffle tracks. Minimizes to mini player and keeps playing while you work or browse the web
+                A simple, clean NFT music player that populates a list automatically with your music NFTS allowing you to play videos, create playlists and shuffle tracks. Minimizes to mini player and keeps playing while you work or browse the web
               </p>
               <p className="text-cheese font-semibold max-w-sm mx-auto mb-6">
                 +Global WAX Radio Feature
