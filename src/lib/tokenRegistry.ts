@@ -13,6 +13,7 @@ export interface TokenConfig {
 export const WAX_TOKENS: TokenConfig[] = [
   { symbol: 'WAX', contract: 'eosio.token', precision: 8, displayName: 'WAX' },
   { symbol: 'CHEESE', contract: 'cheeseburger', precision: 4, displayName: 'CHEESE' },
+  { symbol: 'HOLE', contract: 'hole.cheese', precision: 8, displayName: 'HOLE' },
   { symbol: 'AQUA', contract: 'aquascapeart', precision: 8, displayName: 'AQUA' },
   { symbol: 'HONEY', contract: 'nfthivehoney', precision: 4, displayName: 'HONEY' },
   { symbol: 'AETHER', contract: 'aabormarket', precision: 8, displayName: 'AETHER' },
