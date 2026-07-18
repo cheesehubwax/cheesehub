@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useCheesePriceData } from '@/hooks/useCheesePriceData';
 import { useCheeseStats } from '@/hooks/useCheeseStats';
 import { useCheeseTVL } from '@/hooks/useCheeseTVL';
+import { useCheeseHolePrice } from '@/hooks/useCheeseHolePrice';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TokenLogo } from '@/components/TokenLogo';
 import waxSealUrl from '@/assets/wax-seal.png';
 import usdcUrl from '@/assets/usdc.png';
 import marketcapUrl from '@/assets/marketcap.png';
@@ -55,14 +57,16 @@ export function CheesePriceBar() {
     : undefined;
   const cheeseUsdPrice = priceData?.usdPrice;
   const { data: tvlData, isLoading: tvlLoading, refetch: refetchTvl, isFetching: tvlFetching } = useCheeseTVL(waxUsdPrice, cheeseUsdPrice);
+  const { cheesePerHole, isLoading: holeLoading, isFetching: holeFetching, refetch: refetchHole } = useCheeseHolePrice();
 
   const isLoading = priceLoading || statsLoading;
-  const isAnyFetching = priceFetching || statsFetching || tvlFetching;
+  const isAnyFetching = priceFetching || statsFetching || tvlFetching || holeFetching;
 
   const refreshAll = () => {
     refetchPrice();
     refetchStats();
     refetchTvl();
+    refetchHole();
   };
 
   const marketCap = priceData && stats
@@ -80,7 +84,8 @@ export function CheesePriceBar() {
 
   return (
     <>
-      <div className="flex flex-wrap justify-center gap-4 md:gap-8 mt-6 mb-2">
+      <div className="flex flex-col items-center gap-3 mt-6 mb-2">
+        <div className="flex flex-wrap justify-center gap-4 md:gap-8">
         {/* CHEESE/WAX Price */}
         <div className="flex items-center gap-2 bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border border-cheese/20 rounded-lg px-4 py-2">
           <img src={waxSealUrl} alt="WAX" className="w-7 h-7 object-contain" />
@@ -172,7 +177,23 @@ export function CheesePriceBar() {
         />
         <span className="text-xs text-muted-foreground hidden sm:inline">Refresh</span>
       </button>
-    </div>
+        </div>
+
+        {/* HOLE/CHEESE Price */}
+        <div className="flex items-center gap-2 bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border border-cheese/20 rounded-lg px-4 py-2">
+          <TokenLogo contract="hole.cheese" symbol="HOLE" size="md" />
+          <div className="flex flex-col items-start">
+            <span className="text-xs text-muted-foreground">HOLE/CHEESE</span>
+            {holeLoading ? (
+              <Skeleton className="h-5 w-32" />
+            ) : (
+              <span className="font-semibold text-foreground">
+                1 HOLE = {cheesePerHole.toFixed(4)} CHEESE
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
 
     <CheeseSwapDialog
       open={swapOpen}
