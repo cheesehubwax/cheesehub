@@ -252,6 +252,11 @@ function routeCoverageHubKeys(inKey: string, outKey: string): Set<string> {
   if (inKey === "waxweth-eth.token" || outKey === "waxweth-eth.token") {
     return new Set([...ROUTE_COVERAGE_HUB_KEYS, "cheese-cheeseburger"]);
   }
+  // HOLE only has liquidity via CHEESE. Allow CHEESE as a coverage hub when
+  // HOLE is an endpoint so WAX→HOLE / HOLE→WAX surface the CHEESE-bridged split.
+  if (inKey === "hole-hole.cheese" || outKey === "hole-hole.cheese") {
+    return new Set([...ROUTE_COVERAGE_HUB_KEYS, "cheese-cheeseburger"]);
+  }
   return ROUTE_COVERAGE_HUB_KEYS;
 }
 
