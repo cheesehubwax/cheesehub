@@ -259,7 +259,7 @@ export function SlotCalendar() {
                       <div key={slot.position} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border p-3 bg-background/50 transition-colors ${isHighlighted ? "border-cheese/60 bg-cheese/5" : "border-border/30"}`}>
                         <div className="flex items-center gap-2 sm:gap-3">
                           {selectable && <Checkbox checked={selected} onCheckedChange={() => toggleSlotSelection(slot.time, slot.position, isJoining)} className="data-[state=checked]:bg-cheese data-[state=checked]:border-cheese" />}
-                          {!selectable && editable && <Checkbox checked={editSelected} onCheckedChange={() => toggleEditSlotSelection(slot)} className="data-[state=checked]:bg-cheese data-[state=checked]:border-cheese" />}
+                          {editable && <Checkbox checked={editSelected} onCheckedChange={() => toggleEditSlotSelection(slot)} className="data-[state=checked]:bg-cheese data-[state=checked]:border-cheese" />}
                           <span className="text-sm font-medium text-muted-foreground">Pos {slot.position}</span>
                           <SlotBadge slot={slot} accountName={accountName} />
                         </div>
