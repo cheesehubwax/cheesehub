@@ -296,21 +296,24 @@ export function SlotCalendar() {
         ))}
       </div>
 
-      {selectedSlots.length > 0 && selectionMode === "rent" && (
+      {totalSelected > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-full border border-cheese/40 bg-card/95 backdrop-blur-sm shadow-lg px-5 py-3">
-          <ShoppingCart className="h-4 w-4 text-cheese" />
-          <span className="text-sm font-medium">{selectedSlots.length} slot{selectedSlots.length > 1 ? "s" : ""} selected</span>
+          {selectedSlots.length > 0 ? <ShoppingCart className="h-4 w-4 text-cheese" /> : <Pencil className="h-4 w-4 text-cheese" />}
+          <span className="text-sm font-medium">{totalSelected} slot{totalSelected > 1 ? "s" : ""} selected</span>
           <Button size="sm" variant="ghost" className="text-xs text-muted-foreground h-7" onClick={clearSelection}>Clear</Button>
-          <Button size="sm" className="bg-cheese hover:bg-cheese-dark text-primary-foreground h-8" onClick={() => setBulkDialogOpen(true)}>Rent All</Button>
-        </div>
-      )}
-
-      {selectedEditSlots.length > 0 && selectionMode === "edit" && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-full border border-cheese/40 bg-card/95 backdrop-blur-sm shadow-lg px-5 py-3">
-          <Pencil className="h-4 w-4 text-cheese" />
-          <span className="text-sm font-medium">{selectedEditSlots.length} slot{selectedEditSlots.length > 1 ? "s" : ""} selected</span>
-          <Button size="sm" variant="ghost" className="text-xs text-muted-foreground h-7" onClick={clearSelection}>Clear</Button>
-          <Button size="sm" className="bg-cheese hover:bg-cheese-dark text-primary-foreground h-8" onClick={() => setBulkEditDialogOpen(true)}>Edit All</Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-cheese/40 text-cheese h-8 disabled:opacity-50"
+            disabled={selectedEditSlots.length === 0}
+            title={selectedEditSlots.length === 0 ? "Select slots you have already rented to edit them" : undefined}
+            onClick={() => setBulkEditDialogOpen(true)}
+          >
+            Edit
+          </Button>
+          {selectedSlots.length > 0 && (
+            <Button size="sm" className="bg-cheese hover:bg-cheese-dark text-primary-foreground h-8" onClick={() => setBulkDialogOpen(true)}>Rent All</Button>
+          )}
         </div>
       )}
 
