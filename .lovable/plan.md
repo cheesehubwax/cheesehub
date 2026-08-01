@@ -12,7 +12,7 @@ When multiple slots are checkmarked on CHEESEAds, one floating bar appears with 
 ## What changes
 1. **One floating bar, three buttons.** Replace the two bars with a single bar showing the total number of selected slots and:
    - `Clear` — clears everything (unchanged behaviour).
-   - `Edit` — opens `BulkEditBannerDialog` with the selected slots you own. Shown only when at least one owned/editable slot is selected.
+   - `Edit` — opens `BulkEditBannerDialog` with the selected slots you own. Only pressable when at least one checked slot is a slot you have already rented; otherwise it renders disabled (greyed out), so it can never act on slots you don't own.
    - `Rent All` — opens `BulkRentDialog` with the selected rentable slots. Shown only when at least one rentable slot is selected.
    When only one kind is selected, only that action button shows, so today's behaviour is preserved.
 2. **Allow mixed selection.** Stop clearing the other list when switching kinds: a slot can be checked for renting while another is checked for editing, and each button acts on its own subset.
