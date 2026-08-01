@@ -139,7 +139,6 @@ export function SlotCalendar() {
   const [previewTarget, setPreviewTarget] = useState<BannerSlot | null>(null);
   const [selectedSlots, setSelectedSlots] = useState<BulkSlotSelection[]>([]);
   const [selectedEditSlots, setSelectedEditSlots] = useState<BannerSlot[]>([]);
-  const [selectionMode, setSelectionMode] = useState<"rent" | "edit" | null>(null);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   const [bulkEditDialogOpen, setBulkEditDialogOpen] = useState(false);
   const { isWhitelisted: isAdmin } = useAdminAccess();
@@ -159,60 +158,40 @@ export function SlotCalendar() {
   }, [selectedSlots]);
 
   const toggleSlotSelection = useCallback((time: number, position: number, isJoining: boolean) => {
-    // Switching to rent mode clears edit selections
-    if (selectionMode === "edit") {
-      setSelectedEditSlots([]);
-    }
-    setSelectionMode("rent");
     setSelectedSlots(prev => {
       const exists = prev.some(s => s.time === time && s.position === position);
       if (exists) {
-        const next = prev.filter(s => !(s.time === time && s.position === position));
-        if (next.length === 0) setSelectionMode(null);
-        return next;
+        return prev.filter(s => !(s.time === time && s.position === position));
       }
       return [...prev, { time, position, isJoining, rentalMode: isJoining ? "shared" as const : "exclusive" as const }];
     });
-  }, [selectionMode]);
+  }, []);
 
   const toggleEditSlotSelection = useCallback((slot: BannerSlot) => {
-    // Switching to edit mode clears rent selections
-    if (selectionMode === "rent") {
-      setSelectedSlots([]);
-    }
-    setSelectionMode("edit");
     setSelectedEditSlots(prev => {
       const exists = prev.some(s => s.time === slot.time && s.position === slot.position);
       if (exists) {
-        const next = prev.filter(s => !(s.time === slot.time && s.position === slot.position));
-        if (next.length === 0) setSelectionMode(null);
-        return next;
+        return prev.filter(s => !(s.time === slot.time && s.position === slot.position));
       }
       return [...prev, slot];
     });
-  }, [selectionMode]);
+  }, []);
 
   const removeSlotFromSelection = useCallback((time: number, position: number) => {
-    setSelectedSlots(prev => {
-      const next = prev.filter(s => !(s.time === time && s.position === position));
-      if (next.length === 0) setSelectionMode(null);
-      return next;
-    });
+    setSelectedSlots(prev => prev.filter(s => !(s.time === time && s.position === position)));
   }, []);
 
   const removeEditSlotFromSelection = useCallback((time: number, position: number) => {
-    setSelectedEditSlots(prev => {
-      const next = prev.filter(s => !(s.time === time && s.position === position));
-      if (next.length === 0) setSelectionMode(null);
-      return next;
-    });
+    setSelectedEditSlots(prev => prev.filter(s => !(s.time === time && s.position === position)));
   }, []);
 
   const updateSlotMode = useCallback((time: number, position: number, mode: "exclusive" | "shared") => {
     setSelectedSlots(prev => prev.map(s => s.time === time && s.position === position ? { ...s, rentalMode: mode } : s));
   }, []);
 
-  const clearSelection = useCallback(() => { setSelectedSlots([]); setSelectedEditSlots([]); setSelectionMode(null); }, []);
+  const clearSelection = useCallback(() => { setSelectedSlots([]); setSelectedEditSlots([]); }, []);
+
+  const totalSelected = selectedSlots.length + selectedEditSlots.length;
 
   const handleBulkSuccess = useCallback(() => { clearSelection(); refetch(); }, [clearSelection, refetch]);
 
@@ -282,7 +261,7 @@ export function SlotCalendar() {
                       <div key={slot.position} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border p-3 bg-background/50 transition-colors ${isHighlighted ? "border-cheese/60 bg-cheese/5" : "border-border/30"}`}>
                         <div className="flex items-center gap-2 sm:gap-3">
                           {selectable && <Checkbox checked={selected} onCheckedChange={() => toggleSlotSelection(slot.time, slot.position, isJoining)} className="data-[state=checked]:bg-cheese data-[state=checked]:border-cheese" />}
-                          {!selectable && editable && <Checkbox checked={editSelected} onCheckedChange={() => toggleEditSlotSelection(slot)} className="data-[state=checked]:bg-cheese data-[state=checked]:border-cheese" />}
+                          {editable && <Checkbox checked={editSelected} onCheckedChange={() => toggleEditSlotSelection(slot)} className="data-[state=checked]:bg-cheese data-[state=checked]:border-cheese" />}
                           <span className="text-sm font-medium text-muted-foreground">Pos {slot.position}</span>
                           <SlotBadge slot={slot} accountName={accountName} />
                         </div>
@@ -319,21 +298,24 @@ export function SlotCalendar() {
         ))}
       </div>
 
-      {selectedSlots.length > 0 && selectionMode === "rent" && (
+      {totalSelected > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-full border border-cheese/40 bg-card/95 backdrop-blur-sm shadow-lg px-5 py-3">
-          <ShoppingCart className="h-4 w-4 text-cheese" />
-          <span className="text-sm font-medium">{selectedSlots.length} slot{selectedSlots.length > 1 ? "s" : ""} selected</span>
+          {selectedSlots.length > 0 ? <ShoppingCart className="h-4 w-4 text-cheese" /> : <Pencil className="h-4 w-4 text-cheese" />}
+          <span className="text-sm font-medium">{totalSelected} slot{totalSelected > 1 ? "s" : ""} selected</span>
           <Button size="sm" variant="ghost" className="text-xs text-muted-foreground h-7" onClick={clearSelection}>Clear</Button>
-          <Button size="sm" className="bg-cheese hover:bg-cheese-dark text-primary-foreground h-8" onClick={() => setBulkDialogOpen(true)}>Rent All</Button>
-        </div>
-      )}
-
-      {selectedEditSlots.length > 0 && selectionMode === "edit" && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-full border border-cheese/40 bg-card/95 backdrop-blur-sm shadow-lg px-5 py-3">
-          <Pencil className="h-4 w-4 text-cheese" />
-          <span className="text-sm font-medium">{selectedEditSlots.length} slot{selectedEditSlots.length > 1 ? "s" : ""} selected</span>
-          <Button size="sm" variant="ghost" className="text-xs text-muted-foreground h-7" onClick={clearSelection}>Clear</Button>
-          <Button size="sm" className="bg-cheese hover:bg-cheese-dark text-primary-foreground h-8" onClick={() => setBulkEditDialogOpen(true)}>Edit All</Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-cheese/40 text-cheese h-8 disabled:opacity-50"
+            disabled={selectedEditSlots.length === 0}
+            title={selectedEditSlots.length === 0 ? "Select slots you have already rented to edit them" : undefined}
+            onClick={() => setBulkEditDialogOpen(true)}
+          >
+            Edit
+          </Button>
+          {selectedSlots.length > 0 && (
+            <Button size="sm" className="bg-cheese hover:bg-cheese-dark text-primary-foreground h-8" onClick={() => setBulkDialogOpen(true)}>Rent All</Button>
+          )}
         </div>
       )}
 
