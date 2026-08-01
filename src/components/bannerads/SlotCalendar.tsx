@@ -191,6 +191,8 @@ export function SlotCalendar() {
 
   const clearSelection = useCallback(() => { setSelectedSlots([]); setSelectedEditSlots([]); }, []);
 
+  const totalSelected = selectedSlots.length + selectedEditSlots.length;
+
   const handleBulkSuccess = useCallback(() => { clearSelection(); refetch(); }, [clearSelection, refetch]);
 
   const isSlotSelectable = (slot: BannerSlot): { selectable: boolean; isJoining: boolean } => {
