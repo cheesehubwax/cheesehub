@@ -1,57 +1,29 @@
+# Bulk Edit from the Multi-Select Bar
+
 ## Goal
-1. Show a **HOLE/CHEESE** price card on the homepage price bar, centered on a new row beneath Market Cap / TVL.
-2. Add **HOLE** (`hole.cheese`, precision 8) as a first-class token across the swap widget, token selector, and token registries.
+When multiple slots are checkmarked on CHEESEAds, one floating bar appears with three actions: **Clear**, **Edit**, **Rent All**. Edit opens the same banner-edit form used for a single ad, and applies the image + link to every checked slot you own in one transaction.
 
-## Data source (price)
-Alcor pool `11051` (CHEESE ↔ HOLE): `GET https://wax.alcor.exchange/api/v2/swap/pools/11051`.
-`priceB` = CHEESE per 1 HOLE → displayed as `1 HOLE = {priceB.toFixed(4)} CHEESE`.
+## Current state (verified in code)
+- `SlotCalendar.tsx` keeps two separate selections (`selectedSlots` for renting, `selectedEditSlots` for editing) and a `selectionMode` of `"rent" | "edit" | null`. Picking a slot in one mode wipes the other selection.
+- Each slot row renders only one checkbox: a rent checkbox when the slot is rentable, otherwise an edit checkbox when you own it.
+- Two separate floating bars exist: rent bar (Clear + Rent All) and edit bar (Clear + Edit All).
+- `BulkEditBannerDialog.tsx` already exists and batches `editadbanner` / `editsharedad` actions for every selected slot — it just lives behind the second, separate bar.
 
-## Logo handling
-Alcor doesn't yet host a HOLE logo. Everywhere HOLE renders (price card, TokenSelector, swap inputs, drop price picker), use the existing **`TokenLogo`** component (`src/components/TokenLogo.tsx`), which already:
-- Attempts `getTokenLogoUrl(contract, symbol)`.
-- On 404 falls back to the standard placeholder: a `cheese/20` circle with the first letter ("H") in cheese-yellow.
-- Caches misses via `tokenLogoMisses` so we don't re-request.
+## What changes
+1. **One floating bar, three buttons.** Replace the two bars with a single bar showing the total number of selected slots and:
+   - `Clear` — clears everything (unchanged behaviour).
+   - `Edit` — opens `BulkEditBannerDialog` with the selected slots you own. Shown only when at least one owned/editable slot is selected.
+   - `Rent All` — opens `BulkRentDialog` with the selected rentable slots. Shown only when at least one rentable slot is selected.
+   When only one kind is selected, only that action button shows, so today's behaviour is preserved.
+2. **Allow mixed selection.** Stop clearing the other list when switching kinds: a slot can be checked for renting while another is checked for editing, and each button acts on its own subset.
+3. **Show both checkboxes where applicable.** If a slot is both rentable and editable (e.g. a shared slot you already hold one side of), render the rent checkbox and the edit checkbox is still reachable — priority stays rent-first so nothing regresses.
+4. Copy tweaks: button label becomes `Edit` (was `Edit All`), and the bar icon reflects a mixed selection.
 
-No new asset is added; when Alcor uploads the real logo, it will start rendering automatically.
+## Behaviour details
+- Bulk edit continues to require an IPFS hash, blocks blocklisted domains, and shows the 580 × 150 px reminder and preview — identical to the single-ad edit dialog.
+- Slots inside the edit-cutoff window or suspended slots stay unselectable for editing, as today.
+- On success the selection clears and the calendar refetches.
 
-## Changes
-
-### Price card
-1. **New hook** `src/hooks/useCheeseHolePrice.ts`
-   - `useQuery(["cheese-hole-price"], fetch pool 11051, staleTime 60s, refetchOnWindowFocus false)`.
-   - Returns `{ cheesePerHole, isLoading, isFetching, refetch }` from `priceB`.
-
-2. **`src/components/home/CheesePriceBar.tsx`**
-   - Wrap existing 4-card + refresh flex row in an outer column container.
-   - Add a second centered row containing a single card styled identically (same gradient/border), with:
-     - Icon: `<TokenLogo contract="hole.cheese" symbol="HOLE" size="md" />` (placeholder "H" until Alcor hosts the logo).
-     - Label: `HOLE/CHEESE`.
-     - Value: `1 HOLE = {cheesePerHole.toFixed(4)} CHEESE` (Skeleton while loading).
-     - No trade button.
-   - Wire the new hook's `refetch` / `isFetching` into `refreshAll` and the shared spinner state.
-
-### HOLE as a swap token
-The Alcor `/tokens` endpoint (source of `useSwapTokens`) already returns HOLE, so TokenSelector list, balances, and routing pick it up automatically. Explicit additions:
-
-3. **`src/lib/swapApi.ts`**
-   - Append `"HOLE"` to `POPULAR_TICKERS` so it appears in the swap widget's popular-tokens strip.
-   - Add `HOLE: "hole.cheese"` to `PREFERRED_CONTRACTS` for deterministic default selection.
-
-4. **`src/lib/tokenRegistry.ts`**
-   - Add `{ symbol: 'HOLE', contract: 'hole.cheese', precision: 8, displayName: 'HOLE' }` to `WAX_TOKENS`.
-
-5. **`src/lib/alcorRouter.ts`**
-   - Add `'hole-hole.cheese'` to `ROUTE_COVERAGE_HUB_KEYS` (or the WAX-side pair-seeder equivalent used for `cheese-cheeseburger`) so WAX→HOLE / HOLE→WAX surface the CHEESE-bridged split route. Confirm exact handling by re-reading `alcorRouter.ts` at build time and mirror the CHEESE pattern.
-
-6. **TokenSelector / Swap inputs** — no code changes needed; they already render tokens via `TokenLogo`, which supplies the placeholder automatically.
-
-## Out of scope
-- USD price for HOLE.
-- Custom HOLE branding asset (placeholder handled by existing `TokenLogo` fallback).
-- Adding HOLE to CHEESENull / Farm reward selectors / DAO governance token lists.
-
-## Verification
-- `bun run build` clean.
-- Homepage: new card centered under the existing row; value populates from pool 11051; icon shows "H" placeholder.
-- Swap widget: HOLE appears in the popular strip and TokenSelector search with "H" placeholder; WAX → HOLE returns a valid multi-leg route through CHEESE.
-- CHEESEDrops price selector: HOLE listed and formats amounts at 8 decimals.
+## Technical notes
+- Only `src/components/bannerads/SlotCalendar.tsx` needs edits: drop `selectionMode`, keep the two arrays as independent lists, derive `totalSelected = selectedSlots.length + selectedEditSlots.length`, and render one bar with conditional buttons.
+- `BulkEditBannerDialog` and `BulkRentDialog` are reused unchanged.
