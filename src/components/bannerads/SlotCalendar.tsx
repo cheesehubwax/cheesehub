@@ -260,18 +260,11 @@ export function SlotCalendar() {
                     return (
                       <div key={slot.position} className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border p-3 bg-background/50 transition-colors ${isHighlighted ? "border-cheese/60 bg-cheese/5" : "border-border/30"}`}>
                         <div className="flex items-center gap-2 sm:gap-3">
-                          {editable && (
-                            <label className="flex items-center gap-1 cursor-pointer" title="Select to bulk edit this slot you rented">
-                              <Checkbox checked={editSelected} onCheckedChange={() => toggleEditSlotSelection(slot)} className="data-[state=checked]:bg-cheese data-[state=checked]:border-cheese" />
-                              {selectable && <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Edit</span>}
-                            </label>
-                          )}
-                          {selectable && (
-                            <label className="flex items-center gap-1 cursor-pointer" title={isJoining ? "Select to bulk join this shared slot" : "Select to bulk rent this slot"}>
-                              <Checkbox checked={selected} onCheckedChange={() => toggleSlotSelection(slot.time, slot.position, isJoining)} className="data-[state=checked]:bg-cheese data-[state=checked]:border-cheese" />
-                              {editable && <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{isJoining ? "Join" : "Rent"}</span>}
-                            </label>
-                          )}
+                          {editable ? (
+                            <Checkbox checked={editSelected} onCheckedChange={() => toggleEditSlotSelection(slot)} className="data-[state=checked]:bg-cheese data-[state=checked]:border-cheese" />
+                          ) : selectable ? (
+                            <Checkbox checked={selected} onCheckedChange={() => toggleSlotSelection(slot.time, slot.position, isJoining)} className="data-[state=checked]:bg-cheese data-[state=checked]:border-cheese" />
+                          ) : null}
                           <span className="text-sm font-medium text-muted-foreground">Pos {slot.position}</span>
                           <SlotBadge slot={slot} accountName={accountName} />
                         </div>
