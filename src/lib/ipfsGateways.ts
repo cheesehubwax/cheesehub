@@ -8,6 +8,27 @@ export const IPFS_GATEWAYS = [
   'https://cloudflare-ipfs.com/ipfs/',
 ];
 
+// AtomicHub's image cache. Serves NFT media that is no longer retrievable from
+// public IPFS gateways (unpinned/expired content), so it is used as the last
+// resort after every plain gateway fails.
+// Only the 370px preview is reliably cached; larger sizes 500 when the source
+// content is no longer retrievable from IPFS.
+export function atomicHubImageUrl(hash: string, size = 370): string {
+  return `https://resizer.atomichub.io/images/v1/preview?ipfs=${encodeURIComponent(hash)}&size=${size}`;
+}
+
+// Ordered list of URL builders for an IPFS hash: plain gateways first, then the
+// AtomicHub cache fallback.
+export const IPFS_IMAGE_SOURCES: Array<(hash: string) => string> = [
+  ...IPFS_GATEWAYS.map((gateway) => (hash: string) => `${gateway}${hash}`),
+  (hash: string) => atomicHubImageUrl(hash),
+];
+
+export function buildIpfsImageUrl(index: number, hash: string): string {
+  const builder = IPFS_IMAGE_SOURCES[index] ?? IPFS_IMAGE_SOURCES[0];
+  return builder(hash);
+}
+
 // Timeout configuration for different contexts
 export const IMAGE_LOAD_TIMEOUT = {
   card: 12000,
