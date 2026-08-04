@@ -120,6 +120,7 @@ export function DropCard({ drop, isImageCached, onImageLoaded, alwaysGlow }: Dro
           racingRef.current = false;
           setGatewayIndex(winner);
           setCurrentImageUrl(buildIpfsImageUrl(winner, hash));
+          setImageError(false);
           setImageLoaded(false);
           return;
         } catch {
