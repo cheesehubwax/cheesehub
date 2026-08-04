@@ -10,7 +10,7 @@ import { getTokenConfig } from "@/lib/tokenRegistry";
 import { getTokenContract } from "@/lib/tokenLogos";
 
 import { isImageLoaded, isImagePreloading, waitForPreload } from "@/services/atomicApi";
-import { IPFS_GATEWAYS, IMAGE_LOAD_TIMEOUT, extractIpfsHash, isVideoUrl } from "@/lib/ipfsGateways";
+import { IPFS_IMAGE_SOURCES, buildIpfsImageUrl, IMAGE_LOAD_TIMEOUT, extractIpfsHash, isVideoUrl } from "@/lib/ipfsGateways";
 
 function getContractForCurrency(currency: string): string {
   // Try tokenRegistry first (for known WAX tokens), then Alcor cache
@@ -85,38 +85,50 @@ export function DropCard({ drop, isImageCached, onImageLoaded, alwaysGlow }: Dro
   const handleImageError = useCallback(() => {
     const hash = extractIpfsHash(currentImageUrl);
     if (!hash) { setImageError(true); return; }
-    const nextGateways = IPFS_GATEWAYS.slice(gatewayIndex + 1, gatewayIndex + 3);
-    if (nextGateways.length > 0 && !racingRef.current) {
-      racingRef.current = true;
-      Promise.race(
-        nextGateways.map((gw, i) => 
-          new Promise<number>((resolve, reject) => {
-            const img = new Image();
-            const tid = setTimeout(() => reject(), 3000);
-            img.onload = () => { clearTimeout(tid); img.naturalWidth > 0 ? resolve(gatewayIndex + 1 + i) : reject(); };
-            img.onerror = () => { clearTimeout(tid); reject(); };
-            img.src = `${gw}${hash}`;
-          })
-        )
-      ).then(winnerIndex => {
-        racingRef.current = false;
-        setGatewayIndex(winnerIndex);
-        setCurrentImageUrl(`${IPFS_GATEWAYS[winnerIndex]}${hash}`);
-        setImageLoaded(false);
-      }).catch(() => {
-        racingRef.current = false;
-        const nextIndex = gatewayIndex + nextGateways.length + 1;
-        if (nextIndex < IPFS_GATEWAYS.length) {
-          setGatewayIndex(nextIndex);
-          setCurrentImageUrl(`${IPFS_GATEWAYS[nextIndex]}${hash}`);
-          setImageLoaded(false);
-        } else {
-          setImageError(true);
-        }
+    if (racingRef.current) return;
+    if (gatewayIndex + 1 >= IPFS_IMAGE_SOURCES.length) { setImageError(true); return; }
+    racingRef.current = true;
+
+    // Probe the remaining sources (public gateways, then the AtomicHub image
+    // cache) in batches, keeping the first one that actually decodes.
+    const probe = (index: number) => new Promise<number>((resolve, reject) => {
+      const img = new Image();
+      const tid = setTimeout(() => reject(new Error('timeout')), 4000);
+      img.onload = () => { clearTimeout(tid); img.naturalWidth > 0 ? resolve(index) : reject(new Error('empty')); };
+      img.onerror = () => { clearTimeout(tid); reject(new Error('error')); };
+      img.src = buildIpfsImageUrl(index, hash);
+    });
+
+    const firstSuccess = (indexes: number[]) => new Promise<number>((resolve, reject) => {
+      let remaining = indexes.length;
+      let settled = false;
+      indexes.forEach(index => {
+        probe(index).then(winner => {
+          if (!settled) { settled = true; resolve(winner); }
+        }).catch(() => {
+          remaining -= 1;
+          if (remaining === 0 && !settled) reject(new Error('all failed'));
+        });
       });
-    } else {
+    });
+
+    (async () => {
+      for (let start = gatewayIndex + 1; start < IPFS_IMAGE_SOURCES.length; start += 2) {
+        const batch = [start, start + 1].filter(i => i < IPFS_IMAGE_SOURCES.length);
+        try {
+          const winner = await firstSuccess(batch);
+          racingRef.current = false;
+          setGatewayIndex(winner);
+          setCurrentImageUrl(buildIpfsImageUrl(winner, hash));
+          setImageLoaded(false);
+          return;
+        } catch {
+          // try next batch
+        }
+      }
+      racingRef.current = false;
       setImageError(true);
-    }
+    })();
   }, [currentImageUrl, gatewayIndex, drop.id]);
 
   const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {

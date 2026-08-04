@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Loader2, ShoppingCart, Info, Minus, Plus } from "lucide-react";
 import { TokenLogo } from "@/components/TokenLogo";
+import { IpfsImage } from "@/components/shared/IpfsImage";
 import { fetchDropById } from "@/services/atomicApi";
 import { useWax } from "@/context/WaxContext";
 import { useCart } from "@/context/CartContext";
@@ -133,11 +134,10 @@ const DropDetail = () => {
           {/* Image */}
           <Card className="bg-card/80 border-border/50 overflow-hidden">
             <div className="aspect-square">
-              <img
-                src={drop.image || "/placeholder.svg"}
+              <IpfsImage
+                src={drop.image}
                 alt={drop.name}
                 className="w-full h-full object-contain"
-                onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
               />
             </div>
           </Card>
