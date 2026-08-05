@@ -29,6 +29,53 @@ export function buildIpfsImageUrl(index: number, hash: string): string {
   return builder(hash);
 }
 
+// Every candidate URL for a hash, in preference order. The AtomicHub cache is
+// included so unpinned content still resolves.
+export function ipfsImageCandidates(hash: string): string[] {
+  return IPFS_IMAGE_SOURCES.map((builder) => builder(hash));
+}
+
+/**
+ * Races every candidate URL for a hash in parallel and resolves with the first
+ * one that actually decodes. Public gateways frequently hang rather than error,
+ * so sequential walking is far too slow — parallel racing is what makes the
+ * AtomicHub cache fallback usable.
+ */
+export function raceIpfsImage(hash: string, timeoutMs = 6000): Promise<{ url: string; index: number } | null> {
+  const candidates = ipfsImageCandidates(hash);
+  return new Promise((resolve) => {
+    let remaining = candidates.length;
+    let settled = false;
+    const finish = (value: { url: string; index: number } | null) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+
+    candidates.forEach((url, index) => {
+      const img = new Image();
+      const fail = () => {
+        remaining -= 1;
+        if (remaining === 0) {
+          clearTimeout(timer);
+          finish(null);
+        }
+      };
+      img.onload = () => {
+        if (img.naturalWidth > 0) {
+          clearTimeout(timer);
+          finish({ url, index });
+        } else {
+          fail();
+        }
+      };
+      img.onerror = fail;
+      img.src = url;
+    });
+  });
+}
+
 // Timeout configuration for different contexts
 export const IMAGE_LOAD_TIMEOUT = {
   card: 12000,
