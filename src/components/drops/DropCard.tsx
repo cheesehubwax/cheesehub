@@ -10,7 +10,12 @@ import { getTokenConfig } from "@/lib/tokenRegistry";
 import { getTokenContract } from "@/lib/tokenLogos";
 
 import { isImageLoaded, isImagePreloading, waitForPreload } from "@/services/atomicApi";
-import { IPFS_IMAGE_SOURCES, buildIpfsImageUrl, IMAGE_LOAD_TIMEOUT, extractIpfsHash, isVideoUrl } from "@/lib/ipfsGateways";
+import { extractIpfsHash, isVideoUrl, raceIpfsImage } from "@/lib/ipfsGateways";
+
+// Public gateways often hang instead of erroring, so give the primary URL only a
+// short head start before racing every source (including the AtomicHub cache).
+const IMAGE_WATCHDOG_MS = 3500;
+const IMAGE_RACE_TIMEOUT_MS = 8000;
 
 function getContractForCurrency(currency: string): string {
   // Try tokenRegistry first (for known WAX tokens), then Alcor cache
@@ -75,7 +80,7 @@ export function DropCard({ drop, isImageCached, onImageLoaded, alwaysGlow }: Dro
       return () => { cancelled = true; };
     }
     const jitter = Math.random() * 3000;
-    const timeout = Math.min(IMAGE_LOAD_TIMEOUT.card + jitter + (gatewayIndex * IMAGE_LOAD_TIMEOUT.increment), IMAGE_LOAD_TIMEOUT.max);
+    const timeout = IMAGE_WATCHDOG_MS + jitter;
     timeoutRef.current = setTimeout(() => {
       if (!imageLoaded && !imageError) handleImageError();
     }, timeout);
@@ -86,51 +91,24 @@ export function DropCard({ drop, isImageCached, onImageLoaded, alwaysGlow }: Dro
     const hash = extractIpfsHash(currentImageUrl);
     if (!hash) { setImageError(true); return; }
     if (racingRef.current) return;
-    if (gatewayIndex + 1 >= IPFS_IMAGE_SOURCES.length) { setImageError(true); return; }
     racingRef.current = true;
 
-    // Probe the remaining sources (public gateways, then the AtomicHub image
-    // cache) in batches, keeping the first one that actually decodes.
-    const probe = (index: number) => new Promise<number>((resolve, reject) => {
-      const img = new Image();
-      const tid = setTimeout(() => reject(new Error('timeout')), 4000);
-      img.onload = () => { clearTimeout(tid); img.naturalWidth > 0 ? resolve(index) : reject(new Error('empty')); };
-      img.onerror = () => { clearTimeout(tid); reject(new Error('error')); };
-      img.src = buildIpfsImageUrl(index, hash);
-    });
-
-    const firstSuccess = (indexes: number[]) => new Promise<number>((resolve, reject) => {
-      let remaining = indexes.length;
-      let settled = false;
-      indexes.forEach(index => {
-        probe(index).then(winner => {
-          if (!settled) { settled = true; resolve(winner); }
-        }).catch(() => {
-          remaining -= 1;
-          if (remaining === 0 && !settled) reject(new Error('all failed'));
-        });
-      });
-    });
-
-    (async () => {
-      for (let start = gatewayIndex + 1; start < IPFS_IMAGE_SOURCES.length; start += 2) {
-        const batch = [start, start + 1].filter(i => i < IPFS_IMAGE_SOURCES.length);
-        try {
-          const winner = await firstSuccess(batch);
-          racingRef.current = false;
-          setGatewayIndex(winner);
-          setCurrentImageUrl(buildIpfsImageUrl(winner, hash));
-          setImageError(false);
-          setImageLoaded(false);
-          return;
-        } catch {
-          // try next batch
-        }
-      }
+    // Race every source (public gateways plus the AtomicHub image cache) at once
+    // and keep the first one that actually decodes.
+    raceIpfsImage(hash, IMAGE_RACE_TIMEOUT_MS).then(winner => {
       racingRef.current = false;
-      setImageError(true);
-    })();
-  }, [currentImageUrl, gatewayIndex, drop.id]);
+      if (!winner) { setImageError(true); return; }
+      setGatewayIndex(winner.index);
+      if (winner.url === currentImageUrl) {
+        setImageLoaded(true);
+        setImageError(false);
+        return;
+      }
+      setCurrentImageUrl(winner.url);
+      setImageError(false);
+      setImageLoaded(false);
+    });
+  }, [currentImageUrl, drop.id]);
 
   const handleImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
     const img = e.currentTarget;

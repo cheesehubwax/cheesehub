@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { IPFS_IMAGE_SOURCES, buildIpfsImageUrl, extractIpfsHash } from "@/lib/ipfsGateways";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { extractIpfsHash, raceIpfsImage } from "@/lib/ipfsGateways";
 
 interface IpfsImageProps {
   src?: string;
@@ -8,53 +8,65 @@ interface IpfsImageProps {
   fallbackSrc?: string;
 }
 
-const SOURCE_TIMEOUT_MS = 6000;
+const WATCHDOG_MS = 3500;
+const RACE_TIMEOUT_MS = 8000;
 
 /**
- * Image that walks the full IPFS source chain (public gateways, then the
- * AtomicHub image cache) before giving up on a placeholder.
+ * Image that races the full IPFS source chain (public gateways plus the
+ * AtomicHub image cache) in parallel and renders the first source that decodes.
  */
 export function IpfsImage({ src, alt, className, fallbackSrc = "/placeholder.svg" }: IpfsImageProps) {
   const hash = useMemo(() => (src ? extractIpfsHash(src) : null), [src]);
-  const [sourceIndex, setSourceIndex] = useState(0);
+  const [resolvedSrc, setResolvedSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const racingRef = useRef(false);
 
   useEffect(() => {
-    setSourceIndex(0);
+    setResolvedSrc(null);
     setFailed(false);
     setLoaded(false);
+    racingRef.current = false;
   }, [src]);
 
   const currentSrc = useMemo(() => {
     if (failed || !src) return fallbackSrc;
-    if (!hash) return src;
-    return buildIpfsImageUrl(sourceIndex, hash);
-  }, [failed, src, hash, sourceIndex, fallbackSrc]);
+    return resolvedSrc ?? src;
+  }, [failed, src, resolvedSrc, fallbackSrc]);
 
-  const handleError = useCallback(() => {
-    if (hash && sourceIndex < IPFS_IMAGE_SOURCES.length - 1) {
-      setSourceIndex((prev) => prev + 1);
-    } else {
-      setFailed(true);
+  const startRace = useCallback(() => {
+    if (!hash || racingRef.current) {
+      if (!hash) setFailed(true);
+      return;
     }
-  }, [hash, sourceIndex]);
+    racingRef.current = true;
+    raceIpfsImage(hash, RACE_TIMEOUT_MS).then((winner) => {
+      racingRef.current = false;
+      if (winner) {
+        setResolvedSrc(winner.url);
+        setFailed(false);
+      } else {
+        setFailed(true);
+      }
+    });
+  }, [hash]);
 
-  // Some gateways hang instead of returning an error, so advance on a timeout too.
+  // Some gateways hang instead of returning an error, so kick off the parallel
+  // race on a short watchdog as well as on an explicit error.
   useEffect(() => {
-    if (!hash || loaded || failed) return;
-    const timer = setTimeout(handleError, SOURCE_TIMEOUT_MS);
+    if (!hash || loaded || failed || resolvedSrc) return;
+    const timer = setTimeout(startRace, WATCHDOG_MS);
     return () => clearTimeout(timer);
-  }, [hash, loaded, failed, sourceIndex, handleError]);
+  }, [hash, loaded, failed, resolvedSrc, startRace]);
 
   return (
     <img
       src={currentSrc}
       alt={alt}
       className={className}
-      onError={handleError}
+      onError={startRace}
       onLoad={(e) => {
-        if ((e.currentTarget as HTMLImageElement).naturalWidth === 0) handleError();
+        if ((e.currentTarget as HTMLImageElement).naturalWidth === 0) startRace();
         else setLoaded(true);
       }}
     />

@@ -50,7 +50,16 @@ export function waitForPreload(url: string): Promise<boolean> {
   return Promise.resolve(false);
 }
 
-import { IPFS_GATEWAYS, getIpfsUrl } from '@/lib/ipfsGateways';
+import { IPFS_GATEWAYS, getIpfsUrl, extractIpfsHash, atomicHubImageUrl } from '@/lib/ipfsGateways';
+
+// Warm the AtomicHub image cache alongside the primary gateway URL: for content
+// that is no longer retrievable from public IPFS gateways, the cache is the only
+// source that resolves, and pre-decoding it keeps cards from flashing a retry.
+export function preloadImageWithFallback(url: string): void {
+  preloadImage(url);
+  const hash = extractIpfsHash(url);
+  if (hash) preloadImage(atomicHubImageUrl(hash));
+}
 
 export function getImageUrl(img: string | undefined): string {
   if (!img) return '/placeholder.svg';
@@ -435,7 +444,7 @@ export async function enrichDropTemplates(
       const cached = templateCache.get(key);
       if (cached) {
         if (cached.image && !cached.image.includes('placeholder')) {
-          preloadImage(cached.image);
+          preloadImageWithFallback(cached.image);
         }
         return {
           ...drop,
