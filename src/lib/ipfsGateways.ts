@@ -1,3 +1,6 @@
+import cheeseBottleImage from '@/assets/cheese-bottle.webp';
+import cheeseKeyringImage from '@/assets/cheese-keyring.webp';
+
 // Unified IPFS gateway configuration
 // Ordered by reliability and speed (based on real-world testing)
 export const IPFS_GATEWAYS = [
@@ -17,17 +20,17 @@ export function atomicHubImageUrl(hash: string, size = 370): string {
   return `https://resizer.atomichub.io/images/v1/preview?ipfs=${encodeURIComponent(hash)}&size=${size}`;
 }
 
-// These product images remain available in AtomicHub's image cache but their
-// original IPFS content no longer resolves from public gateways. Starting from
-// the cache avoids showing a broken image while the normal fallback race runs.
-const ATOMICHUB_ONLY_HASHES = new Set([
-  'QmYTvGVY8eVxrzYf7VTgqJJqZiNJF7gAfji6ewxo4qUyeM', // Stainless steel bottle
-  'QmYQRbxpnB3jQLpZDQnc2xKLuTrvEdvEwQsR8hbbwUSEg9', // Metal keyring
-]);
+// The original IPFS content for these products no longer resolves publicly.
+// Keep verified copies in the app bundle so every customer receives them from
+// the same origin instead of depending on a third-party cache at runtime.
+const BUNDLED_IPFS_IMAGES: Record<string, string> = {
+  QmYTvGVY8eVxrzYf7VTgqJJqZiNJF7gAfji6ewxo4qUyeM: cheeseBottleImage,
+  QmYQRbxpnB3jQLpZDQnc2xKLuTrvEdvEwQsR8hbbwUSEg9: cheeseKeyringImage,
+};
 
 export function preferredIpfsImageUrl(url: string): string {
   const hash = extractIpfsHash(url);
-  return hash && ATOMICHUB_ONLY_HASHES.has(hash) ? atomicHubImageUrl(hash) : url;
+  return hash ? BUNDLED_IPFS_IMAGES[hash] ?? url : url;
 }
 
 // Ordered list of URL builders for an IPFS hash: plain gateways first, then the
@@ -45,7 +48,10 @@ export function buildIpfsImageUrl(index: number, hash: string): string {
 // Every candidate URL for a hash, in preference order. The AtomicHub cache is
 // included so unpinned content still resolves.
 export function ipfsImageCandidates(hash: string): string[] {
-  return IPFS_IMAGE_SOURCES.map((builder) => builder(hash));
+  const bundledImage = BUNDLED_IPFS_IMAGES[hash];
+  return bundledImage
+    ? [bundledImage]
+    : IPFS_IMAGE_SOURCES.map((builder) => builder(hash));
 }
 
 /**
