@@ -17,6 +17,19 @@ export function atomicHubImageUrl(hash: string, size = 370): string {
   return `https://resizer.atomichub.io/images/v1/preview?ipfs=${encodeURIComponent(hash)}&size=${size}`;
 }
 
+// These product images remain available in AtomicHub's image cache but their
+// original IPFS content no longer resolves from public gateways. Starting from
+// the cache avoids showing a broken image while the normal fallback race runs.
+const ATOMICHUB_ONLY_HASHES = new Set([
+  'QmYTvGVY8eVxrzYf7VTgqJJqZiNJF7gAfji6ewxo4qUyeM', // Stainless steel bottle
+  'QmYQRbxpnB3jQLpZDQnc2xKLuTrvEdvEwQsR8hbbwUSEg9', // Metal keyring
+]);
+
+export function preferredIpfsImageUrl(url: string): string {
+  const hash = extractIpfsHash(url);
+  return hash && ATOMICHUB_ONLY_HASHES.has(hash) ? atomicHubImageUrl(hash) : url;
+}
+
 // Ordered list of URL builders for an IPFS hash: plain gateways first, then the
 // AtomicHub cache fallback.
 export const IPFS_IMAGE_SOURCES: Array<(hash: string) => string> = [
