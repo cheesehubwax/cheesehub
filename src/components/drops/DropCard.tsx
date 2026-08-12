@@ -10,7 +10,7 @@ import { getTokenConfig } from "@/lib/tokenRegistry";
 import { getTokenContract } from "@/lib/tokenLogos";
 
 import { isImageLoaded, isImagePreloading, waitForPreload } from "@/services/atomicApi";
-import { extractIpfsHash, isVideoUrl, raceIpfsImage } from "@/lib/ipfsGateways";
+import { extractIpfsHash, isVideoUrl, preferredIpfsImageUrl, raceIpfsImage } from "@/lib/ipfsGateways";
 
 // Public gateways often hang instead of erroring, so give the primary URL only a
 // short head start before racing every source (including the AtomicHub cache).
@@ -36,7 +36,7 @@ export interface DropCardProps {
 export function DropCard({ drop, isImageCached, onImageLoaded, alwaysGlow }: DropCardProps) {
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(isImageCached ?? false);
-  const [currentImageUrl, setCurrentImageUrl] = useState(drop.image);
+  const [currentImageUrl, setCurrentImageUrl] = useState(() => preferredIpfsImageUrl(drop.image));
   const [gatewayIndex, setGatewayIndex] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
   const racingRef = useRef(false);
@@ -61,7 +61,7 @@ export function DropCard({ drop, isImageCached, onImageLoaded, alwaysGlow }: Dro
     }
     setImageError(false);
     setImageLoaded(isImageCached ?? false);
-    setCurrentImageUrl(drop.image);
+    setCurrentImageUrl(preferredIpfsImageUrl(drop.image));
     setGatewayIndex(0);
     setRetryCount(0);
   }, [drop.image, drop.id, isImageCached]);
@@ -119,7 +119,7 @@ export function DropCard({ drop, isImageCached, onImageLoaded, alwaysGlow }: Dro
   const handleRetry = useCallback((e: React.MouseEvent) => {
     e.preventDefault(); e.stopPropagation();
     setImageError(false); setImageLoaded(false); setGatewayIndex(0);
-    setRetryCount(prev => prev + 1); setCurrentImageUrl(drop.image);
+    setRetryCount(prev => prev + 1); setCurrentImageUrl(preferredIpfsImageUrl(drop.image));
   }, [drop.image]);
 
   const displayImageUrl = retryCount > 0 

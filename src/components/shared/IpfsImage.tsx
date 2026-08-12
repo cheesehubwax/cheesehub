@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { extractIpfsHash, raceIpfsImage } from "@/lib/ipfsGateways";
+import { extractIpfsHash, preferredIpfsImageUrl, raceIpfsImage } from "@/lib/ipfsGateways";
 
 interface IpfsImageProps {
   src?: string;
@@ -17,6 +17,7 @@ const RACE_TIMEOUT_MS = 8000;
  */
 export function IpfsImage({ src, alt, className, fallbackSrc = "/placeholder.svg" }: IpfsImageProps) {
   const hash = useMemo(() => (src ? extractIpfsHash(src) : null), [src]);
+  const preferredSrc = useMemo(() => (src ? preferredIpfsImageUrl(src) : null), [src]);
   const [resolvedSrc, setResolvedSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -31,8 +32,8 @@ export function IpfsImage({ src, alt, className, fallbackSrc = "/placeholder.svg
 
   const currentSrc = useMemo(() => {
     if (failed || !src) return fallbackSrc;
-    return resolvedSrc ?? src;
-  }, [failed, src, resolvedSrc, fallbackSrc]);
+    return resolvedSrc ?? preferredSrc ?? src;
+  }, [failed, src, resolvedSrc, preferredSrc, fallbackSrc]);
 
   const startRace = useCallback(() => {
     if (!hash || racingRef.current) {
