@@ -96,17 +96,20 @@ A first implementation step is confirming that WAX's `eosio.system` calls `requi
 
 ### New files
 - `src/pages/CheeseRam.tsx` — page shell copying the `PowerUp.tsx` layout: `py-20` hero with radial gradient, floating clickable orb with a fart sound, emoji-title-BETA-emoji heading, then card, leaderboard, stats bar, and a footer line linking to `waxblock.io/account/ram.cheese`.
-- `src/components/ram/RamBuyCard.tsx` — the main card. Recipient input reusing `RecipientInput`, then two tabs:
+- `src/components/ram/RamCard.tsx` — the main card with a top-level Buy / Sell switch.
+- Buy mode: recipient input reusing `RecipientInput`, then two tabs:
   - **Pay with CHEESE** — enter CHEESE, see the estimated KB of RAM.
   - **Buy by size** — enter the KB or MB wanted, see the CHEESE required.
   Both tabs feed one estimate panel and one submit button. A Terms of Use checkbox with `TermsDialog` gates the transfer.
+- Sell mode: shows the connected account's free RAM, a bytes input with a Max button, the estimated CHEESE payout, and the remaining CHEESE pool. Disabled with a clear "sells paused, pool empty" state when the pool is below `min_cheese_pool` or `sell_enabled` is false. Also gated by the Terms checkbox, since it moves user assets.
 - `src/components/ram/RamEstimate.tsx` — shows RAM bytes, WAX equivalent, current RAM price per KB, and USD value, with a refresh button, modelled on `ResourceEstimate`.
-- `src/components/ram/RamStatsBar.tsx` — total purchases, CHEESE nulled, WAX spent, total RAM sold, and the available liquid reserve.
-- `src/components/ram/RamLeaderboard.tsx` — top RAM buyers, built the same way as `PowerupLeaderboard` from Hyperion action history.
+- `src/components/ram/RamStatsBar.tsx` — total purchases, CHEESE nulled, WAX spent, total RAM sold, sales count, CHEESE paid out, and the two live reserves: liquid WAX and the CHEESE pool.
+- `src/components/ram/RamLeaderboard.tsx` — top RAM buyers and sellers, built the same way as `PowerupLeaderboard` from Hyperion action history.
 - `src/hooks/useRamPrice.ts` — reads `eosio::rammarket` through the existing multi-endpoint RPC fallback and returns WAX per KB, cached with react-query.
-- `src/hooks/useRamStats.ts` — reads the `ram.cheese` `stats` table plus its liquid WAX balance, using the same endpoint-fallback pattern as `usePowerupStats`.
+- `src/hooks/useRamStats.ts` — reads the `ram.cheese` `stats` and `config` tables plus its liquid WAX and CHEESE balances, using the same endpoint-fallback pattern as `usePowerupStats`.
+- `src/hooks/useAccountRam.ts` — reads the connected account's RAM quota and usage so the sell tab can show free bytes and a working Max button.
 - `src/hooks/useRamEstimate.ts` — combines `useRamPrice` with `useCheesePriceData` to convert between CHEESE, WAX, and bytes in both directions.
-- `src/lib/ramCheese.ts` — contract constants (`ram.cheese`, min and max amounts, memo format) and the transfer action builder.
+- `src/lib/ramCheese.ts` — contract constants (`ram.cheese`, min and max amounts, memo format) and builders for both the buy transfer action and the `eosio::ramtransfer` sell action.
 
 ### Wiring
 - Route `/cheeseram` added to `src/App.tsx` above the catch-all.
@@ -116,11 +119,14 @@ A first implementation step is confirming that WAX's `eosio.system` calls `requi
 
 ## Part 3 — Build and deploy
 
-Reuse the Docker workflow from the previous guide: compile in the Antelope CDT container to produce `ramcheese.wasm` and `ramcheese.abi`, deploy to `ram.cheese` with `cleos set contract` or the block explorer upload, then call `setconfig` once with the CHEESE/WAX Alcor pool id, the limits, the reference rate, and the liquid reserve floor. Test the whole flow on WAX testnet with a mock CHEESE token before going to mainnet.
+Reuse the Docker workflow from the previous guide: compile in the Antelope CDT container to produce `ramcheese.wasm` and `ramcheese.abi`, deploy to `ram.cheese` with `cleos set contract` or the block explorer upload, then call `setconfig` and `setsellcfg` once each with the CHEESE/WAX Alcor pool id, the limits, the reference rate, the liquid WAX reserve floor, and the CHEESE pool floor. Test both directions on WAX testnet with a mock CHEESE token before going to mainnet, and confirm the `ramtransfer` notification actually reaches the contract there before writing the frontend sell flow.
 
 ## Technical notes and risks
 - **RAM price moves with every trade.** The frontend estimate is indicative only; the contract spends a fixed WAX amount and the bytes received are whatever the Bancor market gives at execution time. The UI should say so, exactly like the CHEESEUp estimate disclaimer.
 - **Staked WAX cannot buy RAM.** Only the liquid balance is spendable, which is why `min_liquid_reserve` and the admin `stake` and `unstake` actions exist. If the liquid pool runs dry, purchases fail with a readable error instead of a confusing revert.
 - **Price manipulation.** The `reference_rate` and `max_deviation_pct` guard from `cheesepowerz` carries over unchanged and should be kept current.
 - **RAM sold to the receiver is theirs.** They can sell it back for WAX at market, so a rate error in the buyer's favour is not recoverable; the deviation guard and a conservative `max_cheese` are the main protections.
+- **The sell pool is finite.** With admin deposits as the only inflow, sustained selling empties it. Selling gets paused automatically at the floor, and refilling is a manual deposit. If that becomes a chore, the natural upgrade later is diverting a configurable share of buy CHEESE into the pool instead of nulling it, which is a config-level change rather than a redesign.
+- **Round-trip loss is real for users.** Buying and immediately selling RAM loses the system's 0.5% RAM sale fee plus whatever the Bancor curve moved, even with no contract spread. The UI should show the payout estimate clearly so nobody expects a break-even round trip.
+- **RAM cannot be un-transferred.** Once a user sends bytes via `ramtransfer`, the contract owns them. The sell handler must never be able to accept RAM and then fail to pay: the CHEESE pool check happens before `sellram` is sent, so an underfunded pool aborts the whole transaction and the RAM stays with the user.
 - **Admin key hygiene.** Prefer a dedicated permission on `ram.cheese` limited to the admin actions rather than using the full `active` key day to day.
