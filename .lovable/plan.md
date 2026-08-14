@@ -15,6 +15,31 @@ docker --version
 
 You should see a version number. If you see "command not found", Docker Desktop is not installed or not running. Open Docker Desktop and wait until its whale icon stops animating, then try again.
 
+### If you get `failed to connect to the docker API at npipe:////./pipe/docker_engine`
+That exact error (Windows) means Docker is installed but **the engine is not running**. `docker` the command exists, but there is no daemon behind it. Nothing is broken. Do this, in order, and stop as soon as `docker run hello-world` works:
+
+1. Press Start, type `Docker Desktop`, press Enter. Leave it open. Watch the whale icon in the system tray (bottom-right, you may need to click the `^` arrow): while it is animating, the engine is still booting. Wait until the Docker Desktop window says **Engine running** in the bottom-left corner. First launch after installing can take 2-3 minutes.
+2. Back in PowerShell, test with the smallest possible command:
+   ```powershell
+   docker run hello-world
+   ```
+   If you get "Hello from Docker!", the engine is up — go back and retry `docker pull antelopeio/cdt:latest`.
+3. If Docker Desktop shows an error instead of "Engine running", it almost always names WSL2. Open PowerShell **as Administrator** (right-click Start -> Terminal (Admin)) and run:
+   ```powershell
+   wsl --install
+   wsl --update
+   ```
+   Then reboot Windows and reopen Docker Desktop.
+4. If Docker Desktop refuses to start at all, right-click the Start button -> Terminal (Admin) and run:
+   ```powershell
+   Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -NoRestart
+   Enable-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform -NoRestart
+   ```
+   Reboot, then open Docker Desktop again. On some machines virtualisation is switched off in the BIOS/UEFI — if Docker complains about that specifically, enable "Intel VT-x" / "AMD-V" (sometimes labelled SVM) in your BIOS setup screen.
+5. If you closed Docker Desktop earlier and want it to start with Windows: in Docker Desktop go to Settings -> General -> tick "Start Docker Desktop when you sign in".
+
+Rule of thumb for the rest of this guide: **Docker Desktop must be open and showing "Engine running" before any `docker` command will work.** Every `docker pull` and `docker run` step below assumes it is.
+
 ## Step 2 — Install VS Code
 Do this: download VS Code from code.visualstudio.com and install it. Open it. Click the four-squares icon in the left bar (Extensions). In the search box type each of these and click Install:
 
