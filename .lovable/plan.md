@@ -1,43 +1,56 @@
-# Building and deploying `ram.cheese` — a first-timer's guide
+# Building and deploying `ram.cheese` — do this, in this order
 
-Everything below assumes you have never compiled a smart contract before. The project folder is called `ram.cheese`, and the compiled contract gets deployed to the WAX account `ram.cheese`.
+You have never done this before, so every step below tells you exactly what to click, what to type, and how to know it worked. Do them in order. Do not skip Step 8.
 
-One naming note up front: a *folder* on your computer can contain a dot, and so can a WAX account name — so both are `ram.cheese`. But a C++ class name cannot contain a dot, so the code files inside the folder are named `ramcheese.cpp` / `ramcheese.hpp` and the build target is `ramcheese`. That mismatch is normal and changes nothing about deployment: the account you deploy *to* is chosen at deploy time, not at compile time.
+The folder on your computer is called `ram.cheese`. The WAX account you deploy to is also called `ram.cheese`. The code files inside are called `ramcheese.cpp` and `ramcheese.hpp` — no dot — because a C++ class name is not allowed to contain a dot. That is the only place the names differ, and it changes nothing about deployment.
 
 ## Step 1 — Install Docker Desktop
-Docker runs the WAX compiler inside a small pre-built Linux environment, so you never install a compiler by hand.
+Do this: go to docker.com/products/docker-desktop, download the version for your operating system, install it, then launch it. On Windows, if it asks to enable WSL2, click yes.
 
-1. Go to docker.com/products/docker-desktop and download the version for your operating system.
-2. Install it and start it. On Windows it may ask to enable WSL2 — accept.
-3. Confirm it works: open a terminal (PowerShell on Windows, Terminal on macOS/Linux) and run `docker --version`. A version number means you are done.
+Then open a terminal — PowerShell on Windows (press Start, type `powershell`, Enter), Terminal on macOS (press Cmd+Space, type `terminal`, Enter) — and type:
+
+```bash
+docker --version
+```
+
+You should see a version number. If you see "command not found", Docker Desktop is not installed or not running. Open Docker Desktop and wait until its whale icon stops animating, then try again.
 
 ## Step 2 — Install VS Code
-1. Download from code.visualstudio.com and install.
-2. Open the Extensions panel (the four-squares icon) and install:
-   - **C/C++** by Microsoft — syntax highlighting and error squiggles
-   - **CMake Tools** by Microsoft — understands the build file
-   - **Dev Containers** by Microsoft — optional, used in Step 7
+Do this: download VS Code from code.visualstudio.com and install it. Open it. Click the four-squares icon in the left bar (Extensions). In the search box type each of these and click Install:
 
-## Step 3 — Create your project folder
-1. Make a folder somewhere easy, for example `Documents/wax-contracts/ram.cheese`.
-2. In VS Code: File -> Open Folder -> pick that folder.
-3. Inside it, create this structure (right-click in the VS Code file panel -> New File / New Folder):
+- `C/C++` by Microsoft
+- `CMake Tools` by Microsoft
+- `Dev Containers` by Microsoft
+
+## Step 3 — Create the project folder
+Do this: create a folder named exactly `ram.cheese`, for example at `Documents/wax-contracts/ram.cheese`.
+
+In VS Code click File -> Open Folder, select that `ram.cheese` folder, and click Open. The left panel now shows your empty folder.
+
+## Step 4 — Create the three files inside it
+You are making this exact layout:
 
 ```text
 ram.cheese/
 ├── src/
 │   └── ramcheese.cpp        <- the contract logic
 ├── include/
-│   └── ramcheese.hpp        <- the contract's declarations (tables, actions)
+│   └── ramcheese.hpp        <- the declarations: tables, action names
 └── CMakeLists.txt           <- the build instructions
 ```
 
-Why the split: the `.hpp` header declares what exists (the contract class, its tables, its action names), and the `.cpp` contains the actual code for each action. The compiler reads the header first, then the source.
+Do this, in the VS Code left panel:
 
-## Step 4 — Understanding `CMakeLists.txt` line by line
-This is the file that confused you, so here is every line explained. CMake is not the compiler. CMake is a *recipe reader*: it reads `CMakeLists.txt`, works out which files to compile and in what order, and then writes the low-level build commands that `make` actually runs. You write the short recipe; CMake writes the long boring part.
+1. Right-click the empty space under the folder name -> New Folder -> type `src` -> Enter.
+2. Right-click the empty space again -> New Folder -> type `include` -> Enter.
+3. Right-click the `src` folder -> New File -> type `ramcheese.cpp` -> Enter.
+4. Right-click the `include` folder -> New File -> type `ramcheese.hpp` -> Enter.
+5. Right-click the empty space (not inside either folder) -> New File -> type `CMakeLists.txt` -> Enter. The capital letters matter; `cmakelists.txt` will not be found.
 
-Here is the complete file for this project:
+Why two code files: the `.hpp` header is the list of what exists — the contract class, its tables, its action names. The `.cpp` holds the actual code for each action. The compiler reads the header first, then the source. Leave both empty for now; you will paste the contract code in later.
+
+## Step 5 — Fill in `CMakeLists.txt`, and understand what you typed
+Do this: click `CMakeLists.txt` in the left panel to open it, paste the five lines below exactly, then press Ctrl+S (Cmd+S on Mac) to save.
 
 ```cmake
 cmake_minimum_required(VERSION 3.16)
@@ -47,42 +60,49 @@ add_contract(ramcheese ramcheese src/ramcheese.cpp)
 target_include_directories(ramcheese PRIVATE ${CMAKE_SOURCE_DIR}/include)
 ```
 
-Line by line:
+First, what CMake even is, because this is the part that confused you. CMake is **not** the compiler. CMake is a recipe reader. It reads `CMakeLists.txt`, works out which files need compiling and in what order, and then writes out the long, boring, low-level build commands for you. A second tool called `make` then runs those commands, and the compiler does the actual work. You write five short lines; CMake writes the hundreds you never see.
 
-**`cmake_minimum_required(VERSION 3.16)`**
-"Refuse to continue if the CMake in this environment is older than 3.16." Older versions do not understand some of the syntax below. It is a safety check, nothing more. The CDT Docker image ships a newer CMake, so this always passes.
+Now each line, one at a time.
 
-**`project(ramcheese)`**
-Gives the whole build a name. It mostly affects labels in build output and some default variables. Cosmetic — but required, because CMake expects every recipe to declare a project.
+**Line 1 — `cmake_minimum_required(VERSION 3.16)`**
+Means: "stop immediately if the CMake here is older than version 3.16." Older versions do not understand some of the syntax below, so this is a seatbelt. The Docker image you pull in Step 6 has a newer CMake, so this line always passes. You will never need to change it.
 
-**`find_package(cdt)`**
-The important one. CDT is the WAX/Antelope Contract Development Toolkit — the actual compiler (`cdt-cpp`) plus WAX's smart-contract libraries. This line says "go find CDT on this machine and load its extra CMake commands." Loading it is what makes the next line, `add_contract`, exist at all — `add_contract` is not built into CMake, it comes from CDT. This is also why the build must run inside the Docker image: outside it, CDT is not installed and this line fails with "Could not find a package configuration file provided by cdt".
+**Line 2 — `project(ramcheese)`**
+Means: "the name of this build is ramcheese." It mostly just labels the build output. It is cosmetic, but CMake refuses to run without it, so it must be there.
 
-**`add_contract(ramcheese ramcheese src/ramcheese.cpp)`**
-This is the build order. It takes three kinds of argument, and the first two being identical is what looks confusing:
+**Line 3 — `find_package(cdt)`**
+This is the important line. CDT stands for Contract Development Toolkit: it is the real WAX/Antelope C++ compiler plus WAX's smart-contract libraries. This line means "find CDT on this machine and load its extra commands."
 
-1. First `ramcheese` — the **contract name**. This is baked into the generated `.abi` file.
-2. Second `ramcheese` — the **CMake target name**, an internal label for this build job. You reuse this label in later lines (as in the `target_include_directories` line below) to refer back to "the thing I am building".
-3. `src/ramcheese.cpp` — the **source file(s)**. You can list more than one, space-separated, if you later split the code across several `.cpp` files.
+Loading CDT is what makes line 4 possible at all — `add_contract` is not a built-in CMake command, it comes from CDT. This is also exactly why you must build inside the Docker image: on your own machine CDT is not installed, and this line fails with `Could not find a package configuration file provided by cdt`. If you ever see that error, you ran the build outside the container.
 
-The output filenames come from the target name, so this line is what produces `ramcheese.wasm` and `ramcheese.abi`.
+**Line 4 — `add_contract(ramcheese ramcheese src/ramcheese.cpp)`**
+This is the actual build order: "build a contract out of this source file." It takes three arguments, and the first two being the same word is what makes it look strange:
 
-**`target_include_directories(ramcheese PRIVATE ${CMAKE_SOURCE_DIR}/include)`**
-Tells the compiler where to look for header files. Without it, `#include "ramcheese.hpp"` inside your `.cpp` may not be found, because the header lives in `include/` while the source lives in `src/`.
-- `ramcheese` — which build target this applies to (the target name from the line above).
-- `PRIVATE` — this include path is only for building this contract, not for anything that might depend on it. For a standalone contract, `PRIVATE` is always the right choice.
-- `${CMAKE_SOURCE_DIR}` — a CMake variable meaning "the folder containing this `CMakeLists.txt`". Using it instead of a hard-coded path keeps the file working on any machine.
+1. The first `ramcheese` is the **contract name**. It gets written into the generated `.abi` file.
+2. The second `ramcheese` is the **target name** — an internal nickname for this build job, which you reuse in line 5 to point back at "the thing I am building".
+3. `src/ramcheese.cpp` is the **source file**. If you later split your code into more `.cpp` files, list them here separated by spaces.
 
-Mental summary: *require a modern CMake, name the project, load the WAX toolchain, build these sources into a contract called ramcheese, and look in `include/` for headers.* That is the whole file.
+The output file names come from the target name, so this line is what produces `ramcheese.wasm` and `ramcheese.abi`.
 
-## Step 5 — Get the WAX compiler (CDT) through Docker
-You pull the compiler image once.
+**Line 5 — `target_include_directories(ramcheese PRIVATE ${CMAKE_SOURCE_DIR}/include)`**
+Means: "when compiling ramcheese, also look in the `include` folder for header files." Without this line, the `#include "ramcheese.hpp"` at the top of your `.cpp` fails, because the header sits in `include/` while the source sits in `src/` and the compiler does not go looking on its own.
+
+- `ramcheese` — which build job this applies to (the target name from line 4).
+- `PRIVATE` — this search path is only for building this contract, not for anything that might later depend on it. For a standalone contract, `PRIVATE` is always correct.
+- `${CMAKE_SOURCE_DIR}` — a CMake variable meaning "the folder that contains this CMakeLists.txt". Using it instead of typing `C:/Users/you/Documents/...` keeps the file working on any computer.
+
+Read as one sentence: *require a modern CMake, name the build ramcheese, load the WAX toolchain, build `src/ramcheese.cpp` into a contract called ramcheese, and look in `include/` for headers.* That is the entire file, and you will not need to touch it again unless you add another `.cpp`.
+
+## Step 6 — Download the WAX compiler with Docker
+Do this: in your terminal, type:
 
 ```bash
 docker pull antelopeio/cdt:latest
 ```
 
-If that image name is unavailable, try these in order until one succeeds:
+You know it worked when the last line says `Status: Downloaded newer image for ...`. Confirm with `docker images` — it should be listed.
+
+If that name is unavailable, try these one at a time until one succeeds:
 
 ```bash
 docker pull ghcr.io/antelopeio/cdt:latest
@@ -90,10 +110,12 @@ docker pull eostudio/eosio.cdt:latest
 docker pull waxteam/dev:latest
 ```
 
-Write down which image name worked — you use it in the next step. Success looks like `Status: Downloaded newer image for ...`, and the image appears in `docker images`.
+Write down whichever name worked. You type it in the next step where it says `IMAGE_NAME`.
 
-## Step 6 — Compile the contract
-Run this from inside your project folder, replacing `IMAGE_NAME` with the image that pulled successfully.
+## Step 7 — Compile
+Do this: in the terminal, move into your project folder first. Type `cd` then a space, then drag the `ram.cheese` folder from your file manager onto the terminal window (that pastes the path), then Enter.
+
+Now run the command for your system, replacing `IMAGE_NAME` with the image from Step 6.
 
 macOS / Linux:
 ```bash
@@ -107,22 +129,22 @@ docker run --rm -v "${PWD}:/project" -w /project IMAGE_NAME `
   bash -c "mkdir -p build && cd build && cmake .. && make"
 ```
 
-What each part does:
-- `--rm` — delete the container afterwards, so nothing accumulates on your machine.
-- `-v "$(pwd)":/project` — share your current folder with the container as `/project`, so it can read your code and write results back to your real folder.
+What you just typed:
+- `--rm` — throw the container away when it finishes, so nothing piles up on your machine.
+- `-v "$(pwd)":/project` — share your current folder with the container as `/project`, so it can read your code and write the results back into your real folder.
 - `-w /project` — start inside that shared folder.
-- `mkdir -p build && cd build` — keep generated files in a `build/` folder instead of mixing them with your source.
-- `cmake ..` — read `CMakeLists.txt` in the parent folder and generate the real build commands.
-- `make` — actually run the compiler.
+- `mkdir -p build && cd build` — keep generated junk in a `build` folder instead of mixing it with your code.
+- `cmake ..` — read `CMakeLists.txt` in the folder above and generate the real build commands.
+- `make` — run them. This is where compiling actually happens.
 
-Success looks like a new `build/` folder containing:
+You know it worked when a `build` folder appears containing:
 - `ramcheese.wasm` — the compiled contract
-- `ramcheese.abi` — the interface description that wallets and explorers read
+- `ramcheese.abi` — the interface file wallets and explorers read
 
-Both files are required for deployment. If the build fails, the error names a file and line number — that is a code problem, not a Docker problem. If instead it says it cannot find package `cdt`, you are running outside the CDT image.
+You need both to deploy. If it fails and names a file and a line number, that is a mistake in your C++, not in Docker. If it says it cannot find package `cdt`, you ran the build outside the container — recheck the `IMAGE_NAME`.
 
-## Step 7 (optional) — Make VS Code build inside Docker automatically
-So you stop typing the long docker command. Create `.devcontainer/devcontainer.json`:
+## Step 8 (optional) — Stop typing the long docker command
+Do this: right-click empty space in the VS Code panel -> New Folder -> `.devcontainer`. Inside it create `devcontainer.json` and paste:
 
 ```json
 {
@@ -136,78 +158,90 @@ So you stop typing the long docker command. Create `.devcontainer/devcontainer.j
 }
 ```
 
-Press F1 in VS Code and choose "Dev Containers: Reopen in Container". VS Code now runs inside the WAX toolchain, so its built-in terminal already has `cdt-cpp` and `cmake`, and you can just run `mkdir -p build && cd build && cmake .. && make`.
+Replace `IMAGE_NAME` with your image, save, press F1, type `Reopen in Container`, and pick "Dev Containers: Reopen in Container". VS Code now runs inside the WAX toolchain, so in its built-in terminal you can simply run:
 
-## Step 8 — Test on WAX testnet first
-Deploying a broken contract to mainnet costs real WAX and can lock funds.
+```bash
+mkdir -p build && cd build && cmake .. && make
+```
 
-1. Create a free testnet account through a WAX testnet faucet such as https://waxsweden.org/testnet/
-2. Deploy there first using Step 9 or 10, but point at a testnet endpoint such as `https://testnet.waxsweden.org`.
-3. Call the actions and check the tables look correct before touching mainnet. For `ram.cheese` specifically, test a CHEESE-in buy and a RAM-in sell with a mock token before mainnet.
+## Step 9 — Deploy to WAX testnet first. Do not skip this.
+A broken contract on mainnet costs real WAX and can lock funds.
 
-## Step 9 — Deploy option A: the WAX block explorer (easiest, no keys typed)
-This is the route described in the statement you quoted.
+Do this:
+1. Create a free testnet account at a faucet such as https://waxsweden.org/testnet/ and save the keys it gives you.
+2. Deploy there using Step 10 or Step 11, but point at a testnet endpoint: `https://testnet.waxsweden.org`.
+3. Call each action once and look at the tables in the explorer. For `ram.cheese`, send a mock CHEESE transfer to test a buy and a `ramtransfer` to test a sell.
+4. Only when both work, repeat on mainnet.
 
-1. Go to https://wax.bloks.io (or https://waxblock.io), open the `ram.cheese` account, then the contract deploy tool.
-2. Connect your wallet (Anchor, Wombat, or WAX Cloud Wallet) and log in as `ram.cheese`.
-3. Upload `build/ramcheese.wasm` and `build/ramcheese.abi`.
-4. Review the transaction — it contains two actions, `eosio::setcode` and `eosio::setabi`.
-5. Sign it in your wallet.
-6. Copy the transaction ID and confirm it at `https://waxblock.io/transaction/<txid>`.
+## Step 10 — Deploy option A: the block explorer (easiest, you never type a private key)
+This is the route the person you quoted used.
+
+Do this:
+1. Go to https://waxblock.io (or https://wax.bloks.io) and open the `ram.cheese` account, then its contract deploy tool.
+2. Click Login, choose your wallet (Anchor, Wombat, or WAX Cloud Wallet) and log in as `ram.cheese`.
+3. Upload `build/ramcheese.wasm` in the WASM field and `build/ramcheese.abi` in the ABI field.
+4. Read the transaction preview. It should contain two actions: `eosio::setcode` and `eosio::setabi`. If it does not, you uploaded the wrong files.
+5. Click Sign / Submit and approve it in your wallet.
+6. Copy the transaction ID and open `https://waxblock.io/transaction/<txid>` to confirm it executed.
 
 If it fails with a RAM error, buy more RAM on `ram.cheese` and retry.
 
-## Step 10 — Deploy option B: command line with cleos
-Better for repeat deployments.
+## Step 11 — Deploy option B: command line with cleos
+Use this once you are deploying repeatedly.
 
-1. Pull the Leap image, which contains `cleos` and `keosd`:
+Do this:
+1. Pull the image that contains `cleos`:
    ```bash
    docker pull antelopeio/leap:latest
    ```
-2. Start it with your project mounted:
+2. From your project folder, start it:
    ```bash
    docker run --rm -it -v "$(pwd)":/project -w /project antelopeio/leap:latest bash
    ```
-3. Inside the container, create a wallet and import your key:
+   You are now typing inside the container.
+3. Create a wallet and load your key:
    ```bash
    keosd &
    cleos wallet create --to-console
    cleos wallet import
    ```
-   `cleos wallet import` prompts for the private key so it never lands in your shell history. Save the wallet password it prints.
+   `cleos wallet create --to-console` prints a password — copy it somewhere safe, you need it to unlock the wallet later. `cleos wallet import` then prompts for your private key, so it never appears in your shell history. Never paste a private key directly on a command line.
 4. Deploy:
    ```bash
    cleos -u https://wax.greymass.com set contract ram.cheese ./build ramcheese.wasm ramcheese.abi
    ```
-5. Verify:
+5. Check it landed:
    ```bash
    cleos -u https://wax.greymass.com get code ram.cheese
    ```
-   The returned code hash should be non-zero.
+   The code hash it prints must not be all zeros. All zeros means nothing deployed.
 
-Alternative WAX endpoints if one is rate-limited: `https://wax.eosphere.io`, `https://api.wax.alohaeos.com`, `https://wax.pink.gg`.
+If an endpoint is rate-limited, swap `-u` for `https://wax.eosphere.io`, `https://api.wax.alohaeos.com`, or `https://wax.pink.gg`.
 
-## Step 11 — After deploying `ram.cheese`
-1. Add `eosio.code` to the account's `active` permission, so the contract can sign its own inline actions (`buyram`, `sellram`, CHEESE transfers). Without this every action fails with a missing-authority error.
-2. Call `setconfig` once with the CHEESE/WAX Alcor pool id, min/max CHEESE, the reference rate, the max deviation percent, and the liquid WAX reserve floor.
-3. Call `setsellcfg` once with the sell toggle, min/max sell bytes, and the CHEESE pool floor.
-4. Fund it: send WAX for the buy reserve, and CHEESE with memo `deposit` for the sell payout pool.
+## Step 12 — Set the contract up after deploying
+A freshly deployed contract does nothing until you configure it. Do this, in this order:
 
-## Step 12 — Safety practices
-- Create a dedicated permission (for example `deployer`) with parent `active`, linked only to `eosio::setcode` and `eosio::setabi`, and deploy with that instead of your full `active` key.
-- Keep private keys out of git. Add any wallet password or `.key` files to `.gitignore`.
-- Once the contract manages real value, move control to a multisig so nobody can silently replace the code.
+1. Add `eosio.code` to the `active` permission of `ram.cheese`. In waxblock.io: open the account -> Permissions -> edit `active` -> add `ram.cheese@eosio.code` as an authority -> sign. Without this, every inline action (`buyram`, `sellram`, CHEESE transfers) fails with a missing-authority error.
+2. Call `setconfig` once, with the CHEESE/WAX Alcor pool id, min and max CHEESE per purchase, the reference rate, the max deviation percent, and the liquid WAX reserve floor.
+3. Call `setsellcfg` once, with the sell on/off switch, min and max sell bytes, and the CHEESE pool floor.
+4. Fund it: send WAX to `ram.cheese` for the buy reserve (no memo needed), and send CHEESE with the memo `deposit` to fill the sell payout pool.
+5. Confirm on waxblock.io that the `config` and `stats` tables now show your values.
+
+## Step 13 — Safety, before real money touches it
+- Create a dedicated permission on `ram.cheese` called `deployer`, with parent `active`, linked only to `eosio::setcode` and `eosio::setabi`. Deploy with that key from then on, not your full `active` key.
+- Never commit private keys. Add any `.key` files and wallet passwords to `.gitignore`.
+- Once the contract holds real value, move control to a multisig so no single key can silently replace the code.
 
 ## Quick reference
 | What | Where to get it | Why |
 | --- | --- | --- |
-| Docker Desktop | docker.com/products/docker-desktop | Runs the WAX compiler without manual install |
+| Docker Desktop | docker.com/products/docker-desktop | Runs the WAX compiler without installing one |
 | VS Code | code.visualstudio.com | Writing the C++ contract |
-| CDT Docker image | `docker pull` in Step 5 | Compiles `.cpp` into `.wasm` and `.abi` |
-| Leap Docker image | `docker pull antelopeio/leap` | `cleos` for command-line deployment |
+| CDT Docker image | `docker pull` in Step 6 | Turns `.cpp` into `.wasm` and `.abi` |
+| Leap Docker image | `docker pull antelopeio/leap` | Gives you `cleos` for CLI deployment |
 | `ram.cheese` account with RAM | Any WAX wallet or Anchor | Holds and pays for the contract |
-| Testnet account | A WAX testnet faucet | Safe place to test first |
-| bloks.io / waxblock.io | Browser | Upload without the CLI, and verify transactions |
+| Testnet account | A WAX testnet faucet | Safe place to break things first |
+| waxblock.io / bloks.io | Browser | Upload without the CLI, and verify transactions |
 
-## Adding this to CHEESEHub later
-Optional and not part of this task: a `contracts/ramcheese/` folder with the C++ source and `CMakeLists.txt`, a `contracts/build.sh` wrapper around the Docker command, and a GitHub Actions workflow that compiles on every push so the `.wasm` and `.abi` are always reproducible.
+## Later, if the contract should live in the CHEESEHub repo
+Not part of this task. It would be a `contracts/ramcheese/` folder with the C++ source and `CMakeLists.txt`, a `contracts/build.sh` wrapper around the Docker command, and a GitHub Actions workflow that compiles on every push so the `.wasm` and `.abi` are always reproducible.
