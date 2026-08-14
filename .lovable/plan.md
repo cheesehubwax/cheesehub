@@ -1,141 +1,213 @@
-# CHEESERam — `ram.cheese` Smart Contract + CHEESEHub dApp
+# Building and deploying `ram.cheese` — a first-timer's guide
 
-Buy WAX RAM with $CHEESE, and sell RAM back for $CHEESE. On a buy, the contract values the incoming CHEESE in WAX from the Alcor CHEESE/WAX pool, spends that much WAX from its liquid reserve on `eosio::buyram` for the recipient, and sends every CHEESE it received to `eosio.null`. On a sell, the user transfers RAM bytes to the contract, the contract sells them for WAX (keeping the WAX) and pays the seller CHEESE from its own CHEESE pool. Same shape as `cheesepowerz`, but for RAM.
+Everything below assumes you have never compiled a smart contract before. The project folder is called `ramcheese`, the contract file names are `ramcheese.cpp` / `ramcheese.hpp`, and the compiled contract gets deployed to the WAX account `ram.cheese`.
 
-## Confirmed decisions
-- Users can enter either a CHEESE amount or a target RAM size (two tabs).
-- No margin: the full WAX equivalent of the CHEESE is spent on RAM.
-- The memo can name any existing account as the RAM receiver; it defaults to the sender.
-- Selling pays out at the same Alcor rate as buying, with no spread.
-- The sell-side CHEESE pool is funded by admin deposits only. CHEESE from buys is still nulled in full, and sells are disabled automatically when the pool runs low.
+One naming note up front: WAX account names may contain a dot (`ram.cheese`), but C++ class names and CMake target names may not. So the account is `ram.cheese` while every file and build target is `ramcheese`. That mismatch is normal and does not affect deployment — the account you deploy *to* is chosen at deploy time, not at compile time.
 
-## How a purchase flows
+## Step 1 — Install Docker Desktop
+Docker runs the WAX compiler inside a small pre-built Linux environment, so you never install a compiler by hand.
+
+1. Go to docker.com/products/docker-desktop and download the version for your operating system.
+2. Install it and start it. On Windows it may ask to enable WSL2 — accept.
+3. Confirm it works: open a terminal (PowerShell on Windows, Terminal on macOS/Linux) and run `docker --version`. A version number means you are done.
+
+## Step 2 — Install VS Code
+1. Download from code.visualstudio.com and install.
+2. Open the Extensions panel (the four-squares icon) and install:
+   - **C/C++** by Microsoft — syntax highlighting and error squiggles
+   - **CMake Tools** by Microsoft — understands the build file
+   - **Dev Containers** by Microsoft — optional, used in Step 7
+
+## Step 3 — Create your project folder
+1. Make a folder somewhere easy, for example `Documents/wax-contracts/ramcheese`.
+2. In VS Code: File -> Open Folder -> pick that folder.
+3. Inside it, create this structure (right-click in the VS Code file panel -> New File / New Folder):
 
 ```text
-User  --transfer CHEESE, memo "recipient"-->  ram.cheese
-                                                 |
-                          read swap.alcor pool   |  WAX-per-CHEESE rate
-                          check price deviation  |  (reject manipulated rates)
-                                                 |
-                          eosio::buyram          |  payer=ram.cheese, receiver=recipient
-                          cheeseburger::transfer |  quantity sent to eosio.null
-                          update stats + logbuy  |
+ramcheese/
+├── src/
+│   └── ramcheese.cpp        <- the contract logic
+├── include/
+│   └── ramcheese.hpp        <- the contract's declarations (tables, actions)
+└── CMakeLists.txt           <- the build instructions
 ```
 
-## How a sale flows
+Why the split: the `.hpp` header declares what exists (the contract class, its tables, its action names), and the `.cpp` contains the actual code for each action. The compiler reads the header first, then the source.
 
-```text
-User  --eosio::ramtransfer(bytes)-->  ram.cheese
-                                         |
-                  eosio::sellram(bytes)  |  contract sells the received RAM, keeps the WAX
-                  read swap.alcor pool   |  WAX-per-CHEESE rate + deviation guard
-                  cheeseburger::transfer |  CHEESE pool pays the seller
-                  update stats + logsell |
+## Step 4 — Understanding `CMakeLists.txt` line by line
+This is the file that confused you, so here is every line explained. CMake is not the compiler. CMake is a *recipe reader*: it reads `CMakeLists.txt`, works out which files to compile and in what order, and then writes the low-level build commands that `make` actually runs. You write the short recipe; CMake writes the long boring part.
+
+Here is the complete file for this project:
+
+```cmake
+cmake_minimum_required(VERSION 3.16)
+project(ramcheese)
+find_package(cdt)
+add_contract(ramcheese ramcheese src/ramcheese.cpp)
+target_include_directories(ramcheese PRIVATE ${CMAKE_SOURCE_DIR}/include)
 ```
 
-WAX has `eosio::ramtransfer(from, to, bytes, memo)`, so RAM can be handed to a contract account. The contract then owns those bytes and can legitimately call `eosio::sellram` on itself. The WAX proceeds stay in the reserve, which is exactly what makes the buy side sustainable: buys drain WAX and null CHEESE, sells refill WAX and drain the CHEESE pool.
+Line by line:
 
-## Part 1 — The contract (`contracts/ramcheese/`)
+**`cmake_minimum_required(VERSION 3.16)`**
+"Refuse to continue if the CMake in this environment is older than 3.16." Older versions do not understand some of the syntax below. It is a safety check, nothing more. The CDT Docker image ships a newer CMake, so this always passes.
 
-New C++ contract mirroring the structure of `cheesepowerz`, deployed to the `ram.cheese` account.
+**`project(ramcheese)`**
+Gives the whole build a name. It mostly affects labels in build output and some default variables. Cosmetic — but required, because CMake expects every recipe to declare a project.
 
-### Tables
-- `config` singleton: `admin`, `min_cheese`, `max_cheese`, `enabled`, `alcor_market_id` (CHEESE/WAX pool), `reference_rate`, `max_deviation_pct`, `min_liquid_reserve` (WAX that must remain liquid after a purchase, so the pool is never drained to zero), plus the sell-side settings `sell_enabled`, `min_sell_bytes`, `max_sell_bytes`, and `min_cheese_pool` (the CHEESE floor below which sells are refused).
-- `stats` table (single row): `total_purchases`, `total_cheese_received`, `total_wax_spent`, `total_bytes_sold`, `total_sales`, `total_bytes_bought_back`, `total_cheese_paid_out`, `total_wax_received`.
-- Read-only external mirrors, copied from `cheesepowerz`: `swap.alcor::pools` for the rate, and `eosio.token::accounts` for the contract's own liquid WAX balance. Plus `eosio::rammarket` so the contract can report the bytes purchased.
+**`find_package(cdt)`**
+The important one. CDT is the WAX/Antelope Contract Development Toolkit — the actual compiler (`cdt-cpp`) plus WAX's smart-contract libraries. This line says "go find CDT on this machine and load its extra CMake commands." Loading it is what makes the next line, `add_contract`, exist at all — `add_contract` is not built into CMake, it comes from CDT. This is also why the build must run inside the Docker image: outside it, CDT is not installed and this line fails with "Could not find a package configuration file provided by cdt".
 
-### Actions
-- `setconfig(admin, min_cheese, max_cheese, enabled, alcor_market_id, reference_rate, max_deviation_pct, min_liquid_reserve)` — admin only.
-- `setrate(reference_rate, max_deviation_pct)` — quick rate-guard update, admin only.
-- `withdraw(name to, asset quantity)` — admin-only escape hatch for treasury management. There are no `stake` / `unstake` actions: staking, unstaking, and vote reward claims are handled manually from the account owner's wallet, so the contract only ever spends the liquid balance it already has.
-- `logbuy(sender, recipient, cheese_sent, wax_spent, bytes_bought)` — inline notification action so the purchase appears in both accounts' history, the same trick `logpowerup` uses.
-- `[[eosio::on_notify("cheeseburger::transfer")]] on_cheese_transfer(from, to, quantity, memo)` — the entry point.
-- `setsellcfg(sell_enabled, min_sell_bytes, max_sell_bytes, min_cheese_pool)` — admin only, tunes the sell side without touching the buy config.
-- `logsell(seller, bytes_sold, wax_received, cheese_paid)` — inline notification action so the sale lands in the seller's account history.
-- `[[eosio::on_notify("eosio::ramtransfer")]] on_ram_transfer(from, to, bytes, memo)` — the sell entry point.
+**`add_contract(ramcheese ramcheese src/ramcheese.cpp)`**
+This is the build order. It takes three kinds of argument, and the first two being identical is what looks confusing:
 
-### Sell-side entry point
-A first implementation step is confirming that WAX's `eosio.system` calls `require_recipient` on the `to` account for `ramtransfer`. If it does, `on_notify("eosio::ramtransfer")` is all that is needed. If it does not notify, the fallback is to listen on `eosio::logramchange` (which notifies the owner whose RAM changed) and reconcile against a pending-sell row the user creates with an explicit `sellram` action in the same transaction. The plan assumes the notification path and treats the fallback as a contingency.
+1. First `ramcheese` — the **contract name**. This is baked into the generated `.abi` file.
+2. Second `ramcheese` — the **CMake target name**, an internal label for this build job. You reuse this label in later lines (as in the `target_include_directories` line below) to refer back to "the thing I am building".
+3. `src/ramcheese.cpp` — the **source file(s)**. You can list more than one, space-separated, if you later split the code across several `.cpp` files.
 
-### `on_cheese_transfer` logic
-1. Ignore outgoing and self transfers.
-2. `check(config.enabled)`, symbol is CHEESE, amount within `min_cheese` and `max_cheese`.
-3. Parse the memo: empty means the sender, otherwise the memo is the receiver account name. `check(is_account(recipient))`.
-4. Read `wax_per_cheese` from the Alcor pool, `check(rate > 0)`, then run the deviation guard against `reference_rate`.
-5. Convert: `wax_units = cheese_amount * wax_per_cheese`, rounded to WAX's 8 decimals. `check(wax_units > 0)`.
-6. Read the contract's own liquid WAX from `eosio.token::accounts` and require that `liquid - wax_to_spend` stays at or above `min_liquid_reserve`, with a clear error telling the user to try a smaller amount.
-7. Compute the bytes the purchase will yield from the `eosio::rammarket` Bancor reserves, for stats and the log.
-8. Send `eosio::buyram` with `payer: ram.cheese`, `receiver: recipient`, `quant: wax_to_spend`.
-9. Send `cheeseburger::transfer` from `ram.cheese` to `eosio.null` for the full received quantity.
-10. Update `stats` and send the `logbuy` inline action.
+The output filenames come from the target name, so this line is what produces `ramcheese.wasm` and `ramcheese.abi`.
 
-### `on_ram_transfer` logic
-1. Ignore transfers where `to` is not the contract, and ignore the contract's own outgoing transfers.
-2. `check(config.sell_enabled)` and require `bytes` to sit between `min_sell_bytes` and `max_sell_bytes`.
-3. Call `eosio::sellram{account: ram.cheese, bytes}`. The WAX proceeds land in the contract's liquid balance and stay there.
-4. Compute the WAX the sale is worth from the `eosio::rammarket` Bancor reserves, minus the system's 0.5% RAM sale fee, so the payout matches what the contract actually received.
-5. Read `wax_per_cheese` from Alcor and run the same deviation guard. Convert the WAX proceeds into CHEESE at that rate, with no spread.
-6. Read the contract's own CHEESE balance from `cheeseburger::accounts`. Require that `pool - payout` stays at or above `min_cheese_pool`, otherwise fail with a message telling the seller the CHEESE pool is temporarily empty.
-7. Send `cheeseburger::transfer` from `ram.cheese` to the seller for the payout.
-8. Update `stats` and send the `logsell` inline action.
+**`target_include_directories(ramcheese PRIVATE ${CMAKE_SOURCE_DIR}/include)`**
+Tells the compiler where to look for header files. Without it, `#include "ramcheese.hpp"` inside your `.cpp` may not be found, because the header lives in `include/` while the source lives in `src/`.
+- `ramcheese` — which build target this applies to (the target name from the line above).
+- `PRIVATE` — this include path is only for building this contract, not for anything that might depend on it. For a standalone contract, `PRIVATE` is always the right choice.
+- `${CMAKE_SOURCE_DIR}` — a CMake variable meaning "the folder containing this `CMakeLists.txt`". Using it instead of a hard-coded path keeps the file working on any machine.
 
-### Funding and topping up the CHEESE pool
-- CHEESE transfers to `ram.cheese` with the memo `deposit` (or from the admin account) are treated as pool funding: they are recorded and left in place instead of triggering a RAM buy. This is the only inflow to the sell pool.
-- `withdrawcheese(name to, asset quantity)` — admin only, so pool funds can be recovered.
-- Because buys still null 100% of their CHEESE, the pool only shrinks with use. The dApp surfaces the remaining pool prominently and the contract flips sells off on its own once `min_cheese_pool` is reached, so the failure mode is a clear "sells paused" state rather than a broken transaction.
+Mental summary: *require a modern CMake, name the project, load the WAX toolchain, build these sources into a contract called ramcheese, and look in `include/` for headers.* That is the whole file.
 
-### Funding the WAX pool
-Funding WAX is simply sending WAX to `ram.cheese` — no memo needed, and it cannot be mistaken for a sale.
+## Step 5 — Get the WAX compiler (CDT) through Docker
+You pull the compiler image once.
 
-The contract deliberately has **no** `on_notify` handler for `eosio.token::transfer`. Selling is triggered only by `eosio::ramtransfer`, never by an incoming WAX transfer, so:
-- A plain WAX transfer to `ram.cheese` just increases the liquid balance. The contract does not react at all and no CHEESE is paid out.
-- The WAX proceeds that `eosio::sellram` sends back (an `eosio.token` transfer from `eosio.ram`) are likewise ignored, which is what keeps that flow from looping.
-- The same is true for unstaked WAX returning from `eosio` and for claimed vote rewards.
+```bash
+docker pull antelopeio/cdt:latest
+```
 
-In short: CHEESE in equals a RAM purchase (or a `deposit` memo), RAM in equals a sale, and WAX in equals funding the reserve. The three inflows are handled by separate notification hooks and never overlap.
+If that image name is unavailable, try these in order until one succeeds:
 
-### Account setup on `ram.cheese`
-- `eosio.code` permission added to `active` so the contract can sign its own inline actions.
-- Enough RAM on the account itself for its tables.
-- Treasury WAX: the majority staked manually by the account owner, with a liquid working balance kept topped up for buys, including from claimed vote rewards.
-- `min_cheese` and `max_cheese` set so a single transfer cannot exhaust the liquid pool.
-- An initial CHEESE deposit sized to whatever sell volume you want to support.
+```bash
+docker pull ghcr.io/antelopeio/cdt:latest
+docker pull eostudio/eosio.cdt:latest
+docker pull waxteam/dev:latest
+```
 
-## Part 2 — The CHEESEHub dApp
+Write down which image name worked — you use it in the next step. Success looks like `Status: Downloaded newer image for ...`, and the image appears in `docker images`.
 
-### New files
-- `src/pages/CheeseRam.tsx` — page shell copying the `PowerUp.tsx` layout: `py-20` hero with radial gradient, floating clickable orb with a fart sound, emoji-title-BETA-emoji heading, then card, leaderboard, stats bar, and a footer line linking to `waxblock.io/account/ram.cheese`.
-- `src/components/ram/RamCard.tsx` — the main card with a top-level Buy / Sell switch.
-- Buy mode: recipient input reusing `RecipientInput`, then two tabs:
-  - **Pay with CHEESE** — enter CHEESE, see the estimated KB of RAM.
-  - **Buy by size** — enter the KB or MB wanted, see the CHEESE required.
-  Both tabs feed one estimate panel and one submit button. A Terms of Use checkbox with `TermsDialog` gates the transfer.
-- Sell mode: shows the connected account's free RAM, a bytes input with a Max button, the estimated CHEESE payout, and the remaining CHEESE pool. Disabled with a clear "sells paused, pool empty" state when the pool is below `min_cheese_pool` or `sell_enabled` is false. Also gated by the Terms checkbox, since it moves user assets.
-- `src/components/ram/RamEstimate.tsx` — shows RAM bytes, WAX equivalent, current RAM price per KB, and USD value, with a refresh button, modelled on `ResourceEstimate`.
-- `src/components/ram/RamStatsBar.tsx` — total purchases, CHEESE nulled, WAX spent, total RAM sold, sales count, CHEESE paid out, and the two live reserves: liquid WAX and the CHEESE pool.
-- `src/components/ram/RamLeaderboard.tsx` — top RAM buyers and sellers, built the same way as `PowerupLeaderboard` from Hyperion action history.
-- `src/hooks/useRamPrice.ts` — reads `eosio::rammarket` through the existing multi-endpoint RPC fallback and returns WAX per KB, cached with react-query.
-- `src/hooks/useRamStats.ts` — reads the `ram.cheese` `stats` and `config` tables plus its liquid WAX and CHEESE balances, using the same endpoint-fallback pattern as `usePowerupStats`.
-- `src/hooks/useAccountRam.ts` — reads the connected account's RAM quota and usage so the sell tab can show free bytes and a working Max button.
-- `src/hooks/useRamEstimate.ts` — combines `useRamPrice` with `useCheesePriceData` to convert between CHEESE, WAX, and bytes in both directions.
-- `src/lib/ramCheese.ts` — contract constants (`ram.cheese`, min and max amounts, memo format) and builders for both the buy transfer action and the `eosio::ramtransfer` sell action.
+## Step 6 — Compile the contract
+Run this from inside your project folder, replacing `IMAGE_NAME` with the image that pulled successfully.
 
-### Wiring
-- Route `/cheeseram` added to `src/App.tsx` above the catch-all.
-- Nav entry in `src/components/Header.tsx` alongside CHEESEUp.
-- A CHEESE tools tile on `src/pages/Index.tsx` with an OpenMoji icon and a short description.
-- The transfer goes through `useWaxTransaction` and `getTransactPlugins` so Greymass Fuel is attempted and the TX ID is verified, matching every other CHEESEHub transaction.
+macOS / Linux:
+```bash
+docker run --rm -v "$(pwd)":/project -w /project IMAGE_NAME \
+  bash -c "mkdir -p build && cd build && cmake .. && make"
+```
 
-## Part 3 — Build and deploy
+Windows PowerShell:
+```powershell
+docker run --rm -v "${PWD}:/project" -w /project IMAGE_NAME `
+  bash -c "mkdir -p build && cd build && cmake .. && make"
+```
 
-Reuse the Docker workflow from the previous guide: compile in the Antelope CDT container to produce `ramcheese.wasm` and `ramcheese.abi`, deploy to `ram.cheese` with `cleos set contract` or the block explorer upload, then call `setconfig` and `setsellcfg` once each with the CHEESE/WAX Alcor pool id, the limits, the reference rate, the liquid WAX reserve floor, and the CHEESE pool floor. Test both directions on WAX testnet with a mock CHEESE token before going to mainnet, and confirm the `ramtransfer` notification actually reaches the contract there before writing the frontend sell flow.
+What each part does:
+- `--rm` — delete the container afterwards, so nothing accumulates on your machine.
+- `-v "$(pwd)":/project` — share your current folder with the container as `/project`, so it can read your code and write results back to your real folder.
+- `-w /project` — start inside that shared folder.
+- `mkdir -p build && cd build` — keep generated files in a `build/` folder instead of mixing them with your source.
+- `cmake ..` — read `CMakeLists.txt` in the parent folder and generate the real build commands.
+- `make` — actually run the compiler.
 
-## Technical notes and risks
-- **RAM price moves with every trade.** The frontend estimate is indicative only; the contract spends a fixed WAX amount and the bytes received are whatever the Bancor market gives at execution time. The UI should say so, exactly like the CHEESEUp estimate disclaimer.
-- **Staked WAX cannot buy RAM.** Only the liquid balance is spendable. Since staking is managed manually, the contract's job is just to refuse cleanly: `min_liquid_reserve` makes a low balance produce a readable "try a smaller amount" error instead of a confusing revert, and the dApp shows the remaining liquid WAX so a top-up is obvious before users hit the wall.
-- **Price manipulation.** The `reference_rate` and `max_deviation_pct` guard from `cheesepowerz` carries over unchanged and should be kept current.
-- **RAM sold to the receiver is theirs.** They can sell it back for WAX at market, so a rate error in the buyer's favour is not recoverable; the deviation guard and a conservative `max_cheese` are the main protections.
-- **The sell pool is finite.** With admin deposits as the only inflow, sustained selling empties it. Selling gets paused automatically at the floor, and refilling is a manual deposit. If that becomes a chore, the natural upgrade later is diverting a configurable share of buy CHEESE into the pool instead of nulling it, which is a config-level change rather than a redesign.
-- **Round-trip loss is real for users.** Buying and immediately selling RAM loses the system's 0.5% RAM sale fee plus whatever the Bancor curve moved, even with no contract spread. The UI should show the payout estimate clearly so nobody expects a break-even round trip.
-- **RAM cannot be un-transferred.** Once a user sends bytes via `ramtransfer`, the contract owns them. The sell handler must never be able to accept RAM and then fail to pay: the CHEESE pool check happens before `sellram` is sent, so an underfunded pool aborts the whole transaction and the RAM stays with the user.
-- **Admin key hygiene.** Prefer a dedicated permission on `ram.cheese` limited to the admin actions rather than using the full `active` key day to day.
+Success looks like a new `build/` folder containing:
+- `ramcheese.wasm` — the compiled contract
+- `ramcheese.abi` — the interface description that wallets and explorers read
+
+Both files are required for deployment. If the build fails, the error names a file and line number — that is a code problem, not a Docker problem. If instead it says it cannot find package `cdt`, you are running outside the CDT image.
+
+## Step 7 (optional) — Make VS Code build inside Docker automatically
+So you stop typing the long docker command. Create `.devcontainer/devcontainer.json`:
+
+```json
+{
+  "name": "WAX Contract Dev",
+  "image": "IMAGE_NAME",
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-vscode.cpptools", "ms-vscode.cmake-tools"]
+    }
+  }
+}
+```
+
+Press F1 in VS Code and choose "Dev Containers: Reopen in Container". VS Code now runs inside the WAX toolchain, so its built-in terminal already has `cdt-cpp` and `cmake`, and you can just run `mkdir -p build && cd build && cmake .. && make`.
+
+## Step 8 — Test on WAX testnet first
+Deploying a broken contract to mainnet costs real WAX and can lock funds.
+
+1. Create a free testnet account through a WAX testnet faucet such as https://waxsweden.org/testnet/
+2. Deploy there first using Step 9 or 10, but point at a testnet endpoint such as `https://testnet.waxsweden.org`.
+3. Call the actions and check the tables look correct before touching mainnet. For `ram.cheese` specifically, test a CHEESE-in buy and a RAM-in sell with a mock token before mainnet.
+
+## Step 9 — Deploy option A: the WAX block explorer (easiest, no keys typed)
+This is the route described in the statement you quoted.
+
+1. Go to https://wax.bloks.io (or https://waxblock.io), open the `ram.cheese` account, then the contract deploy tool.
+2. Connect your wallet (Anchor, Wombat, or WAX Cloud Wallet) and log in as `ram.cheese`.
+3. Upload `build/ramcheese.wasm` and `build/ramcheese.abi`.
+4. Review the transaction — it contains two actions, `eosio::setcode` and `eosio::setabi`.
+5. Sign it in your wallet.
+6. Copy the transaction ID and confirm it at `https://waxblock.io/transaction/<txid>`.
+
+If it fails with a RAM error, buy more RAM on `ram.cheese` and retry.
+
+## Step 10 — Deploy option B: command line with cleos
+Better for repeat deployments.
+
+1. Pull the Leap image, which contains `cleos` and `keosd`:
+   ```bash
+   docker pull antelopeio/leap:latest
+   ```
+2. Start it with your project mounted:
+   ```bash
+   docker run --rm -it -v "$(pwd)":/project -w /project antelopeio/leap:latest bash
+   ```
+3. Inside the container, create a wallet and import your key:
+   ```bash
+   keosd &
+   cleos wallet create --to-console
+   cleos wallet import
+   ```
+   `cleos wallet import` prompts for the private key so it never lands in your shell history. Save the wallet password it prints.
+4. Deploy:
+   ```bash
+   cleos -u https://wax.greymass.com set contract ram.cheese ./build ramcheese.wasm ramcheese.abi
+   ```
+5. Verify:
+   ```bash
+   cleos -u https://wax.greymass.com get code ram.cheese
+   ```
+   The returned code hash should be non-zero.
+
+Alternative WAX endpoints if one is rate-limited: `https://wax.eosphere.io`, `https://api.wax.alohaeos.com`, `https://wax.pink.gg`.
+
+## Step 11 — After deploying `ram.cheese`
+1. Add `eosio.code` to the account's `active` permission, so the contract can sign its own inline actions (`buyram`, `sellram`, CHEESE transfers). Without this every action fails with a missing-authority error.
+2. Call `setconfig` once with the CHEESE/WAX Alcor pool id, min/max CHEESE, the reference rate, the max deviation percent, and the liquid WAX reserve floor.
+3. Call `setsellcfg` once with the sell toggle, min/max sell bytes, and the CHEESE pool floor.
+4. Fund it: send WAX for the buy reserve, and CHEESE with memo `deposit` for the sell payout pool.
+
+## Step 12 — Safety practices
+- Create a dedicated permission (for example `deployer`) with parent `active`, linked only to `eosio::setcode` and `eosio::setabi`, and deploy with that instead of your full `active` key.
+- Keep private keys out of git. Add any wallet password or `.key` files to `.gitignore`.
+- Once the contract manages real value, move control to a multisig so nobody can silently replace the code.
+
+## Quick reference
+| What | Where to get it | Why |
+| --- | --- | --- |
+| Docker Desktop | docker.com/products/docker-desktop | Runs the WAX compiler without manual install |
+| VS Code | code.visualstudio.com | Writing the C++ contract |
+| CDT Docker image | `docker pull` in Step 5 | Compiles `.cpp` into `.wasm` and `.abi` |
+| Leap Docker image | `docker pull antelopeio/leap` | `cleos` for command-line deployment |
+| `ram.cheese` account with RAM | Any WAX wallet or Anchor | Holds and pays for the contract |
+| Testnet account | A WAX testnet faucet | Safe place to test first |
+| bloks.io / waxblock.io | Browser | Upload without the CLI, and verify transactions |
+
+## Adding this to CHEESEHub later
+Optional and not part of this task: a `contracts/ramcheese/` folder with the C++ source and `CMakeLists.txt`, a `contracts/build.sh` wrapper around the Docker command, and a GitHub Actions workflow that compiles on every push so the `.wasm` and `.abi` are always reproducible.
