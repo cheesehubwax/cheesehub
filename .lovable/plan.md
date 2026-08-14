@@ -84,6 +84,16 @@ A first implementation step is confirming that WAX's `eosio.system` calls `requi
 - `withdrawcheese(name to, asset quantity)` — admin only, so pool funds can be recovered.
 - Because buys still null 100% of their CHEESE, the pool only shrinks with use. The dApp surfaces the remaining pool prominently and the contract flips sells off on its own once `min_cheese_pool` is reached, so the failure mode is a clear "sells paused" state rather than a broken transaction.
 
+### Funding the WAX pool
+Funding WAX is simply sending WAX to `ram.cheese` — no memo needed, and it cannot be mistaken for a sale.
+
+The contract deliberately has **no** `on_notify` handler for `eosio.token::transfer`. Selling is triggered only by `eosio::ramtransfer`, never by an incoming WAX transfer, so:
+- A plain WAX transfer to `ram.cheese` just increases the liquid balance. The contract does not react at all and no CHEESE is paid out.
+- The WAX proceeds that `eosio::sellram` sends back (an `eosio.token` transfer from `eosio.ram`) are likewise ignored, which is what keeps that flow from looping.
+- The same is true for unstaked WAX returning from `eosio` and for claimed vote rewards.
+
+In short: CHEESE in equals a RAM purchase (or a `deposit` memo), RAM in equals a sale, and WAX in equals funding the reserve. The three inflows are handled by separate notification hooks and never overlap.
+
 ### Account setup on `ram.cheese`
 - `eosio.code` permission added to `active` so the contract can sign its own inline actions.
 - Enough RAM on the account itself for its tables.
