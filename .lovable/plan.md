@@ -1,11 +1,13 @@
 # CHEESERam — `ram.cheese` Smart Contract + CHEESEHub dApp
 
-Buy WAX RAM with $CHEESE. The contract receives CHEESE, values it in WAX from the Alcor CHEESE/WAX pool, spends that much WAX from its liquid reserve on `eosio::buyram` for the recipient, and sends every CHEESE it received to `eosio.null`. Same shape as `cheesepowerz`, but RAM instead of CPU/NET.
+Buy WAX RAM with $CHEESE, and sell RAM back for $CHEESE. On a buy, the contract values the incoming CHEESE in WAX from the Alcor CHEESE/WAX pool, spends that much WAX from its liquid reserve on `eosio::buyram` for the recipient, and sends every CHEESE it received to `eosio.null`. On a sell, the user transfers RAM bytes to the contract, the contract sells them for WAX (keeping the WAX) and pays the seller CHEESE from its own CHEESE pool. Same shape as `cheesepowerz`, but for RAM.
 
 ## Confirmed decisions
 - Users can enter either a CHEESE amount or a target RAM size (two tabs).
 - No margin: the full WAX equivalent of the CHEESE is spent on RAM.
 - The memo can name any existing account as the RAM receiver; it defaults to the sender.
+- Selling pays out at the same Alcor rate as buying, with no spread.
+- The sell-side CHEESE pool is funded by admin deposits only. CHEESE from buys is still nulled in full, and sells are disabled automatically when the pool runs low.
 
 ## How a purchase flows
 
@@ -20,13 +22,26 @@ User  --transfer CHEESE, memo "recipient"-->  ram.cheese
                           update stats + logbuy  |
 ```
 
+## How a sale flows
+
+```text
+User  --eosio::ramtransfer(bytes)-->  ram.cheese
+                                         |
+                  eosio::sellram(bytes)  |  contract sells the received RAM, keeps the WAX
+                  read swap.alcor pool   |  WAX-per-CHEESE rate + deviation guard
+                  cheeseburger::transfer |  CHEESE pool pays the seller
+                  update stats + logsell |
+```
+
+WAX has `eosio::ramtransfer(from, to, bytes, memo)`, so RAM can be handed to a contract account. The contract then owns those bytes and can legitimately call `eosio::sellram` on itself. The WAX proceeds stay in the reserve, which is exactly what makes the buy side sustainable: buys drain WAX and null CHEESE, sells refill WAX and drain the CHEESE pool.
+
 ## Part 1 — The contract (`contracts/ramcheese/`)
 
 New C++ contract mirroring the structure of `cheesepowerz`, deployed to the `ram.cheese` account.
 
 ### Tables
-- `config` singleton: `admin`, `min_cheese`, `max_cheese`, `enabled`, `alcor_market_id` (CHEESE/WAX pool), `reference_rate`, `max_deviation_pct`, plus `min_liquid_reserve` (WAX that must remain liquid after a purchase, so the pool is never drained to zero).
-- `stats` table (single row): `total_purchases`, `total_cheese_received`, `total_wax_spent`, `total_bytes_sold`.
+- `config` singleton: `admin`, `min_cheese`, `max_cheese`, `enabled`, `alcor_market_id` (CHEESE/WAX pool), `reference_rate`, `max_deviation_pct`, `min_liquid_reserve` (WAX that must remain liquid after a purchase, so the pool is never drained to zero), plus the sell-side settings `sell_enabled`, `min_sell_bytes`, `max_sell_bytes`, and `min_cheese_pool` (the CHEESE floor below which sells are refused).
+- `stats` table (single row): `total_purchases`, `total_cheese_received`, `total_wax_spent`, `total_bytes_sold`, `total_sales`, `total_bytes_bought_back`, `total_cheese_paid_out`, `total_wax_received`.
 - Read-only external mirrors, copied from `cheesepowerz`: `swap.alcor::pools` for the rate, and `eosio.token::accounts` for the contract's own liquid WAX balance. Plus `eosio::rammarket` so the contract can report the bytes purchased.
 
 ### Actions
@@ -36,6 +51,12 @@ New C++ contract mirroring the structure of `cheesepowerz`, deployed to the `ram
 - `withdraw(name to, asset quantity)` — admin-only escape hatch for treasury management.
 - `logbuy(sender, recipient, cheese_sent, wax_spent, bytes_bought)` — inline notification action so the purchase appears in both accounts' history, the same trick `logpowerup` uses.
 - `[[eosio::on_notify("cheeseburger::transfer")]] on_cheese_transfer(from, to, quantity, memo)` — the entry point.
+- `setsellcfg(sell_enabled, min_sell_bytes, max_sell_bytes, min_cheese_pool)` — admin only, tunes the sell side without touching the buy config.
+- `logsell(seller, bytes_sold, wax_received, cheese_paid)` — inline notification action so the sale lands in the seller's account history.
+- `[[eosio::on_notify("eosio::ramtransfer")]] on_ram_transfer(from, to, bytes, memo)` — the sell entry point.
+
+### Sell-side entry point
+A first implementation step is confirming that WAX's `eosio.system` calls `require_recipient` on the `to` account for `ramtransfer`. If it does, `on_notify("eosio::ramtransfer")` is all that is needed. If it does not notify, the fallback is to listen on `eosio::logramchange` (which notifies the owner whose RAM changed) and reconcile against a pending-sell row the user creates with an explicit `sellram` action in the same transaction. The plan assumes the notification path and treats the fallback as a contingency.
 
 ### `on_cheese_transfer` logic
 1. Ignore outgoing and self transfers.
@@ -49,11 +70,27 @@ New C++ contract mirroring the structure of `cheesepowerz`, deployed to the `ram
 9. Send `cheeseburger::transfer` from `ram.cheese` to `eosio.null` for the full received quantity.
 10. Update `stats` and send the `logbuy` inline action.
 
+### `on_ram_transfer` logic
+1. Ignore transfers where `to` is not the contract, and ignore the contract's own outgoing transfers.
+2. `check(config.sell_enabled)` and require `bytes` to sit between `min_sell_bytes` and `max_sell_bytes`.
+3. Call `eosio::sellram{account: ram.cheese, bytes}`. The WAX proceeds land in the contract's liquid balance and stay there.
+4. Compute the WAX the sale is worth from the `eosio::rammarket` Bancor reserves, minus the system's 0.5% RAM sale fee, so the payout matches what the contract actually received.
+5. Read `wax_per_cheese` from Alcor and run the same deviation guard. Convert the WAX proceeds into CHEESE at that rate, with no spread.
+6. Read the contract's own CHEESE balance from `cheeseburger::accounts`. Require that `pool - payout` stays at or above `min_cheese_pool`, otherwise fail with a message telling the seller the CHEESE pool is temporarily empty.
+7. Send `cheeseburger::transfer` from `ram.cheese` to the seller for the payout.
+8. Update `stats` and send the `logsell` inline action.
+
+### Funding and topping up the CHEESE pool
+- CHEESE transfers to `ram.cheese` with the memo `deposit` (or from the admin account) are treated as pool funding: they are recorded and left in place instead of triggering a RAM buy. This is the only inflow to the sell pool.
+- `withdrawcheese(name to, asset quantity)` — admin only, so pool funds can be recovered.
+- Because buys still null 100% of their CHEESE, the pool only shrinks with use. The dApp surfaces the remaining pool prominently and the contract flips sells off on its own once `min_cheese_pool` is reached, so the failure mode is a clear "sells paused" state rather than a broken transaction.
+
 ### Account setup on `ram.cheese`
 - `eosio.code` permission added to `active` so the contract can sign its own inline actions.
 - Enough RAM on the account itself for its tables.
 - Treasury WAX: the majority staked through `stake`, with a liquid working balance for buys.
 - `min_cheese` and `max_cheese` set so a single transfer cannot exhaust the liquid pool.
+- An initial CHEESE deposit sized to whatever sell volume you want to support.
 
 ## Part 2 — The CHEESEHub dApp
 
