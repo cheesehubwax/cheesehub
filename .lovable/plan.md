@@ -1,8 +1,8 @@
 # Building and deploying `ram.cheese` — a first-timer's guide
 
-Everything below assumes you have never compiled a smart contract before. The project folder is called `ramcheese`, the contract file names are `ramcheese.cpp` / `ramcheese.hpp`, and the compiled contract gets deployed to the WAX account `ram.cheese`.
+Everything below assumes you have never compiled a smart contract before. The project folder is called `ram.cheese`, and the compiled contract gets deployed to the WAX account `ram.cheese`.
 
-One naming note up front: WAX account names may contain a dot (`ram.cheese`), but C++ class names and CMake target names may not. So the account is `ram.cheese` while every file and build target is `ramcheese`. That mismatch is normal and does not affect deployment — the account you deploy *to* is chosen at deploy time, not at compile time.
+One naming note up front: a *folder* on your computer can contain a dot, and so can a WAX account name — so both are `ram.cheese`. But a C++ class name cannot contain a dot, so the code files inside the folder are named `ramcheese.cpp` / `ramcheese.hpp` and the build target is `ramcheese`. That mismatch is normal and changes nothing about deployment: the account you deploy *to* is chosen at deploy time, not at compile time.
 
 ## Step 1 — Install Docker Desktop
 Docker runs the WAX compiler inside a small pre-built Linux environment, so you never install a compiler by hand.
@@ -19,12 +19,12 @@ Docker runs the WAX compiler inside a small pre-built Linux environment, so you 
    - **Dev Containers** by Microsoft — optional, used in Step 7
 
 ## Step 3 — Create your project folder
-1. Make a folder somewhere easy, for example `Documents/wax-contracts/ramcheese`.
+1. Make a folder somewhere easy, for example `Documents/wax-contracts/ram.cheese`.
 2. In VS Code: File -> Open Folder -> pick that folder.
 3. Inside it, create this structure (right-click in the VS Code file panel -> New File / New Folder):
 
 ```text
-ramcheese/
+ram.cheese/
 ├── src/
 │   └── ramcheese.cpp        <- the contract logic
 ├── include/
