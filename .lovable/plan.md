@@ -47,8 +47,7 @@ New C++ contract mirroring the structure of `cheesepowerz`, deployed to the `ram
 ### Actions
 - `setconfig(admin, min_cheese, max_cheese, enabled, alcor_market_id, reference_rate, max_deviation_pct, min_liquid_reserve)` — admin only.
 - `setrate(reference_rate, max_deviation_pct)` — quick rate-guard update, admin only.
-- `stake(asset quantity)` / `unstake(asset quantity)` — admin only; wrap `eosio::delegatebw` and `eosio::undelegatebw` on the contract's own account so the treasury can hold most of its WAX staked while keeping a liquid slice for RAM buys.
-- `withdraw(name to, asset quantity)` — admin-only escape hatch for treasury management.
+- `withdraw(name to, asset quantity)` — admin-only escape hatch for treasury management. There are no `stake` / `unstake` actions: staking, unstaking, and vote reward claims are handled manually from the account owner's wallet, so the contract only ever spends the liquid balance it already has.
 - `logbuy(sender, recipient, cheese_sent, wax_spent, bytes_bought)` — inline notification action so the purchase appears in both accounts' history, the same trick `logpowerup` uses.
 - `[[eosio::on_notify("cheeseburger::transfer")]] on_cheese_transfer(from, to, quantity, memo)` — the entry point.
 - `setsellcfg(sell_enabled, min_sell_bytes, max_sell_bytes, min_cheese_pool)` — admin only, tunes the sell side without touching the buy config.
@@ -88,7 +87,7 @@ A first implementation step is confirming that WAX's `eosio.system` calls `requi
 ### Account setup on `ram.cheese`
 - `eosio.code` permission added to `active` so the contract can sign its own inline actions.
 - Enough RAM on the account itself for its tables.
-- Treasury WAX: the majority staked through `stake`, with a liquid working balance for buys.
+- Treasury WAX: the majority staked manually by the account owner, with a liquid working balance kept topped up for buys, including from claimed vote rewards.
 - `min_cheese` and `max_cheese` set so a single transfer cannot exhaust the liquid pool.
 - An initial CHEESE deposit sized to whatever sell volume you want to support.
 
@@ -123,7 +122,7 @@ Reuse the Docker workflow from the previous guide: compile in the Antelope CDT c
 
 ## Technical notes and risks
 - **RAM price moves with every trade.** The frontend estimate is indicative only; the contract spends a fixed WAX amount and the bytes received are whatever the Bancor market gives at execution time. The UI should say so, exactly like the CHEESEUp estimate disclaimer.
-- **Staked WAX cannot buy RAM.** Only the liquid balance is spendable, which is why `min_liquid_reserve` and the admin `stake` and `unstake` actions exist. If the liquid pool runs dry, purchases fail with a readable error instead of a confusing revert.
+- **Staked WAX cannot buy RAM.** Only the liquid balance is spendable. Since staking is managed manually, the contract's job is just to refuse cleanly: `min_liquid_reserve` makes a low balance produce a readable "try a smaller amount" error instead of a confusing revert, and the dApp shows the remaining liquid WAX so a top-up is obvious before users hit the wall.
 - **Price manipulation.** The `reference_rate` and `max_deviation_pct` guard from `cheesepowerz` carries over unchanged and should be kept current.
 - **RAM sold to the receiver is theirs.** They can sell it back for WAX at market, so a rate error in the buyer's favour is not recoverable; the deviation guard and a conservative `max_cheese` are the main protections.
 - **The sell pool is finite.** With admin deposits as the only inflow, sustained selling empties it. Selling gets paused automatically at the floor, and refilling is a manual deposit. If that becomes a chore, the natural upgrade later is diverting a configurable share of buy CHEESE into the pool instead of nulling it, which is a config-level change rather than a redesign.
