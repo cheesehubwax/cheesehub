@@ -334,27 +334,29 @@ Then re-run the Step 2 compile command. You are looking for `ramcheese.wasm` **a
 2. **The sell flow depends on `eosio::ramtransfer` existing on WAX.** Before deploying, open `eosio` on waxblock.io -> Contract -> ABI and search for `ramtransfer`. If it is there, the sell flow works as written. If it is not, WAX's system contract predates that feature and the sell side needs a different design — tell me and I will rework it. The buy side is unaffected either way.
 
 ## Step 2 — Compile
-Do this: in the terminal, move into your project folder first (VS Code's built-in terminal with Ctrl+` already starts there).
 
-**First, delete the old build folder** if one exists — it caches the compiler choice:
+**If you are stuck at a `>>` prompt right now:** press Enter on the empty line (or press Ctrl+C) until the normal `PS C:\...>` prompt comes back. The `>>` means PowerShell is still waiting for the rest of a command. It happened because the two-line command got pasted in the wrong order — the line ending in a backtick (`` ` ``) must come **first**, and the `bash -c "..."` line **second**. A backtick at the end of a line means "the command continues on the next line".
+
+To avoid this entirely, use the **one-line** version below. Copy it with the copy button, click once in the terminal, paste, press Enter once.
+
+First, move into your project folder (VS Code's terminal with Ctrl+` already starts there) and **delete the old build folder** — it caches the compiler choice:
 
 ```powershell
 Remove-Item -Recurse -Force build
 ```
 
-(macOS/Linux: `rm -rf build`.)
+(If it says the path does not exist, that is fine — there was nothing to delete. macOS/Linux: `rm -rf build`.)
 
-Windows PowerShell:
+Windows PowerShell — one line, do not add line breaks:
 ```powershell
-docker run --rm -v "${PWD}:/project" -w /project waxcdt `
-  bash -c "mkdir -p build && cd build && cmake -DCMAKE_TOOLCHAIN_FILE=/usr/lib/cmake/cdt/CDTWasmToolchain.cmake .. && make"
+docker run --rm -v "${PWD}:/project" -w /project waxcdt bash -c "mkdir -p build && cd build && cmake -DCMAKE_TOOLCHAIN_FILE=/usr/lib/cmake/cdt/CDTWasmToolchain.cmake .. && make"
 ```
 
-macOS / Linux:
+macOS / Linux — one line:
 ```bash
-docker run --rm -v "$(pwd)":/project -w /project waxcdt \
-  bash -c "mkdir -p build && cd build && cmake -DCMAKE_TOOLCHAIN_FILE=/usr/lib/cmake/cdt/CDTWasmToolchain.cmake .. && make"
+docker run --rm -v "$(pwd)":/project -w /project waxcdt bash -c "mkdir -p build && cd build && cmake -DCMAKE_TOOLCHAIN_FILE=/usr/lib/cmake/cdt/CDTWasmToolchain.cmake .. && make"
 ```
+
 
 You know it worked when the `build` folder contains:
 - `ramcheese.wasm` — the compiled contract
