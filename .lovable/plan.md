@@ -444,13 +444,54 @@ If it fails with a RAM error, buy more RAM on `ram.cheese` and retry.
 If an endpoint is rate-limited, swap `-u` for `https://wax.eosphere.io`, `https://api.wax.alohaeos.com`, or `https://wax.pink.gg`.
 
 ## Step 7 — Set the contract up after deploying
-A freshly deployed contract does nothing until configured. In this order:
 
-1. Add `eosio.code` to the `active` permission of `ram.cheese`. In waxblock.io: open the account -> Permissions -> edit `active` -> add `ram.cheese@eosio.code` as an authority -> sign. Without this, every inline action (`buyram`, `sellram`, CHEESE transfers) fails with a missing-authority error.
-2. Call `setconfig` once: `owner` (your account), `oracle` (the account that pushes rates), `min_buy` / `max_buy` in CHEESE, `buy_fee_bps` / `sell_fee_bps` (100 = 1%), `wax_reserve_floor` in WAX, `cheese_pool_floor` in CHEESE, `min_sell_bytes` / `max_sell_bytes`.
-3. Call `setrates`: current `cheese_per_wax` (CHEESE), `wax_per_kb` (WAX per 1024 bytes of RAM), `max_deviation_bps` (1000 = 10%). Repeat on a schedule from the oracle account.
-4. Fund it: send WAX to `ram.cheese` for the buy reserve (no memo needed), and send CHEESE with the memo `deposit` to fill the sell payout pool.
-5. Confirm on waxblock.io that the `config` and `stats` tables show your values.
+Permission step is done (`ram.cheese@eosio.code` on `active`). Now the two config actions, field by field.
+
+### 7a — `setconfig`
+
+Where: waxblock.io -> account `ram.cheese` -> **Contract** tab -> **Actions** -> pick `setconfig` -> log in as `ram.cheese` -> fill the form -> Submit.
+
+Type these values exactly, including the symbol name and the number of decimals. Amounts are strings: CHEESE always has **4** decimals, WAX always has **8**. `2 CHEESE` is rejected; `2.0000 CHEESE` is accepted.
+
+| Field | Type it as | What it means |
+| --- | --- | --- |
+| `owner` | `ram.cheese` | The only account allowed to call `setpause`, `withdraw`, and re-run `setconfig`. Use your own personal account instead if you want the contract account itself to have no admin power. |
+| `oracle` | `ram.cheese` | The account allowed to call `setrates`. Start with `ram.cheese`; change it later to a dedicated pusher account. |
+| `min_buy` | `100.0000 CHEESE` | Smallest CHEESE amount accepted for a RAM purchase. Anything less is refused. |
+| `max_buy` | `100000.0000 CHEESE` | Largest single purchase. Keeps one transaction from draining the WAX reserve. |
+| `buy_fee_bps` | `100` | Your margin on buys, in basis points. `100` = 1%. `0` = no fee. Max allowed is `2000` (20%). |
+| `sell_fee_bps` | `300` | Margin on sells. `300` = 3%. Keep this higher than the buy fee so round-tripping cannot drain you. |
+| `wax_reserve_floor` | `100.00000000 WAX` | WAX the contract must never spend. Buys fail rather than dip into it, so the account always keeps CPU/NET budget. |
+| `cheese_pool_floor` | `0.0000 CHEESE` | CHEESE the contract must never pay out. `0.0000` while testing; raise it if you want a permanent buffer. |
+| `min_sell_bytes` | `1024` | Smallest RAM sale, in bytes. `1024` = 1 KB. |
+| `max_sell_bytes` | `1048576` | Largest single sale in bytes. `1048576` = 1 MB. |
+
+Notes on the choices:
+- The first `setconfig` must be signed by `ram.cheese` itself. Every later call must be signed by whatever you set as `owner`.
+- Basis points: divide by 100 to get a percent. `50` = 0.5%, `100` = 1%, `250` = 2.5%.
+- Start conservative (small `max_buy`, high `wax_reserve_floor`) and loosen once it is proven.
+
+### 7b — `setrates`
+
+Same place, action `setrates`. Sign with the `oracle` account (or `owner`).
+
+| Field | Example | What it means |
+| --- | --- | --- |
+| `cheese_per_wax` | `1234.5678 CHEESE` | How much CHEESE 1 WAX is worth right now. Read it from the Alcor WAX/CHEESE pool — the same number CHEESEHub's price bar shows. |
+| `wax_per_kb` | `0.05000000 WAX` | What 1 KB (1024 bytes) of RAM costs in WAX right now. |
+| `max_deviation_bps` | `1000` | How far the oracle may move `cheese_per_wax` in one call. `1000` = 10%. A bigger jump is rejected unless `owner` signs it. |
+
+How to get `wax_per_kb` before your first call: on waxblock.io open the `eosio` account -> Tables -> `rammarket`. It has `base` (RAM bytes in the market) and `quote` (WAX). Price per byte is `quote / base`; multiply by 1024 for per-KB. Or simpler: buy 1 KB of RAM manually in any wallet, note the WAX charged, and use that figure.
+
+The very first `setrates` has no stored rate to compare against, so `max_deviation_bps` is not enforced on it. Every later call is checked.
+
+### 7c — Fund it
+- Send WAX to `ram.cheese` with **no memo** (or any memo other than a valid account name) — this is the reserve the contract spends on RAM.
+- Send CHEESE to `ram.cheese` with the memo exactly `deposit` — this fills the payout pool for sells. Without the `deposit` memo the contract treats it as a RAM purchase.
+
+### 7d — Verify
+waxblock.io -> `ram.cheese` -> Tables -> `config`. Confirm every field matches what you typed and `rates_updated` is a recent timestamp. Then test with the smallest allowed buy before announcing it.
+
 
 ## Step 8 — Safety, before real money touches it
 - Create a dedicated permission on `ram.cheese` called `deployer`, parent `active`, linked only to `eosio::setcode` and `eosio::setabi`. Deploy with that key from then on, not your full `active` key.
