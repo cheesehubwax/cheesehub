@@ -109,9 +109,12 @@ private:
 };
 ```
 
-`src/ramcheese.cpp` — the logic. Click it, paste all of this, Ctrl+S:
+`src/ramcheese.cpp` — the logic. It is long, so it is split into 4 short parts below. Use the **copy button in the top-right corner of each code block** (do not highlight the text with the mouse — a mouse selection in a scrolling chat panel stops at whatever is on screen, which is why you only got 56 lines). Paste each part into `src/ramcheese.cpp` one after the other, in order, so they end up in the same file.
+
+**Part 1 of 4** — paste at the top of the empty `src/ramcheese.cpp`:
 
 ```cpp
+
 #include "ramcheese.hpp"
 
 using std::string;
