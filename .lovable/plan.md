@@ -40,6 +40,70 @@ That exact error (Windows) means Docker is installed but **the engine is not run
 
 Rule of thumb for the rest of this guide: **Docker Desktop must be open and showing "Engine running" before any `docker` command will work.** Every `docker pull` and `docker run` step below assumes it is.
 
+### If Docker says "virtualization support not detected" even though BIOS says it is enabled
+Your machine is capable — an i5-4570 (Haswell) has VT-x with EPT, which is everything Docker needs, and 16 GB RAM is plenty. So this is a Windows-side problem, not hardware. BIOS is only half the job; Windows also has to hand virtualization to the hypervisor, and right now something is blocking that.
+
+Work through these in order. After each one, reopen Docker Desktop and check for "Engine running". Stop as soon as it appears.
+
+**1. See what Windows actually thinks.** Press Ctrl+Shift+Esc -> Performance tab -> click CPU. Bottom right, look for `Virtualization:`.
+- Says **Enabled** -> BIOS is fine; a Windows feature or a rival hypervisor is the problem. Go to 2.
+- Says **Disabled** -> Windows is not seeing VT-x. Reboot into BIOS/UEFI (Del, F2 or F12 at the boot logo), Advanced -> CPU Configuration -> set "Intel Virtualization Technology" to Enabled, and enable "VT-d" if listed. Save and exit, then **fully shut down** — hold Shift while clicking Shut Down — because Windows fast startup can restore the old CPU state on a normal restart.
+- The line is **missing entirely** -> a hypervisor already owns the feature. Go to 5.
+
+**2. Turn on the Windows features Docker needs.** Right-click Start -> Terminal (Admin), then run all three:
+```powershell
+Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux -NoRestart
+Enable-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform -NoRestart
+Enable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -NoRestart
+```
+`VirtualMachinePlatform` is the one this error is usually about. Reboot afterwards.
+
+**3. Allow the hypervisor to launch.** Same Admin terminal:
+```powershell
+bcdedit /set hypervisorlaunchtype auto
+```
+If it was `off` — some anti-cheat tools and old "gaming tweak" guides set that — Docker reports no virtualization regardless of BIOS. Reboot.
+
+**4. Install and update the WSL2 kernel.** Same Admin terminal:
+```powershell
+wsl --install --no-distribution
+wsl --update
+wsl --set-default-version 2
+wsl --status
+```
+`wsl --status` should say default version 2. If `wsl --install` is not recognised, run Windows Update fully, or install the kernel by hand from https://aka.ms/wsl2kernel. Reboot.
+
+**5. Remove hypervisor conflicts.** Only one thing can own VT-x at a time. Uninstall or fully close any of these, then retry: VirtualBox, VMware Workstation/Player, BlueStacks or other Android emulators, Riot Vanguard (Valorant), Faceit/ESEA anti-cheat. Also check Task Manager -> Startup and disable them there.
+
+**6. Check Core Isolation.** Windows Security -> Device security -> Core isolation details. If "Memory integrity" is On, turn it Off, reboot, retry. You can switch it back on later.
+
+**7. Switch Docker's backend.** Docker Desktop -> Settings -> General. If "Use WSL 2 based engine" is ticked and failing, untick it to use the Hyper-V backend, Apply & Restart. Caveat: the Hyper-V backend needs Windows Pro or Enterprise. On Windows Home, leave it ticked and fix WSL in step 4 instead.
+
+**8. Check your Windows edition and build.** Win+R -> type `winver` -> Enter. Current Docker Desktop needs Windows 10 build 19044 (22H2) or newer. Older builds cannot run it — run Windows Update first. A Haswell i5 will never be offered Windows 11 officially, and that is fine: Windows 10 22H2 plus WSL2 runs Docker properly.
+
+Test after each attempt with the smallest possible command:
+```powershell
+docker run hello-world
+```
+
+### If Docker simply refuses to work on this machine
+You do not actually need Docker to compile `ram.cheese`. Two fallbacks, best first.
+
+**Fallback A — compile inside WSL2 Ubuntu, no Docker at all.** If step 4 got WSL working but Docker still won't start, install Ubuntu and CDT directly:
+```powershell
+wsl --install -d Ubuntu
+```
+Open Ubuntu from the Start menu, set a username and password, then:
+```bash
+sudo apt update && sudo apt install -y build-essential cmake wget
+wget https://github.com/AntelopeIO/cdt/releases/download/v4.1.0/cdt_4.1.0_amd64.deb
+sudo apt install -y ./cdt_4.1.0_amd64.deb
+cdt-cpp --version
+```
+Your Windows files are visible inside Ubuntu at `/mnt/c/Users/User/Documents/wax-contracts/ram.cheese`, so `cd` there and run `mkdir -p build && cd build && cmake .. && make`. The `.wasm` and `.abi` land in your normal Windows folder, ready for Step 10. Everything in Step 5 about `CMakeLists.txt` still applies unchanged.
+
+**Fallback B — let GitHub compile it for you.** Push the `ram.cheese` folder to a private GitHub repo with a workflow that installs CDT and runs those same three commands, then download `ramcheese.wasm` and `ramcheese.abi` from the run's artifacts and deploy them via waxblock.io as in Step 10. Nothing to install locally beyond git, and every future change rebuilds reproducibly. Say the word and I will write that workflow file for you.
+
 ## Step 2 — Install VS Code
 Do this: download VS Code from code.visualstudio.com and install it. Open it. Click the four-squares icon in the left bar (Extensions). In the search box type each of these and click Install:
 
