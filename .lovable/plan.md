@@ -210,19 +210,22 @@ First, some words so the rest makes sense:
 ```dockerfile
 FROM ubuntu:22.04
 RUN apt-get update && apt-get install -y build-essential cmake wget \
- && wget -q https://github.com/AntelopeIO/cdt/releases/download/v4.1.0/cdt_4.1.0_amd64.deb \
- && apt-get install -y ./cdt_4.1.0_amd64.deb \
- && rm cdt_4.1.0_amd64.deb
+ && wget -q https://github.com/AntelopeIO/cdt/releases/download/v4.1.1/cdt_4.1.1-1_amd64.deb \
+ && apt-get install -y ./cdt_4.1.1-1_amd64.deb \
+ && rm cdt_4.1.1-1_amd64.deb
 ```
+
+Note the filename: `cdt_4.1.1-1_amd64.deb`. That trailing `-1` is part of the real name of the file AntelopeIO published (it is the Debian package revision number). Leaving it out is what produces the `exit code: 8` build failure — that is `wget` reporting "the server said no such file", i.e. a 404. Copy the block above verbatim; do not tidy the `-1` away.
 
 6. Press **Ctrl+S** to save. The white dot next to the filename in its tab disappears when it is saved. If it is still there, the file is unsaved and `docker build` will not see your text.
 
 **What you just pasted, in plain English:**
 - `FROM ubuntu:22.04` — begin with a clean Ubuntu Linux 22.04 system. Docker downloads this part for you.
 - `RUN apt-get update && apt-get install -y build-essential cmake wget` — inside that Ubuntu, install a C++ compiler toolchain, CMake, and `wget` (a downloader). `-y` means "answer yes to prompts", because nobody is sitting there to press y.
-- the `wget -q https://...cdt_4.1.0_amd64.deb` line — download the official WAX/Antelope CDT installer package from AntelopeIO's GitHub releases.
-- `apt-get install -y ./cdt_4.1.0_amd64.deb` — install it. This is the step that gives you the actual WAX compiler.
-- `rm cdt_4.1.0_amd64.deb` — delete the installer file afterwards, so the image stays small.
+- the `wget -q https://...cdt_4.1.1-1_amd64.deb` line — download the official WAX/Antelope CDT installer package from AntelopeIO's GitHub releases.
+- `apt-get install -y ./cdt_4.1.1-1_amd64.deb` — install it. This is the step that gives you the actual WAX compiler.
+- `rm cdt_4.1.1-1_amd64.deb` — delete the installer file afterwards, so the image stays small.
+
 - The `\` at the end of lines and the `&&` at the start of the next simply mean "this is all one long command, continued". Keep them exactly as shown.
 
 Your folder now looks like this:
