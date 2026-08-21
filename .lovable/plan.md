@@ -273,7 +273,322 @@ If you do, Step 6 is finished. **Wherever the steps below say `IMAGE_NAME`, type
 **If something goes wrong:**
 - `failed to read dockerfile` or `Dockerfile: no such file` — you are in the wrong folder, or the file is named `Dockerfile.txt`. Run `dir` and check that `Dockerfile` is listed with no extension.
 - The build stops on the `wget` line with a 404 — AntelopeIO published a newer version and removed that URL. Open https://github.com/AntelopeIO/cdt/releases in your browser, find the newest file ending in `_amd64.deb`, and replace `4.1.0` with that version number in **both** places in the Dockerfile. Save, and run `docker build -t waxcdt .` again.
-- `failed to connect to the docker API` — Docker Desktop is closed. Open it, wait for "Engine running", retry.
+
+
+### 6d — Paste the contract code (this is why your last build failed)
+
+Read your last output again: the toolchain part now works perfectly.
+
+```text
+-- Setting up CDT Wasm Toolchain 4.1.1 at /usr
+-- The CXX compiler identification is Clang 9.0.1
+```
+
+That is the fix from Step 7 doing its job. Docker, CDT, CMake and the toolchain flag are all correct now. The two lines that stopped it are:
+
+```text
+Warning, contract is empty and ABI is not generated
+wasm-ld: error: fatal failure: contract with no actions and trying to create dispatcher
+```
+
+In plain English: your `src/ramcheese.cpp` and `include/ramcheese.hpp` are still the empty files you created in Step 4. The compiler compiled nothing, found no actions, and refused to produce a contract that can never be called. Nothing is broken — you just have not written the contract yet. (`--- failed` on the two "compiler ABI info" lines is normal for a Wasm compiler and is not an error.)
+
+`ramcheese.hpp` — the declarations. Click it in the VS Code panel, paste all of this, Ctrl+S:
+
+```cpp
+#pragma once
+
+#include <eosio/eosio.hpp>
+#include <eosio/asset.hpp>
+#include <eosio/singleton.hpp>
+#include <eosio/system.hpp>
+#include <string>
+
+using namespace eosio;
+
+// Read-only view of any eosio.token-style contract's balance table.
+namespace tokenview {
+   struct account {
+      asset balance;
+      uint64_t primary_key() const { return balance.symbol.code().raw(); }
+   };
+   typedef multi_index<name("accounts"), account> accounts;
+}
+
+CONTRACT ramcheese : public contract {
+public:
+   using contract::contract;
+
+   static constexpr symbol WAX_SYM      = symbol("WAX", 8);
+   static constexpr symbol CHEESE_SYM   = symbol("CHEESE", 4);
+   static constexpr name   WAX_TOKEN    = name("eosio.token");
+   static constexpr name   CHEESE_TOKEN = name("cheeseburger");
+   static constexpr name   NULL_ACCT    = name("eosio.null");
+   static constexpr name   SYSTEM_ACCT  = name("eosio");
+
+   ACTION setconfig(name owner, name oracle, asset min_buy, asset max_buy,
+                    uint16_t buy_fee_bps, uint16_t sell_fee_bps,
+                    asset wax_reserve_floor, asset cheese_pool_floor,
+                    int64_t min_sell_bytes, int64_t max_sell_bytes);
+
+   ACTION setrates(asset cheese_per_wax, asset wax_per_kb, uint16_t max_deviation_bps);
+
+   ACTION setpause(bool buy_paused, bool sell_paused);
+
+   ACTION withdraw(name token_contract, name to, asset quantity, std::string memo);
+
+   [[eosio::on_notify("cheeseburger::transfer")]]
+   void on_cheese(name from, name to, asset quantity, std::string memo);
+
+   [[eosio::on_notify("eosio::ramtransfer")]]
+   void on_ram(name from, name to, int64_t bytes, std::string memo);
+
+   TABLE config_row {
+      name           owner;
+      name           oracle;
+      asset          min_buy;
+      asset          max_buy;
+      uint16_t       buy_fee_bps       = 0;
+      uint16_t       sell_fee_bps      = 0;
+      asset          wax_reserve_floor;
+      asset          cheese_pool_floor;
+      int64_t        min_sell_bytes    = 0;
+      int64_t        max_sell_bytes    = 0;
+      asset          cheese_per_wax;
+      asset          wax_per_kb;
+      uint16_t       max_deviation_bps = 1000;
+      bool           buy_paused        = false;
+      bool           sell_paused       = false;
+      time_point_sec rates_updated;
+   };
+   typedef singleton<name("config"), config_row> config_tbl;
+
+   TABLE stats_row {
+      asset    cheese_nulled;
+      asset    wax_spent;
+      asset    cheese_paid;
+      int64_t  bytes_bought = 0;
+      int64_t  bytes_sold   = 0;
+      uint64_t buys         = 0;
+      uint64_t sells        = 0;
+   };
+   typedef singleton<name("stats"), stats_row> stats_tbl;
+
+private:
+   config_row load_config();
+   stats_row  load_stats();
+   asset      balance_of(name token_contract, symbol sym);
+   void       pay(name token_contract, name to, asset quantity, const std::string& memo);
+};
+```
+
+`ramcheese.cpp` — the logic. Click it, paste all of this, Ctrl+S:
+
+```cpp
+#include "ramcheese.hpp"
+
+using std::string;
+
+ramcheese::config_row ramcheese::load_config() {
+   config_tbl cfg(get_self(), get_self().value);
+   check(cfg.exists(), "ram.cheese is not configured yet: call setconfig first");
+   return cfg.get();
+}
+
+ramcheese::stats_row ramcheese::load_stats() {
+   stats_tbl st(get_self(), get_self().value);
+   if (st.exists()) return st.get();
+   stats_row row;
+   row.cheese_nulled = asset(0, CHEESE_SYM);
+   row.wax_spent     = asset(0, WAX_SYM);
+   row.cheese_paid   = asset(0, CHEESE_SYM);
+   return row;
+}
+
+asset ramcheese::balance_of(name token_contract, symbol sym) {
+   tokenview::accounts acc(token_contract, get_self().value);
+   auto it = acc.find(sym.code().raw());
+   return it == acc.end() ? asset(0, sym) : it->balance;
+}
+
+void ramcheese::pay(name token_contract, name to, asset quantity, const string& memo) {
+   action(
+      permission_level{get_self(), name("active")},
+      token_contract, name("transfer"),
+      std::make_tuple(get_self(), to, quantity, memo)
+   ).send();
+}
+
+void ramcheese::setconfig(name owner, name oracle, asset min_buy, asset max_buy,
+                          uint16_t buy_fee_bps, uint16_t sell_fee_bps,
+                          asset wax_reserve_floor, asset cheese_pool_floor,
+                          int64_t min_sell_bytes, int64_t max_sell_bytes) {
+   config_tbl cfg(get_self(), get_self().value);
+   config_row row;
+   if (cfg.exists()) {
+      row = cfg.get();
+      require_auth(row.owner);
+   } else {
+      require_auth(get_self());
+      row.cheese_per_wax    = asset(0, CHEESE_SYM);
+      row.wax_per_kb        = asset(0, WAX_SYM);
+      row.max_deviation_bps = 1000;
+      row.buy_paused        = false;
+      row.sell_paused       = false;
+      row.rates_updated     = time_point_sec(0);
+   }
+
+   check(is_account(owner),  "owner account does not exist");
+   check(is_account(oracle), "oracle account does not exist");
+   check(min_buy.symbol == CHEESE_SYM && max_buy.symbol == CHEESE_SYM, "buy limits must be CHEESE");
+   check(min_buy.amount > 0 && max_buy.amount >= min_buy.amount, "bad buy limits");
+   check(wax_reserve_floor.symbol == WAX_SYM && wax_reserve_floor.amount >= 0, "wax_reserve_floor must be WAX");
+   check(cheese_pool_floor.symbol == CHEESE_SYM && cheese_pool_floor.amount >= 0, "cheese_pool_floor must be CHEESE");
+   check(buy_fee_bps <= 2000 && sell_fee_bps <= 2000, "fees are capped at 20%");
+   check(min_sell_bytes > 0 && max_sell_bytes >= min_sell_bytes, "bad sell size limits");
+
+   row.owner             = owner;
+   row.oracle            = oracle;
+   row.min_buy           = min_buy;
+   row.max_buy           = max_buy;
+   row.buy_fee_bps       = buy_fee_bps;
+   row.sell_fee_bps      = sell_fee_bps;
+   row.wax_reserve_floor = wax_reserve_floor;
+   row.cheese_pool_floor = cheese_pool_floor;
+   row.min_sell_bytes    = min_sell_bytes;
+   row.max_sell_bytes    = max_sell_bytes;
+   cfg.set(row, get_self());
+}
+
+void ramcheese::setrates(asset cheese_per_wax, asset wax_per_kb, uint16_t max_deviation_bps) {
+   config_tbl cfg(get_self(), get_self().value);
+   check(cfg.exists(), "call setconfig first");
+   config_row row = cfg.get();
+   check(has_auth(row.oracle) || has_auth(row.owner), "only the oracle or the owner can set rates");
+
+   check(cheese_per_wax.symbol == CHEESE_SYM && cheese_per_wax.amount > 0, "cheese_per_wax must be positive CHEESE");
+   check(wax_per_kb.symbol == WAX_SYM && wax_per_kb.amount > 0, "wax_per_kb must be positive WAX");
+   check(max_deviation_bps > 0 && max_deviation_bps <= 5000, "max_deviation_bps out of range");
+
+   if (row.cheese_per_wax.amount > 0 && !has_auth(row.owner)) {
+      int128_t old_v = row.cheese_per_wax.amount;
+      int128_t new_v = cheese_per_wax.amount;
+      int128_t diff  = new_v > old_v ? new_v - old_v : old_v - new_v;
+      check(diff * 10000 <= old_v * (int128_t)row.max_deviation_bps,
+            "new rate deviates too far from the stored rate; the owner must confirm it");
+   }
+
+   row.cheese_per_wax    = cheese_per_wax;
+   row.wax_per_kb        = wax_per_kb;
+   row.max_deviation_bps = max_deviation_bps;
+   row.rates_updated     = time_point_sec(current_time_point());
+   cfg.set(row, get_self());
+}
+
+void ramcheese::setpause(bool buy_paused, bool sell_paused) {
+   config_tbl cfg(get_self(), get_self().value);
+   check(cfg.exists(), "call setconfig first");
+   config_row row = cfg.get();
+   require_auth(row.owner);
+   row.buy_paused  = buy_paused;
+   row.sell_paused = sell_paused;
+   cfg.set(row, get_self());
+}
+
+void ramcheese::withdraw(name token_contract, name to, asset quantity, string memo) {
+   config_row row = load_config();
+   require_auth(row.owner);
+   check(quantity.amount > 0, "quantity must be positive");
+   check(is_account(to), "destination account does not exist");
+   pay(token_contract, to, quantity, memo);
+}
+
+// BUY RAM: someone sends CHEESE, contract spends its own liquid WAX on RAM for them,
+// and the CHEESE it received is nulled.
+void ramcheese::on_cheese(name from, name to, asset quantity, string memo) {
+   if (to != get_self() || from == get_self()) return;   // outgoing or not for us
+   if (memo == "deposit") return;                        // owner funding the CHEESE payout pool
+
+   config_row row = load_config();
+   check(!row.buy_paused, "RAM buying is paused");
+   check(quantity.symbol == CHEESE_SYM, "only CHEESE is accepted here");
+   check(row.cheese_per_wax.amount > 0, "no CHEESE/WAX rate is set yet");
+   check(quantity >= row.min_buy, "below the minimum purchase");
+   check(quantity <= row.max_buy, "above the maximum purchase");
+
+   name receiver = from;
+   if (!memo.empty()) {
+      check(memo.size() <= 12, "memo must be empty or a WAX account name");
+      receiver = name(memo);
+      check(is_account(receiver), "the account in the memo does not exist");
+   }
+
+   // CHEESE -> WAX using the stored rate, then take the buy fee.
+   int128_t gross = (int128_t)quantity.amount * 100000000 / (int128_t)row.cheese_per_wax.amount;
+   int128_t net   = gross * (10000 - (int128_t)row.buy_fee_bps) / 10000;
+   check(net > 0, "amount too small to buy any RAM");
+   asset wax_spend = asset((int64_t)net, WAX_SYM);
+
+   asset liquid = balance_of(WAX_TOKEN, WAX_SYM);
+   check(liquid >= wax_spend + row.wax_reserve_floor,
+         "not enough liquid WAX in the contract right now; try a smaller amount");
+
+   action(permission_level{get_self(), name("active")}, SYSTEM_ACCT, name("buyram"),
+          std::make_tuple(get_self(), receiver, wax_spend)).send();
+
+   pay(CHEESE_TOKEN, NULL_ACCT, quantity, "ram.cheese: CHEESE nulled for a RAM purchase");
+
+   stats_tbl st(get_self(), get_self().value);
+   stats_row s = load_stats();
+   s.cheese_nulled += quantity;
+   s.wax_spent     += wax_spend;
+   s.buys          += 1;
+   st.set(s, get_self());
+}
+
+// SELL RAM: someone transfers RAM bytes to the contract, the contract sells them
+// for WAX (which it keeps) and pays the seller CHEESE out of its pool.
+void ramcheese::on_ram(name from, name to, int64_t bytes, string memo) {
+   if (to != get_self() || from == get_self()) return;
+   if (memo == "deposit") return;                        // owner topping up contract RAM
+
+   config_row row = load_config();
+   check(!row.sell_paused, "RAM selling is paused");
+   check(row.cheese_per_wax.amount > 0 && row.wax_per_kb.amount > 0, "no rates are set yet");
+   check(bytes >= row.min_sell_bytes, "below the minimum sell size");
+   check(bytes <= row.max_sell_bytes, "above the maximum sell size");
+
+   int128_t wax_units    = (int128_t)bytes * (int128_t)row.wax_per_kb.amount / 1024;
+   int128_t cheese_units = wax_units * (int128_t)row.cheese_per_wax.amount / 100000000;
+   cheese_units          = cheese_units * (10000 - (int128_t)row.sell_fee_bps) / 10000;
+   check(cheese_units > 0, "amount too small to pay out");
+   asset payout = asset((int64_t)cheese_units, CHEESE_SYM);
+
+   asset pool = balance_of(CHEESE_TOKEN, CHEESE_SYM);
+   check(pool >= payout + row.cheese_pool_floor, "the CHEESE payout pool is too low right now");
+
+   action(permission_level{get_self(), name("active")}, SYSTEM_ACCT, name("sellram"),
+          std::make_tuple(get_self(), bytes)).send();
+
+   pay(CHEESE_TOKEN, from, payout, "ram.cheese: CHEESE for RAM sold");
+
+   stats_tbl st(get_self(), get_self().value);
+   stats_row s = load_stats();
+   s.cheese_paid += payout;
+   s.bytes_sold  += bytes;
+   s.sells       += 1;
+   st.set(s, get_self());
+}
+```
+
+Then re-run the Step 7 compile command. You are looking for `ramcheese.wasm` **and** `ramcheese.abi` in the `build` folder, with no `wasm-ld` error.
+
+**Two things about this code you should know before deploying it.**
+
+1. **Pricing comes from a rate you push in, not from Alcor on-chain.** Alcor's pools store price as a 128-bit square-root value that needs heavy maths a contract should not be doing, so this version keeps `cheese_per_wax` and `wax_per_kb` in the `config` table. The `oracle` account (which can be a small script, or you) calls `setrates` on a schedule; `max_deviation_bps` rejects any jump bigger than you allow unless the owner signs it. Every buy and sell uses the stored rate, so a stale rate is the main risk — keep the updater running and keep the deviation guard tight.
+2. **The sell flow depends on `eosio::ramtransfer` existing on WAX.** Before deploying, open `eosio` on waxblock.io -> Contract -> ABI and search for `ramtransfer`. If it is there, the sell flow works as written. If it is not, WAX's system contract predates that feature and the sell side needs a different design — tell me and I will rework it; the buy side is unaffected either way.
+
+
 
 
 
