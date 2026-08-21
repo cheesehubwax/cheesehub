@@ -732,8 +732,8 @@ If an endpoint is rate-limited, swap `-u` for `https://wax.eosphere.io`, `https:
 A freshly deployed contract does nothing until you configure it. Do this, in this order:
 
 1. Add `eosio.code` to the `active` permission of `ram.cheese`. In waxblock.io: open the account -> Permissions -> edit `active` -> add `ram.cheese@eosio.code` as an authority -> sign. Without this, every inline action (`buyram`, `sellram`, CHEESE transfers) fails with a missing-authority error.
-2. Call `setconfig` once, with the CHEESE/WAX Alcor pool id, min and max CHEESE per purchase, the reference rate, the max deviation percent, and the liquid WAX reserve floor.
-3. Call `setsellcfg` once, with the sell on/off switch, min and max sell bytes, and the CHEESE pool floor.
+2. Call `setconfig` once, with: `owner` (your account), `oracle` (the account that will push rates), `min_buy` / `max_buy` in CHEESE, `buy_fee_bps` / `sell_fee_bps` (100 = 1%), `wax_reserve_floor` in WAX, `cheese_pool_floor` in CHEESE, and `min_sell_bytes` / `max_sell_bytes`.
+3. Call `setrates` once, with the current `cheese_per_wax` (CHEESE), `wax_per_kb` (WAX per 1024 bytes of RAM), and `max_deviation_bps` (1000 = 10%). Repeat this on a schedule from the oracle account.
 4. Fund it: send WAX to `ram.cheese` for the buy reserve (no memo needed), and send CHEESE with the memo `deposit` to fill the sell payout pool.
 5. Confirm on waxblock.io that the `config` and `stats` tables now show your values.
 
