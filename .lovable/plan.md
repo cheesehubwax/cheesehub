@@ -145,6 +145,11 @@ void ramcheese::pay(name token_contract, name to, asset quantity, const string& 
       std::make_tuple(get_self(), to, quantity, memo)
    ).send();
 }
+```
+
+**Part 2 of 4** — paste at the bottom of `src/ramcheese.cpp`:
+
+```cpp
 
 void ramcheese::setconfig(name owner, name oracle, asset min_buy, asset max_buy,
                           uint16_t buy_fee_bps, uint16_t sell_fee_bps,
