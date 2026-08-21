@@ -278,36 +278,60 @@ If you do, Step 6 is finished. **Wherever the steps below say `IMAGE_NAME`, type
 
 
 ## Step 7 — Compile
-Do this: in the terminal, move into your project folder first. Type `cd` then a space, then drag the `ram.cheese` folder from your file manager onto the terminal window (that pastes the path), then Enter.
+Do this: in the terminal, move into your project folder first. Type `cd` then a space, then drag the `ram.cheese` folder from your file manager onto the terminal window (that pastes the path), then Enter. (Or just use VS Code's built-in terminal with Ctrl+`, which already starts there.)
+
+One important extra piece: plain `cmake ..` is not enough. Inside the container there are **two** C++ compilers — Ubuntu's ordinary `c++`, which builds programs for Linux, and CDT's `cdt-cpp`, which builds WebAssembly for WAX. CMake picks Ubuntu's by default, and Ubuntu's compiler has never heard of WAX-only options like `-abigen`, which is exactly the `unrecognized command-line option '-abigen'` error. CDT ships a small file that tells CMake "use my compiler, not the system one" — a **toolchain file** — and you point CMake at it with `-DCMAKE_TOOLCHAIN_FILE=...`. Get that one flag in and the error disappears.
+
+**First, delete the failed build folder.** It has the wrong compiler choice cached inside it, and CMake will keep reusing that choice no matter what flags you add. In PowerShell, from your `ram.cheese` folder:
+
+```powershell
+Remove-Item -Recurse -Force build
+```
+
+(macOS/Linux: `rm -rf build`.)
 
 Now run the command for your system. `waxcdt` is the image you built in Step 6 — if you named it something else, use that name instead.
-
-macOS / Linux:
-```bash
-docker run --rm -v "$(pwd)":/project -w /project waxcdt \
-  bash -c "mkdir -p build && cd build && cmake .. && make"
-```
 
 Windows PowerShell:
 ```powershell
 docker run --rm -v "${PWD}:/project" -w /project waxcdt `
-  bash -c "mkdir -p build && cd build && cmake .. && make"
+  bash -c "mkdir -p build && cd build && cmake -DCMAKE_TOOLCHAIN_FILE=/usr/lib/cmake/cdt/CDTWasmToolchain.cmake .. && make"
 ```
 
+macOS / Linux:
+```bash
+docker run --rm -v "$(pwd)":/project -w /project waxcdt \
+  bash -c "mkdir -p build && cd build && cmake -DCMAKE_TOOLCHAIN_FILE=/usr/lib/cmake/cdt/CDTWasmToolchain.cmake .. && make"
+```
 
 What you just typed:
 - `--rm` — throw the container away when it finishes, so nothing piles up on your machine.
-- `-v "$(pwd)":/project` — share your current folder with the container as `/project`, so it can read your code and write the results back into your real folder.
+- `-v "${PWD}:/project"` — share your current folder with the container as `/project`, so it can read your code and write the results back into your real folder.
 - `-w /project` — start inside that shared folder.
 - `mkdir -p build && cd build` — keep generated junk in a `build` folder instead of mixing it with your code.
-- `cmake ..` — read `CMakeLists.txt` in the folder above and generate the real build commands.
+- `cmake -DCMAKE_TOOLCHAIN_FILE=/usr/lib/cmake/cdt/CDTWasmToolchain.cmake ..` — read `CMakeLists.txt` in the folder above and generate the real build commands, **using the WAX compiler**. `-D` means "define a setting for CMake"; that path is where CDT installs its toolchain file inside the image.
 - `make` — run them. This is where compiling actually happens.
 
-You know it worked when a `build` folder appears containing:
+**How you know it is now using the right compiler.** In the output near the top you should see:
+
+```text
+-- Setting up CDT Wasm Toolchain 4.1.1 at /usr
+-- The CXX compiler identification is Clang ...
+```
+
+If you still see `The CXX compiler identification is GNU 11.4.0`, the toolchain flag did not take effect — almost always because the old `build` folder still exists. Delete it and run again.
+
+You know the whole thing worked when a `build` folder appears containing:
 - `ramcheese.wasm` — the compiled contract
 - `ramcheese.abi` — the interface file wallets and explorers read
 
-You need both to deploy. If it fails and names a file and a line number, that is a mistake in your C++, not in Docker. If it says it cannot find package `cdt`, you ran the build outside the container — recheck the `IMAGE_NAME`.
+You need both to deploy.
+
+**Troubleshooting Step 7:**
+- `unrecognized command-line option '-abigen'` — the toolchain flag is missing, or a stale `build` folder is being reused. Delete `build`, re-run the full command above.
+- An error naming one of your own files with a line number (e.g. `src/ramcheese.cpp:42`) — that is a mistake in your C++, not in Docker. Fix the line it names.
+- `Could not find a package configuration file provided by cdt` — you ran `cmake` on your Windows machine instead of inside the container. Use the `docker run ...` command exactly as written.
+
 
 ## Step 8 (optional) — Stop typing the long docker command
 Do this: right-click empty space in the VS Code panel -> New Folder -> `.devcontainer`. Inside it create `devcontainer.json` and paste:
@@ -315,7 +339,7 @@ Do this: right-click empty space in the VS Code panel -> New Folder -> `.devcont
 ```json
 {
   "name": "WAX Contract Dev",
-  "image": "IMAGE_NAME",
+  "image": "waxcdt",
   "customizations": {
     "vscode": {
       "extensions": ["ms-vscode.cpptools", "ms-vscode.cmake-tools"]
@@ -324,11 +348,12 @@ Do this: right-click empty space in the VS Code panel -> New Folder -> `.devcont
 }
 ```
 
-Replace `IMAGE_NAME` with your image, save, press F1, type `Reopen in Container`, and pick "Dev Containers: Reopen in Container". VS Code now runs inside the WAX toolchain, so in its built-in terminal you can simply run:
+Save, press F1, type `Reopen in Container`, and pick "Dev Containers: Reopen in Container". VS Code now runs inside the WAX toolchain, so in its built-in terminal you can simply run:
 
 ```bash
-mkdir -p build && cd build && cmake .. && make
+mkdir -p build && cd build && cmake -DCMAKE_TOOLCHAIN_FILE=/usr/lib/cmake/cdt/CDTWasmToolchain.cmake .. && make
 ```
+
 
 ## Step 9 — Deploy to WAX testnet first. Do not skip this.
 A broken contract on mainnet costs real WAX and can lock funds.
