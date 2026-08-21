@@ -109,9 +109,12 @@ private:
 };
 ```
 
-`src/ramcheese.cpp` — the logic. Click it, paste all of this, Ctrl+S:
+`src/ramcheese.cpp` — the logic. It is long, so it is split into 4 short parts below. Use the **copy button in the top-right corner of each code block** (do not highlight the text with the mouse — a mouse selection in a scrolling chat panel stops at whatever is on screen, which is why you only got 56 lines). Paste each part into `src/ramcheese.cpp` one after the other, in order, so they end up in the same file.
+
+**Part 1 of 4** — paste at the top of the empty `src/ramcheese.cpp`:
 
 ```cpp
+
 #include "ramcheese.hpp"
 
 using std::string;
@@ -145,6 +148,11 @@ void ramcheese::pay(name token_contract, name to, asset quantity, const string& 
       std::make_tuple(get_self(), to, quantity, memo)
    ).send();
 }
+```
+
+**Part 2 of 4** — paste at the bottom of `src/ramcheese.cpp`:
+
+```cpp
 
 void ramcheese::setconfig(name owner, name oracle, asset min_buy, asset max_buy,
                           uint16_t buy_fee_bps, uint16_t sell_fee_bps,
@@ -211,6 +219,11 @@ void ramcheese::setrates(asset cheese_per_wax, asset wax_per_kb, uint16_t max_de
    row.rates_updated     = time_point_sec(current_time_point());
    cfg.set(row, get_self());
 }
+```
+
+**Part 3 of 4** — paste at the bottom of `src/ramcheese.cpp`:
+
+```cpp
 
 void ramcheese::setpause(bool buy_paused, bool sell_paused) {
    config_tbl cfg(get_self(), get_self().value);
@@ -229,6 +242,11 @@ void ramcheese::withdraw(name token_contract, name to, asset quantity, string me
    check(is_account(to), "destination account does not exist");
    pay(token_contract, to, quantity, memo);
 }
+```
+
+**Part 4 of 4** — paste at the very bottom of `src/ramcheese.cpp`, save with Ctrl+S:
+
+```cpp
 
 // BUY RAM: someone sends CHEESE, the contract spends its own liquid WAX on RAM for
 // them, and the CHEESE it received is nulled.
