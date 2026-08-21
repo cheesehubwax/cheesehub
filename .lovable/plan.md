@@ -1,508 +1,64 @@
-# `ram.cheese` — from here on
-
-Docker, VS Code, the `waxcdt` image, `CMakeLists.txt` and the toolchain flag are all done and working. Below is only what is left, in order. (The earlier setup steps are archived — ask if you want them back.)
-
-## Step 1 — Paste the contract code (this is why your last build failed)
-
-Read your last output again: the toolchain part now works perfectly.
-
-```text
--- Setting up CDT Wasm Toolchain 4.1.1 at /usr
--- The CXX compiler identification is Clang 9.0.1
-```
-
-Docker, CDT, CMake and the toolchain flag are all correct now. The two lines that stopped it are:
-
-```text
-Warning, contract is empty and ABI is not generated
-wasm-ld: error: fatal failure: contract with no actions and trying to create dispatcher
-```
-
-In plain English: your `src/ramcheese.cpp` and `include/ramcheese.hpp` are still empty files. The compiler compiled nothing, found no actions, and refused to produce a contract that can never be called. Nothing is broken — you just have not written the contract yet. (`--- failed` on the two "compiler ABI info" lines is normal for a Wasm compiler and is not an error.)
-
-`include/ramcheese.hpp` — the declarations. Click it in the VS Code panel, paste all of this, Ctrl+S:
-
-```cpp
-#pragma once
-
-#include <eosio/eosio.hpp>
-#include <eosio/asset.hpp>
-#include <eosio/singleton.hpp>
-#include <eosio/system.hpp>
-#include <string>
-
-using namespace eosio;
-
-// Read-only view of any eosio.token-style contract's balance table.
-namespace tokenview {
-   struct account {
-      asset balance;
-      uint64_t primary_key() const { return balance.symbol.code().raw(); }
-   };
-   typedef multi_index<name("accounts"), account> accounts;
-}
-
-CONTRACT ramcheese : public contract {
-public:
-   using contract::contract;
-
-   static constexpr symbol WAX_SYM      = symbol("WAX", 8);
-   static constexpr symbol CHEESE_SYM   = symbol("CHEESE", 4);
-   static constexpr name   WAX_TOKEN    = name("eosio.token");
-   static constexpr name   CHEESE_TOKEN = name("cheeseburger");
-   static constexpr name   NULL_ACCT    = name("eosio.null");
-   static constexpr name   SYSTEM_ACCT  = name("eosio");
-
-   ACTION setconfig(name owner, name oracle, asset min_buy, asset max_buy,
-                    uint16_t buy_fee_bps, uint16_t sell_fee_bps,
-                    asset wax_reserve_floor, asset cheese_pool_floor,
-                    int64_t min_sell_bytes, int64_t max_sell_bytes);
-
-   ACTION setrates(asset cheese_per_wax, asset wax_per_kb, uint16_t max_deviation_bps);
-
-   ACTION setpause(bool buy_paused, bool sell_paused);
-
-   ACTION withdraw(name token_contract, name to, asset quantity, std::string memo);
-
-   [[eosio::on_notify("cheeseburger::transfer")]]
-   void on_cheese(name from, name to, asset quantity, std::string memo);
-
-   [[eosio::on_notify("eosio::ramtransfer")]]
-   void on_ram(name from, name to, int64_t bytes, std::string memo);
-
-   TABLE config_row {
-      name           owner;
-      name           oracle;
-      asset          min_buy;
-      asset          max_buy;
-      uint16_t       buy_fee_bps       = 0;
-      uint16_t       sell_fee_bps      = 0;
-      asset          wax_reserve_floor;
-      asset          cheese_pool_floor;
-      int64_t        min_sell_bytes    = 0;
-      int64_t        max_sell_bytes    = 0;
-      asset          cheese_per_wax;
-      asset          wax_per_kb;
-      uint16_t       max_deviation_bps = 1000;
-      bool           buy_paused        = false;
-      bool           sell_paused       = false;
-      time_point_sec rates_updated;
-   };
-   typedef singleton<name("config"), config_row> config_tbl;
-
-   TABLE stats_row {
-      asset    cheese_nulled;
-      asset    wax_spent;
-      asset    cheese_paid;
-      int64_t  bytes_bought = 0;
-      int64_t  bytes_sold   = 0;
-      uint64_t buys         = 0;
-      uint64_t sells        = 0;
-   };
-   typedef singleton<name("stats"), stats_row> stats_tbl;
-
-private:
-   config_row load_config();
-   stats_row  load_stats();
-   asset      balance_of(name token_contract, symbol sym);
-   void       pay(name token_contract, name to, asset quantity, const std::string& memo);
-};
-```
-
-`src/ramcheese.cpp` — the logic. It is long, so it is split into 4 short parts below. Use the **copy button in the top-right corner of each code block** (do not highlight the text with the mouse — a mouse selection in a scrolling chat panel stops at whatever is on screen, which is why you only got 56 lines). Paste each part into `src/ramcheese.cpp` one after the other, in order, so they end up in the same file.
-
-**Part 1 of 4** — paste at the top of the empty `src/ramcheese.cpp`:
-
-```cpp
-
-#include "ramcheese.hpp"
-
-using std::string;
-
-ramcheese::config_row ramcheese::load_config() {
-   config_tbl cfg(get_self(), get_self().value);
-   check(cfg.exists(), "ram.cheese is not configured yet: call setconfig first");
-   return cfg.get();
-}
-
-ramcheese::stats_row ramcheese::load_stats() {
-   stats_tbl st(get_self(), get_self().value);
-   if (st.exists()) return st.get();
-   stats_row row;
-   row.cheese_nulled = asset(0, CHEESE_SYM);
-   row.wax_spent     = asset(0, WAX_SYM);
-   row.cheese_paid   = asset(0, CHEESE_SYM);
-   return row;
-}
-
-asset ramcheese::balance_of(name token_contract, symbol sym) {
-   tokenview::accounts acc(token_contract, get_self().value);
-   auto it = acc.find(sym.code().raw());
-   return it == acc.end() ? asset(0, sym) : it->balance;
-}
-
-void ramcheese::pay(name token_contract, name to, asset quantity, const string& memo) {
-   action(
-      permission_level{get_self(), name("active")},
-      token_contract, name("transfer"),
-      std::make_tuple(get_self(), to, quantity, memo)
-   ).send();
-}
-```
-
-**Part 2 of 4** — paste at the bottom of `src/ramcheese.cpp`:
-
-```cpp
-
-void ramcheese::setconfig(name owner, name oracle, asset min_buy, asset max_buy,
-                          uint16_t buy_fee_bps, uint16_t sell_fee_bps,
-                          asset wax_reserve_floor, asset cheese_pool_floor,
-                          int64_t min_sell_bytes, int64_t max_sell_bytes) {
-   config_tbl cfg(get_self(), get_self().value);
-   config_row row;
-   if (cfg.exists()) {
-      row = cfg.get();
-      require_auth(row.owner);
-   } else {
-      require_auth(get_self());
-      row.cheese_per_wax    = asset(0, CHEESE_SYM);
-      row.wax_per_kb        = asset(0, WAX_SYM);
-      row.max_deviation_bps = 1000;
-      row.buy_paused        = false;
-      row.sell_paused       = false;
-      row.rates_updated     = time_point_sec(0);
-   }
-
-   check(is_account(owner),  "owner account does not exist");
-   check(is_account(oracle), "oracle account does not exist");
-   check(min_buy.symbol == CHEESE_SYM && max_buy.symbol == CHEESE_SYM, "buy limits must be CHEESE");
-   check(min_buy.amount > 0 && max_buy.amount >= min_buy.amount, "bad buy limits");
-   check(wax_reserve_floor.symbol == WAX_SYM && wax_reserve_floor.amount >= 0, "wax_reserve_floor must be WAX");
-   check(cheese_pool_floor.symbol == CHEESE_SYM && cheese_pool_floor.amount >= 0, "cheese_pool_floor must be CHEESE");
-   check(buy_fee_bps <= 2000 && sell_fee_bps <= 2000, "fees are capped at 20%");
-   check(min_sell_bytes > 0 && max_sell_bytes >= min_sell_bytes, "bad sell size limits");
-
-   row.owner             = owner;
-   row.oracle            = oracle;
-   row.min_buy           = min_buy;
-   row.max_buy           = max_buy;
-   row.buy_fee_bps       = buy_fee_bps;
-   row.sell_fee_bps      = sell_fee_bps;
-   row.wax_reserve_floor = wax_reserve_floor;
-   row.cheese_pool_floor = cheese_pool_floor;
-   row.min_sell_bytes    = min_sell_bytes;
-   row.max_sell_bytes    = max_sell_bytes;
-   cfg.set(row, get_self());
-}
-
-void ramcheese::setrates(asset cheese_per_wax, asset wax_per_kb, uint16_t max_deviation_bps) {
-   config_tbl cfg(get_self(), get_self().value);
-   check(cfg.exists(), "call setconfig first");
-   config_row row = cfg.get();
-   check(has_auth(row.oracle) || has_auth(row.owner), "only the oracle or the owner can set rates");
-
-   check(cheese_per_wax.symbol == CHEESE_SYM && cheese_per_wax.amount > 0, "cheese_per_wax must be positive CHEESE");
-   check(wax_per_kb.symbol == WAX_SYM && wax_per_kb.amount > 0, "wax_per_kb must be positive WAX");
-   check(max_deviation_bps > 0 && max_deviation_bps <= 5000, "max_deviation_bps out of range");
-
-   if (row.cheese_per_wax.amount > 0 && !has_auth(row.owner)) {
-      int128_t old_v = row.cheese_per_wax.amount;
-      int128_t new_v = cheese_per_wax.amount;
-      int128_t diff  = new_v > old_v ? new_v - old_v : old_v - new_v;
-      check(diff * 10000 <= old_v * (int128_t)row.max_deviation_bps,
-            "new rate deviates too far from the stored rate; the owner must confirm it");
-   }
-
-   row.cheese_per_wax    = cheese_per_wax;
-   row.wax_per_kb        = wax_per_kb;
-   row.max_deviation_bps = max_deviation_bps;
-   row.rates_updated     = time_point_sec(current_time_point());
-   cfg.set(row, get_self());
-}
-```
-
-**Part 3 of 4** — paste at the bottom of `src/ramcheese.cpp`:
-
-```cpp
-
-void ramcheese::setpause(bool buy_paused, bool sell_paused) {
-   config_tbl cfg(get_self(), get_self().value);
-   check(cfg.exists(), "call setconfig first");
-   config_row row = cfg.get();
-   require_auth(row.owner);
-   row.buy_paused  = buy_paused;
-   row.sell_paused = sell_paused;
-   cfg.set(row, get_self());
-}
-
-void ramcheese::withdraw(name token_contract, name to, asset quantity, string memo) {
-   config_row row = load_config();
-   require_auth(row.owner);
-   check(quantity.amount > 0, "quantity must be positive");
-   check(is_account(to), "destination account does not exist");
-   pay(token_contract, to, quantity, memo);
-}
-```
-
-**Part 4 of 4** — paste at the very bottom of `src/ramcheese.cpp`, save with Ctrl+S:
-
-```cpp
-
-// BUY RAM: someone sends CHEESE, the contract spends its own liquid WAX on RAM for
-// them, and the CHEESE it received is nulled.
-void ramcheese::on_cheese(name from, name to, asset quantity, string memo) {
-   if (to != get_self() || from == get_self()) return;   // outgoing, or not for us
-   if (memo == "deposit") return;                        // owner funding the CHEESE payout pool
-
-   config_row row = load_config();
-   check(!row.buy_paused, "RAM buying is paused");
-   check(quantity.symbol == CHEESE_SYM, "only CHEESE is accepted here");
-   check(row.cheese_per_wax.amount > 0, "no CHEESE/WAX rate is set yet");
-   check(quantity >= row.min_buy, "below the minimum purchase");
-   check(quantity <= row.max_buy, "above the maximum purchase");
-
-   name receiver = from;
-   if (!memo.empty()) {
-      check(memo.size() <= 12, "memo must be empty or a WAX account name");
-      receiver = name(memo);
-      check(is_account(receiver), "the account in the memo does not exist");
-   }
-
-   // CHEESE -> WAX using the stored rate, then take the buy fee.
-   int128_t gross = (int128_t)quantity.amount * 100000000 / (int128_t)row.cheese_per_wax.amount;
-   int128_t net   = gross * (10000 - (int128_t)row.buy_fee_bps) / 10000;
-   check(net > 0, "amount too small to buy any RAM");
-   asset wax_spend = asset((int64_t)net, WAX_SYM);
-
-   asset liquid = balance_of(WAX_TOKEN, WAX_SYM);
-   check(liquid >= wax_spend + row.wax_reserve_floor,
-         "not enough liquid WAX in the contract right now; try a smaller amount");
-
-   action(permission_level{get_self(), name("active")}, SYSTEM_ACCT, name("buyram"),
-          std::make_tuple(get_self(), receiver, wax_spend)).send();
-
-   pay(CHEESE_TOKEN, NULL_ACCT, quantity, "ram.cheese: CHEESE nulled for a RAM purchase");
-
-   stats_tbl st(get_self(), get_self().value);
-   stats_row s = load_stats();
-   s.cheese_nulled += quantity;
-   s.wax_spent     += wax_spend;
-   s.buys          += 1;
-   st.set(s, get_self());
-}
-
-// SELL RAM: someone transfers RAM bytes to the contract, the contract sells them
-// for WAX (which it keeps) and pays the seller CHEESE out of its pool.
-void ramcheese::on_ram(name from, name to, int64_t bytes, string memo) {
-   if (to != get_self() || from == get_self()) return;
-   if (memo == "deposit") return;                        // owner topping up contract RAM
-
-   config_row row = load_config();
-   check(!row.sell_paused, "RAM selling is paused");
-   check(row.cheese_per_wax.amount > 0 && row.wax_per_kb.amount > 0, "no rates are set yet");
-   check(bytes >= row.min_sell_bytes, "below the minimum sell size");
-   check(bytes <= row.max_sell_bytes, "above the maximum sell size");
-
-   int128_t wax_units    = (int128_t)bytes * (int128_t)row.wax_per_kb.amount / 1024;
-   int128_t cheese_units = wax_units * (int128_t)row.cheese_per_wax.amount / 100000000;
-   cheese_units          = cheese_units * (10000 - (int128_t)row.sell_fee_bps) / 10000;
-   check(cheese_units > 0, "amount too small to pay out");
-   asset payout = asset((int64_t)cheese_units, CHEESE_SYM);
-
-   asset pool = balance_of(CHEESE_TOKEN, CHEESE_SYM);
-   check(pool >= payout + row.cheese_pool_floor, "the CHEESE payout pool is too low right now");
-
-   action(permission_level{get_self(), name("active")}, SYSTEM_ACCT, name("sellram"),
-          std::make_tuple(get_self(), bytes)).send();
-
-   pay(CHEESE_TOKEN, from, payout, "ram.cheese: CHEESE for RAM sold");
-
-   stats_tbl st(get_self(), get_self().value);
-   stats_row s = load_stats();
-   s.cheese_paid += payout;
-   s.bytes_sold  += bytes;
-   s.sells       += 1;
-   st.set(s, get_self());
-}
-```
-
-Then re-run the Step 2 compile command. You are looking for `ramcheese.wasm` **and** `ramcheese.abi` in the `build` folder, with no `wasm-ld` error.
-
-**Two things to know about this code before deploying it.**
-
-1. **Pricing comes from a rate you push in, not from Alcor on-chain.** Alcor's pools store price as a 128-bit square-root value needing heavy maths a contract should not do, so this version keeps `cheese_per_wax` and `wax_per_kb` in the `config` table. The `oracle` account (a small script, or you) calls `setrates` on a schedule; `max_deviation_bps` rejects any jump bigger than you allow unless the owner signs it. A stale rate is the main risk — keep the updater running and the guard tight.
-2. **The sell flow depends on `eosio::ramtransfer` existing on WAX.** Before deploying, open `eosio` on waxblock.io -> Contract -> ABI and search for `ramtransfer`. If it is there, the sell flow works as written. If it is not, WAX's system contract predates that feature and the sell side needs a different design — tell me and I will rework it. The buy side is unaffected either way.
-
-## Step 2 — Compile
-
-**If you are stuck at a `>>` prompt right now:** do not type or paste anything else. Press **Ctrl+C once**. You should see the normal prompt again:
-
-```text
-PS C:\Users\User\Desktop\wax contracts\ram.cheese>
-```
-
-The `>>` is not a Docker error. It means PowerShell thinks the command is unfinished and is waiting for another line. Your pasted lines were in the wrong order: `bash -c ...` appeared first, while `docker run ...` appeared afterward. Do not run `bash -c ...` by itself in PowerShell, and do not use the older two-line command.
-
-To avoid this entirely, use the **one-line** version below. Copy it with the copy button, click once in the terminal, paste, press Enter once.
-
-First, move into your project folder (VS Code's terminal with Ctrl+` already starts there) and **delete the old build folder** — it caches the compiler choice:
-
-```powershell
-Remove-Item -Recurse -Force build
-```
-
-(If it says the path does not exist, that is fine — there was nothing to delete. macOS/Linux: `rm -rf build`.)
-
-Windows PowerShell — copy this **entire line at once**. It begins with `docker run` and ends with `make"`. Paste it only after the normal `PS ...>` prompt has returned, then press **Enter once**. Do not press Enter halfway through it and do not paste the `powershell` label:
-```powershell
-docker run --rm -v "${PWD}:/project" -w /project waxcdt bash -c "mkdir -p build && cd build && cmake -DCMAKE_TOOLCHAIN_FILE=/usr/lib/cmake/cdt/CDTWasmToolchain.cmake .. && make"
-```
-
-macOS / Linux — one line:
-```bash
-docker run --rm -v "$(pwd)":/project -w /project waxcdt bash -c "mkdir -p build && cd build && cmake -DCMAKE_TOOLCHAIN_FILE=/usr/lib/cmake/cdt/CDTWasmToolchain.cmake .. && make"
-```
-
-
-You know it worked when the `build` folder contains:
-- `ramcheese.wasm` — the compiled contract
-- `ramcheese.abi` — the interface file wallets and explorers read
-
-You need both to deploy.
-
-**Troubleshooting Step 2:**
-- `contract with no actions and trying to create dispatcher` / `Warning, contract is empty` — the two files are still empty. Go back to Step 1, paste both, save both.
-- `unrecognized command-line option '-abigen'` — the toolchain flag is missing, or a stale `build` folder is being reused. Delete `build`, re-run the full command.
-- An error naming one of your own files with a line number (e.g. `src/ramcheese.cpp:42`) — that is a mistake in the C++, not in Docker. Fix that line. Paste me the error and I will fix it.
-- `Could not find a package configuration file provided by cdt` — you ran `cmake` on Windows instead of inside the container. Use the `docker run ...` command exactly as written.
-
-## Step 3 (optional) — Stop typing the long docker command
-Right-click empty space in the VS Code panel -> New Folder -> `.devcontainer`. Inside it create `devcontainer.json` and paste:
-
-```json
-{
-  "name": "WAX Contract Dev",
-  "image": "waxcdt",
-  "customizations": {
-    "vscode": {
-      "extensions": ["ms-vscode.cpptools", "ms-vscode.cmake-tools"]
-    }
-  }
-}
-```
-
-Save, press F1, type `Reopen in Container`, pick "Dev Containers: Reopen in Container". VS Code now runs inside the WAX toolchain, so in its terminal you can just run:
-
-```bash
-mkdir -p build && cd build && cmake -DCMAKE_TOOLCHAIN_FILE=/usr/lib/cmake/cdt/CDTWasmToolchain.cmake .. && make
-```
-
-## Step 4 — Deploy to WAX testnet first. Do not skip this.
-A broken contract on mainnet costs real WAX and can lock funds.
-
-1. Create a free testnet account at a faucet such as https://waxsweden.org/testnet/ and save the keys.
-2. Deploy there using Step 5 or Step 6, but point at a testnet endpoint: `https://testnet.waxsweden.org`.
-3. Call each action once and check the tables in the explorer. Send a mock CHEESE transfer to test a buy, and a `ramtransfer` to test a sell.
-4. Only when both work, repeat on mainnet.
-
-## Step 5 — Deploy option A: the block explorer (easiest, you never type a private key)
-1. Go to https://waxblock.io (or https://wax.bloks.io), open the `ram.cheese` account, then its contract deploy tool.
-2. Click Login, choose your wallet (Anchor, Wombat, WAX Cloud Wallet), log in as `ram.cheese`.
-3. Upload `build/ramcheese.wasm` in the WASM field and `build/ramcheese.abi` in the ABI field.
-4. Read the transaction preview: it should contain `eosio::setcode` and `eosio::setabi`. If not, you uploaded the wrong files.
-5. Sign / Submit and approve in your wallet.
-6. Copy the transaction ID and open `https://waxblock.io/transaction/<txid>` to confirm it executed.
-
-If it fails with a RAM error, buy more RAM on `ram.cheese` and retry.
-
-## Step 6 — Deploy option B: command line with cleos
-1. Pull the image that contains `cleos`:
-   ```bash
-   docker pull antelopeio/leap:latest
-   ```
-2. From your project folder:
-   ```bash
-   docker run --rm -it -v "$(pwd)":/project -w /project antelopeio/leap:latest bash
-   ```
-3. Create a wallet and load your key:
-   ```bash
-   keosd &
-   cleos wallet create --to-console
-   cleos wallet import
-   ```
-   `create --to-console` prints a password — save it. `wallet import` prompts for the private key so it never lands in shell history. Never paste a private key directly on a command line.
-4. Deploy:
-   ```bash
-   cleos -u https://wax.greymass.com set contract ram.cheese ./build ramcheese.wasm ramcheese.abi
-   ```
-5. Check it landed:
-   ```bash
-   cleos -u https://wax.greymass.com get code ram.cheese
-   ```
-   The code hash must not be all zeros. All zeros means nothing deployed.
-
-If an endpoint is rate-limited, swap `-u` for `https://wax.eosphere.io`, `https://api.wax.alohaeos.com`, or `https://wax.pink.gg`.
-
-## Step 7 — Set the contract up after deploying
-
-Permission step is done (`ram.cheese@eosio.code` on `active`). Now the two config actions, field by field.
-
-### 7a — `setconfig`
-
-Where: waxblock.io -> account `ram.cheese` -> **Contract** tab -> **Actions** -> pick `setconfig` -> log in as `ram.cheese` -> fill the form -> Submit.
-
-Type these values exactly, including the symbol name and the number of decimals. Amounts are strings: CHEESE always has **4** decimals, WAX always has **8**. `2 CHEESE` is rejected; `2.0000 CHEESE` is accepted.
-
-| Field | Type it as | What it means |
-| --- | --- | --- |
-| `owner` | `ram.cheese` | The only account allowed to call `setpause`, `withdraw`, and re-run `setconfig`. Use your own personal account instead if you want the contract account itself to have no admin power. |
-| `oracle` | `ram.cheese` | The account allowed to call `setrates`. Start with `ram.cheese`; change it later to a dedicated pusher account. |
-| `min_buy` | `100.0000 CHEESE` | Smallest CHEESE amount accepted for a RAM purchase. Anything less is refused. |
-| `max_buy` | `100000.0000 CHEESE` | Largest single purchase. Keeps one transaction from draining the WAX reserve. |
-| `buy_fee_bps` | `100` | Your margin on buys, in basis points. `100` = 1%. `0` = no fee. Max allowed is `2000` (20%). |
-| `sell_fee_bps` | `300` | Margin on sells. `300` = 3%. Keep this higher than the buy fee so round-tripping cannot drain you. |
-| `wax_reserve_floor` | `100.00000000 WAX` | WAX the contract must never spend. Buys fail rather than dip into it, so the account always keeps CPU/NET budget. |
-| `cheese_pool_floor` | `0.0000 CHEESE` | CHEESE the contract must never pay out. `0.0000` while testing; raise it if you want a permanent buffer. |
-| `min_sell_bytes` | `1024` | Smallest RAM sale, in bytes. `1024` = 1 KB. |
-| `max_sell_bytes` | `1048576` | Largest single sale in bytes. `1048576` = 1 MB. |
-
-Notes on the choices:
-- The first `setconfig` must be signed by `ram.cheese` itself. Every later call must be signed by whatever you set as `owner`.
-- Basis points: divide by 100 to get a percent. `50` = 0.5%, `100` = 1%, `250` = 2.5%.
-- Start conservative (small `max_buy`, high `wax_reserve_floor`) and loosen once it is proven.
-
-### 7b — `setrates`
-
-Same place, action `setrates`. Sign with the `oracle` account (or `owner`).
-
-| Field | Example | What it means |
-| --- | --- | --- |
-| `cheese_per_wax` | `1234.5678 CHEESE` | How much CHEESE 1 WAX is worth right now. Read it from the Alcor WAX/CHEESE pool — the same number CHEESEHub's price bar shows. |
-| `wax_per_kb` | `0.05000000 WAX` | What 1 KB (1024 bytes) of RAM costs in WAX right now. |
-| `max_deviation_bps` | `1000` | How far the oracle may move `cheese_per_wax` in one call. `1000` = 10%. A bigger jump is rejected unless `owner` signs it. |
-
-How to get `wax_per_kb` before your first call: on waxblock.io open the `eosio` account -> Tables -> `rammarket`. It has `base` (RAM bytes in the market) and `quote` (WAX). Price per byte is `quote / base`; multiply by 1024 for per-KB. Or simpler: buy 1 KB of RAM manually in any wallet, note the WAX charged, and use that figure.
-
-The very first `setrates` has no stored rate to compare against, so `max_deviation_bps` is not enforced on it. Every later call is checked.
-
-### 7c — Fund it
-- Send WAX to `ram.cheese` with **no memo** (or any memo other than a valid account name) — this is the reserve the contract spends on RAM.
-- Send CHEESE to `ram.cheese` with the memo exactly `deposit` — this fills the payout pool for sells. Without the `deposit` memo the contract treats it as a RAM purchase.
-
-### 7d — Verify
-waxblock.io -> `ram.cheese` -> Tables -> `config`. Confirm every field matches what you typed and `rates_updated` is a recent timestamp. Then test with the smallest allowed buy before announcing it.
-
-
-## Step 8 — Safety, before real money touches it
-- Create a dedicated permission on `ram.cheese` called `deployer`, parent `active`, linked only to `eosio::setcode` and `eosio::setabi`. Deploy with that key from then on, not your full `active` key.
-- Never commit private keys. Add any `.key` files and wallet passwords to `.gitignore`.
-- Once the contract holds real value, move control to a multisig so no single key can silently replace the code.
-
-## Quick reference
-| What | Where to get it | Why |
-| --- | --- | --- |
-| `waxcdt` image | already built on your machine | Turns `.cpp` into `.wasm` and `.abi` |
-| Leap Docker image | `docker pull antelopeio/leap` | Gives you `cleos` for CLI deployment |
-| `ram.cheese` account with RAM | Any WAX wallet or Anchor | Holds and pays for the contract |
-| Testnet account | A WAX testnet faucet | Safe place to break things first |
-| waxblock.io / bloks.io | Browser | Upload without the CLI, and verify transactions |
+# Add a daily vote-reward claim for `cheesepowerz` to the powerup script
+
+Yes, this is possible, and it fits the existing job cleanly. The claim runs as a second, independent phase after the powerup transfers, and skips itself when the 24h cooldown has not elapsed — exactly the behaviour you described.
+
+## What is true on-chain right now (checked)
+
+- `cheesepowerz` does vote: `eosio::voters` shows `proxy: bigmikeproxy`, `staked` ~62,332 WAX, and a non-zero `unpaid_voteshare`, so it accrues GBM voter rewards.
+- Its `last_claim_time` is `2026-08-21T15:20:11` UTC, i.e. it was claimed manually today. The next eligible claim is ~24h after whatever the latest claim time is.
+- `cheesepowerz` has only `owner` and `active` permissions, both holding the same key. There is **no** permission the daily script can currently sign with.
+- The script signs as `power.chz@dailypower`, and per the README that permission is linked only to `cheeseburger::transfer`. So today it cannot claim for `cheesepowerz`.
+
+That last point is the one blocker, and it is a wallet setup step, not code.
+
+## One-time setup you do (before the code matters)
+
+`eosio::claimgbmvote(owner)` requires the authority of `owner`, so `cheesepowerz` itself must authorise the claim. Two options:
+
+- **Option A (recommended) — reuse the existing script key.** On `cheesepowerz`, add a new permission `claimvote`, parent `active`, whose key is the **public** key of the `WAX_DAILYPOWER_KEY` already in GitHub secrets. Then link it to only that one action:
+  ```
+  cleos set action permission cheesepowerz eosio claimgbmvote claimvote
+  ```
+  Nothing new goes into GitHub. The one key can now do two things and nothing else: send CHEESE from `power.chz`, and claim vote rewards for `cheesepowerz`.
+- **Option B — separate key.** Fresh keypair for `cheesepowerz@claimvote`, linked the same way, added as a second GitHub secret. More isolation, one more secret to manage.
+
+Either way the key can never move WAX, unstake, or change votes, because `linkauth` restricts it to `claimgbmvote`.
+
+## How the claim phase behaves
+
+Order per run: powerup transfers first (unchanged), then the claim. The claim never blocks or fails the powerup.
+
+1. Read `eosio::voters` for `cheesepowerz` over the existing multi-endpoint RPC fallback.
+2. Skip with a log line, not an error, if any of these hold:
+   - no voter row, or neither `producers` nor `proxy` is set (not voting, nothing accrues)
+   - `now < last_claim_time + 24h` — still in cooldown; the next daily run picks it up
+   - `unpaid_voteshare` is zero
+3. Otherwise push one transaction: `eosio::claimgbmvote { owner: "cheesepowerz" }`, authorised by `cheesepowerz@claimvote`.
+4. Log the tx id, and re-read `last_claim_time` to confirm it advanced.
+5. On failure: log it, print the tx error, and set a non-fatal warning. A claim error must not mark the powerup run failed, so `process.exitCode` is only set when the powerup itself failed.
+
+Because the workflow already fires several times a day (00:17 plus retries) and later ticks exit early via the idempotency guard, the claim rides along with whichever tick actually does the work — roughly once every 24h. When the cooldown has not passed at that moment, it simply waits for the next day's run, as you asked. The existing `claim_only` escape hatch below lets you force one on demand.
+
+## Guards
+
+- **Cooldown read from chain, not from a local clock.** `last_claim_time` is the source of truth, so a missed day or a manual claim in your wallet can never double-claim or wedge the schedule.
+- **Small safety margin.** The eligibility test uses `last_claim_time + 24h + 60s` so a run landing a few seconds early does not waste a transaction on a `nothing to claim` error.
+- **Bounded work.** Exactly one claim attempt per run, no retry loop.
+- **Dry run.** `DRY_RUN=1` prints the eligibility decision and the action it would send, and signs nothing.
+- **Kill switch.** `CLAIM_VOTE_ENABLED=0` (repo variable or dispatch input) disables the phase entirely, leaving the powerup untouched.
+- **Silently-off detection.** If setup is incomplete, the missing-authority error is logged verbatim so it shows up in the run log rather than failing quietly.
+
+## Technical changes
+
+- `scripts/daily-powerup/waxSign.ts` — add a generic `buildAction(session, { account, name, authorization, data })`. `buildTransferAction` hardcodes `cheeseburger`/`transfer`, so it cannot express the claim. Also allow `createSession` to be called with a different actor/permission so the claim can sign as `cheesepowerz@claimvote`.
+- `scripts/daily-powerup/waxRpc.ts` — add `getVoterInfo(account)` returning `{ proxy, producers, unpaid_voteshare, last_claim_time }` from `eosio::voters`, using the existing `ENDPOINTS` fallback and timeout helper.
+- `scripts/daily-powerup/claimVoteRewards.ts` (new) — the eligibility check and the single claim, exported as one function returning `{ skipped, reason?, txId? }` so `run.ts` just logs the outcome.
+- `scripts/daily-powerup/run.ts` — call it after the powerup summary, inside `try/catch`, and print a `---- vote claim ----` section.
+- `.github/workflows/daily-powerup.yml` — pass `CLAIM_VOTE_ENABLED`, `CLAIM_VOTE_ACCOUNT` (default `cheesepowerz`), `CLAIM_VOTE_PERMISSION` (default `claimvote`), and, only for Option B, `WAX_CLAIMVOTE_KEY`. Add a `claim_only` dispatch input to run just the claim for testing.
+- `scripts/daily-powerup/README.md` — document the new env vars, the `cheesepowerz@claimvote` setup steps, and the 24h skip behaviour.
+
+No CHEESEHub frontend code changes; the in-app `VoteRewardsManager` keeps working as it does now.
+
+## What I need from you
+
+Which key option do you want — A (reuse `WAX_DAILYPOWER_KEY`, no new secret) or B (separate `claimvote` key as a second secret)? I will write the code for whichever you pick; both need the `cheesepowerz@claimvote` permission plus `linkauth` created in your wallet before the first real claim can land.
