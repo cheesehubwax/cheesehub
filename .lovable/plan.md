@@ -229,6 +229,11 @@ void ramcheese::withdraw(name token_contract, name to, asset quantity, string me
    check(is_account(to), "destination account does not exist");
    pay(token_contract, to, quantity, memo);
 }
+```
+
+**Part 4 of 4** — paste at the very bottom of `src/ramcheese.cpp`, save with Ctrl+S:
+
+```cpp
 
 // BUY RAM: someone sends CHEESE, the contract spends its own liquid WAX on RAM for
 // them, and the CHEESE it received is nulled.
