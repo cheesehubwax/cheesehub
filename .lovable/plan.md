@@ -273,6 +273,9 @@ If you do, Step 6 is finished. **Wherever the steps below say `IMAGE_NAME`, type
 **If something goes wrong:**
 - `failed to read dockerfile` or `Dockerfile: no such file` — you are in the wrong folder, or the file is named `Dockerfile.txt`. Run `dir` and check that `Dockerfile` is listed with no extension.
 - The build stops on the `wget` line with a 404 — AntelopeIO published a newer version and removed that URL. Open https://github.com/AntelopeIO/cdt/releases in your browser, find the newest file ending in `_amd64.deb`, and replace `4.1.0` with that version number in **both** places in the Dockerfile. Save, and run `docker build -t waxcdt .` again.
+- `failed to connect to the docker API` — Docker Desktop is closed. Open it, wait for "Engine running", retry.
+
+
 
 
 ### 6d — Paste the contract code (this is why your last build failed)
