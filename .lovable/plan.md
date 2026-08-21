@@ -185,9 +185,27 @@ Read as one sentence: *require a modern CMake, name the build ramcheese, load th
 ## Step 6 — Get the WAX compiler (CDT) into an image you own
 Two things went wrong in your attempt: you typed `:lat` instead of `:latest`, and more importantly **`antelopeio/cdt` is not published on Docker Hub**. That is what "pull access denied ... repository does not exist" means — Docker Hub has no such repo, so it assumed it must be a private one and asked you to log in. Nothing is wrong with your Docker; the engine clearly works now, since it reached the daemon and got a real answer back from Docker Hub.
 
-So instead of hunting for a prebuilt image, you build a tiny one yourself. It is three lines and it is the most reliable route, because it installs CDT straight from the official AntelopeIO release.
+So you are going to stop looking for a ready-made image and make your own instead. That sounds harder than it is: you write a 5-line text file that says "start with Ubuntu, then install the WAX compiler in it", and Docker follows those instructions once and saves the result as your own image. From then on it behaves exactly like a downloaded one.
 
-**6a. Create the Dockerfile.** In VS Code, right-click empty space in the left panel (not inside `src` or `include`) -> New File -> type `Dockerfile` -> Enter. No file extension, capital D. Paste this and save with Ctrl+S:
+First, some words so the rest makes sense:
+- An **image** is a saved, frozen copy of a small Linux computer with software already installed in it.
+- A **Dockerfile** is a plain text file — a recipe — listing the steps to build that image. It is not code you run; Docker reads it.
+- `docker build` reads the Dockerfile and produces the image. You do that once. `docker run` starts a throwaway copy of the image, which is what you do every time you compile.
+
+### 6a — Create the Dockerfile
+
+**Where:** in VS Code, with your `ram.cheese` folder open (the one you opened in Step 3). You will be looking at the file list on the left, which currently shows `src`, `include` and `CMakeLists.txt`.
+
+**Do this:**
+1. In that left-hand file list, right-click on the **empty grey space below** `CMakeLists.txt`. Not on top of `src`, not on top of `include` — if you right-click a folder, the new file goes inside it, which is wrong here.
+2. Click **New File**.
+3. Type exactly this name, then press Enter:
+   ```text
+   Dockerfile
+   ```
+   Capital `D`, lower-case the rest, and **no `.txt`, no dot, no extension of any kind**. If VS Code shows it as `Dockerfile.txt`, right-click it -> Rename -> delete the `.txt` -> Enter. The name matters because `docker build` looks for a file called precisely `Dockerfile`.
+4. VS Code opens the empty file in the big editing area on the right. Click once inside that empty area so the cursor is there.
+5. Copy the five lines below and paste them in with Ctrl+V:
 
 ```dockerfile
 FROM ubuntu:22.04
@@ -197,25 +215,63 @@ RUN apt-get update && apt-get install -y build-essential cmake wget \
  && rm cdt_4.1.0_amd64.deb
 ```
 
-Line by line: start from a plain Ubuntu 22.04 system; install a C++ toolchain, CMake and `wget`; download the official CDT installer package; install it; delete the installer to keep the image small.
+6. Press **Ctrl+S** to save. The white dot next to the filename in its tab disappears when it is saved. If it is still there, the file is unsaved and `docker build` will not see your text.
 
-**6b. Build the image.** In PowerShell, `cd` into your `ram.cheese` folder (type `cd`, a space, then drag the folder onto the window, then Enter), and run:
+**What you just pasted, in plain English:**
+- `FROM ubuntu:22.04` — begin with a clean Ubuntu Linux 22.04 system. Docker downloads this part for you.
+- `RUN apt-get update && apt-get install -y build-essential cmake wget` — inside that Ubuntu, install a C++ compiler toolchain, CMake, and `wget` (a downloader). `-y` means "answer yes to prompts", because nobody is sitting there to press y.
+- the `wget -q https://...cdt_4.1.0_amd64.deb` line — download the official WAX/Antelope CDT installer package from AntelopeIO's GitHub releases.
+- `apt-get install -y ./cdt_4.1.0_amd64.deb` — install it. This is the step that gives you the actual WAX compiler.
+- `rm cdt_4.1.0_amd64.deb` — delete the installer file afterwards, so the image stays small.
+- The `\` at the end of lines and the `&&` at the start of the next simply mean "this is all one long command, continued". Keep them exactly as shown.
+
+Your folder now looks like this:
+
+```text
+ram.cheese/
+├── src/ramcheese.cpp
+├── include/ramcheese.hpp
+├── CMakeLists.txt
+└── Dockerfile        <- new
+```
+
+### 6b — Build the image
+
+**Where:** in PowerShell — and it must be pointed at the `ram.cheese` folder, because `docker build` reads the Dockerfile from whatever folder you are currently in.
+
+Easiest way to be sure you are in the right place: in VS Code press **Ctrl+`** (the backtick key, top-left under Esc). A terminal panel opens at the bottom, already sitting in your `ram.cheese` folder. If it says `PS C:\Users\User\Documents\wax-contracts\ram.cheese>` you are correct.
+
+If you prefer your own PowerShell window: type `cd`, then a space, then drag the `ram.cheese` folder from File Explorer onto the PowerShell window (that pastes its path), then press Enter.
+
+Confirm Docker Desktop is open and says **Engine running**, then type this and press Enter:
 
 ```powershell
 docker build -t waxcdt .
 ```
 
-`-t waxcdt` names the image `waxcdt`. The `.` means "the Dockerfile is in this folder". First run takes a few minutes as it downloads Ubuntu and CDT.
+- `docker build` — read the Dockerfile and construct the image.
+- `-t waxcdt` — "tag it", i.e. name the finished image `waxcdt`. You choose this name; `waxcdt` is what the rest of this guide assumes.
+- the `.` on the end — "the Dockerfile is in the folder I am in right now". It is easy to miss and Docker fails without it.
 
-**6c. Check it worked.**
+**What you will see:** several minutes of scrolling text as Ubuntu and the compiler download and install. That is normal, leave it alone. It finishes with lines containing `naming to docker.io/library/waxcdt` or `Successfully tagged waxcdt:latest`.
+
+### 6c — Check it worked
+
+Same terminal, type:
 
 ```powershell
 docker run --rm waxcdt cdt-cpp --version
 ```
 
-You should see a version number like `cdt-cpp version 4.1.0`. If you do, you are done — **your `IMAGE_NAME` for every step below is `waxcdt`.**
+This starts a throwaway copy of your image and asks the WAX compiler inside it to print its version. You should see something like `cdt-cpp version 4.1.0`.
 
-If `docker build` fails on the `wget` line, the release URL changed. Open https://github.com/AntelopeIO/cdt/releases in a browser, find the newest `cdt_<version>_amd64.deb`, and put that version number in both places in the Dockerfile.
+If you do, Step 6 is finished. **Wherever the steps below say `IMAGE_NAME`, type `waxcdt`.**
+
+**If something goes wrong:**
+- `failed to read dockerfile` or `Dockerfile: no such file` — you are in the wrong folder, or the file is named `Dockerfile.txt`. Run `dir` and check that `Dockerfile` is listed with no extension.
+- The build stops on the `wget` line with a 404 — AntelopeIO published a newer version and removed that URL. Open https://github.com/AntelopeIO/cdt/releases in your browser, find the newest file ending in `_amd64.deb`, and replace `4.1.0` with that version number in **both** places in the Dockerfile. Save, and run `docker build -t waxcdt .` again.
+- `failed to connect to the docker API` — Docker Desktop is closed. Open it, wait for "Engine running", retry.
+
 
 
 ## Step 7 — Compile
