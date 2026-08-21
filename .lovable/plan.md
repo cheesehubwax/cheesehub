@@ -182,24 +182,41 @@ Means: "when compiling ramcheese, also look in the `include` folder for header f
 
 Read as one sentence: *require a modern CMake, name the build ramcheese, load the WAX toolchain, build `src/ramcheese.cpp` into a contract called ramcheese, and look in `include/` for headers.* That is the entire file, and you will not need to touch it again unless you add another `.cpp`.
 
-## Step 6 — Download the WAX compiler with Docker
-Do this: in your terminal, type:
+## Step 6 — Get the WAX compiler (CDT) into an image you own
+Two things went wrong in your attempt: you typed `:lat` instead of `:latest`, and more importantly **`antelopeio/cdt` is not published on Docker Hub**. That is what "pull access denied ... repository does not exist" means — Docker Hub has no such repo, so it assumed it must be a private one and asked you to log in. Nothing is wrong with your Docker; the engine clearly works now, since it reached the daemon and got a real answer back from Docker Hub.
 
-```bash
-docker pull antelopeio/cdt:latest
+So instead of hunting for a prebuilt image, you build a tiny one yourself. It is three lines and it is the most reliable route, because it installs CDT straight from the official AntelopeIO release.
+
+**6a. Create the Dockerfile.** In VS Code, right-click empty space in the left panel (not inside `src` or `include`) -> New File -> type `Dockerfile` -> Enter. No file extension, capital D. Paste this and save with Ctrl+S:
+
+```dockerfile
+FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y build-essential cmake wget \
+ && wget -q https://github.com/AntelopeIO/cdt/releases/download/v4.1.0/cdt_4.1.0_amd64.deb \
+ && apt-get install -y ./cdt_4.1.0_amd64.deb \
+ && rm cdt_4.1.0_amd64.deb
 ```
 
-You know it worked when the last line says `Status: Downloaded newer image for ...`. Confirm with `docker images` — it should be listed.
+Line by line: start from a plain Ubuntu 22.04 system; install a C++ toolchain, CMake and `wget`; download the official CDT installer package; install it; delete the installer to keep the image small.
 
-If that name is unavailable, try these one at a time until one succeeds:
+**6b. Build the image.** In PowerShell, `cd` into your `ram.cheese` folder (type `cd`, a space, then drag the folder onto the window, then Enter), and run:
 
-```bash
-docker pull ghcr.io/antelopeio/cdt:latest
-docker pull eostudio/eosio.cdt:latest
-docker pull waxteam/dev:latest
+```powershell
+docker build -t waxcdt .
 ```
 
-Write down whichever name worked. You type it in the next step where it says `IMAGE_NAME`.
+`-t waxcdt` names the image `waxcdt`. The `.` means "the Dockerfile is in this folder". First run takes a few minutes as it downloads Ubuntu and CDT.
+
+**6c. Check it worked.**
+
+```powershell
+docker run --rm waxcdt cdt-cpp --version
+```
+
+You should see a version number like `cdt-cpp version 4.1.0`. If you do, you are done — **your `IMAGE_NAME` for every step below is `waxcdt`.**
+
+If `docker build` fails on the `wget` line, the release URL changed. Open https://github.com/AntelopeIO/cdt/releases in a browser, find the newest `cdt_<version>_amd64.deb`, and put that version number in both places in the Dockerfile.
+
 
 ## Step 7 — Compile
 Do this: in the terminal, move into your project folder first. Type `cd` then a space, then drag the `ram.cheese` folder from your file manager onto the terminal window (that pastes the path), then Enter.
