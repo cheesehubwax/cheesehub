@@ -339,7 +339,7 @@ Do this: right-click empty space in the VS Code panel -> New Folder -> `.devcont
 ```json
 {
   "name": "WAX Contract Dev",
-  "image": "IMAGE_NAME",
+  "image": "waxcdt",
   "customizations": {
     "vscode": {
       "extensions": ["ms-vscode.cpptools", "ms-vscode.cmake-tools"]
@@ -348,11 +348,12 @@ Do this: right-click empty space in the VS Code panel -> New Folder -> `.devcont
 }
 ```
 
-Replace `IMAGE_NAME` with your image, save, press F1, type `Reopen in Container`, and pick "Dev Containers: Reopen in Container". VS Code now runs inside the WAX toolchain, so in its built-in terminal you can simply run:
+Save, press F1, type `Reopen in Container`, and pick "Dev Containers: Reopen in Container". VS Code now runs inside the WAX toolchain, so in its built-in terminal you can simply run:
 
 ```bash
-mkdir -p build && cd build && cmake .. && make
+mkdir -p build && cd build && cmake -DCMAKE_TOOLCHAIN_FILE=/usr/lib/cmake/cdt/CDTWasmToolchain.cmake .. && make
 ```
+
 
 ## Step 9 — Deploy to WAX testnet first. Do not skip this.
 A broken contract on mainnet costs real WAX and can lock funds.
