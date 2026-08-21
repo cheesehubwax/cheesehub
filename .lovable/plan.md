@@ -211,6 +211,11 @@ void ramcheese::setrates(asset cheese_per_wax, asset wax_per_kb, uint16_t max_de
    row.rates_updated     = time_point_sec(current_time_point());
    cfg.set(row, get_self());
 }
+```
+
+**Part 3 of 4** — paste at the bottom of `src/ramcheese.cpp`:
+
+```cpp
 
 void ramcheese::setpause(bool buy_paused, bool sell_paused) {
    config_tbl cfg(get_self(), get_self().value);
