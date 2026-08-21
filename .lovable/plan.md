@@ -280,19 +280,20 @@ If you do, Step 6 is finished. **Wherever the steps below say `IMAGE_NAME`, type
 ## Step 7 — Compile
 Do this: in the terminal, move into your project folder first. Type `cd` then a space, then drag the `ram.cheese` folder from your file manager onto the terminal window (that pastes the path), then Enter.
 
-Now run the command for your system, replacing `IMAGE_NAME` with the image from Step 6.
+Now run the command for your system. `waxcdt` is the image you built in Step 6 — if you named it something else, use that name instead.
 
 macOS / Linux:
 ```bash
-docker run --rm -v "$(pwd)":/project -w /project IMAGE_NAME \
+docker run --rm -v "$(pwd)":/project -w /project waxcdt \
   bash -c "mkdir -p build && cd build && cmake .. && make"
 ```
 
 Windows PowerShell:
 ```powershell
-docker run --rm -v "${PWD}:/project" -w /project IMAGE_NAME `
+docker run --rm -v "${PWD}:/project" -w /project waxcdt `
   bash -c "mkdir -p build && cd build && cmake .. && make"
 ```
+
 
 What you just typed:
 - `--rm` — throw the container away when it finishes, so nothing piles up on your machine.
