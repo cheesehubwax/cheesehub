@@ -646,6 +646,7 @@ You know the whole thing worked when a `build` folder appears containing:
 You need both to deploy.
 
 **Troubleshooting Step 7:**
+- `contract with no actions and trying to create dispatcher` / `Warning, contract is empty` — your `.cpp` and `.hpp` are still empty. Go back to Step 6d and paste the contract code, save both files, then run this command again.
 - `unrecognized command-line option '-abigen'` — the toolchain flag is missing, or a stale `build` folder is being reused. Delete `build`, re-run the full command above.
 - An error naming one of your own files with a line number (e.g. `src/ramcheese.cpp:42`) — that is a mistake in your C++, not in Docker. Fix the line it names.
 - `Could not find a package configuration file provided by cdt` — you ran `cmake` on your Windows machine instead of inside the container. Use the `docker run ...` command exactly as written.
