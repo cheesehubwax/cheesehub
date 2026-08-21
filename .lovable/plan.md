@@ -335,7 +335,13 @@ Then re-run the Step 2 compile command. You are looking for `ramcheese.wasm` **a
 
 ## Step 2 — Compile
 
-**If you are stuck at a `>>` prompt right now:** press Enter on the empty line (or press Ctrl+C) until the normal `PS C:\...>` prompt comes back. The `>>` means PowerShell is still waiting for the rest of a command. It happened because the two-line command got pasted in the wrong order — the line ending in a backtick (`` ` ``) must come **first**, and the `bash -c "..."` line **second**. A backtick at the end of a line means "the command continues on the next line".
+**If you are stuck at a `>>` prompt right now:** do not type or paste anything else. Press **Ctrl+C once**. You should see the normal prompt again:
+
+```text
+PS C:\Users\User\Desktop\wax contracts\ram.cheese>
+```
+
+The `>>` is not a Docker error. It means PowerShell thinks the command is unfinished and is waiting for another line. Your pasted lines were in the wrong order: `bash -c ...` appeared first, while `docker run ...` appeared afterward. Do not run `bash -c ...` by itself in PowerShell, and do not use the older two-line command.
 
 To avoid this entirely, use the **one-line** version below. Copy it with the copy button, click once in the terminal, paste, press Enter once.
 
@@ -347,7 +353,7 @@ Remove-Item -Recurse -Force build
 
 (If it says the path does not exist, that is fine — there was nothing to delete. macOS/Linux: `rm -rf build`.)
 
-Windows PowerShell — one line, do not add line breaks:
+Windows PowerShell — copy this **entire line at once**. It begins with `docker run` and ends with `make"`. Paste it only after the normal `PS ...>` prompt has returned, then press **Enter once**. Do not press Enter halfway through it and do not paste the `powershell` label:
 ```powershell
 docker run --rm -v "${PWD}:/project" -w /project waxcdt bash -c "mkdir -p build && cd build && cmake -DCMAKE_TOOLCHAIN_FILE=/usr/lib/cmake/cdt/CDTWasmToolchain.cmake .. && make"
 ```
