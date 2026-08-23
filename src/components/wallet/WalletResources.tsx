@@ -192,6 +192,19 @@ export function WalletResources({ onResourcesUpdate, showTotalWaxBalance, waxUsd
   const totalWaxUsd = totalWaxBalance * waxUsdPrice;
   const stakedBalance = selfCpuStaked + selfNetStaked;
 
+  const handleClaimRefund = async () => {
+    if (!accountName || isClaiming) return;
+    setIsClaiming(true);
+    const amount = refundStatus?.amount ?? 0;
+    const result = await executeTransaction(
+      [{ account: 'eosio', name: 'refund', authorization: [session!.permissionLevel], data: { owner: accountName } }],
+      { successTitle: 'Refund Claimed!', successDescription: `Refunded ${amount.toFixed(8)} WAX to your liquid balance.` }
+    );
+    setIsClaiming(false);
+    if (result.success) await fetchResources();
+  };
+
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 items-center p-3 bg-muted/50 rounded-lg">
