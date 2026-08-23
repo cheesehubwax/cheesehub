@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useWax } from '@/context/WaxContext';
 import { Loader2, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { AccountResources, parseWaxBalance } from './WalletResources';
+import { AccountResources, parseWaxBalance, getRefundStatus, type RefundRequest } from './WalletResources';
 import { fetchWithFallback } from '@/lib/fetchWithFallback';
 
 const WAX_ENDPOINTS = ['https://wax.greymass.com', 'https://api.wax.alohaeos.com', 'https://wax.eosphere.io'];
