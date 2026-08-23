@@ -167,6 +167,13 @@ export function WalletResources({ onResourcesUpdate, showTotalWaxBalance, waxUsd
 
   useEffect(() => { if (accountName) { fetchResources(); fetchRamPrice(); } }, [accountName]);
 
+  // Keep the refund countdown fresh without a per-second timer.
+  useEffect(() => {
+    if (!resources?.refund_request) return;
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, [resources?.refund_request]);
+
   const waxBalance = parseWaxBalance(resources?.core_liquid_balance);
   const ramUsagePercent = resources ? Math.round((resources.ram_usage / resources.ram_quota) * 100) : 0;
   const cpuPercent = resources ? Math.min(100, Math.round((resources.cpu_limit.used / resources.cpu_limit.max) * 100)) : 0;
@@ -174,7 +181,9 @@ export function WalletResources({ onResourcesUpdate, showTotalWaxBalance, waxUsd
   const ramWaxValue = resources && ramPrice ? (resources.ram_quota * ramPrice) : null;
   const selfCpuStaked = parseStakedWeight(resources?.self_delegated_bandwidth?.cpu_weight);
   const selfNetStaked = parseStakedWeight(resources?.self_delegated_bandwidth?.net_weight);
-  const totalWaxBalance = waxBalance + selfCpuStaked + selfNetStaked;
+  const refundStatus = getRefundStatus(resources?.refund_request, now);
+  const unstakingBalance = refundStatus?.amount ?? 0;
+  const totalWaxBalance = waxBalance + selfCpuStaked + selfNetStaked + unstakingBalance;
   const totalWaxUsd = totalWaxBalance * waxUsdPrice;
   const stakedBalance = selfCpuStaked + selfNetStaked;
 
@@ -186,12 +195,29 @@ export function WalletResources({ onResourcesUpdate, showTotalWaxBalance, waxUsd
           <div><span className="text-muted-foreground">Liquid: </span><span className="font-medium text-cheese">{waxBalance.toFixed(8)} WAX</span></div>
         </div>
         <div className="text-sm text-center space-y-1">
-          <div className="invisible h-5" />
+          {refundStatus ? (
+            refundStatus.available ? (
+              <div className="flex items-center justify-center gap-1.5">
+                <span className="inline-flex h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                <span className="text-green-500 font-medium">Refund Ready:</span>
+                <span className="font-semibold text-green-500">{refundStatus.amount.toFixed(8)} WAX</span>
+              </div>
+            ) : (
+              <div>
+                <span className="text-muted-foreground">Unstaking: </span>
+                <span className="font-medium text-amber-500">{refundStatus.amount.toFixed(8)} WAX</span>
+                <span className="text-muted-foreground"> — ready in {refundStatus.timeLeft}</span>
+              </div>
+            )
+          ) : (
+            <div className="invisible h-5" />
+          )}
           <div>
             <span className="text-muted-foreground">Staked: </span>
             <span className="font-medium text-cheese">{stakedBalance.toFixed(8)} WAX</span>
           </div>
         </div>
+
         <div className="flex items-center gap-3 justify-self-end">
           {showTotalWaxBalance && resources && (
             <div className="text-right">
