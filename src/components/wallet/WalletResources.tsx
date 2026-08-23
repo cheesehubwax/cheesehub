@@ -4,6 +4,14 @@ import { useWax } from '@/context/WaxContext';
 import { waxRpcCall } from '@/lib/waxRpcFallback';
 import { RefreshCw } from 'lucide-react';
 
+/** eosio::refunds row, also returned inline by get_account as `refund_request`. */
+export interface RefundRequest {
+  owner: string;
+  request_time: string;
+  net_amount: string;
+  cpu_amount: string;
+}
+
 export interface AccountResources {
   ram_quota: number;
   ram_usage: number;
@@ -14,9 +22,51 @@ export interface AccountResources {
   net_weight?: string;
   self_delegated_bandwidth?: { cpu_weight: string; net_weight: string };
   total_resources?: { cpu_weight: string; net_weight: string };
+  refund_request?: RefundRequest | null;
   created?: string;
   creator?: string;
 }
+
+export const REFUND_DELAY_MS = 3 * 24 * 60 * 60 * 1000;
+
+export interface RefundStatus {
+  /** Total WAX pending (cpu + net). */
+  amount: number;
+  /** True once the 3-day refund delay has elapsed. */
+  available: boolean;
+  /** Human-readable time remaining, e.g. "2d 4h" / "4h 12m". Empty when available. */
+  timeLeft: string;
+}
+
+/**
+ * Shared 3-day refund maturity calculation. Used by both the account summary
+ * and the Stake manager's Refund tab so the two views can never disagree.
+ */
+export function getRefundStatus(
+  refund: RefundRequest | null | undefined,
+  now: number = Date.now()
+): RefundStatus | null {
+  if (!refund) return null;
+  const cpu = parseFloat(refund.cpu_amount?.split(' ')[0] || '0') || 0;
+  const net = parseFloat(refund.net_amount?.split(' ')[0] || '0') || 0;
+  const amount = cpu + net;
+  if (amount <= 0) return null;
+
+  const raw = refund.request_time || '';
+  const requestTime = new Date(raw.endsWith('Z') ? raw : `${raw}Z`).getTime();
+  const readyAt = requestTime + REFUND_DELAY_MS;
+
+  if (!Number.isFinite(requestTime)) return { amount, available: true, timeLeft: '' };
+  if (now >= readyAt) return { amount, available: true, timeLeft: '' };
+
+  const remaining = readyAt - now;
+  const days = Math.floor(remaining / (24 * 60 * 60 * 1000));
+  const hours = Math.floor((remaining % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+  const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+  const timeLeft = days > 0 ? `${days}d ${hours}h` : `${hours}h ${minutes}m`;
+  return { amount, available: false, timeLeft };
+}
+
 
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -55,6 +105,9 @@ export function WalletResources({ onResourcesUpdate, showTotalWaxBalance, waxUsd
   const [resources, setResources] = useState<AccountResources | null>(null);
   const [ramPrice, setRamPrice] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  // Coarse ticker: day/hour countdown needs no per-second updates.
+  const [now, setNow] = useState(() => Date.now());
+
 
   const fetchRamPrice = async () => {
     try {
@@ -101,15 +154,25 @@ export function WalletResources({ onResourcesUpdate, showTotalWaxBalance, waxUsd
         cpu_limit: data.cpu_limit || { used: 0, max: 0 }, net_limit: data.net_limit || { used: 0, max: 0 },
         core_liquid_balance: data.core_liquid_balance, cpu_weight: data.cpu_weight as string | undefined, net_weight: data.net_weight as string | undefined,
         self_delegated_bandwidth: data.self_delegated_bandwidth as AccountResources['self_delegated_bandwidth'],
-        total_resources: data.total_resources as AccountResources['total_resources'], created, creator,
+        total_resources: data.total_resources as AccountResources['total_resources'],
+        refund_request: (data.refund_request as RefundRequest | null | undefined) ?? null,
+        created, creator,
       };
       setResources(newResources);
       onResourcesUpdate?.(newResources);
+
     } catch (error) { console.error('Failed to fetch resources:', error); }
     finally { setIsLoading(false); }
   };
 
   useEffect(() => { if (accountName) { fetchResources(); fetchRamPrice(); } }, [accountName]);
+
+  // Keep the refund countdown fresh without a per-second timer.
+  useEffect(() => {
+    if (!resources?.refund_request) return;
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, [resources?.refund_request]);
 
   const waxBalance = parseWaxBalance(resources?.core_liquid_balance);
   const ramUsagePercent = resources ? Math.round((resources.ram_usage / resources.ram_quota) * 100) : 0;
@@ -118,7 +181,9 @@ export function WalletResources({ onResourcesUpdate, showTotalWaxBalance, waxUsd
   const ramWaxValue = resources && ramPrice ? (resources.ram_quota * ramPrice) : null;
   const selfCpuStaked = parseStakedWeight(resources?.self_delegated_bandwidth?.cpu_weight);
   const selfNetStaked = parseStakedWeight(resources?.self_delegated_bandwidth?.net_weight);
-  const totalWaxBalance = waxBalance + selfCpuStaked + selfNetStaked;
+  const refundStatus = getRefundStatus(resources?.refund_request, now);
+  const unstakingBalance = refundStatus?.amount ?? 0;
+  const totalWaxBalance = waxBalance + selfCpuStaked + selfNetStaked + unstakingBalance;
   const totalWaxUsd = totalWaxBalance * waxUsdPrice;
   const stakedBalance = selfCpuStaked + selfNetStaked;
 
@@ -130,12 +195,29 @@ export function WalletResources({ onResourcesUpdate, showTotalWaxBalance, waxUsd
           <div><span className="text-muted-foreground">Liquid: </span><span className="font-medium text-cheese">{waxBalance.toFixed(8)} WAX</span></div>
         </div>
         <div className="text-sm text-center space-y-1">
-          <div className="invisible h-5" />
+          {refundStatus ? (
+            refundStatus.available ? (
+              <div className="flex items-center justify-center gap-1.5">
+                <span className="inline-flex h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                <span className="text-green-500 font-medium">Refund Ready:</span>
+                <span className="font-semibold text-green-500">{refundStatus.amount.toFixed(8)} WAX</span>
+              </div>
+            ) : (
+              <div>
+                <span className="text-muted-foreground">Unstaking: </span>
+                <span className="font-medium text-amber-500">{refundStatus.amount.toFixed(8)} WAX</span>
+                <span className="text-muted-foreground"> — ready in {refundStatus.timeLeft}</span>
+              </div>
+            )
+          ) : (
+            <div className="invisible h-5" />
+          )}
           <div>
             <span className="text-muted-foreground">Staked: </span>
             <span className="font-medium text-cheese">{stakedBalance.toFixed(8)} WAX</span>
           </div>
         </div>
+
         <div className="flex items-center gap-3 justify-self-end">
           {showTotalWaxBalance && resources && (
             <div className="text-right">

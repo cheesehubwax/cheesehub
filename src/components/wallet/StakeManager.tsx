@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useWax } from '@/context/WaxContext';
 import { Loader2, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { AccountResources, parseWaxBalance } from './WalletResources';
+import { AccountResources, parseWaxBalance, getRefundStatus, type RefundRequest } from './WalletResources';
 import { fetchWithFallback } from '@/lib/fetchWithFallback';
 
 const WAX_ENDPOINTS = ['https://wax.greymass.com', 'https://api.wax.alohaeos.com', 'https://wax.eosphere.io'];
@@ -18,7 +18,7 @@ interface StakeManagerProps {
   onTransactionSuccess?: (title: string, description: string, txId: string | null) => void;
 }
 
-interface RefundRow { owner: string; request_time: string; net_amount: string; cpu_amount: string; }
+type RefundRow = RefundRequest;
 
 export function StakeManager({ resources, onTransactionComplete, onTransactionSuccess }: StakeManagerProps) {
   const { session, accountName } = useWax();
@@ -132,19 +132,9 @@ export function StakeManager({ resources, onTransactionComplete, onTransactionSu
     if (type === 'cpu') setCpuStakeAmount(amount); else setNetStakeAmount(amount);
   };
 
-  const getRefundAvailability = () => {
-    if (!refundInfo) return null;
-    const requestTime = new Date(refundInfo.request_time + 'Z');
-    const refundTime = new Date(requestTime.getTime() + 3 * 24 * 60 * 60 * 1000);
-    const now = new Date();
-    const cpuRefund = parseFloat(refundInfo.cpu_amount?.split(' ')[0] || '0');
-    const netRefund = parseFloat(refundInfo.net_amount?.split(' ')[0] || '0');
-    const totalRefund = cpuRefund + netRefund;
-    if (now >= refundTime) return { available: true, amount: totalRefund };
-    const remaining = refundTime.getTime() - now.getTime();
-    return { available: false, amount: totalRefund, timeLeft: `${Math.floor(remaining / (1000 * 60 * 60))}h ${Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60))}m` };
-  };
-  const refundStatus = getRefundAvailability();
+  // Shared with the account summary so the two views can never disagree.
+  const refundStatus = getRefundStatus(refundInfo);
+
 
   const PercentButtons = ({ type }: { type: 'cpu' | 'net' }) => (
     <div className="flex gap-2">
