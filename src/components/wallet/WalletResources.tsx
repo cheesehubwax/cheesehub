@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useWax } from '@/context/WaxContext';
 import { waxRpcCall } from '@/lib/waxRpcFallback';
-import { RefreshCw } from 'lucide-react';
+import { useWaxTransaction } from '@/hooks/useWaxTransaction';
+import { RefreshCw, Loader2 } from 'lucide-react';
+
 
 /** eosio::refunds row, also returned inline by get_account as `refund_request`. */
 export interface RefundRequest {
