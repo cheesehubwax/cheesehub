@@ -105,6 +105,9 @@ export function WalletResources({ onResourcesUpdate, showTotalWaxBalance, waxUsd
   const [resources, setResources] = useState<AccountResources | null>(null);
   const [ramPrice, setRamPrice] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  // Coarse ticker: day/hour countdown needs no per-second updates.
+  const [now, setNow] = useState(() => Date.now());
+
 
   const fetchRamPrice = async () => {
     try {
