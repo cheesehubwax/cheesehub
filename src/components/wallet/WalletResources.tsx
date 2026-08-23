@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useWax } from '@/context/WaxContext';
 import { waxRpcCall } from '@/lib/waxRpcFallback';
-import { RefreshCw } from 'lucide-react';
+import { useWaxTransaction } from '@/hooks/useWaxTransaction';
+import { RefreshCw, Loader2 } from 'lucide-react';
+
 
 /** eosio::refunds row, also returned inline by get_account as `refund_request`. */
 export interface RefundRequest {
@@ -101,12 +103,15 @@ interface WalletResourcesProps {
 }
 
 export function WalletResources({ onResourcesUpdate, showTotalWaxBalance, waxUsdPrice = 0 }: WalletResourcesProps) {
-  const { accountName } = useWax();
+  const { accountName, session } = useWax();
+  const { executeTransaction } = useWaxTransaction(session);
   const [resources, setResources] = useState<AccountResources | null>(null);
   const [ramPrice, setRamPrice] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
   // Coarse ticker: day/hour countdown needs no per-second updates.
   const [now, setNow] = useState(() => Date.now());
+
 
 
   const fetchRamPrice = async () => {
@@ -187,6 +192,19 @@ export function WalletResources({ onResourcesUpdate, showTotalWaxBalance, waxUsd
   const totalWaxUsd = totalWaxBalance * waxUsdPrice;
   const stakedBalance = selfCpuStaked + selfNetStaked;
 
+  const handleClaimRefund = async () => {
+    if (!accountName || !session || isClaiming) return;
+    setIsClaiming(true);
+    const amount = refundStatus?.amount ?? 0;
+    const result = await executeTransaction(
+      [{ account: 'eosio', name: 'refund', authorization: [session!.permissionLevel], data: { owner: accountName } }],
+      { successTitle: 'Refund Claimed!', successDescription: `Refunded ${amount.toFixed(8)} WAX to your liquid balance.` }
+    );
+    setIsClaiming(false);
+    if (result.success) await fetchResources();
+  };
+
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 items-center p-3 bg-muted/50 rounded-lg">
@@ -195,28 +213,42 @@ export function WalletResources({ onResourcesUpdate, showTotalWaxBalance, waxUsd
           <div><span className="text-muted-foreground">Liquid: </span><span className="font-medium text-cheese">{waxBalance.toFixed(8)} WAX</span></div>
         </div>
         <div className="text-sm text-center space-y-1">
-          {refundStatus ? (
-            refundStatus.available ? (
-              <div className="flex items-center justify-center gap-1.5">
-                <span className="inline-flex h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-green-500 font-medium">Refund Ready:</span>
-                <span className="font-semibold text-green-500">{refundStatus.amount.toFixed(8)} WAX</span>
-              </div>
-            ) : (
-              <div>
-                <span className="text-muted-foreground">Unstaking: </span>
-                <span className="font-medium text-amber-500">{refundStatus.amount.toFixed(8)} WAX</span>
-                <span className="text-muted-foreground"> — ready in {refundStatus.timeLeft}</span>
-              </div>
-            )
-          ) : (
-            <div className="invisible h-5" />
-          )}
           <div>
             <span className="text-muted-foreground">Staked: </span>
             <span className="font-medium text-cheese">{stakedBalance.toFixed(8)} WAX</span>
           </div>
+          {refundStatus ? (
+            <div className="flex items-center justify-center gap-2">
+              {refundStatus.available ? (
+                <>
+                  <span className="inline-flex h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-green-500 font-medium">Refund Ready:</span>
+                  <span className="font-semibold text-green-500">{refundStatus.amount.toFixed(8)} WAX</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-muted-foreground">Unstaking: </span>
+                  <span className="font-medium text-amber-500">{refundStatus.amount.toFixed(8)} WAX</span>
+                  <span className="text-muted-foreground">— ready in {refundStatus.timeLeft}</span>
+                </>
+              )}
+              <Button
+                size="sm"
+                onClick={handleClaimRefund}
+                disabled={!refundStatus.available || isClaiming}
+                title={refundStatus.available ? 'Claim your refund' : `Claimable in ${refundStatus.timeLeft}`}
+                className={`h-6 px-2 text-[11px] ${refundStatus.available
+                  ? 'bg-green-600 hover:bg-green-500 text-white'
+                  : 'bg-amber-500/20 text-amber-500/70 border border-amber-500/30 opacity-60 cursor-not-allowed hover:bg-amber-500/20'}`}
+              >
+                {isClaiming ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Claim'}
+              </Button>
+            </div>
+          ) : (
+            <div className="invisible h-5" />
+          )}
         </div>
+
 
         <div className="flex items-center gap-3 justify-self-end">
           {showTotalWaxBalance && resources && (
