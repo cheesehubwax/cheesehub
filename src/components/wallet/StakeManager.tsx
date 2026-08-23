@@ -18,7 +18,7 @@ interface StakeManagerProps {
   onTransactionSuccess?: (title: string, description: string, txId: string | null) => void;
 }
 
-interface RefundRow { owner: string; request_time: string; net_amount: string; cpu_amount: string; }
+type RefundRow = RefundRequest;
 
 export function StakeManager({ resources, onTransactionComplete, onTransactionSuccess }: StakeManagerProps) {
   const { session, accountName } = useWax();
