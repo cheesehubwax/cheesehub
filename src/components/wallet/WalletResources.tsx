@@ -218,31 +218,37 @@ export function WalletResources({ onResourcesUpdate, showTotalWaxBalance, waxUsd
             <span className="font-medium text-cheese">{stakedBalance.toFixed(8)} WAX</span>
           </div>
           {refundStatus ? (
-            <div className="flex items-center justify-center gap-2">
-              {refundStatus.available ? (
-                <>
-                  <span className="inline-flex h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                  <span className="text-green-500 font-medium">Refund Ready:</span>
-                  <span className="font-semibold text-green-500">{refundStatus.amount.toFixed(8)} WAX</span>
-                </>
-              ) : (
-                <>
-                  <span className="text-muted-foreground">Unstaking: </span>
-                  <span className="font-medium text-amber-500">{refundStatus.amount.toFixed(8)} WAX</span>
-                  <span className="text-muted-foreground">— ready in {refundStatus.timeLeft}</span>
-                </>
-              )}
-              <Button
-                size="sm"
-                onClick={handleClaimRefund}
-                disabled={!refundStatus.available || isClaiming}
-                title={refundStatus.available ? 'Claim your refund' : `Claimable in ${refundStatus.timeLeft}`}
-                className={`h-6 px-2 text-[11px] ${refundStatus.available
-                  ? 'bg-green-600 hover:bg-green-500 text-white'
-                  : 'bg-amber-500/20 text-amber-500/70 border border-amber-500/30 opacity-60 cursor-not-allowed hover:bg-amber-500/20'}`}
-              >
-                {isClaiming ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Claim'}
-              </Button>
+            <div className="flex flex-col items-center justify-center gap-1">
+              <div className="flex items-center gap-2">
+                {refundStatus.available ? (
+                  <>
+                    <span className="inline-flex h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                    <span className="text-green-500 font-medium">Refund Ready:</span>
+                    <span className="font-semibold text-green-500">{refundStatus.amount.toFixed(8)} WAX</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-muted-foreground">Unstaking: </span>
+                    <span className="font-medium text-amber-500">{refundStatus.amount.toFixed(8)} WAX</span>
+                  </>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {!refundStatus.available && (
+                  <span className="text-muted-foreground text-xs">ready in {refundStatus.timeLeft}</span>
+                )}
+                <Button
+                  size="sm"
+                  onClick={handleClaimRefund}
+                  disabled={!refundStatus.available || isClaiming}
+                  title={refundStatus.available ? 'Claim your refund' : `Claimable in ${refundStatus.timeLeft}`}
+                  className={`h-6 px-2 text-[11px] ${refundStatus.available
+                    ? 'bg-green-600 hover:bg-green-500 text-white'
+                    : 'bg-amber-500/20 text-amber-500/70 border border-amber-500/30 opacity-60 cursor-not-allowed hover:bg-amber-500/20'}`}
+                >
+                  {isClaiming ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Claim'}
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="invisible h-5" />
