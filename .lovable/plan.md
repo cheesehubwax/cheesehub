@@ -1,42 +1,38 @@
-# Make the admin dashboard reachable on the live site
+# Show unstaking / refundable WAX in the CHEESEWallet account section
 
-## What is actually happening
+## Confirmed on-chain
 
-The admin page is not missing from the live build — it is just unlinked and undiscoverable.
+Queried `eosio::refunds` for `ram.cheese`:
 
-- `/admin` and `/admin/guide` are registered routes in `src/App.tsx`, so they ship in every build including GitHub Pages.
-- Deep links do work: `https://cheesehubwax.github.io/cheesehub/admin` returns GitHub's 404 status, but `public/404.html` catches it, stores the path in `sessionStorage`, redirects to the base, and `index.html` restores the path with `history.replaceState`. Verified against the live site: the 404 response body is the SPA redirect shim, and the base URL returns 200.
-- A search of `src/components/Header.tsx` and `src/components/Footer.tsx` found no reference to `admin` anywhere, so there is no link to it in any navigation.
+```text
+owner: ram.cheese
+cpu_amount: 1400.00000000 WAX
+net_amount: 0.00000000 WAX
+request_time: 2026-08-22T00:20:01 UTC   -> claimable 2026-08-25T00:20:01 UTC
+```
 
-So nothing is broken. What is missing is an entry point, and a way to know the URL without being told.
+Its `get_account` shows `core_liquid_balance: 0.00000000 WAX` and self-delegated CPU/NET of ~105.4 WAX. So the account really holds ~1505 WAX, but the account section computes `totalWaxBalance = liquid + selfCpuStaked + selfNetStaked` in `src/components/wallet/WalletResources.tsx`, which excludes the 1400 entirely. That is exactly the discrepancy you saw.
 
-## Is exposing it a security risk?
+The refund data is already fetched, but only inside `StakeManager`'s "Refund" tab (`src/components/wallet/StakeManager.tsx`), so it is invisible from the account summary.
 
-Not materially, for this app, provided the change stays presentational.
+## What changes
 
-- Everything on the dashboard is public on-chain data already: `cheeseburner`, `cheesefeefee`, `cheesebannad`, and `cheesepowerz` config/stats tables, Alcor pool prices, and drop purchase history. Anyone can read all of it from any WAX explorer.
-- The one action surface, `AddBannerSlotsCard`, still requires a signed transaction from an account the `cheesebannad` contract accepts. The contract is the real gate, and it does not care whether a link exists in the header.
-- The `useAdminAccess` check (`fetchIsAdmin` against `cheesebannad::admins`) is a **UI convenience gate, not a security boundary**. It runs in the browser, so anyone can bypass it by editing local state and see the same public data. That is already true today, linked or not — the whole bundle is public JavaScript.
+In the CHEESEWallet account section:
 
-The rule to keep: never put a secret, a private key, or an unauthenticated write path behind this gate. As long as authority lives in the smart contracts, the link is safe.
+1. **New "Unstaking" figure** next to Liquid and Staked, showing the pending refund total (`cpu_amount + net_amount`).
+2. **Include it in Total WAX Balance**, so the total becomes `liquid + staked + unstaking`. The USD figure follows the same total. This is the number that was wrong.
+3. **State-aware label and styling:**
+   - While the 3-day timer runs: `Unstaking` with a countdown, e.g. `1400.00000000 WAX — ready in 2d 4h`, in muted/amber styling.
+   - Once `request_time + 3 days` has passed: `Refund Ready` with a clear highlight (cheese/green accent) and the claimable amount, so it is obvious at a glance.
+4. **Nothing when there is no refund row** — no empty placeholder, so accounts with no pending unstake look exactly as they do today.
 
-## The change
-
-Add a discreet admin entry point that only renders when the connected wallet is a whitelisted admin:
-
-1. In `src/components/Header.tsx`, render an "Admin" nav item only when `useAdminAccess()` returns `isWhitelisted`. Non-admins and disconnected visitors see nothing new. Use the existing `NavLink` styling and the same icon language as the rest of the header, so it does not stand out as a bolt-on.
-2. Mirror it in `src/components/Footer.tsx` under the same condition, so it is reachable from the bottom of any page.
-3. Leave the route, the access gate, and `Admin.tsx` itself untouched.
-
-Because the gate is conditional on an on-chain lookup, the link is invisible to everyone except accounts in `cheesebannad::admins` — which is the right level of obscurity here, not a substitute for the contract-level checks that already exist.
-
-## Right now, before any deploy
-
-You can already reach it. Go to `https://cheesehubwax.github.io/cheesehub/admin` and connect the wallet that is listed in `cheesebannad::admins`. If it shows "Not Authorized", the connected account is not in that table — the fix is adding it on-chain, not in code.
+Optional, tell me if you want it: make the "Refund Ready" indicator a button that jumps straight to the Stake manager's Refund tab, or claims inline. Default in this plan is indicate-only, since the existing Refund tab already performs the claim.
 
 ## Technical notes
 
-- `src/components/Header.tsx` — import `useAdminAccess`, conditionally render the nav item; include it in the mobile hamburger list too, guarded by the same flag.
-- `src/components/Footer.tsx` — same conditional link.
-- `useAdminAccess` already caches with a 5-minute `staleTime` and only runs when connected, so adding two consumers costs no extra RPC traffic.
-- No routing, `vite.config.ts`, or `public/404.html` changes are needed — GitHub Pages deep linking is already working.
+- `src/components/wallet/WalletResources.tsx` — add a `refunds` fetch (`code: eosio`, `scope: accountName`, `table: refunds`, limit 1) alongside the existing `fetchResources` / `fetchRamPrice` calls, using `waxRpcCall` for the same multi-endpoint fallback. Derive `refundTotal` and `refundReady` from `request_time + 3 days`. Include `refundTotal` in `totalWaxBalance`.
+- `get_account` also returns `refund_request` directly, which matches the table row, so the extra call can be avoided — the plan uses the `refund_request` field already present in the existing `get_account` response and extends the `AccountResources` interface with it. One fewer RPC round trip.
+- Countdown reuses the same 3-day formula already implemented in `StakeManager.getRefundAvailability`; extract it into a small shared helper (e.g. exported from `WalletResources.tsx`, where `parseWaxBalance` and `parseStakedWeight` already live) so the two views can never disagree.
+- Ticking: a 1-minute interval is enough for a day/hour countdown; no per-second timer.
+- Refresh: the existing refresh button re-reads `get_account`, so the refund figures update with it automatically.
+- Purely presentational — no transaction logic changes, and the existing Refund tab keeps working as-is.
