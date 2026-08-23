@@ -103,12 +103,15 @@ interface WalletResourcesProps {
 }
 
 export function WalletResources({ onResourcesUpdate, showTotalWaxBalance, waxUsdPrice = 0 }: WalletResourcesProps) {
-  const { accountName } = useWax();
+  const { accountName, session } = useWax();
+  const { executeTransaction } = useWaxTransaction(session);
   const [resources, setResources] = useState<AccountResources | null>(null);
   const [ramPrice, setRamPrice] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
   // Coarse ticker: day/hour countdown needs no per-second updates.
   const [now, setNow] = useState(() => Date.now());
+
 
 
   const fetchRamPrice = async () => {
