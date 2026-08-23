@@ -1,64 +1,42 @@
-# Add a daily vote-reward claim for `cheesepowerz` to the powerup script
+# Make the admin dashboard reachable on the live site
 
-Yes, this is possible, and it fits the existing job cleanly. The claim runs as a second, independent phase after the powerup transfers, and skips itself when the 24h cooldown has not elapsed — exactly the behaviour you described.
+## What is actually happening
 
-## What is true on-chain right now (checked)
+The admin page is not missing from the live build — it is just unlinked and undiscoverable.
 
-- `cheesepowerz` does vote: `eosio::voters` shows `proxy: bigmikeproxy`, `staked` ~62,332 WAX, and a non-zero `unpaid_voteshare`, so it accrues GBM voter rewards.
-- Its `last_claim_time` is `2026-08-21T15:20:11` UTC, i.e. it was claimed manually today. The next eligible claim is ~24h after whatever the latest claim time is.
-- `cheesepowerz` has only `owner` and `active` permissions, both holding the same key. There is **no** permission the daily script can currently sign with.
-- The script signs as `power.chz@dailypower`, and per the README that permission is linked only to `cheeseburger::transfer`. So today it cannot claim for `cheesepowerz`.
+- `/admin` and `/admin/guide` are registered routes in `src/App.tsx`, so they ship in every build including GitHub Pages.
+- Deep links do work: `https://cheesehubwax.github.io/cheesehub/admin` returns GitHub's 404 status, but `public/404.html` catches it, stores the path in `sessionStorage`, redirects to the base, and `index.html` restores the path with `history.replaceState`. Verified against the live site: the 404 response body is the SPA redirect shim, and the base URL returns 200.
+- A search of `src/components/Header.tsx` and `src/components/Footer.tsx` found no reference to `admin` anywhere, so there is no link to it in any navigation.
 
-That last point is the one blocker, and it is a wallet setup step, not code.
+So nothing is broken. What is missing is an entry point, and a way to know the URL without being told.
 
-## One-time setup you do (before the code matters)
+## Is exposing it a security risk?
 
-`eosio::claimgbmvote(owner)` requires the authority of `owner`, so `cheesepowerz` itself must authorise the claim. Two options:
+Not materially, for this app, provided the change stays presentational.
 
-- **Option A (recommended) — reuse the existing script key.** On `cheesepowerz`, add a new permission `claimvote`, parent `active`, whose key is the **public** key of the `WAX_DAILYPOWER_KEY` already in GitHub secrets. Then link it to only that one action:
-  ```
-  cleos set action permission cheesepowerz eosio claimgbmvote claimvote
-  ```
-  Nothing new goes into GitHub. The one key can now do two things and nothing else: send CHEESE from `power.chz`, and claim vote rewards for `cheesepowerz`.
-- **Option B — separate key.** Fresh keypair for `cheesepowerz@claimvote`, linked the same way, added as a second GitHub secret. More isolation, one more secret to manage.
+- Everything on the dashboard is public on-chain data already: `cheeseburner`, `cheesefeefee`, `cheesebannad`, and `cheesepowerz` config/stats tables, Alcor pool prices, and drop purchase history. Anyone can read all of it from any WAX explorer.
+- The one action surface, `AddBannerSlotsCard`, still requires a signed transaction from an account the `cheesebannad` contract accepts. The contract is the real gate, and it does not care whether a link exists in the header.
+- The `useAdminAccess` check (`fetchIsAdmin` against `cheesebannad::admins`) is a **UI convenience gate, not a security boundary**. It runs in the browser, so anyone can bypass it by editing local state and see the same public data. That is already true today, linked or not — the whole bundle is public JavaScript.
 
-Either way the key can never move WAX, unstake, or change votes, because `linkauth` restricts it to `claimgbmvote`.
+The rule to keep: never put a secret, a private key, or an unauthenticated write path behind this gate. As long as authority lives in the smart contracts, the link is safe.
 
-## How the claim phase behaves
+## The change
 
-Order per run: powerup transfers first (unchanged), then the claim. The claim never blocks or fails the powerup.
+Add a discreet admin entry point that only renders when the connected wallet is a whitelisted admin:
 
-1. Read `eosio::voters` for `cheesepowerz` over the existing multi-endpoint RPC fallback.
-2. Skip with a log line, not an error, if any of these hold:
-   - no voter row, or neither `producers` nor `proxy` is set (not voting, nothing accrues)
-   - `now < last_claim_time + 24h` — still in cooldown; the next daily run picks it up
-   - `unpaid_voteshare` is zero
-3. Otherwise push one transaction: `eosio::claimgbmvote { owner: "cheesepowerz" }`, authorised by `cheesepowerz@claimvote`.
-4. Log the tx id, and re-read `last_claim_time` to confirm it advanced.
-5. On failure: log it, print the tx error, and set a non-fatal warning. A claim error must not mark the powerup run failed, so `process.exitCode` is only set when the powerup itself failed.
+1. In `src/components/Header.tsx`, render an "Admin" nav item only when `useAdminAccess()` returns `isWhitelisted`. Non-admins and disconnected visitors see nothing new. Use the existing `NavLink` styling and the same icon language as the rest of the header, so it does not stand out as a bolt-on.
+2. Mirror it in `src/components/Footer.tsx` under the same condition, so it is reachable from the bottom of any page.
+3. Leave the route, the access gate, and `Admin.tsx` itself untouched.
 
-Because the workflow already fires several times a day (00:17 plus retries) and later ticks exit early via the idempotency guard, the claim rides along with whichever tick actually does the work — roughly once every 24h. When the cooldown has not passed at that moment, it simply waits for the next day's run, as you asked. The existing `claim_only` escape hatch below lets you force one on demand.
+Because the gate is conditional on an on-chain lookup, the link is invisible to everyone except accounts in `cheesebannad::admins` — which is the right level of obscurity here, not a substitute for the contract-level checks that already exist.
 
-## Guards
+## Right now, before any deploy
 
-- **Cooldown read from chain, not from a local clock.** `last_claim_time` is the source of truth, so a missed day or a manual claim in your wallet can never double-claim or wedge the schedule.
-- **Small safety margin.** The eligibility test uses `last_claim_time + 24h + 60s` so a run landing a few seconds early does not waste a transaction on a `nothing to claim` error.
-- **Bounded work.** Exactly one claim attempt per run, no retry loop.
-- **Dry run.** `DRY_RUN=1` prints the eligibility decision and the action it would send, and signs nothing.
-- **Kill switch.** `CLAIM_VOTE_ENABLED=0` (repo variable or dispatch input) disables the phase entirely, leaving the powerup untouched.
-- **Silently-off detection.** If setup is incomplete, the missing-authority error is logged verbatim so it shows up in the run log rather than failing quietly.
+You can already reach it. Go to `https://cheesehubwax.github.io/cheesehub/admin` and connect the wallet that is listed in `cheesebannad::admins`. If it shows "Not Authorized", the connected account is not in that table — the fix is adding it on-chain, not in code.
 
-## Technical changes
+## Technical notes
 
-- `scripts/daily-powerup/waxSign.ts` — add a generic `buildAction(session, { account, name, authorization, data })`. `buildTransferAction` hardcodes `cheeseburger`/`transfer`, so it cannot express the claim. Also allow `createSession` to be called with a different actor/permission so the claim can sign as `cheesepowerz@claimvote`.
-- `scripts/daily-powerup/waxRpc.ts` — add `getVoterInfo(account)` returning `{ proxy, producers, unpaid_voteshare, last_claim_time }` from `eosio::voters`, using the existing `ENDPOINTS` fallback and timeout helper.
-- `scripts/daily-powerup/claimVoteRewards.ts` (new) — the eligibility check and the single claim, exported as one function returning `{ skipped, reason?, txId? }` so `run.ts` just logs the outcome.
-- `scripts/daily-powerup/run.ts` — call it after the powerup summary, inside `try/catch`, and print a `---- vote claim ----` section.
-- `.github/workflows/daily-powerup.yml` — pass `CLAIM_VOTE_ENABLED`, `CLAIM_VOTE_ACCOUNT` (default `cheesepowerz`), `CLAIM_VOTE_PERMISSION` (default `claimvote`), and, only for Option B, `WAX_CLAIMVOTE_KEY`. Add a `claim_only` dispatch input to run just the claim for testing.
-- `scripts/daily-powerup/README.md` — document the new env vars, the `cheesepowerz@claimvote` setup steps, and the 24h skip behaviour.
-
-No CHEESEHub frontend code changes; the in-app `VoteRewardsManager` keeps working as it does now.
-
-## What I need from you
-
-Which key option do you want — A (reuse `WAX_DAILYPOWER_KEY`, no new secret) or B (separate `claimvote` key as a second secret)? I will write the code for whichever you pick; both need the `cheesepowerz@claimvote` permission plus `linkauth` created in your wallet before the first real claim can land.
+- `src/components/Header.tsx` — import `useAdminAccess`, conditionally render the nav item; include it in the mobile hamburger list too, guarded by the same flag.
+- `src/components/Footer.tsx` — same conditional link.
+- `useAdminAccess` already caches with a 5-minute `staleTime` and only runs when connected, so adding two consumers costs no extra RPC traffic.
+- No routing, `vite.config.ts`, or `public/404.html` changes are needed — GitHub Pages deep linking is already working.
