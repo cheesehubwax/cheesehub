@@ -193,7 +193,7 @@ export function WalletResources({ onResourcesUpdate, showTotalWaxBalance, waxUsd
   const stakedBalance = selfCpuStaked + selfNetStaked;
 
   const handleClaimRefund = async () => {
-    if (!accountName || isClaiming) return;
+    if (!accountName || !session || isClaiming) return;
     setIsClaiming(true);
     const amount = refundStatus?.amount ?? 0;
     const result = await executeTransaction(
