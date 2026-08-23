@@ -154,10 +154,13 @@ export function WalletResources({ onResourcesUpdate, showTotalWaxBalance, waxUsd
         cpu_limit: data.cpu_limit || { used: 0, max: 0 }, net_limit: data.net_limit || { used: 0, max: 0 },
         core_liquid_balance: data.core_liquid_balance, cpu_weight: data.cpu_weight as string | undefined, net_weight: data.net_weight as string | undefined,
         self_delegated_bandwidth: data.self_delegated_bandwidth as AccountResources['self_delegated_bandwidth'],
-        total_resources: data.total_resources as AccountResources['total_resources'], created, creator,
+        total_resources: data.total_resources as AccountResources['total_resources'],
+        refund_request: (data.refund_request as RefundRequest | null | undefined) ?? null,
+        created, creator,
       };
       setResources(newResources);
       onResourcesUpdate?.(newResources);
+
     } catch (error) { console.error('Failed to fetch resources:', error); }
     finally { setIsLoading(false); }
   };
