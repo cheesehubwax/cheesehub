@@ -34,7 +34,14 @@ export function RamPricePanel({ cheesePerKb, history }: RamPricePanelProps) {
                   <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <YAxis domain={['dataMin', 'dataMax']} hide />
+              <YAxis
+                domain={[
+                  (dataMin: number) => dataMin * 0.999,
+                  (dataMax: number) => dataMax * 1.001,
+                ]}
+                hide
+              />
+
               <Tooltip
                 content={({ active, payload }) =>
                   active && payload?.length ? (
