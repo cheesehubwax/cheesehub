@@ -9,6 +9,7 @@ import { WaxProvider } from "@/context/WaxContext";
 import { TransactionSuccessProvider } from "@/context/TransactionSuccessContext";
 import Index from "./pages/Index";
 import PowerUp from "./pages/PowerUp";
+import Ram from "./pages/Ram";
 import Locker from "./pages/Locker";
 import Drops from "./pages/Drops";
 import DropDetail from "./pages/DropDetail";
@@ -46,6 +47,7 @@ const App = () => {
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/powerup" element={<PowerUp />} />
+                <Route path="/ram" element={<Ram />} />
                 <Route path="/locker" element={<Locker />} />
                 <Route path="/drops" element={<Drops />} />
                 <Route path="/drops/:id" element={<DropDetail />} />

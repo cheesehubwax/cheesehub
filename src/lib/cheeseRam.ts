@@ -1,0 +1,183 @@
+// CHEESERam — on-chain helpers for the RAM-for-CHEESE contract
+import { fetchWithFallback } from '@/lib/fetchWithFallback';
+
+/** The CHEESERam contract account. Change this single constant to point the dApp elsewhere. */
+export const CHEESE_RAM_CONTRACT = 'ram.chz';
+export const CHEESE_TOKEN_CONTRACT = 'cheeseburger';
+export const SELL_MEMO = 'CHEESERam sell';
+
+const WAX_ENDPOINTS = [
+  'https://wax.greymass.com',
+  'https://wax.eosusa.io',
+  'https://api.waxsweden.org',
+  'https://wax.eosphere.io',
+];
+
+export interface CheeseRamConfig {
+  admin: string;
+  minCheese: number;
+  maxCheese: number;
+  enabled: boolean;
+  referenceRate: number; // WAX per CHEESE
+  minLiquidReserve: number;
+  sellEnabled: boolean;
+  minSellBytes: number;
+  maxSellBytes: number;
+  minCheesePool: number;
+  buySpreadBps: number;
+  sellSpreadBps: number;
+  sellHaircutBps: number;
+}
+
+export interface CheeseRamStats {
+  totalPurchases: number;
+  totalCheeseReceived: number;
+  totalWaxSpent: number;
+  totalBytesBought: number;
+  totalSales: number;
+  totalBytesSoldBack: number;
+  totalCheesePaidOut: number;
+  totalWaxReceived: number;
+  totalCheeseNulled: number;
+  totalWaxStaked: number;
+}
+
+export interface ContractReserves {
+  liquidWax: number;
+  cheesePool: number;
+}
+
+export const parseAsset = (value: string | undefined | null): number => {
+  if (!value) return 0;
+  return parseFloat(String(value).split(' ')[0]) || 0;
+};
+
+async function getTableRows<T>(body: Record<string, unknown>): Promise<T[]> {
+  const response = await fetchWithFallback(WAX_ENDPOINTS, '/v1/chain/get_table_rows', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ json: true, limit: 1, ...body }),
+  });
+  const data = await response.json();
+  return (data?.rows ?? []) as T[];
+}
+
+export async function fetchCheeseRamConfig(): Promise<CheeseRamConfig | null> {
+  const rows = await getTableRows<Record<string, string | number | boolean>>({
+    code: CHEESE_RAM_CONTRACT,
+    scope: CHEESE_RAM_CONTRACT,
+    table: 'config',
+  });
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    admin: String(row.admin ?? ''),
+    minCheese: parseAsset(row.min_cheese as string),
+    maxCheese: parseAsset(row.max_cheese as string),
+    enabled: Boolean(row.enabled),
+    referenceRate: parseFloat(String(row.reference_rate ?? '0')) || 0,
+    minLiquidReserve: parseAsset(row.min_liquid_reserve as string),
+    sellEnabled: Boolean(row.sell_enabled),
+    minSellBytes: Number(row.min_sell_bytes ?? 0),
+    maxSellBytes: Number(row.max_sell_bytes ?? 0),
+    minCheesePool: parseAsset(row.min_cheese_pool as string),
+    buySpreadBps: Number(row.buy_spread_bps ?? 0),
+    sellSpreadBps: Number(row.sell_spread_bps ?? 0),
+    sellHaircutBps: Number(row.sell_haircut_bps ?? 0),
+  };
+}
+
+export async function fetchCheeseRamStats(): Promise<CheeseRamStats | null> {
+  const rows = await getTableRows<Record<string, string | number>>({
+    code: CHEESE_RAM_CONTRACT,
+    scope: CHEESE_RAM_CONTRACT,
+    table: 'stats',
+  });
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    totalPurchases: Number(row.total_purchases ?? 0),
+    totalCheeseReceived: parseAsset(row.total_cheese_received as string),
+    totalWaxSpent: parseAsset(row.total_wax_spent as string),
+    totalBytesBought: Number(row.total_bytes_bought ?? 0),
+    totalSales: Number(row.total_sales ?? 0),
+    totalBytesSoldBack: Number(row.total_bytes_sold_back ?? 0),
+    totalCheesePaidOut: parseAsset(row.total_cheese_paid_out as string),
+    totalWaxReceived: parseAsset(row.total_wax_received as string),
+    totalCheeseNulled: parseAsset(row.total_cheese_burned as string),
+    totalWaxStaked: parseAsset(row.total_wax_staked as string),
+  };
+}
+
+/** WAX cost of a single byte of RAM, straight from the eosio::rammarket table. */
+export async function fetchRamPricePerByte(): Promise<number> {
+  const rows = await getTableRows<{ base: { balance: string }; quote: { balance: string } }>({
+    code: 'eosio',
+    scope: 'eosio',
+    table: 'rammarket',
+  });
+  const row = rows[0];
+  if (!row) throw new Error('rammarket unavailable');
+  const quote = parseAsset(row.quote.balance);
+  const base = parseAsset(row.base.balance);
+  if (!base) throw new Error('invalid rammarket state');
+  return quote / base;
+}
+
+export async function fetchAccountRam(account: string): Promise<{ quota: number; usage: number }> {
+  const response = await fetchWithFallback(WAX_ENDPOINTS, '/v1/chain/get_account', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ account_name: account }),
+  });
+  const data = await response.json();
+  return { quota: Number(data?.ram_quota ?? 0), usage: Number(data?.ram_usage ?? 0) };
+}
+
+async function fetchCurrencyBalance(code: string, account: string, symbol: string): Promise<number> {
+  const response = await fetchWithFallback(WAX_ENDPOINTS, '/v1/chain/get_currency_balance', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, account, symbol }),
+  });
+  const data = await response.json();
+  return parseAsset(Array.isArray(data) ? data[0] : undefined);
+}
+
+export async function fetchContractReserves(): Promise<ContractReserves> {
+  const [liquidWax, cheesePool] = await Promise.all([
+    fetchCurrencyBalance('eosio.token', CHEESE_RAM_CONTRACT, 'WAX'),
+    fetchCurrencyBalance(CHEESE_TOKEN_CONTRACT, CHEESE_RAM_CONTRACT, 'CHEESE'),
+  ]);
+  return { liquidWax, cheesePool };
+}
+
+/** RAM purchases pay a 0.5% network fee on the WAX spent. */
+const RAM_FEE_RATE = 0.005;
+
+/** Estimated bytes received for a CHEESE spend. Display only — the contract is authoritative. */
+export function estimateBytesForCheese(
+  cheese: number,
+  config: CheeseRamConfig | null | undefined,
+  pricePerByte: number | null | undefined,
+): { waxValue: number; bytes: number } | null {
+  if (!cheese || cheese <= 0 || !config?.referenceRate || !pricePerByte) return null;
+  const waxValue = cheese * config.referenceRate * (1 - config.buySpreadBps / 10000);
+  const bytes = Math.floor((waxValue * (1 - RAM_FEE_RATE)) / pricePerByte);
+  return { waxValue, bytes };
+}
+
+/** Estimated CHEESE payout for selling bytes back to the contract. */
+export function estimateCheeseForBytes(
+  bytes: number,
+  config: CheeseRamConfig | null | undefined,
+  pricePerByte: number | null | undefined,
+): { waxValue: number; cheese: number } | null {
+  if (!bytes || bytes <= 0 || !config?.referenceRate || !pricePerByte) return null;
+  const waxValue = bytes * pricePerByte;
+  const cheese =
+    (waxValue / config.referenceRate) *
+    (1 - config.sellHaircutBps / 10000) *
+    (1 - config.sellSpreadBps / 10000);
+  return { waxValue, cheese };
+}
