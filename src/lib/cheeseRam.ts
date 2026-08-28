@@ -18,7 +18,9 @@ export interface CheeseRamConfig {
   minCheese: number;
   maxCheese: number;
   enabled: boolean;
-  referenceRate: number; // WAX per CHEESE
+  referenceRate: number; // WAX per CHEESE (contract oracle rate, set by admin)
+  maxDeviationPct: number; // allowed drift between live market rate and referenceRate
+
   minLiquidReserve: number;
   sellEnabled: boolean;
   minSellBytes: number;
