@@ -37,67 +37,81 @@ export function RamPricePanel({ cheesePerKb, waxPerKb, history }: RamPricePanelP
       </div>
 
       {chartData.length >= 2 ? (
-        <div className="h-16">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="cheeseRamPriceGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
-                  <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <YAxis
-                yAxisId="cheese"
-                domain={[
-                  (dataMin: number) => dataMin * 0.999,
-                  (dataMax: number) => dataMax * 1.001,
-                ]}
-                hide
-              />
-              <YAxis
-                yAxisId="wax"
-                domain={[
-                  (dataMin: number) => dataMin * 0.999,
-                  (dataMax: number) => dataMax * 1.001,
-                ]}
-                hide
-              />
+        <div className="space-y-1">
+          {/* WAX line — own scale, own path */}
+          <div className="h-12">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                <YAxis
+                  domain={[
+                    (dataMin: number) => dataMin * 0.999,
+                    (dataMax: number) => dataMax * 1.001,
+                  ]}
+                  hide
+                />
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (!active || !payload?.length) return null;
+                    const point = payload[0].payload as RamPricePoint;
+                    return (
+                      <div className="bg-background/95 border border-border px-2 py-1 rounded text-xs font-mono">
+                        <span className="text-white">{point.waxPerKb.toFixed(4)} WAX / KB</span>
+                      </div>
+                    );
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="waxPerKb"
+                  stroke="#FFFFFF"
+                  strokeWidth={1.5}
+                  fill="none"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
 
-              <Tooltip
-                content={({ active, payload }) => {
-                  if (!active || !payload?.length) return null;
-                  const point = payload[0].payload as RamPricePoint;
-                  return (
-                    <div className="bg-background/95 border border-border px-2 py-1 rounded text-xs font-mono space-y-0.5">
-                      {point.cheesePerKb !== null && (
-                        <div className="text-primary">{point.cheesePerKb.toFixed(4)} CHEESE / KB</div>
-                      )}
-                      <div className="text-white">{point.waxPerKb.toFixed(4)} WAX / KB</div>
-                    </div>
-                  );
-                }}
-              />
-              <Area
-                yAxisId="cheese"
-                type="monotone"
-                dataKey="cheesePerKb"
-                stroke="hsl(var(--primary))"
-                strokeWidth={1.5}
-                fill="url(#cheeseRamPriceGradient)"
-              />
-              <Area
-                yAxisId="wax"
-                type="monotone"
-                dataKey="waxPerKb"
-                stroke="#FFFFFF"
-                strokeWidth={1.5}
-                fill="none"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          {/* CHEESE line — own scale, own path */}
+          <div className="h-12">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="cheeseRamPriceGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
+                    <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <YAxis
+                  domain={[
+                    (dataMin: number) => dataMin * 0.999,
+                    (dataMax: number) => dataMax * 1.001,
+                  ]}
+                  hide
+                />
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (!active || !payload?.length) return null;
+                    const point = payload[0].payload as RamPricePoint;
+                    return point.cheesePerKb !== null ? (
+                      <div className="bg-background/95 border border-border px-2 py-1 rounded text-xs font-mono">
+                        <span className="text-primary">{point.cheesePerKb.toFixed(4)} CHEESE / KB</span>
+                      </div>
+                    ) : null;
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="cheesePerKb"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={1.5}
+                  fill="url(#cheeseRamPriceGradient)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       ) : (
-        <div className="h-16 flex items-center justify-center">
+        <div className="h-24 flex items-center justify-center">
           <span className="text-xs text-muted-foreground">Building price history...</span>
         </div>
       )}
