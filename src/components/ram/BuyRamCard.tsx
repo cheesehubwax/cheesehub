@@ -118,6 +118,7 @@ export function BuyRamCard({ config, pricePerByte, onComplete }: BuyRamCardProps
         txId,
       );
       setAmount('');
+      setBytesInput('');
       setTermsAgreed(false);
       refreshBalance?.();
       onComplete?.();
@@ -143,25 +144,99 @@ export function BuyRamCard({ config, pricePerByte, onComplete }: BuyRamCardProps
         </h2>
       </div>
 
-      <CheeseInput
-        value={amount}
-        onChange={setAmount}
-        balance={cheeseBalance}
-        label="You spend"
-      />
+      {/* Input mode switch — spend CHEESE, or target a byte amount */}
+      <div className="inline-flex rounded-lg border border-border/50 bg-secondary/20 p-1 text-xs font-medium">
+        {([
+          { key: 'cheese' as BuyMode, label: 'Spend CHEESE' },
+          { key: 'bytes' as BuyMode, label: 'Target bytes' },
+        ]).map((opt) => (
+          <button
+            key={opt.key}
+            type="button"
+            onClick={() => setMode(opt.key)}
+            className={cn(
+              'px-3 py-1.5 rounded-md transition-colors',
+              mode === opt.key
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
+      {mode === 'cheese' ? (
+        <CheeseInput
+          value={amount}
+          onChange={setAmount}
+          balance={cheeseBalance}
+          label="You spend"
+        />
+      ) : (
+        <div className="rounded-xl p-4 bg-card border border-border/50 space-y-3">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="ram-target-bytes" className="text-sm font-medium">
+              RAM you want (bytes)
+            </Label>
+            <span className="text-sm text-muted-foreground">
+              Balance:{' '}
+              <span className="text-foreground font-mono">
+                {cheeseBalance.toLocaleString(undefined, {
+                  minimumFractionDigits: 4,
+                  maximumFractionDigits: 4,
+                })}
+              </span>{' '}
+              CHEESE
+            </span>
+          </div>
+          <Input
+            id="ram-target-bytes"
+            type="number"
+            min="0"
+            step="1"
+            inputMode="numeric"
+            placeholder="e.g. 10240"
+            value={bytesInput}
+            onChange={(e) => setBytesInput(e.target.value)}
+            className="font-mono"
+          />
+          <div className="flex flex-wrap gap-2">
+            {[1024, 10240, 102400, 1048576].map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => setBytesInput(String(preset))}
+                className="px-2 py-1 rounded-md border border-border/50 text-[11px] text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
+              >
+                {formatBytes(preset)}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">CHEESE required</span>
+            <span className="font-mono font-bold text-primary">
+              {cheese > 0 ? `${cheese.toFixed(4)} CHEESE` : '-'}
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
         <span>
           Limits: {minCheese.toFixed(4)} – {maxCheese.toFixed(4)} CHEESE
         </span>
-        <button
-          type="button"
-          onClick={() => setAmount(Math.min(cheeseBalance, maxCheese || cheeseBalance).toFixed(4))}
-          className="text-primary hover:underline font-medium"
-        >
-          Max
-        </button>
+        {mode === 'cheese' && (
+          <button
+            type="button"
+            onClick={() => setAmount(Math.min(cheeseBalance, maxCheese || cheeseBalance).toFixed(4))}
+            className="text-primary hover:underline font-medium"
+          >
+            Max
+          </button>
+        )}
       </div>
+
 
       <RecipientInput value={recipient} onChange={setRecipient} defaultAccount={accountName || ''} />
 
