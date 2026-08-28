@@ -98,8 +98,7 @@ const Ram = () => {
                 <OpenMojiIcon emoji="💾" size={24} className="text-2xl" />
               </div>
               <p className="text-muted-foreground max-w-2xl mx-auto">
-                Buy WAX RAM using $CHEESE, or sell RAM back for $CHEESE. The $CHEESE spent is sent to
-                eosio.null and leaves circulation forever
+                Buy RAM with $CHEESE and sell RAM for $CHEESE. The $CHEESE spent is nulled and used to fund x-CHEESE
               </p>
             </div>
 
