@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { CheeseInput } from '@/components/powerup/CheeseInput';
 import { RecipientInput } from '@/components/powerup/RecipientInput';
 import { TermsDialog } from '@/components/shared/TermsDialog';
@@ -14,8 +16,10 @@ import {
   CHEESE_RAM_CONTRACT,
   CHEESE_TOKEN_CONTRACT,
   estimateBytesForCheese,
+  estimateCheeseForTargetBytes,
   type CheeseRamConfig,
 } from '@/lib/cheeseRam';
+import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 
 interface BuyRamCardProps {
@@ -24,13 +28,17 @@ interface BuyRamCardProps {
   onComplete?: () => void;
 }
 
+type BuyMode = 'cheese' | 'bytes';
+
 const isValidAccount = (account: string) =>
   !!account && account.length <= 12 && /^[a-z1-5.]+$/.test(account);
 
 export function BuyRamCard({ config, pricePerByte, onComplete }: BuyRamCardProps) {
   const { session, isConnected, accountName, cheeseBalance, login, refreshBalance } = useWax();
   const { showSuccess } = useTransactionSuccess();
+  const [mode, setMode] = useState<BuyMode>('cheese');
   const [amount, setAmount] = useState('');
+  const [bytesInput, setBytesInput] = useState('');
   const [recipient, setRecipient] = useState(accountName || '');
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [isTransacting, setIsTransacting] = useState(false);
@@ -39,7 +47,17 @@ export function BuyRamCard({ config, pricePerByte, onComplete }: BuyRamCardProps
     if (accountName) setRecipient(accountName);
   }, [accountName]);
 
-  const cheese = parseFloat(amount) || 0;
+  const desiredBytes = Math.floor(parseFloat(bytesInput) || 0);
+
+  // In bytes mode the CHEESE spend is derived from the target byte amount
+  // (rounded up to token precision so the contract can cover the request).
+  const cheese = useMemo(() => {
+    if (mode === 'cheese') return parseFloat(amount) || 0;
+    const derived = estimateCheeseForTargetBytes(desiredBytes, config, pricePerByte);
+    if (!derived) return 0;
+    return Math.ceil(derived.cheese * 10000) / 10000;
+  }, [mode, amount, desiredBytes, config, pricePerByte]);
+
   const estimate = estimateBytesForCheese(cheese, config, pricePerByte);
   const minCheese = config?.minCheese ?? 0;
   const maxCheese = config?.maxCheese ?? 0;
@@ -47,6 +65,7 @@ export function BuyRamCard({ config, pricePerByte, onComplete }: BuyRamCardProps
   const aboveMax = cheese > 0 && maxCheese > 0 && cheese > maxCheese;
   const insufficient = cheese > cheeseBalance;
   const buyDisabled = config ? !config.enabled : false;
+  const missingPrice = mode === 'bytes' && desiredBytes > 0 && cheese === 0;
 
   const canSubmit =
     !isTransacting &&
@@ -57,6 +76,7 @@ export function BuyRamCard({ config, pricePerByte, onComplete }: BuyRamCardProps
     !aboveMax &&
     !insufficient &&
     isValidAccount(recipient);
+
 
   const handleBuy = async () => {
     if (!isConnected || !session) {
