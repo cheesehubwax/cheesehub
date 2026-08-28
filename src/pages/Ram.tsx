@@ -115,7 +115,7 @@ const Ram = () => {
 
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="buy" className="gap-2">
-              <OpenMojiIcon emoji="💾" size={18} />
+              <img src={ramStickAsset.url} alt="RAM" className="h-4 w-auto object-contain" />
               Buy RAM
             </TabsTrigger>
             <TabsTrigger value="sell" className="gap-2">
