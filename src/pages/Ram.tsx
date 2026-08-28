@@ -7,6 +7,7 @@ import { SellRamCard } from '@/components/ram/SellRamCard';
 import { RamPricePanel } from '@/components/ram/RamPricePanel';
 import { RamStatsBar } from '@/components/ram/RamStatsBar';
 import { LiquidReservesPanel } from '@/components/ram/LiquidReservesPanel';
+import { ResourceGauges } from '@/components/shared/ResourceGauges';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useWax } from '@/context/WaxContext';
 import { useCheesePriceData } from '@/hooks/useCheesePriceData';
@@ -108,6 +109,7 @@ const Ram = () => {
       </section>
 
       <main className="container pb-12 flex flex-col items-center gap-8">
+        <ResourceGauges />
         <LiquidReservesPanel reserves={reserves} />
         <RamPricePanel cheesePerKb={cheesePerKb} pricePerByte={pricePerByte} history={history} />
 
