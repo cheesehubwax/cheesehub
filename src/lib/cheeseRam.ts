@@ -38,8 +38,17 @@ export interface CheeseRamStats {
   totalBytesSoldBack: number;
   totalCheesePaidOut: number;
   totalWaxReceived: number;
+  totalCheeseDeposited: number;
   totalCheeseNulled: number;
+  totalCheeseToXcheese: number;
   totalWaxStaked: number;
+  totalWaxToPowerz: number;
+  totalWaxToBurner: number;
+  totalWaxToBuyback: number;
+  totalCheeseBuyback: number;
+  totalWaxClaimed: number;
+  lastClaimAttempt: number;
+  claimPending: number;
 }
 
 export interface ContractReserves {
