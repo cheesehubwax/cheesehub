@@ -33,14 +33,26 @@ export function RamStatsBar({ stats, isLoading }: RamStatsBarProps) {
     { label: 'CHEESE Bought Back', emoji: '🔄', value: value(stats?.totalCheeseBuyback ?? 0), unit: 'CHEESE' },
   ];
 
+  const TokenLogo = ({ unit }: { unit: 'WAX' | 'CHEESE' }) => (
+    <img
+      src={unit === 'WAX' ? waxLogoUrl : cheeseLogoUrl}
+      alt={unit}
+      className="w-3.5 h-3.5 object-contain inline-block"
+    />
+  );
+
   return (
     <div className="rounded-xl p-3 max-w-4xl w-full bg-card border border-border/50">
       {/* Top row — RAM activity */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {topItems.map((item) => (
           <div key={item.label} className="text-center">
-            <div className="flex items-center justify-center gap-1.5">
-              <OpenMojiIcon emoji={item.emoji} size={14} />
+            <div className="flex items-center justify-center gap-1">
+              {item.label === 'RAM Purchases' || item.label === 'RAM Sales' ? (
+                <span className="text-xs font-bold text-foreground">$</span>
+              ) : (
+                <OpenMojiIcon emoji={item.emoji} size={14} />
+              )}
               <span className="text-sm font-bold font-mono text-foreground">{item.value}</span>
             </div>
             <p className="text-[10px] text-muted-foreground">{item.label}</p>
@@ -54,11 +66,10 @@ export function RamStatsBar({ stats, isLoading }: RamStatsBarProps) {
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
         {middleItems.map((item) => (
           <div key={item.label} className="text-center">
-            <div className="flex items-center justify-center gap-1.5">
+            <div className="flex items-center justify-center gap-1">
               <OpenMojiIcon emoji={item.emoji} size={14} />
-              <span className="text-sm font-bold font-mono text-foreground">
-                {item.value} <span className="text-[10px] text-muted-foreground font-normal">{item.unit}</span>
-              </span>
+              <span className="text-sm font-bold font-mono text-foreground">{item.value}</span>
+              <TokenLogo unit={item.unit as 'WAX' | 'CHEESE'} />
             </div>
             <p className="text-[10px] text-muted-foreground">{item.label}</p>
           </div>
@@ -70,12 +81,12 @@ export function RamStatsBar({ stats, isLoading }: RamStatsBarProps) {
       {/* Bottom row — WAX staked */}
       <div className="flex justify-center">
         <div className="text-center">
-          <div className="flex items-center justify-center gap-1.5">
+          <div className="flex items-center justify-center gap-1">
             <OpenMojiIcon emoji="🔒" size={14} />
             <span className="text-sm font-bold font-mono text-foreground">
-              {isLoading || !stats ? dash : formatNumber(stats.totalWaxStaked, 2)}{' '}
-              <span className="text-[10px] text-muted-foreground font-normal">WAX</span>
+              {isLoading || !stats ? dash : formatNumber(stats.totalWaxStaked, 2)}
             </span>
+            <TokenLogo unit="WAX" />
           </div>
           <p className="text-[10px] text-muted-foreground">WAX Staked</p>
         </div>
