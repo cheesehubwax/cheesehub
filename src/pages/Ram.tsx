@@ -68,15 +68,30 @@ const Ram = () => {
       </section>
 
       <main className="container pb-12 flex flex-col items-center gap-8">
-        <BuyRamCard config={config} pricePerByte={pricePerByte} onComplete={handleComplete} />
-
-        <SellRamCard
-          config={config}
-          pricePerByte={pricePerByte}
-          reserves={reserves}
-          availableBytes={availableBytes}
-          onComplete={handleComplete}
-        />
+        <Tabs defaultValue="buy" className="w-full max-w-2xl">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="buy" className="gap-2">
+              <OpenMojiIcon emoji="💾" size={18} />
+              Buy RAM
+            </TabsTrigger>
+            <TabsTrigger value="sell" className="gap-2">
+              <OpenMojiIcon emoji="📤" size={18} />
+              Sell RAM
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="buy">
+            <BuyRamCard config={config} pricePerByte={pricePerByte} onComplete={handleComplete} />
+          </TabsContent>
+          <TabsContent value="sell">
+            <SellRamCard
+              config={config}
+              pricePerByte={pricePerByte}
+              reserves={reserves}
+              availableBytes={availableBytes}
+              onComplete={handleComplete}
+            />
+          </TabsContent>
+        </Tabs>
 
         <RamPricePanel pricePerByte={pricePerByte} history={history} />
 
