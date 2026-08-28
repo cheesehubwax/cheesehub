@@ -86,6 +86,7 @@ export function useRamPrice() {
   return {
     pricePerByte,
     cheesePerKb,
+    waxPerKb: pricePerByte !== null ? pricePerByte * 1024 : null,
     history,
     isLoading: query.isLoading,
     refetch: query.refetch,
