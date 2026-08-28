@@ -71,7 +71,8 @@ export function RamStatsBar({ stats, isLoading }: RamStatsBarProps) {
           <div className="flex items-center justify-center gap-1.5 mb-1">
             <OpenMojiIcon emoji="🔒" size={16} />
             <span className="text-sm font-bold font-mono text-foreground">
-              {value(stats?.totalWaxStaked ?? 0, 2)} <span className="text-[10px] text-muted-foreground font-normal">WAX</span>
+              {isLoading || !stats ? dash : formatNumber(stats.totalWaxStaked, 2)}{' '}
+              <span className="text-[10px] text-muted-foreground font-normal">WAX</span>
             </span>
           </div>
           <p className="text-[11px] text-muted-foreground">WAX Staked</p>
