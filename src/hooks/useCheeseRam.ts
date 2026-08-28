@@ -7,6 +7,7 @@ import {
   fetchContractReserves,
   fetchRamPricePerByte,
 } from '@/lib/cheeseRam';
+import { useCheesePriceData } from '@/hooks/useCheesePriceData';
 
 export function useCheeseRamConfig() {
   return useQuery({
