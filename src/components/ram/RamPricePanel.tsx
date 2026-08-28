@@ -11,7 +11,7 @@ export function RamPricePanel({ cheesePerKb, history }: RamPricePanelProps) {
   const chartData = history.filter((point) => point.cheesePerKb !== null);
 
   return (
-    <div className="rounded-xl p-4 max-w-2xl w-full bg-card border border-border/50">
+    <div className="rounded-xl p-4 max-w-lg w-full bg-card border border-border/50">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <OpenMojiIcon emoji="📈" size={18} />

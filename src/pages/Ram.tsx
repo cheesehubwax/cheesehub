@@ -78,7 +78,7 @@ const Ram = () => {
         <LiquidReservesPanel reserves={reserves} />
         <RamPricePanel cheesePerKb={cheesePerKb} history={history} />
 
-        <Tabs defaultValue="buy" className="w-full max-w-2xl">
+        <Tabs defaultValue="buy" className="w-full max-w-lg">
 
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="buy" className="gap-2">

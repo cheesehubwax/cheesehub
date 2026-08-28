@@ -32,7 +32,7 @@ export function RamStatsBar({ stats, isLoading }: RamStatsBarProps) {
   ];
 
   return (
-    <div className="rounded-xl p-3 max-w-4xl w-full bg-card border border-border/50">
+    <div className="rounded-xl p-3 max-w-lg w-full bg-card border border-border/50">
       {/* Top row — RAM activity */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {topItems.map((item) => (
