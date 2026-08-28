@@ -28,7 +28,7 @@ const Ram = () => {
   const { data: config, refetch: refetchConfig } = useCheeseRamConfig();
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useCheeseRamStats();
   const { data: reserves, refetch: refetchReserves } = useCheeseRamReserves();
-  const { pricePerByte, cheesePerKb, waxPerKb, history, refetch: refetchRamPrice } = useRamPrice();
+  const { pricePerByte, cheesePerKb, history, refetch: refetchRamPrice } = useRamPrice();
   const { data: accountRam, refetch: refetchAccountRam } = useAccountRam(accountName);
   const { data: cheesePrice, refetch: refetchCheesePrice } = useCheesePriceData();
 
