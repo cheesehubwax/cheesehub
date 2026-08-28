@@ -7,6 +7,7 @@ import {
   fetchContractReserves,
   fetchRamPricePerByte,
 } from '@/lib/cheeseRam';
+import { useCheesePriceData } from '@/hooks/useCheesePriceData';
 
 export function useCheeseRamConfig() {
   return useQuery({
@@ -37,10 +38,13 @@ export function useCheeseRamReserves() {
 
 export interface RamPricePoint {
   time: number;
+  /** WAX per byte of RAM (raw rammarket price). */
   price: number;
+  /** CHEESE per KB of RAM, derived from the live Alcor CHEESE/WAX price. */
+  cheesePerKb: number | null;
 }
 
-/** Live RAM price with a session-only sparkline history. */
+/** Live RAM price with a session-only sparkline history, denominated in CHEESE. */
 export function useRamPrice() {
   const query = useQuery({
     queryKey: ['cheeseRam', 'ramPrice'],
@@ -49,19 +53,33 @@ export function useRamPrice() {
     refetchInterval: 30_000,
   });
 
+  const { data: cheesePrice } = useCheesePriceData();
+  const waxPerCheese = cheesePrice?.waxPrice ?? 0;
+
+  const pricePerByte = typeof query.data === 'number' ? query.data : null;
+  const cheesePerKb =
+    pricePerByte !== null && waxPerCheese > 0 ? (pricePerByte * 1024) / waxPerCheese : null;
+
   const [history, setHistory] = useState<RamPricePoint[]>([]);
 
   useEffect(() => {
-    if (typeof query.data !== 'number') return;
+    if (pricePerByte === null || cheesePerKb === null) return;
     setHistory((prev) => {
       const last = prev[prev.length - 1];
-      if (last && last.price === query.data) return prev;
-      return [...prev, { time: Date.now(), price: query.data as number }].slice(-20);
+      if (last && last.price === pricePerByte && last.cheesePerKb === cheesePerKb) return prev;
+      return [...prev, { time: Date.now(), price: pricePerByte, cheesePerKb }].slice(-20);
     });
-  }, [query.data, query.dataUpdatedAt]);
+  }, [pricePerByte, cheesePerKb, query.dataUpdatedAt]);
 
-  return { pricePerByte: query.data ?? null, history, isLoading: query.isLoading, refetch: query.refetch };
+  return {
+    pricePerByte,
+    cheesePerKb,
+    history,
+    isLoading: query.isLoading,
+    refetch: query.refetch,
+  };
 }
+
 
 export function useAccountRam(account: string | null) {
   return useQuery({
