@@ -28,7 +28,7 @@ const Ram = () => {
   const { data: config, refetch: refetchConfig } = useCheeseRamConfig();
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useCheeseRamStats();
   const { data: reserves, refetch: refetchReserves } = useCheeseRamReserves();
-  const { pricePerByte, cheesePerKb, waxPerKb, history, refetch: refetchRamPrice } = useRamPrice();
+  const { pricePerByte, cheesePerKb, history, refetch: refetchRamPrice } = useRamPrice();
   const { data: accountRam, refetch: refetchAccountRam } = useAccountRam(accountName);
   const { data: cheesePrice, refetch: refetchCheesePrice } = useCheesePriceData();
 
@@ -109,7 +109,7 @@ const Ram = () => {
 
       <main className="container pb-12 flex flex-col items-center gap-8">
         <LiquidReservesPanel reserves={reserves} />
-        <RamPricePanel cheesePerKb={cheesePerKb} waxPerKb={waxPerKb} history={history} />
+        <RamPricePanel cheesePerKb={cheesePerKb} pricePerByte={pricePerByte} history={history} />
 
         <Tabs defaultValue="buy" className="w-full max-w-lg">
 
