@@ -38,7 +38,7 @@ export function SellRamCard({
   availableBytes,
   onComplete,
 }: SellRamCardProps) {
-  const { session, isConnected, login } = useWax();
+  const { session, isConnected, login, refreshBalance } = useWax();
   const { showSuccess } = useTransactionSuccess();
   const [bytesInput, setBytesInput] = useState('');
   const [termsAgreed, setTermsAgreed] = useState(false);
@@ -111,6 +111,7 @@ export function SellRamCard({
       );
       setBytesInput('');
       setTermsAgreed(false);
+      refreshBalance?.();
       onComplete?.();
     } catch (error) {
       console.error('[CHEESERam] Sell failed:', error);

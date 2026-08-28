@@ -1,4 +1,5 @@
 // CHEESERam page — buy and sell WAX RAM with $CHEESE
+import { useCallback, useEffect, useRef } from 'react';
 import { Layout } from '@/components/Layout';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { BuyRamCard } from '@/components/ram/BuyRamCard';
@@ -22,23 +23,55 @@ import { playRandomFart } from '@/lib/fartSounds';
 
 
 const Ram = () => {
-  const { accountName } = useWax();
-  const { data: config } = useCheeseRamConfig();
+  const { accountName, refreshBalance } = useWax();
+  const { data: config, refetch: refetchConfig } = useCheeseRamConfig();
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useCheeseRamStats();
   const { data: reserves, refetch: refetchReserves } = useCheeseRamReserves();
-  const { pricePerByte, cheesePerKb, history } = useRamPrice();
+  const { pricePerByte, cheesePerKb, history, refetch: refetchRamPrice } = useRamPrice();
   const { data: accountRam, refetch: refetchAccountRam } = useAccountRam(accountName);
-  const { data: cheesePrice } = useCheesePriceData();
+  const { data: cheesePrice, refetch: refetchCheesePrice } = useCheesePriceData();
 
   const liveWaxPerCheese = cheesePrice?.waxPrice && cheesePrice.waxPrice > 0 ? cheesePrice.waxPrice : null;
   const availableBytes = accountRam ? Math.max(0, accountRam.quota - accountRam.usage) : 0;
 
+  // Refresh every on-page value after a buy/sell. The chain needs a moment to
+  // apply the transaction, so we poll a few times instead of reading once.
+  const timersRef = useRef<number[]>([]);
 
-  const handleComplete = () => {
+  useEffect(
+    () => () => {
+      timersRef.current.forEach((id) => window.clearTimeout(id));
+      timersRef.current = [];
+    },
+    [],
+  );
+
+  const refreshAll = useCallback(() => {
     refetchStats();
     refetchReserves();
     refetchAccountRam();
-  };
+    refetchRamPrice();
+    refetchConfig();
+    refetchCheesePrice?.();
+    refreshBalance?.();
+  }, [
+    refetchStats,
+    refetchReserves,
+    refetchAccountRam,
+    refetchRamPrice,
+    refetchConfig,
+    refetchCheesePrice,
+    refreshBalance,
+  ]);
+
+  const handleComplete = useCallback(() => {
+    refreshAll();
+    [1500, 4000, 8000].forEach((delay) => {
+      const id = window.setTimeout(refreshAll, delay);
+      timersRef.current.push(id);
+    });
+  }, [refreshAll]);
+
 
   return (
     <Layout>
