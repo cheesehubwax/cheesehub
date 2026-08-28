@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { CheeseInput } from '@/components/powerup/CheeseInput';
 import { RecipientInput } from '@/components/powerup/RecipientInput';
 import { TermsDialog } from '@/components/shared/TermsDialog';
-import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { formatBytes } from '@/components/wallet/WalletResources';
 import { useWax } from '@/context/WaxContext';
 import { useTransactionSuccess } from '@/context/TransactionSuccessContext';
