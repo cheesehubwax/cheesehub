@@ -6,7 +6,7 @@ import { useWax } from "@/context/WaxContext";
 import { usePowerupStats } from "@/hooks/usePowerupStats";
 import { usePowerupLeaderboard } from "@/hooks/usePowerupLeaderboard";
 import { PowerupLeaderboard } from "@/components/powerup/PowerupLeaderboard";
-import { ResourceGauges } from "@/components/shared/ResourceGauges";
+import { ResourceGauges, refreshResourceGauges } from "@/components/shared/ResourceGauges";
 import cheeseUpOrb from "@/assets/cheeseup.png";
 import { playRandomFart } from "@/lib/fartSounds";
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
@@ -69,7 +69,7 @@ const PowerUp = () => {
           accountName={accountName}
           cheeseBalance={cheeseBalance}
           onBalanceRefresh={refreshBalance}
-          onStatsRefresh={refetchStats}
+          onStatsRefresh={() => { refetchStats(); refreshResourceGauges(); }}
         />
 
         <PowerupLeaderboard rawActions={rawActions} isLoading={lbLoading} isError={lbError} onRefresh={() => refetchLeaderboard()} />

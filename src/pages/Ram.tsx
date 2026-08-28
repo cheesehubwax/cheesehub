@@ -7,7 +7,7 @@ import { SellRamCard } from '@/components/ram/SellRamCard';
 import { RamPricePanel } from '@/components/ram/RamPricePanel';
 import { RamStatsBar } from '@/components/ram/RamStatsBar';
 import { LiquidReservesPanel } from '@/components/ram/LiquidReservesPanel';
-import { ResourceGauges } from '@/components/shared/ResourceGauges';
+import { ResourceGauges, refreshResourceGauges } from '@/components/shared/ResourceGauges';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useWax } from '@/context/WaxContext';
 import { useCheesePriceData } from '@/hooks/useCheesePriceData';
@@ -56,6 +56,7 @@ const Ram = () => {
     refetchConfig();
     refetchCheesePrice?.();
     refreshBalance?.();
+    refreshResourceGauges();
   }, [
     refetchStats,
     refetchReserves,
