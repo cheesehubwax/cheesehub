@@ -95,8 +95,10 @@ const Ram = () => {
           </TabsContent>
         </Tabs>
 
+        <RamStatsBar stats={stats} reserves={reserves} isLoading={statsLoading} />
 
         <div className="text-center text-sm text-muted-foreground">
+
           <p>
             Powered by the{' '}
             <a
