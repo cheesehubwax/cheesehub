@@ -48,7 +48,7 @@ const Ram = () => {
               <img src={cheeseRamOrb} alt="CHEESE Ram" className="w-24 h-24 object-contain" />
             </div>
 
-            <div className="text-center space-y-2">
+            <div className="text-center space-y-4">
               <div className="flex items-center justify-center gap-2">
                 <OpenMojiIcon emoji="💾" size={24} className="text-2xl" />
                 <h1 className="text-3xl md:text-4xl font-bold">
@@ -62,7 +62,9 @@ const Ram = () => {
                 Buy WAX RAM using $CHEESE, or sell RAM back for $CHEESE. The $CHEESE spent is sent to
                 eosio.null and leaves circulation forever
               </p>
+              <RamPricePanel cheesePerKb={cheesePerKb} history={history} />
             </div>
+
           </div>
         </div>
       </section>
