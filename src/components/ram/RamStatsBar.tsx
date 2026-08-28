@@ -32,50 +32,50 @@ export function RamStatsBar({ stats, isLoading }: RamStatsBarProps) {
   ];
 
   return (
-    <div className="rounded-xl p-4 max-w-4xl w-full bg-card border border-border/50 space-y-4">
+    <div className="rounded-xl p-3 max-w-4xl w-full bg-card border border-border/50">
       {/* Top row — RAM activity */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {topItems.map((item) => (
           <div key={item.label} className="text-center">
-            <div className="flex items-center justify-center gap-1.5 mb-1">
-              <OpenMojiIcon emoji={item.emoji} size={16} />
+            <div className="flex items-center justify-center gap-1.5">
+              <OpenMojiIcon emoji={item.emoji} size={14} />
               <span className="text-sm font-bold font-mono text-foreground">{item.value}</span>
             </div>
-            <p className="text-[11px] text-muted-foreground">{item.label}</p>
+            <p className="text-[10px] text-muted-foreground">{item.label}</p>
           </div>
         ))}
       </div>
 
-      <div className="border-t border-border/50" />
+      <div className="border-t border-border/50 my-2" />
 
       {/* Middle row — CHEESE distribution */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
         {middleItems.map((item) => (
           <div key={item.label} className="text-center">
-            <div className="flex items-center justify-center gap-1.5 mb-1">
-              <OpenMojiIcon emoji={item.emoji} size={16} />
+            <div className="flex items-center justify-center gap-1.5">
+              <OpenMojiIcon emoji={item.emoji} size={14} />
               <span className="text-sm font-bold font-mono text-foreground">
                 {item.value} <span className="text-[10px] text-muted-foreground font-normal">{item.unit}</span>
               </span>
             </div>
-            <p className="text-[11px] text-muted-foreground">{item.label}</p>
+            <p className="text-[10px] text-muted-foreground">{item.label}</p>
           </div>
         ))}
       </div>
 
-      <div className="border-t border-border/50" />
+      <div className="border-t border-border/50 my-2" />
 
       {/* Bottom row — WAX staked */}
       <div className="flex justify-center">
         <div className="text-center">
-          <div className="flex items-center justify-center gap-1.5 mb-1">
-            <OpenMojiIcon emoji="🔒" size={16} />
+          <div className="flex items-center justify-center gap-1.5">
+            <OpenMojiIcon emoji="🔒" size={14} />
             <span className="text-sm font-bold font-mono text-foreground">
               {isLoading || !stats ? dash : formatNumber(stats.totalWaxStaked, 2)}{' '}
               <span className="text-[10px] text-muted-foreground font-normal">WAX</span>
             </span>
           </div>
-          <p className="text-[11px] text-muted-foreground">WAX Staked</p>
+          <p className="text-[10px] text-muted-foreground">WAX Staked</p>
         </div>
       </div>
     </div>
