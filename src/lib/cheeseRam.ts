@@ -87,6 +87,8 @@ export async function fetchCheeseRamConfig(): Promise<CheeseRamConfig | null> {
     maxCheese: parseAsset(row.max_cheese as string),
     enabled: Boolean(row.enabled),
     referenceRate: parseFloat(String(row.reference_rate ?? '0')) || 0,
+    maxDeviationPct: parseFloat(String(row.max_deviation_pct ?? '0')) || 0,
+
     minLiquidReserve: parseAsset(row.min_liquid_reserve as string),
     sellEnabled: Boolean(row.sell_enabled),
     minSellBytes: Number(row.min_sell_bytes ?? 0),
