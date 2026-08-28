@@ -23,7 +23,7 @@ const Ram = () => {
   const { data: config } = useCheeseRamConfig();
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useCheeseRamStats();
   const { data: reserves, refetch: refetchReserves } = useCheeseRamReserves();
-  const { pricePerByte, history } = useRamPrice();
+  const { pricePerByte, cheesePerKb, history } = useRamPrice();
   const { data: accountRam, refetch: refetchAccountRam } = useAccountRam(accountName);
 
   const availableBytes = accountRam ? Math.max(0, accountRam.quota - accountRam.usage) : 0;
@@ -93,7 +93,7 @@ const Ram = () => {
           </TabsContent>
         </Tabs>
 
-        <RamPricePanel pricePerByte={pricePerByte} history={history} />
+        <RamPricePanel cheesePerKb={cheesePerKb} history={history} />
 
         <RamStatsBar stats={stats} reserves={reserves} isLoading={statsLoading} />
 
