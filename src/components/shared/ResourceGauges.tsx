@@ -1,7 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useWax } from '@/context/WaxContext';
 import { waxRpcCall } from '@/lib/waxRpcFallback';
 import { formatBytes, parseStakedWeight, type AccountResources } from '@/components/wallet/WalletResources';
+
+/** Window event name used to tell every mounted ResourceGauges to re-fetch. */
+export const RESOURCE_GAUGES_REFRESH_EVENT = 'cheese:refresh-resource-gauges';
+
+/** Ask all mounted resource gauges to reload from the chain. */
+export function refreshResourceGauges() {
+  window.dispatchEvent(new Event(RESOURCE_GAUGES_REFRESH_EVENT));
+}
 
 function formatCpu(us: number): string {
   if (us < 1000) return `${us} µs`;
