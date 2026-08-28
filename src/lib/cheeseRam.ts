@@ -185,6 +185,24 @@ export function estimateBytesForCheese(
   return { waxValue, bytes };
 }
 
+/**
+ * Inverse of estimateBytesForCheese — the CHEESE needed to buy a target byte
+ * amount. Display only; the contract calculates the final amount at execution.
+ */
+export function estimateCheeseForTargetBytes(
+  bytes: number,
+  config: CheeseRamConfig | null | undefined,
+  pricePerByte: number | null | undefined,
+): { waxValue: number; cheese: number } | null {
+  if (!bytes || bytes <= 0 || !config?.referenceRate || !pricePerByte) return null;
+  const waxValue = (bytes * pricePerByte) / (1 - RAM_FEE_RATE);
+  const cheese = waxValue / (config.referenceRate * (1 - config.buySpreadBps / 10000));
+  if (!Number.isFinite(cheese) || cheese <= 0) return null;
+  return { waxValue, cheese };
+}
+
+
+
 /** Estimated CHEESE payout for selling bytes back to the contract. */
 export function estimateCheeseForBytes(
   bytes: number,
