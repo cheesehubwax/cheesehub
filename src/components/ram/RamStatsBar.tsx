@@ -1,5 +1,7 @@
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { formatBytes } from '@/components/wallet/WalletResources';
+import waxLogoUrl from '@/assets/wax-seal.png';
+import cheeseLogoUrl from '@/assets/cheese-logo.png';
 import type { CheeseRamStats } from '@/lib/cheeseRam';
 
 interface RamStatsBarProps {
