@@ -1,7 +1,7 @@
 # Add CHEESERam disclosures to Terms of Use and Disclaimer
 
 ## Goal
-Add CHEESERam-specific legal disclosures to the existing Terms of Use and Disclaimer pages, using the project's existing jurisdiction-neutral, non-custodial style while incorporating ASIC INFO 225 principles (clear statements that CHEESERam is not a financial product, no AFSL/licence, no consumer protections if unregulated, and that Australian laws may apply to offers made to Australian users).
+Add CHEESERam-specific legal disclosures to the existing Terms of Use and Disclaimer pages, using the project's existing jurisdiction-neutral, non-custodial style. The language should make clear that CHEESERam is not a financial product, investment scheme, or financial service, and that users are responsible for understanding how the conversion of CHEESE into WAX RAM works.
 
 ## Current state
 - `src/components/shared/TermsContent.tsx` is a shared component used by both `/terms` and the `TermsDialog` modal. It currently does not mention CHEESERam.
@@ -30,7 +30,7 @@ Price quotes displayed in CHEESERam are estimates only. The contract uses a stor
 
 CHEESERam is not a financial product, investment scheme, derivative, non-cash payment facility, or financial service. It is a utility function for acquiring and disposing of blockchain network resources (RAM). No return, profit, yield, or price appreciation is promised or implied. RAM is a consumable network resource and not an asset with guaranteed value or liquidity.
 
-If you access CHEESEHub from Australia, Australian laws (including the Corporations Act 2001 and the ASIC Act) may apply to the offering of products or services to you. CHEESEHub does not hold an Australian financial services licence and does not provide financial product advice. You should consider whether CHEESERam could be a financial product or financial service in your jurisdiction and seek independent legal advice.
+Laws in your jurisdiction may classify activities involving digital assets, network resources, or token conversions as regulated financial products or services. CHEESERam is provided as a non-custodial utility only. You should consider whether CHEESERam could be a financial product or financial service in your jurisdiction and seek independent legal advice.
 ```
 
 ### 2. Terms of Use — add CHEESERam bullets to Section 8 (User Responsibilities)
@@ -61,7 +61,7 @@ to the current date at build time (August 2026).
 ## Out of scope
 - No changes to CHEESERam smart contract code or frontend functionality.
 - No changes to other dApp disclosures unless required for consistency.
-- No jurisdiction-specific legal advice; the drafted language is a disclosure template and should be reviewed by a qualified legal professional before reliance.
+- The drafted language is a disclosure template and should be reviewed by a qualified legal professional before reliance.
 
 ## Verification
 - Build the project and confirm no TypeScript/JSX errors in edited files.
