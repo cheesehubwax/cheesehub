@@ -61,15 +61,24 @@ export function useRamPrice() {
     pricePerByte !== null && waxPerCheese > 0 ? (pricePerByte * 1024) / waxPerCheese : null;
 
   const [history, setHistory] = useState<RamPricePoint[]>([]);
+  const updatedAt = query.dataUpdatedAt;
 
   useEffect(() => {
     if (pricePerByte === null || cheesePerKb === null) return;
+    const stamp = updatedAt || Date.now();
     setHistory((prev) => {
+      // Seed the chart with two points so a line renders on the first read.
+      if (prev.length === 0) {
+        return [
+          { time: stamp - 30_000, price: pricePerByte, cheesePerKb },
+          { time: stamp, price: pricePerByte, cheesePerKb },
+        ];
+      }
       const last = prev[prev.length - 1];
-      if (last && last.price === pricePerByte && last.cheesePerKb === cheesePerKb) return prev;
-      return [...prev, { time: Date.now(), price: pricePerByte, cheesePerKb }].slice(-20);
+      if (last.time === stamp) return prev;
+      return [...prev, { time: stamp, price: pricePerByte, cheesePerKb }].slice(-40);
     });
-  }, [pricePerByte, cheesePerKb, query.dataUpdatedAt]);
+  }, [pricePerByte, cheesePerKb, updatedAt]);
 
   return {
     pricePerByte,
