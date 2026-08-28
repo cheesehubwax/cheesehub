@@ -6,6 +6,7 @@ import { useWax } from "@/context/WaxContext";
 import { usePowerupStats } from "@/hooks/usePowerupStats";
 import { usePowerupLeaderboard } from "@/hooks/usePowerupLeaderboard";
 import { PowerupLeaderboard } from "@/components/powerup/PowerupLeaderboard";
+import { ResourceGauges } from "@/components/shared/ResourceGauges";
 import cheeseUpOrb from "@/assets/cheeseup.png";
 import { playRandomFart } from "@/lib/fartSounds";
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
@@ -58,6 +59,8 @@ const PowerUp = () => {
       </section>
 
       <main className="container pb-12 flex flex-col items-center gap-8">
+
+        <ResourceGauges />
 
         <PowerUpCard
           walletConnected={isConnected}
