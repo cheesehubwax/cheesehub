@@ -7,7 +7,6 @@ import { Label } from '@/components/ui/label';
 import { CheeseInput } from '@/components/powerup/CheeseInput';
 import { RecipientInput } from '@/components/powerup/RecipientInput';
 import { TermsDialog } from '@/components/shared/TermsDialog';
-import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { formatBytes } from '@/components/wallet/WalletResources';
 import { useWax } from '@/context/WaxContext';
 import { useTransactionSuccess } from '@/context/TransactionSuccessContext';
@@ -21,6 +20,7 @@ import {
   type CheeseRamConfig,
 } from '@/lib/cheeseRam';
 import { cn } from '@/lib/utils';
+import ramStickAsset from '@/assets/ram-stick.png.asset.json';
 import { Loader2 } from 'lucide-react';
 
 interface BuyRamCardProps {
@@ -144,7 +144,7 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
   return (
     <div className="rounded-2xl p-6 max-w-lg w-full bg-card border border-border/50 space-y-5">
       <div className="flex items-center gap-2">
-        <OpenMojiIcon emoji="💾" size={22} />
+        <img src={ramStickAsset.url} alt="RAM" className="h-5 w-auto object-contain" />
         <h2 className="text-xl font-bold">
           <span className="text-cheese">Buy</span> <span className="text-foreground">RAM</span>
         </h2>
