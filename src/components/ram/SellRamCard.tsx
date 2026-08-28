@@ -100,7 +100,11 @@ export function SellRamCard({ config, pricePerByte, reserves, availableBytes, on
       setTermsAgreed(false);
       onComplete?.();
     } catch (error) {
-      toast.error(parseTransactError(error));
+      console.error('[CHEESERam] Sell failed:', error);
+      const info = parseTransactError(error);
+      if (info.type !== 'cancelled') {
+        toast.error(info.title, { description: info.description, duration: info.duration });
+      }
     } finally {
       setIsTransacting(false);
       closeWharfkitModals();

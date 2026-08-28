@@ -102,7 +102,11 @@ export function BuyRamCard({ config, pricePerByte, onComplete }: BuyRamCardProps
       refreshBalance?.();
       onComplete?.();
     } catch (error) {
-      toast.error(parseTransactError(error));
+      console.error('[CHEESERam] Buy failed:', error);
+      const info = parseTransactError(error);
+      if (info.type !== 'cancelled') {
+        toast.error(info.title, { description: info.description, duration: info.duration });
+      }
     } finally {
       setIsTransacting(false);
       closeWharfkitModals();
