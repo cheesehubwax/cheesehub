@@ -142,7 +142,7 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
   };
 
   return (
-    <div className="rounded-2xl p-6 max-w-2xl w-full bg-card border border-border/50 space-y-5">
+    <div className="rounded-2xl p-6 max-w-lg w-full bg-card border border-border/50 space-y-5">
       <div className="flex items-center gap-2">
         <OpenMojiIcon emoji="💾" size={22} />
         <h2 className="text-xl font-bold">
