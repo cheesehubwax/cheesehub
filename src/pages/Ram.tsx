@@ -5,6 +5,7 @@ import { BuyRamCard } from '@/components/ram/BuyRamCard';
 import { SellRamCard } from '@/components/ram/SellRamCard';
 import { RamPricePanel } from '@/components/ram/RamPricePanel';
 import { RamStatsBar } from '@/components/ram/RamStatsBar';
+import { LiquidReservesPanel } from '@/components/ram/LiquidReservesPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useWax } from '@/context/WaxContext';
 import {
@@ -17,6 +18,7 @@ import {
 import { CHEESE_RAM_CONTRACT } from '@/lib/cheeseRam';
 import cheeseRamOrb from '@/assets/cheeseram.png';
 import { playRandomFart } from '@/lib/fartSounds';
+
 
 const Ram = () => {
   const { accountName } = useWax();
