@@ -1,4 +1,5 @@
 // CHEESERam page — buy and sell WAX RAM with $CHEESE
+import { useCallback, useEffect, useRef } from 'react';
 import { Layout } from '@/components/Layout';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { BuyRamCard } from '@/components/ram/BuyRamCard';
