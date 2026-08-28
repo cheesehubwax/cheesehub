@@ -40,6 +40,8 @@ export interface RamPricePoint {
   time: number;
   /** WAX per byte of RAM (raw rammarket price). */
   price: number;
+  /** WAX per KB of RAM. */
+  waxPerKb: number;
   /** CHEESE per KB of RAM, derived from the live Alcor CHEESE/WAX price. */
   cheesePerKb: number | null;
 }
@@ -65,18 +67,19 @@ export function useRamPrice() {
 
   useEffect(() => {
     if (pricePerByte === null || cheesePerKb === null) return;
+    const waxPerKb = pricePerByte * 1024;
     const stamp = updatedAt || Date.now();
     setHistory((prev) => {
       // Seed the chart with two points so a line renders on the first read.
       if (prev.length === 0) {
         return [
-          { time: stamp - 30_000, price: pricePerByte, cheesePerKb },
-          { time: stamp, price: pricePerByte, cheesePerKb },
+          { time: stamp - 30_000, price: pricePerByte, waxPerKb, cheesePerKb },
+          { time: stamp, price: pricePerByte, waxPerKb, cheesePerKb },
         ];
       }
       const last = prev[prev.length - 1];
       if (last.time === stamp) return prev;
-      return [...prev, { time: stamp, price: pricePerByte, cheesePerKb }].slice(-40);
+      return [...prev, { time: stamp, price: pricePerByte, waxPerKb, cheesePerKb }].slice(-40);
     });
   }, [pricePerByte, cheesePerKb, updatedAt]);
 
