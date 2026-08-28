@@ -177,14 +177,50 @@ export async function fetchContractReserves(): Promise<ContractReserves> {
 /** RAM purchases pay a 0.5% network fee on the WAX spent. */
 const RAM_FEE_RATE = 0.005;
 
+export interface ResolvedRate {
+  /** WAX per CHEESE used for quoting. */
+  rate: number;
+  /** True when the live market rate was used. */
+  live: boolean;
+  /**
+   * True when the live rate drifted beyond the contract's max_deviation_pct, so the
+   * stored oracle rate is used instead (the contract would reject the live price).
+   */
+  stale: boolean;
+}
+
+/**
+ * Picks the WAX-per-CHEESE rate used for quotes: the live Alcor market rate when it
+ * is within the contract's allowed deviation of the stored reference rate, otherwise
+ * the stored reference rate.
+ */
+export function resolveQuoteRate(
+  config: CheeseRamConfig | null | undefined,
+  liveWaxPerCheese: number | null | undefined,
+): ResolvedRate | null {
+  const reference = config?.referenceRate ?? 0;
+  const live = liveWaxPerCheese && liveWaxPerCheese > 0 ? liveWaxPerCheese : 0;
+  if (!live && !reference) return null;
+  if (!live) return { rate: reference, live: false, stale: false };
+  if (!reference) return { rate: live, live: true, stale: false };
+
+  const maxDeviation = config?.maxDeviationPct ?? 0;
+  const deviationPct = Math.abs((live - reference) / reference) * 100;
+  if (maxDeviation > 0 && deviationPct > maxDeviation) {
+    return { rate: reference, live: false, stale: true };
+  }
+  return { rate: live, live: true, stale: false };
+}
+
 /** Estimated bytes received for a CHEESE spend. Display only — the contract is authoritative. */
 export function estimateBytesForCheese(
   cheese: number,
   config: CheeseRamConfig | null | undefined,
   pricePerByte: number | null | undefined,
+  waxPerCheese: number | null | undefined,
 ): { waxValue: number; bytes: number } | null {
-  if (!cheese || cheese <= 0 || !config?.referenceRate || !pricePerByte) return null;
-  const waxValue = cheese * config.referenceRate * (1 - config.buySpreadBps / 10000);
+  if (!cheese || cheese <= 0 || !waxPerCheese || !config || !pricePerByte) return null;
+  const waxValue = cheese * waxPerCheese * (1 - config.buySpreadBps / 10000);
   const bytes = Math.floor((waxValue * (1 - RAM_FEE_RATE)) / pricePerByte);
   return { waxValue, bytes };
 }
@@ -197,27 +233,30 @@ export function estimateCheeseForTargetBytes(
   bytes: number,
   config: CheeseRamConfig | null | undefined,
   pricePerByte: number | null | undefined,
+  waxPerCheese: number | null | undefined,
 ): { waxValue: number; cheese: number } | null {
-  if (!bytes || bytes <= 0 || !config?.referenceRate || !pricePerByte) return null;
+  if (!bytes || bytes <= 0 || !waxPerCheese || !config || !pricePerByte) return null;
   const waxValue = (bytes * pricePerByte) / (1 - RAM_FEE_RATE);
-  const cheese = waxValue / (config.referenceRate * (1 - config.buySpreadBps / 10000));
+  const cheese = waxValue / (waxPerCheese * (1 - config.buySpreadBps / 10000));
   if (!Number.isFinite(cheese) || cheese <= 0) return null;
   return { waxValue, cheese };
 }
-
-
 
 /** Estimated CHEESE payout for selling bytes back to the contract. */
 export function estimateCheeseForBytes(
   bytes: number,
   config: CheeseRamConfig | null | undefined,
   pricePerByte: number | null | undefined,
+  waxPerCheese: number | null | undefined,
 ): { waxValue: number; cheese: number } | null {
-  if (!bytes || bytes <= 0 || !config?.referenceRate || !pricePerByte) return null;
+  if (!bytes || bytes <= 0 || !waxPerCheese || !config || !pricePerByte) return null;
   const waxValue = bytes * pricePerByte;
   const cheese =
-    (waxValue / config.referenceRate) *
+    (waxValue / waxPerCheese) *
     (1 - config.sellHaircutBps / 10000) *
     (1 - config.sellSpreadBps / 10000);
+  return { waxValue, cheese };
+}
+
   return { waxValue, cheese };
 }
