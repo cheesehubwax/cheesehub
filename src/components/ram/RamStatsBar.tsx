@@ -23,9 +23,8 @@ export function RamStatsBar({ stats, reserves, isLoading }: RamStatsBarProps) {
     { label: 'RAM Sold Back', emoji: '📤', value: isLoading || !stats ? dash : formatBytes(stats.totalBytesSoldBack) },
     { label: 'CHEESE Paid Out', emoji: '💸', value: isLoading || !stats ? dash : formatNumber(stats.totalCheesePaidOut) },
     { label: 'WAX Staked', emoji: '🔒', value: isLoading || !stats ? dash : formatNumber(stats.totalWaxStaked, 2) },
-    { label: 'Liquid WAX', emoji: '💧', value: !reserves ? dash : formatNumber(reserves.liquidWax, 2) },
-    { label: 'CHEESE Pool', emoji: '🏦', value: !reserves ? dash : formatNumber(reserves.cheesePool) },
   ];
+
 
   return (
     <div className="rounded-xl p-4 max-w-2xl w-full bg-card border border-border/50">

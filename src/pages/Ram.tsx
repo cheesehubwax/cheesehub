@@ -5,6 +5,7 @@ import { BuyRamCard } from '@/components/ram/BuyRamCard';
 import { SellRamCard } from '@/components/ram/SellRamCard';
 import { RamPricePanel } from '@/components/ram/RamPricePanel';
 import { RamStatsBar } from '@/components/ram/RamStatsBar';
+import { LiquidReservesPanel } from '@/components/ram/LiquidReservesPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useWax } from '@/context/WaxContext';
 import {
@@ -17,6 +18,7 @@ import {
 import { CHEESE_RAM_CONTRACT } from '@/lib/cheeseRam';
 import cheeseRamOrb from '@/assets/cheeseram.png';
 import { playRandomFart } from '@/lib/fartSounds';
+
 
 const Ram = () => {
   const { accountName } = useWax();
@@ -62,7 +64,7 @@ const Ram = () => {
                 Buy WAX RAM using $CHEESE, or sell RAM back for $CHEESE. The $CHEESE spent is sent to
                 eosio.null and leaves circulation forever
               </p>
-              <RamPricePanel cheesePerKb={cheesePerKb} history={history} />
+              <LiquidReservesPanel reserves={reserves} />
             </div>
 
           </div>
@@ -70,7 +72,10 @@ const Ram = () => {
       </section>
 
       <main className="container pb-12 flex flex-col items-center gap-8">
+        <RamPricePanel cheesePerKb={cheesePerKb} history={history} />
+
         <Tabs defaultValue="buy" className="w-full max-w-2xl">
+
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="buy" className="gap-2">
               <OpenMojiIcon emoji="💾" size={18} />
