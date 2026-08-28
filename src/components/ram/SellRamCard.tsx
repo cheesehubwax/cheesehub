@@ -15,6 +15,7 @@ import {
   CHEESE_RAM_CONTRACT,
   SELL_MEMO,
   estimateCheeseForBytes,
+  resolveQuoteRate,
   type CheeseRamConfig,
   type ContractReserves,
 } from '@/lib/cheeseRam';
@@ -22,12 +23,21 @@ import {
 interface SellRamCardProps {
   config: CheeseRamConfig | null | undefined;
   pricePerByte: number | null;
+  /** Live Alcor CHEESE/WAX rate (WAX per CHEESE). */
+  liveWaxPerCheese: number | null;
   reserves: ContractReserves | null | undefined;
   availableBytes: number;
   onComplete?: () => void;
 }
 
-export function SellRamCard({ config, pricePerByte, reserves, availableBytes, onComplete }: SellRamCardProps) {
+export function SellRamCard({
+  config,
+  pricePerByte,
+  liveWaxPerCheese,
+  reserves,
+  availableBytes,
+  onComplete,
+}: SellRamCardProps) {
   const { session, isConnected, login } = useWax();
   const { showSuccess } = useTransactionSuccess();
   const [bytesInput, setBytesInput] = useState('');
@@ -35,7 +45,10 @@ export function SellRamCard({ config, pricePerByte, reserves, availableBytes, on
   const [isTransacting, setIsTransacting] = useState(false);
 
   const bytes = parseInt(bytesInput, 10) || 0;
-  const estimate = estimateCheeseForBytes(bytes, config, pricePerByte);
+  const quoteRate = resolveQuoteRate(config, liveWaxPerCheese);
+  const rate = quoteRate?.rate ?? null;
+  const estimate = estimateCheeseForBytes(bytes, config, pricePerByte, rate);
+
   const minBytes = config?.minSellBytes ?? 0;
   const maxBytes = config?.maxSellBytes ?? 0;
   const sellDisabled = config ? !config.sellEnabled : false;
@@ -169,10 +182,34 @@ export function SellRamCard({ config, pricePerByte, reserves, availableBytes, on
             {estimate ? `${estimate.waxValue.toFixed(8)} WAX` : '-'}
           </span>
         </div>
+        <div className="flex items-center justify-between">
+          <span className="text-muted-foreground">Rate</span>
+          <span className="font-mono text-foreground">
+            {rate ? (
+              <>
+                1 CHEESE = {rate.toFixed(4)} WAX{' '}
+                <span className="text-[10px] text-muted-foreground font-normal">
+                  ({quoteRate?.live ? 'live' : 'contract'})
+                </span>
+              </>
+            ) : (
+              '-'
+            )}
+          </span>
+        </div>
         <p className="text-[11px] text-muted-foreground pt-1">
           Estimate only — the contract calculates the final payout at execution time.
         </p>
       </div>
+
+      {quoteRate?.stale && (
+        <p className="text-xs text-amber-500">
+          The contract's oracle rate has drifted more than{' '}
+          {(config?.maxDeviationPct ?? 0).toFixed(0)}% from the live market — quoting at the
+          contract rate instead.
+        </p>
+      )}
+
 
       {belowMin && (
         <p className="text-xs text-destructive">Minimum sale is {minBytes.toLocaleString()} bytes.</p>

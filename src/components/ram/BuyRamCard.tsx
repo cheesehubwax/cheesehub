@@ -17,6 +17,7 @@ import {
   CHEESE_TOKEN_CONTRACT,
   estimateBytesForCheese,
   estimateCheeseForTargetBytes,
+  resolveQuoteRate,
   type CheeseRamConfig,
 } from '@/lib/cheeseRam';
 import { cn } from '@/lib/utils';
@@ -25,6 +26,8 @@ import { Loader2 } from 'lucide-react';
 interface BuyRamCardProps {
   config: CheeseRamConfig | null | undefined;
   pricePerByte: number | null;
+  /** Live Alcor CHEESE/WAX rate (WAX per CHEESE). */
+  liveWaxPerCheese: number | null;
   onComplete?: () => void;
 }
 
@@ -33,7 +36,7 @@ type BuyMode = 'cheese' | 'bytes';
 const isValidAccount = (account: string) =>
   !!account && account.length <= 12 && /^[a-z1-5.]+$/.test(account);
 
-export function BuyRamCard({ config, pricePerByte, onComplete }: BuyRamCardProps) {
+export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete }: BuyRamCardProps) {
   const { session, isConnected, accountName, cheeseBalance, login, refreshBalance } = useWax();
   const { showSuccess } = useTransactionSuccess();
   const [mode, setMode] = useState<BuyMode>('cheese');
@@ -47,18 +50,20 @@ export function BuyRamCard({ config, pricePerByte, onComplete }: BuyRamCardProps
     if (accountName) setRecipient(accountName);
   }, [accountName]);
 
+  const quoteRate = resolveQuoteRate(config, liveWaxPerCheese);
+  const rate = quoteRate?.rate ?? null;
   const desiredBytes = Math.floor(parseFloat(bytesInput) || 0);
 
   // In bytes mode the CHEESE spend is derived from the target byte amount
   // (rounded up to token precision so the contract can cover the request).
   const cheese = useMemo(() => {
     if (mode === 'cheese') return parseFloat(amount) || 0;
-    const derived = estimateCheeseForTargetBytes(desiredBytes, config, pricePerByte);
+    const derived = estimateCheeseForTargetBytes(desiredBytes, config, pricePerByte, rate);
     if (!derived) return 0;
     return Math.ceil(derived.cheese * 10000) / 10000;
-  }, [mode, amount, desiredBytes, config, pricePerByte]);
+  }, [mode, amount, desiredBytes, config, pricePerByte, rate]);
 
-  const estimate = estimateBytesForCheese(cheese, config, pricePerByte);
+  const estimate = estimateBytesForCheese(cheese, config, pricePerByte, rate);
   const minCheese = config?.minCheese ?? 0;
   const maxCheese = config?.maxCheese ?? 0;
   const belowMin = cheese > 0 && minCheese > 0 && cheese < minCheese;
@@ -76,6 +81,7 @@ export function BuyRamCard({ config, pricePerByte, onComplete }: BuyRamCardProps
     !aboveMax &&
     !insufficient &&
     isValidAccount(recipient);
+
 
 
   const handleBuy = async () => {
@@ -259,10 +265,34 @@ export function BuyRamCard({ config, pricePerByte, onComplete }: BuyRamCardProps
             {estimate ? estimate.bytes.toLocaleString() : '-'}
           </span>
         </div>
+        <div className="flex items-center justify-between">
+          <span className="text-muted-foreground">Rate</span>
+          <span className="font-mono text-foreground">
+            {rate ? (
+              <>
+                1 CHEESE = {rate.toFixed(4)} WAX{' '}
+                <span className="text-[10px] text-muted-foreground font-normal">
+                  ({quoteRate?.live ? 'live' : 'contract'})
+                </span>
+              </>
+            ) : (
+              '-'
+            )}
+          </span>
+        </div>
         <p className="text-[11px] text-muted-foreground pt-1">
           Estimate only — the contract calculates the final amount at execution time.
         </p>
       </div>
+
+      {quoteRate?.stale && (
+        <p className="text-xs text-amber-500">
+          The contract's oracle rate has drifted more than{' '}
+          {(config?.maxDeviationPct ?? 0).toFixed(0)}% from the live market — quoting at the
+          contract rate instead.
+        </p>
+      )}
+
 
       {belowMin && (
         <p className="text-xs text-destructive">Minimum purchase is {minCheese.toFixed(4)} CHEESE.</p>
