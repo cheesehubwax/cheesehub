@@ -95,9 +95,6 @@ const Ram = () => {
           </TabsContent>
         </Tabs>
 
-        <RamPricePanel cheesePerKb={cheesePerKb} history={history} />
-
-        <RamStatsBar stats={stats} reserves={reserves} isLoading={statsLoading} />
 
         <div className="text-center text-sm text-muted-foreground">
           <p>
