@@ -91,17 +91,24 @@ const Ram = () => {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="buy">
-            <BuyRamCard config={config} pricePerByte={pricePerByte} onComplete={handleComplete} />
+            <BuyRamCard
+              config={config}
+              pricePerByte={pricePerByte}
+              liveWaxPerCheese={liveWaxPerCheese}
+              onComplete={handleComplete}
+            />
           </TabsContent>
           <TabsContent value="sell">
             <SellRamCard
               config={config}
               pricePerByte={pricePerByte}
+              liveWaxPerCheese={liveWaxPerCheese}
               reserves={reserves}
               availableBytes={availableBytes}
               onComplete={handleComplete}
             />
           </TabsContent>
+
         </Tabs>
 
         <RamStatsBar stats={stats} isLoading={statsLoading} />
