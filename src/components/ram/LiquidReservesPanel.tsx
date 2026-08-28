@@ -1,5 +1,5 @@
-import waxCoinUrl from '@/assets/wax-coin.png';
-import cheeseCoinUrl from '@/assets/cheese-coin.png';
+import waxLogoUrl from '@/assets/wax-seal.png';
+import cheeseLogoUrl from '@/assets/cheese-logo.png';
 import type { ContractReserves } from '@/lib/cheeseRam';
 
 interface LiquidReservesPanelProps {
