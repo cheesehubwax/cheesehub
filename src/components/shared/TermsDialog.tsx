@@ -19,7 +19,7 @@ export function TermsDialog() {
         <DialogContent className="sm:max-w-2xl max-h-[80vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-cheese">Terms of Use</DialogTitle>
-            <p className="text-xs text-muted-foreground">Last updated: March 2025</p>
+            <p className="text-xs text-muted-foreground">Last updated: August 2026</p>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto pr-2" style={{ maxHeight: 'calc(80vh - 6rem)' }}>
             <TermsContent />

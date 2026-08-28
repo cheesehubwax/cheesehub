@@ -78,6 +78,10 @@ export function TermsContent() {
           <li>You acknowledge that banner advertisements displayed on CHEESEHub may contain referral or affiliate links. CHEESEHub does not endorse, recommend, or receive commission from any product, service, or platform advertised through CHEESEAds. You should exercise particular caution with advertisements promoting speculative trading or "play-to-earn" platforms, and you accept full responsibility for any interaction with advertised third-party services.</li>
           <li>You acknowledge that nothing on CHEESEHub constitutes financial product advice and that you should seek independent professional advice before making financial decisions.</li>
           <li>You acknowledge that all staking, farming, and liquidity provision conducted through CHEESEHub is entirely self-directed and that CHEESEHub does not pool, manage, or control any user funds.</li>
+          <li>You acknowledge that CHEESERam is a utility for acquiring and disposing of WAX blockchain RAM using CHEESE. It is not a financial product, investment, or managed service, and CHEESEHub does not hold or control any RAM, WAX, or CHEESE on your behalf.</li>
+          <li>You acknowledge that CHEESE sent to the <code className="text-foreground bg-muted px-1 rounded">ram.chz</code> contract may be permanently nulled or routed to other ecosystem functions by fixed contract logic, and that this does not constitute, imply, or guarantee an increase in the price or value of CHEESE.</li>
+          <li>You acknowledge that CHEESERam price quotes are estimates based on live market data and a contract reference rate, and that the actual on-chain execution rate may differ due to spreads, deviation guards, slippage, or market movement.</li>
+          <li>You acknowledge that RAM is a network resource, not a financial asset, and that its utility or value may change as network conditions change.</li>
         </ul>
       </section>
 
@@ -129,6 +133,7 @@ export function TermsContent() {
           <li><strong className="text-foreground">Impermanent loss:</strong> Providing liquidity to decentralised exchange pools carries the risk of impermanent loss, where the value of deposited assets may decrease relative to simply holding them.</li>
           <li><strong className="text-foreground">Regulatory risk:</strong> Laws and regulations governing digital assets are evolving and may change in ways that adversely affect the legality, utility, or value of digital assets in your jurisdiction.</li>
           <li><strong className="text-foreground">Counterparty risk:</strong> Third-party platforms, wallets, and services integrated with or accessible through CHEESEHub may fail, be compromised, or cease operations without notice.</li>
+          <li><strong className="text-foreground">Resource-conversion risk:</strong> CHEESERam involves converting CHEESE into WAX RAM and vice versa. RAM is a consumable blockchain resource with no guaranteed resale value or liquidity. Quote rates may differ from execution rates, and you may receive less RAM or less CHEESE than estimated.</li>
           <li><strong className="text-foreground">No guaranteed returns:</strong> No return, profit, yield, or financial benefit of any kind is promised, guaranteed, or implied by CHEESEHub or any feature accessible through the platform.</li>
         </ul>
       </section>
