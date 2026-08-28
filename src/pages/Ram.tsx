@@ -64,7 +64,6 @@ const Ram = () => {
                 Buy WAX RAM using $CHEESE, or sell RAM back for $CHEESE. The $CHEESE spent is sent to
                 eosio.null and leaves circulation forever
               </p>
-              <LiquidReservesPanel reserves={reserves} />
             </div>
 
           </div>
@@ -72,6 +71,7 @@ const Ram = () => {
       </section>
 
       <main className="container pb-12 flex flex-col items-center gap-8">
+        <LiquidReservesPanel reserves={reserves} />
         <RamPricePanel cheesePerKb={cheesePerKb} history={history} />
 
         <Tabs defaultValue="buy" className="w-full max-w-2xl">

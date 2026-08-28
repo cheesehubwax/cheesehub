@@ -18,7 +18,7 @@ export function LiquidReservesPanel({ reserves }: LiquidReservesPanelProps) {
       <div className="flex items-center gap-2 rounded-lg bg-card/50 border border-border/50 px-4 py-2">
         <img src={waxLogoUrl} alt="WAX" className="w-6 h-6 object-contain" />
         <div className="text-left">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Liquid WAX</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">RAM.CHZ Liquid WAX</p>
           <p className="text-sm font-bold font-mono text-foreground">{formatNumber(liquidWax, 2)} WAX</p>
         </div>
       </div>
@@ -26,7 +26,7 @@ export function LiquidReservesPanel({ reserves }: LiquidReservesPanelProps) {
       <div className="flex items-center gap-2 rounded-lg bg-card/50 border border-border/50 px-4 py-2">
         <img src={cheeseLogoUrl} alt="CHEESE" className="w-6 h-6 object-contain" />
         <div className="text-left">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Liquid CHEESE</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">RAM.CHZ Liquid CHEESE</p>
           <p className="text-sm font-bold font-mono text-foreground">{formatNumber(cheesePool, 4)} CHEESE</p>
         </div>
       </div>
