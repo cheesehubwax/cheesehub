@@ -1,5 +1,5 @@
-import waxCoinUrl from '@/assets/wax-coin.png';
-import cheeseCoinUrl from '@/assets/cheese-coin.png';
+import waxLogoUrl from '@/assets/wax-seal.png';
+import cheeseLogoUrl from '@/assets/cheese-logo.png';
 import type { ContractReserves } from '@/lib/cheeseRam';
 
 interface LiquidReservesPanelProps {
@@ -16,7 +16,7 @@ export function LiquidReservesPanel({ reserves }: LiquidReservesPanelProps) {
   return (
     <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8">
       <div className="flex items-center gap-2 rounded-lg bg-card/50 border border-border/50 px-4 py-2">
-        <img src={waxCoinUrl} alt="WAX" className="w-6 h-6 object-contain" />
+        <img src={waxLogoUrl} alt="WAX" className="w-6 h-6 object-contain" />
         <div className="text-left">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Liquid WAX</p>
           <p className="text-sm font-bold font-mono text-foreground">{formatNumber(liquidWax, 2)} WAX</p>
@@ -24,7 +24,7 @@ export function LiquidReservesPanel({ reserves }: LiquidReservesPanelProps) {
       </div>
 
       <div className="flex items-center gap-2 rounded-lg bg-card/50 border border-border/50 px-4 py-2">
-        <img src={cheeseCoinUrl} alt="CHEESE" className="w-6 h-6 object-contain" />
+        <img src={cheeseLogoUrl} alt="CHEESE" className="w-6 h-6 object-contain" />
         <div className="text-left">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Liquid CHEESE</p>
           <p className="text-sm font-bold font-mono text-foreground">{formatNumber(cheesePool, 4)} CHEESE</p>
