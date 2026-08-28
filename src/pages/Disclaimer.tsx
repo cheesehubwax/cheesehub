@@ -6,7 +6,7 @@ export default function Disclaimer() {
       <div className="container max-w-3xl py-12 space-y-8">
         <div>
           <h1 className="text-3xl font-bold text-cheese mb-2">Clause</h1>
-          <p className="text-sm text-muted-foreground">Last updated: March 2025</p>
+          <p className="text-sm text-muted-foreground">Last updated: August 2026</p>
         </div>
 
         <section className="space-y-4">
@@ -166,6 +166,25 @@ export default function Disclaimer() {
               </p>
               <p className="text-sm text-muted-foreground leading-relaxed mt-2">
                 Price quotes, price impact estimates, expected output, minimum received amounts, and route details shown in the interface are indicative only and may differ from the final on-chain execution due to slippage, pool depth changes, concurrent transactions, or differences between the quoted block and the execution block. CHEESEHub makes no guarantee regarding swap execution, pricing accuracy, or availability of the Alcor API or on-chain data. Users are solely responsible for reviewing and confirming all transaction details before signing.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="text-base font-semibold text-cheese">7.11 CHEESERam</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed mt-1">
+                CHEESERam is powered by the <code className="text-foreground bg-muted px-1 rounded">ram.chz</code> smart contract on the WAX blockchain. It provides a non-custodial interface that allows users to send CHEESE in exchange for WAX RAM, and to sell WAX RAM back to the contract in exchange for CHEESE. CHEESEHub does not hold, pool, or control any WAX, CHEESE, or RAM at any time; all transactions are constructed in the user's browser and signed by the user's own wallet provider.
+              </p>
+              <p className="text-sm text-muted-foreground leading-relaxed mt-2">
+                CHEESE received by the <code className="text-foreground bg-muted px-1 rounded">ram.chz</code> contract is routed according to fixed, immutable on-chain logic. A portion is permanently nulled to <code className="text-foreground bg-muted px-1 rounded">eosio.null</code>, and other portions may be directed to ecosystem functions such as xCHEESE liquidity provision, CHEESEPowerz, CHEESEBurner, or buyback mechanisms. WAX received from RAM sales is held by the contract as reserves and may be staked to generate vote rewards or kept liquid to fund future RAM purchases. These allocations are determined entirely by the contract and cannot be altered by CHEESEHub or any individual.
+              </p>
+              <p className="text-sm text-muted-foreground leading-relaxed mt-2">
+                Price quotes displayed in CHEESERam are estimates only. The contract uses a stored reference rate and a maximum deviation guard against live Alcor market rates, together with buy spreads, sell spreads, and a sell haircut. The actual rate applied on-chain may differ from the quoted rate due to market movement, pool depth changes, or the deviation guard selecting the reference rate. CHEESEHub does not set, guarantee, or control the price.
+              </p>
+              <p className="text-sm text-muted-foreground leading-relaxed mt-2">
+                CHEESERam is not a financial product, investment scheme, derivative, non-cash payment facility, or financial service. It is a utility function for acquiring and disposing of blockchain network resources (RAM). No return, profit, yield, or price appreciation is promised or implied. RAM is a consumable network resource and not an asset with guaranteed value or liquidity.
+              </p>
+              <p className="text-sm text-muted-foreground leading-relaxed mt-2">
+                Laws in your jurisdiction may classify activities involving digital assets, network resources, or token conversions as regulated financial products or services. CHEESERam is provided as a non-custodial utility only. You should consider whether CHEESERam could be a financial product or financial service in your jurisdiction and seek independent legal advice.
               </p>
             </div>
           </div>
