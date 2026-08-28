@@ -1,7 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useWax } from '@/context/WaxContext';
 import { waxRpcCall } from '@/lib/waxRpcFallback';
 import { formatBytes, parseStakedWeight, type AccountResources } from '@/components/wallet/WalletResources';
+
+/** Window event name used to tell every mounted ResourceGauges to re-fetch. */
+export const RESOURCE_GAUGES_REFRESH_EVENT = 'cheese:refresh-resource-gauges';
+
+/** Ask all mounted resource gauges to reload from the chain. */
+export function refreshResourceGauges() {
+  window.dispatchEvent(new Event(RESOURCE_GAUGES_REFRESH_EVENT));
+}
 
 function formatCpu(us: number): string {
   if (us < 1000) return `${us} µs`;
@@ -42,46 +50,46 @@ export function ResourceGauges() {
   const [resources, setResources] = useState<AccountResources | null>(null);
   const [ramPrice, setRamPrice] = useState<number | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!accountName) {
       setResources(null);
       return;
     }
-    let cancelled = false;
-
-    const load = async () => {
-      try {
-        const data = await waxRpcCall<AccountResources>('/v1/chain/get_account', { account_name: accountName });
-        if (cancelled) return;
-        setResources({
-          ram_quota: data.ram_quota || 0,
-          ram_usage: data.ram_usage || 0,
-          cpu_limit: data.cpu_limit || { used: 0, max: 0 },
-          net_limit: data.net_limit || { used: 0, max: 0 },
-          self_delegated_bandwidth: data.self_delegated_bandwidth,
-        });
-      } catch (error) {
-        console.error('Failed to fetch resources:', error);
+    try {
+      const data = await waxRpcCall<AccountResources>('/v1/chain/get_account', { account_name: accountName });
+      setResources({
+        ram_quota: data.ram_quota || 0,
+        ram_usage: data.ram_usage || 0,
+        cpu_limit: data.cpu_limit || { used: 0, max: 0 },
+        net_limit: data.net_limit || { used: 0, max: 0 },
+        self_delegated_bandwidth: data.self_delegated_bandwidth,
+      });
+    } catch (error) {
+      console.error('Failed to fetch resources:', error);
+    }
+    try {
+      const data = await waxRpcCall<{ rows: Array<{ quote: { balance: string }; base: { balance: string } }> }>(
+        '/v1/chain/get_table_rows',
+        { code: 'eosio', scope: 'eosio', table: 'rammarket', limit: 1, json: true }
+      );
+      if (data.rows?.[0]) {
+        const quote = parseFloat(data.rows[0].quote.balance.replace(' WAX', ''));
+        const base = parseFloat(data.rows[0].base.balance.replace(' RAM', ''));
+        setRamPrice(quote / base);
       }
-      try {
-        const data = await waxRpcCall<{ rows: Array<{ quote: { balance: string }; base: { balance: string } }> }>(
-          '/v1/chain/get_table_rows',
-          { code: 'eosio', scope: 'eosio', table: 'rammarket', limit: 1, json: true }
-        );
-        if (cancelled) return;
-        if (data.rows?.[0]) {
-          const quote = parseFloat(data.rows[0].quote.balance.replace(' WAX', ''));
-          const base = parseFloat(data.rows[0].base.balance.replace(' RAM', ''));
-          setRamPrice(quote / base);
-        }
-      } catch (error) {
-        console.error('Failed to fetch RAM price:', error);
-      }
-    };
-
-    load();
-    return () => { cancelled = true; };
+    } catch (error) {
+      console.error('Failed to fetch RAM price:', error);
+    }
   }, [accountName]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Re-fetch whenever a buy/sell/powerup transaction completes anywhere in the app.
+  useEffect(() => {
+    const handler = () => { load(); };
+    window.addEventListener(RESOURCE_GAUGES_REFRESH_EVENT, handler);
+    return () => window.removeEventListener(RESOURCE_GAUGES_REFRESH_EVENT, handler);
+  }, [load]);
 
   if (!accountName || !resources) return null;
 
