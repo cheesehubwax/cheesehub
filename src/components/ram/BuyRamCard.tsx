@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { CheeseInput } from '@/components/powerup/CheeseInput';
 import { RecipientInput } from '@/components/powerup/RecipientInput';
 import { TermsDialog } from '@/components/shared/TermsDialog';
@@ -14,8 +16,10 @@ import {
   CHEESE_RAM_CONTRACT,
   CHEESE_TOKEN_CONTRACT,
   estimateBytesForCheese,
+  estimateCheeseForTargetBytes,
   type CheeseRamConfig,
 } from '@/lib/cheeseRam';
+import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 
 interface BuyRamCardProps {
@@ -24,13 +28,17 @@ interface BuyRamCardProps {
   onComplete?: () => void;
 }
 
+type BuyMode = 'cheese' | 'bytes';
+
 const isValidAccount = (account: string) =>
   !!account && account.length <= 12 && /^[a-z1-5.]+$/.test(account);
 
 export function BuyRamCard({ config, pricePerByte, onComplete }: BuyRamCardProps) {
   const { session, isConnected, accountName, cheeseBalance, login, refreshBalance } = useWax();
   const { showSuccess } = useTransactionSuccess();
+  const [mode, setMode] = useState<BuyMode>('cheese');
   const [amount, setAmount] = useState('');
+  const [bytesInput, setBytesInput] = useState('');
   const [recipient, setRecipient] = useState(accountName || '');
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [isTransacting, setIsTransacting] = useState(false);
@@ -39,7 +47,17 @@ export function BuyRamCard({ config, pricePerByte, onComplete }: BuyRamCardProps
     if (accountName) setRecipient(accountName);
   }, [accountName]);
 
-  const cheese = parseFloat(amount) || 0;
+  const desiredBytes = Math.floor(parseFloat(bytesInput) || 0);
+
+  // In bytes mode the CHEESE spend is derived from the target byte amount
+  // (rounded up to token precision so the contract can cover the request).
+  const cheese = useMemo(() => {
+    if (mode === 'cheese') return parseFloat(amount) || 0;
+    const derived = estimateCheeseForTargetBytes(desiredBytes, config, pricePerByte);
+    if (!derived) return 0;
+    return Math.ceil(derived.cheese * 10000) / 10000;
+  }, [mode, amount, desiredBytes, config, pricePerByte]);
+
   const estimate = estimateBytesForCheese(cheese, config, pricePerByte);
   const minCheese = config?.minCheese ?? 0;
   const maxCheese = config?.maxCheese ?? 0;
@@ -47,6 +65,7 @@ export function BuyRamCard({ config, pricePerByte, onComplete }: BuyRamCardProps
   const aboveMax = cheese > 0 && maxCheese > 0 && cheese > maxCheese;
   const insufficient = cheese > cheeseBalance;
   const buyDisabled = config ? !config.enabled : false;
+  const missingPrice = mode === 'bytes' && desiredBytes > 0 && cheese === 0;
 
   const canSubmit =
     !isTransacting &&
@@ -57,6 +76,7 @@ export function BuyRamCard({ config, pricePerByte, onComplete }: BuyRamCardProps
     !aboveMax &&
     !insufficient &&
     isValidAccount(recipient);
+
 
   const handleBuy = async () => {
     if (!isConnected || !session) {
@@ -98,6 +118,7 @@ export function BuyRamCard({ config, pricePerByte, onComplete }: BuyRamCardProps
         txId,
       );
       setAmount('');
+      setBytesInput('');
       setTermsAgreed(false);
       refreshBalance?.();
       onComplete?.();
@@ -123,25 +144,99 @@ export function BuyRamCard({ config, pricePerByte, onComplete }: BuyRamCardProps
         </h2>
       </div>
 
-      <CheeseInput
-        value={amount}
-        onChange={setAmount}
-        balance={cheeseBalance}
-        label="You spend"
-      />
+      {/* Input mode switch — spend CHEESE, or target a byte amount */}
+      <div className="inline-flex rounded-lg border border-border/50 bg-secondary/20 p-1 text-xs font-medium">
+        {([
+          { key: 'cheese' as BuyMode, label: 'Spend CHEESE' },
+          { key: 'bytes' as BuyMode, label: 'Target bytes' },
+        ]).map((opt) => (
+          <button
+            key={opt.key}
+            type="button"
+            onClick={() => setMode(opt.key)}
+            className={cn(
+              'px-3 py-1.5 rounded-md transition-colors',
+              mode === opt.key
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
+      {mode === 'cheese' ? (
+        <CheeseInput
+          value={amount}
+          onChange={setAmount}
+          balance={cheeseBalance}
+          label="You spend"
+        />
+      ) : (
+        <div className="rounded-xl p-4 bg-card border border-border/50 space-y-3">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="ram-target-bytes" className="text-sm font-medium">
+              RAM you want (bytes)
+            </Label>
+            <span className="text-sm text-muted-foreground">
+              Balance:{' '}
+              <span className="text-foreground font-mono">
+                {cheeseBalance.toLocaleString(undefined, {
+                  minimumFractionDigits: 4,
+                  maximumFractionDigits: 4,
+                })}
+              </span>{' '}
+              CHEESE
+            </span>
+          </div>
+          <Input
+            id="ram-target-bytes"
+            type="number"
+            min="0"
+            step="1"
+            inputMode="numeric"
+            placeholder="e.g. 10240"
+            value={bytesInput}
+            onChange={(e) => setBytesInput(e.target.value)}
+            className="font-mono"
+          />
+          <div className="flex flex-wrap gap-2">
+            {[1024, 10240, 102400, 1048576].map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => setBytesInput(String(preset))}
+                className="px-2 py-1 rounded-md border border-border/50 text-[11px] text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
+              >
+                {formatBytes(preset)}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">CHEESE required</span>
+            <span className="font-mono font-bold text-primary">
+              {cheese > 0 ? `${cheese.toFixed(4)} CHEESE` : '-'}
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
         <span>
           Limits: {minCheese.toFixed(4)} – {maxCheese.toFixed(4)} CHEESE
         </span>
-        <button
-          type="button"
-          onClick={() => setAmount(Math.min(cheeseBalance, maxCheese || cheeseBalance).toFixed(4))}
-          className="text-primary hover:underline font-medium"
-        >
-          Max
-        </button>
+        {mode === 'cheese' && (
+          <button
+            type="button"
+            onClick={() => setAmount(Math.min(cheeseBalance, maxCheese || cheeseBalance).toFixed(4))}
+            className="text-primary hover:underline font-medium"
+          >
+            Max
+          </button>
+        )}
       </div>
+
 
       <RecipientInput value={recipient} onChange={setRecipient} defaultAccount={accountName || ''} />
 
@@ -176,6 +271,10 @@ export function BuyRamCard({ config, pricePerByte, onComplete }: BuyRamCardProps
         <p className="text-xs text-destructive">Maximum purchase is {maxCheese.toFixed(4)} CHEESE.</p>
       )}
       {insufficient && <p className="text-xs text-destructive">Insufficient CHEESE balance.</p>}
+      {missingPrice && (
+        <p className="text-xs text-destructive">Waiting for live RAM pricing — try again in a moment.</p>
+      )}
+
       {buyDisabled && (
         <p className="text-xs text-destructive">RAM purchases are currently disabled by the contract.</p>
       )}
