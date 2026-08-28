@@ -109,7 +109,7 @@ const Ram = () => {
 
       <main className="container pb-12 flex flex-col items-center gap-8">
         <LiquidReservesPanel reserves={reserves} />
-        <RamPricePanel cheesePerKb={cheesePerKb} waxPerKb={waxPerKb} history={history} />
+        <RamPricePanel cheesePerKb={cheesePerKb} pricePerByte={pricePerByte} history={history} />
 
         <Tabs defaultValue="buy" className="w-full max-w-lg">
 
