@@ -113,8 +113,17 @@ export async function fetchCheeseRamStats(): Promise<CheeseRamStats | null> {
     totalBytesSoldBack: Number(row.total_bytes_sold_back ?? 0),
     totalCheesePaidOut: parseAsset(row.total_cheese_paid_out as string),
     totalWaxReceived: parseAsset(row.total_wax_received as string),
+    totalCheeseDeposited: parseAsset(row.total_cheese_deposited as string),
     totalCheeseNulled: parseAsset(row.total_cheese_burned as string),
+    totalCheeseToXcheese: parseAsset(row.total_cheese_to_xcheese as string),
     totalWaxStaked: parseAsset(row.total_wax_staked as string),
+    totalWaxToPowerz: parseAsset(row.total_wax_to_powerz as string),
+    totalWaxToBurner: parseAsset(row.total_wax_to_burner as string),
+    totalWaxToBuyback: parseAsset(row.total_wax_to_buyback as string),
+    totalCheeseBuyback: parseAsset(row.total_cheese_buyback as string),
+    totalWaxClaimed: parseAsset(row.total_wax_claimed as string),
+    lastClaimAttempt: Number(row.last_claim_attempt ?? 0),
+    claimPending: Number(row.claim_pending ?? 0),
   };
 }
 
