@@ -258,5 +258,3 @@ export function estimateCheeseForBytes(
   return { waxValue, cheese };
 }
 
-  return { waxValue, cheese };
-}
