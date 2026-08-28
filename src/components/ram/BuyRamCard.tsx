@@ -271,6 +271,10 @@ export function BuyRamCard({ config, pricePerByte, onComplete }: BuyRamCardProps
         <p className="text-xs text-destructive">Maximum purchase is {maxCheese.toFixed(4)} CHEESE.</p>
       )}
       {insufficient && <p className="text-xs text-destructive">Insufficient CHEESE balance.</p>}
+      {missingPrice && (
+        <p className="text-xs text-destructive">Waiting for live RAM pricing — try again in a moment.</p>
+      )}
+
       {buyDisabled && (
         <p className="text-xs text-destructive">RAM purchases are currently disabled by the contract.</p>
       )}
