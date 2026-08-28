@@ -8,6 +8,7 @@ import { RamStatsBar } from '@/components/ram/RamStatsBar';
 import { LiquidReservesPanel } from '@/components/ram/LiquidReservesPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useWax } from '@/context/WaxContext';
+import { useCheesePriceData } from '@/hooks/useCheesePriceData';
 import {
   useAccountRam,
   useCheeseRamConfig,
@@ -27,8 +28,11 @@ const Ram = () => {
   const { data: reserves, refetch: refetchReserves } = useCheeseRamReserves();
   const { pricePerByte, cheesePerKb, history } = useRamPrice();
   const { data: accountRam, refetch: refetchAccountRam } = useAccountRam(accountName);
+  const { data: cheesePrice } = useCheesePriceData();
 
+  const liveWaxPerCheese = cheesePrice?.waxPrice && cheesePrice.waxPrice > 0 ? cheesePrice.waxPrice : null;
   const availableBytes = accountRam ? Math.max(0, accountRam.quota - accountRam.usage) : 0;
+
 
   const handleComplete = () => {
     refetchStats();
