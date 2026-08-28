@@ -19,6 +19,7 @@ import {
 } from '@/hooks/useCheeseRam';
 import { CHEESE_RAM_CONTRACT } from '@/lib/cheeseRam';
 import cheeseRamOrb from '@/assets/cheeseram.png';
+import ramStickAsset from '@/assets/ram-stick.png.asset.json';
 import { playRandomFart } from '@/lib/fartSounds';
 
 
