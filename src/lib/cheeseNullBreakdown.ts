@@ -197,6 +197,7 @@ const NULL_CONTRACTS = [
   { account: 'cheeseburner', displayName: 'cheeseburner' },
   { account: 'cheesefeefee', displayName: 'cheesefeefee' },
   { account: 'cheesepowerz', displayName: 'cheesepowerz' },
+  { account: 'ram.chz', displayName: 'ram.chz' },
   { account: 'cheesebannad', displayName: 'cheesebannad' },
   { account: 'cheesenftwax', displayName: 'cheesenftwax' },
   { account: 'liquidcheese', displayName: 'Liquidity Fees' },
