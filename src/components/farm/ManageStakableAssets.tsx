@@ -396,11 +396,18 @@ export function ManageStakableAssets({ farm, open, onOpenChange, onSuccess }: Ma
                 })}
               </div>
 
+              {entryCount > 1 && (
+                <p className="text-xs text-primary">
+                  {entryCount} {entryNoun}s will be added in one transaction.
+                </p>
+              )}
+
               <TermsCheckbox id="terms-stakable-assets" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
-              <Button onClick={handleAdd} disabled={txLoading || !termsAgreed} className="w-full bg-primary text-primary-foreground">
+              <Button onClick={handleAdd} disabled={txLoading || !termsAgreed || entryCount === 0} className="w-full bg-primary text-primary-foreground">
                 {txLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
-                Add Stakable Asset
+                {entryCount > 1 ? `Add ${entryCount} Stakable Assets` : "Add Stakable Asset"}
               </Button>
+
             </div>
           </div>
         )}
