@@ -95,23 +95,53 @@ export function ManageStakableAssets({ farm, open, onOpenChange, onSuccess }: Ma
         return;
       }
 
-      let action: any;
+      const actions: any[] = [];
       if (farmType === 0) {
-        if (!newCollection) return;
-        action = buildSetCollectionValuesAction(accountName, farm.farm_name, newCollection, rewardValues);
+        const collections = parseEntries(newCollection);
+        if (!collections.length) {
+          toast({ title: "Error", description: "Enter at least one collection name", variant: "destructive" });
+          return;
+        }
+        chunkValues(collections).forEach(chunk =>
+          actions.push(buildSetCollectionValuesAction(accountName, farm.farm_name, chunk, rewardValues))
+        );
       } else if (farmType === 1) {
-        if (!newCollection || !newSchema) return;
-        action = buildSetSchemaValuesAction(accountName, farm.farm_name, newCollection, newSchema, rewardValues);
+        const schemas = parseEntries(newSchema);
+        if (!newCollection.trim() || !schemas.length) {
+          toast({ title: "Error", description: "Enter a collection and at least one schema name", variant: "destructive" });
+          return;
+        }
+        chunkValues(schemas).forEach(chunk =>
+          actions.push(buildSetSchemaValuesAction(accountName, farm.farm_name, newCollection.trim(), chunk, rewardValues))
+        );
       } else if (farmType === 2) {
-        if (!newCollection || !newTemplateId) return;
-        action = buildSetTemplateValuesAction(accountName, farm.farm_name, newCollection, parseInt(newTemplateId), rewardValues);
+        const rawIds = parseEntries(newTemplateId);
+        if (!newCollection.trim() || !rawIds.length) {
+          toast({ title: "Error", description: "Enter a collection and at least one template ID", variant: "destructive" });
+          return;
+        }
+        const invalid = rawIds.find(id => !/^\d+$/.test(id));
+        if (invalid) {
+          toast({ title: "Invalid Template ID", description: `"${invalid}" is not a valid template ID`, variant: "destructive" });
+          return;
+        }
+        const templateIds = rawIds.map(id => parseInt(id, 10));
+        chunkValues(templateIds).forEach(chunk =>
+          actions.push(buildSetTemplateValuesAction(accountName, farm.farm_name, newCollection.trim(), chunk, rewardValues))
+        );
       } else {
-        if (!newAttrName || !newAttrValue) return;
-        action = buildSetAttributeValuesAction(accountName, farm.farm_name, newAttrName, newAttrValue, rewardValues);
+        const attrValues = parseEntries(newAttrValue);
+        if (!newAttrName.trim() || !attrValues.length) {
+          toast({ title: "Error", description: "Enter an attribute name and at least one value", variant: "destructive" });
+          return;
+        }
+        chunkValues(attrValues).forEach(chunk =>
+          actions.push(buildSetAttributeValuesAction(accountName, farm.farm_name, newAttrName.trim(), chunk, rewardValues))
+        );
       }
 
-      const result = await executeTransaction([action], {
-        successTitle: "Stakable Asset Added!",
+      const result = await executeTransaction(actions, {
+        successTitle: entryCount > 1 ? `${entryCount} Stakable Assets Added!` : "Stakable Asset Added!",
       });
       if (result.success) {
         await loadConfig();
@@ -127,6 +157,7 @@ export function ManageStakableAssets({ farm, open, onOpenChange, onSuccess }: Ma
       setTxLoading(false);
     }
   };
+
 
   const handleErase = async (type: string, params: any) => {
     if (!accountName) return;
