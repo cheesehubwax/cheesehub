@@ -80,6 +80,18 @@ export function ManageStakableAssets({ farm, open, onOpenChange, onSuccess }: Ma
 
   const farmType = farm.farm_type; // 0=col, 1=sch, 2=tmp, 3=att
 
+  // How many stakable entries the current form will add in one transaction
+  const entryCount =
+    farmType === 0 ? parseEntries(newCollection).length
+    : farmType === 1 ? parseEntries(newSchema).length
+    : farmType === 2 ? parseEntries(newTemplateId).length
+    : parseEntries(newAttrValue).length;
+
+  const entryNoun =
+    farmType === 0 ? "collection" : farmType === 1 ? "schema" : farmType === 2 ? "template" : "value";
+
+
+
   const buildRewardValues = (): RewardValue[] => {
     return newRewardValues
       .filter(rv => rv.quantity && parseFloat(rv.quantity) > 0)
