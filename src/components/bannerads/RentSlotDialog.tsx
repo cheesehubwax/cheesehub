@@ -11,8 +11,7 @@ import { formatSlotDateUTC } from "./SlotCalendar";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 import { closeWharfkitModals, getTransactPlugins } from "@/lib/wharfKit";
 import { isDomainBlocked } from "@/lib/bannerBlocklist";
-import { Checkbox } from "@/components/ui/checkbox";
-import { TermsDialog } from "@/components/shared/TermsDialog";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 interface RentSlotDialogProps {
@@ -97,13 +96,7 @@ export function RentSlotDialog({ open, onOpenChange, startTime, position, waxPri
           <div className="rounded-lg bg-muted/50 p-3 text-sm"><p className="font-medium">{totalWax.toFixed(2)} WAX</p><p className="text-xs text-muted-foreground">{(waxPricePerDay * priceMultiplier).toFixed(2)} WAX × {numDays} day{numDays > 1 ? "s" : ""}</p>{isPromoz && <p className="text-xs font-medium mt-1" style={{color: 'hsl(142 71% 45%)'}}><OpenMojiIcon emoji="🧀" size={14} /> Promoz 50% discount applied</p>}</div>
           <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground"><p>Memo: <code className="text-foreground">{memo}</code></p></div>
         </div>
-        <div className="flex items-start gap-3 py-2">
-          <Checkbox id="terms-rent" checked={termsAgreed} onCheckedChange={(v) => setTermsAgreed(v === true)} className="mt-0.5" />
-          <label htmlFor="terms-rent" className="text-sm cursor-pointer leading-relaxed text-muted-foreground">
-           I have read the{" "}
-            <TermsDialog />
-          </label>
-        </div>
+        <TermsCheckbox id="terms-rent" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleRent} disabled={isSubmitting || !session || isDomainBlocked(websiteUrl) || !termsAgreed} className="bg-cheese hover:bg-cheese-dark text-primary-foreground">{isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Rent Slot</Button>

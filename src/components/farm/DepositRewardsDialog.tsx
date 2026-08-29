@@ -8,8 +8,7 @@ import { FarmInfo, buildAddRewardsAction } from "@/lib/farm";
 import { TokenLogo } from "@/components/TokenLogo";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
-import { Checkbox } from "@/components/ui/checkbox";
-import { TermsDialog } from "@/components/shared/TermsDialog";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface DepositRewardsDialogProps {
   farm: FarmInfo;
@@ -98,18 +97,7 @@ export function DepositRewardsDialog({ farm, open, onOpenChange, onSuccess, isCr
               </div>
             </div>
           ))}
-          <div className="flex items-start gap-3 pt-2">
-            <Checkbox
-              id="terms-deposit-rewards"
-              checked={termsAgreed}
-              onCheckedChange={(v) => setTermsAgreed(v === true)}
-              className="mt-0.5"
-            />
-            <label htmlFor="terms-deposit-rewards" className="text-sm cursor-pointer leading-relaxed text-muted-foreground">
-              I have read the <TermsDialog /> and understand that deposits to{" "}
-              <code className="text-foreground bg-muted px-1 rounded text-xs">farms.waxdao</code> are non-refundable.
-            </label>
-          </div>
+          <TermsCheckbox id="terms-deposit-rewards" checked={termsAgreed} onCheckedChange={setTermsAgreed} extraText="and understand that deposits to farms.waxdao are non-refundable." />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>

@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, ExternalLink, Package, RefreshCw } from 'lucide-react';
 import { useWax } from '@/context/WaxContext';
 import { useWaxTransaction } from '@/hooks/useWaxTransaction';
 import { useWojakPacks, useInvalidateWojakPacks, WojakPack } from '@/hooks/useWojakPacks';
 import { buildUnboxAction, WAXDAO_UNBOX_CONTRACT, WOJAK_UNBOX_POOL_ID, WOJAK_PACK_COLLECTION } from '@/lib/wojakUnbox';
 import { getImageUrl } from '@/services/atomicApi';
-import { TermsDialog } from '@/components/shared/TermsDialog';
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 import { toast } from 'sonner';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
@@ -186,18 +185,7 @@ export function WojakUnboxManager({ onTransactionComplete, onTransactionSuccess 
       )}
 
       {/* Terms gate */}
-      <div className="flex items-start gap-3 pt-2 border-t border-border">
-        <Checkbox
-          id="terms-wojak-unbox"
-          checked={termsAgreed}
-          onCheckedChange={(v) => setTermsAgreed(v === true)}
-          className="mt-0.5"
-        />
-        <label htmlFor="terms-wojak-unbox" className="text-sm cursor-pointer leading-relaxed text-muted-foreground">
-          I understand opening a pack permanently destroys it on-chain and I have read the{' '}
-          <TermsDialog />
-        </label>
-      </div>
+      <TermsCheckbox id="terms-wojak-unbox" checked={termsAgreed} onCheckedChange={setTermsAgreed} extraText="and understand opening a pack permanently destroys it on-chain." />
     </div>
   );
 }

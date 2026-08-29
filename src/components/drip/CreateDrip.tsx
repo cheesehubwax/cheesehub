@@ -11,8 +11,7 @@ import { Droplets, Calendar, AlertCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getTokenLogoUrl } from "@/lib/tokenLogos";
 import { setDripName } from "@/lib/dripNames";
-import { Checkbox } from "@/components/ui/checkbox";
-import { TermsDialog } from "@/components/shared/TermsDialog";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 import {
   Select,
   SelectContent,
@@ -416,13 +415,7 @@ export function CreateDrip() {
         </div>
 
         {/* Terms checkbox */}
-        <div className="flex items-start gap-3">
-          <Checkbox id="terms-drip" checked={termsAgreed} onCheckedChange={(v) => setTermsAgreed(v === true)} className="mt-0.5" />
-          <label htmlFor="terms-drip" className="text-sm cursor-pointer leading-relaxed text-muted-foreground">
-           I have read the{" "}
-            <TermsDialog />
-          </label>
-        </div>
+        <TermsCheckbox id="terms-drip" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
 
         {/* Submit Button */}
         <Button

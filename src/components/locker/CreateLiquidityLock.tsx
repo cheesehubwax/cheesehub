@@ -23,8 +23,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Lock, Calendar, AlertCircle, Droplets } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Checkbox } from "@/components/ui/checkbox";
-import { TermsDialog } from "@/components/shared/TermsDialog";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 
@@ -289,13 +288,7 @@ export function CreateLiquidityLock() {
           </div>
         </div>
 
-        <div className="flex items-start gap-3">
-          <Checkbox id="terms-liqlock" checked={termsAgreed} onCheckedChange={(v) => setTermsAgreed(v === true)} className="mt-0.5" />
-          <label htmlFor="terms-liqlock" className="text-sm cursor-pointer leading-relaxed text-muted-foreground">
-           I have read the{" "}
-            <TermsDialog />
-          </label>
-        </div>
+        <TermsCheckbox id="terms-liqlock" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
 
         <Button
           onClick={handleCreate}
