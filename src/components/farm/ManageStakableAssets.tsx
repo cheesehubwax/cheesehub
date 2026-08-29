@@ -21,6 +21,15 @@ import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useToast } from "@/hooks/use-toast";
 import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
+/** Split a free-form list (commas, spaces, new lines) into unique trimmed entries. */
+function parseEntries(input: string): string[] {
+  const parts = input
+    .split(/[\s,;]+/)
+    .map(p => p.trim())
+    .filter(Boolean);
+  return Array.from(new Set(parts));
+}
+
 
 interface ManageStakableAssetsProps {
   farm: FarmInfo;
