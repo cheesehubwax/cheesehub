@@ -14,6 +14,7 @@ import { useWax } from "@/context/WaxContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useState } from "react";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface DeleteDropDialogProps {
   dropId: number;
@@ -27,6 +28,7 @@ export function DeleteDropDialog({ dropId, dropName, open, onOpenChange }: Delet
   const queryClient = useQueryClient();
   const { executeTransaction } = useWaxTransaction(session);
   const [isLoading, setIsLoading] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
 
   const handleDelete = async () => {
     if (!accountName) return;
@@ -54,11 +56,12 @@ export function DeleteDropDialog({ dropId, dropName, open, onOpenChange }: Delet
             This action is irreversible and cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
+        <TermsCheckbox id="terms-delete-drop" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleDelete}
-            disabled={isLoading}
+            disabled={isLoading || !termsAgreed}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {isLoading ? "Deleting..." : "Delete Drop"}

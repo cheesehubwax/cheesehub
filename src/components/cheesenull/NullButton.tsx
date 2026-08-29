@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { useWax } from '@/context/WaxContext';
 import { useWaxTransaction } from '@/hooks/useWaxTransaction';
 import { Loader2 } from 'lucide-react';
+import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 
 interface NullButtonProps {
   disabled?: boolean;
@@ -12,10 +13,11 @@ interface NullButtonProps {
 export function NullButton({ disabled = false, onBurnSuccess }: NullButtonProps) {
   const [isPressed, setIsPressed] = useState(false);
   const [isTransacting, setIsTransacting] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const { session, isConnected } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
 
-  const isDisabled = disabled || !isConnected || isTransacting;
+  const isDisabled = disabled || !isConnected || isTransacting || !termsAgreed;
 
   const handleClick = async () => {
     if (isDisabled || !session) return;
@@ -64,6 +66,7 @@ export function NullButton({ disabled = false, onBurnSuccess }: NullButtonProps)
 
   return (
     <div className="flex flex-col items-center gap-2">
+      <TermsCheckbox id="terms-null" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
       <button
         onClick={handleClick}
         onMouseDown={() => !isDisabled && setIsPressed(true)}

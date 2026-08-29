@@ -15,6 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { fetchAllPools, buildCreateIncentiveActions, getNextIncentiveId, AlcorPool } from '@/lib/alcorFarms';
 import { useAllTokenBalances, TokenWithBalance } from '@/hooks/useAllTokenBalances';
+import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 
 interface CreateAlcorFarmDialogProps {
   open: boolean;
@@ -58,6 +59,7 @@ export function CreateAlcorFarmDialog({
 
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [pools, setPools] = useState<AlcorPool[]>([]);
   const [selectedPool, setSelectedPool] = useState<AlcorPool | null>(null);
   const [poolSearchOpen, setPoolSearchOpen] = useState(false);
@@ -458,6 +460,9 @@ export function CreateAlcorFarmDialog({
           </div>
         </ScrollArea>
 
+        <div className="pt-2">
+          <TermsCheckbox id="terms-create-alcor-farm" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
+        </div>
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
           <Button
             variant="outline"
@@ -468,7 +473,7 @@ export function CreateAlcorFarmDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!isValid || isSubmitting}
+            disabled={!isValid || isSubmitting || !termsAgreed}
             className="bg-cheese hover:bg-cheese-dark text-primary-foreground gap-2"
           >
             {isSubmitting ? (

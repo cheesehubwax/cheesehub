@@ -8,6 +8,7 @@ import { FarmInfo, buildWithdrawRewardsAction } from "@/lib/farm";
 import { TokenLogo } from "@/components/TokenLogo";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface WithdrawRewardsDialogProps {
   farm: FarmInfo;
@@ -20,6 +21,7 @@ export function WithdrawRewardsDialog({ farm, open, onOpenChange, onSuccess }: W
   const { accountName, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const [loading, setLoading] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [amounts, setAmounts] = useState<Record<number, string>>({});
 
   const handleWithdraw = async () => {
@@ -80,11 +82,12 @@ export function WithdrawRewardsDialog({ farm, open, onOpenChange, onSuccess }: W
             </div>
           ))}
         </div>
+        <TermsCheckbox id="terms-withdraw-rewards" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button
             onClick={handleWithdraw}
-            disabled={loading || Object.values(amounts).every(a => !a || parseFloat(a) <= 0)}
+            disabled={loading || Object.values(amounts).every(a => !a || parseFloat(a) <= 0) || !termsAgreed}
             className="bg-primary text-primary-foreground"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}

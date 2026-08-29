@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import { FarmInfo, buildOpenFarmAction } from "@/lib/farm";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 import { OpenMojiIcon } from "@/components/OpenMojiIcon";
 
 interface OpenFarmDialogProps {
@@ -22,6 +23,7 @@ export function OpenFarmDialog({ farm, open, onOpenChange, onSuccess }: OpenFarm
   const { accountName, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const [loading, setLoading] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [expirationDate, setExpirationDate] = useState<Date | undefined>(
     new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
   );
@@ -99,9 +101,10 @@ export function OpenFarmDialog({ farm, open, onOpenChange, onSuccess }: OpenFarm
             </p>
           )}
         </div>
+        <TermsCheckbox id="terms-open-farm" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleOpen} disabled={loading || !expirationDate} className="bg-green-600 hover:bg-green-700 text-white">
+          <Button onClick={handleOpen} disabled={loading || !expirationDate || !termsAgreed} className="bg-green-600 hover:bg-green-700 text-white">
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Open Farm
           </Button>

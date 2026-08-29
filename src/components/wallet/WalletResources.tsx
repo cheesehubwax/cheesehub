@@ -4,6 +4,7 @@ import { useWax } from '@/context/WaxContext';
 import { waxRpcCall } from '@/lib/waxRpcFallback';
 import { useWaxTransaction } from '@/hooks/useWaxTransaction';
 import { RefreshCw, Loader2 } from 'lucide-react';
+import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 
 
 /** eosio::refunds row, also returned inline by get_account as `refund_request`. */
@@ -109,6 +110,7 @@ export function WalletResources({ onResourcesUpdate, showTotalWaxBalance, waxUsd
   const [ramPrice, setRamPrice] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   // Coarse ticker: day/hour countdown needs no per-second updates.
   const [now, setNow] = useState(() => Date.now());
 
@@ -237,10 +239,13 @@ export function WalletResources({ onResourcesUpdate, showTotalWaxBalance, waxUsd
                 {!refundStatus.available && (
                   <span className="text-muted-foreground text-xs">ready in {refundStatus.timeLeft}</span>
                 )}
+                {refundStatus.available && !termsAgreed && (
+                  <TermsCheckbox id="terms-claim-refund" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
+                )}
                 <Button
                   size="sm"
                   onClick={handleClaimRefund}
-                  disabled={!refundStatus.available || isClaiming}
+                  disabled={!refundStatus.available || isClaiming || !termsAgreed}
                   title={refundStatus.available ? 'Claim your refund' : `Claimable in ${refundStatus.timeLeft}`}
                   className={`h-6 px-2 text-[11px] ${refundStatus.available
                     ? 'bg-green-600 hover:bg-green-500 text-white'

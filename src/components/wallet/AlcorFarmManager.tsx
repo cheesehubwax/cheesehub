@@ -16,6 +16,7 @@ import { IncreaseLiquidityDialog } from './IncreaseLiquidityDialog';
 import { CreateAlcorFarmDialog } from './CreateAlcorFarmDialog';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 
 interface AlcorFarmManagerProps {
   onTransactionComplete?: () => void;
@@ -80,6 +81,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
   const { data: tokenPrices } = useAlcorTokenPrices();
   const { data: waxUsdPrice = 0 } = useWaxPrice();
   const [isTransacting, setIsTransacting] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [expandedPosition, setExpandedPosition] = useState<number | null>(null);
   const [liveRewards, setLiveRewards] = useState<Map<string, number>>(new Map());
@@ -460,14 +462,15 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
             <Plus className="h-3 w-3" />Create Farm
           </Button>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <TermsCheckbox id="terms-alcor-farm-actions" checked={termsAgreed} onCheckedChange={setTermsAgreed} className="mr-auto" />
           {allExpiredIncentives.length > 0 && (
-            <Button size="sm" onClick={() => handleClaimUnstakeAllExpired(allExpiredIncentives)} disabled={isTransacting} className="h-8 px-3 text-xs bg-amber-600 hover:bg-amber-700 text-white gap-1.5">
+            <Button size="sm" onClick={() => handleClaimUnstakeAllExpired(allExpiredIncentives)} disabled={isTransacting || !termsAgreed} className="h-8 px-3 text-xs bg-amber-600 hover:bg-amber-700 text-white gap-1.5">
               {isTransacting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><LogOut className="h-3.5 w-3.5" />Claim & Unstake Ended ({allExpiredIncentives.length})</>}
             </Button>
           )}
           {totalStakeableCount > 0 && (
-            <Button size="sm" onClick={handleStakeAllUnstakedPositions} disabled={isTransacting} className="h-8 px-3 text-xs bg-green-600 hover:bg-green-700 text-white gap-1.5">
+            <Button size="sm" onClick={handleStakeAllUnstakedPositions} disabled={isTransacting || !termsAgreed} className="h-8 px-3 text-xs bg-green-600 hover:bg-green-700 text-white gap-1.5">
               {isTransacting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Zap className="h-3.5 w-3.5" />Stake All Positions ({totalStakeableCount})</>}
             </Button>
           )}
@@ -477,7 +480,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button size="sm" onClick={handleClaimAll} disabled={isTransacting} className="bg-cheese hover:bg-cheese-dark text-primary-foreground">
+                <Button size="sm" onClick={handleClaimAll} disabled={isTransacting || !termsAgreed} className="bg-cheese hover:bg-cheese-dark text-primary-foreground">
                   {isTransacting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Coins className="h-4 w-4 mr-1" />Claim All</>}
                 </Button>
               </TooltipTrigger>
@@ -525,7 +528,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
                       </div>
                     </div>
                     {position.unstakedIncentives.length > 0 && (
-                      <Button size="sm" onClick={(e) => { e.stopPropagation(); position.unstakedIncentives.length === 1 ? handleStakeToIncentive(position.positionId, position.unstakedIncentives[0]) : handleStakeAllIncentives(position.positionId, position.unstakedIncentives); }} disabled={isTransacting} className="h-7 px-3 text-xs bg-green-600 hover:bg-green-700 text-white animate-pulse">
+                      <Button size="sm" onClick={(e) => { e.stopPropagation(); position.unstakedIncentives.length === 1 ? handleStakeToIncentive(position.positionId, position.unstakedIncentives[0]) : handleStakeAllIncentives(position.positionId, position.unstakedIncentives); }} disabled={isTransacting || !termsAgreed} className="h-7 px-3 text-xs bg-green-600 hover:bg-green-700 text-white animate-pulse">
                         <Zap className="h-3 w-3 mr-1" />{position.unstakedIncentives.length === 1 ? 'Stake' : `Stake (${position.unstakedIncentives.length})`}
                       </Button>
                     )}
@@ -587,11 +590,11 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
 
                     <div className="flex items-center gap-2">
                       {allIncentivesExpired ? (
-                        <Button size="sm" onClick={() => handleUnstake(position.incentives)} disabled={isTransacting} className="h-8 px-3 text-xs bg-amber-600 hover:bg-amber-700 text-white">
+                        <Button size="sm" onClick={() => handleUnstake(position.incentives)} disabled={isTransacting || !termsAgreed} className="h-8 px-3 text-xs bg-amber-600 hover:bg-amber-700 text-white">
                           <LogOut className="h-3 w-3 mr-1" />Claim & Unstake
                         </Button>
                       ) : (
-                        <Button size="sm" onClick={() => handleClaimRewards(positionClaims)} disabled={isTransacting} className="h-8 px-3 text-xs bg-green-600 hover:bg-green-700 text-white">
+                        <Button size="sm" onClick={() => handleClaimRewards(positionClaims)} disabled={isTransacting || !termsAgreed} className="h-8 px-3 text-xs bg-green-600 hover:bg-green-700 text-white">
                           Claim
                         </Button>
                       )}
@@ -643,7 +646,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
                                     )}
                                   </div>
                                   {isExpiredInc && (
-                                    <Button size="sm" onClick={() => handleUnstakeSingle(incentive)} disabled={isTransacting} variant="outline" className="h-7 px-2 text-xs border-amber-500/50 text-amber-400 hover:bg-amber-500/10">
+                                    <Button size="sm" onClick={() => handleUnstakeSingle(incentive)} disabled={isTransacting || !termsAgreed} variant="outline" className="h-7 px-2 text-xs border-amber-500/50 text-amber-400 hover:bg-amber-500/10">
                                       <LogOut className="h-3 w-3 mr-1" />Claim & Unstake
                                     </Button>
                                   )}
@@ -665,7 +668,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
                                   <span className="font-medium">{incentive.rewardToken.symbol}</span>
                                   <span className="text-xs text-muted-foreground">#{incentive.incentiveId}</span>
                                 </div>
-                                <Button size="sm" onClick={() => handleStakeToIncentive(position.positionId, incentive)} disabled={isTransacting} className="h-7 px-3 text-xs bg-green-600 hover:bg-green-700">
+                                <Button size="sm" onClick={() => handleStakeToIncentive(position.positionId, incentive)} disabled={isTransacting || !termsAgreed} className="h-7 px-3 text-xs bg-green-600 hover:bg-green-700">
                                   <Zap className="h-3 w-3 mr-1" />Stake Position
                                 </Button>
                               </div>
@@ -678,7 +681,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
                         <Button size="sm" onClick={() => { const baseIncentive = position.incentives[0]; if (baseIncentive) setIncreaseLiquidityPosition({ ...baseIncentive, tickLower: position.tickLower, tickUpper: position.tickUpper }); }} disabled={isTransacting || (position.tickLower === 0 && position.tickUpper === 0)} className="flex-1 gap-1 bg-green-600 hover:bg-green-700 text-white">
                           <Plus className="h-3 w-3" />Increase Position
                         </Button>
-                        <Button size="sm" onClick={() => handleUnstake(position.incentives)} disabled={isTransacting} className="flex-1 bg-red-600 hover:bg-red-700 text-white">
+                        <Button size="sm" onClick={() => handleUnstake(position.incentives)} disabled={isTransacting || !termsAgreed} className="flex-1 bg-red-600 hover:bg-red-700 text-white">
                           Unstake from Farm
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => window.open(`https://wax.alcor.exchange/positions/${position.positionId}`, '_blank')} className="px-2">
@@ -736,11 +739,11 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
 
                     <div className="flex items-center gap-2">
                       {position.availableIncentives.length === 1 ? (
-                        <Button size="sm" onClick={() => handleStakeToIncentive(position.positionId, position.availableIncentives[0])} disabled={isTransacting} className="h-8 px-4 text-xs bg-green-600 hover:bg-green-700 text-white animate-pulse">
+                        <Button size="sm" onClick={() => handleStakeToIncentive(position.positionId, position.availableIncentives[0])} disabled={isTransacting || !termsAgreed} className="h-8 px-4 text-xs bg-green-600 hover:bg-green-700 text-white animate-pulse">
                           <Zap className="h-4 w-4 mr-1" />Stake Position
                         </Button>
                       ) : (
-                        <Button size="sm" onClick={() => handleStakeAllIncentives(position.positionId, position.availableIncentives)} disabled={isTransacting} className="h-8 px-4 text-xs bg-green-600 hover:bg-green-700 text-white animate-pulse">
+                        <Button size="sm" onClick={() => handleStakeAllIncentives(position.positionId, position.availableIncentives)} disabled={isTransacting || !termsAgreed} className="h-8 px-4 text-xs bg-green-600 hover:bg-green-700 text-white animate-pulse">
                           <Zap className="h-4 w-4 mr-1" />Stake All ({position.availableIncentives.length})
                         </Button>
                       )}
@@ -775,7 +778,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
                                 <span className="font-medium">{incentive.rewardToken.symbol}</span>
                                 <span className="text-xs text-muted-foreground">#{incentive.incentiveId}</span>
                               </div>
-                              <Button size="sm" variant="outline" onClick={() => handleStakeToIncentive(position.positionId, incentive)} disabled={isTransacting} className="h-6 px-2 text-xs">
+                              <Button size="sm" variant="outline" onClick={() => handleStakeToIncentive(position.positionId, incentive)} disabled={isTransacting || !termsAgreed} className="h-6 px-2 text-xs">
                                 <Zap className="h-3 w-3 mr-1" />Stake
                               </Button>
                             </div>

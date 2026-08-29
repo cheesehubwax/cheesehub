@@ -22,6 +22,7 @@ import { OpenMojiIcon } from "@/components/OpenMojiIcon";
 import { Badge } from "@/components/ui/badge";
 import { Lock, Unlock, RefreshCw, Clock, Droplets } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 export function MyLiquidityLocks() {
   const waxContext = useWax();
@@ -29,6 +30,7 @@ export function MyLiquidityLocks() {
   const [locks, setLocks] = useState<LiquidityLock[]>([]);
   const [loading, setLoading] = useState(false);
   const [claiming, setClaiming] = useState<number | null>(null);
+  const [termsAgreed, setTermsAgreed] = useState(false);
 
   const session = waxContext?.session ?? null;
   const accountName = waxContext?.accountName ?? null;
@@ -171,9 +173,11 @@ export function MyLiquidityLocks() {
                     {formatLiqUnlockTime(lock.unlock_time)}
                   </div>
                   {claimable && (
+                    <>
+                    <TermsCheckbox id={`terms-claim-liqlock-${lock.ID}`} checked={termsAgreed} onCheckedChange={setTermsAgreed} />
                     <Button
                       onClick={() => handleClaim(lock)}
-                      disabled={claiming === lock.ID}
+                      disabled={claiming === lock.ID || !termsAgreed}
                       className="w-full bg-cheese hover:bg-cheese-dark text-primary-foreground"
                     >
                       {claiming === lock.ID ? (
@@ -183,6 +187,7 @@ export function MyLiquidityLocks() {
                       )}
                       Claim LP Tokens
                     </Button>
+                    </>
                   )}
                 </CardContent>
               </Card>

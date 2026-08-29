@@ -13,6 +13,7 @@ import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 import { isDomainBlocked } from "@/lib/bannerBlocklist";
 import { formatSlotDateUTC } from "./SlotCalendar";
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface BulkEditBannerDialogProps {
   open: boolean;
@@ -28,6 +29,7 @@ export function BulkEditBannerDialog({ open, onOpenChange, slots, onRemoveSlot, 
   const [ipfsHash, setIpfsHash] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const previewUrl = ipfsHash ? `${IPFS_GATEWAYS[0]}${ipfsHash}` : "";
   const blocked = isDomainBlocked(websiteUrl);
 
@@ -146,11 +148,14 @@ export function BulkEditBannerDialog({ open, onOpenChange, slots, onRemoveSlot, 
           </div>
         </ScrollArea>
 
+        <div className="pt-2">
+          <TermsCheckbox id="terms-bulk-edit-banner" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
+        </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button
             onClick={handleSave}
-            disabled={isSubmitting || !session || blocked || !ipfsHash || slots.length === 0}
+            disabled={isSubmitting || !session || blocked || !ipfsHash || slots.length === 0 || !termsAgreed}
             className="bg-cheese hover:bg-cheese-dark text-primary-foreground"
           >
             {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

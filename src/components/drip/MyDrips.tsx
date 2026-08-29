@@ -25,6 +25,7 @@ import { TransactionSuccessDialog } from "@/components/wallet/TransactionSuccess
 import { getDripName, setDripName as saveDripName, getAllDripNames, importDripNames } from "@/lib/dripNames";
 import { Input } from "@/components/ui/input";
 import { useRef } from "react";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 export function MyDrips() {
   const { session, accountName, isConnected } = useWax();
@@ -317,6 +318,7 @@ function DripCard({
   // Countdown display
   const [countdown, setCountdown] = useState("");
   const [editingName, setEditingName] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [nameValue, setNameValue] = useState(() => getDripName(accountName, drip.ID));
 
   const handleSaveName = () => {
@@ -444,11 +446,12 @@ function DripCard({
         </p>
 
         {/* Actions */}
+        <TermsCheckbox id={`terms-drip-${drip.ID}`} checked={termsAgreed} onCheckedChange={setTermsAgreed} />
         <div className="flex gap-2">
           {role === "receiver" && status === "active" && claimable > 0 && onClaim && (
             <Button
               onClick={onClaim}
-              disabled={actionLoading}
+              disabled={actionLoading || !termsAgreed}
               className="flex-1 bg-green-600 hover:bg-green-700 text-white"
               size="sm"
             >
@@ -458,7 +461,7 @@ function DripCard({
           {role === "payer" && status === "active" && !isExpired && onCancel && (
             <Button
               onClick={onCancel}
-              disabled={actionLoading}
+              disabled={actionLoading || !termsAgreed}
               variant="destructive"
               className="flex-1"
               size="sm"
@@ -469,7 +472,7 @@ function DripCard({
           {role === "payer" && isExpired && status === "active" && onFinalize && (
             <Button
               onClick={onFinalize}
-              disabled={actionLoading}
+              disabled={actionLoading || !termsAgreed}
               className="flex-1 bg-cheese hover:bg-cheese-dark text-primary-foreground"
               size="sm"
             >

@@ -17,6 +17,7 @@ import {
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useToast } from "@/hooks/use-toast";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface ManageStakableAssetsProps {
   farm: FarmInfo;
@@ -31,6 +32,7 @@ export function ManageStakableAssets({ farm, open, onOpenChange, onSuccess }: Ma
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [txLoading, setTxLoading] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [config, setConfig] = useState<FarmStakableConfig | null>(null);
 
   // Add form state
@@ -295,7 +297,8 @@ export function ManageStakableAssets({ farm, open, onOpenChange, onSuccess }: Ma
                 })}
               </div>
 
-              <Button onClick={handleAdd} disabled={txLoading} className="w-full bg-primary text-primary-foreground">
+              <TermsCheckbox id="terms-stakable-assets" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
+              <Button onClick={handleAdd} disabled={txLoading || !termsAgreed} className="w-full bg-primary text-primary-foreground">
                 {txLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
                 Add Stakable Asset
               </Button>

@@ -7,6 +7,7 @@ import { fetchProposals, buildClaimVoteRamAction, Proposal } from "@/lib/dao";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useToast } from "@/hooks/use-toast";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface ClaimVoteRamProps {
   daoName: string;
@@ -20,6 +21,7 @@ export function ClaimVoteRam({ daoName }: ClaimVoteRamProps) {
   const [loading, setLoading] = useState(true);
   const [claiming, setClaiming] = useState<number | null>(null);
   const [claimed, setClaimed] = useState<Set<number>>(new Set());
+  const [termsAgreed, setTermsAgreed] = useState(false);
 
   useEffect(() => {
     fetchProposals(daoName).then(data => {
@@ -67,6 +69,7 @@ export function ClaimVoteRam({ daoName }: ClaimVoteRamProps) {
       <p className="text-sm text-muted-foreground">
         Reclaim RAM from your votes on ended proposals. This frees up WAX resources on your account.
       </p>
+      <TermsCheckbox id="terms-claim-vote-ram" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
       {proposals.map(p => (
         <Card key={p.proposal_id} className="bg-card/60 border-border/40">
           <CardContent className="p-3 flex items-center justify-between gap-3">
@@ -84,7 +87,7 @@ export function ClaimVoteRam({ daoName }: ClaimVoteRamProps) {
                 size="sm"
                 variant="outline"
                 onClick={() => handleClaim(p.proposal_id)}
-                disabled={claiming !== null}
+                disabled={claiming !== null || !termsAgreed}
               >
                 {claiming === p.proposal_id ? (
                   <Loader2 className="h-4 w-4 animate-spin" />

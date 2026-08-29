@@ -7,6 +7,7 @@ import { buildEditPropCostAction } from "@/lib/dao";
 import { ProposalFeeInput, ProposalFeeValue } from "@/components/dao/ProposalFeeInput";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface EditProposalCostProps {
   open: boolean;
@@ -20,6 +21,7 @@ export function EditProposalCost({ open, onOpenChange, daoName, currentCost, onU
   const { accountName, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const [loading, setLoading] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [feeToken, setFeeToken] = useState<ProposalFeeValue>(() => {
     const parts = currentCost.split(" ");
     const amount = parseFloat(parts[0]) || 0;
@@ -65,9 +67,10 @@ export function EditProposalCost({ open, onOpenChange, daoName, currentCost, onU
             </p>
           </div>
         </div>
+        <TermsCheckbox id="terms-edit-proposal-cost" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} disabled={loading}>
+          <Button onClick={handleSave} disabled={loading || !termsAgreed}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update Cost"}
           </Button>
         </DialogFooter>

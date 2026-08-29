@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { fetchWithFallback } from '@/lib/fetchWithFallback';
 import { cn } from '@/lib/utils';
 import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
+import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 
 const WAX_ENDPOINTS = ['https://wax.eosusa.io', 'https://api.wax.alohaeos.com', 'https://wax.cryptolions.io'];
 
@@ -22,6 +23,7 @@ interface GbmGlobalState {
 export function VoteRewardsManager({ onTransactionComplete, onTransactionSuccess }: VoteRewardsManagerProps) {
   const { session, accountName } = useWax();
   const [isTransacting, setIsTransacting] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [hasVoted, setHasVoted] = useState(false);
   const [canClaim, setCanClaim] = useState(false);
@@ -253,9 +255,10 @@ export function VoteRewardsManager({ onTransactionComplete, onTransactionSuccess
             </div>
           </div>
 
+          <TermsCheckbox id="terms-claim-vote-rewards" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
           <Button
             onClick={handleClaimVote}
-            disabled={isTransacting || !hasVoted || !canClaim}
+            disabled={isTransacting || !hasVoted || !canClaim || !termsAgreed}
             className={cn(
               "w-full text-primary-foreground",
               canClaim ? "bg-primary hover:bg-primary/90" : "bg-primary/50 cursor-not-allowed"

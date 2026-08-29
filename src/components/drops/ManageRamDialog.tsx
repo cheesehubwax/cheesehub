@@ -13,11 +13,13 @@ import { fetchUserCollections } from "@/services/atomicApi";
 import { useQuery } from "@tanstack/react-query";
 import { buildDepositRamActions, buildWithdrawRamActions, fetchCollectionRamBalance, type RamBalance } from "@/lib/drops";
 import { WAX_CHAIN } from "@/lib/waxConfig";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 export function ManageRamDialog() {
   const { session, isConnected } = useWax();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [selectedCollection, setSelectedCollection] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
   const [withdrawBytes, setWithdrawBytes] = useState("");
@@ -142,7 +144,8 @@ export function ManageRamDialog() {
                 </div>
                 <Input type="number" placeholder="e.g. 20" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} min="0" step="0.00000001" />
               </div>
-              <Button onClick={handleDeposit} disabled={loading || !selectedCollection || !depositAmount} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+              <TermsCheckbox id="terms-ram-deposit" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
+              <Button onClick={handleDeposit} disabled={loading || !selectedCollection || !depositAmount || !termsAgreed} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
                 {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Depositing...</> : <><Download className="h-4 w-4 mr-2" />Deposit RAM</>}
               </Button>
             </TabsContent>
@@ -154,7 +157,8 @@ export function ManageRamDialog() {
                   <Button type="button" variant="outline" size="sm" onClick={() => setWithdrawBytes(ramBalance?.bytes.toString() || "")} disabled={!ramBalance || ramBalance.bytes === 0} className="px-3">Max</Button>
                 </div>
               </div>
-              <Button onClick={handleWithdraw} disabled={loading || !selectedCollection || !withdrawBytes || !ramBalance || ramBalance.bytes === 0} variant="outline" className="w-full">
+              <TermsCheckbox id="terms-ram-withdraw" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
+              <Button onClick={handleWithdraw} disabled={loading || !selectedCollection || !withdrawBytes || !ramBalance || ramBalance.bytes === 0 || !termsAgreed} variant="outline" className="w-full">
                 {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Withdrawing...</> : <><Upload className="h-4 w-4 mr-2" />Withdraw RAM</>}
               </Button>
             </TabsContent>

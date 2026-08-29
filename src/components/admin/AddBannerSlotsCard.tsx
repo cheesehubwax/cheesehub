@@ -12,6 +12,7 @@ import { format, eachDayOfInterval, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useWax } from '@/context/WaxContext';
 import { useWaxTransaction } from '@/hooks/useWaxTransaction';
+import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 
 export function AddBannerSlotsCard() {
   const { session, accountName } = useWax();
@@ -21,6 +22,7 @@ export function AddBannerSlotsCard() {
   const [endDate, setEndDate] = useState<Date>();
   const [positions, setPositions] = useState(2);
   const [submitting, setSubmitting] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
 
   const slots = useMemo(() => {
     if (!startDate || !endDate || endDate < startDate) return [];
@@ -140,9 +142,10 @@ export function AddBannerSlotsCard() {
           </div>
         )}
 
+        <TermsCheckbox id="terms-add-banner-slots" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
         <Button
           onClick={handleCreate}
-          disabled={submitting || slots.length === 0 || positions < 1}
+          disabled={submitting || slots.length === 0 || positions < 1 || !termsAgreed}
           className="w-full sm:w-auto"
         >
           {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
