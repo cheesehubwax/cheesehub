@@ -19,7 +19,7 @@ export function RamPricePanel({ cheesePerKb, pricePerByte, history }: RamPricePa
         <span className="text-sm font-medium text-foreground">Live RAM Price</span>
       </div>
 
-      {/* WAX price — own header + own graph (8 decimals, WAX per byte) */}
+      {/* WAX price — own header + own graph (8 decimals, WAX per KB) */}
       <div className="mb-3">
         <div className="flex items-center justify-between mb-1">
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -28,7 +28,7 @@ export function RamPricePanel({ cheesePerKb, pricePerByte, history }: RamPricePa
           </span>
           {pricePerByte !== null && (
             <span className="text-xs font-mono font-medium text-white whitespace-nowrap">
-              {pricePerByte.toFixed(8)} WAX/byte
+              {(pricePerByte * 1024).toFixed(8)} WAX/KB
             </span>
           )}
         </div>
@@ -47,14 +47,14 @@ export function RamPricePanel({ cheesePerKb, pricePerByte, history }: RamPricePa
                   content={({ active, payload }) =>
                     active && payload?.length ? (
                       <div className="bg-background/95 border border-border px-2 py-1 rounded text-xs font-mono text-white">
-                        {(payload[0].value as number).toFixed(8)} WAX/byte
+                        {(payload[0].value as number).toFixed(8)} WAX/KB
                       </div>
                     ) : null
                   }
                 />
                 <Area
                   type="monotone"
-                  dataKey="price"
+                  dataKey="waxPerKb"
                   stroke="#FFFFFF"
                   strokeWidth={1.5}
                   fill="url(#waxRamPriceGradient)"
