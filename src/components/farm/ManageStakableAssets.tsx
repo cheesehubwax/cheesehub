@@ -294,7 +294,23 @@ export function ManageStakableAssets({ farm, open, onOpenChange, onSuccess }: Ma
                 <Plus className="h-4 w-4" /> Add Stakable Asset
               </h4>
 
-              {(farmType === 0 || farmType === 1 || farmType === 2) && (
+              {farmType === 0 && (
+                <div>
+                  <Label className="text-xs">Collection Name(s)</Label>
+                  <Textarea
+                    value={newCollection}
+                    onChange={(e) => setNewCollection(e.target.value)}
+                    placeholder="mycollection, othercollect"
+                    rows={2}
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    One or more collection names, separated by commas or new lines.
+                  </p>
+                </div>
+              )}
+
+              {(farmType === 1 || farmType === 2) && (
                 <div>
                   <Label className="text-xs">Collection Name</Label>
                   <Input value={newCollection} onChange={(e) => setNewCollection(e.target.value)} placeholder="mycollection" />
@@ -303,30 +319,58 @@ export function ManageStakableAssets({ farm, open, onOpenChange, onSuccess }: Ma
 
               {farmType === 1 && (
                 <div>
-                  <Label className="text-xs">Schema Name</Label>
-                  <Input value={newSchema} onChange={(e) => setNewSchema(e.target.value)} placeholder="myschema" />
+                  <Label className="text-xs">Schema Name(s)</Label>
+                  <Textarea
+                    value={newSchema}
+                    onChange={(e) => setNewSchema(e.target.value)}
+                    placeholder="myschema, otherschema"
+                    rows={2}
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    One or more schema names, separated by commas or new lines.
+                  </p>
                 </div>
               )}
 
               {farmType === 2 && (
                 <div>
-                  <Label className="text-xs">Template ID</Label>
-                  <Input value={newTemplateId} onChange={(e) => setNewTemplateId(e.target.value)} placeholder="12345" type="number" />
+                  <Label className="text-xs">Template ID(s)</Label>
+                  <Textarea
+                    value={newTemplateId}
+                    onChange={(e) => setNewTemplateId(e.target.value)}
+                    placeholder="12345, 12346, 12350"
+                    rows={3}
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    One or more template IDs, separated by commas or new lines. All share the reward below.
+                  </p>
                 </div>
               )}
 
               {farmType === 3 && (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2">
                   <div>
                     <Label className="text-xs">Attribute Name</Label>
                     <Input value={newAttrName} onChange={(e) => setNewAttrName(e.target.value)} placeholder="rarity" />
                   </div>
                   <div>
-                    <Label className="text-xs">Attribute Value</Label>
-                    <Input value={newAttrValue} onChange={(e) => setNewAttrValue(e.target.value)} placeholder="legendary" />
+                    <Label className="text-xs">Attribute Value(s)</Label>
+                    <Textarea
+                      value={newAttrValue}
+                      onChange={(e) => setNewAttrValue(e.target.value)}
+                      placeholder="legendary, epic"
+                      rows={2}
+                      className="font-mono text-sm"
+                    />
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      One or more values, separated by commas or new lines.
+                    </p>
                   </div>
                 </div>
               )}
+
 
               {/* Reward values per pool */}
               <div className="space-y-2">
