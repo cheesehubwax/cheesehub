@@ -54,7 +54,7 @@ import {
 import { useFarmClaimTotals } from "@/hooks/useFarmClaimTotals";
 
 const TOKEN_LOGO_PLACEHOLDER = "/placeholder.svg";
-const IPFS_GATEWAY = "https://ipfs.io/ipfs/";
+const IPFS_GATEWAY = "https://gateway.pinata.cloud/ipfs/";
 
 interface NFTStakingProps {
   farm: FarmInfo;

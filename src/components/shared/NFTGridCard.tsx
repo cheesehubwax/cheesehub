@@ -4,8 +4,8 @@ import { Check, Loader2, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const IPFS_GATEWAYS = [
-  "https://ipfs.io/ipfs/",
   "https://gateway.pinata.cloud/ipfs/",
+  "https://ipfs.io/ipfs/",
   "https://cloudflare-ipfs.com/ipfs/",
   "https://dweb.link/ipfs/",
 ];
