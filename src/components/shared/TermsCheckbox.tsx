@@ -1,5 +1,6 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { TermsDialog } from "@/components/shared/TermsDialog";
+import { cn } from "@/lib/utils";
 
 interface TermsCheckboxProps {
   id?: string;
@@ -7,6 +8,7 @@ interface TermsCheckboxProps {
   onCheckedChange: (checked: boolean) => void;
   /** Extra sentence appended after the terms link, e.g. "and understand the CHEESE I spend is nulled forever." */
   extraText?: string;
+  className?: string;
 }
 
 /**
@@ -14,9 +16,9 @@ interface TermsCheckboxProps {
  * with the Terms of Use opening the TermsDialog. Pair with a state boolean and
  * gate the action button's `disabled` prop.
  */
-export function TermsCheckbox({ id = "terms-confirm", checked, onCheckedChange, extraText }: TermsCheckboxProps) {
+export function TermsCheckbox({ id = "terms-confirm", checked, onCheckedChange, extraText, className }: TermsCheckboxProps) {
   return (
-    <div className="flex items-start gap-2">
+    <div className={cn("flex items-start gap-2", className)}>
       <Checkbox
         id={id}
         checked={checked}
