@@ -14,7 +14,7 @@ import { getTransactPlugins } from "@/lib/wharfKit";
 import { fetchSingleTokenBalance } from "@/lib/waxRpcFallback";
 import type { TokenWithBalance } from "@/hooks/useAllTokenBalances";
 import { toast } from "sonner";
-import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
+
 
 interface CheeseSwapWidgetProps {
   defaultInputTicker?: string;
