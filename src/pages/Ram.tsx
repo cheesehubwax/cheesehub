@@ -80,7 +80,7 @@ const Ram = () => {
   return (
     <Layout>
       {/* Hero */}
-      <section className="relative py-20 overflow-hidden">
+      <section className="relative pt-20 pb-14 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
         <div className="container relative z-10">
           <div className="flex flex-col items-center gap-8">
@@ -112,7 +112,7 @@ const Ram = () => {
         </div>
       </section>
 
-      <main className="container pb-12 flex flex-col items-center gap-8">
+      <main className="container pb-12 flex flex-col items-center gap-6">
         <ResourceGauges />
         <LiquidReservesPanel reserves={reserves} />
         <RamPricePanel cheesePerKb={cheesePerKb} pricePerByte={pricePerByte} history={history} />
