@@ -20,7 +20,7 @@ import {
   type CheeseRamConfig,
 } from '@/lib/cheeseRam';
 import { cn } from '@/lib/utils';
-import ramStickAsset from '@/assets/ram-stick.png.asset.json';
+import ramStickAsset from '@/assets/ram-stick.png';
 import { Loader2 } from 'lucide-react';
 
 interface BuyRamCardProps {
