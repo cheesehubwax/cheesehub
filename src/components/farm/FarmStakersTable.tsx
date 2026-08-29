@@ -40,14 +40,10 @@ function Thumb({ assetId, meta }: { assetId: string; meta?: StakerAssetMeta }) {
           aria-label={`Asset ${assetId}`}
         >
           {img ? (
-            <img
+            <IpfsImage
               src={img}
               alt={meta?.name || `NFT ${assetId}`}
-              loading="lazy"
               className="w-full h-full object-cover"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).style.visibility = "hidden";
-              }}
             />
           ) : (
             <div className="w-full h-full" />
@@ -56,8 +52,9 @@ function Thumb({ assetId, meta }: { assetId: string; meta?: StakerAssetMeta }) {
       </HoverCardTrigger>
       <HoverCardContent className="w-56 p-2">
         {img && (
-          <img src={img} alt={meta?.name || assetId} className="w-full h-40 object-contain rounded mb-2 bg-muted" />
+          <IpfsImage src={img} alt={meta?.name || assetId} className="w-full h-40 object-contain rounded mb-2 bg-muted" />
         )}
+
         <p className="text-sm font-medium truncate">{meta?.name || `Asset ${assetId}`}</p>
         <p className="text-xs text-muted-foreground font-mono">#{assetId}</p>
         {meta?.mint && (
