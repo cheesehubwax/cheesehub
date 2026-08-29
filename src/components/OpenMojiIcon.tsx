@@ -110,6 +110,7 @@ export const openMojiMap: Record<string, string> = {
   "🧾": svg52,
   "📤": svg53,
   "🔁": svg54,
+  "ℹ": svg55,
 };
 
 export interface OpenMojiIconProps {
