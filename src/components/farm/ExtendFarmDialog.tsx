@@ -7,7 +7,6 @@ import { Loader2, AlertTriangle } from "lucide-react";
 import { FarmInfo, buildExtendFarmAction, calculateEffectiveBalance } from "@/lib/farm";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
-import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface ExtendFarmDialogProps {
   farm: FarmInfo;
@@ -22,7 +21,6 @@ export function ExtendFarmDialog({ farm, open, onOpenChange, onSuccess }: Extend
   const { accountName, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const [loading, setLoading] = useState(false);
-  const [termsAgreed, setTermsAgreed] = useState(false);
   const [newDate, setNewDate] = useState<Date | undefined>(
     farm.expiration > 0 ? new Date((farm.expiration + 30 * 86400) * 1000) : new Date(Date.now() + 60 * 86400 * 1000)
   );
@@ -125,10 +123,9 @@ export function ExtendFarmDialog({ farm, open, onOpenChange, onSuccess }: Extend
             </div>
           )}
         </div>
-        <TermsCheckbox id="terms-extend-farm" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleExtend} disabled={loading || !newDate || !termsAgreed} className="bg-primary text-primary-foreground">
+          <Button onClick={handleExtend} disabled={loading || !newDate} className="bg-primary text-primary-foreground">
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Extend Farm
           </Button>

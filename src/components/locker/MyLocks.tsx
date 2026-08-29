@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { Lock, Unlock, RefreshCw, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { TokenLogo } from "@/components/TokenLogo";
-import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 export function MyLocks() {
   const { session, accountName } = useWax();
@@ -17,7 +16,6 @@ export function MyLocks() {
   const [locks, setLocks] = useState<TokenLock[]>([]);
   const [loading, setLoading] = useState(false);
   const [claiming, setClaiming] = useState<number | null>(null);
-  const [termsAgreed, setTermsAgreed] = useState(false);
 
   const loadLocks = async () => {
     if (!session || !accountName) return;
@@ -155,10 +153,9 @@ export function MyLocks() {
                   </div>
                   {claimable && (
                     <>
-                    <TermsCheckbox id={`terms-claim-lock-${lock.ID}`} checked={termsAgreed} onCheckedChange={setTermsAgreed} />
                     <Button
                       onClick={() => handleClaim(lock)}
-                      disabled={claiming === lock.ID || !termsAgreed}
+                      disabled={claiming === lock.ID}
                       className="w-full bg-cheese hover:bg-cheese-dark text-primary-foreground"
                     >
                       {claiming === lock.ID ? (

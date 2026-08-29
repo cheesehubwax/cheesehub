@@ -11,7 +11,6 @@ import { cn } from "@/lib/utils";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useSquareGridRowHeight } from "@/hooks/useSquareGridRowHeight";
 import { NFTGridCard } from "@/components/shared/NFTGridCard";
-import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface UserNFTItem {
   asset_id: string;
@@ -40,7 +39,6 @@ export function TreasuryNFTDeposit({ daoName, onDeposited }: TreasuryNFTDepositP
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [depositing, setDepositing] = useState(false);
-  const [termsAgreed, setTermsAgreed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [collectionFilter, setCollectionFilter] = useState<string>("all");
@@ -328,10 +326,9 @@ export function TreasuryNFTDeposit({ daoName, onDeposited }: TreasuryNFTDepositP
         )}
       </div>
 
-      <TermsCheckbox id="terms-treasury-nft-deposit" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
       <Button
         onClick={handleDeposit}
-        disabled={depositing || selected.size === 0 || !termsAgreed}
+        disabled={depositing || selected.size === 0}
         className="w-full"
       >
         {depositing ? (

@@ -9,7 +9,6 @@ import { ChevronDown, Loader2 } from "lucide-react";
 import { FarmInfo, buildSetFarmProfileAction } from "@/lib/farm";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
-import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface EditFarmProfileProps {
   farm: FarmInfo;
@@ -22,7 +21,6 @@ export function EditFarmProfile({ farm, open, onOpenChange, onSuccess }: EditFar
   const { accountName, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const [loading, setLoading] = useState(false);
-  const [termsAgreed, setTermsAgreed] = useState(false);
   const [socialsOpen, setSocialsOpen] = useState(false);
 
   const [avatar, setAvatar] = useState(farm.profile?.avatar || "");
@@ -120,10 +118,9 @@ export function EditFarmProfile({ farm, open, onOpenChange, onSuccess }: EditFar
             </CollapsibleContent>
           </Collapsible>
         </div>
-        <TermsCheckbox id="terms-edit-farm-profile" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} disabled={loading || !termsAgreed} className="bg-primary text-primary-foreground">
+          <Button onClick={handleSave} disabled={loading} className="bg-primary text-primary-foreground">
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Save Profile
           </Button>

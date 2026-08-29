@@ -19,7 +19,6 @@ import {
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useToast } from "@/hooks/use-toast";
-import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 /** Split a free-form list (commas, spaces, new lines) into unique trimmed entries. */
 function parseEntries(input: string): string[] {
@@ -44,7 +43,6 @@ export function ManageStakableAssets({ farm, open, onOpenChange, onSuccess }: Ma
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [txLoading, setTxLoading] = useState(false);
-  const [termsAgreed, setTermsAgreed] = useState(false);
   const [config, setConfig] = useState<FarmStakableConfig | null>(null);
 
   // Add form state
@@ -402,8 +400,7 @@ export function ManageStakableAssets({ farm, open, onOpenChange, onSuccess }: Ma
                 </p>
               )}
 
-              <TermsCheckbox id="terms-stakable-assets" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
-              <Button onClick={handleAdd} disabled={txLoading || !termsAgreed || entryCount === 0} className="w-full bg-primary text-primary-foreground">
+              <Button onClick={handleAdd} disabled={txLoading || entryCount === 0} className="w-full bg-primary text-primary-foreground">
                 {txLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
                 {entryCount > 1 ? `Add ${entryCount} Stakable Assets` : "Add Stakable Asset"}
               </Button>

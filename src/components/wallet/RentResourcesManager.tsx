@@ -10,7 +10,6 @@ import { Loader2, Check, X, Zap, Cpu, Wifi } from 'lucide-react';
 import { toast } from 'sonner';
 import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
 import cheeseLogo from '@/assets/cheese-logo.png';
-import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 
 interface RentResourcesManagerProps {
   onTransactionComplete?: () => void;
@@ -25,7 +24,6 @@ function isValidWaxAccount(account: string): boolean {
 export function RentResourcesManager({ onTransactionComplete, onTransactionSuccess }: RentResourcesManagerProps) {
   const { session, accountName, cheeseBalance } = useWax();
   const [isTransacting, setIsTransacting] = useState(false);
-  const [termsAgreed, setTermsAgreed] = useState(false);
   const [receiver, setReceiver] = useState('');
   const [paymentMode, setPaymentMode] = useState<'cheese' | 'wax'>('cheese');
 
@@ -250,10 +248,9 @@ export function RentResourcesManager({ onTransactionComplete, onTransactionSucce
             </div>
           )}
 
-          <TermsCheckbox id="terms-rent-cheeseup" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
           <Button
             onClick={handleCheeseUp}
-            disabled={!canCheeseUp || !termsAgreed}
+            disabled={!canCheeseUp}
             className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             {isTransacting ? (
@@ -320,10 +317,9 @@ export function RentResourcesManager({ onTransactionComplete, onTransactionSucce
             </div>
           )}
 
-          <TermsCheckbox id="terms-rent-wax" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
           <Button
             onClick={() => handleWaxPowerup()}
-            disabled={!isValidReceiver || (waxCpuNum <= 0 && waxNetNum <= 0) || isTransacting || !termsAgreed}
+            disabled={!isValidReceiver || (waxCpuNum <= 0 && waxNetNum <= 0) || isTransacting}
             className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             {isTransacting ? (

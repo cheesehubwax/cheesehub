@@ -10,7 +10,6 @@ import { Loader2, ShieldAlert } from "lucide-react";
 import { BannerSlot } from "@/hooks/useBannerSlots";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 import { formatSlotDateUTC } from "./SlotCalendar";
-import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 function BannerPreview({ ipfsHash, label }: { ipfsHash: string; label: string }) {
   const [gatewayIdx, setGatewayIdx] = useState(0);
@@ -31,7 +30,6 @@ export function RemoveBannerDialog({ open, onOpenChange, slot, onSuccess }: Remo
   const { toast } = useToast();
   const [clearShared, setClearShared] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [termsAgreed, setTermsAgreed] = useState(false);
   const hasSharedRenter = slot.rentalType === "shared" && !!slot.sharedUser;
 
   const handleRemove = async () => {
@@ -74,10 +72,9 @@ export function RemoveBannerDialog({ open, onOpenChange, slot, onSuccess }: Remo
           )}
           <p className="text-xs text-muted-foreground">The slot will remain rented. Use <strong>Reinstate</strong> to allow the renter to re-upload after a community decision.</p>
         </div>
-        <TermsCheckbox id="terms-remove-banner" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleRemove} disabled={isSubmitting || !session || !termsAgreed} variant="destructive">{isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Remove Ad</Button>
+          <Button onClick={handleRemove} disabled={isSubmitting || !session} variant="destructive">{isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Remove Ad</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

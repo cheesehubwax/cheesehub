@@ -9,7 +9,6 @@ import { Loader2, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { AccountResources, parseWaxBalance, getRefundStatus, type RefundRequest } from './WalletResources';
 import { fetchWithFallback } from '@/lib/fetchWithFallback';
-import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 
 const WAX_ENDPOINTS = ['https://wax.greymass.com', 'https://api.wax.alohaeos.com', 'https://wax.eosphere.io'];
 
@@ -24,7 +23,6 @@ type RefundRow = RefundRequest;
 export function StakeManager({ resources, onTransactionComplete, onTransactionSuccess }: StakeManagerProps) {
   const { session, accountName } = useWax();
   const [isTransacting, setIsTransacting] = useState(false);
-  const [termsAgreed, setTermsAgreed] = useState(false);
   const [stakeReceiver, setStakeReceiver] = useState('');
   const [cpuStakeAmount, setCpuStakeAmount] = useState('');
   const [netStakeAmount, setNetStakeAmount] = useState('');
@@ -173,8 +171,7 @@ export function StakeManager({ resources, onTransactionComplete, onTransactionSu
           <Input type="number" placeholder="0" value={netStakeAmount} onChange={(e) => setNetStakeAmount(e.target.value)} min={0} step={0.00000001} />
           <PercentButtons type="net" />
         </div>
-        <TermsCheckbox id="terms-stake" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
-        <Button onClick={handleStake} disabled={!isValidReceiver || isTransacting || !termsAgreed || ((parseFloat(cpuStakeAmount) || 0) <= 0 && (parseFloat(netStakeAmount) || 0) <= 0)} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+        <Button onClick={handleStake} disabled={!isValidReceiver || isTransacting || ((parseFloat(cpuStakeAmount) || 0) <= 0 && (parseFloat(netStakeAmount) || 0) <= 0)} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
           {isTransacting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Staking...</> : 'Stake'}
         </Button>
       </TabsContent>
@@ -198,8 +195,7 @@ export function StakeManager({ resources, onTransactionComplete, onTransactionSu
           </div>
         </div>
         <p className="text-xs text-muted-foreground">Note: Unstaked WAX will be available after a 3-day refund period.</p>
-        <TermsCheckbox id="terms-unstake" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
-        <Button onClick={handleUnstake} disabled={isTransacting || !termsAgreed || ((parseFloat(cpuUnstakeAmount) || 0) <= 0 && (parseFloat(netUnstakeAmount) || 0) <= 0)} className="w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+        <Button onClick={handleUnstake} disabled={isTransacting || ((parseFloat(cpuUnstakeAmount) || 0) <= 0 && (parseFloat(netUnstakeAmount) || 0) <= 0)} className="w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground">
           {isTransacting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Unstaking...</> : 'Unstake'}
         </Button>
       </TabsContent>
@@ -212,8 +208,7 @@ export function StakeManager({ resources, onTransactionComplete, onTransactionSu
               <div className="flex justify-between text-sm"><span className="text-muted-foreground">Pending Refund:</span><span className="font-medium text-primary">{refundStatus.amount.toFixed(8)} WAX</span></div>
               {!refundStatus.available && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Available in:</span><span className="font-medium">{refundStatus.timeLeft}</span></div>}
             </div>
-            <TermsCheckbox id="terms-refund" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
-            <Button onClick={handleRefund} disabled={!refundStatus.available || isTransacting || !termsAgreed} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Button onClick={handleRefund} disabled={!refundStatus.available || isTransacting} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
               {isTransacting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Claiming...</> : refundStatus.available ? 'Claim Refund' : `Refund Available in ${refundStatus.timeLeft}`}
             </Button>
           </>
