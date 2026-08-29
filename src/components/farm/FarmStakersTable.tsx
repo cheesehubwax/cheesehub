@@ -10,6 +10,7 @@ import {
 import { Users, RefreshCw, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
 import { useFarmStakers, useStakerAssetMeta } from "@/hooks/useFarmStakers";
 import type { StakerAssetMeta } from "@/lib/farmStakers";
+import { IpfsImage } from "@/components/shared/IpfsImage";
 
 interface FarmStakersTableProps {
   farmName: string;
