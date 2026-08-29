@@ -7,6 +7,7 @@ import { fetchTableRows } from "./waxRpcFallback";
 import { fetchWithFallback } from "./fetchWithFallback";
 import { ATOMIC_API } from "./waxConfig";
 import { FARM_CONTRACT } from "./farm";
+import { IPFS_GATEWAYS } from "./ipfsGateways";
 
 export interface FarmStakerRow {
   user: string;
