@@ -7,6 +7,7 @@ import { SellRamCard } from '@/components/ram/SellRamCard';
 import { RamPricePanel } from '@/components/ram/RamPricePanel';
 import { RamStatsBar } from '@/components/ram/RamStatsBar';
 import { LiquidReservesPanel } from '@/components/ram/LiquidReservesPanel';
+import { RamInfoDropdown } from '@/components/ram/RamInfoDropdown';
 import { ResourceGauges, refreshResourceGauges } from '@/components/shared/ResourceGauges';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useWax } from '@/context/WaxContext';
