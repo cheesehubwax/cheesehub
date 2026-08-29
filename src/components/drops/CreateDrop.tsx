@@ -25,14 +25,12 @@ import { fetchUserCollections, fetchTemplateById } from "@/services/atomicApi";
 import { useQuery } from "@tanstack/react-query";
 import { TokenPriceInput } from "./TokenPriceInput";
 import { PremintNFTPicker } from "./PremintNFTPicker";
-import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 const IPFS_GATEWAY = 'https://ipfs.io/ipfs/';
 
 export function CreateDrop() {
   const { session, isConnected, login } = useWax();
   const [loading, setLoading] = useState(false);
-  const [termsAgreed, setTermsAgreed] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [templatePreview, setTemplatePreview] = useState<{
     name: string;
@@ -485,9 +483,8 @@ export function CreateDrop() {
             </CollapsibleContent>
           </Collapsible>
 
-          <TermsCheckbox id="terms-create-drop" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
 
-          <Button type="submit" disabled={loading || !termsAgreed} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+          <Button type="submit" disabled={loading} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
             {loading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating Drop...</>) : (<><Plus className="mr-2 h-4 w-4" />Create Drop</>)}
           </Button>
 

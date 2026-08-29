@@ -8,7 +8,6 @@ import { useWax } from '@/context/WaxContext';
 import { useWaxTransaction } from '@/hooks/useWaxTransaction';
 import { Loader2, Check, X, ShieldAlert } from 'lucide-react';
 import { KeyPairGenerator } from './KeyPairGenerator';
-import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 
 interface CreateAccountManagerProps {
   onTransactionComplete?: () => void;
@@ -39,7 +38,6 @@ export function CreateAccountManager({ onTransactionComplete, onTransactionSucce
   const [ramBytes, setRamBytes] = useState('3000');
   const [transfer, setTransfer] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [termsAgreed, setTermsAgreed] = useState(false);
   const [showKeyWarning, setShowKeyWarning] = useState(false);
   const nameValid = isValidWaxAccountName(newAccountName);
   const ownerKeyValid = isValidPublicKey(ownerKey);
@@ -100,8 +98,7 @@ export function CreateAccountManager({ onTransactionComplete, onTransactionSucce
         <Checkbox id="transfer-stake" checked={transfer} onCheckedChange={(checked) => setTransfer(checked === true)} />
         <Label htmlFor="transfer-stake" className="cursor-pointer text-sm">Transfer staked resources to new account</Label>
       </div>
-      <TermsCheckbox id="terms-create-account" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
-      <Button onClick={() => setShowKeyWarning(true)} disabled={!canSubmit || !termsAgreed} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+      <Button onClick={() => setShowKeyWarning(true)} disabled={!canSubmit} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
         {isCreating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating Account...</> : 'Create Account'}
       </Button>
 

@@ -16,8 +16,7 @@ import {
 import { Lock, Calendar, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getTokenLogoUrl } from "@/lib/tokenLogos";
-import { Checkbox } from "@/components/ui/checkbox";
-import { TermsDialog } from "@/components/shared/TermsDialog";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 const TOKEN_LOGO_PLACEHOLDER = '/placeholder.svg';
 
@@ -265,13 +264,7 @@ export function CreateLock() {
           </div>
         </div>
 
-        <div className="flex items-start gap-3">
-          <Checkbox id="terms-lock" checked={termsAgreed} onCheckedChange={(v) => setTermsAgreed(v === true)} className="mt-0.5" />
-          <label htmlFor="terms-lock" className="text-sm cursor-pointer leading-relaxed text-muted-foreground">
-           I have read the{" "}
-            <TermsDialog />
-          </label>
-        </div>
+        <TermsCheckbox id="terms-lock" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
 
         <Button
           onClick={handleCreate}

@@ -7,7 +7,6 @@ import { Loader2 } from "lucide-react";
 import { FarmInfo, buildEmptyFarmAction } from "@/lib/farm";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
-import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface EmptyFarmDialogProps {
   farm: FarmInfo;
@@ -20,7 +19,6 @@ export function EmptyFarmDialog({ farm, open, onOpenChange, onSuccess }: EmptyFa
   const { accountName, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const [loading, setLoading] = useState(false);
-  const [termsAgreed, setTermsAgreed] = useState(false);
 
   const handleEmpty = async () => {
     if (!accountName) return;
@@ -49,10 +47,9 @@ export function EmptyFarmDialog({ farm, open, onOpenChange, onSuccess }: EmptyFa
             This will retrieve all remaining reward tokens from the permanently closed farm and return them to your wallet.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <TermsCheckbox id="terms-empty-farm" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleEmpty} disabled={loading || !termsAgreed}>
+          <AlertDialogAction onClick={handleEmpty} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Empty Farm
           </AlertDialogAction>

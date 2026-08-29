@@ -8,8 +8,7 @@ import { useWax } from "@/context/WaxContext";
 import { usePurchaseDrop } from "@/hooks/usePurchaseDrop";
 import { useTransactionSuccess } from "@/context/TransactionSuccessContext";
 import { useToast } from "@/hooks/use-toast";
-import { Checkbox } from "@/components/ui/checkbox";
-import { TermsDialog } from "@/components/shared/TermsDialog";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 export function CartDrawer() {
   const { items, removeFromCart, clearCart, isOpen, setIsOpen, totalItems } = useCart();
@@ -86,13 +85,7 @@ export function CartDrawer() {
                   <p className="text-sm text-muted-foreground text-center">Connect wallet to purchase</p>
                 ) : (
                   <>
-                    <div className="flex items-start gap-3">
-                      <Checkbox id="terms-cart" checked={termsAgreed} onCheckedChange={(v) => setTermsAgreed(v === true)} className="mt-0.5" />
-                      <label htmlFor="terms-cart" className="text-sm cursor-pointer leading-relaxed text-muted-foreground">
-                        I have read the{" "}
-                        <TermsDialog />
-                      </label>
-                    </div>
+                    <TermsCheckbox id="terms-cart" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
                     <Button
                       className="w-full bg-primary text-primary-foreground"
                       onClick={handlePurchaseAll}

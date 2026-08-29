@@ -11,7 +11,6 @@ import { useWax } from '@/context/WaxContext';
 import { Loader2, Check, X, Users, Vote, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchTable } from '@/lib/wax';
-import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 
 interface Producer { owner: string; total_votes: string; producer_key: string; is_active: number; url: string; unpaid_blocks: number; last_claim_time: string; location: number; }
 interface ProxyVoter { owner: string; proxy: string; producers: string[]; staked: number; last_vote_weight: string; proxied_vote_weight: string; is_proxy: number; }
@@ -47,7 +46,6 @@ export function VoteManager({ onTransactionComplete, onTransactionSuccess }: Vot
   const [activeTab, setActiveTab] = useState<'validators' | 'proxies'>('validators');
   const [isLoading, setIsLoading] = useState(true);
   const [isVoting, setIsVoting] = useState(false);
-  const [termsAgreed, setTermsAgreed] = useState(false);
   const [producers, setProducers] = useState<Producer[]>([]);
   const [proxies, setProxies] = useState<ProxyVoter[]>([]);
   const [selectedProducers, setSelectedProducers] = useState<string[]>([]);
@@ -217,8 +215,7 @@ export function VoteManager({ onTransactionComplete, onTransactionSuccess }: Vot
           </ScrollArea>
         </TabsContent>
       </Tabs>
-      <TermsCheckbox id="terms-vote" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
-      <Button onClick={handleVote} disabled={!canVote || !termsAgreed} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50">
+      <Button onClick={handleVote} disabled={!canVote} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50">
         {isVoting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Submitting Vote...</> : <><Vote className="mr-2 h-4 w-4" />{activeTab === 'proxies' ? 'Set Proxy' : `Vote for ${selectedProducers.length} Validator(s)`}</>}
       </Button>
     </div>

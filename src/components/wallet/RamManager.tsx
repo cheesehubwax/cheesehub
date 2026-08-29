@@ -11,7 +11,6 @@ import { toast } from 'sonner';
 import { AccountResources, formatBytes } from './WalletResources';
 import { fetchWithFallback } from '@/lib/fetchWithFallback';
 import { AreaChart, Area, ResponsiveContainer, Tooltip, YAxis } from 'recharts';
-import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 
 const WAX_ENDPOINTS = ['https://wax.greymass.com', 'https://api.wax.alohaeos.com', 'https://wax.eosphere.io'];
 
@@ -26,7 +25,6 @@ interface PricePoint { time: number; price: number; }
 export function RamManager({ resources, onTransactionComplete, onTransactionSuccess }: RamManagerProps) {
   const { session, accountName } = useWax();
   const [isTransacting, setIsTransacting] = useState(false);
-  const [termsAgreed, setTermsAgreed] = useState(false);
   const [ramPricePerByte, setRamPricePerByte] = useState<number | null>(null);
   const [priceHistory, setPriceHistory] = useState<PricePoint[]>([]);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -138,8 +136,7 @@ export function RamManager({ resources, onTransactionComplete, onTransactionSucc
             {buyMode === 'wax' && buyAmount && <p className="text-xs text-muted-foreground">≈ {formatBytes(estimatedBytes)}</p>}
             {buyMode === 'bytes' && buyAmount && estimatedWaxCost && <p className="text-xs text-muted-foreground">≈ {estimatedWaxCost} WAX</p>}
           </div>
-          <TermsCheckbox id="terms-buy-ram-wallet" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
-          <Button onClick={handleBuyRam} disabled={!isValidReceiver || !buyAmount || isTransacting || !termsAgreed} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+          <Button onClick={handleBuyRam} disabled={!isValidReceiver || !buyAmount || isTransacting} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
             {isTransacting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Buying RAM...</> : 'Buy RAM'}
           </Button>
         </TabsContent>
@@ -161,8 +158,7 @@ export function RamManager({ resources, onTransactionComplete, onTransactionSucc
             {sellMode === 'bytes' && sellAmount && estimatedWaxReturn && <p className="text-xs text-muted-foreground">≈ {estimatedWaxReturn} WAX (after 0.5% fee)</p>}
             {sellMode === 'wax' && sellAmount && sellBytes > 0 && <p className="text-xs text-muted-foreground">≈ {formatBytes(sellBytes)} ({sellBytes.toLocaleString()} bytes)</p>}
           </div>
-          <TermsCheckbox id="terms-sell-ram-wallet" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
-          <Button onClick={handleSellRam} disabled={!sellAmount || sellBytes <= 0 || isTransacting || !termsAgreed} className="w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+          <Button onClick={handleSellRam} disabled={!sellAmount || sellBytes <= 0 || isTransacting} className="w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground">
             {isTransacting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Selling RAM...</> : 'Sell RAM'}
           </Button>
         </TabsContent>

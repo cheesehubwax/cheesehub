@@ -27,8 +27,7 @@ import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useToast } from "@/hooks/use-toast";
 import { FeePaymentSelector } from "@/components/shared/FeePaymentSelector";
-import { Checkbox } from "@/components/ui/checkbox";
-import { TermsDialog } from "@/components/shared/TermsDialog";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
@@ -753,13 +752,7 @@ export function CreateDao() {
           </p>
         </div>
 
-        <div className="flex items-start gap-3">
-          <Checkbox id="terms-dao" checked={termsAgreed} onCheckedChange={(v) => setTermsAgreed(v === true)} className="mt-0.5" />
-          <label htmlFor="terms-dao" className="text-sm cursor-pointer leading-relaxed text-muted-foreground">
-           I have read the{" "}
-            <TermsDialog />
-          </label>
-        </div>
+        <TermsCheckbox id="terms-dao" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
 
         {/* Submit */}
         <Button onClick={handleCreate} disabled={loading || !paymentMethod || !termsAgreed} className="w-full bg-primary text-primary-foreground" size="lg">

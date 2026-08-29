@@ -11,8 +11,7 @@ import {
 import { TokenLogo } from "@/components/TokenLogo";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { Loader2, ArrowDownToLine, Wallet } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
-import { TermsDialog } from "@/components/shared/TermsDialog";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface TreasuryDepositProps {
   daoName: string;
@@ -238,13 +237,7 @@ export function TreasuryDeposit({ daoName, onDeposited }: TreasuryDepositProps) 
         </span>
       </div>
 
-      <div className="flex items-start gap-3">
-        <Checkbox id="terms-treasury" checked={termsAgreed} onCheckedChange={(v) => setTermsAgreed(v === true)} className="mt-0.5" />
-        <label htmlFor="terms-treasury" className="text-sm cursor-pointer leading-relaxed text-muted-foreground">
-           I have read the{" "}
-            <TermsDialog />
-        </label>
-      </div>
+      <TermsCheckbox id="terms-treasury" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
 
       <Button
         onClick={handleDeposit}
