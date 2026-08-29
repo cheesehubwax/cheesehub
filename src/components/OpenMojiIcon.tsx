@@ -53,6 +53,7 @@ import svg51 from 'openmoji/color/svg/1F4BE.svg';
 import svg52 from 'openmoji/color/svg/1F9FE.svg';
 import svg53 from 'openmoji/color/svg/1F4E4.svg';
 import svg54 from 'openmoji/color/svg/1F501.svg';
+import svg55 from 'openmoji/color/svg/2139.svg';
 
 export const openMojiMap: Record<string, string> = {
   "🏠": svg1,
@@ -109,6 +110,7 @@ export const openMojiMap: Record<string, string> = {
   "🧾": svg52,
   "📤": svg53,
   "🔁": svg54,
+  "ℹ": svg55,
 };
 
 export interface OpenMojiIconProps {

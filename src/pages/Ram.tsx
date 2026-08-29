@@ -7,6 +7,7 @@ import { SellRamCard } from '@/components/ram/SellRamCard';
 import { RamPricePanel } from '@/components/ram/RamPricePanel';
 import { RamStatsBar } from '@/components/ram/RamStatsBar';
 import { LiquidReservesPanel } from '@/components/ram/LiquidReservesPanel';
+import { RamInfoDropdown } from '@/components/ram/RamInfoDropdown';
 import { ResourceGauges, refreshResourceGauges } from '@/components/shared/ResourceGauges';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useWax } from '@/context/WaxContext';
@@ -91,15 +92,17 @@ const Ram = () => {
             </div>
 
             <div className="text-center space-y-4">
-              <div className="flex items-center justify-center gap-2">
-                <img src={ramStickAsset.url} alt="RAM" className="h-7 w-auto object-contain" />
-                <h1 className="text-3xl md:text-4xl font-bold">
-                  <span className="text-cheese">CHEESE</span>
-                  <span className="text-foreground">Ram</span>
-                </h1>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
-                <img src={ramStickAsset.url} alt="RAM" className="h-7 w-auto object-contain" />
-              </div>
+              <RamInfoDropdown>
+                <div className="flex items-center justify-center gap-2">
+                  <img src={ramStickAsset.url} alt="RAM" className="h-7 w-auto object-contain" />
+                  <h1 className="text-3xl md:text-4xl font-bold">
+                    <span className="text-cheese">CHEESE</span>
+                    <span className="text-foreground">Ram</span>
+                  </h1>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
+                  <img src={ramStickAsset.url} alt="RAM" className="h-7 w-auto object-contain" />
+                </div>
+              </RamInfoDropdown>
               <p className="text-muted-foreground max-w-2xl mx-auto">
                 Buy RAM with $CHEESE and sell RAM for $CHEESE. The $CHEESE spent is nulled and used to fund x-CHEESE
               </p>
