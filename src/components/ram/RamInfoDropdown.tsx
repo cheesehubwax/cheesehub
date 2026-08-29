@@ -50,7 +50,7 @@ export const RamInfoDropdown = ({ children }: RamInfoDropdownProps) => {
       </div>
 
       <CollapsibleContent className="overflow-hidden">
-        <div className="mt-6 animate-collapsible-down">
+        <div className="mt-6">
           <div className="max-w-3xl mx-auto rounded-xl border border-cheese/20 bg-card/80 backdrop-blur-sm p-6 text-left shadow-[0_0_30px_rgba(234,179,8,0.08)]">
             <h2 className="text-xl font-bold text-cheese mb-1">How CHEESERam works</h2>
             <p className="text-sm text-muted-foreground mb-6">
