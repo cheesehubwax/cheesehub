@@ -1,13 +1,9 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { Button } from '@/components/ui/button';
 
 const sections = [
-  {
-    title: 'A RAM gateway for the CHEESE token on WAX.',
-    body: null,
-  },
   {
     title: 'Buy RAM with CHEESE',
     body: 'Send CHEESE to ram.chz. The contract values your CHEESE in WAX using the live Alcor CHEESE/WAX pool, minus a 0.5% spread, then spends that much WAX from its own liquid WAX reserve on eosio::buyram for the recipient.\n\nYour CHEESE is never sold to fund the RAM. It is split instead: 80% (plus any rounding remainder) goes to eosio.null and is gone forever, and 20% goes to xcheeseliqst for liquid staking.',
@@ -30,17 +26,22 @@ const sections = [
   },
 ];
 
-export const RamInfoDropdown = () => {
+interface RamInfoDropdownProps {
+  children: ReactNode;
+}
+
+export const RamInfoDropdown = ({ children }: RamInfoDropdownProps) => {
   const [open, setOpen] = useState(false);
 
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="w-full">
-      <div className="relative flex items-center justify-center">
+      <div className="relative inline-flex items-center justify-center">
+        {children}
         <CollapsibleTrigger asChild>
           <Button
             variant="ghost"
             size="sm"
-            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-[calc(100%+0.5rem)] flex items-center gap-1.5 text-cheese hover:text-cheese hover:bg-cheese/10 px-2 py-1 h-auto"
+            className="absolute left-[calc(100%+0.5rem)] top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-cheese hover:text-cheese hover:bg-cheese/10 px-2 py-1 h-auto whitespace-nowrap"
           >
             <OpenMojiIcon emoji="ℹ️" size={18} />
             <span className="text-xs font-semibold uppercase tracking-wide hidden sm:inline">Info</span>
@@ -52,16 +53,18 @@ export const RamInfoDropdown = () => {
         <div className="mt-6 animate-collapsible-down">
           <div className="max-w-3xl mx-auto rounded-xl border border-cheese/20 bg-card/80 backdrop-blur-sm p-6 text-left shadow-[0_0_30px_rgba(234,179,8,0.08)]">
             <h2 className="text-xl font-bold text-cheese mb-1">How CHEESERam works</h2>
-            <p className="text-sm text-muted-foreground mb-6">{sections[0].title}</p>
+            <p className="text-sm text-muted-foreground mb-6">
+              A RAM gateway for the CHEESE token on WAX.
+            </p>
 
             <div className="space-y-6">
-              {sections.slice(1).map((section, idx) => (
+              {sections.map((section, idx) => (
                 <div key={idx} className="space-y-2">
                   <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-cheese" />
                     {section.title}
                   </h3>
-                  {section.body?.split('\n\n').map((paragraph, pidx) => (
+                  {section.body.split('\n\n').map((paragraph, pidx) => (
                     <p key={pidx} className="text-sm text-muted-foreground leading-relaxed pl-3.5">
                       {paragraph}
                     </p>
