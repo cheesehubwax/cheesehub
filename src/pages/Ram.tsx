@@ -21,7 +21,7 @@ import {
 } from '@/hooks/useCheeseRam';
 import { CHEESE_RAM_CONTRACT } from '@/lib/cheeseRam';
 import cheeseRamOrb from '@/assets/cheeseram.png';
-import ramStickAsset from '@/assets/ram-stick.png.asset.json';
+import ramStickAsset from '@/assets/ram-stick.png';
 import { playRandomFart } from '@/lib/fartSounds';
 
 
@@ -94,13 +94,13 @@ const Ram = () => {
             <div className="text-center space-y-4">
               <RamInfoDropdown>
                 <div className="flex items-center justify-center gap-2">
-                  <img src={ramStickAsset.url} alt="RAM" className="h-7 w-auto object-contain" />
+                  <img src={ramStickAsset} alt="RAM" className="h-7 w-auto object-contain" />
                   <h1 className="text-3xl md:text-4xl font-bold">
                     <span className="text-cheese">CHEESE</span>
                     <span className="text-foreground">Ram</span>
                   </h1>
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
-                  <img src={ramStickAsset.url} alt="RAM" className="h-7 w-auto object-contain" />
+                  <img src={ramStickAsset} alt="RAM" className="h-7 w-auto object-contain" />
                 </div>
               </RamInfoDropdown>
               <p className="text-muted-foreground max-w-2xl mx-auto">
@@ -121,7 +121,7 @@ const Ram = () => {
 
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="buy" className="gap-2">
-              <img src={ramStickAsset.url} alt="RAM" className="h-4 w-auto object-contain" />
+              <img src={ramStickAsset} alt="RAM" className="h-4 w-auto object-contain" />
               Buy RAM
             </TabsTrigger>
             <TabsTrigger value="sell" className="gap-2">

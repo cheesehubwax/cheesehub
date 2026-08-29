@@ -20,7 +20,7 @@ import {
   type CheeseRamConfig,
 } from '@/lib/cheeseRam';
 import { cn } from '@/lib/utils';
-import ramStickAsset from '@/assets/ram-stick.png.asset.json';
+import ramStickAsset from '@/assets/ram-stick.png';
 import { Loader2 } from 'lucide-react';
 
 interface BuyRamCardProps {
@@ -144,7 +144,7 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
   return (
     <div className="rounded-2xl p-6 max-w-lg w-full bg-card border border-border/50 space-y-5">
       <div className="flex items-center gap-2">
-        <img src={ramStickAsset.url} alt="RAM" className="h-5 w-auto object-contain" />
+        <img src={ramStickAsset} alt="RAM" className="h-5 w-auto object-contain" />
         <h2 className="text-xl font-bold">
           <span className="text-cheese">Buy</span> <span className="text-foreground">RAM</span>
         </h2>
