@@ -16,7 +16,7 @@ import { fetchFarmStakers, fetchAssetsMetadata } from "./farmStakers";
 export const TEMPLATE_DISTRIBUTION_MAX = 50;
 export const TEMPLATE_FETCH_CONCURRENCY = 5;
 
-const IPFS_GATEWAY = "https://ipfs.io/ipfs/";
+const IPFS_GATEWAY = "https://gateway.pinata.cloud/ipfs/";
 
 function toImageUrl(img: string | undefined): string {
   if (!img) return "/placeholder.svg";

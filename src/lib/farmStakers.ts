@@ -7,6 +7,7 @@ import { fetchTableRows } from "./waxRpcFallback";
 import { fetchWithFallback } from "./fetchWithFallback";
 import { ATOMIC_API } from "./waxConfig";
 import { FARM_CONTRACT } from "./farm";
+import { IPFS_GATEWAYS } from "./ipfsGateways";
 
 export interface FarmStakerRow {
   user: string;
@@ -22,13 +23,15 @@ export interface StakerAssetMeta {
   mint: string;
 }
 
-const IPFS_GATEWAY = "https://ipfs.io/ipfs/";
+// Use the shared, reliability-ordered gateway list. The old hardcoded
+// ipfs.io gateway stopped responding, which broke every staker thumbnail.
+const IPFS_GATEWAY = IPFS_GATEWAYS[0];
 
 function toImageUrl(img: string | undefined): string {
   if (!img) return "/placeholder.svg";
   if (img.startsWith("http")) return img;
   if (img.startsWith("ipfs://")) return `${IPFS_GATEWAY}${img.replace("ipfs://", "")}`;
-  if (img.startsWith("Qm") || img.startsWith("bafy") || img.startsWith("bafk")) {
+  if (img.startsWith("Qm") || img.startsWith("baf")) {
     return `${IPFS_GATEWAY}${img}`;
   }
   return img;

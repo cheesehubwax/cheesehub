@@ -277,7 +277,7 @@ export function getIpfsUrl(hash: string): string {
   if (!hash) return "";
   if (hash.startsWith("http")) return hash;
   if (hash.startsWith("Qm") || hash.startsWith("bafy")) {
-    return `https://ipfs.io/ipfs/${hash}`;
+    return `https://gateway.pinata.cloud/ipfs/${hash}`;
   }
   return hash;
 }
