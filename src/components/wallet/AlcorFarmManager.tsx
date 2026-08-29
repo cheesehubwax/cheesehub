@@ -16,6 +16,7 @@ import { IncreaseLiquidityDialog } from './IncreaseLiquidityDialog';
 import { CreateAlcorFarmDialog } from './CreateAlcorFarmDialog';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 
 interface AlcorFarmManagerProps {
   onTransactionComplete?: () => void;
@@ -80,6 +81,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
   const { data: tokenPrices } = useAlcorTokenPrices();
   const { data: waxUsdPrice = 0 } = useWaxPrice();
   const [isTransacting, setIsTransacting] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [expandedPosition, setExpandedPosition] = useState<number | null>(null);
   const [liveRewards, setLiveRewards] = useState<Map<string, number>>(new Map());
@@ -460,7 +462,8 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
             <Plus className="h-3 w-3" />Create Farm
           </Button>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <TermsCheckbox id="terms-alcor-farm-actions" checked={termsAgreed} onCheckedChange={setTermsAgreed} className="mr-auto" />
           {allExpiredIncentives.length > 0 && (
             <Button size="sm" onClick={() => handleClaimUnstakeAllExpired(allExpiredIncentives)} disabled={isTransacting} className="h-8 px-3 text-xs bg-amber-600 hover:bg-amber-700 text-white gap-1.5">
               {isTransacting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><LogOut className="h-3.5 w-3.5" />Claim & Unstake Ended ({allExpiredIncentives.length})</>}

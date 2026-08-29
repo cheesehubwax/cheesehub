@@ -17,6 +17,7 @@ import { TokenLogo } from '@/components/TokenLogo';
 
 import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 
 interface IncreaseLiquidityDialogProps {
   open: boolean;
@@ -37,6 +38,7 @@ export function IncreaseLiquidityDialog({
   const [tokenBAmount, setTokenBAmount] = useState('');
   const [lastEditedToken, setLastEditedToken] = useState<'A' | 'B' | null>(null);
   const [isTransacting, setIsTransacting] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const tokenABalance = useMemo(() => {
@@ -308,9 +310,10 @@ export function IncreaseLiquidityDialog({
             </Alert>
           )}
 
+          <TermsCheckbox id="terms-increase-liquidity" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
           <Button
             onClick={handleSubmit}
-            disabled={!canSubmit}
+            disabled={!canSubmit || !termsAgreed}
             className="w-full bg-cheese hover:bg-cheese-dark text-primary-foreground"
           >
             {isTransacting ? (
