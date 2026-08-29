@@ -14,6 +14,7 @@ import { getTransactPlugins } from "@/lib/wharfKit";
 import { fetchSingleTokenBalance } from "@/lib/waxRpcFallback";
 import type { TokenWithBalance } from "@/hooks/useAllTokenBalances";
 import { toast } from "sonner";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface CheeseSwapWidgetProps {
   defaultInputTicker?: string;
@@ -43,6 +44,7 @@ export function CheeseSwapWidget({
   const [selectorSide, setSelectorSide] = useState<"in" | "out" | null>(null);
   const [showRouteDetails, setShowRouteDetails] = useState(true);
   const [isSwapping, setIsSwapping] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
 
   // Set defaults when tokens load
   useEffect(() => {
@@ -359,6 +361,9 @@ export function CheeseSwapWidget({
       )}
 
       {/* Swap / Connect button */}
+      {accountName && canSwap && (
+        <TermsCheckbox id="terms-swap" checked={termsAgreed} onCheckedChange={setTermsAgreed} className="px-1" />
+      )}
       <button
         onClick={
           canSwap
@@ -369,9 +374,9 @@ export function CheeseSwapWidget({
             ? () => refetchRoute()
             : undefined
         }
-        disabled={!!accountName && !canSwap && !(exhaustedTransient && hasAmount)}
+        disabled={(!!accountName && !canSwap && !(exhaustedTransient && hasAmount)) || (canSwap && !termsAgreed)}
         className={`w-full py-3 rounded-xl font-bold text-base transition-colors ${
-          canSwap
+          canSwap && termsAgreed
             ? "bg-cheese text-cheese-foreground hover:bg-cheese/90"
             : !accountName
             ? "bg-cheese text-cheese-foreground hover:bg-cheese/90"

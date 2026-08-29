@@ -20,6 +20,7 @@ import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { TokenLogo } from "@/components/TokenLogo";
 import cheeseUpOrb from "@/assets/cheeseup.png";
 import waxCoin from "@/assets/wax-coin.png";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface SuccessDetails {
   cpuMs: number;
@@ -55,6 +56,7 @@ export const PowerUpCard = ({
   const [paymentMode, setPaymentMode] = useState<"cheese" | "wax">("cheese");
   const [recipient, setRecipient] = useState(accountName || "");
   const [isTransacting, setIsTransacting] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [successDetails, setSuccessDetails] = useState<SuccessDetails | null>(null);
 
@@ -313,10 +315,14 @@ export const PowerUpCard = ({
         onRefresh={refetch}
       />
 
+      {walletConnected && (
+        <TermsCheckbox id="terms-powerup" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
+      )}
+
       <Button
         className="w-full h-12 text-base font-semibold"
         onClick={handlePowerUp}
-        disabled={(walletConnected && !canPowerUp) || isTransacting}
+        disabled={(walletConnected && (!canPowerUp || !termsAgreed)) || isTransacting}
       >
         {isTransacting ? (
           <>

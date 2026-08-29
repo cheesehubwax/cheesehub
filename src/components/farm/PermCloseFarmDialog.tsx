@@ -8,6 +8,7 @@ import { FarmInfo, buildPermCloseFarmAction } from "@/lib/farm";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface PermCloseFarmDialogProps {
   farm: FarmInfo;
@@ -20,6 +21,7 @@ export function PermCloseFarmDialog({ farm, open, onOpenChange, onSuccess }: Per
   const { accountName, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const [loading, setLoading] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
 
   const handlePermClose = async () => {
     if (!accountName) return;
@@ -49,9 +51,10 @@ export function PermCloseFarmDialog({ farm, open, onOpenChange, onSuccess }: Per
             You will need to kick all remaining stakers before you can retrieve any remaining reward tokens.
           </AlertDialogDescription>
         </AlertDialogHeader>
+        <TermsCheckbox id="terms-perm-close-farm" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handlePermClose} disabled={loading} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+          <AlertDialogAction onClick={handlePermClose} disabled={loading || !termsAgreed} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Permanently Close
           </AlertDialogAction>

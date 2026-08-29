@@ -11,6 +11,7 @@ import { BannerSlot } from "@/hooks/useBannerSlots";
 import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
 import { isDomainBlocked } from "@/lib/bannerBlocklist";
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface EditBannerDialogProps {
   open: boolean;
@@ -26,6 +27,7 @@ export function EditBannerDialog({ open, onOpenChange, slot, onSuccess }: EditBa
   const [ipfsHash, setIpfsHash] = useState(isSharedUser ? slot.sharedIpfsHash || "" : slot.ipfsHash);
   const [websiteUrl, setWebsiteUrl] = useState(isSharedUser ? slot.sharedWebsiteUrl || "" : slot.websiteUrl);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const previewUrl = ipfsHash ? `${IPFS_GATEWAYS[0]}${ipfsHash}` : "";
 
   const handleSave = async () => {
@@ -60,9 +62,10 @@ export function EditBannerDialog({ open, onOpenChange, slot, onSuccess }: EditBa
           <div className="rounded-lg border border-border/30 bg-muted/30 p-3 text-xs text-muted-foreground space-y-1"><p className="font-medium text-foreground text-sm"><OpenMojiIcon emoji="📐" size={14} /> Required Dimensions</p><p><strong>580 × 150 px</strong> — exact size required</p></div>
           {previewUrl && <div><Label className="text-muted-foreground">Preview</Label><div className="mt-2 rounded-lg overflow-hidden border border-border/30"><img src={previewUrl} alt="Banner preview" className="w-full h-auto max-h-40 object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} /></div></div>}
         </div>
+        <TermsCheckbox id="terms-edit-banner" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} disabled={isSubmitting || !session || isDomainBlocked(websiteUrl)} className="bg-cheese hover:bg-cheese-dark text-primary-foreground">{isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Save</Button>
+          <Button onClick={handleSave} disabled={isSubmitting || !session || isDomainBlocked(websiteUrl) || !termsAgreed} className="bg-cheese hover:bg-cheese-dark text-primary-foreground">{isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

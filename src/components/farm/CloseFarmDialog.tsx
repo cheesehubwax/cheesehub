@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import { FarmInfo, buildCloseFarmAction } from "@/lib/farm";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface CloseFarmDialogProps {
   farm: FarmInfo;
@@ -19,6 +20,7 @@ export function CloseFarmDialog({ farm, open, onOpenChange, onSuccess }: CloseFa
   const { accountName, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const [loading, setLoading] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
 
   const handleClose = async () => {
     if (!accountName) return;
@@ -48,9 +50,10 @@ export function CloseFarmDialog({ farm, open, onOpenChange, onSuccess }: CloseFa
             You can still permanently close the farm later to retrieve remaining rewards.
           </AlertDialogDescription>
         </AlertDialogHeader>
+        <TermsCheckbox id="terms-close-farm" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleClose} disabled={loading}>
+          <AlertDialogAction onClick={handleClose} disabled={loading || !termsAgreed}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Close Farm
           </AlertDialogAction>

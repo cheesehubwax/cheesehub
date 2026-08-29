@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react";
 import { DaoInfo, buildSetProfileActionWithSocials, DaoSocials } from "@/lib/dao";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface EditDaoProfileProps {
   open: boolean;
@@ -20,6 +21,7 @@ export function EditDaoProfile({ open, onOpenChange, dao, onUpdated }: EditDaoPr
   const { accountName, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const [loading, setLoading] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
 
   const [description, setDescription] = useState(dao.description || "");
   const [avatar, setAvatar] = useState(dao.logo || "");
@@ -94,9 +96,10 @@ export function EditDaoProfile({ open, onOpenChange, dao, onUpdated }: EditDaoPr
           </div>
         </div>
 
+        <TermsCheckbox id="terms-edit-dao-profile" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} disabled={loading}>
+          <Button onClick={handleSave} disabled={loading || !termsAgreed}>
             {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...</> : "Save Profile"}
           </Button>
         </DialogFooter>

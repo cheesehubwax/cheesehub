@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
@@ -235,6 +236,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
   const [selectedToStake, setSelectedToStake] = useState<Set<string>>(new Set());
   const [selectedToUnstake, setSelectedToUnstake] = useState<Set<string>>(new Set());
   const [isStaking, setIsStaking] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [isUnstaking, setIsUnstaking] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
   const [confirmStakeOpen, setConfirmStakeOpen] = useState(false);
@@ -1000,6 +1002,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
             </TabsList>
 
             <TabsContent value="unstaked" className="mt-4 space-y-3">
+              <TermsCheckbox id="terms-nft-staking" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
               {willAutoClaimOnStake && (
                 <Alert className="border-cheese/40 bg-cheese/5">
                   <Info className="h-4 w-4 text-cheese" />
@@ -1024,7 +1027,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
                 </Button>
                 <Button
                   onClick={requestStake}
-                  disabled={isStaking || selectedToStake.size === 0 || isExpired}
+                  disabled={isStaking || selectedToStake.size === 0 || isExpired || !termsAgreed}
                   size="sm"
                   className="bg-primary text-primary-foreground"
                 >
@@ -1057,6 +1060,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
             </TabsContent>
 
             <TabsContent value="staked" className="mt-4 space-y-3">
+              <TermsCheckbox id="terms-nft-unstaking" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
               <div className="flex items-center justify-between">
                 <Button variant="ghost" size="sm" onClick={selectAllStaked}>
                   {selectedToUnstake.size === filteredStaked.length && filteredStaked.length > 0
@@ -1065,7 +1069,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
                 </Button>
                 <Button
                   onClick={handleUnstake}
-                  disabled={isUnstaking || selectedToUnstake.size === 0}
+                  disabled={isUnstaking || selectedToUnstake.size === 0 || !termsAgreed}
                   size="sm"
                   variant="outline"
                 >
@@ -1179,7 +1183,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
             <div className="flex justify-center">
               <Button
                 onClick={handleClaim}
-                disabled={isClaiming || !hasRewards}
+                disabled={isClaiming || !hasRewards || !termsAgreed}
                 className="w-full sm:w-1/2 bg-primary hover:bg-primary/90 text-primary-foreground"
               >
                 {isClaiming ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Coins className="h-4 w-4 mr-2" />}
@@ -1251,9 +1255,10 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <TermsCheckbox id="terms-claim-stake" checked={termsAgreed} onCheckedChange={setTermsAgreed} className="px-1" />
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmAndStake}>
+            <AlertDialogAction onClick={confirmAndStake} disabled={!termsAgreed}>
               Claim & Stake
             </AlertDialogAction>
           </AlertDialogFooter>

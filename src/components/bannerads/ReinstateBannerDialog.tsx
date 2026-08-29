@@ -7,6 +7,7 @@ import { closeWharfkitModals, getTransactPlugins } from "@/lib/wharfKit";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { BannerSlot } from "@/hooks/useBannerSlots";
 import { formatSlotDateUTC } from "./SlotCalendar";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface ReinstateBannerDialogProps { open: boolean; onOpenChange: (open: boolean) => void; slot: BannerSlot; onSuccess: () => void; }
 
@@ -14,6 +15,7 @@ export function ReinstateBannerDialog({ open, onOpenChange, slot, onSuccess }: R
   const { session } = useWax();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
 
   const handleReinstate = async () => {
     if (!session) return;
@@ -46,9 +48,10 @@ export function ReinstateBannerDialog({ open, onOpenChange, slot, onSuccess }: R
           </div>
           <p className="text-xs text-muted-foreground">The renter will need to call <strong>Edit Banner</strong> again to upload new content after reinstatement.</p>
         </div>
+        <TermsCheckbox id="terms-reinstate-banner" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleReinstate} disabled={isSubmitting || !session} className="bg-green-600 hover:bg-green-700 text-white">{isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Reinstate</Button>
+          <Button onClick={handleReinstate} disabled={isSubmitting || !session || !termsAgreed} className="bg-green-600 hover:bg-green-700 text-white">{isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Reinstate</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

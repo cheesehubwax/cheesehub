@@ -16,6 +16,7 @@ import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useToast } from "@/hooks/use-toast";
 import { getIpfsUrl } from "@/lib/ipfsGateways";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface DaoStakingProps {
   daoName: string;
@@ -34,6 +35,7 @@ export function DaoStaking({ daoName, dao }: DaoStakingProps) {
   const [unstakeAmount, setUnstakeAmount] = useState("");
   const [loading, setLoading] = useState(true);
   const [txLoading, setTxLoading] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
 
   const isTokenDao = dao.dao_type === 4;
   const isNftDao = [1, 5].includes(dao.dao_type);
@@ -178,6 +180,7 @@ export function DaoStaking({ daoName, dao }: DaoStakingProps) {
             </Card>
           </div>
 
+          <TermsCheckbox id="terms-dao-staking" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
           <Card className="bg-card/60 border-border/40">
             <CardContent className="p-4 space-y-3">
               <div>
@@ -189,7 +192,7 @@ export function DaoStaking({ daoName, dao }: DaoStakingProps) {
                     value={stakeAmount}
                     onChange={e => setStakeAmount(e.target.value)}
                   />
-                  <Button onClick={handleStakeTokens} disabled={txLoading || !stakeAmount} size="sm">
+                  <Button onClick={handleStakeTokens} disabled={txLoading || !stakeAmount || !termsAgreed} size="sm">
                     {txLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUpCircle className="h-4 w-4 mr-1" />}
                     Stake
                   </Button>
@@ -204,7 +207,7 @@ export function DaoStaking({ daoName, dao }: DaoStakingProps) {
                     value={unstakeAmount}
                     onChange={e => setUnstakeAmount(e.target.value)}
                   />
-                  <Button variant="outline" onClick={handleUnstakeTokens} disabled={txLoading || !unstakeAmount} size="sm">
+                  <Button variant="outline" onClick={handleUnstakeTokens} disabled={txLoading || !unstakeAmount || !termsAgreed} size="sm">
                     {txLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowDownCircle className="h-4 w-4 mr-1" />}
                     Unstake
                   </Button>
@@ -247,7 +250,7 @@ export function DaoStaking({ daoName, dao }: DaoStakingProps) {
                       variant="outline"
                       className="w-full mt-1 text-xs h-7"
                       onClick={() => handleUnstakeNFT(nft.asset_id)}
-                      disabled={txLoading}
+                      disabled={txLoading || !termsAgreed}
                     >
                       Unstake
                     </Button>

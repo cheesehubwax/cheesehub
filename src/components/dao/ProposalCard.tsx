@@ -19,6 +19,7 @@ import type { UserVote } from "@/lib/voteStorage";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { NFTVotePicker } from "./NFTVotePicker";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface ProposalCardProps {
   proposal: Proposal;
@@ -43,6 +44,7 @@ export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: paren
   const { accountName, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const [txLoading, setTxLoading] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [votingChoice, setVotingChoice] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [stakedWeight, setStakedWeight] = useState<StakedToken | null>(null);
@@ -264,6 +266,10 @@ export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: paren
           </div>
         )}
 
+        {canVote && (
+          <TermsCheckbox id={`terms-vote-${proposal.proposal_id}`} checked={termsAgreed} onCheckedChange={setTermsAgreed} />
+        )}
+
         {/* Vote Buttons - Yes/No/Abstain */}
         {canVote && (isYesNoAbstain || isTokenTransfer || isNFTTransfer) && (
           <div className="flex gap-2 pt-2">
@@ -271,7 +277,7 @@ export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: paren
               size="sm" variant="outline"
               className="flex-1 text-green-400 border-green-500/30 hover:bg-green-500/10"
               onClick={() => handleYNAVote("yes")}
-              disabled={txLoading || (isType5 && selectedNFTs.length === 0)}
+              disabled={txLoading || (isType5 && selectedNFTs.length === 0) || !termsAgreed}
             >
               {votingChoice === "yes" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ThumbsUp className="h-4 w-4 mr-1" />}
               Yes
@@ -280,7 +286,7 @@ export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: paren
               size="sm" variant="outline"
               className="flex-1 text-destructive border-destructive/30 hover:bg-destructive/10"
               onClick={() => handleYNAVote("no")}
-              disabled={txLoading || (isType5 && selectedNFTs.length === 0)}
+              disabled={txLoading || (isType5 && selectedNFTs.length === 0) || !termsAgreed}
             >
               {votingChoice === "no" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ThumbsDown className="h-4 w-4 mr-1" />}
               No
@@ -288,7 +294,7 @@ export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: paren
             <Button
               size="sm" variant="outline" className="flex-1"
               onClick={() => handleYNAVote("abstain")}
-              disabled={txLoading || (isType5 && selectedNFTs.length === 0)}
+              disabled={txLoading || (isType5 && selectedNFTs.length === 0) || !termsAgreed}
             >
               {votingChoice === "abstain" ? <Loader2 className="h-4 w-4 animate-spin" /> : <MinusCircle className="h-4 w-4 mr-1" />}
               Abstain
@@ -309,7 +315,7 @@ export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: paren
                   size="sm"
                   variant="outline"
                   onClick={() => handleMultiVote(idx)}
-                  disabled={txLoading || (isType5 && selectedNFTs.length === 0)}
+                  disabled={txLoading || (isType5 && selectedNFTs.length === 0) || !termsAgreed}
                   className="text-xs"
                 >
                   {choice.description}
@@ -342,7 +348,7 @@ export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: paren
           proposal.status === "inconclusive"
         ) && (
           <div className="flex gap-2 pt-1">
-            <Button size="sm" variant="outline" onClick={handleFinalize} disabled={txLoading}>
+            <Button size="sm" variant="outline" onClick={handleFinalize} disabled={txLoading || !termsAgreed}>
               Finalize Proposal
             </Button>
           </div>

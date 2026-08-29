@@ -21,6 +21,7 @@ import { getTokenConfig } from "@/lib/tokenRegistry";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useToast } from "@/hooks/use-toast";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface CreateProposalProps {
   daoName: string;
@@ -41,6 +42,7 @@ export function CreateProposal({ daoName, dao, treasuryNFTs = [], onClose, onCre
   const { accountName, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const [loading, setLoading] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const { toast } = useToast();
 
   // Resolve which contract to use to pay the DAO's proposal_cost token.
@@ -334,7 +336,8 @@ export function CreateProposal({ daoName, dao, treasuryNFTs = [], onClose, onCre
           </div>
         )}
 
-        <Button onClick={handleSubmit} disabled={loading} className="w-full bg-primary text-primary-foreground">
+        <TermsCheckbox id="terms-create-proposal" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
+        <Button onClick={handleSubmit} disabled={loading || !termsAgreed} className="w-full bg-primary text-primary-foreground">
           {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Submitting...</> : "Submit Proposal"}
         </Button>
       </CardContent>

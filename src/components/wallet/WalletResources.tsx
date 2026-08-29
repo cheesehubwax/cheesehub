@@ -4,6 +4,7 @@ import { useWax } from '@/context/WaxContext';
 import { waxRpcCall } from '@/lib/waxRpcFallback';
 import { useWaxTransaction } from '@/hooks/useWaxTransaction';
 import { RefreshCw, Loader2 } from 'lucide-react';
+import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 
 
 /** eosio::refunds row, also returned inline by get_account as `refund_request`. */

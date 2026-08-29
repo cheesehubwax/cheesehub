@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import { FarmInfo, buildKickManyAction } from "@/lib/farm";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
+import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface KickUsersDialogProps {
   farm: FarmInfo;
@@ -19,6 +20,7 @@ export function KickUsersDialog({ farm, open, onOpenChange, onSuccess }: KickUse
   const { accountName, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const [loading, setLoading] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(false);
   const [amount, setAmount] = useState("10");
 
   const handleKick = async () => {
@@ -55,9 +57,10 @@ export function KickUsersDialog({ farm, open, onOpenChange, onSuccess }: KickUse
             <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} min={1} max={200} />
           </div>
         </div>
+        <TermsCheckbox id="terms-kick-users" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleKick} disabled={loading} className="bg-primary text-primary-foreground">
+          <Button onClick={handleKick} disabled={loading || !termsAgreed} className="bg-primary text-primary-foreground">
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Kick Stakers
           </Button>
