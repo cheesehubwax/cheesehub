@@ -393,14 +393,35 @@ export interface RewardValue {
   contract: string;
 }
 
-// Build action for setting template values (V2)
+const MAX_VALUES_PER_ACTION = 50;
+
+function toArray<T>(input: T | T[]): T[] {
+  return Array.isArray(input) ? input : [input];
+}
+
+function mapRewards(rewardValues: RewardValue[]) {
+  return rewardValues.map(rv => ({ quantity: rv.quantity, contract: rv.contract }));
+}
+
+/** Split a values vector into chunks so a single action never gets too large. */
+export function chunkValues<T>(values: T[], size: number = MAX_VALUES_PER_ACTION): T[][] {
+  if (values.length <= size) return [values];
+  const chunks: T[][] = [];
+  for (let i = 0; i < values.length; i += size) {
+    chunks.push(values.slice(i, i + size));
+  }
+  return chunks;
+}
+
+// Build action for setting template values (V2) — accepts one or many template IDs
 export function buildSetTemplateValuesAction(
   user: string,
   farmname: string,
   collectionName: string,
-  templateId: number,
+  templateId: number | number[],
   rewardValues: RewardValue[]
 ) {
+  const hourly_rewards = mapRewards(rewardValues);
   return {
     account: FARM_CONTRACT,
     name: "settmpvalues",
@@ -408,26 +429,24 @@ export function buildSetTemplateValuesAction(
     data: {
       user,
       farmname,
-      values: [{
-        template_id: templateId,
+      values: toArray(templateId).map(id => ({
+        template_id: id,
         collection_name: collectionName,
-        hourly_rewards: rewardValues.map(rv => ({
-          quantity: rv.quantity,
-          contract: rv.contract,
-        })),
-      }],
+        hourly_rewards,
+      })),
     },
   };
 }
 
-// Build action for setting schema values (V2)
+// Build action for setting schema values (V2) — accepts one or many schema names
 export function buildSetSchemaValuesAction(
   user: string,
   farmname: string,
   collectionName: string,
-  schemaName: string,
+  schemaName: string | string[],
   rewardValues: RewardValue[]
 ) {
+  const hourly_rewards = mapRewards(rewardValues);
   return {
     account: FARM_CONTRACT,
     name: "setschvalues",
@@ -435,25 +454,23 @@ export function buildSetSchemaValuesAction(
     data: {
       user,
       farmname,
-      values: [{
+      values: toArray(schemaName).map(schema => ({
         collection_name: collectionName,
-        schema_name: schemaName,
-        hourly_rewards: rewardValues.map(rv => ({
-          quantity: rv.quantity,
-          contract: rv.contract,
-        })),
-      }],
+        schema_name: schema,
+        hourly_rewards,
+      })),
     },
   };
 }
 
-// Build action for setting collection values (V2)
+// Build action for setting collection values (V2) — accepts one or many collections
 export function buildSetCollectionValuesAction(
   user: string,
   farmname: string,
-  collectionName: string,
+  collectionName: string | string[],
   rewardValues: RewardValue[]
 ) {
+  const hourly_rewards = mapRewards(rewardValues);
   return {
     account: FARM_CONTRACT,
     name: "setcolvalues",
@@ -461,25 +478,23 @@ export function buildSetCollectionValuesAction(
     data: {
       user,
       farmname,
-      values: [{
-        collection_name: collectionName,
-        hourly_rewards: rewardValues.map(rv => ({
-          quantity: rv.quantity,
-          contract: rv.contract,
-        })),
-      }],
+      values: toArray(collectionName).map(collection => ({
+        collection_name: collection,
+        hourly_rewards,
+      })),
     },
   };
 }
 
-// Build action for setting attribute values (V2)
+// Build action for setting attribute values (V2) — accepts one or many attribute values
 export function buildSetAttributeValuesAction(
   user: string,
   farmname: string,
   attributeName: string,
-  attributeValue: string,
+  attributeValue: string | string[],
   rewardValues: RewardValue[]
 ) {
+  const hourly_rewards = mapRewards(rewardValues);
   return {
     account: FARM_CONTRACT,
     name: "setattvalues",
@@ -487,17 +502,15 @@ export function buildSetAttributeValuesAction(
     data: {
       user,
       farmname,
-      values: [{
+      values: toArray(attributeValue).map(value => ({
         attribute_name: attributeName,
-        attribute_value: attributeValue,
-        hourly_rewards: rewardValues.map(rv => ({
-          quantity: rv.quantity,
-          contract: rv.contract,
-        })),
-      }],
+        attribute_value: value,
+        hourly_rewards,
+      })),
     },
   };
 }
+
 
 // Build action for erasing template values
 export function buildEraseTemplateValuesAction(user: string, farmname: string, templateId: number) {
