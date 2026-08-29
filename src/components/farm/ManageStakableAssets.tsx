@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,11 +14,22 @@ import {
   buildSetCollectionValuesAction, buildSetAttributeValuesAction,
   buildEraseTemplateValuesAction, buildEraseSchemaValuesAction,
   buildEraseCollectionValuesAction, buildEraseAttributeValuesAction,
+  chunkValues,
 } from "@/lib/farm";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useToast } from "@/hooks/use-toast";
 import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
+
+/** Split a free-form list (commas, spaces, new lines) into unique trimmed entries. */
+function parseEntries(input: string): string[] {
+  const parts = input
+    .split(/[\s,;]+/)
+    .map(p => p.trim())
+    .filter(Boolean);
+  return Array.from(new Set(parts));
+}
+
 
 interface ManageStakableAssetsProps {
   farm: FarmInfo;
@@ -68,6 +80,18 @@ export function ManageStakableAssets({ farm, open, onOpenChange, onSuccess }: Ma
 
   const farmType = farm.farm_type; // 0=col, 1=sch, 2=tmp, 3=att
 
+  // How many stakable entries the current form will add in one transaction
+  const entryCount =
+    farmType === 0 ? parseEntries(newCollection).length
+    : farmType === 1 ? parseEntries(newSchema).length
+    : farmType === 2 ? parseEntries(newTemplateId).length
+    : parseEntries(newAttrValue).length;
+
+  const entryNoun =
+    farmType === 0 ? "collection" : farmType === 1 ? "schema" : farmType === 2 ? "template" : "value";
+
+
+
   const buildRewardValues = (): RewardValue[] => {
     return newRewardValues
       .filter(rv => rv.quantity && parseFloat(rv.quantity) > 0)
@@ -92,23 +116,53 @@ export function ManageStakableAssets({ farm, open, onOpenChange, onSuccess }: Ma
         return;
       }
 
-      let action: any;
+      const actions: any[] = [];
       if (farmType === 0) {
-        if (!newCollection) return;
-        action = buildSetCollectionValuesAction(accountName, farm.farm_name, newCollection, rewardValues);
+        const collections = parseEntries(newCollection);
+        if (!collections.length) {
+          toast({ title: "Error", description: "Enter at least one collection name", variant: "destructive" });
+          return;
+        }
+        chunkValues(collections).forEach(chunk =>
+          actions.push(buildSetCollectionValuesAction(accountName, farm.farm_name, chunk, rewardValues))
+        );
       } else if (farmType === 1) {
-        if (!newCollection || !newSchema) return;
-        action = buildSetSchemaValuesAction(accountName, farm.farm_name, newCollection, newSchema, rewardValues);
+        const schemas = parseEntries(newSchema);
+        if (!newCollection.trim() || !schemas.length) {
+          toast({ title: "Error", description: "Enter a collection and at least one schema name", variant: "destructive" });
+          return;
+        }
+        chunkValues(schemas).forEach(chunk =>
+          actions.push(buildSetSchemaValuesAction(accountName, farm.farm_name, newCollection.trim(), chunk, rewardValues))
+        );
       } else if (farmType === 2) {
-        if (!newCollection || !newTemplateId) return;
-        action = buildSetTemplateValuesAction(accountName, farm.farm_name, newCollection, parseInt(newTemplateId), rewardValues);
+        const rawIds = parseEntries(newTemplateId);
+        if (!newCollection.trim() || !rawIds.length) {
+          toast({ title: "Error", description: "Enter a collection and at least one template ID", variant: "destructive" });
+          return;
+        }
+        const invalid = rawIds.find(id => !/^\d+$/.test(id));
+        if (invalid) {
+          toast({ title: "Invalid Template ID", description: `"${invalid}" is not a valid template ID`, variant: "destructive" });
+          return;
+        }
+        const templateIds = rawIds.map(id => parseInt(id, 10));
+        chunkValues(templateIds).forEach(chunk =>
+          actions.push(buildSetTemplateValuesAction(accountName, farm.farm_name, newCollection.trim(), chunk, rewardValues))
+        );
       } else {
-        if (!newAttrName || !newAttrValue) return;
-        action = buildSetAttributeValuesAction(accountName, farm.farm_name, newAttrName, newAttrValue, rewardValues);
+        const attrValues = parseEntries(newAttrValue);
+        if (!newAttrName.trim() || !attrValues.length) {
+          toast({ title: "Error", description: "Enter an attribute name and at least one value", variant: "destructive" });
+          return;
+        }
+        chunkValues(attrValues).forEach(chunk =>
+          actions.push(buildSetAttributeValuesAction(accountName, farm.farm_name, newAttrName.trim(), chunk, rewardValues))
+        );
       }
 
-      const result = await executeTransaction([action], {
-        successTitle: "Stakable Asset Added!",
+      const result = await executeTransaction(actions, {
+        successTitle: entryCount > 1 ? `${entryCount} Stakable Assets Added!` : "Stakable Asset Added!",
       });
       if (result.success) {
         await loadConfig();
@@ -124,6 +178,7 @@ export function ManageStakableAssets({ farm, open, onOpenChange, onSuccess }: Ma
       setTxLoading(false);
     }
   };
+
 
   const handleErase = async (type: string, params: any) => {
     if (!accountName) return;
@@ -239,7 +294,23 @@ export function ManageStakableAssets({ farm, open, onOpenChange, onSuccess }: Ma
                 <Plus className="h-4 w-4" /> Add Stakable Asset
               </h4>
 
-              {(farmType === 0 || farmType === 1 || farmType === 2) && (
+              {farmType === 0 && (
+                <div>
+                  <Label className="text-xs">Collection Name(s)</Label>
+                  <Textarea
+                    value={newCollection}
+                    onChange={(e) => setNewCollection(e.target.value)}
+                    placeholder="mycollection, othercollect"
+                    rows={2}
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    One or more collection names, separated by commas or new lines.
+                  </p>
+                </div>
+              )}
+
+              {(farmType === 1 || farmType === 2) && (
                 <div>
                   <Label className="text-xs">Collection Name</Label>
                   <Input value={newCollection} onChange={(e) => setNewCollection(e.target.value)} placeholder="mycollection" />
@@ -248,30 +319,58 @@ export function ManageStakableAssets({ farm, open, onOpenChange, onSuccess }: Ma
 
               {farmType === 1 && (
                 <div>
-                  <Label className="text-xs">Schema Name</Label>
-                  <Input value={newSchema} onChange={(e) => setNewSchema(e.target.value)} placeholder="myschema" />
+                  <Label className="text-xs">Schema Name(s)</Label>
+                  <Textarea
+                    value={newSchema}
+                    onChange={(e) => setNewSchema(e.target.value)}
+                    placeholder="myschema, otherschema"
+                    rows={2}
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    One or more schema names, separated by commas or new lines.
+                  </p>
                 </div>
               )}
 
               {farmType === 2 && (
                 <div>
-                  <Label className="text-xs">Template ID</Label>
-                  <Input value={newTemplateId} onChange={(e) => setNewTemplateId(e.target.value)} placeholder="12345" type="number" />
+                  <Label className="text-xs">Template ID(s)</Label>
+                  <Textarea
+                    value={newTemplateId}
+                    onChange={(e) => setNewTemplateId(e.target.value)}
+                    placeholder="12345, 12346, 12350"
+                    rows={3}
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    One or more template IDs, separated by commas or new lines. All share the reward below.
+                  </p>
                 </div>
               )}
 
               {farmType === 3 && (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2">
                   <div>
                     <Label className="text-xs">Attribute Name</Label>
                     <Input value={newAttrName} onChange={(e) => setNewAttrName(e.target.value)} placeholder="rarity" />
                   </div>
                   <div>
-                    <Label className="text-xs">Attribute Value</Label>
-                    <Input value={newAttrValue} onChange={(e) => setNewAttrValue(e.target.value)} placeholder="legendary" />
+                    <Label className="text-xs">Attribute Value(s)</Label>
+                    <Textarea
+                      value={newAttrValue}
+                      onChange={(e) => setNewAttrValue(e.target.value)}
+                      placeholder="legendary, epic"
+                      rows={2}
+                      className="font-mono text-sm"
+                    />
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      One or more values, separated by commas or new lines.
+                    </p>
                   </div>
                 </div>
               )}
+
 
               {/* Reward values per pool */}
               <div className="space-y-2">
@@ -297,11 +396,18 @@ export function ManageStakableAssets({ farm, open, onOpenChange, onSuccess }: Ma
                 })}
               </div>
 
+              {entryCount > 1 && (
+                <p className="text-xs text-primary">
+                  {entryCount} {entryNoun}s will be added in one transaction.
+                </p>
+              )}
+
               <TermsCheckbox id="terms-stakable-assets" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
-              <Button onClick={handleAdd} disabled={txLoading || !termsAgreed} className="w-full bg-primary text-primary-foreground">
+              <Button onClick={handleAdd} disabled={txLoading || !termsAgreed || entryCount === 0} className="w-full bg-primary text-primary-foreground">
                 {txLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
-                Add Stakable Asset
+                {entryCount > 1 ? `Add ${entryCount} Stakable Assets` : "Add Stakable Asset"}
               </Button>
+
             </div>
           </div>
         )}
