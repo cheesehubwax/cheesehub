@@ -264,8 +264,7 @@ export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: paren
           </div>
         )}
 
-        {canVote && (
-        )}
+
 
         {/* Vote Buttons - Yes/No/Abstain */}
         {canVote && (isYesNoAbstain || isTokenTransfer || isNFTTransfer) && (

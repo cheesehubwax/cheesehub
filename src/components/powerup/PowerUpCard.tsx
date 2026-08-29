@@ -313,8 +313,7 @@ export const PowerUpCard = ({
         onRefresh={refetch}
       />
 
-      {walletConnected && (
-      )}
+
 
       <Button
         className="w-full h-12 text-base font-semibold"
