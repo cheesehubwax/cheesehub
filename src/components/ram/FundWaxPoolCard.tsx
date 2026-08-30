@@ -85,7 +85,7 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
       setJustClaimed(true);
       showSuccess(
         'WAX Pool Funded!',
-        `Claimed ~${claimable.toFixed(8)} WAX of voting rewards into the ${CHEESE_RAM_CONTRACT} liquid WAX pool.`,
+        `Claimed ~${claimable.toFixed(2)} WAX of voting rewards into the ${CHEESE_RAM_CONTRACT} liquid WAX pool.`,
         txId,
       );
       refetch();
