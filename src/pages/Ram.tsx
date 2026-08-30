@@ -21,6 +21,7 @@ import {
   useCheeseRamStats,
   useRamPrice,
 } from '@/hooks/useCheeseRam';
+import { useCheeseRamVoteRewards } from '@/hooks/useCheeseRamVoteRewards';
 import { CHEESE_RAM_CONTRACT } from '@/lib/cheeseRam';
 import cheeseRamOrb from '@/assets/cheeseram.png';
 import ramStickAsset from '@/assets/ram-stick.png';
@@ -35,6 +36,7 @@ const Ram = () => {
   const { pricePerByte, cheesePerKb, history, refetch: refetchRamPrice } = useRamPrice();
   const { data: accountRam, refetch: refetchAccountRam } = useAccountRam(accountName);
   const { data: cheesePrice, refetch: refetchCheesePrice } = useCheesePriceData();
+  const { refetch: refetchVoteRewards } = useCheeseRamVoteRewards();
 
   const liveWaxPerCheese = cheesePrice?.waxPrice && cheesePrice.waxPrice > 0 ? cheesePrice.waxPrice : null;
   const availableBytes = accountRam ? Math.max(0, accountRam.quota - accountRam.usage) : 0;
@@ -58,6 +60,7 @@ const Ram = () => {
     refetchRamPrice();
     refetchConfig();
     refetchCheesePrice?.();
+    refetchVoteRewards();
     refreshBalance?.();
     refreshResourceGauges();
   }, [
@@ -67,6 +70,7 @@ const Ram = () => {
     refetchRamPrice,
     refetchConfig,
     refetchCheesePrice,
+    refetchVoteRewards,
     refreshBalance,
   ]);
 
@@ -117,6 +121,7 @@ const Ram = () => {
       <main className="container pb-12 flex flex-col items-center gap-6">
         <ResourceGauges />
         <LiquidReservesPanel reserves={reserves} />
+        <FundWaxPoolCard onComplete={handleComplete} />
         <RamPricePanel cheesePerKb={cheesePerKb} pricePerByte={pricePerByte} history={history} />
 
         <Tabs defaultValue="buy" className="w-full max-w-lg">
