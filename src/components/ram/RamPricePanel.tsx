@@ -50,18 +50,19 @@ export function RamPricePanel({ cheesePerKb, pricePerByte, history }: RamPricePa
       ? 'Building price history...'
       : historyLoading
         ? 'Loading history...'
-        : 'Collecting history — recorded every 4 hours.';
+        : 'Collecting history — recorded twice daily.';
 
   const footer =
     range === 'live'
       ? 'Updates every 30s • Session data only'
       : firstSampleAt
-        ? `Recorded every 4 hours since ${new Date(firstSampleAt).toLocaleDateString([], {
+        ? `Recorded twice daily since ${new Date(firstSampleAt).toLocaleDateString([], {
             day: 'numeric',
             month: 'short',
             year: 'numeric',
           })}`
-        : 'Recorded every 4 hours';
+        : 'Recorded twice daily';
+
 
   const renderTooltip = (decimals: number, unit: string, textClass: string) =>
     ({ active, payload }: { active?: boolean; payload?: { value?: unknown; payload?: ChartPoint }[] }) =>

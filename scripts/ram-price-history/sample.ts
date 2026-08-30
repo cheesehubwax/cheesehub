@@ -3,7 +3,7 @@
  *
  * Reads the live WAX RAM price from eosio::rammarket plus the Alcor
  * CHEESE/WAX and WAXUSDC rates, then appends one record to the history
- * JSON file. Run by .github/workflows/ram-price-history.yml every 4 hours.
+ * JSON file. Run by .github/workflows/ram-price-history.yml twice a day.
  *
  * Env:
  *   RAM_HISTORY_FILE  path to the JSON file to append to (required)
@@ -19,11 +19,16 @@ const ENDPOINTS = [
 
 const ALCOR_TOKENS_URL = "https://wax.alcor.exchange/api/v2/tokens";
 
-/** Skip the append when the newest record is younger than this. */
-const MIN_GAP_MS = 2 * 60 * 60 * 1000;
-/** ~2 years of 4-hourly samples. */
-const MAX_RECORDS = 4400;
+/**
+ * Skip the append when the newest record is younger than this. Sits between
+ * the 2h catch-up gap and the 12h primary gap, so a catch-up tick only records
+ * when the primary tick was actually dropped.
+ */
+const MIN_GAP_MS = 10 * 60 * 60 * 1000;
+/** ~2 years of twice-daily samples. */
+const MAX_RECORDS = 1600;
 const TIMEOUT_MS = 10_000;
+
 
 export interface RamHistoryRecord {
   /** Sample time, epoch ms. */
