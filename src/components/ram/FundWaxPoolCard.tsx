@@ -124,7 +124,13 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
         <p className="text-sm font-bold font-mono text-foreground">{claimable.toFixed(2)} WAX</p>
       </div>
 
-      {isConnected && (
+      {!mayClaim && (
+        <p className="ml-auto text-[10px] text-muted-foreground text-right max-w-[55%] leading-tight">
+          Claimed automatically on each RAM purchase
+        </p>
+      )}
+
+      {isConnected && mayClaim && (
         <Button
           onClick={handleClaim}
           disabled={!canClaim}
