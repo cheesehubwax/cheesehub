@@ -1,0 +1,75 @@
+name: RAM Price History
+
+on:
+  schedule:
+    # Every 4 hours, offset off the hour so it doesn't collide with other jobs.
+    - cron: "7 */4 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Set to '1' to bypass the 'last sample under 2h old' guard"
+        required: false
+        default: "0"
+
+concurrency:
+  group: ram-price-history
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Prepare data branch checkout
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git clone --depth 1 --branch ram-price-data "$REPO_URL" /tmp/ram-data 2>/dev/null; then
+            echo "Existing ram-price-data branch checked out."
+          else
+            echo "Creating orphan ram-price-data branch..."
+            git clone --depth 1 "$REPO_URL" /tmp/ram-data
+            cd /tmp/ram-data
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git checkout --orphan ram-price-data
+            git rm -rf --quiet . || true
+            mkdir -p data
+            echo "[]" > data/ram-price-history.json
+            printf '%s\n' "# CHEESERam price history" "" "Data-only branch written by .github/workflows/ram-price-history.yml." > README.md
+            git add -A
+            git commit -m "chore: init RAM price history data branch"
+            git push -u origin ram-price-data
+          fi
+
+      - name: Sample RAM price
+        working-directory: scripts/ram-price-history
+        env:
+          RAM_HISTORY_FILE: /tmp/ram-data/data/ram-price-history.json
+          FORCE: ${{ github.event.inputs.force }}
+        run: bun run sample.ts
+
+      - name: Commit sample
+        run: |
+          set -euo pipefail
+          cd /tmp/ram-data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- data/ram-price-history.json; then
+            echo "No change to commit."
+            exit 0
+          fi
+          git add data/ram-price-history.json
+          git commit -m "chore: RAM price sample $(date -u +'%Y-%m-%dT%H:%MZ')"
+          git push origin ram-price-data
