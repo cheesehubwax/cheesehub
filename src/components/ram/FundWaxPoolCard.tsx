@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { useWax } from '@/context/WaxContext';
 import { useTransactionSuccess } from '@/context/TransactionSuccessContext';
 import { useCheeseRamVoteRewards } from '@/hooks/useCheeseRamVoteRewards';
+import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { closeWharfkitModals, getTransactPlugins, parseTransactError } from '@/lib/wharfKit';
-import { CHEESE_RAM_CONTRACT } from '@/lib/cheeseRam';
+import { CHEESE_RAM_CONTRACT, PUBLIC_VOTE_CLAIM } from '@/lib/cheeseRam';
 import waxLogoUrl from '@/assets/wax-seal.png';
 
 interface FundWaxPoolCardProps {
@@ -25,6 +26,7 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
   const { session, isConnected, login } = useWax();
   const { showSuccess } = useTransactionSuccess();
   const { data, refetch } = useCheeseRamVoteRewards();
+  const { isWhitelisted } = useAdminAccess();
   const [isTransacting, setIsTransacting] = useState(false);
   const [justClaimed, setJustClaimed] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -49,7 +51,9 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
   const cooldownRemaining = data?.nextClaimTime ? Math.max(0, data.nextClaimTime - now) : 0;
   const onCooldown = cooldownRemaining > 0;
   const hasRewards = claimable > 0;
-  const canClaim = isConnected && !isTransacting && !onCooldown && hasRewards;
+  // Until the contract exposes a public claim, only the admin can sign `claimvotes`.
+  const mayClaim = PUBLIC_VOTE_CLAIM || isWhitelisted;
+  const canClaim = isConnected && mayClaim && !isTransacting && !onCooldown && hasRewards;
 
   const handleClaim = async () => {
     if (!isConnected || !session) {
@@ -92,6 +96,15 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
       onComplete?.();
     } catch (error) {
       console.error('[CHEESERam] Claim votes failed:', error);
+      const raw = (error instanceof Error ? error.message : String(error)).toLowerCase();
+      if (raw.includes('missing authority')) {
+        toast.error('Claim not available yet', {
+          description:
+            'Only the contract admin can claim the voting rewards right now. Rewards are also claimed automatically whenever someone buys RAM.',
+          duration: 10000,
+        });
+        return;
+      }
       const info = parseTransactError(error);
       if (info.type !== 'cancelled') {
         toast.error(info.title, { description: info.description, duration: info.duration });
@@ -111,7 +124,13 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
         <p className="text-sm font-bold font-mono text-foreground">{claimable.toFixed(2)} WAX</p>
       </div>
 
-      {isConnected && (
+      {!mayClaim && (
+        <p className="ml-auto text-[10px] text-muted-foreground text-right max-w-[55%] leading-tight">
+          Claimed automatically on each RAM purchase
+        </p>
+      )}
+
+      {isConnected && mayClaim && (
         <Button
           onClick={handleClaim}
           disabled={!canClaim}
