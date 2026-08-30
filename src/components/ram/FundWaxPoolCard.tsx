@@ -5,9 +5,8 @@ import { Button } from '@/components/ui/button';
 import { useWax } from '@/context/WaxContext';
 import { useTransactionSuccess } from '@/context/TransactionSuccessContext';
 import { useCheeseRamVoteRewards } from '@/hooks/useCheeseRamVoteRewards';
-import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { closeWharfkitModals, getTransactPlugins, parseTransactError } from '@/lib/wharfKit';
-import { CHEESE_RAM_CONTRACT, PUBLIC_VOTE_CLAIM } from '@/lib/cheeseRam';
+import { CHEESE_RAM_CONTRACT } from '@/lib/cheeseRam';
 import waxLogoUrl from '@/assets/wax-seal.png';
 
 interface FundWaxPoolCardProps {
@@ -26,7 +25,6 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
   const { session, isConnected, login } = useWax();
   const { showSuccess } = useTransactionSuccess();
   const { data, refetch } = useCheeseRamVoteRewards();
-  const { isWhitelisted } = useAdminAccess();
   const [isTransacting, setIsTransacting] = useState(false);
   const [justClaimed, setJustClaimed] = useState(false);
   const [now, setNow] = useState(() => Date.now());
