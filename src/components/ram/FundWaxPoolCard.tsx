@@ -96,6 +96,15 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
       onComplete?.();
     } catch (error) {
       console.error('[CHEESERam] Claim votes failed:', error);
+      const raw = (error instanceof Error ? error.message : String(error)).toLowerCase();
+      if (raw.includes('missing authority')) {
+        toast.error('Claim not available yet', {
+          description:
+            'Only the contract admin can claim the voting rewards right now. Rewards are also claimed automatically whenever someone buys RAM.',
+          duration: 10000,
+        });
+        return;
+      }
       const info = parseTransactError(error);
       if (info.type !== 'cancelled') {
         toast.error(info.title, { description: info.description, duration: info.duration });
