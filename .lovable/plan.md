@@ -1,53 +1,32 @@
-# Plan: Publish CHEESERam price history tracking to GitHub
+# Plan: Fix "Collecting history" on the ALL tab
 
-Goal: get the historical RAM price tracking system (built this session) live on your GitHub Pages site, and start the automated recorder that samples prices every 4 hours. Written for someone doing this for the first time.
+## What's actually happening
 
-## What is being shipped
+Nothing is broken. I fetched the live data file on the `ram-price-data` branch and it currently contains **exactly one** recorded sample:
 
-1. `scripts/ram-price-history/` — a small recorder script that reads the live RAM price (WAX/KB, CHEESE/KB, USD/KB) and appends it to a history file.
-2. `.github/workflows/ram-price-history.yml` — a GitHub Actions "robot" that runs the recorder automatically every 4 hours.
-3. `src/hooks/useRamPriceHistory.ts` + updated `src/components/ram/RamPricePanel.tsx` — the CHEESERam page now has LIVE / 24H / 7D / 30D / ALL tabs that read the recorded history.
+```text
+[{"t":1788057534923,"waxPerKb":0.44823751,"cheesePerKb":0.2245,"waxPerCheese":1.99659,"usdPerKb":0.00193732}]
+```
 
-## Key concept (read once, makes everything below make sense)
+The chart only draws when it has 2 or more points (one point can't make a line), so every history range falls back to the placeholder text. The second sample lands on the next 4-hourly run, after which 24H/ALL start drawing. So the current behaviour is "working as coded" — but the message is misleading and the wait feels like a bug.
 
-Your site deploys from the `main` branch. If the robot saved its data on `main`, every 4-hour sample would trigger a full site rebuild — wasteful and slow. So instead the robot saves data to a **separate branch** called `ram-price-data`. Think of branches as parallel folders of your project: `main` = the website, `ram-price-data` = just a data file (`data/ram-price-history.json`). The website reads the data file directly from GitHub's "raw" file URL, so the site code and the data never interfere with each other.
+## What to change (presentation only)
 
-## Step-by-step
+Make the panel honest and useful while history is thin, in `src/components/ram/RamPricePanel.tsx`:
 
-### Step 1 — Push the code from Lovable to GitHub
-You don't need a terminal. In the Lovable editor:
-1. Click the **GitHub icon** (top right) to open the GitHub panel.
-2. Click **Sync / Push** so all the new files above land on your repo's `main` branch.
-3. Wait ~1–2 minutes for the existing GitHub Pages deploy workflow to build and publish the site.
+1. **Render a single sample instead of hiding it.** When a history range has exactly 1 point, duplicate it into two points so both charts draw a flat line at that recorded value — the same visual the WAX chart already gives when the price is stable. No more dead panel.
+2. **Replace the vague placeholder.** Show the real state instead of "Collecting history":
+   - 0 samples: `No samples recorded yet — first one lands within 4 hours.`
+   - Range empty but samples exist (e.g. ALL has data but 24H window is empty): `No samples in this range yet — try ALL.`
+3. **Add a sample counter to the footer** for history ranges, e.g. `1 sample • recorded every 4 hours since 30 Aug 2026`, pluralised. Makes it obvious the recorder is alive and how much data exists.
+4. **Leave the LIVE tab untouched** — it already behaves correctly with session data.
 
-### Step 2 — Turn on the recorder robot (first run)
-GitHub only runs scheduled workflows after they exist on `main` — which Step 1 does. To avoid waiting up to 4 hours for the first automatic run, trigger it by hand once:
-1. Open your repo on github.com.
-2. Click the **Actions** tab (top menu).
-3. In the left sidebar, click **RAM Price History**.
-4. Click the **Run workflow** dropdown (right side), keep branch = `main`, press the green **Run workflow** button.
-5. Refresh after ~30 seconds — you should see a green checkmark.
+## Optional: don't wait 4 hours
 
-What that first run does behind the scenes:
-- Creates the brand-new `ram-price-data` branch automatically (the workflow handles this — nothing for you to do).
-- Writes the first price record into `data/ram-price-history.json` on that branch.
+If you'd rather see a real line today, run the recorder a few times by hand: repo → **Actions** → **RAM Price History** → **Run workflow**. Each run appends one sample, so three or four runs spaced a few minutes apart gives an immediately drawable chart. No code change needed for this, and it doesn't affect the scheduled runs.
 
-### Step 3 — Verify it worked
-1. In your repo, click the branch dropdown (says `main`, top-left of the file list) — confirm a branch named `ram-price-data` now exists.
-2. Switch to it and open `data/ram-price-history.json` — you should see a JSON array with one record containing `t`, `waxPerKb`, `cheesePerKb`, `waxPerCheese`, `usdPerKb`.
-3. Visit the live site's CHEESERam page → price panel → click the **ALL** tab. With only one sample it will look like a dot/flat blip — that's correct. After a day you'll have ~6 points; after a week the 7D tab becomes a real chart.
+## Technical notes
 
-### Step 4 — Let it run
-Nothing more to do. Every 4 hours the robot appends one record (~6 per day). The file is capped at roughly 2 years of history so it never grows unwieldy. The site's 24H/7D/30D/ALL tabs fill in automatically.
-
-## If something goes wrong
-
-- **Actions tab shows a red X on the run:** click it → click the failed job → read the red log lines. Most common cause: the `GITHUB_TOKEN` needs write permission. Fix: repo **Settings → Actions → General → Workflow permissions → "Read and write permissions" → Save**, then re-run the workflow.
-- **ALL tab says "No historical samples yet":** the data branch doesn't exist yet (Step 2 not done) or the fetch URL is wrong. The hook defaults to `https://raw.githubusercontent.com/cheesehubwax/cheesehub/ram-price-data/data/ram-price-history.json` — confirm that matches your repo name; if not, set `VITE_RAM_HISTORY_URL` in the repo's environment/config.
-- **Scheduled runs seem late:** normal. GitHub cron can drift 5–30 minutes at busy times; the timestamps come from the script, not the schedule, so the chart stays accurate.
-
-## Technical details (for reference)
-
-- No new secrets or paid services required — uses only the built-in `GITHUB_TOKEN` and public APIs (WAX RPC endpoints + Alcor API).
-- The workflow uses `actions/checkout` + `bun` to run `scripts/ram-price-history/sample.ts`, then commits only if the data file changed.
-- The frontend hook caches history for 15 minutes and downsamples long ranges so charts stay fast.
+- Change is scoped to `RamPricePanel.tsx`; no changes to `useRamPriceHistory.ts`, the sampler script, or the workflow.
+- The single-point duplication happens in the existing `chartData` memo, keyed off range so LIVE is unaffected.
+- The hook already sorts and filters records, so the counter can read `records.length` and the sliced range length directly.
