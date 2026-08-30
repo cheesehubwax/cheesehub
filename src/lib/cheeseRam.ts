@@ -174,6 +174,77 @@ export async function fetchContractReserves(): Promise<ContractReserves> {
   return { liquidWax, cheesePool };
 }
 
+export interface ContractVoteRewards {
+  /** Estimated claimable WAX at `sampledAt`. */
+  claimable: number;
+  /** Per-second accrual so the UI can tick the estimate up. */
+  perSecond: number;
+  /** Epoch ms the estimate was computed for. */
+  sampledAt: number;
+  /** Epoch ms of the contract's last on-chain vote claim (0 when never). */
+  lastClaimTime: number;
+  /** Epoch ms the next claim becomes possible (last claim + 24h). */
+  nextClaimTime: number;
+}
+
+/**
+ * Estimated WAX voting rewards claimable by the CHEESERam contract account, using the
+ * same GBM voteshare formula the wallet's vote-rewards panel uses.
+ */
+export async function fetchContractVoteRewards(): Promise<ContractVoteRewards> {
+  const [voterRows, globalRows] = await Promise.all([
+    getTableRows<Record<string, string | number>>({
+      code: 'eosio',
+      scope: 'eosio',
+      table: 'voters',
+      lower_bound: CHEESE_RAM_CONTRACT,
+      upper_bound: CHEESE_RAM_CONTRACT,
+    }),
+    getTableRows<Record<string, string | number>>({ code: 'eosio', scope: 'eosio', table: 'global' }),
+  ]);
+
+  const voter = voterRows[0];
+  const global = globalRows[0];
+  const now = Date.now();
+
+  const empty: ContractVoteRewards = {
+    claimable: 0,
+    perSecond: 0,
+    sampledAt: now,
+    lastClaimTime: 0,
+    nextClaimTime: 0,
+  };
+  if (!voter || !global) return empty;
+
+  const parseTime = (value: unknown): number => {
+    const raw = String(value ?? '');
+    if (!raw || raw.startsWith('1970-01-01') || raw.startsWith('2000-01-01')) return 0;
+    const ms = new Date(raw.endsWith('Z') ? raw : `${raw}Z`).getTime();
+    return Number.isFinite(ms) ? ms : 0;
+  };
+
+  const lastClaimTime = parseTime(voter.last_claim_time);
+  const nextClaimTime = lastClaimTime ? lastClaimTime + 24 * 60 * 60 * 1000 : 0;
+
+  const votersBucket = (Number(global.voters_bucket ?? 0) || 0) / 100_000_000;
+  const totalUnpaid = parseFloat(String(global.total_unpaid_voteshare ?? '0')) || 0;
+  const unpaid = parseFloat(String(voter.unpaid_voteshare ?? '0')) || 0;
+  const changeRate = parseFloat(String(voter.unpaid_voteshare_change_rate ?? '0')) || 0;
+  const updatedAt = parseTime(voter.unpaid_voteshare_last_updated);
+
+  if (totalUnpaid <= 0 || votersBucket <= 0) {
+    return { ...empty, lastClaimTime, nextClaimTime };
+  }
+
+  const elapsedSecs = updatedAt ? Math.max(0, (now - updatedAt) / 1000) : 0;
+  const currentVoteshare = unpaid + changeRate * elapsedSecs;
+  const claimable = Math.max(0, (currentVoteshare / totalUnpaid) * votersBucket);
+  const perSecond = Math.max(0, (changeRate / totalUnpaid) * votersBucket);
+
+  return { claimable, perSecond, sampledAt: now, lastClaimTime, nextClaimTime };
+}
+
+
 /** RAM purchases pay a 0.5% network fee on the WAX spent. */
 const RAM_FEE_RATE = 0.005;
 
