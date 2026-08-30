@@ -6,6 +6,14 @@ export const CHEESE_RAM_CONTRACT = 'ram.chz';
 export const CHEESE_TOKEN_CONTRACT = 'cheeseburger';
 export const SELL_MEMO = 'CHEESERam sell';
 
+/**
+ * Whether the deployed contract's `claimvotes` action accepts any signer.
+ * While false, only the admin can fund the WAX pool manually (the chain rejects
+ * anyone else with `missing authority of ram.chz`). Flip to true once the
+ * contract is redeployed with a public claim path.
+ */
+export const PUBLIC_VOTE_CLAIM = false;
+
 const WAX_ENDPOINTS = [
   'https://wax.greymass.com',
   'https://wax.eosusa.io',
