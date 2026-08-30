@@ -1,32 +1,33 @@
-# Plan: Fix "Collecting history" on the ALL tab
+# CHEESERam — "Fund WAX Pool" manual vote-reward claim
 
-## What's actually happening
+Add a centred box on `/ram`, directly beneath the RAM.CHZ Liquid WAX / Liquid CHEESE values, that lets anyone push the contract's `claimvotes` action so the WAX voting rewards earned by `ram.chz` land in the liquid WAX pool.
 
-Nothing is broken. I fetched the live data file on the `ram-price-data` branch and it currently contains **exactly one** recorded sample:
+## What the user sees
 
-```text
-[{"t":1788057534923,"waxPerKb":0.44823751,"cheesePerKb":0.2245,"waxPerCheese":1.99659,"usdPerKb":0.00193732}]
-```
+- A single centred card titled **Fund WAX Pool** with:
+  - the live claimable amount (WAX) for `ram.chz`, ticking up each second like the CHEESEWallet vote-rewards panel does
+  - a short line of copy: claiming pushes the accrued WAX voting rewards into the RAM.CHZ liquid WAX pool
+  - a **Claim** button, CheeseHub yellow, full width of the box
+- Button states:
+  - enabled when a wallet is connected, there is a claimable amount, and the 24h chain cooldown has passed
+  - opaque/disabled while claiming, when the amount is 0, or while the cooldown is still running (shows `Available in 3h 12m` instead)
+- On success: success dialog with the TX ID, the claimable figure resets to 0, the button goes opaque, and the Liquid WAX value plus the resource gauges and stats refresh (reusing the existing staggered refresh already wired for buy/sell).
+- Placement: between `LiquidReservesPanel` and `RamPricePanel`, same `max-w-lg` width and card styling as the rest of the page.
 
-The chart only draws when it has 2 or more points (one point can't make a line), so every history range falls back to the placeholder text. The second sample lands on the next 4-hourly run, after which 24H/ALL start drawing. So the current behaviour is "working as coded" — but the message is misleading and the wait feels like a bug.
+## Data
 
-## What to change (presentation only)
+Claimable WAX is derived on-chain exactly the way the CHEESEWallet vote-rewards panel already does it, but for the contract account instead of the user:
 
-Make the panel honest and useful while history is thin, in `src/components/ram/RamPricePanel.tsx`:
-
-1. **Render a single sample instead of hiding it.** When a history range has exactly 1 point, duplicate it into two points so both charts draw a flat line at that recorded value — the same visual the WAX chart already gives when the price is stable. No more dead panel.
-2. **Replace the vague placeholder.** Show the real state instead of "Collecting history":
-   - 0 samples: `No samples recorded yet — first one lands within 4 hours.`
-   - Range empty but samples exist (e.g. ALL has data but 24H window is empty): `No samples in this range yet — try ALL.`
-3. **Add a sample counter to the footer** for history ranges, e.g. `1 sample • recorded every 4 hours since 30 Aug 2026`, pluralised. Makes it obvious the recorder is alive and how much data exists.
-4. **Leave the LIVE tab untouched** — it already behaves correctly with session data.
-
-## Optional: don't wait 4 hours
-
-If you'd rather see a real line today, run the recorder a few times by hand: repo → **Actions** → **RAM Price History** → **Run workflow**. Each run appends one sample, so three or four runs spaced a few minutes apart gives an immediately drawable chart. No code change needed for this, and it doesn't affect the scheduled runs.
+- `eosio::voters` row for `ram.chz` — `unpaid_voteshare`, `unpaid_voteshare_change_rate`, `unpaid_voteshare_last_updated`, `last_claim_time`
+- `eosio::global` — `voters_bucket`, `total_unpaid_voteshare`
+- estimate = `(unpaid_voteshare + change_rate * elapsed) / total_unpaid_voteshare * voters_bucket`
+- cooldown = `last_claim_time + 24h`
 
 ## Technical notes
 
-- Change is scoped to `RamPricePanel.tsx`; no changes to `useRamPriceHistory.ts`, the sampler script, or the workflow.
-- The single-point duplication happens in the existing `chartData` memo, keyed off range so LIVE is unaffected.
-- The hook already sorts and filters records, so the counter can read `records.length` and the sliced range length directly.
+- New helper in `src/lib/cheeseRam.ts`: `fetchContractVoteRewards()` returning `{ claimable, lastClaimTime, canClaim }`, using the existing `fetchWithFallback` + `WAX_ENDPOINTS` pattern.
+- New hook `src/hooks/useCheeseRamVoteRewards.ts` (react-query, 30s stale / 60s refetch) plus a 1s ticker in the component for the live accrual display.
+- New component `src/components/ram/FundWaxPoolCard.tsx` — signs `{ account: 'ram.chz', name: 'claimvotes', data: {} }` with the connected session through `getTransactPlugins` (Greymass Fuel), verifies the TX ID, reports via `TransactionSuccessContext`, and parses failures with `parseTransactError`.
+- `src/pages/Ram.tsx`: render the card under `LiquidReservesPanel`, add the vote-rewards refetch into the existing `refreshAll` callback so a claim also refreshes reserves, gauges and stats.
+- The `claimvotes` action takes no arguments. If the on-chain contract restricts it to the admin authority, the signed transaction will fail with a missing-authority error — that case is surfaced as a clear toast, and the contract itself would need a permission change to allow public claiming. This is the one point to confirm on the first live claim attempt.
+- No new terms-of-use checkbox: this is not a user-funds transaction, matching how the existing wallet claim buttons behave.
