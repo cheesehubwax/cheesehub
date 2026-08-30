@@ -102,14 +102,19 @@ async function fetchAlcorRates(): Promise<{ waxPerCheese: number; waxPerUsdc: nu
   const response = await fetchWithTimeout(ALCOR_TOKENS_URL);
   if (!response.ok) throw new Error(`Alcor tokens returned ${response.status}`);
   const tokens = (await response.json()) as {
-    ticker?: string;
+    id?: string;
+    symbol?: string;
     contract?: string;
     system_price?: number | string;
   }[];
   if (!Array.isArray(tokens)) throw new Error("Alcor tokens returned an unexpected payload");
 
-  const find = (ticker: string, contract: string) =>
-    tokens.find((t) => t.ticker === ticker && t.contract === contract);
+  const find = (symbol: string, contract: string) =>
+    tokens.find(
+      (t) =>
+        t.id === `${symbol.toLowerCase()}-${contract}` ||
+        (t.symbol === symbol && t.contract === contract),
+    );
 
   const waxPerCheese = Number(find("CHEESE", "cheeseburger")?.system_price ?? 0);
   const waxPerUsdc = Number(find("WAXUSDC", "eth.token")?.system_price ?? 0);
