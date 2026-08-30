@@ -97,7 +97,7 @@ export function DepositRewardsDialog({ farm, open, onOpenChange, onSuccess, isCr
               </div>
             </div>
           ))}
-          <TermsCheckbox id="terms-deposit-rewards" checked={termsAgreed} onCheckedChange={setTermsAgreed} extraText="and understand that deposits to farms.waxdao are non-refundable." />
+          <TermsCheckbox id="terms-deposit-rewards" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
