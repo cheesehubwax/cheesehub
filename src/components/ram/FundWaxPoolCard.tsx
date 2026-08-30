@@ -51,9 +51,8 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
   const cooldownRemaining = data?.nextClaimTime ? Math.max(0, data.nextClaimTime - now) : 0;
   const onCooldown = cooldownRemaining > 0;
   const hasRewards = claimable > 0;
-  // Until the contract exposes a public claim, only the admin can sign `claimvotes`.
-  const mayClaim = PUBLIC_VOTE_CLAIM || isWhitelisted;
-  const canClaim = isConnected && mayClaim && !isTransacting && !onCooldown && hasRewards;
+  const canClaim = isConnected && !isTransacting && !onCooldown && hasRewards;
+
 
   const handleClaim = async () => {
     if (!isConnected || !session) {
