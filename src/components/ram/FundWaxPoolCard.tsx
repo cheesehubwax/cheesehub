@@ -108,7 +108,7 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
       <img src={waxLogoUrl} alt="WAX" className="w-6 h-6 object-contain" />
       <div className="text-left">
         <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Fund WAX Pool</p>
-        <p className="text-sm font-bold font-mono text-foreground">{claimable.toFixed(8)} WAX</p>
+        <p className="text-sm font-bold font-mono text-foreground">{claimable.toFixed(2)} WAX</p>
       </div>
 
       {isConnected && (
