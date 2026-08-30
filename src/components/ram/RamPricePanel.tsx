@@ -1,6 +1,13 @@
+import { useMemo, useState } from 'react';
 import { AreaChart, Area, ResponsiveContainer, Tooltip, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import type { RamPricePoint } from '@/hooks/useCheeseRam';
+import {
+  RAM_HISTORY_RANGES,
+  sliceRange,
+  useRamPriceHistory,
+  type RamHistoryRange,
+} from '@/hooks/useRamPriceHistory';
 
 interface RamPricePanelProps {
   cheesePerKb: number | null;
@@ -8,15 +15,94 @@ interface RamPricePanelProps {
   history: RamPricePoint[];
 }
 
+type ChartPoint = { time: number; waxPerKb: number; cheesePerKb: number | null };
+type RangeKey = 'live' | RamHistoryRange;
+
+const formatStamp = (time: number, range: RangeKey) =>
+  range === 'live' || range === '24h'
+    ? new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : new Date(time).toLocaleDateString([], { day: 'numeric', month: 'short' });
+
 export function RamPricePanel({ cheesePerKb, pricePerByte, history }: RamPricePanelProps) {
-  const chartData = history.filter((point) => point.cheesePerKb !== null);
+  const [range, setRange] = useState<RangeKey>('live');
+  const { records, firstSampleAt, isLoading: historyLoading } = useRamPriceHistory();
+
+  const chartData = useMemo<ChartPoint[]>(() => {
+    if (range === 'live') {
+      return history
+        .filter((point) => point.cheesePerKb !== null)
+        .map((point) => ({
+          time: point.time,
+          waxPerKb: point.waxPerKb,
+          cheesePerKb: point.cheesePerKb,
+        }));
+    }
+    return sliceRange(records, range).map((record) => ({
+      time: record.t,
+      waxPerKb: record.waxPerKb,
+      cheesePerKb: record.cheesePerKb,
+    }));
+  }, [range, history, records]);
+
   const hasChart = chartData.length >= 2;
+  const emptyMessage =
+    range === 'live'
+      ? 'Building price history...'
+      : historyLoading
+        ? 'Loading history...'
+        : 'Collecting history — recorded every 4 hours.';
+
+  const footer =
+    range === 'live'
+      ? 'Updates every 30s • Session data only'
+      : firstSampleAt
+        ? `Recorded every 4 hours since ${new Date(firstSampleAt).toLocaleDateString([], {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+          })}`
+        : 'Recorded every 4 hours';
+
+  const renderTooltip = (decimals: number, unit: string, textClass: string) =>
+    ({ active, payload }: { active?: boolean; payload?: { value?: unknown; payload?: ChartPoint }[] }) =>
+      active && payload?.length ? (
+        <div className="bg-background/95 border border-border px-2 py-1 rounded text-xs font-mono">
+          <span className={textClass}>
+            {(payload[0].value as number).toFixed(decimals)} {unit}
+          </span>
+          {payload[0].payload && (
+            <span className="text-muted-foreground ml-1.5">
+              {formatStamp(payload[0].payload.time, range)}
+            </span>
+          )}
+        </div>
+      ) : null;
 
   return (
     <div className="rounded-xl p-4 max-w-lg w-full bg-card border border-border/50">
       <div className="flex items-center gap-2 mb-3">
         <OpenMojiIcon emoji="📈" size={18} />
         <span className="text-sm font-medium text-foreground">Live RAM Price</span>
+      </div>
+
+      {/* Range tabs — LIVE is the session sparkline, the rest are recorded history */}
+      <div className="flex items-center justify-center gap-1 mb-3">
+        {([{ key: 'live', label: 'LIVE' }, ...RAM_HISTORY_RANGES] as { key: RangeKey; label: string }[]).map(
+          (tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setRange(tab.key)}
+              className={`px-2 py-0.5 rounded text-[10px] font-semibold tracking-wide transition-colors ${
+                range === tab.key
+                  ? 'bg-primary/20 text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ),
+        )}
       </div>
 
       {/* WAX price — own header + own graph (8 decimals, WAX per KB) */}
@@ -43,15 +129,7 @@ export function RamPricePanel({ cheesePerKb, pricePerByte, history }: RamPricePa
                   </linearGradient>
                 </defs>
                 <YAxis domain={['dataMin', 'dataMax']} hide />
-                <Tooltip
-                  content={({ active, payload }) =>
-                    active && payload?.length ? (
-                      <div className="bg-background/95 border border-border px-2 py-1 rounded text-xs font-mono text-white">
-                        {(payload[0].value as number).toFixed(8)} WAX/KB
-                      </div>
-                    ) : null
-                  }
-                />
+                <Tooltip content={renderTooltip(8, 'WAX/KB', 'text-white')} />
                 <Area
                   type="monotone"
                   dataKey="waxPerKb"
@@ -64,7 +142,7 @@ export function RamPricePanel({ cheesePerKb, pricePerByte, history }: RamPricePa
           </div>
         ) : (
           <div className="h-12 flex items-center justify-center">
-            <span className="text-xs text-muted-foreground">Building price history...</span>
+            <span className="text-xs text-muted-foreground">{emptyMessage}</span>
           </div>
         )}
       </div>
@@ -93,15 +171,7 @@ export function RamPricePanel({ cheesePerKb, pricePerByte, history }: RamPricePa
                   </linearGradient>
                 </defs>
                 <YAxis domain={['dataMin', 'dataMax']} hide />
-                <Tooltip
-                  content={({ active, payload }) =>
-                    active && payload?.length ? (
-                      <div className="bg-background/95 border border-border px-2 py-1 rounded text-xs font-mono text-primary">
-                        {(payload[0].value as number).toFixed(4)} CHEESE/KB
-                      </div>
-                    ) : null
-                  }
-                />
+                <Tooltip content={renderTooltip(4, 'CHEESE/KB', 'text-primary')} />
                 <Area
                   type="monotone"
                   dataKey="cheesePerKb"
@@ -114,14 +184,12 @@ export function RamPricePanel({ cheesePerKb, pricePerByte, history }: RamPricePa
           </div>
         ) : (
           <div className="h-12 flex items-center justify-center">
-            <span className="text-xs text-muted-foreground">Building price history...</span>
+            <span className="text-xs text-muted-foreground">{emptyMessage}</span>
           </div>
         )}
       </div>
 
-      <p className="text-[10px] text-muted-foreground mt-2 text-center">
-        Updates every 30s • Session data only
-      </p>
+      <p className="text-[10px] text-muted-foreground mt-2 text-center">{footer}</p>
     </div>
   );
 }
