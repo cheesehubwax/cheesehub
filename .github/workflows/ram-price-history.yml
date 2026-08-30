@@ -2,12 +2,18 @@ name: RAM Price History
 
 on:
   schedule:
-    # Every 4 hours, offset off the hour so it doesn't collide with other jobs.
-    - cron: "7 */4 * * *"
+    # Twice daily (~00:00 and ~12:00 UTC), each with a catch-up tick two hours
+    # later in case GitHub's shared cron queue drops the primary one. The
+    # sampler's 10h guard makes the catch-up tick a no-op when the primary ran.
+    - cron: "23 0 * * *"    # primary, 00:00 sample
+    - cron: "23 2 * * *"    # catch-up
+    - cron: "23 12 * * *"   # primary, 12:00 sample
+    - cron: "23 14 * * *"   # catch-up
   workflow_dispatch:
     inputs:
       force:
-        description: "Set to '1' to bypass the 'last sample under 2h old' guard"
+        description: "Set to '1' to bypass the 'last sample under 10h old' guard"
+
         required: false
         default: "0"
 
