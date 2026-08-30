@@ -26,6 +26,7 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
   const { session, isConnected, login } = useWax();
   const { showSuccess } = useTransactionSuccess();
   const { data, refetch } = useCheeseRamVoteRewards();
+  const { isWhitelisted } = useAdminAccess();
   const [isTransacting, setIsTransacting] = useState(false);
   const [justClaimed, setJustClaimed] = useState(false);
   const [now, setNow] = useState(() => Date.now());
