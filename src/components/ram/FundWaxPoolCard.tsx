@@ -5,9 +5,8 @@ import { Button } from '@/components/ui/button';
 import { useWax } from '@/context/WaxContext';
 import { useTransactionSuccess } from '@/context/TransactionSuccessContext';
 import { useCheeseRamVoteRewards } from '@/hooks/useCheeseRamVoteRewards';
-import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { closeWharfkitModals, getTransactPlugins, parseTransactError } from '@/lib/wharfKit';
-import { CHEESE_RAM_CONTRACT, PUBLIC_VOTE_CLAIM } from '@/lib/cheeseRam';
+import { CHEESE_RAM_CONTRACT } from '@/lib/cheeseRam';
 import waxLogoUrl from '@/assets/wax-seal.png';
 
 interface FundWaxPoolCardProps {
@@ -26,7 +25,6 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
   const { session, isConnected, login } = useWax();
   const { showSuccess } = useTransactionSuccess();
   const { data, refetch } = useCheeseRamVoteRewards();
-  const { isWhitelisted } = useAdminAccess();
   const [isTransacting, setIsTransacting] = useState(false);
   const [justClaimed, setJustClaimed] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -51,9 +49,8 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
   const cooldownRemaining = data?.nextClaimTime ? Math.max(0, data.nextClaimTime - now) : 0;
   const onCooldown = cooldownRemaining > 0;
   const hasRewards = claimable > 0;
-  // Until the contract exposes a public claim, only the admin can sign `claimvotes`.
-  const mayClaim = PUBLIC_VOTE_CLAIM || isWhitelisted;
-  const canClaim = isConnected && mayClaim && !isTransacting && !onCooldown && hasRewards;
+  const canClaim = isConnected && !isTransacting && !onCooldown && hasRewards;
+
 
   const handleClaim = async () => {
     if (!isConnected || !session) {
@@ -124,13 +121,8 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
         <p className="text-sm font-bold font-mono text-foreground">{claimable.toFixed(2)} WAX</p>
       </div>
 
-      {!mayClaim && (
-        <p className="ml-auto text-[10px] text-muted-foreground text-right max-w-[55%] leading-tight">
-          Claimed automatically on each RAM purchase
-        </p>
-      )}
+      {isConnected && (
 
-      {isConnected && mayClaim && (
         <Button
           onClick={handleClaim}
           disabled={!canClaim}
