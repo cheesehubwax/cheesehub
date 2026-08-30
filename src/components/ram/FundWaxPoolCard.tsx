@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { useWax } from '@/context/WaxContext';
 import { useTransactionSuccess } from '@/context/TransactionSuccessContext';
 import { useCheeseRamVoteRewards } from '@/hooks/useCheeseRamVoteRewards';
@@ -111,7 +110,6 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
         <h2 className="text-lg font-bold">
           <span className="text-cheese">Fund</span> <span className="text-foreground">WAX Pool</span>
         </h2>
-        <OpenMojiIcon emoji="🎁" size={18} />
       </div>
 
       <div>
