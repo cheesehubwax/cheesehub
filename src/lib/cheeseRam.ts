@@ -8,11 +8,10 @@ export const SELL_MEMO = 'CHEESERam sell';
 
 /**
  * Whether the deployed contract's `claimvotes` action accepts any signer.
- * While false, only the admin can fund the WAX pool manually (the chain rejects
- * anyone else with `missing authority of ram.chz`). Flip to true once the
- * contract is redeployed with a public claim path.
+ * The `ram.chz` contract has been redeployed with a public claim path, so
+ * any connected wallet can now fund the WAX pool manually.
  */
-export const PUBLIC_VOTE_CLAIM = false;
+export const PUBLIC_VOTE_CLAIM = true;
 
 const WAX_ENDPOINTS = [
   'https://wax.greymass.com',
