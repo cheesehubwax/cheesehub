@@ -107,31 +107,31 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
     <div className="flex items-center gap-2 rounded-lg bg-card/50 border border-border/50 px-4 py-2">
       <img src={waxLogoUrl} alt="WAX" className="w-6 h-6 object-contain" />
       <div className="text-left">
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Claimable rewards</p>
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Fund WAX Pool</p>
         <p className="text-sm font-bold font-mono text-foreground">{claimable.toFixed(8)} WAX</p>
       </div>
 
-      <Button
-        onClick={handleClaim}
-        disabled={isConnected && !canClaim}
-        size="sm"
-        className="ml-auto h-7 px-3 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-bold disabled:opacity-40"
-      >
-        {isTransacting ? (
-          <>
-            <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
-            Claiming...
-          </>
-        ) : !isConnected ? (
-          'Connect'
-        ) : onCooldown ? (
-          formatCountdown(cooldownRemaining)
-        ) : !hasRewards ? (
-          'No rewards'
-        ) : (
-          'Claim'
-        )}
-      </Button>
+      {isConnected && (
+        <Button
+          onClick={handleClaim}
+          disabled={!canClaim}
+          size="sm"
+          className="ml-auto h-7 px-3 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-bold disabled:opacity-40"
+        >
+          {isTransacting ? (
+            <>
+              <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+              Claiming...
+            </>
+          ) : onCooldown ? (
+            formatCountdown(cooldownRemaining)
+          ) : !hasRewards ? (
+            'No rewards'
+          ) : (
+            'Claim'
+          )}
+        </Button>
+      )}
     </div>
   );
 }
