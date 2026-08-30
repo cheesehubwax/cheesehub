@@ -6,8 +6,6 @@ interface TermsCheckboxProps {
   id?: string;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
-  /** Extra sentence appended after the terms link, e.g. "and understand the CHEESE I spend is nulled forever." */
-  extraText?: string;
   className?: string;
 }
 
@@ -16,7 +14,7 @@ interface TermsCheckboxProps {
  * with the Terms of Use opening the TermsDialog. Pair with a state boolean and
  * gate the action button's `disabled` prop.
  */
-export function TermsCheckbox({ id = "terms-confirm", checked, onCheckedChange, extraText, className }: TermsCheckboxProps) {
+export function TermsCheckbox({ id = "terms-confirm", checked, onCheckedChange, className }: TermsCheckboxProps) {
   return (
     <div className={cn("flex items-start gap-2", className)}>
       <Checkbox
@@ -26,7 +24,7 @@ export function TermsCheckbox({ id = "terms-confirm", checked, onCheckedChange, 
         className="mt-0.5"
       />
       <label htmlFor={id} className="text-sm text-muted-foreground leading-snug cursor-pointer select-none">
-        I have read and agree to the <TermsDialog />{extraText ? ` ${extraText}` : ""}
+        I have read and agree to the <TermsDialog />
       </label>
     </div>
   );

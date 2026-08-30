@@ -185,7 +185,7 @@ export function WojakUnboxManager({ onTransactionComplete, onTransactionSuccess 
       )}
 
       {/* Terms gate */}
-      <TermsCheckbox id="terms-wojak-unbox" checked={termsAgreed} onCheckedChange={setTermsAgreed} extraText="and understand opening a pack permanently destroys it on-chain." />
+      <TermsCheckbox id="terms-wojak-unbox" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
     </div>
   );
 }

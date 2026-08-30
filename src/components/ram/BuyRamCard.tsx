@@ -317,7 +317,7 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
           className="mt-0.5"
         />
         <label htmlFor="terms-buy-ram" className="text-xs text-muted-foreground leading-relaxed">
-          I have read and agree to the <TermsDialog /> and understand the CHEESE I spend is nulled forever.
+          I have read and agree to the <TermsDialog />
         </label>
       </div>
 

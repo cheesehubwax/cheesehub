@@ -238,7 +238,7 @@ export function SellRamCard({
           className="mt-0.5"
         />
         <label htmlFor="terms-sell-ram" className="text-xs text-muted-foreground leading-relaxed">
-          I have read and agree to the <TermsDialog /> and understand my RAM is sent to the contract in exchange for CHEESE.
+          I have read and agree to the <TermsDialog />
         </label>
       </div>
 
