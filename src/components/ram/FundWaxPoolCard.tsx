@@ -104,42 +104,30 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
   };
 
   return (
-    <div className="rounded-2xl p-5 max-w-lg w-full bg-card border border-border/50 space-y-4 text-center">
-      <div className="flex items-center justify-center gap-2">
-        <img src={waxLogoUrl} alt="WAX" className="w-6 h-6 object-contain" />
-        <h2 className="text-lg font-bold">
-          <span className="text-cheese">Fund</span> <span className="text-foreground">WAX Pool</span>
-        </h2>
+    <div className="flex items-center gap-2 rounded-lg bg-card/50 border border-border/50 px-4 py-2">
+      <img src={waxLogoUrl} alt="WAX" className="w-6 h-6 object-contain" />
+      <div className="text-left">
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Claimable rewards</p>
+        <p className="text-sm font-bold font-mono text-foreground">{claimable.toFixed(8)} WAX</p>
       </div>
-
-      <div>
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-          Claimable voting rewards
-        </p>
-        <p className="text-2xl font-bold font-mono text-cheese">{claimable.toFixed(8)} WAX</p>
-      </div>
-
-      <p className="text-xs text-muted-foreground leading-relaxed">
-        Anyone can claim the WAX voting rewards earned by {CHEESE_RAM_CONTRACT}. The claimed WAX goes
-        straight into the RAM.CHZ liquid WAX pool.
-      </p>
 
       <Button
         onClick={handleClaim}
         disabled={isConnected && !canClaim}
-        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold disabled:opacity-40"
+        size="sm"
+        className="ml-auto h-7 px-3 text-xs bg-primary hover:bg-primary/90 text-primary-foreground font-bold disabled:opacity-40"
       >
         {isTransacting ? (
           <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
             Claiming...
           </>
         ) : !isConnected ? (
-          'Connect Wallet'
+          'Connect'
         ) : onCooldown ? (
-          `Available in ${formatCountdown(cooldownRemaining)}`
+          formatCountdown(cooldownRemaining)
         ) : !hasRewards ? (
-          'Nothing to claim'
+          'No rewards'
         ) : (
           'Claim'
         )}

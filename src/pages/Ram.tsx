@@ -121,7 +121,9 @@ const Ram = () => {
       <main className="container pb-12 flex flex-col items-center gap-6">
         <ResourceGauges />
         <LiquidReservesPanel reserves={reserves} />
-        <FundWaxPoolCard onComplete={handleComplete} />
+        <div className="w-full max-w-lg flex justify-center">
+          <FundWaxPoolCard onComplete={handleComplete} />
+        </div>
         <RamPricePanel cheesePerKb={cheesePerKb} pricePerByte={pricePerByte} history={history} />
 
         <Tabs defaultValue="buy" className="w-full max-w-lg">
