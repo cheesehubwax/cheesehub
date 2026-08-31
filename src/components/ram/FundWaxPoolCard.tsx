@@ -59,6 +59,20 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
     }
     if (!canClaim) return;
 
+    const startedAt = Date.now();
+    const amount = claimable;
+
+    const finishSuccess = (txId: string) => {
+      setJustClaimed(true);
+      showSuccess(
+        'WAX Pool Funded!',
+        `Claimed ~${amount.toFixed(2)} WAX of voting rewards into the ${CHEESE_RAM_CONTRACT} liquid WAX pool.`,
+        txId,
+      );
+      refetch();
+      onComplete?.();
+    };
+
     setIsTransacting(true);
     try {
       const result = await session.transact(
@@ -76,21 +90,20 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
       );
       const txId = result.resolved?.transaction.id?.toString() ?? null;
       if (!txId) {
-        toast.error('Transaction may not have confirmed', {
-          description: 'Please check the contract account on waxblock.io.',
-          duration: 10000,
-        });
+        const match = await pollForConfirmation(() => findRecentVoteClaim(startedAt), 4, 3000);
+        if (match) {
+          finishSuccess(match.txId);
+        } else {
+          toast.warning('Claim not confirmed', {
+            description: `Your claim was signed but we could not confirm it. Check ${CHEESE_RAM_CONTRACT} on waxblock.io before trying again.`,
+            duration: 15000,
+          });
+          refetch();
+        }
         return;
       }
 
-      setJustClaimed(true);
-      showSuccess(
-        'WAX Pool Funded!',
-        `Claimed ~${claimable.toFixed(2)} WAX of voting rewards into the ${CHEESE_RAM_CONTRACT} liquid WAX pool.`,
-        txId,
-      );
-      refetch();
-      onComplete?.();
+      finishSuccess(txId);
     } catch (error) {
       console.error('[CHEESERam] Claim votes failed:', error);
       const raw = (error instanceof Error ? error.message : String(error)).toLowerCase();
@@ -103,6 +116,19 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
         return;
       }
       const info = parseTransactError(error);
+      if (info.type === 'unconfirmed') {
+        // The claim may already be on-chain — verify instead of inviting a retry.
+        const match = info.txId
+          ? { txId: info.txId, timestamp: startedAt }
+          : await pollForConfirmation(() => findRecentVoteClaim(startedAt), 4, 3000);
+        if (match) {
+          finishSuccess(match.txId);
+        } else {
+          toast.warning(info.title, { description: info.description, duration: info.duration });
+          refetch();
+        }
+        return;
+      }
       if (info.type !== 'cancelled') {
         toast.error(info.title, { description: info.description, duration: info.duration });
       }
@@ -112,6 +138,7 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
       setTimeout(() => closeWharfkitModals(), 300);
     }
   };
+
 
   return (
     <div className="flex items-center gap-2 rounded-lg bg-card/50 border border-border/50 px-4 py-2">
