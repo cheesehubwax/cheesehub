@@ -153,14 +153,20 @@ async function main() {
   const force = process.env.FORCE === "1";
 
   const history = await readHistory(file);
-  const last = history[history.length - 1];
   const now = Date.now();
-  if (!force && last && now - last.t < MIN_GAP_MS) {
+  const currentSlot = slotStart(now);
+  const existing = history.find((r) => slotStart(r.t) === currentSlot);
+  console.log(`Now ${new Date(now).toISOString()} → ${slotLabel(currentSlot)}.`);
+  if (existing && !force) {
     console.log(
-      `Last sample is ${Math.round((now - last.t) / 60000)}m old (< ${MIN_GAP_MS / 3600000}h) — skipping.`
+      `Slot already filled by sample at ${new Date(existing.t).toISOString()} — skipping.`,
     );
     return;
   }
+  if (existing && force) {
+    console.log("Slot already filled, but FORCE=1 — recording anyway.");
+  }
+
 
   // Both reads must succeed; a partial sample would poison the series.
   const [waxPerByte, rates] = await Promise.all([fetchRamPricePerByte(), fetchAlcorRates()]);
