@@ -272,6 +272,10 @@ export function SellRamCard({
         <p className="text-xs text-destructive">RAM sales are currently disabled by the contract.</p>
       )}
 
+      {unconfirmed && (
+        <UnconfirmedNotice state={unconfirmed} onAcknowledge={() => setUnconfirmed(null)} />
+      )}
+
       <div className="flex items-start gap-2">
         <Checkbox
           id="terms-sell-ram"
@@ -289,15 +293,18 @@ export function SellRamCard({
         disabled={isConnected && !canSubmit}
         className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold"
       >
-        {isTransacting ? (
+        {isTransacting || unconfirmed?.checking ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Selling RAM...
+            {unconfirmed?.checking ? 'Verifying…' : 'Selling RAM...'}
           </>
+        ) : unconfirmed ? (
+          'Awaiting your check'
         ) : !isConnected ? (
           'Connect Wallet'
         ) : (
           'Sell RAM for CHEESE'
+
         )}
       </Button>
     </div>
