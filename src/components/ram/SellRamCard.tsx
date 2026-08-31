@@ -47,6 +47,8 @@ export function SellRamCard({
   const [bytesInput, setBytesInput] = useState('');
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [isTransacting, setIsTransacting] = useState(false);
+  const [unconfirmed, setUnconfirmed] = useState<UnconfirmedState | null>(null);
+
 
   const bytes = parseInt(bytesInput, 10) || 0;
   const quoteRate = resolveQuoteRate(config, liveWaxPerCheese);
