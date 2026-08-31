@@ -49,6 +49,8 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
   const [recipient, setRecipient] = useState(accountName || '');
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [isTransacting, setIsTransacting] = useState(false);
+  const [unconfirmed, setUnconfirmed] = useState<UnconfirmedState | null>(null);
+
 
   useEffect(() => {
     if (accountName) setRecipient(accountName);
