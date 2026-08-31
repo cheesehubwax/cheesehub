@@ -2,20 +2,23 @@ name: RAM Price History
 
 on:
   schedule:
-    # Twice daily (~00:00 and ~12:00 UTC), each with a catch-up tick two hours
-    # later in case GitHub's shared cron queue drops the primary one. The
-    # sampler's 10h guard makes the catch-up tick a no-op when the primary ran.
-    - cron: "23 0 * * *"    # primary, 00:00 sample
-    - cron: "23 2 * * *"    # catch-up
-    - cron: "23 12 * * *"   # primary, 12:00 sample
-    - cron: "23 14 * * *"   # catch-up
+    # Two samples per UTC day: one in the 00:00-11:59 slot and one in the
+    # 12:00-23:59 slot. Each slot has three ticks because GitHub's shared cron
+    # queue often delays or drops them. The sampler records only when the
+    # current slot has no sample yet, so the extra ticks are free no-ops.
+    - cron: "23 0 * * *"
+    - cron: "23 2 * * *"
+    - cron: "23 5 * * *"
+    - cron: "23 12 * * *"
+    - cron: "23 14 * * *"
+    - cron: "23 17 * * *"
   workflow_dispatch:
     inputs:
       force:
-        description: "Set to '1' to bypass the 'last sample under 10h old' guard"
-
+        description: "Set to '1' to record even when this 12h slot already has a sample"
         required: false
         default: "0"
+
 
 concurrency:
   group: ram-price-history
