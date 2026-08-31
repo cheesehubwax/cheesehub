@@ -20,11 +20,18 @@ const ENDPOINTS = [
 const ALCOR_TOKENS_URL = "https://wax.alcor.exchange/api/v2/tokens";
 
 /**
- * Skip the append when the newest record is younger than this. Sits between
- * the 2h catch-up gap and the 12h primary gap, so a catch-up tick only records
- * when the primary tick was actually dropped.
+ * Sampling slots per UTC day. Each run resolves to the slot it lands in and
+ * records only when that slot has no sample yet, so a cron tick delayed by
+ * hours still lands, and a manual run only fills its own slot instead of
+ * suppressing the next scheduled one.
  */
-const MIN_GAP_MS = 10 * 60 * 60 * 1000;
+const SLOT_LENGTH_MS = 12 * 60 * 60 * 1000;
+
+/** Start of the 12h slot containing `t`, in epoch ms. */
+const slotStart = (t: number) => Math.floor(t / SLOT_LENGTH_MS) * SLOT_LENGTH_MS;
+const slotLabel = (start: number) =>
+  `${new Date(start).toISOString().slice(0, 13)}:00Z slot`;
+
 /** ~2 years of twice-daily samples. */
 const MAX_RECORDS = 1600;
 const TIMEOUT_MS = 10_000;
@@ -146,14 +153,20 @@ async function main() {
   const force = process.env.FORCE === "1";
 
   const history = await readHistory(file);
-  const last = history[history.length - 1];
   const now = Date.now();
-  if (!force && last && now - last.t < MIN_GAP_MS) {
+  const currentSlot = slotStart(now);
+  const existing = history.find((r) => slotStart(r.t) === currentSlot);
+  console.log(`Now ${new Date(now).toISOString()} → ${slotLabel(currentSlot)}.`);
+  if (existing && !force) {
     console.log(
-      `Last sample is ${Math.round((now - last.t) / 60000)}m old (< ${MIN_GAP_MS / 3600000}h) — skipping.`
+      `Slot already filled by sample at ${new Date(existing.t).toISOString()} — skipping.`,
     );
     return;
   }
+  if (existing && force) {
+    console.log("Slot already filled, but FORCE=1 — recording anyway.");
+  }
+
 
   // Both reads must succeed; a partial sample would poison the series.
   const [waxPerByte, rates] = await Promise.all([fetchRamPricePerByte(), fetchAlcorRates()]);
