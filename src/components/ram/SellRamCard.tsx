@@ -15,10 +15,14 @@ import {
   CHEESE_RAM_CONTRACT,
   SELL_MEMO,
   estimateCheeseForBytes,
+  findRecentSell,
+  pollForConfirmation,
   resolveQuoteRate,
   type CheeseRamConfig,
   type ContractReserves,
 } from '@/lib/cheeseRam';
+import { UnconfirmedNotice, type UnconfirmedState } from '@/components/ram/UnconfirmedNotice';
+
 
 interface SellRamCardProps {
   config: CheeseRamConfig | null | undefined;
