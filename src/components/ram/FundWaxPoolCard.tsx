@@ -68,7 +68,7 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
               account: CHEESE_RAM_CONTRACT,
               name: 'claimvotes',
               authorization: [session.permissionLevel],
-              data: {},
+              data: { caller: session.permissionLevel.actor.toString() },
             },
           ],
         },
