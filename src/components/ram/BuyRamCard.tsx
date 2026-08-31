@@ -363,6 +363,10 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
         <p className="text-xs text-destructive">RAM purchases are currently disabled by the contract.</p>
       )}
 
+      {unconfirmed && (
+        <UnconfirmedNotice state={unconfirmed} onAcknowledge={() => setUnconfirmed(null)} />
+      )}
+
       <div className="flex items-start gap-2">
         <Checkbox
           id="terms-buy-ram"
@@ -380,16 +384,19 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
         disabled={isConnected && !canSubmit}
         className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold"
       >
-        {isTransacting ? (
+        {isTransacting || unconfirmed?.checking ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Buying RAM...
+            {unconfirmed?.checking ? 'Verifying…' : 'Buying RAM...'}
           </>
+        ) : unconfirmed ? (
+          'Awaiting your check'
         ) : !isConnected ? (
           'Connect Wallet'
         ) : (
           'Buy RAM with CHEESE'
         )}
+
       </Button>
     </div>
   );
