@@ -213,11 +213,44 @@ export function ensureModalOnTop() {
 
 // Centralized transaction error parsing for WharfKit/Fuel errors
 export interface TransactErrorInfo {
-  type: 'fuel_rejected' | 'fuel_unreachable' | 'cpu_billing' | 'net_billing' | 'not_broadcast' | 'cancelled' | 'generic';
+  type:
+    | 'fuel_rejected'
+    | 'fuel_unreachable'
+    | 'unconfirmed'
+    | 'cpu_billing'
+    | 'net_billing'
+    | 'not_broadcast'
+    | 'cancelled'
+    | 'generic';
   title: string;
   description: string;
   duration: number;
+  /** Transaction id recovered from the error, when the wallet already resolved one. */
+  txId?: string | null;
 }
+
+/**
+ * Dig a transaction id out of a thrown WharfKit error. When one is present the
+ * transaction was signed (and usually broadcast), so the outcome is unknown
+ * rather than failed.
+ */
+export function extractErrorTxId(error: unknown): string | null {
+  const candidates = [
+    (error as any)?.transaction?.id,
+    (error as any)?.resolved?.transaction?.id,
+    (error as any)?.response?.transaction_id,
+    (error as any)?.cause?.transaction?.id,
+    (error as any)?.cause?.resolved?.transaction?.id,
+    (error as any)?.cause?.response?.transaction_id,
+  ];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const id = String(candidate);
+    if (/^[0-9a-f]{64}$/i.test(id)) return id;
+  }
+  return null;
+}
+
 
 export function parseTransactError(error: unknown): TransactErrorInfo {
   const msg = error instanceof Error ? error.message : String(error);
