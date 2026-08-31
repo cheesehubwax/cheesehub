@@ -16,12 +16,16 @@ import {
   CHEESE_TOKEN_CONTRACT,
   estimateBytesForCheese,
   estimateCheeseForTargetBytes,
+  findRecentBuy,
+  pollForConfirmation,
   resolveQuoteRate,
   type CheeseRamConfig,
 } from '@/lib/cheeseRam';
+import { UnconfirmedNotice, type UnconfirmedState } from '@/components/ram/UnconfirmedNotice';
 import { cn } from '@/lib/utils';
 import ramStickAsset from '@/assets/ram-stick.png';
 import { Loader2 } from 'lucide-react';
+
 
 interface BuyRamCardProps {
   config: CheeseRamConfig | null | undefined;
