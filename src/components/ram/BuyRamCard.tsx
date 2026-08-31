@@ -92,12 +92,30 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
 
 
 
+  const finishSuccess = (txId: string) => {
+    showSuccess(
+      'RAM Purchased!',
+      `Sent ${cheese.toFixed(4)} CHEESE for ~${formatBytes(estimate?.bytes ?? 0)} of RAM to ${recipient}. The CHEESE has been nulled.`,
+      txId,
+    );
+    setAmount('');
+    setBytesInput('');
+    setTermsAgreed(false);
+    setUnconfirmed(null);
+    refreshBalance?.();
+    onComplete?.();
+  };
+
   const handleBuy = async () => {
     if (!isConnected || !session) {
       await login();
       return;
     }
     if (!canSubmit) return;
+
+    const account = String(session.actor);
+    const signedCheese = cheese;
+    const startedAt = Date.now();
 
     setIsTransacting(true);
     try {
@@ -106,9 +124,9 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
         name: 'transfer',
         authorization: [session.permissionLevel],
         data: {
-          from: String(session.actor),
+          from: account,
           to: CHEESE_RAM_CONTRACT,
-          quantity: `${cheese.toFixed(4)} CHEESE`,
+          quantity: `${signedCheese.toFixed(4)} CHEESE`,
           memo: recipient === accountName ? '' : recipient,
         },
       };
@@ -119,26 +137,19 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
       );
       const txId = result.resolved?.transaction.id?.toString() ?? null;
       if (!txId) {
-        toast.error('Transaction may not have confirmed', {
-          description: 'Please check your account on waxblock.io.',
-          duration: 10000,
-        });
+        // Signed, but no transaction id came back — verify before allowing a retry.
+        await resolveUnconfirmed(account, signedCheese, startedAt, null);
         return;
       }
 
-      showSuccess(
-        'RAM Purchased!',
-        `Sent ${cheese.toFixed(4)} CHEESE for ~${formatBytes(estimate?.bytes ?? 0)} of RAM to ${recipient}. The CHEESE has been nulled.`,
-        txId,
-      );
-      setAmount('');
-      setBytesInput('');
-      setTermsAgreed(false);
-      refreshBalance?.();
-      onComplete?.();
+      finishSuccess(txId);
     } catch (error) {
       console.error('[CHEESERam] Buy failed:', error);
       const info = parseTransactError(error);
+      if (info.type === 'unconfirmed') {
+        await resolveUnconfirmed(account, signedCheese, startedAt, info.txId ?? null);
+        return;
+      }
       if (info.type !== 'cancelled') {
         toast.error(info.title, { description: info.description, duration: info.duration });
       }
@@ -148,6 +159,41 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
       setTimeout(() => closeWharfkitModals(), 300);
     }
   };
+
+  /**
+   * The broadcast reply was lost. Poll the chain for a matching CHEESE transfer
+   * before deciding whether this was a success or an unknown outcome.
+   */
+  const resolveUnconfirmed = async (
+    account: string,
+    signedCheese: number,
+    startedAt: number,
+    knownTxId: string | null,
+  ) => {
+    setUnconfirmed({
+      checking: true,
+      account,
+      detail: `You signed a transfer of ${signedCheese.toFixed(4)} CHEESE to ${CHEESE_RAM_CONTRACT}.`,
+    });
+
+    const match = knownTxId
+      ? { txId: knownTxId, timestamp: startedAt }
+      : await pollForConfirmation(() => findRecentBuy(account, signedCheese, startedAt));
+
+    if (match) {
+      finishSuccess(match.txId);
+      return;
+    }
+
+    setUnconfirmed({
+      checking: false,
+      account,
+      detail: `You signed a transfer of ${signedCheese.toFixed(4)} CHEESE to ${CHEESE_RAM_CONTRACT}.`,
+    });
+    refreshBalance?.();
+    onComplete?.();
+  };
+
 
   return (
     <div className="rounded-2xl p-6 max-w-lg w-full bg-card border border-border/50 space-y-5">
