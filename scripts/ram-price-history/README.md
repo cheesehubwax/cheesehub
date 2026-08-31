@@ -29,18 +29,31 @@ cd scripts/ram-price-history
 RAM_HISTORY_FILE=/tmp/ram-price-history.json bun run sample.ts
 ```
 
-Set `FORCE=1` to bypass the "last sample is under 10 hours old" guard.
+Set `FORCE=1` to record even when the current slot already has a sample.
 
 Both the RPC read and the Alcor read must succeed — on any failure the script
 exits non-zero and writes nothing, so a partial sample never enters the series.
 
+## Slot rule
+
+The UTC day is split into two 12h slots: `00:00-11:59` and `12:00-23:59`. On
+each run the sampler resolves the slot it lands in and records only when that
+slot holds no sample yet. This replaces the older "skip if the newest record is
+under 10 hours old" rule, which measured from the last recorded sample and so
+let a manual run plus a delayed cron tick suppress a whole day of samples.
+
+Consequences:
+
+- A tick delayed by hours still records, as long as its slot is empty.
+- A manual run fills only its own slot; the next scheduled slot still records.
+- Repeat ticks inside a filled slot are no-ops, keeping two points per day.
+
 ## Workflow
 
-`.github/workflows/ram-price-history.yml` runs on four cron ticks —
-`23 0`, `23 2`, `23 12` and `23 14` UTC — and can be triggered manually via
-**Run workflow**. The `:23` ticks at 00 and 12 are the primary samples; the ones
-two hours later are catch-ups for when GitHub's shared cron queue drops a tick.
-Because the sampler skips when the newest record is under 10 hours old, a
-catch-up tick is a no-op whenever the primary tick already ran. The workflow
-creates the `ram-price-data` branch on first run and commits only when the file
-changed.
+`.github/workflows/ram-price-history.yml` runs on six cron ticks — `23 0`,
+`23 2`, `23 5`, `23 12`, `23 14` and `23 17` UTC — three per slot, and can be
+triggered manually via **Run workflow** (with an optional `force` input). The
+run log prints the resolved slot and whether it recorded or skipped. The
+workflow creates the `ram-price-data` branch on first run and commits only when
+the file changed.
+
