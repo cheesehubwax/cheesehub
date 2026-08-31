@@ -80,6 +80,7 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
 
   const canSubmit =
     !isTransacting &&
+    !unconfirmed &&
     !buyDisabled &&
     termsAgreed &&
     cheese > 0 &&
@@ -87,6 +88,7 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
     !aboveMax &&
     !insufficient &&
     isValidAccount(recipient);
+
 
 
 
