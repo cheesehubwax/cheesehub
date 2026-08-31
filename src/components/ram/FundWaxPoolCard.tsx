@@ -6,7 +6,7 @@ import { useWax } from '@/context/WaxContext';
 import { useTransactionSuccess } from '@/context/TransactionSuccessContext';
 import { useCheeseRamVoteRewards } from '@/hooks/useCheeseRamVoteRewards';
 import { closeWharfkitModals, getTransactPlugins, parseTransactError } from '@/lib/wharfKit';
-import { CHEESE_RAM_CONTRACT } from '@/lib/cheeseRam';
+import { CHEESE_RAM_CONTRACT, findRecentVoteClaim, pollForConfirmation } from '@/lib/cheeseRam';
 import waxLogoUrl from '@/assets/wax-seal.png';
 
 interface FundWaxPoolCardProps {
