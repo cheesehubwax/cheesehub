@@ -16,12 +16,16 @@ import {
   CHEESE_TOKEN_CONTRACT,
   estimateBytesForCheese,
   estimateCheeseForTargetBytes,
+  findRecentBuy,
+  pollForConfirmation,
   resolveQuoteRate,
   type CheeseRamConfig,
 } from '@/lib/cheeseRam';
+import { UnconfirmedNotice, type UnconfirmedState } from '@/components/ram/UnconfirmedNotice';
 import { cn } from '@/lib/utils';
 import ramStickAsset from '@/assets/ram-stick.png';
 import { Loader2 } from 'lucide-react';
+
 
 interface BuyRamCardProps {
   config: CheeseRamConfig | null | undefined;
@@ -45,6 +49,8 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
   const [recipient, setRecipient] = useState(accountName || '');
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [isTransacting, setIsTransacting] = useState(false);
+  const [unconfirmed, setUnconfirmed] = useState<UnconfirmedState | null>(null);
+
 
   useEffect(() => {
     if (accountName) setRecipient(accountName);
@@ -74,6 +80,7 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
 
   const canSubmit =
     !isTransacting &&
+    !unconfirmed &&
     !buyDisabled &&
     termsAgreed &&
     cheese > 0 &&
@@ -84,12 +91,31 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
 
 
 
+
+  const finishSuccess = (txId: string) => {
+    showSuccess(
+      'RAM Purchased!',
+      `Sent ${cheese.toFixed(4)} CHEESE for ~${formatBytes(estimate?.bytes ?? 0)} of RAM to ${recipient}. The CHEESE has been nulled.`,
+      txId,
+    );
+    setAmount('');
+    setBytesInput('');
+    setTermsAgreed(false);
+    setUnconfirmed(null);
+    refreshBalance?.();
+    onComplete?.();
+  };
+
   const handleBuy = async () => {
     if (!isConnected || !session) {
       await login();
       return;
     }
     if (!canSubmit) return;
+
+    const account = String(session.actor);
+    const signedCheese = cheese;
+    const startedAt = Date.now();
 
     setIsTransacting(true);
     try {
@@ -98,9 +124,9 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
         name: 'transfer',
         authorization: [session.permissionLevel],
         data: {
-          from: String(session.actor),
+          from: account,
           to: CHEESE_RAM_CONTRACT,
-          quantity: `${cheese.toFixed(4)} CHEESE`,
+          quantity: `${signedCheese.toFixed(4)} CHEESE`,
           memo: recipient === accountName ? '' : recipient,
         },
       };
@@ -111,26 +137,19 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
       );
       const txId = result.resolved?.transaction.id?.toString() ?? null;
       if (!txId) {
-        toast.error('Transaction may not have confirmed', {
-          description: 'Please check your account on waxblock.io.',
-          duration: 10000,
-        });
+        // Signed, but no transaction id came back — verify before allowing a retry.
+        await resolveUnconfirmed(account, signedCheese, startedAt, null);
         return;
       }
 
-      showSuccess(
-        'RAM Purchased!',
-        `Sent ${cheese.toFixed(4)} CHEESE for ~${formatBytes(estimate?.bytes ?? 0)} of RAM to ${recipient}. The CHEESE has been nulled.`,
-        txId,
-      );
-      setAmount('');
-      setBytesInput('');
-      setTermsAgreed(false);
-      refreshBalance?.();
-      onComplete?.();
+      finishSuccess(txId);
     } catch (error) {
       console.error('[CHEESERam] Buy failed:', error);
       const info = parseTransactError(error);
+      if (info.type === 'unconfirmed') {
+        await resolveUnconfirmed(account, signedCheese, startedAt, info.txId ?? null);
+        return;
+      }
       if (info.type !== 'cancelled') {
         toast.error(info.title, { description: info.description, duration: info.duration });
       }
@@ -140,6 +159,41 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
       setTimeout(() => closeWharfkitModals(), 300);
     }
   };
+
+  /**
+   * The broadcast reply was lost. Poll the chain for a matching CHEESE transfer
+   * before deciding whether this was a success or an unknown outcome.
+   */
+  const resolveUnconfirmed = async (
+    account: string,
+    signedCheese: number,
+    startedAt: number,
+    knownTxId: string | null,
+  ) => {
+    setUnconfirmed({
+      checking: true,
+      account,
+      detail: `You signed a transfer of ${signedCheese.toFixed(4)} CHEESE to ${CHEESE_RAM_CONTRACT}.`,
+    });
+
+    const match = knownTxId
+      ? { txId: knownTxId, timestamp: startedAt }
+      : await pollForConfirmation(() => findRecentBuy(account, signedCheese, startedAt));
+
+    if (match) {
+      finishSuccess(match.txId);
+      return;
+    }
+
+    setUnconfirmed({
+      checking: false,
+      account,
+      detail: `You signed a transfer of ${signedCheese.toFixed(4)} CHEESE to ${CHEESE_RAM_CONTRACT}.`,
+    });
+    refreshBalance?.();
+    onComplete?.();
+  };
+
 
   return (
     <div className="rounded-2xl p-6 max-w-lg w-full bg-card border border-border/50 space-y-5">
@@ -309,6 +363,10 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
         <p className="text-xs text-destructive">RAM purchases are currently disabled by the contract.</p>
       )}
 
+      {unconfirmed && (
+        <UnconfirmedNotice state={unconfirmed} onAcknowledge={() => setUnconfirmed(null)} />
+      )}
+
       <div className="flex items-start gap-2">
         <Checkbox
           id="terms-buy-ram"
@@ -326,16 +384,19 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
         disabled={isConnected && !canSubmit}
         className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold"
       >
-        {isTransacting ? (
+        {isTransacting || unconfirmed?.checking ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Buying RAM...
+            {unconfirmed?.checking ? 'Verifying…' : 'Buying RAM...'}
           </>
+        ) : unconfirmed ? (
+          'Awaiting your check'
         ) : !isConnected ? (
           'Connect Wallet'
         ) : (
           'Buy RAM with CHEESE'
         )}
+
       </Button>
     </div>
   );

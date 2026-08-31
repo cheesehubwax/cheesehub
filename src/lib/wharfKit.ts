@@ -213,11 +213,44 @@ export function ensureModalOnTop() {
 
 // Centralized transaction error parsing for WharfKit/Fuel errors
 export interface TransactErrorInfo {
-  type: 'fuel_rejected' | 'fuel_unreachable' | 'cpu_billing' | 'net_billing' | 'not_broadcast' | 'cancelled' | 'generic';
+  type:
+    | 'fuel_rejected'
+    | 'fuel_unreachable'
+    | 'unconfirmed'
+    | 'cpu_billing'
+    | 'net_billing'
+    | 'not_broadcast'
+    | 'cancelled'
+    | 'generic';
   title: string;
   description: string;
   duration: number;
+  /** Transaction id recovered from the error, when the wallet already resolved one. */
+  txId?: string | null;
 }
+
+/**
+ * Dig a transaction id out of a thrown WharfKit error. When one is present the
+ * transaction was signed (and usually broadcast), so the outcome is unknown
+ * rather than failed.
+ */
+export function extractErrorTxId(error: unknown): string | null {
+  const candidates = [
+    (error as any)?.transaction?.id,
+    (error as any)?.resolved?.transaction?.id,
+    (error as any)?.response?.transaction_id,
+    (error as any)?.cause?.transaction?.id,
+    (error as any)?.cause?.resolved?.transaction?.id,
+    (error as any)?.cause?.response?.transaction_id,
+  ];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const id = String(candidate);
+    if (/^[0-9a-f]{64}$/i.test(id)) return id;
+  }
+  return null;
+}
+
 
 export function parseTransactError(error: unknown): TransactErrorInfo {
   const msg = error instanceof Error ? error.message : String(error);
@@ -227,12 +260,37 @@ export function parseTransactError(error: unknown): TransactErrorInfo {
   const causeMsg = (error as any)?.cause?.message?.toLowerCase() || '';
   const allMsg = lower + ' ' + causeMsg;
 
+  const txId = extractErrorTxId(error);
+
   console.error('[WharfKit] Transaction error details:', {
     message: msg,
     cause: (error as any)?.cause?.message,
     causeOfCause: (error as any)?.cause?.cause?.message,
+    resolvedTxId: txId,
     stack: error instanceof Error ? error.stack : undefined,
   });
+
+  // Ambiguous outcome: the request was already in flight and we lost the reply.
+  const looksNetwork =
+    allMsg.includes('fetch') ||
+    allMsg.includes('network') ||
+    allMsg.includes('econnrefused') ||
+    allMsg.includes('timeout') ||
+    allMsg.includes('timed out') ||
+    allMsg.includes('failed to fetch') ||
+    allMsg.includes('503') ||
+    allMsg.includes('502') ||
+    allMsg.includes('504');
+  const looksDuplicate = allMsg.includes('duplicate transaction');
+
+  const unconfirmed: TransactErrorInfo = {
+    type: 'unconfirmed',
+    title: 'Transaction not confirmed',
+    description:
+      'Your transaction was signed and may already be on-chain. We could not confirm it. Check your account on waxblock.io before retrying — retrying may repeat the transaction.',
+    duration: 15000,
+    txId,
+  };
 
   // User cancelled
   if (allMsg.includes('cancelled') || allMsg.includes('canceled') || allMsg.includes('rejected by user') || allMsg.includes('user rejected')) {
@@ -244,8 +302,11 @@ export function parseTransactError(error: unknown): TransactErrorInfo {
     };
   }
 
-  // Fuel/resource provider specific rejections
-  if (allMsg.includes('resource provider') || allMsg.includes('fuel') || allMsg.includes('cosign')) {
+  // Already broadcast (duplicate) or the wallet handed us a real transaction id
+  if (looksDuplicate || txId) return unconfirmed;
+
+  // Fuel/resource provider explicitly declining to sponsor (not a connectivity fault)
+  if (!looksNetwork && (allMsg.includes('resource provider') || allMsg.includes('fuel') || allMsg.includes('cosign'))) {
     return {
       type: 'fuel_rejected',
       title: 'Resource sponsorship declined',
@@ -254,15 +315,9 @@ export function parseTransactError(error: unknown): TransactErrorInfo {
     };
   }
 
-  // Network/endpoint failures
-  if (allMsg.includes('fetch') || allMsg.includes('network') || allMsg.includes('econnrefused') || allMsg.includes('timeout') || allMsg.includes('failed to fetch') || allMsg.includes('503') || allMsg.includes('502')) {
-    return {
-      type: 'fuel_unreachable',
-      title: 'Network error',
-      description: 'Could not reach the blockchain endpoint or Greymass Fuel service. Check your internet connection and try again.',
-      duration: 10000,
-    };
-  }
+  // Network/endpoint failures — the transaction may still have landed
+  if (looksNetwork) return unconfirmed;
+
 
   // CPU billing failure (Fuel attempted but chain still billed user)
   if (allMsg.includes('cpu') || allMsg.includes('billed') || allMsg.includes('deadline exceeded')) {

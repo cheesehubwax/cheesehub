@@ -15,10 +15,14 @@ import {
   CHEESE_RAM_CONTRACT,
   SELL_MEMO,
   estimateCheeseForBytes,
+  findRecentSell,
+  pollForConfirmation,
   resolveQuoteRate,
   type CheeseRamConfig,
   type ContractReserves,
 } from '@/lib/cheeseRam';
+import { UnconfirmedNotice, type UnconfirmedState } from '@/components/ram/UnconfirmedNotice';
+
 
 interface SellRamCardProps {
   config: CheeseRamConfig | null | undefined;
@@ -43,6 +47,8 @@ export function SellRamCard({
   const [bytesInput, setBytesInput] = useState('');
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [isTransacting, setIsTransacting] = useState(false);
+  const [unconfirmed, setUnconfirmed] = useState<UnconfirmedState | null>(null);
+
 
   const bytes = parseInt(bytesInput, 10) || 0;
   const quoteRate = resolveQuoteRate(config, liveWaxPerCheese);
@@ -63,12 +69,50 @@ export function SellRamCard({
 
   const canSubmit =
     !isTransacting &&
+    !unconfirmed &&
     !sellDisabled &&
     termsAgreed &&
     bytes > 0 &&
     !belowMin &&
     !aboveMax &&
     !exceedsAvailable;
+
+  const finishSuccess = (txId: string, soldBytes: number) => {
+    showSuccess(
+      'RAM Sold!',
+      `Sold ${formatBytes(soldBytes)} of RAM for ~${(estimate?.cheese ?? 0).toFixed(4)} CHEESE.`,
+      txId,
+    );
+    setBytesInput('');
+    setTermsAgreed(false);
+    setUnconfirmed(null);
+    refreshBalance?.();
+    onComplete?.();
+  };
+
+  /** Verify on-chain before letting the user retry an ambiguous sale. */
+  const resolveUnconfirmed = async (
+    account: string,
+    soldBytes: number,
+    startedAt: number,
+    knownTxId: string | null,
+  ) => {
+    const detail = `You signed a transfer of ${soldBytes.toLocaleString()} bytes of RAM to ${CHEESE_RAM_CONTRACT}.`;
+    setUnconfirmed({ checking: true, account, detail });
+
+    const match = knownTxId
+      ? { txId: knownTxId, timestamp: startedAt }
+      : await pollForConfirmation(() => findRecentSell(account, soldBytes, startedAt));
+
+    if (match) {
+      finishSuccess(match.txId, soldBytes);
+      return;
+    }
+
+    setUnconfirmed({ checking: false, account, detail });
+    refreshBalance?.();
+    onComplete?.();
+  };
 
   const handleSell = async () => {
     if (!isConnected || !session) {
@@ -77,6 +121,10 @@ export function SellRamCard({
     }
     if (!canSubmit) return;
 
+    const account = String(session.actor);
+    const soldBytes = bytes;
+    const startedAt = Date.now();
+
     setIsTransacting(true);
     try {
       const action = {
@@ -84,9 +132,9 @@ export function SellRamCard({
         name: 'ramtransfer',
         authorization: [session.permissionLevel],
         data: {
-          from: String(session.actor),
+          from: account,
           to: CHEESE_RAM_CONTRACT,
-          bytes,
+          bytes: soldBytes,
           memo: SELL_MEMO,
         },
       };
@@ -97,25 +145,18 @@ export function SellRamCard({
       );
       const txId = result.resolved?.transaction.id?.toString() ?? null;
       if (!txId) {
-        toast.error('Transaction may not have confirmed', {
-          description: 'Please check your account on waxblock.io.',
-          duration: 10000,
-        });
+        await resolveUnconfirmed(account, soldBytes, startedAt, null);
         return;
       }
 
-      showSuccess(
-        'RAM Sold!',
-        `Sold ${formatBytes(bytes)} of RAM for ~${(estimate?.cheese ?? 0).toFixed(4)} CHEESE.`,
-        txId,
-      );
-      setBytesInput('');
-      setTermsAgreed(false);
-      refreshBalance?.();
-      onComplete?.();
+      finishSuccess(txId, soldBytes);
     } catch (error) {
       console.error('[CHEESERam] Sell failed:', error);
       const info = parseTransactError(error);
+      if (info.type === 'unconfirmed') {
+        await resolveUnconfirmed(account, soldBytes, startedAt, info.txId ?? null);
+        return;
+      }
       if (info.type !== 'cancelled') {
         toast.error(info.title, { description: info.description, duration: info.duration });
       }
@@ -125,6 +166,7 @@ export function SellRamCard({
       setTimeout(() => closeWharfkitModals(), 300);
     }
   };
+
 
   return (
     <div className="rounded-2xl p-6 max-w-lg w-full bg-card border border-border/50 space-y-5">
@@ -230,6 +272,10 @@ export function SellRamCard({
         <p className="text-xs text-destructive">RAM sales are currently disabled by the contract.</p>
       )}
 
+      {unconfirmed && (
+        <UnconfirmedNotice state={unconfirmed} onAcknowledge={() => setUnconfirmed(null)} />
+      )}
+
       <div className="flex items-start gap-2">
         <Checkbox
           id="terms-sell-ram"
@@ -247,15 +293,18 @@ export function SellRamCard({
         disabled={isConnected && !canSubmit}
         className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold"
       >
-        {isTransacting ? (
+        {isTransacting || unconfirmed?.checking ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Selling RAM...
+            {unconfirmed?.checking ? 'Verifying…' : 'Selling RAM...'}
           </>
+        ) : unconfirmed ? (
+          'Awaiting your check'
         ) : !isConnected ? (
           'Connect Wallet'
         ) : (
           'Sell RAM for CHEESE'
+
         )}
       </Button>
     </div>

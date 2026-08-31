@@ -336,3 +336,132 @@ export function estimateCheeseForBytes(
   return { waxValue, cheese };
 }
 
+// ---------------------------------------------------------------------------
+// Post-hoc confirmation
+//
+// A signed transaction can land on-chain while the frontend loses the reply
+// (typically a Fuel/RPC timeout). Rather than telling the user it failed, we
+// look the action up in the history indexer before letting them retry.
+// ---------------------------------------------------------------------------
+
+const HYPERION_ENDPOINTS = [
+  'https://wax.eosusa.io',
+  'https://wax.hivebp.io',
+  'https://api.waxsweden.org',
+  'https://wax.greymass.com',
+];
+
+export interface RecentActionMatch {
+  txId: string;
+  timestamp: number;
+}
+
+async function fetchRecentActions(
+  account: string,
+  filter: string,
+  afterMs: number,
+): Promise<Array<{ trx_id: string; timestamp: string; act: { data: Record<string, any> } }>> {
+  const query =
+    `/v2/history/get_actions?account=${encodeURIComponent(account)}` +
+    `&filter=${encodeURIComponent(filter)}&limit=20&sort=desc` +
+    `&after=${new Date(afterMs).toISOString()}`;
+  const response = await fetchWithFallback(HYPERION_ENDPOINTS, query, { method: 'GET' });
+  const data = await response.json();
+  return Array.isArray(data?.actions) ? data.actions : [];
+}
+
+/**
+ * Look for a recent CHEESE transfer from `account` to the CHEESERam contract.
+ * Used to confirm a buy whose broadcast reply was lost.
+ */
+export async function findRecentBuy(
+  account: string,
+  cheeseAmount: number,
+  sinceMs: number,
+): Promise<RecentActionMatch | null> {
+  try {
+    const actions = await fetchRecentActions(
+      account,
+      `${CHEESE_TOKEN_CONTRACT}:transfer`,
+      sinceMs - 60_000,
+    );
+    const target = Number(cheeseAmount.toFixed(4));
+    for (const action of actions) {
+      const data = action.act?.data ?? {};
+      if (String(data.from) !== account) continue;
+      if (String(data.to) !== CHEESE_RAM_CONTRACT) continue;
+      const quantity = parseAsset(data.quantity);
+      if (Math.abs(quantity - target) > 0.00005) continue;
+      const ts = Date.parse(`${action.timestamp}Z`.replace(/Z+$/, 'Z'));
+      if (Number.isFinite(ts) && ts < sinceMs - 120_000) continue;
+      return { txId: action.trx_id, timestamp: ts };
+    }
+    return null;
+  } catch (error) {
+    console.error('[CHEESERam] findRecentBuy failed:', error);
+    return null;
+  }
+}
+
+/**
+ * Look for a recent RAM transfer of `bytes` from `account` to the CHEESERam
+ * contract (a sell), to confirm a sale whose broadcast reply was lost.
+ */
+export async function findRecentSell(
+  account: string,
+  bytes: number,
+  sinceMs: number,
+): Promise<RecentActionMatch | null> {
+  try {
+    const actions = await fetchRecentActions(account, 'eosio:ramtransfer', sinceMs - 60_000);
+    for (const action of actions) {
+      const data = action.act?.data ?? {};
+      if (String(data.from) !== account) continue;
+      if (String(data.to) !== CHEESE_RAM_CONTRACT) continue;
+      if (Number(data.bytes) !== bytes) continue;
+      const ts = Date.parse(`${action.timestamp}Z`.replace(/Z+$/, 'Z'));
+      if (Number.isFinite(ts) && ts < sinceMs - 120_000) continue;
+      return { txId: action.trx_id, timestamp: ts };
+    }
+    return null;
+  } catch (error) {
+    console.error('[CHEESERam] findRecentSell failed:', error);
+    return null;
+  }
+}
+
+/** Look for a recent `claimvotes` action on the CHEESERam contract. */
+export async function findRecentVoteClaim(sinceMs: number): Promise<RecentActionMatch | null> {
+  try {
+    const actions = await fetchRecentActions(
+      CHEESE_RAM_CONTRACT,
+      `${CHEESE_RAM_CONTRACT}:claimvotes`,
+      sinceMs - 60_000,
+    );
+    const action = actions[0];
+    if (!action) return null;
+    const ts = Date.parse(`${action.timestamp}Z`.replace(/Z+$/, 'Z'));
+    if (Number.isFinite(ts) && ts < sinceMs - 120_000) return null;
+    return { txId: action.trx_id, timestamp: ts };
+  } catch (error) {
+    console.error('[CHEESERam] findRecentVoteClaim failed:', error);
+    return null;
+  }
+}
+
+/**
+ * Poll a lookup a few times over ~15s, since history indexers lag the chain by
+ * a second or two.
+ */
+export async function pollForConfirmation(
+  lookup: () => Promise<RecentActionMatch | null>,
+  attempts = 5,
+  delayMs = 3000,
+): Promise<RecentActionMatch | null> {
+  for (let i = 0; i < attempts; i += 1) {
+    if (i > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
+    const match = await lookup();
+    if (match) return match;
+  }
+  return null;
+}
