@@ -182,10 +182,15 @@ export function CheeseSwapWidget({
           if (results[1].status === "fulfilled") patchToken(outTok, results[1].value);
         });
       }
-      queryClient.invalidateQueries({ queryKey: ["all-token-balances", accountName] });
-      setTimeout(() => {
+      const refreshBalances = () => {
         queryClient.invalidateQueries({ queryKey: ["all-token-balances", accountName] });
-      }, 4000);
+        queryClient.invalidateQueries({ queryKey: ["swap-token-balance-fallback"] });
+      };
+      refreshBalances();
+      setTimeout(refreshBalances, 1500);
+      setTimeout(refreshBalances, 4000);
+      setTimeout(refreshBalances, 8000);
+
     } catch (e: any) {
       const msg = e?.message || "Swap failed";
       if (!msg.includes("cancel") && !msg.includes("reject")) {
