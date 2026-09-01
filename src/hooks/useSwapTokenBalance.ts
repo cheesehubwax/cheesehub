@@ -24,17 +24,18 @@ export function useSwapTokenBalance(
     },
   });
 
-  // Fallback: if shared cache has nothing, do a single RPC call
+  // Fallback: if shared cache has nothing for this token, do a direct RPC call
   const { data: rpcBalance } = useQuery({
     queryKey: ["swap-token-balance-fallback", accountName, contract, ticker],
     queryFn: async () => {
       const amount = await fetchSingleTokenBalance(accountName!, contract!, ticker!);
       return amount > 0 ? String(amount) : null;
     },
-    enabled: !!accountName && !!contract && !!ticker && cachedBalance === undefined,
+    enabled: !!accountName && !!contract && !!ticker && cachedBalance == null,
     staleTime: 30_000,
     gcTime: 120_000,
   });
 
   return cachedBalance ?? rpcBalance ?? null;
 }
+
