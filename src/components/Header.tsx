@@ -155,7 +155,7 @@ export function Header() {
             {cartButton}
           </div>
           {/* Row 2: secondary nav */}
-          <div className="flex h-10 items-center justify-center border-t border-border/30">
+          <div className="flex h-10 items-center justify-center border-t border-border/30 md:-translate-x-8">
             <nav className="flex items-center gap-1">
               {SECONDARY_NAV.map((item) => (
                 <NavLink key={item.to} item={item} />
