@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useCart } from "@/context/CartContext";
 import cheeseLogo from "@/assets/cheese-logo.png";
 import waxLogoUrl from "@/assets/wax-logo.png";
+import ramStick from "@/assets/ram-stick.png";
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import { OpenMojiIcon } from "@/components/OpenMojiIcon";
 
