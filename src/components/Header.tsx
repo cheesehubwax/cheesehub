@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useCart } from "@/context/CartContext";
 import cheeseLogo from "@/assets/cheese-logo.png";
 import waxLogoUrl from "@/assets/wax-logo.png";
+import ramStick from "@/assets/ram-stick.png";
 import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import { OpenMojiIcon } from "@/components/OpenMojiIcon";
 
@@ -17,7 +18,7 @@ const NAV_ITEMS = [
   { to: "/farm", label: "CHEESEFarm", emoji: "🌱", prefix: "CHEESE", suffix: "Farm" },
   { to: "/dao", label: "CHEESEDao", emoji: "🏛️", prefix: "CHEESE", suffix: "Dao" },
   { to: "/drip", label: "CHEESEDrip", emoji: "💧", prefix: "CHEESE", suffix: "Drip" },
-  { to: "/ram", label: "CHEESERam", emoji: "🐏", prefix: "CHEESE", suffix: "Ram" },
+  { to: "/ram", label: "CHEESERam", image: ramStick, prefix: "CHEESE", suffix: "Ram" },
   { to: "/locker", label: "CHEESELock", emoji: "🔐", prefix: "CHEESE", suffix: "Lock" },
   { to: "/drops", label: "CHEESEDrop", emoji: "🛒", prefix: "CHEESE", suffix: "Drop" },
 ];
@@ -59,7 +60,11 @@ function NavLink({ item }: { item: typeof NAV_ITEMS[number] }) {
           : "text-foreground hover:text-cheese hover:bg-muted"
       )}
     >
-      <OpenMojiIcon emoji={item.emoji} size={18} />
+      {item.image ? (
+        <img src={item.image} alt={item.label} className="h-4 w-auto object-contain" />
+      ) : (
+        <OpenMojiIcon emoji={item.emoji} size={18} />
+      )}
       <NavLabel item={item} />
     </Link>
   );
@@ -150,7 +155,7 @@ export function Header() {
             {cartButton}
           </div>
           {/* Row 2: secondary nav */}
-          <div className="flex h-10 items-center justify-center border-t border-border/30">
+          <div className="flex h-10 items-center justify-center border-t border-border/30 md:-translate-x-8">
             <nav className="flex items-center gap-1">
               {SECONDARY_NAV.map((item) => (
                 <NavLink key={item.to} item={item} />
