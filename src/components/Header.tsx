@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { to: "/farm", label: "CHEESEFarm", emoji: "🌱", prefix: "CHEESE", suffix: "Farm" },
   { to: "/dao", label: "CHEESEDao", emoji: "🏛️", prefix: "CHEESE", suffix: "Dao" },
   { to: "/drip", label: "CHEESEDrip", emoji: "💧", prefix: "CHEESE", suffix: "Drip" },
+  { to: "/ram", label: "CHEESERam", emoji: "🐏", prefix: "CHEESE", suffix: "Ram" },
   { to: "/locker", label: "CHEESELock", emoji: "🔐", prefix: "CHEESE", suffix: "Lock" },
   { to: "/drops", label: "CHEESEDrop", emoji: "🛒", prefix: "CHEESE", suffix: "Drop" },
 ];
