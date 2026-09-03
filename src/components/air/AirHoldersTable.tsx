@@ -5,6 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { cn } from '@/lib/utils';
 import { formatUnits } from '@/lib/airdrop';
+import { CHEESE_PRECISION, CHEESE_SYMBOL } from '@/lib/airdropCheese';
 import { useAirdrop } from './AirdropContext';
 
 const QUICK = [10, 50, 100];
@@ -19,11 +20,14 @@ export function AirHoldersTable() {
     snapshot,
     snapshotMode,
     isNft,
+    isRam,
     sendSymbol,
     recipients,
     nftAssignments,
     precision,
+    cheesePerRamKb,
   } = useAirdrop();
+
 
   const amountByAccount = useMemo(
     () => new Map(recipients.map((r) => [r.account, r.units])),
@@ -76,6 +80,15 @@ export function AirHoldersTable() {
           </div>
         </div>
 
+        {isRam && (
+          <p className="mb-2 text-xs text-muted-foreground">
+            In RAM mode the last column is the {CHEESE_SYMBOL} spent buying RAM for that account —
+            nobody receives {CHEESE_SYMBOL} or WAX. Rows without an amount fall outside the RAM
+            contract&apos;s per-purchase limits and are skipped.
+          </p>
+        )}
+
+
         {snapshot ? (
           <div className="max-h-[420px] overflow-y-auto rounded-md border border-border">
             <table className="w-full text-left text-sm">
@@ -87,7 +100,12 @@ export function AirHoldersTable() {
                     {snapshotMode === 'nft' ? 'NFTs' : 'Balance'}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">
-                    {isNft ? 'Receives (NFT)' : `Receives (${sendSymbol.toUpperCase()})`}
+                    {isNft
+                      ? 'Receives (NFT)'
+                      : isRam
+                        ? `Spends (${CHEESE_SYMBOL})`
+                        : `Receives (${sendSymbol.toUpperCase()})`}
+
                   </th>
                 </tr>
               </thead>
@@ -123,12 +141,28 @@ export function AirHoldersTable() {
                             })}
                       </td>
                       <td className="px-3 py-1.5 text-right text-cheese">
-                        {isNft
-                          ? (assetId ?? '—')
-                          : units !== undefined
-                            ? formatUnits(units, precision)
-                            : '—'}
+                        {isNft ? (
+                          (assetId ?? '—')
+                        ) : units !== undefined ? (
+                          <>
+                            {formatUnits(units, isRam ? CHEESE_PRECISION : precision)}
+                            {isRam && cheesePerRamKb !== null && cheesePerRamKb > 0 && (
+                              <span className="block text-xs text-muted-foreground">
+                                ~
+                                {(
+                                  Number(units) /
+                                  10 ** CHEESE_PRECISION /
+                                  cheesePerRamKb
+                                ).toFixed(2)}{' '}
+                                KB
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          '—'
+                        )}
                       </td>
+
                     </tr>
                   );
                 })}

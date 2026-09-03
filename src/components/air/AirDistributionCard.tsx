@@ -6,7 +6,9 @@ import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { cn } from '@/lib/utils';
 import type { DistributionMode } from '@/lib/airdrop';
 import { CHEESE_SYMBOL } from '@/lib/airdropCheese';
+import { formatCheese } from '@/lib/airdropResources';
 import { useAirdrop } from './AirdropContext';
+
 
 const MODES: Array<[DistributionMode, string]> = [
   ['equal', 'Equal split'],
@@ -20,6 +22,12 @@ export function AirDistributionCard() {
     isRam,
     ramUnit,
     setRamUnit,
+    ramExcluded,
+    ramLimits,
+    ramMinViable,
+    applyRamMinViable,
+    selectedCount,
+
     mode,
     setMode,
     amountText,
@@ -91,7 +99,30 @@ export function AirDistributionCard() {
                 placeholder={ramUnit === 'cheese' ? 'e.g. 25.0000' : 'e.g. 30'}
                 className="font-mono"
               />
+              {ramExcluded.belowMin > 0 && (
+                <div className="mt-2 rounded-md border border-destructive/40 bg-destructive/5 p-2">
+                  <p className="text-xs text-destructive">
+                    {ramExcluded.belowMin.toLocaleString()} of {selectedCount.toLocaleString()}{' '}
+                    selected holders get less than the{' '}
+                    {ramLimits ? formatCheese(ramLimits.minCheese) : '—'} {CHEESE_SYMBOL} minimum per
+                    RAM purchase and are skipped.
+                    {ramMinViable
+                      ? ` Enter at least ${ramMinViable.text} ${ramUnit === 'cheese' ? CHEESE_SYMBOL : 'KB'} to include all ${selectedCount.toLocaleString()}, or reduce the selection.`
+                      : ' Some selected holders have no balance, so a pro-rata split can never reach the minimum for them.'}
+                  </p>
+                  {ramMinViable && (
+                    <button
+                      type="button"
+                      onClick={applyRamMinViable}
+                      className="mt-2 rounded border border-cheese/40 bg-cheese/10 px-2 py-1 text-xs font-medium text-cheese transition-colors hover:bg-cheese/20"
+                    >
+                      Raise to minimum viable total
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
+
             <p className="mb-2 rounded-md border border-border bg-background p-2 text-xs text-muted-foreground">
               RAM purchases carry the recipient&apos;s account name in the memo, so the memo field is
               not used in RAM mode. KB entries are converted to {CHEESE_SYMBOL} at the live price with
