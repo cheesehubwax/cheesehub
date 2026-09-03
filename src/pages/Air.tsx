@@ -60,7 +60,7 @@ const Air = () => (
       <main className="container pb-12 flex flex-col items-center gap-6">
         <ResourceGauges />
 
-        <div className="w-full max-w-4xl flex flex-col gap-6">
+        <div className="w-full max-w-lg flex flex-col gap-6">
           <AirSendCard />
           <AirSnapshotCard />
           <AirDistributionCard />
@@ -68,6 +68,7 @@ const Air = () => (
           <AirHoldersTable />
           <AirRunPanel />
         </div>
+
 
 
         <div className="text-center text-sm text-muted-foreground max-w-2xl">
