@@ -8,6 +8,8 @@ import { AirDistributionCard } from '@/components/air/AirDistributionCard';
 import { AirHoldersTable } from '@/components/air/AirHoldersTable';
 import { AirCostPanel } from '@/components/air/AirCostPanel';
 import { AirRunPanel } from '@/components/air/AirRunPanel';
+import { AirSellRamCard } from '@/components/air/AirSellRamCard';
+
 import { AirInfoDropdown } from '@/components/air/AirInfoDropdown';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { playRandomFart } from '@/lib/fartSounds';
@@ -79,6 +81,10 @@ const Air = () => (
           <div className="w-full max-w-lg">
             <AirRunPanel />
           </div>
+          <div className="w-full max-w-lg">
+            <AirSellRamCard />
+          </div>
+
         </div>
 
 
