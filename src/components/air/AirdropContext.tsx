@@ -460,7 +460,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
   const recipientKey = recipientAccounts.join(',');
 
   useEffect(() => {
-    if (isNft || !sendContract || !sendSymbol || recipientAccounts.length === 0) return;
+    if (isNft || isRam || !sendContract || !sendSymbol || recipientAccounts.length === 0) return;
     const pending = recipientAccounts.filter((a) => !rowCacheRef.current.has(rowKey(a)));
     if (pending.length === 0) return;
     let cancelled = false;
@@ -489,7 +489,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isNft, sendContract, sendSymbol, recipientKey, rowKey]);
+  }, [isNft, isRam, sendContract, sendSymbol, recipientKey, rowKey]);
 
   const rowStats = useMemo(() => {
     void rowCacheVersion;
