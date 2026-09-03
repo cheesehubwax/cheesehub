@@ -731,7 +731,9 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     busy === null &&
     (isNft
       ? nftAssignments.length > 0 && nftShortfall === 0
-      : recipients.length > 0 && tokenStat !== null);
+      : isRam
+        ? recipients.length > 0 && !!pricing?.ram.enabled
+        : recipients.length > 0 && tokenStat !== null);
 
   const runAirdrop = useCallback(async () => {
     if (!session || !actor) return;
@@ -748,39 +750,100 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
       );
       return;
     }
-    if (requiredRamCheese === null) {
-      setRunError(
-        `${CHEESE_SYMBOL} resource pricing is unavailable right now, so the required RAM purchase cannot be made. Try again in a moment.`,
-      );
-      return;
-    }
     if (!pricing.ram.enabled) {
       setRunError(
-        `The ${CHEESE_RAM_CONTRACT} contract has RAM buying disabled right now, so the required RAM purchase cannot be made. Try again later.`,
+        `The ${CHEESE_RAM_CONTRACT} contract has RAM buying disabled right now, so RAM cannot be bought. Try again later.`,
       );
       return;
     }
-    const totalNeeded = requiredRamCheese + (suggestedCpuCheese ?? 0);
-    if (cheeseBalance !== null && cheeseBalance < totalNeeded) {
-      setRunError(
-        `This airdrop requires ${formatCheese(totalNeeded)} ${CHEESE_SYMBOL} of resources (including the ${formatCheese(requiredRamCheese)} ${CHEESE_SYMBOL} RAM purchase), but your balance is ${formatCheese(cheeseBalance)} ${CHEESE_SYMBOL}.`,
+    if (isRam) {
+      // The drop itself is the RAM purchase: no sender RAM buy, only CPU/NET.
+      const needed = ramCheeseTotal + (suggestedCpuCheese ?? 0);
+      if (cheeseBalance !== null && cheeseBalance < needed) {
+        setRunError(
+          `This RAM airdrop needs ${formatCheese(needed)} ${CHEESE_SYMBOL} (including CPU/NET top-ups), but your balance is ${formatCheese(cheeseBalance)} ${CHEESE_SYMBOL}.`,
+        );
+        return;
+      }
+      if (suggestedCpuCheese) {
+        const ok = await buyWithCheese('cpu', [suggestedCpuCheese]);
+        if (!ok) return;
+      }
+    } else {
+      if (requiredRamCheese === null) {
+        setRunError(
+          `${CHEESE_SYMBOL} resource pricing is unavailable right now, so the required RAM purchase cannot be made. Try again in a moment.`,
+        );
+        return;
+      }
+      const totalNeeded = requiredRamCheese + (suggestedCpuCheese ?? 0);
+      if (cheeseBalance !== null && cheeseBalance < totalNeeded) {
+        setRunError(
+          `This airdrop requires ${formatCheese(totalNeeded)} ${CHEESE_SYMBOL} of resources (including the ${formatCheese(requiredRamCheese)} ${CHEESE_SYMBOL} RAM purchase), but your balance is ${formatCheese(cheeseBalance)} ${CHEESE_SYMBOL}.`,
+        );
+        return;
+      }
+      if (suggestedCpuCheese) {
+        const ok = await buyWithCheese('cpu', [suggestedCpuCheese]);
+        if (!ok) return;
+      }
+      const ramOk = await buyWithCheese(
+        'ram',
+        splitPurchases(requiredRamCheese, pricing.ram.minCheese, pricing.ram.maxCheese),
       );
-      return;
+      if (!ramOk) return;
     }
-    if (suggestedCpuCheese) {
-      const ok = await buyWithCheese('cpu', [suggestedCpuCheese]);
-      if (!ok) return;
-    }
-    const ramOk = await buyWithCheese(
-      'ram',
-      splitPurchases(requiredRamCheese, pricing.ram.minCheese, pricing.ram.maxCheese),
-    );
-    if (!ramOk) return;
 
     setRunState('running');
     setBatchLog([]);
     setCancelRequested(false);
     cancelRef.current = false;
+
+    if (isRam) {
+      // One CHEESE transfer per recipient: ram.chz buys RAM into the memo account.
+      const batches = chunk(recipients, Math.max(1, batchSize));
+      for (let i = 0; i < batches.length; i += 1) {
+        if (cancelRef.current) {
+          setBatchLog((prev) => [
+            ...prev,
+            { batch: i + 1, recipients: 0, error: 'Cancelled by user' },
+          ]);
+          break;
+        }
+        const batch = batches[i];
+        if (!batch) continue;
+        const result = await executeTransaction(
+          batch.map((r) => ({
+            account: CHEESE_CONTRACT,
+            name: 'transfer',
+            authorization: [session.permissionLevel],
+            data: {
+              from: actor,
+              to: CHEESE_RAM_CONTRACT,
+              quantity: formatQuantity(r.units, CHEESE_PRECISION, CHEESE_SYMBOL),
+              memo: r.account === actor ? '' : r.account,
+            },
+          })),
+          { showSuccessToast: false, showErrorToast: false },
+        );
+        setBatchLog((prev) => [
+          ...prev,
+          result.success
+            ? { batch: i + 1, recipients: batch.length, txId: result.txId ?? undefined }
+            : {
+                batch: i + 1,
+                recipients: batch.length,
+                error: shortError(result.error ?? new Error('Transaction failed')),
+              },
+        ]);
+        if (i < batches.length - 1) await new Promise((r) => setTimeout(r, 1200));
+      }
+      setRunState('done');
+      void refreshAccount();
+      return;
+    }
+
+
 
     if (isNft) {
       const batches = chunk(nftAssignments, Math.max(1, batchSize));
