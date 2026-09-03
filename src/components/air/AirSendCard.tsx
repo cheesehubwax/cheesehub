@@ -1,10 +1,12 @@
-// CHEESEAir — step 1: choose the token or NFT template being airdropped.
+// CHEESEAir — step 1: choose the token, NFT template or RAM being airdropped.
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { cn } from '@/lib/utils';
+import { formatCheese } from '@/lib/airdropResources';
+import { CHEESE_RAM_CONTRACT, CHEESE_SYMBOL } from '@/lib/airdropCheese';
 import { useAirdrop } from './AirdropContext';
 
 export function AirSendCard() {
@@ -12,6 +14,10 @@ export function AirSendCard() {
     assetKind,
     setAssetKind,
     isNft,
+    isRam,
+    ramLimits,
+    cheesePerRamKb,
+    cheeseBalance,
     actor,
     sendContract,
     setSendContract,
@@ -38,14 +44,49 @@ export function AirSendCard() {
           1 · What to send
         </h2>
 
-        <Tabs value={assetKind} onValueChange={(v) => setAssetKind(v as 'token' | 'nft')}>
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs value={assetKind} onValueChange={(v) => setAssetKind(v as 'token' | 'nft' | 'ram')}>
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="token">Token</TabsTrigger>
             <TabsTrigger value="nft">NFTs</TabsTrigger>
+            <TabsTrigger value="ram">RAM</TabsTrigger>
           </TabsList>
         </Tabs>
 
-        {isNft ? (
+        {isRam ? (
+          <div className="mt-3 space-y-3">
+            <p className="rounded-md border border-border bg-background p-2 text-xs text-muted-foreground">
+              Your {CHEESE_SYMBOL} buys RAM through <span className="text-cheese">{CHEESE_RAM_CONTRACT}</span>{' '}
+              and the RAM is delivered straight into each recipient&apos;s own account. You pay no RAM
+              rows yourself, and each recipient receives one purchase.
+            </p>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+              <div>
+                <dt className="text-muted-foreground">RAM price</dt>
+                <dd className="font-mono text-foreground">
+                  {cheesePerRamKb !== null
+                    ? `${formatCheese(cheesePerRamKb)} ${CHEESE_SYMBOL} / KB`
+                    : actor
+                      ? 'unavailable'
+                      : 'connect wallet'}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Your {CHEESE_SYMBOL} balance</dt>
+                <dd className="font-mono text-cheese">
+                  {cheeseBalance !== null ? formatCheese(cheeseBalance) : '—'}
+                </dd>
+              </div>
+              <div className="col-span-2">
+                <dt className="text-muted-foreground">Per-recipient limits</dt>
+                <dd className="font-mono text-foreground">
+                  {ramLimits
+                    ? `${formatCheese(ramLimits.minCheese)} – ${formatCheese(ramLimits.maxCheese)} ${CHEESE_SYMBOL}`
+                    : 'unavailable'}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        ) : isNft ? (
           <div className="mt-3 space-y-3">
             {!actor ? (
               <p className="text-xs text-muted-foreground">
