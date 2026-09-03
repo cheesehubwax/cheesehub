@@ -6,7 +6,9 @@ import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { cn } from '@/lib/utils';
 import type { DistributionMode } from '@/lib/airdrop';
 import { CHEESE_SYMBOL } from '@/lib/airdropCheese';
+import { formatCheese } from '@/lib/airdropResources';
 import { useAirdrop } from './AirdropContext';
+
 
 const MODES: Array<[DistributionMode, string]> = [
   ['equal', 'Equal split'],
