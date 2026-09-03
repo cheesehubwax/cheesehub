@@ -19,7 +19,9 @@ import {
   chunk,
   computeAmounts,
   estimateNftResources,
+  estimateRamAirdropResources,
   estimateResources,
+  filterRamRecipients,
   formatQuantity,
   formatUnits,
   resourceWarnings,
@@ -41,6 +43,7 @@ import {
 import {
   CHEESE_CONTRACT,
   CHEESE_CPU_CONTRACT,
+  CHEESE_PRECISION,
   CHEESE_RAM_CONTRACT,
   CHEESE_SYMBOL,
   DEFAULT_CPU_PERCENT,
@@ -48,6 +51,7 @@ import {
   powerupMemo,
   ramMemo,
 } from '@/lib/airdropCheese';
+
 import {
   bytesPerCheese,
   ceilCheese,
@@ -100,9 +104,22 @@ interface AirdropContextValue {
   actor: string | null;
   cheeseBalance: number | null;
   // what to send
-  assetKind: 'token' | 'nft';
-  setAssetKind: (kind: 'token' | 'nft') => void;
+  assetKind: 'token' | 'nft' | 'ram';
+  setAssetKind: (kind: 'token' | 'nft' | 'ram') => void;
   isNft: boolean;
+  isRam: boolean;
+  /** RAM mode: whether amounts are entered in CHEESE or in KB of RAM. */
+  ramUnit: 'cheese' | 'kb';
+  setRamUnit: (unit: 'cheese' | 'kb') => void;
+  /** RAM mode: total CHEESE that will be spent buying RAM for recipients. */
+  ramCheeseTotal: number;
+  /** RAM mode: estimated RAM bytes those purchases deliver. */
+  ramBytesTotal: number;
+  /** RAM mode: per-purchase CHEESE limits enforced by the RAM contract. */
+  ramLimits: { minCheese: number; maxCheese: number } | null;
+  /** RAM mode: recipients dropped because their share breaks a contract limit. */
+  ramExcluded: { belowMin: number; aboveMax: number };
+
   sendContract: string;
   setSendContract: (value: string) => void;
   sendSymbol: string;
@@ -199,8 +216,11 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
   const actor = accountName;
 
   // ---- What to send ------------------------------------------------------
-  const [assetKind, setAssetKind] = useState<'token' | 'nft'>('token');
+  const [assetKind, setAssetKind] = useState<'token' | 'nft' | 'ram'>('token');
   const isNft = assetKind === 'nft';
+  const isRam = assetKind === 'ram';
+  const [ramUnit, setRamUnit] = useState<'cheese' | 'kb'>('cheese');
+
   const [sendContract, setSendContract] = useState('eosio.token');
   const [sendSymbol, setSendSymbol] = useState('WAX');
   const { data: tokenStatData } = useAirTokenStat(sendContract, sendSymbol);
@@ -349,17 +369,74 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     return BigInt(Math.round(t.amount * 10 ** precision));
   }, [actor, tokenStat, walletTokens, sendContract, sendSymbol, precision]);
 
-  const recipients: AirdropRecipient[] = useMemo(() => {
-    if (!snapshot || !amountText) return [];
+  /** RAM contract limits per single purchase, in CHEESE. */
+  const ramLimits = useMemo(
+    () =>
+      pricing ? { minCheese: pricing.ram.minCheese, maxCheese: pricing.ram.maxCheese } : null,
+    [pricing],
+  );
+
+  /**
+   * RAM amounts are always signed as CHEESE transfers, so a KB entry is
+   * converted to CHEESE first (with the same safety margin as CHEESERam).
+   */
+  const ramCheeseText = useMemo(() => {
+    if (ramUnit === 'cheese') return amountText;
+    const kb = parseFloat(amountText);
+    if (!pricing || !(kb > 0)) return '';
+    const cheese = cheeseForBytes(kb * 1024, pricing);
+    return cheese ? formatCheese(cheese) : '';
+  }, [ramUnit, amountText, pricing]);
+
+  const effPrecision = isRam ? CHEESE_PRECISION : precision;
+
+  const { recipients, ramExcluded } = useMemo<{
+    recipients: AirdropRecipient[];
+    ramExcluded: { belowMin: number; aboveMax: number };
+  }>(() => {
+    const none = { recipients: [], ramExcluded: { belowMin: 0, aboveMax: 0 } };
+    const text = isRam ? ramCheeseText : amountText;
+    if (!snapshot || !text) return none;
     const chosen = filteredHolders.filter((h) => selected.has(h.account));
     try {
-      return computeAmounts(chosen, mode, amountText, precision);
+      const all = computeAmounts(chosen, mode, text, effPrecision);
+      if (!isRam) return { recipients: all, ramExcluded: { belowMin: 0, aboveMax: 0 } };
+      const base = 10 ** CHEESE_PRECISION;
+      const minUnits = ramLimits ? BigInt(Math.round(ramLimits.minCheese * base)) : 0n;
+      const maxUnits = ramLimits ? BigInt(Math.round(ramLimits.maxCheese * base)) : 0n;
+      const filtered = filterRamRecipients(all, minUnits, maxUnits);
+      return {
+        recipients: filtered.included,
+        ramExcluded: {
+          belowMin: filtered.belowMin.length,
+          aboveMax: filtered.aboveMax.length,
+        },
+      };
     } catch {
-      return [];
+      return none;
     }
-  }, [snapshot, filteredHolders, selected, mode, amountText, precision]);
+  }, [
+    snapshot,
+    filteredHolders,
+    selected,
+    mode,
+    amountText,
+    ramCheeseText,
+    effPrecision,
+    isRam,
+    ramLimits,
+  ]);
 
   const total = useMemo(() => totalUnits(recipients), [recipients]);
+
+  /** RAM mode: CHEESE spent and the RAM it is expected to deliver. */
+  const ramCheeseTotal = isRam ? Number(total) / 10 ** CHEESE_PRECISION : 0;
+  const ramBytesTotal = useMemo(() => {
+    if (!isRam || !pricing) return 0;
+    const per = bytesPerCheese(pricing);
+    return per ? ramCheeseTotal * per : 0;
+  }, [isRam, pricing, ramCheeseTotal]);
+
 
   const selectedAccounts = useMemo(
     () => filteredHolders.filter((h) => selected.has(h.account)).map((h) => h.account),
@@ -383,7 +460,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
   const recipientKey = recipientAccounts.join(',');
 
   useEffect(() => {
-    if (isNft || !sendContract || !sendSymbol || recipientAccounts.length === 0) return;
+    if (isNft || isRam || !sendContract || !sendSymbol || recipientAccounts.length === 0) return;
     const pending = recipientAccounts.filter((a) => !rowCacheRef.current.has(rowKey(a)));
     if (pending.length === 0) return;
     let cancelled = false;
@@ -412,7 +489,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isNft, sendContract, sendSymbol, recipientKey, rowKey]);
+  }, [isNft, isRam, sendContract, sendSymbol, recipientKey, rowKey]);
 
   const rowStats = useMemo(() => {
     void rowCacheVersion;
@@ -434,22 +511,59 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
 
   const estimate = useMemo(
     () =>
-      isNft
-        ? estimateNftResources(
-            nftAssignments.length,
-            Math.max(1, batchSize),
-            ramPrice?.waxPerKb ?? 0.1,
-          )
-        : estimateResources(
-            recipients.length,
-            Math.max(1, batchSize),
-            ramPrice?.waxPerNewRow ?? 0.028,
-            rowStats.checked > 0 ? rowStats.newRows : null,
-          ),
-    [isNft, nftAssignments.length, recipients.length, batchSize, ramPrice, rowStats],
+      isRam
+        ? estimateRamAirdropResources(recipients.length, Math.max(1, batchSize))
+        : isNft
+          ? estimateNftResources(
+              nftAssignments.length,
+              Math.max(1, batchSize),
+              ramPrice?.waxPerKb ?? 0.1,
+            )
+          : estimateResources(
+              recipients.length,
+              Math.max(1, batchSize),
+              ramPrice?.waxPerNewRow ?? 0.028,
+              rowStats.checked > 0 ? rowStats.newRows : null,
+            ),
+    [isRam, isNft, nftAssignments.length, recipients.length, batchSize, ramPrice, rowStats],
   );
 
   const warnings = useMemo(() => {
+    if (isRam) {
+      // RAM lands directly in each recipient's account, so the sender only
+      // needs enough CHEESE — plus every purchase must obey the contract limits.
+      const out: ResourceWarning[] = [];
+      if (!pricing) {
+        out.push({
+          level: 'warn',
+          message: `${CHEESE_SYMBOL} RAM pricing is unavailable right now, so amounts and costs cannot be quoted yet.`,
+        });
+      } else if (!pricing.ram.enabled) {
+        out.push({
+          level: 'error',
+          message: `The ${CHEESE_RAM_CONTRACT} contract has RAM buying disabled right now, so RAM cannot be airdropped.`,
+        });
+      }
+      if (cheeseBalance !== null && ramCheeseTotal > 0 && cheeseBalance < ramCheeseTotal) {
+        out.push({
+          level: 'error',
+          message: `This RAM airdrop spends ${formatCheese(ramCheeseTotal)} ${CHEESE_SYMBOL} but your balance is ${formatCheese(cheeseBalance)} ${CHEESE_SYMBOL} (CPU/NET top-ups are extra).`,
+        });
+      }
+      if (ramExcluded.belowMin > 0 && ramLimits) {
+        out.push({
+          level: 'warn',
+          message: `${ramExcluded.belowMin} recipient${ramExcluded.belowMin === 1 ? '' : 's'} skipped: their share is below the ${formatCheese(ramLimits.minCheese)} ${CHEESE_SYMBOL} minimum per purchase. Raise the amount or deselect holders.`,
+        });
+      }
+      if (ramExcluded.aboveMax > 0 && ramLimits) {
+        out.push({
+          level: 'warn',
+          message: `${ramExcluded.aboveMax} recipient${ramExcluded.aboveMax === 1 ? '' : 's'} skipped: their share is above the ${formatCheese(ramLimits.maxCheese)} ${CHEESE_SYMBOL} maximum per purchase. Lower the amount or split the drop.`,
+        });
+      }
+      return out;
+    }
     if (isNft) {
       // NFTs come out of your own inventory: the only blocker is pool coverage.
       return nftShortfall > 0
@@ -471,7 +585,21 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
       precision,
       sendSymbol.toUpperCase(),
     );
-  }, [isNft, nftShortfall, estimate, senderBalanceUnits, total, precision, sendSymbol]);
+  }, [
+    isRam,
+    pricing,
+    cheeseBalance,
+    ramCheeseTotal,
+    ramExcluded,
+    ramLimits,
+    isNft,
+    nftShortfall,
+    estimate,
+    senderBalanceUnits,
+    total,
+    precision,
+    sendSymbol,
+  ]);
   const hasError = warnings.some((w) => w.level === 'error');
 
   // ---- CHEESE resource purchases ---------------------------------------
@@ -488,6 +616,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
   /** CPU needed for one batch plus 20% headroom. */
   const cpuNeededUs = estimate.cpuPerTxUs * 1.2;
   const ramNeededBytes = estimate.maxNewRows * (isNft ? RAM_BYTES_PER_NFT : RAM_BYTES_PER_ROW);
+
   const cpuShortUs =
     resources && recipientCount > 0 ? Math.max(0, cpuNeededUs - resources.cpuAvailableUs) : 0;
   const ramShortBytes =
@@ -503,10 +632,13 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
 
   /** RAM is always purchased: at least the minimum, more when the drop needs it. */
   const requiredRamCheese = useMemo(() => {
-    if (!pricing) return null;
+    // In RAM mode the drop itself buys RAM for the recipients; the sender's own
+    // account needs no extra RAM.
+    if (isRam || !pricing) return null;
     const needed = ramShortBytes > 0 ? cheeseForBytes(ramShortBytes, pricing) : 0;
     return ceilCheese(Math.max(MIN_RAM_PURCHASE_CHEESE, needed ?? 0, pricing.ram.minCheese));
-  }, [pricing, ramShortBytes]);
+  }, [isRam, pricing, ramShortBytes]);
+
 
   const cheesePerCpuMs = useMemo(() => {
     if (!pricing) return null;
@@ -599,7 +731,9 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     busy === null &&
     (isNft
       ? nftAssignments.length > 0 && nftShortfall === 0
-      : recipients.length > 0 && tokenStat !== null);
+      : isRam
+        ? recipients.length > 0 && !!pricing?.ram.enabled
+        : recipients.length > 0 && tokenStat !== null);
 
   const runAirdrop = useCallback(async () => {
     if (!session || !actor) return;
@@ -616,39 +750,100 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
       );
       return;
     }
-    if (requiredRamCheese === null) {
-      setRunError(
-        `${CHEESE_SYMBOL} resource pricing is unavailable right now, so the required RAM purchase cannot be made. Try again in a moment.`,
-      );
-      return;
-    }
     if (!pricing.ram.enabled) {
       setRunError(
-        `The ${CHEESE_RAM_CONTRACT} contract has RAM buying disabled right now, so the required RAM purchase cannot be made. Try again later.`,
+        `The ${CHEESE_RAM_CONTRACT} contract has RAM buying disabled right now, so RAM cannot be bought. Try again later.`,
       );
       return;
     }
-    const totalNeeded = requiredRamCheese + (suggestedCpuCheese ?? 0);
-    if (cheeseBalance !== null && cheeseBalance < totalNeeded) {
-      setRunError(
-        `This airdrop requires ${formatCheese(totalNeeded)} ${CHEESE_SYMBOL} of resources (including the ${formatCheese(requiredRamCheese)} ${CHEESE_SYMBOL} RAM purchase), but your balance is ${formatCheese(cheeseBalance)} ${CHEESE_SYMBOL}.`,
+    if (isRam) {
+      // The drop itself is the RAM purchase: no sender RAM buy, only CPU/NET.
+      const needed = ramCheeseTotal + (suggestedCpuCheese ?? 0);
+      if (cheeseBalance !== null && cheeseBalance < needed) {
+        setRunError(
+          `This RAM airdrop needs ${formatCheese(needed)} ${CHEESE_SYMBOL} (including CPU/NET top-ups), but your balance is ${formatCheese(cheeseBalance)} ${CHEESE_SYMBOL}.`,
+        );
+        return;
+      }
+      if (suggestedCpuCheese) {
+        const ok = await buyWithCheese('cpu', [suggestedCpuCheese]);
+        if (!ok) return;
+      }
+    } else {
+      if (requiredRamCheese === null) {
+        setRunError(
+          `${CHEESE_SYMBOL} resource pricing is unavailable right now, so the required RAM purchase cannot be made. Try again in a moment.`,
+        );
+        return;
+      }
+      const totalNeeded = requiredRamCheese + (suggestedCpuCheese ?? 0);
+      if (cheeseBalance !== null && cheeseBalance < totalNeeded) {
+        setRunError(
+          `This airdrop requires ${formatCheese(totalNeeded)} ${CHEESE_SYMBOL} of resources (including the ${formatCheese(requiredRamCheese)} ${CHEESE_SYMBOL} RAM purchase), but your balance is ${formatCheese(cheeseBalance)} ${CHEESE_SYMBOL}.`,
+        );
+        return;
+      }
+      if (suggestedCpuCheese) {
+        const ok = await buyWithCheese('cpu', [suggestedCpuCheese]);
+        if (!ok) return;
+      }
+      const ramOk = await buyWithCheese(
+        'ram',
+        splitPurchases(requiredRamCheese, pricing.ram.minCheese, pricing.ram.maxCheese),
       );
-      return;
+      if (!ramOk) return;
     }
-    if (suggestedCpuCheese) {
-      const ok = await buyWithCheese('cpu', [suggestedCpuCheese]);
-      if (!ok) return;
-    }
-    const ramOk = await buyWithCheese(
-      'ram',
-      splitPurchases(requiredRamCheese, pricing.ram.minCheese, pricing.ram.maxCheese),
-    );
-    if (!ramOk) return;
 
     setRunState('running');
     setBatchLog([]);
     setCancelRequested(false);
     cancelRef.current = false;
+
+    if (isRam) {
+      // One CHEESE transfer per recipient: ram.chz buys RAM into the memo account.
+      const batches = chunk(recipients, Math.max(1, batchSize));
+      for (let i = 0; i < batches.length; i += 1) {
+        if (cancelRef.current) {
+          setBatchLog((prev) => [
+            ...prev,
+            { batch: i + 1, recipients: 0, error: 'Cancelled by user' },
+          ]);
+          break;
+        }
+        const batch = batches[i];
+        if (!batch) continue;
+        const result = await executeTransaction(
+          batch.map((r) => ({
+            account: CHEESE_CONTRACT,
+            name: 'transfer',
+            authorization: [session.permissionLevel],
+            data: {
+              from: actor,
+              to: CHEESE_RAM_CONTRACT,
+              quantity: formatQuantity(r.units, CHEESE_PRECISION, CHEESE_SYMBOL),
+              memo: r.account === actor ? '' : r.account,
+            },
+          })),
+          { showSuccessToast: false, showErrorToast: false },
+        );
+        setBatchLog((prev) => [
+          ...prev,
+          result.success
+            ? { batch: i + 1, recipients: batch.length, txId: result.txId ?? undefined }
+            : {
+                batch: i + 1,
+                recipients: batch.length,
+                error: shortError(result.error ?? new Error('Transaction failed')),
+              },
+        ]);
+        if (i < batches.length - 1) await new Promise((r) => setTimeout(r, 1200));
+      }
+      setRunState('done');
+      void refreshAccount();
+      return;
+    }
+
+
 
     if (isNft) {
       const batches = chunk(nftAssignments, Math.max(1, batchSize));
@@ -734,6 +929,9 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     session,
     actor,
     isNft,
+    isRam,
+    ramCheeseTotal,
+
     nftAssignments,
     nftShortfall,
     recipients,
@@ -757,7 +955,15 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     const stamp = snapshotAt?.slice(0, 19).replace(/[:T]/g, '-') ?? 'report';
     let lines: string[];
     let name: string;
-    if (isNft) {
+    if (isRam) {
+      const perCheeseBytes = pricing ? (bytesPerCheese(pricing) ?? 0) : 0;
+      lines = [`account,cheese,est_kb`];
+      for (const r of recipients) {
+        const cheese = Number(r.units) / 10 ** CHEESE_PRECISION;
+        lines.push(`${r.account},${formatCheese(cheese)},${((cheese * perCheeseBytes) / 1024).toFixed(2)}`);
+      }
+      name = `airdrop-ram-${stamp}.csv`;
+    } else if (isNft) {
       lines = ['account,asset_id,collection,template_id,memo'];
       for (const a of nftAssignments) {
         lines.push(
@@ -765,6 +971,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
         );
       }
       name = `airdrop-nft-${nftCollection || 'assets'}-${stamp}.csv`;
+
     } else {
       lines = ['account,amount,token,memo'];
       for (const r of recipients) {
@@ -783,6 +990,9 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     URL.revokeObjectURL(url);
   }, [
     isNft,
+    isRam,
+    pricing,
+
     nftAssignments,
     nftCollection,
     nftTemplateId,
@@ -799,6 +1009,14 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     assetKind,
     setAssetKind,
     isNft,
+    isRam,
+    ramUnit,
+    setRamUnit,
+    ramCheeseTotal,
+    ramBytesTotal,
+    ramLimits,
+    ramExcluded,
+
     sendContract,
     setSendContract,
     sendSymbol,

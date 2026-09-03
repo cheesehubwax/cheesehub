@@ -10,6 +10,8 @@ import { useAirdrop } from './AirdropContext';
 export function AirRunPanel() {
   const {
     actor,
+    isRam,
+    ramCheeseTotal,
     warnings,
     runError,
     runState,
@@ -86,6 +88,12 @@ export function AirRunPanel() {
           <p className="mt-2 text-xs text-muted-foreground">
             Connect your wallet to enable the airdrop.
           </p>
+        ) : isRam ? (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Each batch signs one {CHEESE_SYMBOL} transfer per recipient, buying RAM straight into
+            their account ({formatCheese(ramCheeseTotal)} {CHEESE_SYMBOL} in total). CPU and NET are
+            topped up with {CHEESE_SYMBOL} only when needed.
+          </p>
         ) : (
           <p className="mt-2 text-xs text-muted-foreground">
             Every airdrop starts with a RAM purchase of at least{' '}
@@ -132,7 +140,7 @@ export function AirRunPanel() {
                 {b.txId ? (
                   <>
                     <span className="text-muted-foreground">
-                      batch {b.batch} · {b.recipients} transfers ·{' '}
+                      batch {b.batch} · {b.recipients} {isRam ? 'RAM purchases' : 'transfers'} ·{' '}
                     </span>
                     <a
                       href={txLink(b.txId)}
@@ -145,7 +153,8 @@ export function AirRunPanel() {
                   </>
                 ) : (
                   <span className="text-destructive">
-                    batch {b.batch} · {b.recipients} transfers · {b.error}
+                    batch {b.batch} · {b.recipients} {isRam ? 'RAM purchases' : 'transfers'} ·{' '}
+                    {b.error}
                   </span>
                 )}
               </div>

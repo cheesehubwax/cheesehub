@@ -270,3 +270,59 @@ export function estimateNftResources(
     txCount,
   };
 }
+
+// ---------------------------------------------------------------------------
+// RAM airdrops (buy RAM for each recipient with CHEESE through ram.chz)
+// ---------------------------------------------------------------------------
+
+/** A RAM purchase costs noticeably more CPU than a plain token transfer. */
+const CPU_US_PER_RAM_BUY = 4200;
+const NET_BYTES_PER_RAM_BUY = 200;
+
+/**
+ * Resource estimate for a RAM airdrop. Each action is a CHEESE transfer to the
+ * RAM contract, which buys RAM into the recipient's own account — so the sender
+ * pays no RAM rows at all (`maxNewRows` is zero).
+ */
+export function estimateRamAirdropResources(
+  recipientCount: number,
+  batchSize: number,
+): ResourceEstimate {
+  const txCount = Math.max(1, Math.ceil(recipientCount / batchSize));
+  const cpuPerTxUs = batchSize * CPU_US_PER_RAM_BUY + CPU_US_TX_OVERHEAD;
+  const netPerTxBytes = batchSize * NET_BYTES_PER_RAM_BUY + NET_BYTES_TX_OVERHEAD;
+  return {
+    cpuPerTxUs,
+    netPerTxBytes,
+    totalCpuUs: cpuPerTxUs * txCount,
+    maxNewRows: 0,
+    maxRamCostWax: 0,
+    txCount,
+  };
+}
+
+export interface RamRecipientFilter {
+  included: AirdropRecipient[];
+  belowMin: AirdropRecipient[];
+  aboveMax: AirdropRecipient[];
+}
+
+/**
+ * The RAM contract enforces per-purchase CHEESE limits, so any recipient whose
+ * share falls outside them has to be dropped before the run.
+ */
+export function filterRamRecipients(
+  recipients: AirdropRecipient[],
+  minUnits: bigint,
+  maxUnits: bigint,
+): RamRecipientFilter {
+  const included: AirdropRecipient[] = [];
+  const belowMin: AirdropRecipient[] = [];
+  const aboveMax: AirdropRecipient[] = [];
+  for (const r of recipients) {
+    if (minUnits > 0n && r.units < minUnits) belowMin.push(r);
+    else if (maxUnits > 0n && r.units > maxUnits) aboveMax.push(r);
+    else included.push(r);
+  }
+  return { included, belowMin, aboveMax };
+}
