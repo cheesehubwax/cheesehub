@@ -128,12 +128,28 @@ export function AirHoldersTable() {
                             })}
                       </td>
                       <td className="px-3 py-1.5 text-right text-cheese">
-                        {isNft
-                          ? (assetId ?? '—')
-                          : units !== undefined
-                            ? formatUnits(units, precision)
-                            : '—'}
+                        {isNft ? (
+                          (assetId ?? '—')
+                        ) : units !== undefined ? (
+                          <>
+                            {formatUnits(units, isRam ? CHEESE_PRECISION : precision)}
+                            {isRam && cheesePerRamKb !== null && cheesePerRamKb > 0 && (
+                              <span className="block text-xs text-muted-foreground">
+                                ~
+                                {(
+                                  Number(units) /
+                                  10 ** CHEESE_PRECISION /
+                                  cheesePerRamKb
+                                ).toFixed(2)}{' '}
+                                KB
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          '—'
+                        )}
                       </td>
+
                     </tr>
                   );
                 })}
