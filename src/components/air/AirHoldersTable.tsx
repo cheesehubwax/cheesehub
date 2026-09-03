@@ -87,7 +87,12 @@ export function AirHoldersTable() {
                     {snapshotMode === 'nft' ? 'NFTs' : 'Balance'}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">
-                    {isNft ? 'Receives (NFT)' : `Receives (${sendSymbol.toUpperCase()})`}
+                    {isNft
+                      ? 'Receives (NFT)'
+                      : isRam
+                        ? `Spends (${CHEESE_SYMBOL})`
+                        : `Receives (${sendSymbol.toUpperCase()})`}
+
                   </th>
                 </tr>
               </thead>
