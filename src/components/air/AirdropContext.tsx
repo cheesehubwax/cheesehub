@@ -390,6 +390,13 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
 
   const effPrecision = isRam ? CHEESE_PRECISION : precision;
 
+  /** Holders ticked in the table — before any contract-limit filtering. */
+  const chosenHolders = useMemo(
+    () => filteredHolders.filter((h) => selected.has(h.account)),
+    [filteredHolders, selected],
+  );
+  const selectedCount = chosenHolders.length;
+
   const { recipients, ramExcluded } = useMemo<{
     recipients: AirdropRecipient[];
     ramExcluded: { belowMin: number; aboveMax: number };
@@ -397,9 +404,8 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     const none = { recipients: [], ramExcluded: { belowMin: 0, aboveMax: 0 } };
     const text = isRam ? ramCheeseText : amountText;
     if (!snapshot || !text) return none;
-    const chosen = filteredHolders.filter((h) => selected.has(h.account));
     try {
-      const all = computeAmounts(chosen, mode, text, effPrecision);
+      const all = computeAmounts(chosenHolders, mode, text, effPrecision);
       if (!isRam) return { recipients: all, ramExcluded: { belowMin: 0, aboveMax: 0 } };
       const base = 10 ** CHEESE_PRECISION;
       const minUnits = ramLimits ? BigInt(Math.round(ramLimits.minCheese * base)) : 0n;
@@ -417,8 +423,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     }
   }, [
     snapshot,
-    filteredHolders,
-    selected,
+    chosenHolders,
     mode,
     amountText,
     ramCheeseText,
@@ -436,6 +441,40 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     const per = bytesPerCheese(pricing);
     return per ? ramCheeseTotal * per : 0;
   }, [isRam, pricing, ramCheeseTotal]);
+
+  /**
+   * RAM mode: the smallest amount (in the unit currently selected) that keeps
+   * every ticked holder above the contract's per-purchase minimum. `null` when
+   * it cannot be reached — e.g. a pro-rata split with zero-balance holders.
+   */
+  const ramMinViable = useMemo<{ cheese: number; text: string } | null>(() => {
+    if (!isRam || !ramLimits || selectedCount === 0) return null;
+    const min = ramLimits.minCheese;
+    let cheese: number | null = null;
+    if (mode === 'fixed') cheese = min;
+    else if (mode === 'equal') cheese = min * selectedCount;
+    else {
+      const weights = chosenHolders.map((h) => h.weight);
+      if (weights.some((w) => !(w > 0))) return null;
+      const totalWeight = weights.reduce((s, w) => s + w, 0);
+      const smallest = Math.min(...weights);
+      if (!(totalWeight > 0) || !(smallest > 0)) return null;
+      cheese = (min * totalWeight) / smallest;
+    }
+    if (cheese === null || !isFinite(cheese) || cheese <= 0) return null;
+    const safeCheese = ceilCheese(cheese * 1.000002) ?? cheese;
+    if (ramUnit === 'cheese') return { cheese: safeCheese, text: formatCheese(safeCheese) };
+    const per = pricing ? bytesPerCheese(pricing) : null;
+    if (!per || per <= 0) return null;
+    const kb = Math.ceil(((safeCheese * per) / 1024) * 100) / 100;
+    return { cheese: safeCheese, text: String(kb) };
+  }, [isRam, ramLimits, selectedCount, mode, chosenHolders, ramUnit, pricing]);
+
+  const applyRamMinViable = useCallback(() => {
+    if (ramMinViable) setAmountText(ramMinViable.text);
+  }, [ramMinViable]);
+
+
 
 
   const selectedAccounts = useMemo(
