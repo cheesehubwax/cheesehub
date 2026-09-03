@@ -369,17 +369,74 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     return BigInt(Math.round(t.amount * 10 ** precision));
   }, [actor, tokenStat, walletTokens, sendContract, sendSymbol, precision]);
 
-  const recipients: AirdropRecipient[] = useMemo(() => {
-    if (!snapshot || !amountText) return [];
+  /** RAM contract limits per single purchase, in CHEESE. */
+  const ramLimits = useMemo(
+    () =>
+      pricing ? { minCheese: pricing.ram.minCheese, maxCheese: pricing.ram.maxCheese } : null,
+    [pricing],
+  );
+
+  /**
+   * RAM amounts are always signed as CHEESE transfers, so a KB entry is
+   * converted to CHEESE first (with the same safety margin as CHEESERam).
+   */
+  const ramCheeseText = useMemo(() => {
+    if (ramUnit === 'cheese') return amountText;
+    const kb = parseFloat(amountText);
+    if (!pricing || !(kb > 0)) return '';
+    const cheese = cheeseForBytes(kb * 1024, pricing);
+    return cheese ? formatCheese(cheese) : '';
+  }, [ramUnit, amountText, pricing]);
+
+  const effPrecision = isRam ? CHEESE_PRECISION : precision;
+
+  const { recipients, ramExcluded } = useMemo<{
+    recipients: AirdropRecipient[];
+    ramExcluded: { belowMin: number; aboveMax: number };
+  }>(() => {
+    const none = { recipients: [], ramExcluded: { belowMin: 0, aboveMax: 0 } };
+    const text = isRam ? ramCheeseText : amountText;
+    if (!snapshot || !text) return none;
     const chosen = filteredHolders.filter((h) => selected.has(h.account));
     try {
-      return computeAmounts(chosen, mode, amountText, precision);
+      const all = computeAmounts(chosen, mode, text, effPrecision);
+      if (!isRam) return { recipients: all, ramExcluded: { belowMin: 0, aboveMax: 0 } };
+      const base = 10 ** CHEESE_PRECISION;
+      const minUnits = ramLimits ? BigInt(Math.round(ramLimits.minCheese * base)) : 0n;
+      const maxUnits = ramLimits ? BigInt(Math.round(ramLimits.maxCheese * base)) : 0n;
+      const filtered = filterRamRecipients(all, minUnits, maxUnits);
+      return {
+        recipients: filtered.included,
+        ramExcluded: {
+          belowMin: filtered.belowMin.length,
+          aboveMax: filtered.aboveMax.length,
+        },
+      };
     } catch {
-      return [];
+      return none;
     }
-  }, [snapshot, filteredHolders, selected, mode, amountText, precision]);
+  }, [
+    snapshot,
+    filteredHolders,
+    selected,
+    mode,
+    amountText,
+    ramCheeseText,
+    effPrecision,
+    isRam,
+    ramLimits,
+  ]);
 
   const total = useMemo(() => totalUnits(recipients), [recipients]);
+
+  /** RAM mode: CHEESE spent and the RAM it is expected to deliver. */
+  const ramCheeseTotal = isRam ? Number(total) / 10 ** CHEESE_PRECISION : 0;
+  const ramBytesTotal = useMemo(() => {
+    if (!isRam || !pricing) return 0;
+    const per = bytesPerCheese(pricing);
+    return per ? ramCheeseTotal * per : 0;
+  }, [isRam, pricing, ramCheeseTotal]);
+
 
   const selectedAccounts = useMemo(
     () => filteredHolders.filter((h) => selected.has(h.account)).map((h) => h.account),
