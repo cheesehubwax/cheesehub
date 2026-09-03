@@ -511,22 +511,59 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
 
   const estimate = useMemo(
     () =>
-      isNft
-        ? estimateNftResources(
-            nftAssignments.length,
-            Math.max(1, batchSize),
-            ramPrice?.waxPerKb ?? 0.1,
-          )
-        : estimateResources(
-            recipients.length,
-            Math.max(1, batchSize),
-            ramPrice?.waxPerNewRow ?? 0.028,
-            rowStats.checked > 0 ? rowStats.newRows : null,
-          ),
-    [isNft, nftAssignments.length, recipients.length, batchSize, ramPrice, rowStats],
+      isRam
+        ? estimateRamAirdropResources(recipients.length, Math.max(1, batchSize))
+        : isNft
+          ? estimateNftResources(
+              nftAssignments.length,
+              Math.max(1, batchSize),
+              ramPrice?.waxPerKb ?? 0.1,
+            )
+          : estimateResources(
+              recipients.length,
+              Math.max(1, batchSize),
+              ramPrice?.waxPerNewRow ?? 0.028,
+              rowStats.checked > 0 ? rowStats.newRows : null,
+            ),
+    [isRam, isNft, nftAssignments.length, recipients.length, batchSize, ramPrice, rowStats],
   );
 
   const warnings = useMemo(() => {
+    if (isRam) {
+      // RAM lands directly in each recipient's account, so the sender only
+      // needs enough CHEESE — plus every purchase must obey the contract limits.
+      const out: ResourceWarning[] = [];
+      if (!pricing) {
+        out.push({
+          level: 'warn',
+          message: `${CHEESE_SYMBOL} RAM pricing is unavailable right now, so amounts and costs cannot be quoted yet.`,
+        });
+      } else if (!pricing.ram.enabled) {
+        out.push({
+          level: 'error',
+          message: `The ${CHEESE_RAM_CONTRACT} contract has RAM buying disabled right now, so RAM cannot be airdropped.`,
+        });
+      }
+      if (cheeseBalance !== null && ramCheeseTotal > 0 && cheeseBalance < ramCheeseTotal) {
+        out.push({
+          level: 'error',
+          message: `This RAM airdrop spends ${formatCheese(ramCheeseTotal)} ${CHEESE_SYMBOL} but your balance is ${formatCheese(cheeseBalance)} ${CHEESE_SYMBOL} (CPU/NET top-ups are extra).`,
+        });
+      }
+      if (ramExcluded.belowMin > 0 && ramLimits) {
+        out.push({
+          level: 'warn',
+          message: `${ramExcluded.belowMin} recipient${ramExcluded.belowMin === 1 ? '' : 's'} skipped: their share is below the ${formatCheese(ramLimits.minCheese)} ${CHEESE_SYMBOL} minimum per purchase. Raise the amount or deselect holders.`,
+        });
+      }
+      if (ramExcluded.aboveMax > 0 && ramLimits) {
+        out.push({
+          level: 'warn',
+          message: `${ramExcluded.aboveMax} recipient${ramExcluded.aboveMax === 1 ? '' : 's'} skipped: their share is above the ${formatCheese(ramLimits.maxCheese)} ${CHEESE_SYMBOL} maximum per purchase. Lower the amount or split the drop.`,
+        });
+      }
+      return out;
+    }
     if (isNft) {
       // NFTs come out of your own inventory: the only blocker is pool coverage.
       return nftShortfall > 0
@@ -548,7 +585,21 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
       precision,
       sendSymbol.toUpperCase(),
     );
-  }, [isNft, nftShortfall, estimate, senderBalanceUnits, total, precision, sendSymbol]);
+  }, [
+    isRam,
+    pricing,
+    cheeseBalance,
+    ramCheeseTotal,
+    ramExcluded,
+    ramLimits,
+    isNft,
+    nftShortfall,
+    estimate,
+    senderBalanceUnits,
+    total,
+    precision,
+    sendSymbol,
+  ]);
   const hasError = warnings.some((w) => w.level === 'error');
 
   // ---- CHEESE resource purchases ---------------------------------------
@@ -565,6 +616,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
   /** CPU needed for one batch plus 20% headroom. */
   const cpuNeededUs = estimate.cpuPerTxUs * 1.2;
   const ramNeededBytes = estimate.maxNewRows * (isNft ? RAM_BYTES_PER_NFT : RAM_BYTES_PER_ROW);
+
   const cpuShortUs =
     resources && recipientCount > 0 ? Math.max(0, cpuNeededUs - resources.cpuAvailableUs) : 0;
   const ramShortBytes =
