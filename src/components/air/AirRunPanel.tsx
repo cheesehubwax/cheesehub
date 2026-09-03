@@ -90,10 +90,14 @@ export function AirRunPanel() {
           </p>
         ) : isRam ? (
           <p className="mt-2 text-xs text-muted-foreground">
-            Each batch signs one {CHEESE_SYMBOL} transfer per recipient, buying RAM straight into
-            their account ({formatCheese(ramCheeseTotal)} {CHEESE_SYMBOL} in total). CPU and NET are
-            topped up with {CHEESE_SYMBOL} only when needed.
+            The RAM contract reads one account name per transfer memo, so each recipient needs its
+            own {CHEESE_SYMBOL} transfer — {recipientCount.toLocaleString()} transfer
+            {recipientCount === 1 ? '' : 's'} batched into {estimate.txCount.toLocaleString()}{' '}
+            transaction{estimate.txCount === 1 ? '' : 's'} ({formatCheese(ramCheeseTotal)}{' '}
+            {CHEESE_SYMBOL} in total). CPU and NET are topped up with {CHEESE_SYMBOL} only when
+            needed.
           </p>
+
         ) : (
           <p className="mt-2 text-xs text-muted-foreground">
             Every airdrop starts with a RAM purchase of at least{' '}
