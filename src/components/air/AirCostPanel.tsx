@@ -20,6 +20,10 @@ export function AirCostPanel() {
   const {
     actor,
     isNft,
+    isRam,
+    ramCheeseTotal,
+    ramBytesTotal,
+    ramExcluded,
     recipientCount,
     total,
     precision,
@@ -59,9 +63,11 @@ export function AirCostPanel() {
           <div>
             <dt className="text-xs text-muted-foreground">Total to send</dt>
             <dd className="font-mono text-lg text-cheese">
-              {isNft
-                ? `${nftAssignments.length.toLocaleString()} NFT${nftAssignments.length === 1 ? '' : 's'}`
-                : `${formatUnits(total, precision)} ${sendSymbol.toUpperCase()}`}
+              {isRam
+                ? `${formatCheese(ramCheeseTotal)} ${CHEESE_SYMBOL}`
+                : isNft
+                  ? `${nftAssignments.length.toLocaleString()} NFT${nftAssignments.length === 1 ? '' : 's'}`
+                  : `${formatUnits(total, precision)} ${sendSymbol.toUpperCase()}`}
             </dd>
           </div>
           <div>
