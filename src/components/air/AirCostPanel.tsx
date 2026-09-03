@@ -48,6 +48,8 @@ export function AirCostPanel() {
 
   // CPU pricing is calibrated from the connected account's own stake weight.
   const unavailable = actor ? 'unavailable' : 'connect wallet';
+  const ramSkipped = ramExcluded.belowMin + ramExcluded.aboveMax;
+
 
   return (
     <Card className="border-cheese/20 bg-card/80 backdrop-blur-sm">
