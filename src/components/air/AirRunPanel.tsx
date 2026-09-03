@@ -11,7 +11,9 @@ export function AirRunPanel() {
   const {
     actor,
     isRam,
+    estimate,
     ramCheeseTotal,
+
     warnings,
     runError,
     runState,
