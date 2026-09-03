@@ -929,6 +929,9 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     session,
     actor,
     isNft,
+    isRam,
+    ramCheeseTotal,
+
     nftAssignments,
     nftShortfall,
     recipients,
