@@ -18,6 +18,7 @@ function Metric({ label, value, sub }: { label: string; value: string; sub?: str
 
 export function AirCostPanel() {
   const {
+    actor,
     isNft,
     recipientCount,
     total,
@@ -36,6 +37,9 @@ export function AirCostPanel() {
     suggestedCpuCheese,
     cheeseBalance,
   } = useAirdrop();
+
+  // CPU pricing is calibrated from the connected account's own stake weight.
+  const unavailable = actor ? 'unavailable' : 'connect wallet';
 
   return (
     <Card className="border-cheese/20 bg-card/80 backdrop-blur-sm">
@@ -82,7 +86,7 @@ export function AirCostPanel() {
               value={
                 estCpuCheese !== null
                   ? `~${formatCheese(estCpuCheese)} ${CHEESE_SYMBOL}`
-                  : 'unavailable'
+                  : unavailable
               }
             />
             <Metric
@@ -90,7 +94,7 @@ export function AirCostPanel() {
               value={
                 estRamCheese !== null
                   ? `~${formatCheese(estRamCheese)} ${CHEESE_SYMBOL}`
-                  : 'unavailable'
+                  : unavailable
               }
               sub={
                 isNft
@@ -107,7 +111,7 @@ export function AirCostPanel() {
               value={
                 cheesePerCpuMs !== null
                   ? `${formatCheese(cheesePerCpuMs)} ${CHEESE_SYMBOL} / ms`
-                  : 'unavailable'
+                  : unavailable
               }
             />
             <Metric
@@ -115,7 +119,7 @@ export function AirCostPanel() {
               value={
                 cheesePerRamKb !== null
                   ? `${formatCheese(cheesePerRamKb)} ${CHEESE_SYMBOL} / KB`
-                  : 'unavailable'
+                  : unavailable
               }
             />
           </dl>
@@ -124,7 +128,7 @@ export function AirCostPanel() {
             RAM purchase (required):{' '}
             {requiredRamCheese !== null
               ? `${formatCheese(requiredRamCheese)} ${CHEESE_SYMBOL}`
-              : 'unavailable'}{' '}
+              : unavailable}{' '}
             — every airdrop buys at least {formatCheese(MIN_RAM_PURCHASE_CHEESE)} {CHEESE_SYMBOL} of
             RAM. The excess RAM stays in your account and can be sold again afterwards.
           </p>
