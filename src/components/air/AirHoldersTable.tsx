@@ -5,6 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { cn } from '@/lib/utils';
 import { formatUnits } from '@/lib/airdrop';
+import { CHEESE_PRECISION, CHEESE_SYMBOL } from '@/lib/airdropCheese';
 import { useAirdrop } from './AirdropContext';
 
 const QUICK = [10, 50, 100];
@@ -19,11 +20,14 @@ export function AirHoldersTable() {
     snapshot,
     snapshotMode,
     isNft,
+    isRam,
     sendSymbol,
     recipients,
     nftAssignments,
     precision,
+    cheesePerRamKb,
   } = useAirdrop();
+
 
   const amountByAccount = useMemo(
     () => new Map(recipients.map((r) => [r.account, r.units])),
