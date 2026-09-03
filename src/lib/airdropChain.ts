@@ -13,10 +13,10 @@ import type { ResourcePricing } from "./airdropResources";
  * preflight for POST /v1/chain/* from a browser origin.
  */
 export const CHAIN_ENDPOINTS = [
-  "https://api.wax.alohaeos.com",
   "https://wax.eosphere.io",
   "https://wax.eosusa.io",
   "https://api.waxsweden.org",
+  "https://api.wax.alohaeos.com",
 ];
 
 export const HYPERION_ENDPOINTS = [
