@@ -632,10 +632,13 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
 
   /** RAM is always purchased: at least the minimum, more when the drop needs it. */
   const requiredRamCheese = useMemo(() => {
-    if (!pricing) return null;
+    // In RAM mode the drop itself buys RAM for the recipients; the sender's own
+    // account needs no extra RAM.
+    if (isRam || !pricing) return null;
     const needed = ramShortBytes > 0 ? cheeseForBytes(ramShortBytes, pricing) : 0;
     return ceilCheese(Math.max(MIN_RAM_PURCHASE_CHEESE, needed ?? 0, pricing.ram.minCheese));
-  }, [pricing, ramShortBytes]);
+  }, [isRam, pricing, ramShortBytes]);
+
 
   const cheesePerCpuMs = useMemo(() => {
     if (!pricing) return null;
