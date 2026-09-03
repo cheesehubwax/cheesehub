@@ -119,6 +119,13 @@ interface AirdropContextValue {
   ramLimits: { minCheese: number; maxCheese: number } | null;
   /** RAM mode: recipients dropped because their share breaks a contract limit. */
   ramExcluded: { belowMin: number; aboveMax: number };
+  /** RAM mode: smallest amount (in the selected unit) that includes every ticked holder. */
+  ramMinViable: { cheese: number; text: string } | null;
+  /** RAM mode: fill the amount field with `ramMinViable`. */
+  applyRamMinViable: () => void;
+  /** Holders ticked in the table, before contract-limit filtering. */
+  selectedCount: number;
+
 
   sendContract: string;
   setSendContract: (value: string) => void;
