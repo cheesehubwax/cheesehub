@@ -955,7 +955,15 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     const stamp = snapshotAt?.slice(0, 19).replace(/[:T]/g, '-') ?? 'report';
     let lines: string[];
     let name: string;
-    if (isNft) {
+    if (isRam) {
+      const perCheeseBytes = pricing ? (bytesPerCheese(pricing) ?? 0) : 0;
+      lines = [`account,cheese,est_kb`];
+      for (const r of recipients) {
+        const cheese = Number(r.units) / 10 ** CHEESE_PRECISION;
+        lines.push(`${r.account},${formatCheese(cheese)},${((cheese * perCheeseBytes) / 1024).toFixed(2)}`);
+      }
+      name = `airdrop-ram-${stamp}.csv`;
+    } else if (isNft) {
       lines = ['account,asset_id,collection,template_id,memo'];
       for (const a of nftAssignments) {
         lines.push(
@@ -963,6 +971,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
         );
       }
       name = `airdrop-nft-${nftCollection || 'assets'}-${stamp}.csv`;
+
     } else {
       lines = ['account,amount,token,memo'];
       for (const r of recipients) {
