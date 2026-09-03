@@ -22,6 +22,12 @@ export function AirDistributionCard() {
     isRam,
     ramUnit,
     setRamUnit,
+    ramExcluded,
+    ramLimits,
+    ramMinViable,
+    applyRamMinViable,
+    selectedCount,
+
     mode,
     setMode,
     amountText,
