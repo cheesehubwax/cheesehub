@@ -990,6 +990,9 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     URL.revokeObjectURL(url);
   }, [
     isNft,
+    isRam,
+    pricing,
+
     nftAssignments,
     nftCollection,
     nftTemplateId,
