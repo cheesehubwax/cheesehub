@@ -57,9 +57,17 @@ export function AirCostPanel() {
           <div>
             <dt className="text-xs text-muted-foreground">Recipients</dt>
             <dd className="font-mono text-lg text-foreground">
-              {recipientCount.toLocaleString()}
+              {isRam && selectedCount > 0
+                ? `${recipientCount.toLocaleString()} of ${selectedCount.toLocaleString()}`
+                : recipientCount.toLocaleString()}
             </dd>
+            {isRam && ramSkipped > 0 && (
+              <dd className="text-xs text-destructive">
+                {ramSkipped.toLocaleString()} skipped — outside contract limits
+              </dd>
+            )}
           </div>
+
           <div>
             <dt className="text-xs text-muted-foreground">Total to send</dt>
             <dd className="font-mono text-lg text-cheese">
