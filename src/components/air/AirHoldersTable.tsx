@@ -80,6 +80,15 @@ export function AirHoldersTable() {
           </div>
         </div>
 
+        {isRam && (
+          <p className="mb-2 text-xs text-muted-foreground">
+            In RAM mode the last column is the {CHEESE_SYMBOL} spent buying RAM for that account —
+            nobody receives {CHEESE_SYMBOL} or WAX. Rows without an amount fall outside the RAM
+            contract&apos;s per-purchase limits and are skipped.
+          </p>
+        )}
+
+
         {snapshot ? (
           <div className="max-h-[420px] overflow-y-auto rounded-md border border-border">
             <table className="w-full text-left text-sm">
