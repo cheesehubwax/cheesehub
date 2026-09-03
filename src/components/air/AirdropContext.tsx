@@ -19,7 +19,9 @@ import {
   chunk,
   computeAmounts,
   estimateNftResources,
+  estimateRamAirdropResources,
   estimateResources,
+  filterRamRecipients,
   formatQuantity,
   formatUnits,
   resourceWarnings,
@@ -41,6 +43,7 @@ import {
 import {
   CHEESE_CONTRACT,
   CHEESE_CPU_CONTRACT,
+  CHEESE_PRECISION,
   CHEESE_RAM_CONTRACT,
   CHEESE_SYMBOL,
   DEFAULT_CPU_PERCENT,
@@ -48,6 +51,7 @@ import {
   powerupMemo,
   ramMemo,
 } from '@/lib/airdropCheese';
+
 import {
   bytesPerCheese,
   ceilCheese,
