@@ -151,14 +151,33 @@ export function AirCostPanel() {
           </dl>
 
           {isRam ? (
-            <p className="mt-3 text-xs text-foreground">
-              This drop spends {formatCheese(ramCheeseTotal)} {CHEESE_SYMBOL} buying RAM for the
-              recipients — no RAM purchase is made for your own account.
-              {ramExcluded.belowMin + ramExcluded.aboveMax > 0
-                ? ` ${(ramExcluded.belowMin + ramExcluded.aboveMax).toLocaleString()} recipient(s) were skipped because their share falls outside the contract limits.`
-                : ''}
-            </p>
+            <>
+              <p className="mt-3 text-xs text-foreground">
+                This drop spends {formatCheese(ramCheeseTotal)} {CHEESE_SYMBOL} buying RAM for the
+                recipients — no RAM purchase is made for your own account.
+              </p>
+              {ramExcluded.belowMin > 0 && (
+                <p className="mt-1 text-xs text-destructive">
+                  {ramExcluded.belowMin.toLocaleString()} recipient
+                  {ramExcluded.belowMin === 1 ? '' : 's'} skipped: their share is below the{' '}
+                  {ramLimits ? formatCheese(ramLimits.minCheese) : '—'} {CHEESE_SYMBOL} minimum per
+                  purchase.
+                  {ramMinViable
+                    ? ` Enter at least ${ramMinViable.text} to include all ${selectedCount.toLocaleString()} selected holders, or reduce the selection.`
+                    : ' Some selected holders have no balance, so a pro-rata split can never reach the minimum for them — deselect them or use an equal split.'}
+                </p>
+              )}
+              {ramExcluded.aboveMax > 0 && (
+                <p className="mt-1 text-xs text-destructive">
+                  {ramExcluded.aboveMax.toLocaleString()} recipient
+                  {ramExcluded.aboveMax === 1 ? '' : 's'} skipped: their share is above the{' '}
+                  {ramLimits ? formatCheese(ramLimits.maxCheese) : '—'} {CHEESE_SYMBOL} maximum per
+                  purchase. Lower the amount or run those accounts separately.
+                </p>
+              )}
+            </>
           ) : (
+
           <p className="mt-3 text-xs text-foreground">
             RAM purchase (required):{' '}
             {requiredRamCheese !== null
