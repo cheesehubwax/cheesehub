@@ -163,7 +163,7 @@ export function AirCostPanel() {
                   {ramLimits ? formatCheese(ramLimits.minCheese) : '—'} {CHEESE_SYMBOL} minimum per
                   purchase.
                   {ramMinViable
-                    ? ` Enter at least ${ramMinViable.text} to include all ${selectedCount.toLocaleString()} selected holders, or reduce the selection.`
+                    ? ` Enter at least ${formatCheese(ramMinViable.cheese)} ${CHEESE_SYMBOL} in total to include all ${selectedCount.toLocaleString()} selected holders, or reduce the selection.`
                     : ' Some selected holders have no balance, so a pro-rata split can never reach the minimum for them — deselect them or use an equal split.'}
                 </p>
               )}
