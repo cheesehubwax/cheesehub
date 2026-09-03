@@ -96,20 +96,26 @@ export function AirCostPanel() {
               }
             />
             <Metric
-              label="RAM for this drop"
+              label={isRam ? 'RAM delivered' : 'RAM for this drop'}
               value={
-                estRamCheese !== null
-                  ? `~${formatCheese(estRamCheese)} ${CHEESE_SYMBOL}`
-                  : unavailable
+                isRam
+                  ? ramBytesTotal > 0
+                    ? `~${(ramBytesTotal / 1024).toFixed(2)} KB`
+                    : unavailable
+                  : estRamCheese !== null
+                    ? `~${formatCheese(estRamCheese)} ${CHEESE_SYMBOL}`
+                    : unavailable
               }
               sub={
-                isNft
+                isRam
+                  ? `bought into ${recipientCount.toLocaleString()} recipient account${recipientCount === 1 ? '' : 's'} — you pay no RAM rows`
+                  : isNft
                   ? `~${((estimate.maxNewRows * RAM_BYTES_PER_NFT) / 1024).toFixed(2)} KB for ${nftAssignments.length} NFT transfer${nftAssignments.length === 1 ? '' : 's'}`
                   : rowCheckLoading
-                    ? 'checking existing token rows…'
-                    : rowStats.complete
-                      ? `${estimate.maxNewRows} of ${recipients.length} need a new row (${((estimate.maxNewRows * RAM_BYTES_PER_ROW) / 1024).toFixed(2)} KB)`
-                      : `upper bound: assumes all ${recipients.length} need a new row`
+                      ? 'checking existing token rows…'
+                      : rowStats.complete
+                        ? `${estimate.maxNewRows} of ${recipients.length} need a new row (${((estimate.maxNewRows * RAM_BYTES_PER_ROW) / 1024).toFixed(2)} KB)`
+                        : `upper bound: assumes all ${recipients.length} need a new row`
               }
             />
             <Metric
@@ -130,6 +136,15 @@ export function AirCostPanel() {
             />
           </dl>
 
+          {isRam ? (
+            <p className="mt-3 text-xs text-foreground">
+              This drop spends {formatCheese(ramCheeseTotal)} {CHEESE_SYMBOL} buying RAM for the
+              recipients — no RAM purchase is made for your own account.
+              {ramExcluded.belowMin + ramExcluded.aboveMax > 0
+                ? ` ${(ramExcluded.belowMin + ramExcluded.aboveMax).toLocaleString()} recipient(s) were skipped because their share falls outside the contract limits.`
+                : ''}
+            </p>
+          ) : (
           <p className="mt-3 text-xs text-foreground">
             RAM purchase (required):{' '}
             {requiredRamCheese !== null
@@ -138,14 +153,18 @@ export function AirCostPanel() {
             — every airdrop buys at least {formatCheese(MIN_RAM_PURCHASE_CHEESE)} {CHEESE_SYMBOL} of
             RAM. The excess RAM stays in your account and can be sold again afterwards.
           </p>
+          )}
           <p className="mt-1 text-xs text-muted-foreground">
+            {isRam ? '' : ''}
             CPU/NET is topped up only if you are short
             {suggestedCpuCheese !== null
               ? ` — about ${formatCheese(suggestedCpuCheese)} ${CHEESE_SYMBOL} right now.`
               : ' — your account currently has enough CPU and NET.'}
-            {requiredRamCheese !== null
-              ? ` Total to sign: ~${formatCheese(requiredRamCheese + (suggestedCpuCheese ?? 0))} ${CHEESE_SYMBOL}.`
-              : ''}
+            {isRam
+              ? ` Total to sign: ~${formatCheese(ramCheeseTotal + (suggestedCpuCheese ?? 0))} ${CHEESE_SYMBOL}.`
+              : requiredRamCheese !== null
+                ? ` Total to sign: ~${formatCheese(requiredRamCheese + (suggestedCpuCheese ?? 0))} ${CHEESE_SYMBOL}.`
+                : ''}
             {cheeseBalance !== null
               ? ` Your balance: ${formatCheese(cheeseBalance)} ${CHEESE_SYMBOL}.`
               : ''}
