@@ -1055,6 +1055,10 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     ramBytesTotal,
     ramLimits,
     ramExcluded,
+    ramMinViable,
+    applyRamMinViable,
+    selectedCount,
+
 
     sendContract,
     setSendContract,
