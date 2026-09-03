@@ -104,9 +104,22 @@ interface AirdropContextValue {
   actor: string | null;
   cheeseBalance: number | null;
   // what to send
-  assetKind: 'token' | 'nft';
-  setAssetKind: (kind: 'token' | 'nft') => void;
+  assetKind: 'token' | 'nft' | 'ram';
+  setAssetKind: (kind: 'token' | 'nft' | 'ram') => void;
   isNft: boolean;
+  isRam: boolean;
+  /** RAM mode: whether amounts are entered in CHEESE or in KB of RAM. */
+  ramUnit: 'cheese' | 'kb';
+  setRamUnit: (unit: 'cheese' | 'kb') => void;
+  /** RAM mode: total CHEESE that will be spent buying RAM for recipients. */
+  ramCheeseTotal: number;
+  /** RAM mode: estimated RAM bytes those purchases deliver. */
+  ramBytesTotal: number;
+  /** RAM mode: per-purchase CHEESE limits enforced by the RAM contract. */
+  ramLimits: { minCheese: number; maxCheese: number } | null;
+  /** RAM mode: recipients dropped because their share breaks a contract limit. */
+  ramExcluded: { belowMin: number; aboveMax: number };
+
   sendContract: string;
   setSendContract: (value: string) => void;
   sendSymbol: string;
