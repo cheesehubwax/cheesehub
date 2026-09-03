@@ -17,6 +17,7 @@ import Dao from "./pages/Dao";
 import Farm from "./pages/Farm";
 import CheeseNull from "./pages/CheeseNull";
 import Drip from "./pages/Drip";
+import Air from "./pages/Air";
 import BannerAds from "./pages/BannerAds";
 import Disclaimer from "./pages/Disclaimer";
 import Terms from "./pages/Terms";
@@ -57,6 +58,8 @@ const App = () => {
                 <Route path="/farm/:farmName" element={<Farm />} />
                 <Route path="/cheesenull" element={<CheeseNull />} />
                 <Route path="/drip" element={<Drip />} />
+                {/* CHEESEAir — intentionally not linked from the header */}
+                <Route path="/air" element={<Air />} />
                 <Route path="/bannerads" element={<BannerAds />} />
                 <Route path="/disclaimer" element={<Disclaimer />} />
                 <Route path="/terms" element={<Terms />} />

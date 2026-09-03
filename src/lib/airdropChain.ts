@@ -1,0 +1,834 @@
+/**
+ * Browser-side WAX chain readers with endpoint failover for CHEESEAir.
+ * Plain fetch helpers — no server runtime required, so they work in the
+ * static CheeseHub SPA. Every endpoint list is tried in order.
+ */
+
+import { CHEESE_CONTRACT, CHEESE_RAM_CONTRACT, CHEESE_SYMBOL } from "./airdropCheese";
+import type { ResourcePricing } from "./airdropResources";
+
+/**
+ * Chain RPC endpoints. Every host here answers browser CORS preflights —
+ * wax.greymass.com deliberately is not in the list because it rejects the
+ * preflight for POST /v1/chain/* from a browser origin.
+ */
+export const CHAIN_ENDPOINTS = [
+  "https://wax.eosphere.io",
+  "https://wax.eosusa.io",
+  "https://api.waxsweden.org",
+  "https://api.wax.alohaeos.com",
+];
+
+export const HYPERION_ENDPOINTS = [
+  "https://wax.eosphere.io",
+  "https://api.waxsweden.org",
+  "https://wax.eosusa.io",
+];
+
+/** Light API mirrors — the only public source of token holder lists with balances. */
+export const LIGHT_API_ENDPOINTS = [
+  "https://lightapi.eosamsterdam.net",
+  "https://wax.light-api.net",
+];
+
+export const ATOMIC_ENDPOINTS = [
+  "https://wax.api.atomicassets.io",
+  "https://atomic3.hivebp.io",
+  "https://aa-wax-public1.neftyblocks.com",
+  "https://aa.dapplica.io",
+];
+
+const FETCH_TIMEOUT_MS = 15_000;
+/** AtomicAssets holder queries can be slow on first touch — allow longer. */
+const AA_TIMEOUT_MS = 30_000;
+
+async function fetchJson(
+  url: string,
+  init?: RequestInit,
+  timeoutMs = FETCH_TIMEOUT_MS,
+): Promise<unknown> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...init, signal: controller.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status} from ${new URL(url).host}`);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Try each endpoint in order until one succeeds. Returns [result, endpointUsed]. */
+async function withFailover<T>(
+  endpoints: string[],
+  fn: (base: string) => Promise<T>,
+): Promise<[T, string]> {
+  let lastError: unknown = new Error("No endpoints configured");
+  for (const base of endpoints) {
+    try {
+      return [await fn(base), base];
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
+async function chainPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
+  const [result] = await withFailover(CHAIN_ENDPOINTS, (base) =>
+    fetchJson(`${base}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  );
+  return result as T;
+}
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface Holder {
+  account: string;
+  /** Whole-token balance as float for weighting (tokens), or asset count (NFTs). */
+  weight: number;
+  /** Formatted balance as reported (e.g. "123.4567 TOKEN") or asset count as string. */
+  raw: string;
+}
+
+export interface HolderSnapshot {
+  holders: Holder[];
+  truncated: boolean;
+  source: "lightapi" | "atomicassets" | "chain-fallback";
+  /** False when balances are unknown (fallback path) — pro-rata unavailable. */
+  hasBalances: boolean;
+}
+
+export interface TokenStat {
+  supply: string;
+  maxSupply: string;
+  precision: number;
+  symbol: string;
+}
+
+export interface WalletToken {
+  contract: string;
+  symbol: string;
+  amount: number;
+  precision: number;
+}
+
+export interface AccountResources {
+  account: string;
+  cpuUsedUs: number;
+  cpuAvailableUs: number;
+  cpuMaxUs: number;
+  netUsedBytes: number;
+  netAvailableBytes: number;
+  netMaxBytes: number;
+  ramUsedBytes: number;
+  ramQuotaBytes: number;
+  ramAvailableBytes: number;
+  refundCpuUs: number;
+  refundNetBytes: number;
+  /** Stake weight backing CPU/NET, in 1e-8 WAX units (from total_resources). */
+  cpuWeightUnits: number;
+  netWeightUnits: number;
+}
+
+export interface RamPrice {
+  waxPerKb: number;
+  /** WAX cost to open one token balance row (~276 bytes). */
+  waxPerNewRow: number;
+}
+
+// ---------------------------------------------------------------------------
+// Token holders (Light API, with a get_table_by_scope sweep as fallback)
+// ---------------------------------------------------------------------------
+
+/** Light API caps `topholders` at 1000 rows per token. */
+const LIGHT_API_MAX = 1000;
+const MAX_HOLDERS = 5_000;
+
+export async function getTokenHolders(code: string, symbol: string): Promise<HolderSnapshot> {
+  try {
+    const holders = await fetchLightApiHolders(code, symbol);
+    return {
+      holders,
+      truncated: holders.length >= LIGHT_API_MAX,
+      source: "lightapi",
+      hasBalances: true,
+    };
+  } catch {
+    // Light API unavailable — sweep the token's accounts table directly.
+    const holders = await fetchScopeHolders(code);
+    return {
+      holders,
+      truncated: holders.length >= MAX_HOLDERS,
+      source: "chain-fallback",
+      hasBalances: true,
+    };
+  }
+}
+
+/**
+ * Light API `topholders` returns `[[account, balance], ...]` sorted by balance,
+ * capped at 1000 rows. It is the only public browser-reachable source of a
+ * token holder list with balances (Hyperion's get_token_holders is gone).
+ */
+async function fetchLightApiHolders(code: string, symbol: string): Promise<Holder[]> {
+  const [result] = await withFailover(LIGHT_API_ENDPOINTS, async (base) => {
+    const url =
+      `${base}/api/topholders/wax/${encodeURIComponent(code)}/` +
+      `${encodeURIComponent(symbol)}/${LIGHT_API_MAX}`;
+    const data = await fetchJson(url, undefined, AA_TIMEOUT_MS);
+    if (!Array.isArray(data)) throw new Error(`Unexpected holder response for ${symbol}@${code}`);
+    const out: Holder[] = [];
+    for (const row of data as unknown[]) {
+      if (!Array.isArray(row)) continue;
+      const account = typeof row[0] === "string" ? row[0] : "";
+      const raw = typeof row[1] === "string" ? row[1] : String(row[1] ?? "0");
+      const amount = parseFloat(raw);
+      if (account && Number.isFinite(amount) && amount > 0) {
+        out.push({ account, weight: amount, raw: `${raw} ${symbol}` });
+      }
+    }
+    if (out.length === 0) throw new Error(`No holders of ${symbol}@${code} found`);
+    return out;
+  });
+  return result;
+}
+
+/** Fetch the balance string for one scope of a token accounts table. */
+async function fetchScopeBalance(code: string, scope: string): Promise<Holder | null> {
+  try {
+    const data = await chainPost<{
+      rows?: Array<{ balance?: string }>;
+    }>("/v1/chain/get_table_rows", {
+      code,
+      scope,
+      table: "accounts",
+      json: true,
+      limit: 1,
+    });
+    const raw = data.rows?.[0]?.balance;
+    const amount = raw ? parseFloat(raw) : 0;
+    if (raw && amount > 0) return { account: scope, weight: amount, raw };
+  } catch {
+    // skip scopes that fail (endpoint hiccup) rather than aborting the whole sweep
+  }
+  return null;
+}
+
+async function fetchScopeHolders(code: string): Promise<Holder[]> {
+  // Pass 1: enumerate account scopes (no balances in this response).
+  const scopes: string[] = [];
+  let lower = "";
+  while (scopes.length < MAX_HOLDERS) {
+    const data = await chainPost<{
+      rows?: Array<{ scope?: string }>;
+      more?: string | boolean;
+    }>("/v1/chain/get_table_by_scope", {
+      code,
+      table: "accounts",
+      lower_bound: lower,
+      limit: 1000,
+    });
+    const rows = data.rows ?? [];
+    if (rows.length === 0) break;
+    for (const row of rows) {
+      const scope = row.scope ?? "";
+      if (scope) scopes.push(scope);
+    }
+    const more = data.more;
+    if (!more || typeof more !== "string") break;
+    lower = more;
+  }
+  if (scopes.length === 0) throw new Error(`No holders found for ${code}`);
+
+  // Pass 2: fetch balances concurrently in bounded batches.
+  const holders: Holder[] = [];
+  const BATCH = 50;
+  for (let i = 0; i < scopes.length && holders.length < MAX_HOLDERS; i += BATCH) {
+    const results = await Promise.all(
+      scopes.slice(i, i + BATCH).map((scope) => fetchScopeBalance(code, scope)),
+    );
+    for (const h of results) if (h) holders.push(h);
+  }
+  if (holders.length === 0) throw new Error(`No holders with balance found for ${code}`);
+  return holders;
+}
+
+// ---------------------------------------------------------------------------
+// NFT holders (AtomicAssets, paginated)
+// ---------------------------------------------------------------------------
+
+const AA_PAGE = 1000;
+
+interface AaAccountsResponse {
+  success?: boolean;
+  data?: Array<{ account?: string; assets?: string }>;
+}
+
+export async function getNftHolders(
+  collection: string,
+  schema?: string,
+  templateId?: number,
+): Promise<HolderSnapshot> {
+  const [holders] = await withFailover(ATOMIC_ENDPOINTS, async (base) => {
+    const out: Holder[] = [];
+    for (let page = 1; ; page++) {
+      const params = new URLSearchParams({
+        collection_name: collection,
+        page: String(page),
+        limit: String(AA_PAGE),
+      });
+      if (schema) params.set("schema_name", schema);
+      if (templateId !== undefined) params.set("template_id", String(templateId));
+      const data = (await fetchJson(
+        `${base}/atomicassets/v1/accounts?${params}`,
+        undefined,
+        AA_TIMEOUT_MS,
+      )) as AaAccountsResponse;
+      const rows = data.data ?? [];
+      if (rows.length === 0) break;
+      for (const r of rows) {
+        const account = r.account ?? "";
+        const assets = parseInt(r.assets ?? "0", 10);
+        if (account && assets > 0) out.push({ account, weight: assets, raw: String(assets) });
+      }
+      if (rows.length < AA_PAGE || out.length >= MAX_HOLDERS) break;
+    }
+    if (out.length === 0) throw new Error(`No holders found for collection ${collection}`);
+    return out;
+  });
+  return {
+    holders,
+    truncated: holders.length >= MAX_HOLDERS,
+    source: "atomicassets",
+    hasBalances: true,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Wallet NFT inventory (AtomicAssets) — used as the pool for NFT airdrops
+// ---------------------------------------------------------------------------
+
+export interface InventoryCollection {
+  collection: string;
+  name: string;
+  assets: number;
+}
+
+export interface InventoryTemplate {
+  templateId: number;
+  schema: string;
+  name: string;
+  /** How many assets of this template the account currently owns. */
+  count: number;
+}
+
+interface AaAccountCollectionsResponse {
+  data?: {
+    collections?: Array<{
+      collection?: { collection_name?: string; name?: string };
+      assets?: string;
+    }>;
+  };
+}
+
+interface AaAccountCollectionDetailResponse {
+  data?: {
+    templates?: Array<{ template_id?: string | null; assets?: string }>;
+  };
+}
+
+interface AaTemplatesResponse {
+  data?: Array<{
+    template_id?: string;
+    schema?: { schema_name?: string };
+    immutable_data?: Record<string, unknown>;
+  }>;
+}
+
+interface AaAssetsResponse {
+  data?: Array<{ asset_id?: string; template?: { template_id?: string } | null }>;
+}
+
+/** Collections the account owns NFTs from, most assets first. */
+export async function getInventoryCollections(account: string): Promise<InventoryCollection[]> {
+  const [collections] = await withFailover(ATOMIC_ENDPOINTS, async (base) => {
+    const data = (await fetchJson(
+      `${base}/atomicassets/v1/accounts/${account}`,
+      undefined,
+      AA_TIMEOUT_MS,
+    )) as AaAccountCollectionsResponse;
+    const rows = data.data?.collections ?? [];
+    return rows
+      .map((r) => ({
+        collection: r.collection?.collection_name ?? "",
+        name: r.collection?.name ?? r.collection?.collection_name ?? "",
+        assets: parseInt(r.assets ?? "0", 10) || 0,
+      }))
+      .filter((c) => c.collection && c.assets > 0)
+      .sort((a, b) => b.assets - a.assets);
+  });
+  return collections;
+}
+
+/** Templates the account owns inside one collection, with owned counts and names. */
+export async function getInventoryTemplates(
+  account: string,
+  collection: string,
+): Promise<InventoryTemplate[]> {
+  const [templates] = await withFailover(ATOMIC_ENDPOINTS, async (base) => {
+    const detail = (await fetchJson(
+      `${base}/atomicassets/v1/accounts/${account}/${collection}`,
+      undefined,
+      AA_TIMEOUT_MS,
+    )) as AaAccountCollectionDetailResponse;
+    const owned = (detail.data?.templates ?? [])
+      .map((t) => ({
+        templateId: t.template_id ? parseInt(t.template_id, 10) : NaN,
+        count: parseInt(t.assets ?? "0", 10) || 0,
+      }))
+      .filter((t) => Number.isFinite(t.templateId) && t.templateId > 0 && t.count > 0)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 200);
+    if (owned.length === 0) return [];
+
+    // Enrich with schema + display name (best effort; falls back to the id).
+    const meta = new Map<number, { schema: string; name: string }>();
+    try {
+      const ids = owned.map((t) => t.templateId).join(",");
+      const res = (await fetchJson(
+        `${base}/atomicassets/v1/templates?collection_name=${collection}&ids=${ids}&limit=200`,
+        undefined,
+        AA_TIMEOUT_MS,
+      )) as AaTemplatesResponse;
+      for (const t of res.data ?? []) {
+        const id = t.template_id ? parseInt(t.template_id, 10) : NaN;
+        if (!Number.isFinite(id)) continue;
+        const data = t.immutable_data ?? {};
+        let label = "";
+        for (const key of ["name", "Name", "title", "card_name", "cardname"]) {
+          const raw = data[key];
+          if (typeof raw === "string" && raw.trim()) {
+            label = raw.trim();
+            break;
+          }
+        }
+        meta.set(id, {
+          schema: t.schema?.schema_name ?? "",
+          name: label || `#${id}`,
+        });
+      }
+    } catch {
+      // names are optional
+    }
+    return owned.map((t) => ({
+      templateId: t.templateId,
+      schema: meta.get(t.templateId)?.schema ?? "",
+      name: meta.get(t.templateId)?.name ?? `#${t.templateId}`,
+      count: t.count,
+    }));
+  });
+  return templates;
+}
+
+/** Max assets pulled into an airdrop pool. */
+const MAX_POOL_ASSETS = 2000;
+const AA_ASSET_PAGE = 200;
+
+/** Asset ids of one template currently owned by the account, oldest mint first. */
+export async function getInventoryAssets(
+  account: string,
+  collection: string,
+  templateId: number,
+): Promise<{ assetIds: string[]; truncated: boolean }> {
+  const [assetIds] = await withFailover(ATOMIC_ENDPOINTS, async (base) => {
+    const out: string[] = [];
+    for (let page = 1; ; page++) {
+      const params = new URLSearchParams({
+        owner: account,
+        collection_name: collection,
+        template_id: String(templateId),
+        page: String(page),
+        limit: String(AA_ASSET_PAGE),
+        order: "asc",
+        sort: "asset_id",
+      });
+      const data = (await fetchJson(
+        `${base}/atomicassets/v1/assets?${params}`,
+        undefined,
+        AA_TIMEOUT_MS,
+      )) as AaAssetsResponse;
+      const rows = data.data ?? [];
+      for (const r of rows) if (r.asset_id) out.push(r.asset_id);
+      if (rows.length < AA_ASSET_PAGE || out.length >= MAX_POOL_ASSETS) break;
+    }
+    return out.slice(0, MAX_POOL_ASSETS);
+  });
+  return { assetIds, truncated: assetIds.length >= MAX_POOL_ASSETS };
+}
+
+// ---------------------------------------------------------------------------
+// Token stat, balances, account resources, RAM price
+// ---------------------------------------------------------------------------
+
+export async function getTokenStat(code: string, symbol: string): Promise<TokenStat> {
+  const data = await chainPost<{ rows?: Array<{ supply?: string; max_supply?: string }> }>(
+    "/v1/chain/get_table_rows",
+    { code, scope: symbol, table: "stat", json: true, limit: 1 },
+  );
+  const stat = data.rows?.[0];
+  if (!stat?.supply) throw new Error(`Token ${symbol} not found on contract ${code}`);
+  const amountPart = stat.supply.split(" ")[0] ?? "0";
+  const precision = amountPart.includes(".") ? (amountPart.split(".")[1] ?? "").length : 0;
+  return { supply: stat.supply, maxSupply: stat.max_supply ?? "", precision, symbol };
+}
+
+/**
+ * Which of the given accounts already have a row in `code`'s accounts table for
+ * `symbol`. Accounts with an existing row cost the sender no RAM on transfer.
+ * Failed lookups are reported as unknown so the caller can stay conservative.
+ */
+export async function getExistingTokenRows(
+  code: string,
+  symbol: string,
+  accounts: string[],
+): Promise<{ existing: string[]; unknown: string[] }> {
+  const upper = symbol.toUpperCase();
+  const existing: string[] = [];
+  const unknown: string[] = [];
+  const BATCH = 50;
+  for (let i = 0; i < accounts.length; i += BATCH) {
+    const slice = accounts.slice(i, i + BATCH);
+    const results = await Promise.all(
+      slice.map(async (account) => {
+        try {
+          const data = await chainPost<{ rows?: Array<{ balance?: string }> }>(
+            "/v1/chain/get_table_rows",
+            { code, scope: account, table: "accounts", json: true, limit: 20 },
+          );
+          const rows = data.rows ?? [];
+          const has = rows.some((r) => (r.balance ?? "").split(" ")[1]?.toUpperCase() === upper);
+          return { account, state: has ? "existing" : "missing" } as const;
+        } catch {
+          return { account, state: "unknown" } as const;
+        }
+      }),
+    );
+    for (const r of results) {
+      if (r.state === "existing") existing.push(r.account);
+      else if (r.state === "unknown") unknown.push(r.account);
+    }
+  }
+  return { existing, unknown };
+}
+
+interface HyperionTokensResponse {
+  tokens?: Array<{ symbol?: string; contract?: string; amount?: number; precision?: number }>;
+}
+
+export async function getWalletTokens(account: string): Promise<WalletToken[]> {
+  try {
+    const [tokens] = await withFailover(HYPERION_ENDPOINTS, async (base) => {
+      const data = (await fetchJson(
+        `${base}/v2/state/get_tokens?account=${encodeURIComponent(account)}&limit=500`,
+      )) as HyperionTokensResponse;
+      return (data.tokens ?? [])
+        .filter((t) => t.symbol && t.contract && typeof t.amount === "number")
+        .map((t) => ({
+          contract: t.contract as string,
+          symbol: t.symbol as string,
+          amount: t.amount as number,
+          precision: t.precision ?? 4,
+        }));
+    });
+    if (tokens.length > 0) return tokens;
+  } catch {
+    // fall through to core balance
+  }
+  const balances = await chainPost<string[]>("/v1/chain/get_currency_balance", {
+    code: "eosio.token",
+    account,
+  });
+  return balances.map((b) => {
+    const parts = b.split(" ");
+    const amountStr = parts[0] ?? "0";
+    const symbol = parts[1] ?? "WAX";
+    const precision = amountStr.includes(".") ? (amountStr.split(".")[1] ?? "").length : 0;
+    return { contract: "eosio.token", symbol, amount: parseFloat(amountStr), precision };
+  });
+}
+
+/** Parse an asset string ("1.23456789 WAX") into integer units of 1e-8. */
+function assetToUnits(asset: string | undefined, precision = 8): number {
+  if (!asset) return 0;
+  const amount = parseFloat(asset.split(" ")[0] ?? "0");
+  if (!isFinite(amount)) return 0;
+  return Math.round(amount * 10 ** precision);
+}
+
+export async function getAccountResources(account: string): Promise<AccountResources> {
+  const data = await chainPost<{
+    cpu_limit?: { used?: number; available?: number; max?: number };
+    net_limit?: { used?: number; available?: number; max?: number };
+    ram_usage?: number;
+    ram_quota?: number;
+    total_resources?: { cpu_weight?: string | number; net_weight?: string | number };
+    self_delegated_bandwidth?: { cpu_weight?: string; net_weight?: string };
+  }>("/v1/chain/get_account", { account_name: account });
+
+  const cpu = data.cpu_limit ?? {};
+  const net = data.net_limit ?? {};
+  const ramQuota = data.ram_quota ?? 0;
+  const ramUsed = data.ram_usage ?? 0;
+  const totals = data.total_resources ?? {};
+  const cpuWeightUnits =
+    typeof totals.cpu_weight === "number" ? totals.cpu_weight : assetToUnits(totals.cpu_weight);
+  const netWeightUnits =
+    typeof totals.net_weight === "number" ? totals.net_weight : assetToUnits(totals.net_weight);
+  return {
+    account,
+    cpuUsedUs: cpu.used ?? 0,
+    cpuAvailableUs: cpu.available ?? 0,
+    cpuMaxUs: cpu.max ?? 0,
+    netUsedBytes: net.used ?? 0,
+    netAvailableBytes: net.available ?? 0,
+    netMaxBytes: net.max ?? 0,
+    ramUsedBytes: ramUsed,
+    ramQuotaBytes: ramQuota,
+    ramAvailableBytes: Math.max(0, ramQuota - ramUsed),
+    refundCpuUs: 0,
+    refundNetBytes: 0,
+    cpuWeightUnits,
+    netWeightUnits,
+  };
+}
+
+export async function getRamPrice(): Promise<RamPrice> {
+  const data = await chainPost<{
+    rows?: Array<{ base?: { balance?: string }; quote?: { balance?: string } }>;
+  }>("/v1/chain/get_table_rows", {
+    code: "eosio",
+    scope: "eosio",
+    table: "rammarket",
+    json: true,
+    limit: 1,
+  });
+  const row = data.rows?.[0];
+  const base = parseFloat(row?.base?.balance ?? "0"); // RAMCORE
+  const quote = parseFloat(row?.quote?.balance ?? "0"); // WAX
+  if (!base || !quote) throw new Error("Could not read RAM market");
+  const waxPerByte = quote / base;
+  return { waxPerKb: waxPerByte * 1024, waxPerNewRow: waxPerByte * 276 };
+}
+
+// ---------------------------------------------------------------------------
+// CHEESE resource purchases (cheesepowerz / ram.chz)
+// ---------------------------------------------------------------------------
+
+/** Liquid CHEESE balance of an account (0 when the account holds none). */
+export async function getCheeseBalance(account: string): Promise<number> {
+  const balances = await chainPost<string[]>("/v1/chain/get_currency_balance", {
+    code: CHEESE_CONTRACT,
+    account,
+    symbol: CHEESE_SYMBOL,
+  });
+  const first = balances[0];
+  return first ? parseFloat(first.split(" ")[0] ?? "0") : 0;
+}
+
+interface RamChzConfig {
+  enabled?: number | boolean;
+  min_cheese?: string;
+  max_cheese?: string;
+  alcor_market_id?: number;
+  reference_rate?: string | number;
+  max_deviation_pct?: string | number;
+  buy_spread_bps?: number;
+  buy_slippage_bps?: number;
+  reserve_buffer_bps?: number;
+}
+
+interface AlcorPoolRow {
+  tokenA?: { quantity?: string; contract?: string };
+  tokenB?: { quantity?: string; contract?: string };
+  currSlot?: { sqrtPriceX64?: string };
+}
+
+interface PowerupStateResource {
+  weight?: string | number;
+  adjusted_utilization?: string | number;
+  utilization?: string | number;
+  min_price?: string;
+  max_price?: string;
+  exponent?: string | number;
+}
+
+function num(value: string | number | undefined, fallback = 0): number {
+  if (typeof value === "number") return value;
+  if (typeof value === "string") {
+    const n = parseFloat(value);
+    return isFinite(n) ? n : fallback;
+  }
+  return fallback;
+}
+
+function assetAmount(asset: string | undefined): number {
+  return asset ? num(asset.split(" ")[0], 0) : 0;
+}
+
+function assetPrecision(asset: string | undefined): number {
+  const amount = asset?.split(" ")[0] ?? "";
+  return amount.includes(".") ? (amount.split(".")[1] ?? "").length : 0;
+}
+
+/** Spot WAX-per-CHEESE from the Alcor concentrated-liquidity pool. */
+function poolWaxPerCheese(pool: AlcorPoolRow): number | null {
+  const sqrtRaw = pool.currSlot?.sqrtPriceX64;
+  if (!sqrtRaw) return null;
+  const sqrt = Number(sqrtRaw) / 2 ** 64;
+  if (!isFinite(sqrt) || sqrt <= 0) return null;
+  const aSym = pool.tokenA?.quantity?.split(" ")[1];
+  const bSym = pool.tokenB?.quantity?.split(" ")[1];
+  const aPrec = assetPrecision(pool.tokenA?.quantity);
+  const bPrec = assetPrecision(pool.tokenB?.quantity);
+  // price = B per A, adjusted for the decimal difference.
+  const bPerA = sqrt * sqrt * 10 ** (aPrec - bPrec);
+  if (!isFinite(bPerA) || bPerA <= 0) return null;
+  if (aSym === CHEESE_SYMBOL && bSym === "WAX") return bPerA;
+  if (aSym === "WAX" && bSym === CHEESE_SYMBOL) return 1 / bPerA;
+  return null;
+}
+
+/** eosio powerup price (WAX to rent 100% of chain weight for the window). */
+function powerupPrice(res: PowerupStateResource): number {
+  const weight = num(res.weight);
+  const minPrice = assetAmount(res.min_price);
+  const maxPrice = assetAmount(res.max_price);
+  const exponent = num(res.exponent, 2);
+  if (weight <= 0 || minPrice <= 0) return 0;
+  const utilization = num(res.adjusted_utilization) || num(res.utilization);
+  const u = Math.max(0, Math.min(1, utilization / weight));
+  return minPrice + Math.max(0, maxPrice - minPrice) * Math.pow(u, exponent);
+}
+
+/**
+ * Live pricing for CHEESE-funded CPU/NET and RAM purchases.
+ * Throws when the CHEESE/WAX price or the RAM market cannot be read; callers
+ * treat that as "pricing unavailable" and keep the manual inputs usable.
+ */
+export async function getResourcePricing(): Promise<ResourcePricing> {
+  const configRes = await chainPost<{ rows?: RamChzConfig[] }>("/v1/chain/get_table_rows", {
+    code: CHEESE_RAM_CONTRACT,
+    scope: CHEESE_RAM_CONTRACT,
+    table: "config",
+    json: true,
+    limit: 1,
+  });
+  const config = configRes.rows?.[0] ?? {};
+  const marketId = config.alcor_market_id ?? 0;
+
+  const [poolRes, ramRes, powerRes, statsRes] = await Promise.all([
+    marketId
+      ? chainPost<{ rows?: AlcorPoolRow[] }>("/v1/chain/get_table_rows", {
+          code: "swap.alcor",
+          scope: "swap.alcor",
+          table: "pools",
+          json: true,
+          lower_bound: marketId,
+          upper_bound: marketId,
+          limit: 1,
+        }).catch(() => ({ rows: [] as AlcorPoolRow[] }))
+      : Promise.resolve({ rows: [] as AlcorPoolRow[] }),
+    chainPost<{ rows?: Array<{ base?: { balance?: string }; quote?: { balance?: string } }> }>(
+      "/v1/chain/get_table_rows",
+      { code: "eosio", scope: "eosio", table: "rammarket", json: true, limit: 1 },
+    ),
+    chainPost<{
+      rows?: Array<{
+        cpu?: PowerupStateResource;
+        net?: PowerupStateResource;
+        powerup_days?: number;
+      }>;
+    }>("/v1/chain/get_table_rows", {
+      code: "eosio",
+      scope: "",
+      table: "powup.state",
+      json: true,
+      limit: 1,
+    }).catch(() => ({ rows: [] })),
+    chainPost<{
+      rows?: Array<{ total_bytes_bought?: number; total_cheese_received?: string }>;
+    }>("/v1/chain/get_table_rows", {
+      code: CHEESE_RAM_CONTRACT,
+      scope: CHEESE_RAM_CONTRACT,
+      table: "stats",
+      json: true,
+      limit: 1,
+    }).catch(() => ({ rows: [] })),
+  ]);
+
+  // CHEESE/WAX price: pool spot, sanity-checked against the contract's own
+  // reference rate; fall back to the reference rate when it deviates too far.
+  const reference = num(config.reference_rate, 0);
+  const maxDeviation = num(config.max_deviation_pct, 25);
+  const spot = poolWaxPerCheese(poolRes.rows?.[0] ?? {});
+  let waxPerCheese = spot ?? reference;
+  let priceSource: ResourcePricing["priceSource"] = spot ? "pool" : "reference";
+  if (spot && reference > 0) {
+    const deviation = (Math.abs(spot - reference) / reference) * 100;
+    if (deviation > maxDeviation) {
+      waxPerCheese = reference;
+      priceSource = "reference";
+    }
+  }
+  if (!(waxPerCheese > 0)) throw new Error("Could not read the CHEESE/WAX price");
+
+  const ramRow = ramRes.rows?.[0];
+  const ramBase = assetAmount(ramRow?.base?.balance); // bytes
+  const ramQuote = assetAmount(ramRow?.quote?.balance); // WAX
+  if (!ramBase || !ramQuote) throw new Error("Could not read the RAM market");
+  const waxPerByte = ramQuote / ramBase;
+
+  const statsRow = statsRes.rows?.[0];
+  const cheeseReceived = assetAmount(statsRow?.total_cheese_received);
+  const bytesBought = statsRow?.total_bytes_bought ?? 0;
+
+  const powerRow = powerRes.rows?.[0];
+  const cpuState = powerRow?.cpu;
+  const netState = powerRow?.net;
+  const cpuPrice = cpuState ? powerupPrice(cpuState) : 0;
+  const netPrice = netState ? powerupPrice(netState) : 0;
+
+  return {
+    waxPerCheese,
+    priceSource,
+    ram: {
+      enabled: config.enabled === 1 || config.enabled === true,
+      minCheese: assetAmount(config.min_cheese) || 1,
+      maxCheese: assetAmount(config.max_cheese) || 100,
+      waxPerByte,
+      feeBps:
+        (config.buy_spread_bps ?? 50) +
+        (config.buy_slippage_bps ?? 25) +
+        (config.reserve_buffer_bps ?? 300),
+      historicalBytesPerCheese:
+        cheeseReceived > 0 && bytesBought > 0 ? bytesBought / cheeseReceived : null,
+    },
+    powerup:
+      cpuPrice > 0 && netPrice > 0
+        ? {
+            cpuPriceWaxPerFullWeight: cpuPrice,
+            netPriceWaxPerFullWeight: netPrice,
+            cpuWeightUnits: num(cpuState?.weight),
+            netWeightUnits: num(netState?.weight),
+            powerupDays: powerRow?.powerup_days ?? 1,
+          }
+        : null,
+  };
+}
