@@ -1,11 +1,22 @@
 // CHEESEAir — step 2: snapshot the holder list the drop goes to.
+import { useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
-import { Loader2 } from 'lucide-react';
-import { ACCOUNT_RE, useAirdrop } from './AirdropContext';
+import { Check, ChevronsUpDown, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { filterPairs, formatFee, pairLabel } from '@/lib/airdropAlcorLp';
+import { ACCOUNT_RE, useAirdrop, type SnapshotMode } from './AirdropContext';
 
 export function AirSnapshotCard() {
   const {
@@ -21,6 +32,12 @@ export function AirSnapshotCard() {
     setSnapSchema,
     snapTemplate,
     setSnapTemplate,
+    lpPairs,
+    lpPairsLoading,
+    lpPair,
+    setLpPair,
+    lpPoolsScanned,
+    lpPositions,
     snapshot,
     snapshotAt,
     snapshotError,
@@ -28,10 +45,18 @@ export function AirSnapshotCard() {
     busy,
   } = useAirdrop();
 
+  const [pairOpen, setPairOpen] = useState(false);
+  const [pairQuery, setPairQuery] = useState('');
+  const pairMatches = useMemo(() => filterPairs(lpPairs, pairQuery), [lpPairs, pairQuery]);
+
   const loading = busy === 'snapshot';
   const disabled =
     loading ||
-    (snapshotMode === 'token' ? !ACCOUNT_RE.test(snapContract) || !snapSymbol : !snapCollection);
+    (snapshotMode === 'token'
+      ? !ACCOUNT_RE.test(snapContract) || !snapSymbol
+      : snapshotMode === 'nft'
+        ? !snapCollection
+        : !lpPair);
 
   return (
     <Card className="border-cheese/20 bg-card/80 backdrop-blur-sm">
@@ -41,12 +66,14 @@ export function AirSnapshotCard() {
           2 · Airdrop to holders of
         </h2>
 
-        <Tabs value={snapshotMode} onValueChange={(v) => setSnapshotMode(v as 'token' | 'nft')}>
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs value={snapshotMode} onValueChange={(v) => setSnapshotMode(v as SnapshotMode)}>
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="token">Token</TabsTrigger>
             <TabsTrigger value="nft">NFT collection</TabsTrigger>
+            <TabsTrigger value="lp">Alcor LP</TabsTrigger>
           </TabsList>
         </Tabs>
+
 
         {snapshotMode === 'token' ? (
           <div className="mt-3 grid grid-cols-2 gap-2">
