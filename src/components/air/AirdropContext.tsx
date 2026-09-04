@@ -41,6 +41,7 @@ import {
   type InventoryCollection,
   type InventoryTemplate,
 } from '@/lib/airdropChain';
+import { getAlcorLpHolders, type AlcorPair } from '@/lib/airdropAlcorLp';
 import {
   CHEESE_CONTRACT,
   CHEESE_CPU_CONTRACT,
@@ -72,7 +73,11 @@ import {
   useAirResourcePricing,
   useAirTokenStat,
   useAirWalletTokens,
+  useAirAlcorPairs,
 } from '@/hooks/useAirdropQueries';
+
+/** Where the recipient list comes from. */
+export type SnapshotMode = 'token' | 'nft' | 'lp';
 
 export const ACCOUNT_RE = /^[a-z1-5.]{1,12}$/;
 /** RAM bytes a fresh token balance row costs the sender. */
