@@ -203,7 +203,7 @@ export function AirSnapshotCard() {
           </p>
         )}
 
-        )}
+
         {snapshot && !snapshot.hasBalances && (
           <p className="mt-1 text-xs text-destructive">
             Fallback source has no balances — pro-rata distribution is unavailable.
