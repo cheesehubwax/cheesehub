@@ -70,14 +70,14 @@ const Air = () => (
           <div className="w-full max-w-lg">
             <AirSnapshotCard />
           </div>
+          <div className="w-full max-w-xl">
+            <AirHoldersTable />
+          </div>
           <div className="w-full max-w-lg">
             <AirDistributionCard />
           </div>
           <div className="w-full max-w-xl">
             <AirCostPanel />
-          </div>
-          <div className="w-full max-w-xl">
-            <AirHoldersTable />
           </div>
           <div className="w-full max-w-lg">
             <AirRunPanel />
