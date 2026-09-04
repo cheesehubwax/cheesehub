@@ -146,8 +146,14 @@ interface AirdropContextValue {
   nftLoading: null | 'collections' | 'templates' | 'assets';
   nftError: string | null;
   // snapshot
-  snapshotMode: 'token' | 'nft';
-  setSnapshotMode: (mode: 'token' | 'nft') => void;
+  snapshotMode: SnapshotMode;
+  setSnapshotMode: (mode: SnapshotMode) => void;
+  lpPairs: AlcorPair[];
+  lpPairsLoading: boolean;
+  lpPair: AlcorPair | null;
+  setLpPair: (pair: AlcorPair | null) => void;
+  lpPoolsScanned: number | null;
+  lpPositions: number | null;
   snapContract: string;
   setSnapContract: (value: string) => void;
   snapSymbol: string;
@@ -270,7 +276,12 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ---- Snapshot ---------------------------------------------------------
-  const [snapshotMode, setSnapshotMode] = useState<'token' | 'nft'>('token');
+  const [snapshotMode, setSnapshotMode] = useState<SnapshotMode>('token');
+  const [lpPair, setLpPair] = useState<AlcorPair | null>(null);
+  const [lpPoolsScanned, setLpPoolsScanned] = useState<number | null>(null);
+  const [lpPositions, setLpPositions] = useState<number | null>(null);
+  const lpPairsQuery = useAirAlcorPairs(snapshotMode === 'lp');
+  const lpPairs = lpPairsQuery.data ?? [];
   const [snapContract, setSnapContract] = useState('');
   const [snapSymbol, setSnapSymbol] = useState('');
   const [snapCollection, setSnapCollection] = useState('');
@@ -318,7 +329,17 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     setRunState('idle');
     setBatchLog([]);
     try {
-      const snap =
+      setLpPoolsScanned(null);
+      setLpPositions(null);
+      let snap: HolderSnapshot;
+      if (snapshotMode === 'lp') {
+        if (!lpPair) throw new Error('Pick a liquidity pair first');
+        const lpSnap = await getAlcorLpHolders(lpPair);
+        setLpPoolsScanned(lpSnap.poolsScanned);
+        setLpPositions(lpSnap.positions);
+        snap = lpSnap;
+      } else {
+        snap =
         snapshotMode === 'token'
           ? await getTokenHolders(snapContract, snapSymbol.toUpperCase())
           : await getNftHolders(
@@ -326,6 +347,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
               snapSchema || undefined,
               snapTemplate ? parseInt(snapTemplate, 10) : undefined,
             );
+      }
       // Exclude the sender and common system/contract accounts by default.
       const excluded = new Set(
         [actor, 'eosio', 'eosio.ram', 'eosio.stake', sendContract, snapContract].filter(
@@ -341,7 +363,17 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     } finally {
       setBusy(null);
     }
-  }, [snapshotMode, snapContract, snapSymbol, snapCollection, snapSchema, snapTemplate, actor, sendContract]);
+  }, [
+    snapshotMode,
+    snapContract,
+    snapSymbol,
+    snapCollection,
+    snapSchema,
+    snapTemplate,
+    lpPair,
+    actor,
+    sendContract,
+  ]);
 
   const sortedHolders = useMemo(
     () => [...(snapshot?.holders ?? [])].sort((a, b) => b.weight - a.weight),
@@ -1109,6 +1141,12 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     nftError,
     snapshotMode,
     setSnapshotMode,
+    lpPairs,
+    lpPairsLoading: lpPairsQuery.isFetching,
+    lpPair,
+    setLpPair,
+    lpPoolsScanned,
+    lpPositions,
     snapContract,
     setSnapContract,
     snapSymbol,
