@@ -355,7 +355,15 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
       }
       // Exclude the sender and common system/contract accounts by default.
       const excluded = new Set(
-        [actor, 'eosio', 'eosio.ram', 'eosio.stake', sendContract, snapContract].filter(
+        [
+          actor,
+          'eosio',
+          'eosio.ram',
+          'eosio.stake',
+          'swap.alcor',
+          sendContract,
+          snapContract,
+        ].filter(
           (x): x is string => !!x,
         ),
       );
