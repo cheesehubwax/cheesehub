@@ -11,7 +11,7 @@ const sections = [
   },
   {
     title: 'Snapshot the holders',
-    body: 'Airdrop to holders of any WAX token, or to holders of an AtomicAssets collection (optionally narrowed to a schema or a single template). Up to 5,000 holders are loaded with their balances.\n\nYour own account and the usual system accounts are unticked automatically. Every holder is listed with a checkbox, so you can deselect anyone, or use Top 10/50/100, All and None.',
+    body: 'Airdrop to holders of any WAX token, to holders of an AtomicAssets collection (optionally narrowed to a schema or a single template), or to liquidity providers of any Alcor pair. Up to 5,000 holders are loaded with their balances.\n\nAlcor LP snapshots scan every fee tier of the chosen pair, keep only open, in-range positions, and weight each provider by the USD value of their position.\n\nYour own account and the usual system accounts are unticked automatically. Every holder is listed with a checkbox, so you can deselect anyone, or use Top 10/50/100, All and None.',
   },
   {
     title: 'Choose the distribution',
