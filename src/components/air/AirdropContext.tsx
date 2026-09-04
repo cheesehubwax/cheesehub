@@ -220,6 +220,8 @@ export function useAirdrop(): AirdropContextValue {
 export function AirdropProvider({ children }: { children: ReactNode }) {
   const { session, accountName, cheeseBalance, refreshBalance } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
+  const { showSuccess } = useTransactionSuccess();
+
   const queryClient = useQueryClient();
   const actor = accountName;
 
