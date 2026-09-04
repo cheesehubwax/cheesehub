@@ -962,6 +962,9 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     void queryClient.invalidateQueries({ queryKey: ['air-wallet-tokens'] });
 
   }, [
+    appendBatch,
+    finishRun,
+
     session,
     actor,
     isNft,
