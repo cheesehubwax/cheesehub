@@ -10,6 +10,7 @@ import {
   getTokenStat,
   getWalletTokens,
 } from '@/lib/airdropChain';
+import { fetchAlcorPairs } from '@/lib/airdropAlcorLp';
 
 const ACCOUNT_RE = /^[a-z1-5.]{1,12}$/;
 
@@ -100,5 +101,16 @@ export function useAirInventoryAssets(
     queryFn: () => getInventoryAssets(account as string, collection, templateId as number),
     enabled: !!account && !!collection && templateId !== null && enabled,
     staleTime: 60 * 1000,
+  });
+}
+
+/** Every Alcor pair (all fee tiers merged) for the LP snapshot picker. */
+export function useAirAlcorPairs(enabled: boolean) {
+  return useQuery({
+    queryKey: ['air-alcor-pairs'],
+    queryFn: fetchAlcorPairs,
+    enabled,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
   });
 }
