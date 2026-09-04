@@ -51,9 +51,9 @@ const Air = () => (
                 </div>
               </AirInfoDropdown>
               <p className="text-muted-foreground max-w-2xl mx-auto">
-                Airdrop any WAX token, NFT or RAM to token and NFT holders. Snapshot the holders,
-                split the drop, and pay for the RAM, CPU and NET with $CHEESE
-
+                Airdrop any WAX token, NFT, RAM or Alcor LP reward to token holders, NFT collectors
+                and liquidity providers. Snapshot the list, split the drop, and pay for the RAM,
+                CPU and NET with $CHEESE
               </p>
             </div>
           </div>
