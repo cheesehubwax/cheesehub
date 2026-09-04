@@ -13,6 +13,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useWax } from '@/context/WaxContext';
 import { useWaxTransaction } from '@/hooks/useWaxTransaction';
+import { useTransactionSuccess } from '@/context/TransactionSuccessContext';
 import { refreshResourceGauges } from '@/components/shared/ResourceGauges';
 import {
   assignAssets,
@@ -219,6 +220,8 @@ export function useAirdrop(): AirdropContextValue {
 export function AirdropProvider({ children }: { children: ReactNode }) {
   const { session, accountName, cheeseBalance, refreshBalance } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
+  const { showSuccess } = useTransactionSuccess();
+
   const queryClient = useQueryClient();
   const actor = accountName;
 
@@ -300,6 +303,8 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
   const [batchLog, setBatchLog] = useState<BatchLogEntry[]>([]);
   const [cancelRequested, setCancelRequested] = useState(false);
   const cancelRef = useRef(false);
+  const runLogRef = useRef<BatchLogEntry[]>([]);
+
 
   const refreshAccount = useCallback(async () => {
     await Promise.all([refetchResources(), refreshBalance?.()]);
@@ -769,6 +774,32 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     setCancelRequested(true);
   }, []);
 
+  /** Record a batch result in both the ref (for the summary) and the visible log. */
+  const appendBatch = useCallback((entry: BatchLogEntry) => {
+    runLogRef.current = [...runLogRef.current, entry];
+    setBatchLog((prev) => [...prev, entry]);
+  }, []);
+
+  /** Close out a run and show the standard CheeseHub transaction confirmation. */
+  const finishRun = useCallback(
+    (kind: 'token' | 'nft' | 'ram') => {
+      setRunState('done');
+      const entries = runLogRef.current;
+      const confirmed = entries.filter((b) => b.txId);
+      if (confirmed.length === 0) return;
+      const delivered = confirmed.reduce((s, b) => s + b.recipients, 0);
+      const noun = kind === 'nft' ? 'NFT transfer' : kind === 'ram' ? 'RAM purchase' : 'transfer';
+      const failed = entries.length - confirmed.length;
+      showSuccess(
+        'Airdrop Complete!',
+        `${delivered.toLocaleString()} ${noun}${delivered === 1 ? '' : 's'} sent across ${confirmed.length} transaction${confirmed.length === 1 ? '' : 's'}${failed > 0 ? ` · ${failed} batch${failed === 1 ? '' : 'es'} failed` : ''}.`,
+        confirmed[confirmed.length - 1]?.txId ?? null,
+      );
+    },
+    [showSuccess],
+  );
+
+
   const canRun =
     !!session &&
     termsAccepted &&
@@ -842,6 +873,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
 
     setRunState('running');
     setBatchLog([]);
+    runLogRef.current = [];
     setCancelRequested(false);
     cancelRef.current = false;
 
@@ -850,10 +882,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
       const batches = chunk(recipients, Math.max(1, batchSize));
       for (let i = 0; i < batches.length; i += 1) {
         if (cancelRef.current) {
-          setBatchLog((prev) => [
-            ...prev,
-            { batch: i + 1, recipients: 0, error: 'Cancelled by user' },
-          ]);
+          appendBatch({ batch: i + 1, recipients: 0, error: 'Cancelled by user' });
           break;
         }
         const batch = batches[i];
@@ -872,8 +901,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
           })),
           { showSuccessToast: false, showErrorToast: false },
         );
-        setBatchLog((prev) => [
-          ...prev,
+        appendBatch(
           result.success
             ? { batch: i + 1, recipients: batch.length, txId: result.txId ?? undefined }
             : {
@@ -881,10 +909,10 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
                 recipients: batch.length,
                 error: shortError(result.error ?? new Error('Transaction failed')),
               },
-        ]);
+        );
         if (i < batches.length - 1) await new Promise((r) => setTimeout(r, 1200));
       }
-      setRunState('done');
+      finishRun('ram');
       void refreshAccount();
       return;
     }
@@ -895,10 +923,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
       const batches = chunk(nftAssignments, Math.max(1, batchSize));
       for (let i = 0; i < batches.length; i += 1) {
         if (cancelRef.current) {
-          setBatchLog((prev) => [
-            ...prev,
-            { batch: i + 1, recipients: 0, error: 'Cancelled by user' },
-          ]);
+          appendBatch({ batch: i + 1, recipients: 0, error: 'Cancelled by user' });
           break;
         }
         const batch = batches[i];
@@ -912,8 +937,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
           })),
           { showSuccessToast: false, showErrorToast: false },
         );
-        setBatchLog((prev) => [
-          ...prev,
+        appendBatch(
           result.success
             ? { batch: i + 1, recipients: batch.length, txId: result.txId ?? undefined }
             : {
@@ -921,10 +945,10 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
                 recipients: batch.length,
                 error: shortError(result.error ?? new Error('Transaction failed')),
               },
-        ]);
+        );
         if (i < batches.length - 1) await new Promise((r) => setTimeout(r, 1200));
       }
-      setRunState('done');
+      finishRun('nft');
       void refreshAccount();
       void queryClient.invalidateQueries({ queryKey: ['air-inventory-assets'] });
       return;
@@ -933,10 +957,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     const batches = chunk(recipients, Math.max(1, batchSize));
     for (let i = 0; i < batches.length; i += 1) {
       if (cancelRef.current) {
-        setBatchLog((prev) => [
-          ...prev,
-          { batch: i + 1, recipients: 0, error: 'Cancelled by user' },
-        ]);
+        appendBatch({ batch: i + 1, recipients: 0, error: 'Cancelled by user' });
         break;
       }
       const batch = batches[i];
@@ -955,8 +976,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
         })),
         { showSuccessToast: false, showErrorToast: false },
       );
-      setBatchLog((prev) => [
-        ...prev,
+      appendBatch(
         result.success
           ? { batch: i + 1, recipients: batch.length, txId: result.txId ?? undefined }
           : {
@@ -964,14 +984,18 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
               recipients: batch.length,
               error: shortError(result.error ?? new Error('Transaction failed')),
             },
-      ]);
+      );
       if (i < batches.length - 1) await new Promise((r) => setTimeout(r, 1200));
     }
 
-    setRunState('done');
+    finishRun('token');
     void refreshAccount();
     void queryClient.invalidateQueries({ queryKey: ['air-wallet-tokens'] });
+
   }, [
+    appendBatch,
+    finishRun,
+
     session,
     actor,
     isNft,
