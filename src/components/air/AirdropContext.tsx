@@ -13,6 +13,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useWax } from '@/context/WaxContext';
 import { useWaxTransaction } from '@/hooks/useWaxTransaction';
+import { useTransactionSuccess } from '@/context/TransactionSuccessContext';
 import { refreshResourceGauges } from '@/components/shared/ResourceGauges';
 import {
   assignAssets,
