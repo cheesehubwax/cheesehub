@@ -300,6 +300,8 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
   const [batchLog, setBatchLog] = useState<BatchLogEntry[]>([]);
   const [cancelRequested, setCancelRequested] = useState(false);
   const cancelRef = useRef(false);
+  const runLogRef = useRef<BatchLogEntry[]>([]);
+
 
   const refreshAccount = useCallback(async () => {
     await Promise.all([refetchResources(), refreshBalance?.()]);
