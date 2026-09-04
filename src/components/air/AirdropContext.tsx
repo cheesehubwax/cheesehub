@@ -769,6 +769,32 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     setCancelRequested(true);
   }, []);
 
+  /** Record a batch result in both the ref (for the summary) and the visible log. */
+  const appendBatch = useCallback((entry: BatchLogEntry) => {
+    runLogRef.current = [...runLogRef.current, entry];
+    setBatchLog((prev) => [...prev, entry]);
+  }, []);
+
+  /** Close out a run and show the standard CheeseHub transaction confirmation. */
+  const finishRun = useCallback(
+    (kind: 'token' | 'nft' | 'ram') => {
+      setRunState('done');
+      const entries = runLogRef.current;
+      const confirmed = entries.filter((b) => b.txId);
+      if (confirmed.length === 0) return;
+      const delivered = confirmed.reduce((s, b) => s + b.recipients, 0);
+      const noun = kind === 'nft' ? 'NFT transfer' : kind === 'ram' ? 'RAM purchase' : 'transfer';
+      const failed = entries.length - confirmed.length;
+      showSuccess(
+        'Airdrop Complete!',
+        `${delivered.toLocaleString()} ${noun}${delivered === 1 ? '' : 's'} sent across ${confirmed.length} transaction${confirmed.length === 1 ? '' : 's'}${failed > 0 ? ` · ${failed} batch${failed === 1 ? '' : 'es'} failed` : ''}.`,
+        confirmed[confirmed.length - 1]?.txId ?? null,
+      );
+    },
+    [showSuccess],
+  );
+
+
   const canRun =
     !!session &&
     termsAccepted &&
