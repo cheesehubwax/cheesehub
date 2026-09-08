@@ -553,11 +553,13 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
             skipped: 0,
             leftover: 0,
             shortfall: 0,
+            capped: false,
           },
     [isNft, nftPool, chosenHolders, mode, amountText],
   );
   const nftAssignments = nftAllocation.assignments;
   const nftShortfall = nftAllocation.shortfall;
+  const nftPoolSize = nftPool.length;
 
 
   // ---- Existing token rows ---------------------------------------------
@@ -679,14 +681,36 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     }
     if (isNft) {
       // NFTs come out of your own inventory: the only blocker is pool coverage.
-      return nftShortfall > 0
-        ? [
-            {
-              level: 'error' as const,
-              message: `You need ${nftShortfall} more NFT${nftShortfall === 1 ? '' : 's'} of this template to cover every selected recipient. Deselect recipients or pick a template you own more of.`,
-            },
-          ]
-        : [];
+      const out: ResourceWarning[] = [];
+      if (nftAssignments.length === 0) {
+        out.push({
+          level: 'error',
+          message:
+            mode === 'fixed'
+              ? 'Nobody is receiving an NFT yet. Pick a template you own, select recipients, and set how many NFTs each one gets.'
+              : 'Nobody is receiving an NFT yet. Pick a template you own, select recipients, and enter the total number of NFTs to send.',
+        });
+        return out;
+      }
+      if (nftShortfall > 0) {
+        out.push({
+          level: 'error',
+          message: `You need ${nftShortfall} more NFT${nftShortfall === 1 ? '' : 's'} of this template to give every selected recipient their share. Lower the amount per holder, deselect recipients, or pick a template you own more of.`,
+        });
+      }
+      if (nftAllocation.capped) {
+        out.push({
+          level: 'warn',
+          message: `You asked to send more NFTs than you hold, so the drop was capped at your ${nftPoolSize.toLocaleString()} NFT${nftPoolSize === 1 ? '' : 's'} of this template.`,
+        });
+      }
+      if (nftAllocation.skipped > 0) {
+        out.push({
+          level: 'warn',
+          message: `${nftAllocation.skipped.toLocaleString()} selected holder${nftAllocation.skipped === 1 ? '' : 's'} get no NFT because their share rounds down to zero. Raise the total or select fewer holders.`,
+        });
+      }
+      return out;
     }
     // Resource shortfalls are handled with CHEESE top-ups, so only the token
     // balance is validated here.
@@ -706,7 +730,12 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     ramExcluded,
     ramLimits,
     isNft,
+    mode,
     nftShortfall,
+    nftAssignments.length,
+    nftAllocation.capped,
+    nftAllocation.skipped,
+    nftPoolSize,
     estimate,
     senderBalanceUnits,
     total,
@@ -1211,6 +1240,10 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     total,
     nftAssignments,
     nftShortfall,
+    nftAssigned: nftAllocation.assigned,
+    nftSkipped: nftAllocation.skipped,
+    nftLeftover: nftAllocation.leftover,
+    nftPoolSize,
     estimate,
     warnings,
     rowStats,
