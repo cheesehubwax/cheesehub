@@ -314,6 +314,18 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
   const [batchSize, setBatchSize] = useState(15);
   const [minWeight, setMinWeight] = useState('');
 
+  /** Switching asset type resets the amount to a sensible default for it. */
+  const setAssetKind = useCallback((kind: 'token' | 'nft' | 'ram') => {
+    setAssetKindState(kind);
+    if (kind === 'nft') {
+      setMode('fixed');
+      setAmountText('1');
+    } else {
+      setAmountText('');
+    }
+  }, []);
+
+
   // ---- Resources / pricing ---------------------------------------------
   const { data: resources, refetch: refetchResources } = useAirAccountResources(actor);
   const { data: ramPrice } = useAirRamPrice();
