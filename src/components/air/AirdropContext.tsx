@@ -16,7 +16,7 @@ import { useWaxTransaction } from '@/hooks/useWaxTransaction';
 import { useTransactionSuccess } from '@/context/TransactionSuccessContext';
 import { refreshResourceGauges } from '@/components/shared/ResourceGauges';
 import {
-  assignAssets,
+  allocateAssets,
   chunk,
   computeAmounts,
   estimateNftResources,
