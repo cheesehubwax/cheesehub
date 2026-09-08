@@ -995,7 +995,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
             account: ATOMICASSETS_CONTRACT,
             name: 'transfer',
             authorization: [session.permissionLevel],
-            data: { from: actor, to: a.account, asset_ids: [a.assetId], memo },
+            data: { from: actor, to: a.account, asset_ids: a.assetIds, memo },
           })),
           { showSuccessToast: false, showErrorToast: false },
         );
