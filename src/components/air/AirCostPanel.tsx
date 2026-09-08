@@ -34,6 +34,10 @@ export function AirCostPanel() {
     sendSymbol,
     estimate,
     nftAssignments,
+    nftAssigned,
+    nftSkipped,
+    nftLeftover,
+    nftPoolSize,
     rowStats,
     rowCheckLoading,
     recipients,
@@ -63,13 +67,18 @@ export function AirCostPanel() {
           <div>
             <dt className="text-xs text-muted-foreground">Recipients</dt>
             <dd className="font-mono text-lg text-foreground">
-              {isRam && selectedCount > 0
+              {(isRam || isNft) && selectedCount > 0
                 ? `${recipientCount.toLocaleString()} of ${selectedCount.toLocaleString()}`
                 : recipientCount.toLocaleString()}
             </dd>
             {isRam && ramSkipped > 0 && (
               <dd className="text-xs text-destructive">
                 {ramSkipped.toLocaleString()} skipped — outside contract limits
+              </dd>
+            )}
+            {isNft && nftSkipped > 0 && (
+              <dd className="text-xs text-destructive">
+                {nftSkipped.toLocaleString()} skipped — share rounds to zero
               </dd>
             )}
           </div>
@@ -80,10 +89,16 @@ export function AirCostPanel() {
               {isRam
                 ? `${formatCheese(ramCheeseTotal)} ${CHEESE_SYMBOL}`
                 : isNft
-                  ? `${nftAssignments.length.toLocaleString()} NFT${nftAssignments.length === 1 ? '' : 's'}`
+                  ? `${nftAssigned.toLocaleString()} NFT${nftAssigned === 1 ? '' : 's'}`
                   : `${formatUnits(total, precision)} ${sendSymbol.toUpperCase()}`}
             </dd>
+            {isNft && nftPoolSize > 0 && (
+              <dd className="text-xs text-muted-foreground">
+                {nftLeftover.toLocaleString()} of {nftPoolSize.toLocaleString()} left in your wallet
+              </dd>
+            )}
           </div>
+
           <div>
             <dt className="text-xs text-muted-foreground">Transactions</dt>
             <dd className="font-mono text-lg text-foreground">{estimate.txCount}</dd>
@@ -124,7 +139,7 @@ export function AirCostPanel() {
                 isRam
                   ? `bought into ${recipientCount.toLocaleString()} recipient account${recipientCount === 1 ? '' : 's'} — you pay no RAM rows`
                   : isNft
-                  ? `~${((estimate.maxNewRows * RAM_BYTES_PER_NFT) / 1024).toFixed(2)} KB for ${nftAssignments.length} NFT transfer${nftAssignments.length === 1 ? '' : 's'}`
+                  ? `~${((estimate.maxNewRows * RAM_BYTES_PER_NFT) / 1024).toFixed(2)} KB for ${nftAssignments.length} transfer${nftAssignments.length === 1 ? '' : 's'} carrying ${nftAssigned} NFT${nftAssigned === 1 ? '' : 's'}`
                   : rowCheckLoading
                       ? 'checking existing token rows…'
                       : rowStats.complete

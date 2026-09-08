@@ -16,7 +16,7 @@ import { useWaxTransaction } from '@/hooks/useWaxTransaction';
 import { useTransactionSuccess } from '@/context/TransactionSuccessContext';
 import { refreshResourceGauges } from '@/components/shared/ResourceGauges';
 import {
-  assignAssets,
+  allocateAssets,
   chunk,
   computeAmounts,
   estimateNftResources,
@@ -30,7 +30,9 @@ import {
   RAM_BYTES_PER_NFT,
   type AirdropRecipient,
   type DistributionMode,
+  type NftAssignment,
   type ResourceWarning,
+
 } from '@/lib/airdrop';
 import {
   getExistingTokenRows,
@@ -192,8 +194,15 @@ interface AirdropContextValue {
   recipients: AirdropRecipient[];
   recipientCount: number;
   total: bigint;
-  nftAssignments: Array<{ account: string; assetId: string }>;
+  nftAssignments: NftAssignment[];
   nftShortfall: number;
+  /** NFT mode: total NFTs handed out, recipients skipped, NFTs left over. */
+  nftAssigned: number;
+  nftSkipped: number;
+  nftLeftover: number;
+  /** NFT mode: how many NFTs of the chosen template you hold. */
+  nftPoolSize: number;
+
   // costs
   estimate: ReturnType<typeof estimateResources>;
   warnings: ResourceWarning[];
@@ -237,9 +246,10 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
   const actor = accountName;
 
   // ---- What to send ------------------------------------------------------
-  const [assetKind, setAssetKind] = useState<'token' | 'nft' | 'ram'>('token');
+  const [assetKind, setAssetKindState] = useState<'token' | 'nft' | 'ram'>('token');
   const isNft = assetKind === 'nft';
   const isRam = assetKind === 'ram';
+
   const [ramUnit, setRamUnit] = useState<'cheese' | 'kb'>('cheese');
 
   const [sendContract, setSendContract] = useState('eosio.token');
@@ -303,6 +313,18 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
   const [memo, setMemo] = useState('Airdrop');
   const [batchSize, setBatchSize] = useState(15);
   const [minWeight, setMinWeight] = useState('');
+
+  /** Switching asset type resets the amount to a sensible default for it. */
+  const setAssetKind = useCallback((kind: 'token' | 'nft' | 'ram') => {
+    setAssetKindState(kind);
+    if (kind === 'nft') {
+      setMode('fixed');
+      setAmountText('1');
+    } else {
+      setAmountText('');
+    }
+  }, []);
+
 
   // ---- Resources / pricing ---------------------------------------------
   const { data: resources, refetch: refetchResources } = useAirAccountResources(actor);
@@ -534,14 +556,24 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
 
 
 
-  const selectedAccounts = useMemo(
-    () => filteredHolders.filter((h) => selected.has(h.account)).map((h) => h.account),
-    [filteredHolders, selected],
+  const nftAllocation = useMemo(
+    () =>
+      isNft
+        ? allocateAssets(nftPool, chosenHolders, mode, amountText)
+        : {
+            assignments: [] as NftAssignment[],
+            assigned: 0,
+            skipped: 0,
+            leftover: 0,
+            shortfall: 0,
+            capped: false,
+          },
+    [isNft, nftPool, chosenHolders, mode, amountText],
   );
-  const { assignments: nftAssignments, shortfall: nftShortfall } = useMemo(
-    () => (isNft ? assignAssets(nftPool, selectedAccounts) : { assignments: [], shortfall: 0 }),
-    [isNft, nftPool, selectedAccounts],
-  );
+  const nftAssignments = nftAllocation.assignments;
+  const nftShortfall = nftAllocation.shortfall;
+  const nftPoolSize = nftPool.length;
+
 
   // ---- Existing token rows ---------------------------------------------
   // Recipients that already hold a row for the token cost the sender no RAM.
@@ -662,14 +694,36 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     }
     if (isNft) {
       // NFTs come out of your own inventory: the only blocker is pool coverage.
-      return nftShortfall > 0
-        ? [
-            {
-              level: 'error' as const,
-              message: `You need ${nftShortfall} more NFT${nftShortfall === 1 ? '' : 's'} of this template to cover every selected recipient. Deselect recipients or pick a template you own more of.`,
-            },
-          ]
-        : [];
+      const out: ResourceWarning[] = [];
+      if (nftAssignments.length === 0) {
+        out.push({
+          level: 'error',
+          message:
+            mode === 'fixed'
+              ? 'Nobody is receiving an NFT yet. Pick a template you own, select recipients, and set how many NFTs each one gets.'
+              : 'Nobody is receiving an NFT yet. Pick a template you own, select recipients, and enter the total number of NFTs to send.',
+        });
+        return out;
+      }
+      if (nftShortfall > 0) {
+        out.push({
+          level: 'error',
+          message: `You need ${nftShortfall} more NFT${nftShortfall === 1 ? '' : 's'} of this template to give every selected recipient their share. Lower the amount per holder, deselect recipients, or pick a template you own more of.`,
+        });
+      }
+      if (nftAllocation.capped) {
+        out.push({
+          level: 'warn',
+          message: `You asked to send more NFTs than you hold, so the drop was capped at your ${nftPoolSize.toLocaleString()} NFT${nftPoolSize === 1 ? '' : 's'} of this template.`,
+        });
+      }
+      if (nftAllocation.skipped > 0) {
+        out.push({
+          level: 'warn',
+          message: `${nftAllocation.skipped.toLocaleString()} selected holder${nftAllocation.skipped === 1 ? '' : 's'} get no NFT because their share rounds down to zero. Raise the total or select fewer holders.`,
+        });
+      }
+      return out;
     }
     // Resource shortfalls are handled with CHEESE top-ups, so only the token
     // balance is validated here.
@@ -689,7 +743,12 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     ramExcluded,
     ramLimits,
     isNft,
+    mode,
     nftShortfall,
+    nftAssignments.length,
+    nftAllocation.capped,
+    nftAllocation.skipped,
+    nftPoolSize,
     estimate,
     senderBalanceUnits,
     total,
@@ -978,7 +1037,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
             account: ATOMICASSETS_CONTRACT,
             name: 'transfer',
             authorization: [session.permissionLevel],
-            data: { from: actor, to: a.account, asset_ids: [a.assetId], memo },
+            data: { from: actor, to: a.account, asset_ids: a.assetIds, memo },
           })),
           { showSuccessToast: false, showErrorToast: false },
         );
@@ -1079,12 +1138,13 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
       }
       name = `airdrop-ram-${stamp}.csv`;
     } else if (isNft) {
-      lines = ['account,asset_id,collection,template_id,memo'];
+      lines = ['account,nfts,asset_ids,collection,template_id,memo'];
       for (const a of nftAssignments) {
         lines.push(
-          `${a.account},${a.assetId},${nftCollection},${nftTemplateId ?? ''},${quotedMemo}`,
+          `${a.account},${a.assetIds.length},"${a.assetIds.join(' ')}",${nftCollection},${nftTemplateId ?? ''},${quotedMemo}`,
         );
       }
+
       name = `airdrop-nft-${nftCollection || 'assets'}-${stamp}.csv`;
 
     } else {
@@ -1193,6 +1253,10 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     total,
     nftAssignments,
     nftShortfall,
+    nftAssigned: nftAllocation.assigned,
+    nftSkipped: nftAllocation.skipped,
+    nftLeftover: nftAllocation.leftover,
+    nftPoolSize,
     estimate,
     warnings,
     rowStats,
