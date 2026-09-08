@@ -130,10 +130,62 @@ export function AirDistributionCard() {
             </p>
           </>
         ) : isNft ? (
-          <p className="mb-3 rounded-md border border-border bg-background p-2 text-xs text-muted-foreground">
-            Each selected recipient receives exactly 1 NFT of the chosen template, assigned in
-            inventory order (lowest asset id first).
-          </p>
+          <>
+            <div className="mb-3 grid grid-cols-3 gap-1 rounded-md border border-border bg-background p-1">
+              {MODES.map(([m, label]) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMode(m)}
+                  disabled={m === 'prorata' && snapshot !== null && !snapshot.hasBalances}
+                  className={cn(
+                    'rounded px-2 py-1 text-sm font-medium transition-colors disabled:opacity-40',
+                    mode === m
+                      ? 'bg-cheese/20 text-cheese'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="mb-2">
+              <Label className="mb-1 block text-xs text-muted-foreground">
+                {mode === 'fixed' ? 'NFTs per holder' : 'Total NFTs to send'}
+              </Label>
+              <Input
+                type="number"
+                min={1}
+                step={1}
+                value={amountText}
+                onChange={(e) => setAmountText(e.target.value)}
+                placeholder={mode === 'fixed' ? '1' : String(nftPoolSize || 10)}
+                className="font-mono"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                You hold {nftPoolSize.toLocaleString()} NFT
+                {nftPoolSize === 1 ? '' : 's'} of the chosen template.
+                {nftPoolSize > 0 && mode !== 'fixed' && (
+                  <button
+                    type="button"
+                    onClick={() => setAmountText(String(nftPoolSize))}
+                    className="ml-1 font-medium text-cheese hover:underline"
+                  >
+                    Use all
+                  </button>
+                )}
+              </p>
+            </div>
+            <p className="mb-3 rounded-md border border-border bg-background p-2 text-xs text-muted-foreground">
+              {mode === 'fixed'
+                ? 'Every selected recipient receives the same number of NFTs.'
+                : mode === 'equal'
+                  ? 'The total is spread as evenly as possible; leftovers go to the highest-ranked holders first.'
+                  : 'The total is split by each holder\u2019s snapshot weight. Holders whose share rounds to zero are skipped.'}{' '}
+              NFTs are assigned in inventory order (lowest asset id first).
+            </p>
+          </>
+
         ) : (
           <>
             <div className="mb-3 grid grid-cols-3 gap-1 rounded-md border border-border bg-background p-1">
