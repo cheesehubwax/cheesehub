@@ -237,8 +237,10 @@ export interface NftAllocation {
   skipped: number;
   /** NFTs of the template left in your wallet after the drop. */
   leftover: number;
-  /** How many more NFTs you would need to satisfy the request. */
+  /** How many more NFTs you would need to satisfy the request (fixed mode). */
   shortfall: number;
+  /** True when the requested total was larger than your holdings and got capped. */
+  capped: boolean;
 }
 
 /**
@@ -261,21 +263,23 @@ export function allocateAssets(
     skipped: 0,
     leftover: pool.length,
     shortfall: 0,
+    capped: false,
   };
   if (holders.length === 0) return empty;
 
   const parsed = Math.floor(Number(amountText));
   const counts: number[] = new Array(holders.length).fill(0);
-  let requested = 0;
+  let shortfall = 0;
+  let capped = false;
 
   if (mode === "fixed") {
     const each = Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
     for (let i = 0; i < holders.length; i++) counts[i] = each;
-    requested = each * holders.length;
+    shortfall = Math.max(0, each * holders.length - pool.length);
   } else {
     const wanted = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
     if (wanted <= 0) return empty;
-    requested = wanted;
+    capped = wanted > pool.length;
     const total = Math.min(wanted, pool.length);
     if (mode === "equal") {
       const base = Math.floor(total / holders.length);
@@ -328,7 +332,8 @@ export function allocateAssets(
     assigned: cursor,
     skipped,
     leftover: Math.max(0, pool.length - cursor),
-    shortfall: Math.max(0, requested - pool.length),
+    shortfall,
+    capped,
   };
 }
 
