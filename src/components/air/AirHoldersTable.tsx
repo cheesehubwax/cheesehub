@@ -33,8 +33,8 @@ export function AirHoldersTable() {
     () => new Map(recipients.map((r) => [r.account, r.units])),
     [recipients],
   );
-  const assetByAccount = useMemo(
-    () => new Map(nftAssignments.map((a) => [a.account, a.assetId])),
+  const assetsByAccount = useMemo(
+    () => new Map(nftAssignments.map((a) => [a.account, a.assetIds])),
     [nftAssignments],
   );
 
@@ -105,7 +105,7 @@ export function AirHoldersTable() {
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">
                     {isNft
-                      ? 'Receives (NFT)'
+                      ? 'Receives (NFTs)'
                       : isRam
                         ? `Spends (${CHEESE_SYMBOL})`
                         : `Receives (${sendSymbol.toUpperCase()})`}
@@ -117,7 +117,7 @@ export function AirHoldersTable() {
                 {filteredHolders.slice(0, MAX_ROWS).map((h, i) => {
                   const isSelected = selected.has(h.account);
                   const units = amountByAccount.get(h.account);
-                  const assetId = assetByAccount.get(h.account);
+                  const assetIds = assetsByAccount.get(h.account);
                   return (
                     <tr
                       key={h.account}
@@ -146,7 +146,17 @@ export function AirHoldersTable() {
                       </td>
                       <td className="px-3 py-1.5 text-right text-cheese">
                         {isNft ? (
-                          (assetId ?? '—')
+                          assetIds && assetIds.length > 0 ? (
+                            <>
+                              {assetIds.length}
+                              <span className="block text-xs text-muted-foreground">
+                                {assetIds.slice(0, 3).join(', ')}
+                                {assetIds.length > 3 ? ` +${assetIds.length - 3}` : ''}
+                              </span>
+                            </>
+                          ) : (
+                            '—'
+                          )
                         ) : units !== undefined ? (
                           <>
                             {formatUnits(units, isRam ? CHEESE_PRECISION : precision)}
