@@ -221,31 +221,117 @@ export function resourceWarnings(
 }
 
 // ---------------------------------------------------------------------------
-// NFT airdrops (one asset per recipient)
+// NFT airdrops
 // ---------------------------------------------------------------------------
 
 export interface NftAssignment {
   account: string;
-  assetId: string;
+  assetIds: string[];
+}
+
+export interface NftAllocation {
+  assignments: NftAssignment[];
+  /** Total NFTs handed out. */
+  assigned: number;
+  /** Recipients whose computed share rounded to zero. */
+  skipped: number;
+  /** NFTs of the template left in your wallet after the drop. */
+  leftover: number;
+  /** How many more NFTs you would need to satisfy the request. */
+  shortfall: number;
 }
 
 /**
- * Assign one asset from the pool to each account, in pool order.
- * `shortfall` is how many more assets are needed to cover every account.
+ * Allocate whole NFTs from `pool` across `holders` (already ranked highest
+ * weight first) using the shared distribution modes:
+ *  - fixed:   every recipient gets the same count (default 1)
+ *  - equal:   a total split as evenly as possible, remainder to the top ranks
+ *  - prorata: a total split by weight with largest-remainder rounding
+ * Assets are handed out in pool order (lowest asset id first).
  */
-export function assignAssets(
+export function allocateAssets(
   pool: string[],
-  accounts: string[],
-): { assignments: NftAssignment[]; shortfall: number } {
-  const assignments: NftAssignment[] = [];
-  for (let i = 0; i < accounts.length; i++) {
-    const account = accounts[i];
-    const assetId = pool[i];
-    if (account === undefined || assetId === undefined) break;
-    assignments.push({ account, assetId });
+  holders: Array<{ account: string; weight: number }>,
+  mode: DistributionMode = "fixed",
+  amountText = "1",
+): NftAllocation {
+  const empty: NftAllocation = {
+    assignments: [],
+    assigned: 0,
+    skipped: 0,
+    leftover: pool.length,
+    shortfall: 0,
+  };
+  if (holders.length === 0) return empty;
+
+  const parsed = Math.floor(Number(amountText));
+  const counts: number[] = new Array(holders.length).fill(0);
+  let requested = 0;
+
+  if (mode === "fixed") {
+    const each = Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+    for (let i = 0; i < holders.length; i++) counts[i] = each;
+    requested = each * holders.length;
+  } else {
+    const wanted = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    if (wanted <= 0) return empty;
+    requested = wanted;
+    const total = Math.min(wanted, pool.length);
+    if (mode === "equal") {
+      const base = Math.floor(total / holders.length);
+      const rem = total % holders.length;
+      for (let i = 0; i < holders.length; i++) counts[i] = base + (i < rem ? 1 : 0);
+    } else {
+      const totalWeight = holders.reduce((s, h) => s + (h.weight > 0 ? h.weight : 0), 0);
+      if (!(totalWeight > 0)) return empty;
+      const exact = holders.map((h) => (total * (h.weight > 0 ? h.weight : 0)) / totalWeight);
+      let handed = 0;
+      for (let i = 0; i < holders.length; i++) {
+        const floor = Math.floor(exact[i] ?? 0);
+        counts[i] = floor;
+        handed += floor;
+      }
+      const order = holders
+        .map((_, i) => i)
+        .sort((a, b) => ((exact[b] ?? 0) % 1) - ((exact[a] ?? 0) % 1));
+      let k = 0;
+      while (handed < total && order.length > 0) {
+        const idx = order[k % order.length];
+        if (idx !== undefined) {
+          counts[idx] = (counts[idx] ?? 0) + 1;
+          handed += 1;
+        }
+        k += 1;
+      }
+    }
   }
-  return { assignments, shortfall: Math.max(0, accounts.length - pool.length) };
+
+  const assignments: NftAssignment[] = [];
+  let cursor = 0;
+  let skipped = 0;
+  for (let i = 0; i < holders.length; i++) {
+    const holder = holders[i];
+    const want = counts[i] ?? 0;
+    if (!holder) continue;
+    if (want <= 0) {
+      skipped += 1;
+      continue;
+    }
+    const slice = pool.slice(cursor, cursor + want);
+    if (slice.length < want) break;
+    cursor += want;
+    assignments.push({ account: holder.account, assetIds: slice });
+  }
+
+  return {
+    assignments,
+    assigned: cursor,
+    skipped,
+    leftover: Math.max(0, pool.length - cursor),
+    shortfall: Math.max(0, requested - pool.length),
+  };
 }
+
 
 /** RAM bytes an incoming NFT costs the sender (AtomicAssets asset row, conservative). */
 export const RAM_BYTES_PER_NFT = 200;
