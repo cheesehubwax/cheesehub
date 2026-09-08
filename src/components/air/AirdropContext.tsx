@@ -30,7 +30,9 @@ import {
   RAM_BYTES_PER_NFT,
   type AirdropRecipient,
   type DistributionMode,
+  type NftAssignment,
   type ResourceWarning,
+
 } from '@/lib/airdrop';
 import {
   getExistingTokenRows,
