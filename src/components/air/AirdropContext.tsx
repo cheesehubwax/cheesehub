@@ -246,9 +246,10 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
   const actor = accountName;
 
   // ---- What to send ------------------------------------------------------
-  const [assetKind, setAssetKind] = useState<'token' | 'nft' | 'ram'>('token');
+  const [assetKind, setAssetKindState] = useState<'token' | 'nft' | 'ram'>('token');
   const isNft = assetKind === 'nft';
   const isRam = assetKind === 'ram';
+
   const [ramUnit, setRamUnit] = useState<'cheese' | 'kb'>('cheese');
 
   const [sendContract, setSendContract] = useState('eosio.token');
