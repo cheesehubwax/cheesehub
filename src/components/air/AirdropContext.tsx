@@ -192,8 +192,15 @@ interface AirdropContextValue {
   recipients: AirdropRecipient[];
   recipientCount: number;
   total: bigint;
-  nftAssignments: Array<{ account: string; assetId: string }>;
+  nftAssignments: NftAssignment[];
   nftShortfall: number;
+  /** NFT mode: total NFTs handed out, recipients skipped, NFTs left over. */
+  nftAssigned: number;
+  nftSkipped: number;
+  nftLeftover: number;
+  /** NFT mode: how many NFTs of the chosen template you hold. */
+  nftPoolSize: number;
+
   // costs
   estimate: ReturnType<typeof estimateResources>;
   warnings: ResourceWarning[];
