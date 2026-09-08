@@ -27,6 +27,8 @@ export function AirDistributionCard() {
     ramMinViable,
     applyRamMinViable,
     selectedCount,
+    nftPoolSize,
+
 
     mode,
     setMode,
