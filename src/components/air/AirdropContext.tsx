@@ -1096,12 +1096,13 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
       }
       name = `airdrop-ram-${stamp}.csv`;
     } else if (isNft) {
-      lines = ['account,asset_id,collection,template_id,memo'];
+      lines = ['account,nfts,asset_ids,collection,template_id,memo'];
       for (const a of nftAssignments) {
         lines.push(
-          `${a.account},${a.assetId},${nftCollection},${nftTemplateId ?? ''},${quotedMemo}`,
+          `${a.account},${a.assetIds.length},"${a.assetIds.join(' ')}",${nftCollection},${nftTemplateId ?? ''},${quotedMemo}`,
         );
       }
+
       name = `airdrop-nft-${nftCollection || 'assets'}-${stamp}.csv`;
 
     } else {
