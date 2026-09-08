@@ -92,7 +92,13 @@ export function AirCostPanel() {
                   ? `${nftAssigned.toLocaleString()} NFT${nftAssigned === 1 ? '' : 's'}`
                   : `${formatUnits(total, precision)} ${sendSymbol.toUpperCase()}`}
             </dd>
+            {isNft && nftPoolSize > 0 && (
+              <dd className="text-xs text-muted-foreground">
+                {nftLeftover.toLocaleString()} of {nftPoolSize.toLocaleString()} left in your wallet
+              </dd>
+            )}
           </div>
+
           <div>
             <dt className="text-xs text-muted-foreground">Transactions</dt>
             <dd className="font-mono text-lg text-foreground">{estimate.txCount}</dd>
