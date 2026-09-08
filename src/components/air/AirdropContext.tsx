@@ -543,14 +543,22 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
 
 
 
-  const selectedAccounts = useMemo(
-    () => filteredHolders.filter((h) => selected.has(h.account)).map((h) => h.account),
-    [filteredHolders, selected],
+  const nftAllocation = useMemo(
+    () =>
+      isNft
+        ? allocateAssets(nftPool, chosenHolders, mode, amountText)
+        : {
+            assignments: [] as NftAssignment[],
+            assigned: 0,
+            skipped: 0,
+            leftover: 0,
+            shortfall: 0,
+          },
+    [isNft, nftPool, chosenHolders, mode, amountText],
   );
-  const { assignments: nftAssignments, shortfall: nftShortfall } = useMemo(
-    () => (isNft ? assignAssets(nftPool, selectedAccounts) : { assignments: [], shortfall: 0 }),
-    [isNft, nftPool, selectedAccounts],
-  );
+  const nftAssignments = nftAllocation.assignments;
+  const nftShortfall = nftAllocation.shortfall;
+
 
   // ---- Existing token rows ---------------------------------------------
   // Recipients that already hold a row for the token cost the sender no RAM.
