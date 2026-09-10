@@ -17,8 +17,9 @@ const NAV_ITEMS = [
   { to: "/cheesenull", label: "CHEESENull", emoji: "⛔", prefix: "CHEESE", suffix: "Null" },
   { to: "/farm", label: "CHEESEFarm", emoji: "🌱", prefix: "CHEESE", suffix: "Farm" },
   { to: "/dao", label: "CHEESEDao", emoji: "🏛️", prefix: "CHEESE", suffix: "Dao" },
-  { to: "/drip", label: "CHEESEDrip", emoji: "💧", prefix: "CHEESE", suffix: "Drip" },
+  { to: "/air", label: "CHEESEAir", emoji: "🪂", prefix: "CHEESE", suffix: "Air" },
   { to: "/ram", label: "CHEESERam", image: ramStick, prefix: "CHEESE", suffix: "Ram" },
+  { to: "/drip", label: "CHEESDrip", emoji: "💧", prefix: "CHEESE", suffix: "Drip" },
   { to: "/locker", label: "CHEESELock", emoji: "🔐", prefix: "CHEESE", suffix: "Lock" },
   { to: "/drops", label: "CHEESEDrop", emoji: "🛒", prefix: "CHEESE", suffix: "Drop" },
 ];
