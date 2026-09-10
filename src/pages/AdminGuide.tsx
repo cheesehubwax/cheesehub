@@ -420,6 +420,7 @@ export default function AdminGuide() {
           <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground space-y-2">
             <p><strong className="text-foreground">CHEESEHub</strong> is a unified platform for the CHEESE ecosystem on the WAX blockchain. It bundles multiple dApps — some built by the CHEESE team, others powered by WaxDAO, NFTHive, or Alcor — into a single interface.</p>
             <p>This guide explains what each dApp does, which smart contracts power it, who owns those contracts, and how fees flow through the system.</p>
+            <p><strong className="text-foreground">Tokens:</strong> $CHEESE (<code className="text-[11px]">cheeseburger</code>) is the platform token. $HOLE (<code className="text-[11px]">hole.cheese</code>) is its sister token; the CHEESE/HOLE rate comes from Alcor pool 11051 and is shown on the homepage price bar.</p>
           </div>
 
           {/* Legend */}
@@ -478,6 +479,25 @@ export default function AdminGuide() {
               </AccordionItem>
             ))}
           </Accordion>
+
+          {/* Automation */}
+          <div className="space-y-3">
+            <h2 className="text-lg font-semibold">Automation</h2>
+            <p className="text-sm text-muted-foreground">
+              Scheduled jobs that run outside the site (GitHub Actions) and keep parts of the ecosystem moving.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {automation.map((job) => (
+                <div key={job.name} className="rounded-lg border bg-card p-4 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold">{job.name}</span>
+                    <Badge variant="outline" className="text-[10px]">{job.schedule}</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{job.detail}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
     </Layout>
