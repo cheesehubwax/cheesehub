@@ -123,6 +123,9 @@ async function fetchAllConfigs(): Promise<ContractConfigsData> {
     bannadConfig,
     bannadAdmins,
     powerzStats,
+    ramConfig,
+    ramStats,
+    ramReserves,
     poolPrices: { pool1252: pool1252Prices, pool1236: pool1236Prices },
     deviations: {
       cheeseWax: cheeseWaxDev,
