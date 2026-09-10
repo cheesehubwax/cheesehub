@@ -16,6 +16,14 @@ import {
   type BannadAdmin,
   type PowerzStats,
 } from '@/lib/adminData';
+import {
+  fetchCheeseRamConfig,
+  fetchCheeseRamStats,
+  fetchContractReserves,
+  type CheeseRamConfig,
+  type CheeseRamStats,
+  type ContractReserves,
+} from '@/lib/cheeseRam';
 
 export interface PoolPriceData {
   pool1252: {
@@ -35,6 +43,9 @@ export interface ContractConfigsData {
   bannadConfig: BannadConfig | null;
   bannadAdmins: BannadAdmin[];
   powerzStats: PowerzStats | null;
+  ramConfig: CheeseRamConfig | null;
+  ramStats: CheeseRamStats | null;
+  ramReserves: ContractReserves | null;
   poolPrices: PoolPriceData;
   deviations: {
     cheeseWax: number | null;
