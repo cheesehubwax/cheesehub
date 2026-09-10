@@ -9,7 +9,7 @@ import { AddBannerSlotsCard } from '@/components/admin/AddBannerSlotsCard';
 import { parseAssetAmount, getDeviationSeverity } from '@/lib/adminData';
 import { DropPurchaseLog } from '@/components/admin/DropPurchaseLog';
 import { useDropPurchases } from '@/hooks/useDropPurchases';
-import { Flame, CurrencyCircleDollar, Megaphone, Lightning, ShieldCheck, ArrowsClockwise, BookOpenText } from '@phosphor-icons/react';
+import { Flame, CurrencyCircleDollar, Megaphone, Lightning, ShieldCheck, ArrowsClockwise, BookOpenText, HardDrives } from '@phosphor-icons/react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState } from 'react';
@@ -64,6 +64,20 @@ export default function Admin() {
   const feefeeStatus = cheeseWaxSeverity === 'red' || waxdaoWaxSeverity === 'red'
     ? 'critical' : cheeseWaxSeverity === 'yellow' || waxdaoWaxSeverity === 'yellow'
     ? 'warn' : 'ok';
+
+  // ram.chz health
+  const ramDisabled = data?.ramConfig != null && !data.ramConfig.enabled;
+  const lowWaxReserve = data?.ramConfig != null && data?.ramReserves != null
+    && data.ramConfig.minLiquidReserve > 0
+    && data.ramReserves.liquidWax < data.ramConfig.minLiquidReserve;
+  const lowCheesePool = data?.ramConfig != null && data?.ramReserves != null
+    && data.ramConfig.minCheesePool > 0
+    && data.ramReserves.cheesePool < data.ramConfig.minCheesePool;
+  const ramStatus: 'ok' | 'warn' | 'critical' = ramDisabled
+    ? 'critical'
+    : (lowWaxReserve || lowCheesePool || (data?.ramConfig != null && !data.ramConfig.sellEnabled))
+      ? 'warn'
+      : 'ok';
 
   return (
     <Layout>
