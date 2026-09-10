@@ -62,6 +62,9 @@ async function fetchAllConfigs(): Promise<ContractConfigsData> {
     bannadConfig,
     bannadAdmins,
     powerzStats,
+    ramConfig,
+    ramStats,
+    ramReserves,
     pool1252,
     pool1236,
   ] = await Promise.all([
@@ -71,6 +74,9 @@ async function fetchAllConfigs(): Promise<ContractConfigsData> {
     fetchBannadConfig().catch(() => null),
     fetchBannadAdmins().catch(() => [] as BannadAdmin[]),
     fetchPowerzStats().catch(() => null),
+    fetchCheeseRamConfig().catch(() => null),
+    fetchCheeseRamStats().catch(() => null),
+    fetchContractReserves().catch(() => null),
     fetchPoolReserves(1252).catch(() => null),
     fetchPoolReserves(1236).catch(() => null),
   ]);
