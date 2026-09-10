@@ -129,6 +129,101 @@ const nullCheeseFlow: FlowStep[] = [
   },
 ];
 
+const ramBuyFlow: FlowStep[] = [
+  {
+    label: 'User sends CHEESE to ram.chz',
+    items: [
+      { pct: '80%', dest: 'Nulled (eosio.null)', highlight: 'burn' },
+      { pct: '20%', dest: 'xcheeseliqst (liquid staking)', highlight: 'liq' },
+    ],
+  },
+  {
+    label: 'Contract delivers RAM',
+    items: [
+      { pct: '—', dest: 'WAX from contract reserve → eosio::buyram for recipient', highlight: 'power' },
+      { pct: '0.5%', dest: 'Spread kept by protocol (anti-arb)', highlight: 'fee' },
+    ],
+  },
+];
+
+const ramSellFlow: FlowStep[] = [
+  {
+    label: 'User transfers RAM bytes to ram.chz',
+    items: [
+      { pct: '—', dest: 'Paid in CHEESE from the payout pool at Alcor rate − 0.5%', highlight: 'neutral' },
+    ],
+  },
+  {
+    label: 'WAX from eosio::sellram',
+    items: [
+      { pct: '25%', dest: 'Self-staked to CPU', highlight: 'stake' },
+      { pct: '25%', dest: 'cheesepowerz', highlight: 'power' },
+      { pct: '25%', dest: 'cheeseburner', highlight: 'burn' },
+      { pct: '25%', dest: 'Buys CHEESE on Alcor → nulled immediately', highlight: 'swap' },
+    ],
+  },
+];
+
+const ramReserveFlow: FlowStep[] = [
+  {
+    label: 'WAX reserve top-ups',
+    items: [
+      { pct: '—', dest: 'Own WAX vote rewards, harvested max once per 24h', highlight: 'stake' },
+      { pct: '—', dest: 'Manual "Fund WAX Pool" claim (any wallet)', highlight: 'swap' },
+    ],
+  },
+  {
+    label: 'CHEESE payout pool top-ups',
+    items: [
+      { pct: '—', dest: 'Anyone sends CHEESE with memo "deposit" (donation, no RAM back)', highlight: 'liq' },
+    ],
+  },
+];
+
+const airFlow: FlowStep[] = [
+  {
+    label: 'Snapshot',
+    items: [
+      { pct: '—', dest: 'Token holders, NFT collectors or Alcor LP positions', highlight: 'neutral' },
+    ],
+  },
+  {
+    label: 'Distribute',
+    items: [
+      { pct: 'Fixed', dest: 'Same amount to each recipient', highlight: 'neutral' },
+      { pct: 'Equal', dest: 'Total split evenly', highlight: 'neutral' },
+      { pct: 'Pro-rata', dest: 'Weighted by holding size', highlight: 'neutral' },
+    ],
+  },
+  {
+    label: 'Send (batched, user-signed)',
+    items: [
+      { pct: 'Tokens', dest: 'token contract transfers', highlight: 'neutral' },
+      { pct: 'NFTs', dest: 'atomicassets::transfer (one per recipient, all IDs)', highlight: 'neutral' },
+      { pct: 'RAM', dest: 'CHEESE transfer to ram.chz per recipient (memo = receiver)', highlight: 'burn' },
+    ],
+  },
+];
+
+/* ── automation jobs ── */
+const automation = [
+  {
+    name: 'Daily CPU powerup',
+    schedule: 'Once daily (GitHub Actions)',
+    detail: 'Powers up eligible CHEESE stakers with CPU/NET via cheesepowerz, and checks whether cheesepowerz has claimable WAX vote rewards — claiming them when available, otherwise retrying on the next daily run.',
+  },
+  {
+    name: 'Powerup watchdog',
+    schedule: 'Daily, after the powerup run',
+    detail: 'Verifies the daily powerup job actually ran and succeeded, so a silent failure does not go unnoticed.',
+  },
+  {
+    name: 'RAM price recorder',
+    schedule: 'Twice daily (12h slots, retried within each slot)',
+    detail: 'Samples the WAX and CHEESE price of RAM and appends one sample per 12-hour UTC slot to a separate data branch. This history feeds the CHEESERam price charts (24h / 7d / all).',
+  },
+];
+
 /* ── dApp sections ── */
 interface DApp {
   id: string;
