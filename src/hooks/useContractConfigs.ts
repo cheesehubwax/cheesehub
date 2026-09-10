@@ -16,6 +16,14 @@ import {
   type BannadAdmin,
   type PowerzStats,
 } from '@/lib/adminData';
+import {
+  fetchCheeseRamConfig,
+  fetchCheeseRamStats,
+  fetchContractReserves,
+  type CheeseRamConfig,
+  type CheeseRamStats,
+  type ContractReserves,
+} from '@/lib/cheeseRam';
 
 export interface PoolPriceData {
   pool1252: {
@@ -35,6 +43,9 @@ export interface ContractConfigsData {
   bannadConfig: BannadConfig | null;
   bannadAdmins: BannadAdmin[];
   powerzStats: PowerzStats | null;
+  ramConfig: CheeseRamConfig | null;
+  ramStats: CheeseRamStats | null;
+  ramReserves: ContractReserves | null;
   poolPrices: PoolPriceData;
   deviations: {
     cheeseWax: number | null;
@@ -51,6 +62,9 @@ async function fetchAllConfigs(): Promise<ContractConfigsData> {
     bannadConfig,
     bannadAdmins,
     powerzStats,
+    ramConfig,
+    ramStats,
+    ramReserves,
     pool1252,
     pool1236,
   ] = await Promise.all([
@@ -60,6 +74,9 @@ async function fetchAllConfigs(): Promise<ContractConfigsData> {
     fetchBannadConfig().catch(() => null),
     fetchBannadAdmins().catch(() => [] as BannadAdmin[]),
     fetchPowerzStats().catch(() => null),
+    fetchCheeseRamConfig().catch(() => null),
+    fetchCheeseRamStats().catch(() => null),
+    fetchContractReserves().catch(() => null),
     fetchPoolReserves(1252).catch(() => null),
     fetchPoolReserves(1236).catch(() => null),
   ]);
@@ -106,6 +123,9 @@ async function fetchAllConfigs(): Promise<ContractConfigsData> {
     bannadConfig,
     bannadAdmins,
     powerzStats,
+    ramConfig,
+    ramStats,
+    ramReserves,
     poolPrices: { pool1252: pool1252Prices, pool1236: pool1236Prices },
     deviations: {
       cheeseWax: cheeseWaxDev,

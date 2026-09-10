@@ -9,7 +9,7 @@ import { AddBannerSlotsCard } from '@/components/admin/AddBannerSlotsCard';
 import { parseAssetAmount, getDeviationSeverity } from '@/lib/adminData';
 import { DropPurchaseLog } from '@/components/admin/DropPurchaseLog';
 import { useDropPurchases } from '@/hooks/useDropPurchases';
-import { Flame, CurrencyCircleDollar, Megaphone, Lightning, ShieldCheck, ArrowsClockwise, BookOpenText } from '@phosphor-icons/react';
+import { Flame, CurrencyCircleDollar, Megaphone, Lightning, ShieldCheck, ArrowsClockwise, BookOpenText, HardDrives } from '@phosphor-icons/react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState } from 'react';
@@ -64,6 +64,20 @@ export default function Admin() {
   const feefeeStatus = cheeseWaxSeverity === 'red' || waxdaoWaxSeverity === 'red'
     ? 'critical' : cheeseWaxSeverity === 'yellow' || waxdaoWaxSeverity === 'yellow'
     ? 'warn' : 'ok';
+
+  // ram.chz health
+  const ramDisabled = data?.ramConfig != null && !data.ramConfig.enabled;
+  const lowWaxReserve = data?.ramConfig != null && data?.ramReserves != null
+    && data.ramConfig.minLiquidReserve > 0
+    && data.ramReserves.liquidWax < data.ramConfig.minLiquidReserve;
+  const lowCheesePool = data?.ramConfig != null && data?.ramReserves != null
+    && data.ramConfig.minCheesePool > 0
+    && data.ramReserves.cheesePool < data.ramConfig.minCheesePool;
+  const ramStatus: 'ok' | 'warn' | 'critical' = ramDisabled
+    ? 'critical'
+    : (lowWaxReserve || lowCheesePool || (data?.ramConfig != null && !data.ramConfig.sellEnabled))
+      ? 'warn'
+      : 'ok';
 
   return (
     <Layout>
@@ -189,6 +203,53 @@ export default function Admin() {
                   { label: 'Total Powerups', value: data.powerzStats?.total_powerups?.toLocaleString() ?? '—' },
                   { label: 'WAX Spent', value: data.powerzStats?.total_wax_spent ?? '—' },
                   { label: 'CHEESE Received', value: data.powerzStats?.total_cheese_received ?? '—' },
+                ]}
+              />
+
+              {/* ram.chz */}
+              <ContractStatusCard
+                title="ram.chz"
+                icon={<HardDrives className="h-5 w-5 text-cheese" />}
+                status={ramStatus}
+                rows={[
+                  {
+                    label: 'Status',
+                    value: data.ramConfig == null
+                      ? <Badge variant="outline">Config Unavailable</Badge>
+                      : data.ramConfig.enabled
+                        ? <Badge className="bg-green-500/20 text-green-400">Enabled</Badge>
+                        : <Badge className="bg-red-500/20 text-red-400">Disabled</Badge>,
+                    critical: ramDisabled,
+                  },
+                  {
+                    label: 'Sell RAM',
+                    value: data.ramConfig == null
+                      ? '—'
+                      : data.ramConfig.sellEnabled
+                        ? <Badge className="bg-green-500/20 text-green-400">Enabled</Badge>
+                        : <Badge className="bg-yellow-500/20 text-yellow-400">Disabled</Badge>,
+                    warn: data.ramConfig != null && !data.ramConfig.sellEnabled,
+                  },
+                  {
+                    label: 'Min / Max CHEESE',
+                    value: data.ramConfig
+                      ? `${data.ramConfig.minCheese.toFixed(4)} / ${data.ramConfig.maxCheese.toFixed(4)}`
+                      : '—',
+                  },
+                  {
+                    label: 'Liquid WAX',
+                    value: data.ramReserves ? `${data.ramReserves.liquidWax.toFixed(4)} WAX` : '—',
+                    warn: lowWaxReserve,
+                  },
+                  {
+                    label: 'CHEESE Pool',
+                    value: data.ramReserves ? `${data.ramReserves.cheesePool.toFixed(4)} CHEESE` : '—',
+                    warn: lowCheesePool,
+                  },
+                  { label: 'Total Buys', value: data.ramStats?.totalPurchases?.toLocaleString() ?? '—' },
+                  { label: 'Total Sells', value: data.ramStats?.totalSales?.toLocaleString() ?? '—' },
+                  { label: 'CHEESE Nulled', value: data.ramStats ? `${data.ramStats.totalCheeseNulled.toFixed(4)} CHEESE` : '—' },
+                  { label: 'WAX Claimed', value: data.ramStats ? `${data.ramStats.totalWaxClaimed.toFixed(4)} WAX` : '—' },
                 ]}
               />
             </div>

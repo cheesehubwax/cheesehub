@@ -129,6 +129,101 @@ const nullCheeseFlow: FlowStep[] = [
   },
 ];
 
+const ramBuyFlow: FlowStep[] = [
+  {
+    label: 'User sends CHEESE to ram.chz',
+    items: [
+      { pct: '80%', dest: 'Nulled (eosio.null)', highlight: 'burn' },
+      { pct: '20%', dest: 'xcheeseliqst (liquid staking)', highlight: 'liq' },
+    ],
+  },
+  {
+    label: 'Contract delivers RAM',
+    items: [
+      { pct: '—', dest: 'WAX from contract reserve → eosio::buyram for recipient', highlight: 'power' },
+      { pct: '0.5%', dest: 'Spread kept by protocol (anti-arb)', highlight: 'fee' },
+    ],
+  },
+];
+
+const ramSellFlow: FlowStep[] = [
+  {
+    label: 'User transfers RAM bytes to ram.chz',
+    items: [
+      { pct: '—', dest: 'Paid in CHEESE from the payout pool at Alcor rate − 0.5%', highlight: 'neutral' },
+    ],
+  },
+  {
+    label: 'WAX from eosio::sellram',
+    items: [
+      { pct: '25%', dest: 'Self-staked to CPU', highlight: 'stake' },
+      { pct: '25%', dest: 'cheesepowerz', highlight: 'power' },
+      { pct: '25%', dest: 'cheeseburner', highlight: 'burn' },
+      { pct: '25%', dest: 'Buys CHEESE on Alcor → nulled immediately', highlight: 'swap' },
+    ],
+  },
+];
+
+const ramReserveFlow: FlowStep[] = [
+  {
+    label: 'WAX reserve top-ups',
+    items: [
+      { pct: '—', dest: 'Own WAX vote rewards, harvested max once per 24h', highlight: 'stake' },
+      { pct: '—', dest: 'Manual "Fund WAX Pool" claim (any wallet)', highlight: 'swap' },
+    ],
+  },
+  {
+    label: 'CHEESE payout pool top-ups',
+    items: [
+      { pct: '—', dest: 'Anyone sends CHEESE with memo "deposit" (donation, no RAM back)', highlight: 'liq' },
+    ],
+  },
+];
+
+const airFlow: FlowStep[] = [
+  {
+    label: 'Snapshot',
+    items: [
+      { pct: '—', dest: 'Token holders, NFT collectors or Alcor LP positions', highlight: 'neutral' },
+    ],
+  },
+  {
+    label: 'Distribute',
+    items: [
+      { pct: 'Fixed', dest: 'Same amount to each recipient', highlight: 'neutral' },
+      { pct: 'Equal', dest: 'Total split evenly', highlight: 'neutral' },
+      { pct: 'Pro-rata', dest: 'Weighted by holding size', highlight: 'neutral' },
+    ],
+  },
+  {
+    label: 'Send (batched, user-signed)',
+    items: [
+      { pct: 'Tokens', dest: 'token contract transfers', highlight: 'neutral' },
+      { pct: 'NFTs', dest: 'atomicassets::transfer (one per recipient, all IDs)', highlight: 'neutral' },
+      { pct: 'RAM', dest: 'CHEESE transfer to ram.chz per recipient (memo = receiver)', highlight: 'burn' },
+    ],
+  },
+];
+
+/* ── automation jobs ── */
+const automation = [
+  {
+    name: 'Daily CPU powerup',
+    schedule: 'Once daily (GitHub Actions)',
+    detail: 'Powers up eligible CHEESE stakers with CPU/NET via cheesepowerz, and checks whether cheesepowerz has claimable WAX vote rewards — claiming them when available, otherwise retrying on the next daily run.',
+  },
+  {
+    name: 'Powerup watchdog',
+    schedule: 'Daily, after the powerup run',
+    detail: 'Verifies the daily powerup job actually ran and succeeded, so a silent failure does not go unnoticed.',
+  },
+  {
+    name: 'RAM price recorder',
+    schedule: 'Twice daily (12h slots, retried within each slot)',
+    detail: 'Samples the WAX and CHEESE price of RAM and appends one sample per 12-hour UTC slot to a separate data branch. This history feeds the CHEESERam price charts (24h / 7d / all).',
+  },
+];
+
 /* ── dApp sections ── */
 interface DApp {
   id: string;
@@ -142,6 +237,28 @@ interface DApp {
 }
 
 const dapps: DApp[] = [
+  {
+    id: 'ram',
+    name: 'CHEESERam',
+    contracts: ['ram.chz'],
+    owner: 'CHEESE team',
+    description: 'Two-way RAM gateway for CHEESE, live at /ram and public in the header. Buying: the user sends CHEESE to ram.chz, the contract values it in WAX using the live Alcor CHEESE/WAX pool minus a 0.5% spread, then spends that much WAX from its own liquid reserve on eosio::buyram for the recipient. The user\'s CHEESE is never sold — 80% (plus rounding remainder) is nulled and 20% goes to xcheeseliqst. Selling: the user transfers RAM bytes to ram.chz and is paid CHEESE out of the contract\'s payout pool at the Alcor rate minus 0.5%; the WAX proceeds are split four ways and the buyback CHEESE is nulled on arrival. Anyone can top the payout pool up by sending CHEESE with the memo "deposit", and anyone can trigger the contract\'s own vote-reward claim from the "Fund WAX Pool" box (claimvotes takes the caller as an argument).',
+    pricingNote: '0.5% spread per side, plus WAX\'s 0.5% system sellram fee and the Alcor pool fee — a full buy-then-sell round trip costs roughly 1.5–2%. Buys are bounded by min/max CHEESE and a per-trade pool-impact cap; sells are bounded by min/max bytes and switch off when the CHEESE payout pool falls below its floor.',
+    flows: [
+      { title: 'Buy RAM with CHEESE', steps: ramBuyFlow },
+      { title: 'Sell RAM for CHEESE', steps: ramSellFlow },
+      { title: 'Reserve & Pool Top-ups', steps: ramReserveFlow },
+    ],
+  },
+  {
+    id: 'air',
+    name: 'CHEESEAir',
+    contracts: ['cheeseburger', 'atomicassets', 'ram.chz'],
+    owner: 'CHEESE team',
+    description: 'Airdrop dashboard at /air, public in the header. Snapshots holders of any WAX token, collectors of any NFT collection, or Alcor liquidity providers (LP positions aggregated by USD value across all fee tiers, in-range positions only), then splits and sends the drop. Three distribution modes: fixed each, equal split of a total, and pro-rata by holding size. Tokens go out as ordinary token-contract transfers, NFTs as one atomicassets::transfer per recipient carrying all of their asset IDs, and RAM as one CHEESE transfer to ram.chz per recipient with the receiver in the memo. Sends are batched into multi-action transactions (default 15 per transaction), with CSV export, resource (RAM/CPU/NET) cost estimates payable in CHEESE, and an optional "sell RAM for CHEESE" box for reclaiming leftover bytes. No dedicated contract — everything is signed client-side by the user.',
+    feeNote: 'No platform fee. Users pay only the resources and the tokens/NFTs/RAM they choose to send.',
+    flows: [{ title: 'Airdrop Flow', steps: airFlow }],
+  },
   {
     id: 'null',
     name: 'CHEESENull',
@@ -235,7 +352,7 @@ const dapps: DApp[] = [
     name: 'CHEESESwap',
     contracts: ['swap.alcor'],
     owner: 'Alcor',
-    description: 'Embedded Alcor DEX swap widget. Allows users to swap between CHEESE, WAX, WAXDAO, and other tokens directly within CHEESEHub.',
+    description: 'In-house swap widget routing through Alcor DEX pools. Swaps between CHEESE, HOLE, WAX, WAXDAO and any other listed WAX token. The router splits a single swap across multiple pools and hop paths (including CHEESE and wrapped-asset hubs) to reduce price impact, showing each leg and its share of the trade. Balances refresh automatically after a swap settles.',
     feeNote: 'Swap fees set by Alcor DEX. No additional CHEESE fees.',
   },
   {
@@ -303,6 +420,7 @@ export default function AdminGuide() {
           <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground space-y-2">
             <p><strong className="text-foreground">CHEESEHub</strong> is a unified platform for the CHEESE ecosystem on the WAX blockchain. It bundles multiple dApps — some built by the CHEESE team, others powered by WaxDAO, NFTHive, or Alcor — into a single interface.</p>
             <p>This guide explains what each dApp does, which smart contracts power it, who owns those contracts, and how fees flow through the system.</p>
+            <p><strong className="text-foreground">Tokens:</strong> $CHEESE (<code className="text-[11px]">cheeseburger</code>) is the platform token. $HOLE (<code className="text-[11px]">hole.cheese</code>) is its sister token; the CHEESE/HOLE rate comes from Alcor pool 11051 and is shown on the homepage price bar.</p>
           </div>
 
           {/* Legend */}
@@ -361,6 +479,25 @@ export default function AdminGuide() {
               </AccordionItem>
             ))}
           </Accordion>
+
+          {/* Automation */}
+          <div className="space-y-3">
+            <h2 className="text-lg font-semibold">Automation</h2>
+            <p className="text-sm text-muted-foreground">
+              Scheduled jobs that run outside the site (GitHub Actions) and keep parts of the ecosystem moving.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {automation.map((job) => (
+                <div key={job.name} className="rounded-lg border bg-card p-4 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold">{job.name}</span>
+                    <Badge variant="outline" className="text-[10px]">{job.schedule}</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{job.detail}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
     </Layout>
