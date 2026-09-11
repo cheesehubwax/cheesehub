@@ -5,7 +5,8 @@
 // two providers), and a freshness probe cannot detect that — a provider can be
 // fully caught up on new blocks and still be missing the past. Every history
 // read here is therefore a UNION across providers, de-duplicated by action
-// identity, via `fetchActionsUnion`.
+// identity, via `fetchActionsUnion`. The complete breakdown is derived from
+// two broad reads so opening the table cannot trigger dozens of scans.
 
 import { fetchContractStats, parseAssetAmount } from './cheeseNullApi';
 import { fetchActionsUnion, sumAssetField } from './hyperionHistory';
@@ -49,51 +50,8 @@ interface CoverageTracker {
   reads: number;
 }
 
-async function unionSum(
-  query: string,
-  coverage: CoverageTracker,
-  filter?: (data: Record<string, unknown>) => boolean,
-): Promise<number> {
-  const result = await fetchActionsUnion(query, {
-    batchSize: BATCH_SIZE,
-    maxActions: MAX_ACTIONS,
-  });
-  coverage.reads += 1;
-  coverage.succeeded += result.endpointsSucceeded;
-  if (result.endpointsSucceeded === 0) {
-    throw new Error(`All Hyperion providers failed for: ${query}`);
-  }
-  return sumAssetField(result.actions, 'quantity', filter);
-}
-
-async function fetchContractNulledFromHyperion(
-  account: string,
-  coverage: CoverageTracker,
-  after?: string,
-): Promise<number> {
-  const query =
-    `act.account=cheeseburger&act.name=transfer` +
-    `&transfer.from=${account}&transfer.to=eosio.null` +
-    (after ? `&after=${after}` : '');
-  return unionSum(query, coverage, (d) => d.from === account && d.to === 'eosio.null');
-}
-
-// cheesepowerz nulls 100% of CHEESE it receives. Its outgoing null may be
-// performed via `cheeseburger::retire` (not a transfer to eosio.null), so
-// windowed totals are derived from inflows to stay consistent with the
-// lifetime counter (`stats.total_cheese_received`).
-async function fetchCheesepowerzReceivedWindow(
-  after: string,
-  coverage: CoverageTracker,
-): Promise<number> {
-  const query =
-    `act.account=cheeseburger&act.name=transfer` +
-    `&transfer.to=cheesepowerz&after=${after}`;
-  return unionSum(query, coverage, (d) => d.to === 'cheesepowerz');
-}
-
 // cheesepowerz stores its own stats on-chain (authoritative)
-async function fetchCheesepowerzNulled(coverage: CoverageTracker): Promise<number> {
+async function fetchCheesepowerzNulled(): Promise<number | null> {
   for (const endpoint of WAX_RPC_ENDPOINTS) {
     try {
       const response = await fetch(endpoint, {
@@ -117,26 +75,13 @@ async function fetchCheesepowerzNulled(coverage: CoverageTracker): Promise<numbe
       continue;
     }
   }
-  // Fallback to history if all RPC endpoints fail
-  return fetchContractNulledFromHyperion('cheesepowerz', coverage);
+  return null;
 }
 
-async function fetchContractNulled(account: string, coverage: CoverageTracker): Promise<number> {
-  if (account === 'cheesepowerz') {
-    return fetchCheesepowerzNulled(coverage);
-  }
-  if (account === 'cheeseburner') {
-    // Authoritative on-chain counter incremented by the burn action itself.
-    try {
-      const stats = await fetchContractStats(account);
-      if (stats && stats.total_cheese_burned) {
-        return parseAssetAmount(stats.total_cheese_burned);
-      }
-    } catch {
-      // fall through to history
-    }
-  }
-  return fetchContractNulledFromHyperion(account, coverage);
+function timestampMs(action: { '@timestamp'?: string; timestamp?: string }): number {
+  const value = action['@timestamp'] || action.timestamp;
+  const parsed = value ? Date.parse(value) : NaN;
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 const NULL_CONTRACTS = [
@@ -156,26 +101,77 @@ function getAgo(days: number): string {
 }
 
 export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
-  const after24h = getAgo(1);
-  const after7d = getAgo(7);
-  const after30d = getAgo(30);
   const coverage: CoverageTracker = { succeeded: 0, reads: 0 };
+  const contractAccounts = new Set(NULL_CONTRACTS.map(({ account }) => account));
 
-  const results = await Promise.all(
-    NULL_CONTRACTS.map(async ({ account, displayName }) => {
-      const windowFetch = account === 'cheesepowerz'
-        ? (after: string) => fetchCheesepowerzReceivedWindow(after, coverage)
-        : (after: string) => fetchContractNulledFromHyperion(account, coverage, after);
-      return {
-        contract: account,
-        displayName,
-        amount: await fetchContractNulled(account, coverage),
-        amount24h: await windowFetch(after24h),
-        amount7d: await windowFetch(after7d),
-        amount30d: await windowFetch(after30d),
-      };
-    })
-  );
+  const [nullHistory, powerHistory, burnerStats, powerTotal] = await Promise.all([
+    fetchActionsUnion(
+      'act.account=cheeseburger&act.name=transfer&transfer.to=eosio.null',
+      { batchSize: BATCH_SIZE, maxActions: MAX_ACTIONS, timeoutMs: 10000 },
+    ),
+    fetchActionsUnion(
+      'act.account=cheeseburger&act.name=transfer&transfer.to=cheesepowerz',
+      { batchSize: BATCH_SIZE, maxActions: MAX_ACTIONS, timeoutMs: 10000 },
+    ),
+    fetchContractStats('cheeseburner').catch(() => null),
+    fetchCheesepowerzNulled(),
+  ]);
+
+  for (const read of [nullHistory, powerHistory]) {
+    coverage.reads += 1;
+    coverage.succeeded += read.endpointsSucceeded;
+  }
+
+  const now = Date.now();
+  const cutoffs = {
+    day: now - 24 * 60 * 60 * 1000,
+    week: now - 7 * 24 * 60 * 60 * 1000,
+    month: now - 30 * 24 * 60 * 60 * 1000,
+  };
+  const totals = new Map<string, { all: number; day: number; week: number; month: number }>();
+  for (const account of contractAccounts) totals.set(account, { all: 0, day: 0, week: 0, month: 0 });
+
+  const addActions = (actions: typeof nullHistory.actions, accountFor: (data: Record<string, unknown>) => string | null) => {
+    for (const action of actions) {
+      const data = action.act?.data;
+      if (!data) continue;
+      const account = accountFor(data);
+      if (!account || !contractAccounts.has(account)) continue;
+      const quantity = sumAssetField([action]);
+      const row = totals.get(account);
+      if (!row) continue;
+      row.all += quantity;
+      const time = timestampMs(action);
+      if (time >= cutoffs.month) row.month += quantity;
+      if (time >= cutoffs.week) row.week += quantity;
+      if (time >= cutoffs.day) row.day += quantity;
+    }
+  };
+
+  addActions(nullHistory.actions, (data) => data.to === 'eosio.null' && typeof data.from === 'string' ? data.from : null);
+  // cheesepowerz retires what it receives, so its incoming transfers are the
+  // consistent source for its period totals and history fallback.
+  addActions(powerHistory.actions, (data) => data.to === 'cheesepowerz' ? 'cheesepowerz' : null);
+
+  const burnerAuthoritative = burnerStats?.total_cheese_burned
+    ? parseAssetAmount(burnerStats.total_cheese_burned)
+    : null;
+  const results = NULL_CONTRACTS.map(({ account, displayName }) => {
+    const values = totals.get(account) ?? { all: 0, day: 0, week: 0, month: 0 };
+    const amount = account === 'cheeseburner' && burnerAuthoritative !== null
+      ? burnerAuthoritative
+      : account === 'cheesepowerz' && powerTotal !== null
+        ? powerTotal
+        : values.all;
+    return {
+      contract: account,
+      displayName,
+      amount,
+      amount24h: values.day,
+      amount7d: values.week,
+      amount30d: values.month,
+    };
+  });
 
   const grandTotal = results.reduce((sum, r) => sum + r.amount, 0);
   const grandTotal24h = results.reduce((sum, r) => sum + r.amount24h, 0);

@@ -514,7 +514,7 @@ async function fetchTokenReceiversFromHyperion(
   try {
     const { actions } = await fetchActionsUnion(
       `account=${DAO_CONTRACT}&filter=${DAO_CONTRACT}:newproposal`,
-      { batchSize: 500, paginate: false },
+      { batchSize: 500, maxActions: 10000, timeoutMs: 10000 },
     );
     for (const action of actions) {
       const actData = action.act?.data as Record<string, unknown> | undefined;

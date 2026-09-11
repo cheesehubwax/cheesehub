@@ -5,10 +5,9 @@ import { getIpfsUrl, extractIpfsHash } from '@/lib/ipfsGateways';
 import { fetchActionsUnion } from '@/lib/hyperionHistory';
 
 const HYPERION_ENDPOINTS = [
-  'https://wax.eosusa.io',
+  'https://wax.cryptolions.io',
+  'https://wax.hivebp.io',
   'https://wax.eosphere.io',
-  'https://api.wax.alohaeos.com',
-  'https://wax.greymass.com',
 ];
 
 export interface DropPurchase {
