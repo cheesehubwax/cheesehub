@@ -94,33 +94,37 @@ const NULL_CONTRACTS = [
   { account: 'liquidcheese', displayName: 'Liquidity Fees' },
 ] as const;
 
-function getAgo(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toISOString();
-}
-
 export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
   const coverage: CoverageTracker = { succeeded: 0, reads: 0 };
-  const contractAccounts = new Set(NULL_CONTRACTS.map(({ account }) => account));
+  const contractAccounts = new Set<string>(NULL_CONTRACTS.map(({ account }) => account));
 
-  const [nullHistory, powerHistory, burnerStats, powerTotal] = await Promise.all([
+  const [nullHistoryResult, powerHistoryResult, burnerStats, powerTotal] = await Promise.all([
+    Promise.resolve().then(() =>
     fetchActionsUnion(
       'act.account=cheeseburger&act.name=transfer&transfer.to=eosio.null',
       { batchSize: BATCH_SIZE, maxActions: MAX_ACTIONS, timeoutMs: 10000 },
-    ),
+    )).catch(() => null),
+    Promise.resolve().then(() =>
     fetchActionsUnion(
       'act.account=cheeseburger&act.name=transfer&transfer.to=cheesepowerz',
       { batchSize: BATCH_SIZE, maxActions: MAX_ACTIONS, timeoutMs: 10000 },
-    ),
+    )).catch(() => null),
     fetchContractStats('cheeseburner').catch(() => null),
     fetchCheesepowerzNulled(),
   ]);
 
-  for (const read of [nullHistory, powerHistory]) {
+  const successfulReads = [nullHistoryResult, powerHistoryResult].filter(
+    (read): read is NonNullable<typeof read> => read !== null,
+  );
+  if (successfulReads.length === 0 && !burnerStats && powerTotal === null) {
+    throw new Error('All null-breakdown data sources failed');
+  }
+  for (const read of successfulReads) {
     coverage.reads += 1;
     coverage.succeeded += read.endpointsSucceeded;
   }
+  const nullActions = nullHistoryResult?.actions ?? [];
+  const powerActions = powerHistoryResult?.actions ?? [];
 
   const now = Date.now();
   const cutoffs = {
@@ -131,7 +135,7 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
   const totals = new Map<string, { all: number; day: number; week: number; month: number }>();
   for (const account of contractAccounts) totals.set(account, { all: 0, day: 0, week: 0, month: 0 });
 
-  const addActions = (actions: typeof nullHistory.actions, accountFor: (data: Record<string, unknown>) => string | null) => {
+  const addActions = (actions: typeof nullActions, accountFor: (data: Record<string, unknown>) => string | null) => {
     for (const action of actions) {
       const data = action.act?.data;
       if (!data) continue;
@@ -148,10 +152,10 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
     }
   };
 
-  addActions(nullHistory.actions, (data) => data.to === 'eosio.null' && typeof data.from === 'string' ? data.from : null);
+  addActions(nullActions, (data) => data.to === 'eosio.null' && typeof data.from === 'string' ? data.from : null);
   // cheesepowerz retires what it receives, so its incoming transfers are the
   // consistent source for its period totals and history fallback.
-  addActions(powerHistory.actions, (data) => data.to === 'cheesepowerz' ? 'cheesepowerz' : null);
+  addActions(powerActions, (data) => data.to === 'cheesepowerz' ? 'cheesepowerz' : null);
 
   const burnerAuthoritative = burnerStats?.total_cheese_burned
     ? parseAssetAmount(burnerStats.total_cheese_burned)
@@ -188,5 +192,8 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
 
   // Fewer than two providers answering on average means the union is thin.
   const avgSucceeded = coverage.reads > 0 ? coverage.succeeded / coverage.reads : 0;
-  return { entries, isPartial: avgSucceeded < 2 };
+  return {
+    entries,
+    isPartial: successfulReads.length < 2 || avgSucceeded < 2,
+  };
 }

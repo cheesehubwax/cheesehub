@@ -34,7 +34,12 @@ function formatFullNumber(num: number): string {
 
 export function TokenStatsBanner() {
   const { data: stats, isLoading, isError } = useCheeseStats();
-  const { data: breakdownResult, isLoading: breakdownLoading, refetch: fetchBreakdown } = useNullBreakdown();
+  const {
+    data: breakdownResult,
+    isLoading: breakdownLoading,
+    isError: breakdownError,
+    refetch: fetchBreakdown,
+  } = useNullBreakdown();
   const breakdown = breakdownResult?.entries;
   const breakdownPartial = breakdownResult?.isPartial ?? false;
 
@@ -216,6 +221,10 @@ export function TokenStatsBanner() {
                     <Skeleton className="h-4 w-full" />
                     <Skeleton className="h-4 w-full" />
                     <Skeleton className="h-4 w-full" />
+                  </div>
+                ) : breakdownError ? (
+                  <div className="p-4 text-sm text-destructive text-center">
+                    Contract history is temporarily unavailable. Reopen this table to retry.
                   </div>
                 ) : breakdown && breakdown.length > 0 ? (
                   <Table>
