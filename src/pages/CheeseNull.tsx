@@ -12,7 +12,7 @@ import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 export default function CheeseNull() {
   const [canClaim, setCanClaim] = useState(false);
-  const { rawActions, isLoading: lbLoading, isError: lbError, refetch: refetchLeaderboard } = useNullerLeaderboard();
+  const { rawActions, isLoading: lbLoading, isError: lbError, isPartial: lbPartial, refetch: refetchLeaderboard } = useNullerLeaderboard();
 
   const handleBurnSuccess = () => {
     refetchLeaderboard();

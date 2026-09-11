@@ -31,7 +31,7 @@ const SORT_OPTIONS: { mode: SortMode; label: string; emoji: string }[] = [
   { mode: 'burns', label: 'Burns', emoji: '⚡' },
 ];
 
-export function NullerLeaderboard({ rawActions, isLoading, isError, onRefresh }: NullerLeaderboardProps) {
+export function NullerLeaderboard({ rawActions, isLoading, isError, isPartial, onRefresh }: NullerLeaderboardProps) {
   const [sortBy, setSortBy] = useState<SortMode>('cheese');
 
   const leaderboard = useMemo(() => {
@@ -147,6 +147,12 @@ export function NullerLeaderboard({ rawActions, isLoading, isError, onRefresh }:
               ))}
             </TableBody>
           </Table>
+        )}
+
+        {isPartial && !isLoading && (
+          <p className="text-center text-[10px] text-muted-foreground">
+            Chain history may be incomplete right now — totals could be understated.
+          </p>
         )}
       </CardContent>
     </Card>
