@@ -9,6 +9,7 @@
 // "You've claimed" row isn't rendered - it never breaks the page.
 
 import { FARM_CONTRACT } from "./farm";
+import { fetchActionsUnion } from "./hyperionHistory";
 
 export interface ClaimedToken {
   contract: string;
@@ -121,9 +122,6 @@ interface HyperionAction {
   };
 }
 
-interface HyperionActionsResponse {
-  actions?: HyperionAction[];
-}
 
 interface HyperionTransactionResponse {
   actions?: HyperionAction[];
