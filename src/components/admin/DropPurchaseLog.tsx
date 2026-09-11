@@ -9,9 +9,10 @@ import type { DropPurchase } from '@/hooks/useDropPurchases';
 interface DropPurchaseLogProps {
   purchases: DropPurchase[];
   isLoading: boolean;
+  isError?: boolean;
 }
 
-export function DropPurchaseLog({ purchases, isLoading }: DropPurchaseLogProps) {
+export function DropPurchaseLog({ purchases, isLoading, isError = false }: DropPurchaseLogProps) {
   return (
     <Card>
       <CardHeader>
@@ -30,9 +31,13 @@ export function DropPurchaseLog({ purchases, isLoading }: DropPurchaseLogProps) 
           <div className="space-y-2">
             {[1, 2, 3].map(i => <Skeleton key={i} className="h-8 w-full" />)}
           </div>
+        ) : isError ? (
+          <p className="text-destructive text-sm py-4 text-center">
+            Purchase history is temporarily unavailable. It will retry automatically.
+          </p>
         ) : purchases.length === 0 ? (
           <p className="text-muted-foreground text-sm py-4 text-center">
-            No recent purchases found. Hyperion may have limited history available.
+            No recent purchases found.
           </p>
         ) : (
           <div className="overflow-x-auto">

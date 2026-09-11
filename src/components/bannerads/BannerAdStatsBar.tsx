@@ -5,7 +5,7 @@ const formatNumber = (num: number, decimals: number = 2) =>
   num.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
 export function BannerAdStatsBar() {
-  const { data, isLoading } = useBannerAdStats();
+  const { data, isLoading, isError } = useBannerAdStats();
 
   const statItems = [
     { label: "Ads Rented", value: isLoading ? "-" : (data?.totalAdsRented.toLocaleString() ?? "-"), emoji: "📢" },
@@ -27,6 +27,11 @@ export function BannerAdStatsBar() {
           </div>
         ))}
       </div>
+      {isError && (
+        <p className="mt-3 text-center text-xs text-destructive">
+          Blockchain history is temporarily unavailable. These totals will retry automatically.
+        </p>
+      )}
     </div>
   );
 }
