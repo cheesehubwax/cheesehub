@@ -401,7 +401,7 @@ export async function getInventoryTemplates(
     if (owned.length === 0) return [];
 
     // Enrich with schema + display name (best effort; falls back to the id).
-    const meta = new Map<number, { schema: string; name: string }>();
+    const meta = new Map<number, { schema: string; name: string; image?: string }>();
     try {
       const ids = owned.map((t) => t.templateId).join(",");
       const res = (await fetchJson(
@@ -421,9 +421,18 @@ export async function getInventoryTemplates(
             break;
           }
         }
+        let image: string | undefined;
+        for (const key of ["img", "image", "Image", "IMG", "video"]) {
+          const raw = data[key];
+          if (typeof raw === "string" && raw.trim()) {
+            image = raw.trim();
+            break;
+          }
+        }
         meta.set(id, {
           schema: t.schema?.schema_name ?? "",
           name: label || `#${id}`,
+          image,
         });
       }
     } catch {
@@ -434,6 +443,7 @@ export async function getInventoryTemplates(
       schema: meta.get(t.templateId)?.schema ?? "",
       name: meta.get(t.templateId)?.name ?? `#${t.templateId}`,
       count: t.count,
+      image: meta.get(t.templateId)?.image,
     }));
   });
   return templates;
