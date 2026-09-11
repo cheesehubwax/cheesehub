@@ -327,6 +327,8 @@ export interface InventoryTemplate {
   name: string;
   /** How many assets of this template the account currently owns. */
   count: number;
+  /** IPFS hash (or URL) for the template image, when available. */
+  image?: string;
 }
 
 interface AaAccountCollectionsResponse {
