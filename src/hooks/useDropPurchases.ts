@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchTableRows } from '@/lib/waxRpcFallback';
 import { NFTHIVE_CONFIG, CHEESE_CONFIG, ATOMIC_API } from '@/lib/waxConfig';
 import { getIpfsUrl, extractIpfsHash } from '@/lib/ipfsGateways';
+import { fetchActionsUnion } from '@/lib/hyperionHistory';
 
 const HYPERION_ENDPOINTS = [
   'https://wax.eosusa.io',
@@ -92,97 +93,71 @@ async function fetchTemplateImages(templateIds: number[]): Promise<Map<number, s
 }
 
 async function fetchDropPurchases(): Promise<DropPurchase[]> {
-  for (const endpoint of HYPERION_ENDPOINTS) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+  const { actions } = await fetchActionsUnion(
+    'account=nfthivedrops&act.name=claimdrop&sort=desc',
+    { endpoints: HYPERION_ENDPOINTS, batchSize: 200, paginate: false, timeoutMs: 10000 },
+  );
 
-      const url = `${endpoint}/v2/history/get_actions?account=nfthivedrops&act.name=claimdrop&limit=200&sort=desc`;
-      const response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeoutId);
+  const purchases: DropPurchase[] = [];
 
-      if (!response.ok) continue;
+  for (const action of actions) {
+    const act = action.act?.data as Record<string, unknown> | undefined;
+    if (!act) continue;
 
-      const data = await response.json();
-      if (!data.actions || !Array.isArray(data.actions)) continue;
+    let quantity = '—';
+    let currency = 'CHEESE';
 
-      const purchases: DropPurchase[] = [];
-
-      for (const action of data.actions) {
-        const act = action.act?.data;
-        if (!act) continue;
-
-        let quantity = '—';
-        let currency = 'CHEESE';
-
-        if (action['@transfer']) {
-          quantity = action['@transfer'].amount?.toString() ?? '—';
-          currency = action['@transfer'].symbol ?? 'CHEESE';
-        }
-
-        const normalizedDropId = Number(act.drop_id);
-        if (isNaN(normalizedDropId)) continue;
-
-        purchases.push({
-          timestamp: action['@timestamp'] || action.timestamp || '',
-          buyer: act.claimer || '—',
-          dropId: normalizedDropId,
-          amount: Number(act.amount) || 1,
-          quantity,
-          currency,
-          txId: action.trx_id || '',
-        });
-      }
-
-      return purchases;
-    } catch (err) {
-      console.warn(`Hyperion ${endpoint} failed for drop purchases:`, (err as Error).message);
+    const transfer = action['@transfer'] as { amount?: number; symbol?: string } | undefined;
+    if (transfer) {
+      quantity = transfer.amount?.toString() ?? '—';
+      currency = transfer.symbol ?? 'CHEESE';
     }
+
+    const normalizedDropId = Number(act.drop_id);
+    if (isNaN(normalizedDropId)) continue;
+
+    purchases.push({
+      timestamp: (action['@timestamp'] as string) || (action.timestamp as string) || '',
+      buyer: (act.claimer as string) || '—',
+      dropId: normalizedDropId,
+      amount: Number(act.amount) || 1,
+      quantity,
+      currency,
+      txId: action.trx_id || '',
+    });
   }
 
-  return [];
+  // Newest first — providers are merged, so ordering must be re-established.
+  purchases.sort((a, b) => Date.parse(b.timestamp || '0') - Date.parse(a.timestamp || '0'));
+  return purchases;
 }
 
 async function fetchDropTransfers(): Promise<Map<string, { quantity: string; currency: string }>> {
-  for (const endpoint of HYPERION_ENDPOINTS) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+  const transferMap = new Map<string, { quantity: string; currency: string }>();
 
-      const url = `${endpoint}/v2/history/get_actions?account=nfthivedrops&act.name=transfer&filter=*:transfer&transfer.to=nfthivedrops&limit=200&sort=desc`;
-      const response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeoutId);
+  const { actions } = await fetchActionsUnion(
+    'account=nfthivedrops&act.name=transfer&filter=*:transfer&transfer.to=nfthivedrops&sort=desc',
+    { endpoints: HYPERION_ENDPOINTS, batchSize: 200, paginate: false, timeoutMs: 10000 },
+  );
 
-      if (!response.ok) continue;
+  for (const action of actions) {
+    const act = action.act?.data as Record<string, unknown> | undefined;
+    if (!act || act.to !== 'nfthivedrops') continue;
+    if (act.memo !== 'deposit') continue;
 
-      const data = await response.json();
-      if (!data.actions || !Array.isArray(data.actions)) continue;
-
-      const transferMap = new Map<string, { quantity: string; currency: string }>();
-
-      for (const action of data.actions) {
-        const act = action.act?.data;
-        if (!act || act.to !== 'nfthivedrops') continue;
-        if (act.memo !== 'deposit') continue;
-
-        const txId = action.trx_id || '';
-        if (txId) {
-          const parts = (act.quantity || '').split(' ');
-          transferMap.set(`${txId}:${act.from}`, {
-            quantity: act.quantity || '—',
-            currency: parts[1] || '?',
-          });
-        }
-      }
-
-      return transferMap;
-    } catch (err) {
-      console.warn(`Hyperion ${endpoint} failed for transfers:`, (err as Error).message);
-    }
+    const txId = action.trx_id || '';
+    if (!txId) continue;
+    const quantity = typeof act.quantity === 'string' ? act.quantity : '';
+    const parts = quantity.split(' ');
+    transferMap.set(`${txId}:${act.from}`, {
+      quantity: quantity || '—',
+      currency: parts[1] || '?',
+    });
   }
 
-  return new Map();
+  return transferMap;
 }
+
 
 async function fetchOfficialPurchases(): Promise<DropPurchase[]> {
   const [purchases, transferMap, dropData] = await Promise.all([

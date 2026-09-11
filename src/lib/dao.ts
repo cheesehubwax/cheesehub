@@ -2,8 +2,24 @@
 // Contract: dao.waxdao
 
 import { getTokenConfig } from "@/lib/tokenRegistry";
+import { fetchWithFallback } from "@/lib/fetchWithFallback";
+import { fetchActionsUnion } from "@/lib/hyperionHistory";
 
 export const DAO_CONTRACT = "dao.waxdao";
+
+// Chain reads used to go to a single node, so CHEESEDao went blank whenever
+// that node was down or rate-limited. Every read now fails over across nodes.
+const DAO_RPC_ENDPOINTS = [
+  "https://wax.eosusa.io",
+  "https://api.waxsweden.org",
+  "https://wax.greymass.com",
+  "https://wax.eosphere.io",
+  "https://api.wax.alohaeos.com",
+];
+
+function daoRpcFetch(path: string, init?: RequestInit): Promise<Response> {
+  return fetchWithFallback(DAO_RPC_ENDPOINTS, path, init, 10000);
+}
 
 // Fee constants for DAO creation
 export const DAO_CREATION_FEE = "265.00000000 WAX";
@@ -323,7 +339,7 @@ interface DaoProfile {
 
 async function fetchDaoProfiles(): Promise<Map<string, DaoProfile>> {
   try {
-    const response = await fetch(`https://wax.eosusa.io/v1/chain/get_table_rows`, {
+    const response = await daoRpcFetch(`/v1/chain/get_table_rows`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -355,7 +371,7 @@ async function fetchDaoProfiles(): Promise<Map<string, DaoProfile>> {
 export async function fetchAllDaos(): Promise<DaoInfo[]> {
   try {
     const [daoResponse, profiles] = await Promise.all([
-      fetch(`https://wax.eosusa.io/v1/chain/get_table_rows`, {
+      daoRpcFetch(`/v1/chain/get_table_rows`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -415,7 +431,7 @@ async function fetchUserNftCollections(account: string): Promise<Set<string>> {
   let hasMore = true;
   try {
     while (hasMore) {
-      const response = await fetch(`https://wax.eosusa.io/v1/chain/get_table_rows`, {
+      const response = await daoRpcFetch(`/v1/chain/get_table_rows`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -442,7 +458,7 @@ async function fetchUserNftCollections(account: string): Promise<Set<string>> {
 export async function fetchUserDaos(account: string): Promise<DaoInfo[]> {
   try {
     const [stakedResponse, stakedNftResponse, allDaos, userNftCollections] = await Promise.all([
-      fetch(`https://wax.eosusa.io/v1/chain/get_table_rows`, {
+      daoRpcFetch(`/v1/chain/get_table_rows`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -450,7 +466,7 @@ export async function fetchUserDaos(account: string): Promise<DaoInfo[]> {
           table: "stakedtokens", limit: 100,
         }),
       }),
-      fetch(`https://wax.eosusa.io/v1/chain/get_table_rows`, {
+      daoRpcFetch(`/v1/chain/get_table_rows`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -496,17 +512,17 @@ async function fetchTokenReceiversFromHyperion(
 ): Promise<Record<string, TokenReceiver[]>> {
   const result: Record<string, TokenReceiver[]> = {};
   try {
-    const response = await fetch(
-      `https://wax.eosusa.io/v2/history/get_actions?account=${DAO_CONTRACT}&filter=${DAO_CONTRACT}:newproposal&limit=500`
+    const { actions } = await fetchActionsUnion(
+      `account=${DAO_CONTRACT}&filter=${DAO_CONTRACT}:newproposal`,
+      { batchSize: 500, paginate: false },
     );
-    if (!response.ok) return result;
-    const data = await response.json();
-    for (const action of data.actions || []) {
-      const actData = action.act?.data;
+    for (const action of actions) {
+      const actData = action.act?.data as Record<string, unknown> | undefined;
       if (actData && actData.dao === daoName && actData.proposal_type === 4) {
-        if (actData.token_receivers && actData.token_receivers.length > 0) {
+        const receivers = actData.token_receivers as Array<Record<string, unknown>> | undefined;
+        if (receivers && receivers.length > 0) {
           const title = (actData.title as string) || "";
-          result[title] = actData.token_receivers.map((tr: Record<string, unknown>) => ({
+          result[title] = receivers.map((tr) => ({
             wax_account: (tr.wax_account as string) || "",
             quantity: (tr.quantity as string) || "",
             contract: (tr.contract as string) || "eosio.token",
@@ -524,7 +540,7 @@ async function fetchTokenReceiversFromHyperion(
 // Fetch proposals for a DAO
 export async function fetchProposals(daoName: string): Promise<Proposal[]> {
   try {
-    const response = await fetch(`https://wax.eosusa.io/v1/chain/get_table_rows`, {
+    const response = await daoRpcFetch(`/v1/chain/get_table_rows`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -689,7 +705,7 @@ export async function fetchProposals(daoName: string): Promise<Proposal[]> {
 export async function fetchDaoTreasury(daoName: string): Promise<TreasuryBalance[]> {
   const balances: TreasuryBalance[] = [];
   try {
-    const response = await fetch(`https://wax.eosusa.io/v1/chain/get_table_rows`, {
+    const response = await daoRpcFetch(`/v1/chain/get_table_rows`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -964,7 +980,7 @@ export function buildRankedChoiceVoteAction(
 // Fetch voted NFTs for a proposal
 export async function fetchVotedNFTs(proposalId: number): Promise<string[]> {
   try {
-    const response = await fetch(`https://wax.eosusa.io/v1/chain/get_table_rows`, {
+    const response = await daoRpcFetch(`/v1/chain/get_table_rows`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -983,7 +999,7 @@ export async function fetchVotedNFTs(proposalId: number): Promise<string[]> {
 // Fetch user's staked tokens
 export async function fetchUserStakedTokens(daoName: string, userAccount: string): Promise<StakedToken | null> {
   try {
-    const response = await fetch(`https://wax.eosusa.io/v1/chain/get_table_rows`, {
+    const response = await daoRpcFetch(`/v1/chain/get_table_rows`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1013,7 +1029,7 @@ export async function fetchUserVote(
   daoName: string, proposalId: number, userAccount: string
 ): Promise<UserVote | null> {
   try {
-    const response = await fetch(`https://wax.eosusa.io/v1/chain/get_table_rows`, {
+    const response = await daoRpcFetch(`/v1/chain/get_table_rows`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1041,7 +1057,7 @@ export async function fetchUserVote(
 // Fetch user's staked NFTs
 export async function fetchUserStakedNFTs(daoName: string, userAccount: string): Promise<StakedNFT[]> {
   try {
-    const response = await fetch(`https://wax.eosusa.io/v1/chain/get_table_rows`, {
+    const response = await daoRpcFetch(`/v1/chain/get_table_rows`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1083,7 +1099,7 @@ export async function fetchUserStakedNFTs(daoName: string, userAccount: string):
 // Fetch user's token balance
 export async function fetchUserTokenBalance(contract: string, symbol: string, userAccount: string): Promise<string> {
   try {
-    const response = await fetch(`https://wax.eosusa.io/v1/chain/get_currency_balance`, {
+    const response = await daoRpcFetch(`/v1/chain/get_currency_balance`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code: contract, account: userAccount, symbol }),
@@ -1102,7 +1118,7 @@ export async function fetchUserTokenBalance(contract: string, symbol: string, us
 
 async function fetchUserTokenBalanceFromTable(contract: string, symbol: string, userAccount: string): Promise<string> {
   try {
-    const response = await fetch(`https://wax.eosusa.io/v1/chain/get_table_rows`, {
+    const response = await daoRpcFetch(`/v1/chain/get_table_rows`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1215,7 +1231,7 @@ async function fetchFromAtomicAPI(path: string): Promise<Response> {
 
 async function fetchTreasuryAssetIds(daoName: string): Promise<string[]> {
   try {
-    const response = await fetch(`https://wax.eosusa.io/v1/chain/get_table_rows`, {
+    const response = await daoRpcFetch(`/v1/chain/get_table_rows`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1272,14 +1288,14 @@ export async function fetchDaoTreasuryNFTs(daoName: string): Promise<TreasuryNFT
 export async function checkDaoMembership(daoName: string, user: string): Promise<boolean> {
   try {
     const [stakedResponse, stakedNftsResponse] = await Promise.all([
-      fetch("https://wax.eosusa.io/v1/chain/get_table_rows", {
+      daoRpcFetch("/v1/chain/get_table_rows", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           json: true, code: DAO_CONTRACT, scope: user, table: "stakedtokens", limit: 100,
         }),
       }),
-      fetch("https://wax.eosusa.io/v1/chain/get_table_rows", {
+      daoRpcFetch("/v1/chain/get_table_rows", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
