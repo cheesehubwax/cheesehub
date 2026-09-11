@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchTableRows } from '@/lib/waxRpcFallback';
 import { NFTHIVE_CONFIG, CHEESE_CONFIG, ATOMIC_API } from '@/lib/waxConfig';
 import { getIpfsUrl, extractIpfsHash } from '@/lib/ipfsGateways';
+import { fetchActionsUnion } from '@/lib/hyperionHistory';
 
 const HYPERION_ENDPOINTS = [
   'https://wax.eosusa.io',
