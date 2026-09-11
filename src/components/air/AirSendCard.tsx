@@ -1,12 +1,16 @@
 // CHEESEAir — step 1: choose the token, NFT template or RAM being airdropped.
+import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+import { IpfsImage } from '@/components/shared/IpfsImage';
 import { cn } from '@/lib/utils';
 import { formatCheese } from '@/lib/airdropResources';
 import { CHEESE_RAM_CONTRACT, CHEESE_SYMBOL } from '@/lib/airdropCheese';
+import type { InventoryTemplate } from '@/lib/airdropChain';
 import { useAirdrop } from './AirdropContext';
 
 export function AirSendCard() {
@@ -125,26 +129,12 @@ export function AirSendCard() {
                 </div>
 
                 {nftCollection && (
-                  <div>
-                    <Label className="mb-1 block text-xs text-muted-foreground">
-                      Template to airdrop (1 NFT per recipient)
-                      {nftLoading === 'templates' && ' · loading…'}
-                    </Label>
-                    <select
-                      value={nftTemplateId ?? ''}
-                      onChange={(e) =>
-                        setNftTemplateId(e.target.value ? Number(e.target.value) : null)
-                      }
-                      className="w-full rounded-md border border-input bg-background px-2 py-2 font-mono text-sm text-foreground"
-                    >
-                      <option value="">Select a template…</option>
-                      {nftTemplates.map((t) => (
-                        <option key={t.templateId} value={t.templateId}>
-                          {t.name} · #{t.templateId} · own {t.count}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <TemplatePicker
+                    templates={nftTemplates}
+                    templateId={nftTemplateId}
+                    loading={nftLoading === 'templates'}
+                    onSelect={setNftTemplateId}
+                  />
                 )}
 
                 {nftTemplateId !== null && (
@@ -223,5 +213,79 @@ export function AirSendCard() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+interface TemplatePickerProps {
+  templates: InventoryTemplate[];
+  templateId: number | null;
+  loading: boolean;
+  onSelect: (id: number | null) => void;
+}
+
+function TemplatePicker({ templates, templateId, loading, onSelect }: TemplatePickerProps) {
+  const [open, setOpen] = useState(false);
+  const selected = templates.find((t) => t.templateId === templateId) ?? null;
+
+  return (
+    <div>
+      <Label className="mb-1 block text-xs text-muted-foreground">
+        Template to airdrop (1 NFT per recipient)
+        {loading && ' · loading…'}
+      </Label>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 rounded-md border border-input bg-background px-2 py-2 text-left font-mono text-sm text-foreground"
+      >
+        {selected ? (
+          <>
+            <IpfsImage
+              src={selected.image}
+              alt={selected.name}
+              className="h-8 w-8 shrink-0 rounded border border-border object-cover"
+            />
+            <span className="min-w-0 flex-1 truncate">
+              {selected.name} <span className="text-muted-foreground">· #{selected.templateId} · own {selected.count}</span>
+            </span>
+          </>
+        ) : (
+          <span className="flex-1 text-muted-foreground">Select a template…</span>
+        )}
+        <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} />
+      </button>
+
+      {open && (
+        <div className="mt-1 max-h-48 overflow-y-auto rounded-md border border-border bg-background">
+          {templates.length === 0 && (
+            <p className="px-2 py-2 text-xs text-muted-foreground">No templates found.</p>
+          )}
+          {templates.map((t) => (
+            <button
+              key={t.templateId}
+              type="button"
+              onClick={() => {
+                onSelect(t.templateId);
+                setOpen(false);
+              }}
+              className={cn(
+                'flex w-full items-center gap-2 px-2 py-1.5 text-left font-mono text-xs transition-colors',
+                t.templateId === templateId
+                  ? 'bg-cheese/10 text-cheese'
+                  : 'text-foreground hover:bg-muted/50',
+              )}
+            >
+              <IpfsImage
+                src={t.image}
+                alt={t.name}
+                className="h-8 w-8 shrink-0 rounded border border-border object-cover"
+              />
+              <span className="min-w-0 flex-1 truncate">{t.name}</span>
+              <span className="shrink-0 text-muted-foreground">#{t.templateId} · own {t.count}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
