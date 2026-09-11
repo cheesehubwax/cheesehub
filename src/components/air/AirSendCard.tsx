@@ -1,9 +1,12 @@
 // CHEESEAir — step 1: choose the token, NFT template or RAM being airdropped.
+import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+import { IpfsImage } from '@/components/shared/IpfsImage';
 import { cn } from '@/lib/utils';
 import { formatCheese } from '@/lib/airdropResources';
 import { CHEESE_RAM_CONTRACT, CHEESE_SYMBOL } from '@/lib/airdropCheese';
