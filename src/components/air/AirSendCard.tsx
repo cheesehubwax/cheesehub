@@ -230,7 +230,7 @@ function TemplatePicker({ templates, templateId, loading, onSelect }: TemplatePi
   return (
     <div>
       <Label className="mb-1 block text-xs text-muted-foreground">
-        Template to airdrop (1 NFT per recipient)
+        Template to airdrop
         {loading && ' · loading…'}
       </Label>
       <button
