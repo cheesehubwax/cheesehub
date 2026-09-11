@@ -1,17 +1,17 @@
-// Fetches per-contract null breakdown from Hyperion + on-chain stats
+// Per-contract null breakdown.
+//
+// Coverage note: single Hyperion providers regularly hold only a fraction of a
+// contract's transfer history (measured: 3 vs 52 records for the same query on
+// two providers), and a freshness probe cannot detect that — a provider can be
+// fully caught up on new blocks and still be missing the past. Every history
+// read here is therefore a UNION across providers, de-duplicated by action
+// identity, via `fetchActionsUnion`.
 
 import { fetchContractStats, parseAssetAmount } from './cheeseNullApi';
+import { fetchActionsUnion, sumAssetField } from './hyperionHistory';
 
-const HYPERION_ENDPOINTS = [
-  'https://wax.eosusa.io/v2/history/get_actions',
-  'https://wax.hivebp.io/v2/history/get_actions',
-  'https://api.waxsweden.org/v2/history/get_actions',
-  'https://wax.greymass.com/v2/history/get_actions',
-];
 const BATCH_SIZE = 1000;
 const MAX_ACTIONS = 50000;
-// Endpoint is considered stale if indexer is more than this far behind real time
-const STALENESS_THRESHOLD_MS = 10 * 60 * 1000;
 
 const WAX_RPC_ENDPOINTS = [
   'https://wax.eosusa.io/v1/chain/get_table_rows',
@@ -32,121 +32,68 @@ export interface NullBreakdownEntry {
   percent30d: number;
 }
 
+export interface NullBreakdownResult {
+  entries: NullBreakdownEntry[];
+  /** True when provider coverage was thin, so totals may understate reality. */
+  isPartial: boolean;
+}
+
 function parseAsset(str: string): number {
   if (!str) return 0;
   return parseFloat(str.split(' ')[0]) || 0;
 }
 
-// Probe each endpoint, return the first one whose indexer is fresh enough.
-// Falls back to the freshest stale endpoint if none are fresh.
-async function pickHyperionEndpoint(): Promise<string> {
-  const now = Date.now();
-  const staleCandidates: Array<{ endpoint: string; lagMs: number }> = [];
-
-  for (const endpoint of HYPERION_ENDPOINTS) {
-    try {
-      // Cheap probe: fetch 1 action to read last_indexed_block_time
-      const probeUrl = `${endpoint}?act.account=cheeseburger&act.name=transfer&limit=1`;
-      const response = await fetch(probeUrl);
-      if (!response.ok) continue;
-      const data = await response.json();
-      const indexedAt = data?.last_indexed_block_time;
-      if (!indexedAt) continue;
-      // Hyperion timestamps come back without a trailing Z; treat as UTC
-      const indexedMs = new Date(
-        indexedAt.endsWith('Z') ? indexedAt : `${indexedAt}Z`
-      ).getTime();
-      if (Number.isNaN(indexedMs)) continue;
-      const lagMs = now - indexedMs;
-      if (lagMs <= STALENESS_THRESHOLD_MS) {
-        return endpoint;
-      }
-      staleCandidates.push({ endpoint, lagMs });
-    } catch {
-      continue;
-    }
-  }
-
-  // No fresh endpoint — fall back to the least-stale one we saw,
-  // or the first configured endpoint if every probe failed.
-  if (staleCandidates.length > 0) {
-    staleCandidates.sort((a, b) => a.lagMs - b.lagMs);
-    return staleCandidates[0].endpoint;
-  }
-  return HYPERION_ENDPOINTS[0];
+// Tracks whether any history read this run had weak provider coverage.
+interface CoverageTracker {
+  succeeded: number;
+  reads: number;
 }
 
-async function fetchContractNulledFromHyperion(account: string, after?: string): Promise<number> {
-  const endpoint = await pickHyperionEndpoint();
-  let total = 0;
-  let skip = 0;
-
-  while (skip < MAX_ACTIONS) {
-    let url = `${endpoint}?act.account=cheeseburger&act.name=transfer&transfer.from=${account}&transfer.to=eosio.null&limit=${BATCH_SIZE}&skip=${skip}`;
-    if (after) url += `&after=${after}`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Hyperion API error: ${response.status}`);
-
-    const data = await response.json();
-    const actions = data.actions;
-
-    if (!actions || actions.length === 0) break;
-
-    for (const action of actions) {
-      const quantity = action.act?.data?.quantity;
-      if (quantity) {
-        total += parseAsset(quantity);
-      }
-    }
-
-    if (actions.length < BATCH_SIZE) break;
-    skip += BATCH_SIZE;
+async function unionSum(
+  query: string,
+  coverage: CoverageTracker,
+  filter?: (data: Record<string, unknown>) => boolean,
+): Promise<number> {
+  const result = await fetchActionsUnion(query, {
+    batchSize: BATCH_SIZE,
+    maxActions: MAX_ACTIONS,
+  });
+  coverage.reads += 1;
+  coverage.succeeded += result.endpointsSucceeded;
+  if (result.endpointsSucceeded === 0) {
+    throw new Error(`All Hyperion providers failed for: ${query}`);
   }
+  return sumAssetField(result.actions, 'quantity', filter);
+}
 
-  return total;
+async function fetchContractNulledFromHyperion(
+  account: string,
+  coverage: CoverageTracker,
+  after?: string,
+): Promise<number> {
+  const query =
+    `act.account=cheeseburger&act.name=transfer` +
+    `&transfer.from=${account}&transfer.to=eosio.null` +
+    (after ? `&after=${after}` : '');
+  return unionSum(query, coverage, (d) => d.from === account && d.to === 'eosio.null');
 }
 
 // cheesepowerz nulls 100% of CHEESE it receives. Its outgoing null may be
-// performed via `cheeseburger::retire` (not a transfer to eosio.null), and
-// even when it is a transfer-to-null the indexer lag can hide it for
-// minutes/hours. To stay consistent with the lifetime counter
-// (`stats.total_cheese_received`), derive windowed totals from inflows:
-// sum CHEESE transfers TO cheesepowerz in the window.
-async function fetchCheesepowerzReceivedWindow(after: string): Promise<number> {
-  const endpoint = await pickHyperionEndpoint();
-  let total = 0;
-  let skip = 0;
-
-  while (skip < MAX_ACTIONS) {
-    const url =
-      `${endpoint}?act.account=cheeseburger&act.name=transfer` +
-      `&transfer.to=cheesepowerz&limit=${BATCH_SIZE}&skip=${skip}&after=${after}`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Hyperion API error: ${response.status}`);
-
-    const data = await response.json();
-    const actions = data.actions;
-
-    if (!actions || actions.length === 0) break;
-
-    for (const action of actions) {
-      const d = action.act?.data;
-      // Defensive: ensure the recipient is actually cheesepowerz and the
-      // quantity is CHEESE (the act filter already enforces the contract).
-      if (d?.to === 'cheesepowerz' && typeof d?.quantity === 'string') {
-        total += parseAsset(d.quantity);
-      }
-    }
-
-    if (actions.length < BATCH_SIZE) break;
-    skip += BATCH_SIZE;
-  }
-
-  return total;
+// performed via `cheeseburger::retire` (not a transfer to eosio.null), so
+// windowed totals are derived from inflows to stay consistent with the
+// lifetime counter (`stats.total_cheese_received`).
+async function fetchCheesepowerzReceivedWindow(
+  after: string,
+  coverage: CoverageTracker,
+): Promise<number> {
+  const query =
+    `act.account=cheeseburger&act.name=transfer` +
+    `&transfer.to=cheesepowerz&after=${after}`;
+  return unionSum(query, coverage, (d) => d.to === 'cheesepowerz');
 }
 
 // cheesepowerz stores its own stats on-chain (authoritative)
-async function fetchCheesepowerzNulled(): Promise<number> {
+async function fetchCheesepowerzNulled(coverage: CoverageTracker): Promise<number> {
   for (const endpoint of WAX_RPC_ENDPOINTS) {
     try {
       const response = await fetch(endpoint, {
@@ -170,27 +117,26 @@ async function fetchCheesepowerzNulled(): Promise<number> {
       continue;
     }
   }
-  // Fallback to Hyperion if all RPC fail
-  return fetchContractNulledFromHyperion('cheesepowerz');
+  // Fallback to history if all RPC endpoints fail
+  return fetchContractNulledFromHyperion('cheesepowerz', coverage);
 }
 
-async function fetchContractNulled(account: string): Promise<number> {
+async function fetchContractNulled(account: string, coverage: CoverageTracker): Promise<number> {
   if (account === 'cheesepowerz') {
-    return fetchCheesepowerzNulled();
+    return fetchCheesepowerzNulled(coverage);
   }
   if (account === 'cheeseburner') {
     // Authoritative on-chain counter incremented by the burn action itself.
-    // Avoids Hyperion gaps/lag and the 50k action cap.
     try {
       const stats = await fetchContractStats(account);
       if (stats && stats.total_cheese_burned) {
         return parseAssetAmount(stats.total_cheese_burned);
       }
     } catch {
-      // fall through to Hyperion
+      // fall through to history
     }
   }
-  return fetchContractNulledFromHyperion(account);
+  return fetchContractNulledFromHyperion(account, coverage);
 }
 
 const NULL_CONTRACTS = [
@@ -209,20 +155,21 @@ function getAgo(days: number): string {
   return d.toISOString();
 }
 
-export async function fetchNullBreakdown(): Promise<NullBreakdownEntry[]> {
+export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
   const after24h = getAgo(1);
   const after7d = getAgo(7);
   const after30d = getAgo(30);
+  const coverage: CoverageTracker = { succeeded: 0, reads: 0 };
 
   const results = await Promise.all(
     NULL_CONTRACTS.map(async ({ account, displayName }) => {
       const windowFetch = account === 'cheesepowerz'
-        ? fetchCheesepowerzReceivedWindow
-        : (after: string) => fetchContractNulledFromHyperion(account, after);
+        ? (after: string) => fetchCheesepowerzReceivedWindow(after, coverage)
+        : (after: string) => fetchContractNulledFromHyperion(account, coverage, after);
       return {
         contract: account,
         displayName,
-        amount: await fetchContractNulled(account),
+        amount: await fetchContractNulled(account, coverage),
         amount24h: await windowFetch(after24h),
         amount7d: await windowFetch(after7d),
         amount30d: await windowFetch(after30d),
@@ -235,11 +182,15 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownEntry[]> {
   const grandTotal7d = results.reduce((sum, r) => sum + r.amount7d, 0);
   const grandTotal30d = results.reduce((sum, r) => sum + r.amount30d, 0);
 
-  return results.map((r) => ({
+  const entries = results.map((r) => ({
     ...r,
     percent: grandTotal > 0 ? (r.amount / grandTotal) * 100 : 0,
     percent24h: grandTotal24h > 0 ? (r.amount24h / grandTotal24h) * 100 : 0,
     percent7d: grandTotal7d > 0 ? (r.amount7d / grandTotal7d) * 100 : 0,
     percent30d: grandTotal30d > 0 ? (r.amount30d / grandTotal30d) * 100 : 0,
   }));
+
+  // Fewer than two providers answering on average means the union is thin.
+  const avgSucceeded = coverage.reads > 0 ? coverage.succeeded / coverage.reads : 0;
+  return { entries, isPartial: avgSucceeded < 2 };
 }
