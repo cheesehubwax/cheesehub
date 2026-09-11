@@ -10,6 +10,7 @@ import { IpfsImage } from '@/components/shared/IpfsImage';
 import { cn } from '@/lib/utils';
 import { formatCheese } from '@/lib/airdropResources';
 import { CHEESE_RAM_CONTRACT, CHEESE_SYMBOL } from '@/lib/airdropCheese';
+import type { InventoryTemplate } from '@/lib/airdropChain';
 import { useAirdrop } from './AirdropContext';
 
 export function AirSendCard() {
