@@ -199,11 +199,18 @@ export function AirSnapshotCard() {
                             lpPair?.key === pair.key ? 'opacity-100' : 'opacity-0',
                           )}
                         />
-                        <span className="flex-1">{pairLabel(pair)}</span>
-                        <span className="ml-2 text-muted-foreground">
+                        <PairLogos pair={pair} />
+                        <span className="ml-2 min-w-0 flex-1">
+                          <span className="block truncate">{pairLabel(pair)}</span>
+                          <span className="block truncate text-[10px] text-muted-foreground">
+                            {pair.contractA} / {pair.contractB}
+                          </span>
+                        </span>
+                        <span className="ml-2 shrink-0 text-right text-muted-foreground">
                           {pair.poolIds.length} pool{pair.poolIds.length === 1 ? '' : 's'} ·{' '}
                           {pair.fees.map(formatFee).join(', ')}
                         </span>
+
                       </CommandItem>
                     ))}
                   </CommandList>
