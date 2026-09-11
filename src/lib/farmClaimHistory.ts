@@ -31,12 +31,9 @@ const STORAGE_PREFIX = "cheesehub:farmClaims:v1:";
 const SCHEMA_VERSION = 1 as const;
 
 const HYPERION_ENDPOINTS = [
-  "https://wax.eosusa.io",
-  "https://wax.greymass.com",
-  "https://wax.eu.eosamsterdam.net",
-  "https://api.wax.alohaeos.com",
+  "https://wax.cryptolions.io",
+  "https://wax.hivebp.io",
   "https://wax.eosphere.io",
-  "https://wax.pink.gg",
 ];
 
 // ── Storage ────────────────────────────────────────────────────────────────
@@ -171,6 +168,7 @@ export async function fetchBaselineFromHyperion(
       endpoints: HYPERION_ENDPOINTS,
       batchSize: PAGE_SIZE,
       maxActions: PAGE_SIZE * MAX_PAGES,
+      timeoutMs: 10000,
     },
   );
 

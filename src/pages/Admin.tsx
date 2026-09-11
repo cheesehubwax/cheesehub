@@ -24,7 +24,11 @@ export default function Admin() {
 
   const { data, isLoading: configsLoading } = useContractConfigs(isWhitelisted && autoRefresh);
   const { data: failedTxs, isLoading: txsLoading } = useFailedTransactions(isWhitelisted);
-  const { data: dropPurchases, isLoading: purchasesLoading } = useDropPurchases(isWhitelisted);
+  const {
+    data: dropPurchases,
+    isLoading: purchasesLoading,
+    isError: purchasesError,
+  } = useDropPurchases(isWhitelisted);
 
   // Access gate
   if (accessLoading) {
@@ -278,7 +282,11 @@ export default function Admin() {
             </div>
 
             {/* CHEESEDrop Purchases */}
-            <DropPurchaseLog purchases={dropPurchases ?? []} isLoading={purchasesLoading} />
+            <DropPurchaseLog
+              purchases={dropPurchases ?? []}
+              isLoading={purchasesLoading}
+              isError={purchasesError}
+            />
 
             {/* Failed Transactions */}
             <FailedTransactionLog transactions={failedTxs ?? []} isLoading={txsLoading} />

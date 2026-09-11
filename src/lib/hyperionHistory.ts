@@ -9,9 +9,7 @@
 
 export const DEFAULT_HYPERION_ENDPOINTS = [
   'https://wax.cryptolions.io',
-  'https://api.waxsweden.org',
   'https://wax.hivebp.io',
-  'https://wax.eosusa.io',
   'https://wax.eosphere.io',
 ];
 
@@ -60,6 +58,7 @@ export function actionIdentity(action: HyperionActionRecord, fallbackIndex: numb
 }
 
 async function fetchJson(url: string, timeoutMs: number): Promise<{ actions?: HyperionActionRecord[] }> {
+  if (timeoutMs <= 0) throw new Error('Hyperion provider deadline exceeded');
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -81,13 +80,16 @@ async function fetchFromEndpoint(
 ): Promise<Map<string, HyperionActionRecord>> {
   const found = new Map<string, HyperionActionRecord>();
   let skip = 0;
+  const deadline = Date.now() + timeoutMs;
 
   const separator = query.startsWith('?') ? '' : '?';
   const baseUrl = `${base.replace(/\/$/, '')}/v2/history/get_actions${separator}${query}`;
 
   while (skip < maxActions) {
     const url = `${baseUrl}&limit=${batchSize}${paginate ? `&skip=${skip}` : ''}`;
-    const data = await fetchJson(url, timeoutMs);
+    // The timeout is a budget for the whole provider, not for every page. A
+    // slow mirror must not hold the UI open once healthy mirrors have replied.
+    const data = await fetchJson(url, deadline - Date.now());
     const actions = data.actions;
     if (!actions || actions.length === 0) break;
 
@@ -142,6 +144,10 @@ export async function fetchActionsUnion(
       if (!merged.has(id)) merged.set(id, action);
     }
   });
+
+  if (endpointsSucceeded === 0) {
+    throw new Error('All Hyperion history providers failed');
+  }
 
   return {
     actions: Array.from(merged.values()),

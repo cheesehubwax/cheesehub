@@ -32,40 +32,32 @@ async function fetchTotalAdsRented(): Promise<number> {
 
 /** Total WAX transferred from cheesebannad to a recipient (union across providers) */
 async function fetchWaxTransfers(to: string): Promise<number> {
-  try {
-    const { actions } = await fetchActionsUnion(
-      `act.account=eosio.token&act.name=transfer&transfer.from=${BANNER_CONTRACT}&transfer.to=${to}`,
-      { batchSize: BATCH_SIZE, maxActions: MAX_ACTIONS },
-    );
-    return sumAssetField(
-      actions,
-      'quantity',
-      (d) =>
-        d.from === BANNER_CONTRACT &&
-        d.to === to &&
-        typeof d.quantity === 'string' &&
-        d.quantity.includes('WAX'),
-    );
-  } catch {
-    return 0;
-  }
+  const { actions } = await fetchActionsUnion(
+    `act.account=eosio.token&act.name=transfer&transfer.from=${BANNER_CONTRACT}&transfer.to=${to}`,
+    { batchSize: BATCH_SIZE, maxActions: MAX_ACTIONS, timeoutMs: 10000 },
+  );
+  return sumAssetField(
+    actions,
+    'quantity',
+    (d) =>
+      d.from === BANNER_CONTRACT &&
+      d.to === to &&
+      typeof d.quantity === 'string' &&
+      d.quantity.includes('WAX'),
+  );
 }
 
 /** CHEESE nulled (cheesebannad → eosio.null via cheeseburger token) */
 async function fetchCheeseBurnt(): Promise<number> {
-  try {
-    const { actions } = await fetchActionsUnion(
-      `act.account=cheeseburger&act.name=transfer&transfer.from=${BANNER_CONTRACT}&transfer.to=eosio.null`,
-      { batchSize: BATCH_SIZE, maxActions: MAX_ACTIONS },
-    );
-    return sumAssetField(
-      actions,
-      'quantity',
-      (d) => d.from === BANNER_CONTRACT && d.to === 'eosio.null',
-    );
-  } catch {
-    return 0;
-  }
+  const { actions } = await fetchActionsUnion(
+    `act.account=cheeseburger&act.name=transfer&transfer.from=${BANNER_CONTRACT}&transfer.to=eosio.null`,
+    { batchSize: BATCH_SIZE, maxActions: MAX_ACTIONS, timeoutMs: 10000 },
+  );
+  return sumAssetField(
+    actions,
+    'quantity',
+    (d) => d.from === BANNER_CONTRACT && d.to === 'eosio.null',
+  );
 }
 
 
