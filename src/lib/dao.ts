@@ -503,9 +503,10 @@ async function fetchTokenReceiversFromHyperion(
     for (const action of actions) {
       const actData = action.act?.data as Record<string, unknown> | undefined;
       if (actData && actData.dao === daoName && actData.proposal_type === 4) {
-        if (actData.token_receivers && actData.token_receivers.length > 0) {
+        const receivers = actData.token_receivers as Array<Record<string, unknown>> | undefined;
+        if (receivers && receivers.length > 0) {
           const title = (actData.title as string) || "";
-          result[title] = actData.token_receivers.map((tr: Record<string, unknown>) => ({
+          result[title] = receivers.map((tr) => ({
             wax_account: (tr.wax_account as string) || "",
             quantity: (tr.quantity as string) || "",
             contract: (tr.contract as string) || "eosio.token",
