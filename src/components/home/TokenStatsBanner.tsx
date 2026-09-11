@@ -205,6 +205,11 @@ export function TokenStatsBanner() {
               <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[860px] max-w-[860px] p-0" align="end">
                 <div className="p-3 border-b border-border">
                   <p className="text-sm font-semibold text-foreground">Null Breakdown by Contract</p>
+                  {breakdownPartial && (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      History sources are responding poorly right now — these totals may be incomplete.
+                    </p>
+                  )}
                 </div>
                 {breakdownLoading ? (
                   <div className="p-4 space-y-2">
