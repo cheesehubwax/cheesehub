@@ -156,12 +156,20 @@ export function AirSnapshotCard() {
                   aria-expanded={pairOpen}
                   className="w-full justify-between font-mono"
                 >
-                  {lpPair ? pairLabel(lpPair) : 'Select a liquidity pair'}
+                  {lpPair ? (
+                    <span className="flex min-w-0 items-center gap-2">
+                      <PairLogos pair={lpPair} />
+                      <span className="truncate">{pairLabel(lpPair)}</span>
+                    </span>
+                  ) : (
+                    'Select a liquidity pair'
+                  )}
                   {lpPairsLoading ? (
                     <Loader2 className="ml-2 h-4 w-4 animate-spin opacity-60" />
                   ) : (
                     <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
                   )}
+
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
