@@ -5,7 +5,7 @@ import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 import { formatCheese } from '@/lib/airdropResources';
 import { CHEESE_SYMBOL, MIN_RAM_PURCHASE_CHEESE, txLink } from '@/lib/airdropCheese';
-import { useAirdrop } from './AirdropContext';
+import { useAirdrop } from '@/components/air/AirdropContext';
 
 export function AirRunPanel() {
   const {

@@ -6,7 +6,7 @@ import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { cn } from '@/lib/utils';
 import { formatUnits } from '@/lib/airdrop';
 import { CHEESE_PRECISION, CHEESE_SYMBOL } from '@/lib/airdropCheese';
-import { useAirdrop } from './AirdropContext';
+import { useAirdrop } from '@/components/air/AirdropContext';
 
 const QUICK = [10, 50, 100];
 const MAX_ROWS = 500;

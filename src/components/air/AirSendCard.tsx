@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { formatCheese } from '@/lib/airdropResources';
 import { CHEESE_RAM_CONTRACT, CHEESE_SYMBOL } from '@/lib/airdropCheese';
 import type { InventoryTemplate } from '@/lib/airdropChain';
-import { useAirdrop } from './AirdropContext';
+import { useAirdrop } from '@/components/air/AirdropContext';
 
 export function AirSendCard() {
   const {
