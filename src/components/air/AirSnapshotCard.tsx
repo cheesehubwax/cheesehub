@@ -17,7 +17,7 @@ import { Check, ChevronsUpDown, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { filterPairs, formatFee, pairLabel, type AlcorPair } from '@/lib/airdropAlcorLp';
 import { getTokenLogoUrl } from '@/lib/tokenLogos';
-import { ACCOUNT_RE, useAirdrop, type SnapshotMode } from './AirdropContext';
+import { ACCOUNT_RE, useAirdrop, type SnapshotMode } from '@/components/air/AirdropContext';
 
 /** Small Alcor token logo with a graceful placeholder fallback. */
 function TokenLogo({ contract, symbol }: { contract: string; symbol: string }) {
