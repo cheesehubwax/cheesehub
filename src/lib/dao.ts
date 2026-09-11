@@ -496,13 +496,12 @@ async function fetchTokenReceiversFromHyperion(
 ): Promise<Record<string, TokenReceiver[]>> {
   const result: Record<string, TokenReceiver[]> = {};
   try {
-    const response = await fetch(
-      `https://wax.eosusa.io/v2/history/get_actions?account=${DAO_CONTRACT}&filter=${DAO_CONTRACT}:newproposal&limit=500`
+    const { actions } = await fetchActionsUnion(
+      `account=${DAO_CONTRACT}&filter=${DAO_CONTRACT}:newproposal`,
+      { batchSize: 500, paginate: false },
     );
-    if (!response.ok) return result;
-    const data = await response.json();
-    for (const action of data.actions || []) {
-      const actData = action.act?.data;
+    for (const action of actions) {
+      const actData = action.act?.data as Record<string, unknown> | undefined;
       if (actData && actData.dao === daoName && actData.proposal_type === 4) {
         if (actData.token_receivers && actData.token_receivers.length > 0) {
           const title = (actData.title as string) || "";
