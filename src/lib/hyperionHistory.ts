@@ -13,7 +13,6 @@ export const DEFAULT_HYPERION_ENDPOINTS = [
   'https://wax.hivebp.io',
   'https://wax.eosusa.io',
   'https://wax.eosphere.io',
-  'https://wax.blokcrafters.io',
 ];
 
 export interface HyperionActionRecord {
