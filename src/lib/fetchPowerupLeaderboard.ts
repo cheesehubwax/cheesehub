@@ -28,6 +28,9 @@ export interface PowerupLeaderStats {
 export type PowerupSortMode = 'cheese' | 'powerups';
 
 interface HyperionAction {
+  trx_id?: string;
+  action_ordinal?: number;
+  global_sequence?: number;
   act: {
     data: {
       from: string;
@@ -40,51 +43,75 @@ interface HyperionAction {
 
 interface HyperionResponse {
   actions: HyperionAction[];
-  total: { value: number };
+  total?: { value: number };
 }
 
-async function fetchFromEndpoint(endpoint: string): Promise<PowerupTransferAction[]> {
-  const allActions: PowerupTransferAction[] = [];
+function actionId(action: HyperionAction, fallbackIndex: number): string {
+  if (action.global_sequence !== undefined) return `gs:${action.global_sequence}`;
+  if (action.trx_id) return `${action.trx_id}:${action.action_ordinal ?? 0}`;
+  return `idx:${fallbackIndex}`;
+}
+
+async function fetchJson(url: string): Promise<HyperionResponse> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ENDPOINT_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(`Hyperion API error: ${response.status}`);
+    return (await response.json()) as HyperionResponse;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchFromEndpoint(endpoint: string): Promise<Map<string, PowerupTransferAction>> {
+  const found = new Map<string, PowerupTransferAction>();
   let skip = 0;
 
   while (skip < MAX_ACTIONS) {
     const url = `${endpoint}?act.account=cheeseburger&act.name=transfer&transfer.to=cheesepowerz&limit=${BATCH_SIZE}&skip=${skip}`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Hyperion API error: ${response.status}`);
-
-    const data: HyperionResponse = await response.json();
+    const data = await fetchJson(url);
     const actions = data.actions;
 
     if (!actions || actions.length === 0) break;
 
-    for (const action of actions) {
+    actions.forEach((action, i) => {
       const d = action.act?.data;
-      if (d?.from && d?.quantity && d?.to === 'cheesepowerz') {
-        allActions.push({
-          from: d.from,
-          quantity: d.quantity,
-        });
-      }
-    }
+      if (!(d?.from && d?.quantity && d?.to === 'cheesepowerz')) return;
+      const id = actionId(action, skip + i);
+      if (found.has(id)) return;
+      found.set(id, { id, from: d.from, quantity: d.quantity });
+    });
 
     if (actions.length < BATCH_SIZE) break;
     skip += BATCH_SIZE;
   }
 
-  return allActions;
+  return found;
 }
 
+/** Union of every provider's view, de-duplicated by action identity. */
 export async function fetchPowerupTransfers(): Promise<PowerupTransferAction[]> {
-  for (const endpoint of HYPERION_ENDPOINTS) {
-    try {
-      const actions = await fetchFromEndpoint(endpoint);
-      if (actions.length > 0) return actions;
-    } catch (err) {
-      console.error(`Powerup leaderboard fetch failed for ${endpoint}:`, err);
-      continue;
+  const merged = new Map<string, PowerupTransferAction>();
+  let succeeded = 0;
+
+  const results = await Promise.allSettled(
+    HYPERION_ENDPOINTS.map((endpoint) => fetchFromEndpoint(endpoint)),
+  );
+
+  results.forEach((result, i) => {
+    if (result.status !== 'fulfilled') {
+      console.error(`Powerup leaderboard fetch failed for ${HYPERION_ENDPOINTS[i]}:`, result.reason);
+      return;
     }
-  }
-  return [];
+    succeeded += 1;
+    for (const [id, action] of result.value) {
+      if (!merged.has(id)) merged.set(id, action);
+    }
+  });
+
+  if (succeeded === 0) return [];
+  return Array.from(merged.values());
 }
 
 function parseAsset(str: string): number {
