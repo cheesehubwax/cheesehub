@@ -2,8 +2,24 @@
 // Contract: dao.waxdao
 
 import { getTokenConfig } from "@/lib/tokenRegistry";
+import { fetchWithFallback } from "@/lib/fetchWithFallback";
+import { fetchActionsUnion } from "@/lib/hyperionHistory";
 
 export const DAO_CONTRACT = "dao.waxdao";
+
+// Chain reads used to go to a single node, so CHEESEDao went blank whenever
+// that node was down or rate-limited. Every read now fails over across nodes.
+const DAO_RPC_ENDPOINTS = [
+  "https://wax.eosusa.io",
+  "https://api.waxsweden.org",
+  "https://wax.greymass.com",
+  "https://wax.eosphere.io",
+  "https://api.wax.alohaeos.com",
+];
+
+function daoRpcFetch(path: string, init?: RequestInit): Promise<Response> {
+  return fetchWithFallback(DAO_RPC_ENDPOINTS, path, init, 10000);
+}
 
 // Fee constants for DAO creation
 export const DAO_CREATION_FEE = "265.00000000 WAX";
