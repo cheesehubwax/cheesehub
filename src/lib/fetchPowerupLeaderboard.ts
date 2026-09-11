@@ -1,11 +1,19 @@
+// Coverage note: single Hyperion providers can return a partially indexed
+// history, which silently shrinks the leaderboard. Query several and merge.
 const HYPERION_ENDPOINTS = [
+  'https://wax.cryptolions.io/v2/history/get_actions',
+  'https://api.waxsweden.org/v2/history/get_actions',
   'https://wax.eosphere.io/v2/history/get_actions',
   'https://wax.eosusa.io/v2/history/get_actions',
+  'https://wax.blokcrafters.io/v2/history/get_actions',
 ];
 const BATCH_SIZE = 1000;
 const MAX_ACTIONS = 10000;
+const ENDPOINT_TIMEOUT_MS = 20000;
 
 export interface PowerupTransferAction {
+  /** Stable identity used to de-duplicate across providers. */
+  id: string;
   from: string;
   quantity: string;
 }
