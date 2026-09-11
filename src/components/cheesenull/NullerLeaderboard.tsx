@@ -21,6 +21,8 @@ interface NullerLeaderboardProps {
   rawActions: LogburnAction[];
   isLoading: boolean;
   isError: boolean;
+  /** True when chain history providers returned an incomplete index. */
+  isPartial?: boolean;
   onRefresh?: () => void;
 }
 
