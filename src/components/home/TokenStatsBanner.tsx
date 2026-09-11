@@ -34,7 +34,9 @@ function formatFullNumber(num: number): string {
 
 export function TokenStatsBanner() {
   const { data: stats, isLoading, isError } = useCheeseStats();
-  const { data: breakdown, isLoading: breakdownLoading, refetch: fetchBreakdown } = useNullBreakdown();
+  const { data: breakdownResult, isLoading: breakdownLoading, refetch: fetchBreakdown } = useNullBreakdown();
+  const breakdown = breakdownResult?.entries;
+  const breakdownPartial = breakdownResult?.isPartial ?? false;
 
   return (
     <section className="container py-8">
