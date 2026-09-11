@@ -161,35 +161,31 @@ export async function fetchBaselineFromHyperion(
   const MAX_PAGES = 10;
   type ClaimRef = { trxId: string; farmName: string; ts: number };
   const claimRefs: ClaimRef[] = [];
-  let skip = 0;
   let newestTs = 0;
 
-  for (let page = 0; page < MAX_PAGES; page++) {
-    const data = await withHyperionFallback<HyperionActionsResponse>(
-      (base) =>
-        `${base}/v2/history/get_actions` +
-        `?account=${encodeURIComponent(account)}` +
-        `&filter=${encodeURIComponent(`${FARM_CONTRACT}:claim`)}` +
-        `&limit=${PAGE_SIZE}&skip=${skip}&sort=desc`,
-      signal,
-    );
-    const actions = data.actions || [];
-    if (actions.length === 0) break;
+  // Union across providers: one provider alone can hold only part of an
+  // account's claim history, which would understate lifetime claim totals.
+  const union = await fetchActionsUnion(
+    `account=${encodeURIComponent(account)}` +
+      `&filter=${encodeURIComponent(`${FARM_CONTRACT}:claim`)}` +
+      `&sort=desc`,
+    {
+      endpoints: HYPERION_ENDPOINTS,
+      batchSize: PAGE_SIZE,
+      maxActions: PAGE_SIZE * MAX_PAGES,
+    },
+  );
 
-    for (const a of actions) {
-      const trxId = a.trx_id;
-      const ad = (a.act?.data || {}) as Record<string, unknown>;
-      const farmName = String(ad.farmname || ad.farm_name || "");
-      const user = String(ad.user || "");
-      if (!trxId || !farmName) continue;
-      if (user && user !== account) continue;
-      const ts = a["@timestamp"] ? Date.parse(a["@timestamp"]) : 0;
-      if (Number.isFinite(ts) && ts > newestTs) newestTs = ts;
-      claimRefs.push({ trxId, farmName, ts });
-    }
-
-    if (actions.length < PAGE_SIZE) break;
-    skip += PAGE_SIZE;
+  for (const a of union.actions) {
+    const trxId = a.trx_id;
+    const ad = (a.act?.data || {}) as Record<string, unknown>;
+    const farmName = String(ad.farmname || ad.farm_name || "");
+    const user = String(ad.user || "");
+    if (!trxId || !farmName) continue;
+    if (user && user !== account) continue;
+    const ts = a["@timestamp"] ? Date.parse(a["@timestamp"]) : 0;
+    if (Number.isFinite(ts) && ts > newestTs) newestTs = ts;
+    claimRefs.push({ trxId, farmName, ts });
   }
 
   if (claimRefs.length === 0) {
