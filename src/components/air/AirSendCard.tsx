@@ -128,26 +128,12 @@ export function AirSendCard() {
                 </div>
 
                 {nftCollection && (
-                  <div>
-                    <Label className="mb-1 block text-xs text-muted-foreground">
-                      Template to airdrop (1 NFT per recipient)
-                      {nftLoading === 'templates' && ' · loading…'}
-                    </Label>
-                    <select
-                      value={nftTemplateId ?? ''}
-                      onChange={(e) =>
-                        setNftTemplateId(e.target.value ? Number(e.target.value) : null)
-                      }
-                      className="w-full rounded-md border border-input bg-background px-2 py-2 font-mono text-sm text-foreground"
-                    >
-                      <option value="">Select a template…</option>
-                      {nftTemplates.map((t) => (
-                        <option key={t.templateId} value={t.templateId}>
-                          {t.name} · #{t.templateId} · own {t.count}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <TemplatePicker
+                    templates={nftTemplates}
+                    templateId={nftTemplateId}
+                    loading={nftLoading === 'templates'}
+                    onSelect={setNftTemplateId}
+                  />
                 )}
 
                 {nftTemplateId !== null && (
