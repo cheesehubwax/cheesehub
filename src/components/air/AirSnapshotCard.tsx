@@ -15,8 +15,41 @@ import {
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { Check, ChevronsUpDown, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { filterPairs, formatFee, pairLabel } from '@/lib/airdropAlcorLp';
+import { filterPairs, formatFee, pairLabel, type AlcorPair } from '@/lib/airdropAlcorLp';
+import { getTokenLogoUrl } from '@/lib/tokenLogos';
 import { ACCOUNT_RE, useAirdrop, type SnapshotMode } from './AirdropContext';
+
+/** Small Alcor token logo with a graceful placeholder fallback. */
+function TokenLogo({ contract, symbol }: { contract: string; symbol: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed || !contract) {
+    return (
+      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-muted text-[7px] font-bold text-muted-foreground">
+        {symbol.slice(0, 2)}
+      </span>
+    );
+  }
+  return (
+    <img
+      src={getTokenLogoUrl(contract, symbol)}
+      alt={symbol}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="h-4 w-4 rounded-full bg-background object-contain"
+    />
+  );
+}
+
+/** Overlapping logo pair shown to the left of the pair symbols. */
+function PairLogos({ pair }: { pair: AlcorPair }) {
+  return (
+    <span className="flex shrink-0 items-center -space-x-1">
+      <TokenLogo contract={pair.contractA} symbol={pair.symbolA} />
+      <TokenLogo contract={pair.contractB} symbol={pair.symbolB} />
+    </span>
+  );
+}
+
 
 export function AirSnapshotCard() {
   const {
