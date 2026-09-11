@@ -15,8 +15,41 @@ import {
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { Check, ChevronsUpDown, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { filterPairs, formatFee, pairLabel } from '@/lib/airdropAlcorLp';
+import { filterPairs, formatFee, pairLabel, type AlcorPair } from '@/lib/airdropAlcorLp';
+import { getTokenLogoUrl } from '@/lib/tokenLogos';
 import { ACCOUNT_RE, useAirdrop, type SnapshotMode } from './AirdropContext';
+
+/** Small Alcor token logo with a graceful placeholder fallback. */
+function TokenLogo({ contract, symbol }: { contract: string; symbol: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed || !contract) {
+    return (
+      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-muted text-[7px] font-bold text-muted-foreground">
+        {symbol.slice(0, 2)}
+      </span>
+    );
+  }
+  return (
+    <img
+      src={getTokenLogoUrl(contract, symbol)}
+      alt={symbol}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="h-4 w-4 rounded-full bg-background object-contain"
+    />
+  );
+}
+
+/** Overlapping logo pair shown to the left of the pair symbols. */
+function PairLogos({ pair }: { pair: AlcorPair }) {
+  return (
+    <span className="flex shrink-0 items-center -space-x-1">
+      <TokenLogo contract={pair.contractA} symbol={pair.symbolA} />
+      <TokenLogo contract={pair.contractB} symbol={pair.symbolB} />
+    </span>
+  );
+}
+
 
 export function AirSnapshotCard() {
   const {
@@ -123,12 +156,20 @@ export function AirSnapshotCard() {
                   aria-expanded={pairOpen}
                   className="w-full justify-between font-mono"
                 >
-                  {lpPair ? pairLabel(lpPair) : 'Select a liquidity pair'}
+                  {lpPair ? (
+                    <span className="flex min-w-0 items-center gap-2">
+                      <PairLogos pair={lpPair} />
+                      <span className="truncate">{pairLabel(lpPair)}</span>
+                    </span>
+                  ) : (
+                    'Select a liquidity pair'
+                  )}
                   {lpPairsLoading ? (
                     <Loader2 className="ml-2 h-4 w-4 animate-spin opacity-60" />
                   ) : (
                     <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
                   )}
+
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
@@ -158,11 +199,18 @@ export function AirSnapshotCard() {
                             lpPair?.key === pair.key ? 'opacity-100' : 'opacity-0',
                           )}
                         />
-                        <span className="flex-1">{pairLabel(pair)}</span>
-                        <span className="ml-2 text-muted-foreground">
+                        <PairLogos pair={pair} />
+                        <span className="ml-2 min-w-0 flex-1">
+                          <span className="block truncate">{pairLabel(pair)}</span>
+                          <span className="block truncate text-[10px] text-muted-foreground">
+                            {pair.contractA} / {pair.contractB}
+                          </span>
+                        </span>
+                        <span className="ml-2 shrink-0 text-right text-muted-foreground">
                           {pair.poolIds.length} pool{pair.poolIds.length === 1 ? '' : 's'} ·{' '}
                           {pair.fees.map(formatFee).join(', ')}
                         </span>
+
                       </CommandItem>
                     ))}
                   </CommandList>
