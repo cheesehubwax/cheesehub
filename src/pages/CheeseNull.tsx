@@ -58,7 +58,7 @@ export default function CheeseNull() {
           <NullTotalStats />
 
           {/* Leaderboard */}
-          <NullerLeaderboard rawActions={rawActions} isLoading={lbLoading} isError={lbError} onRefresh={() => refetchLeaderboard()} />
+          <NullerLeaderboard rawActions={rawActions} isLoading={lbLoading} isError={lbError} isPartial={lbPartial} onRefresh={() => refetchLeaderboard()} />
 
           {/* Powered by */}
           <div className="text-center text-sm text-muted-foreground">
