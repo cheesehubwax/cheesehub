@@ -125,8 +125,16 @@ interface AirdropContextValue {
   ramBytesTotal: number;
   /** RAM mode: per-purchase CHEESE limits enforced by the RAM contract. */
   ramLimits: { minCheese: number; maxCheese: number } | null;
-  /** RAM mode: recipients dropped because their share breaks a contract limit. */
-  ramExcluded: { belowMin: number; aboveMax: number };
+  /**
+   * RAM mode: `belowMin` = accounts skipped because their whole share is under
+   * the contract minimum; `split` = accounts paid over several purchases.
+   */
+  ramExcluded: { belowMin: number; split: number };
+  /** RAM mode: account -> how many purchases deliver that account's share. */
+  ramPurchaseCounts: Map<string, number>;
+  /** RAM mode: total number of contract purchases in the run. */
+  ramPurchaseCount: number;
+
   /** RAM mode: smallest amount (in the selected unit) that includes every ticked holder. */
   ramMinViable: { cheese: number; text: string } | null;
   /** RAM mode: fill the amount field with `ramMinViable`. */
