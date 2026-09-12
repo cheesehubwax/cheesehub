@@ -18,7 +18,7 @@ interface AnalPoolDetailProps {
   onSelectAccount: (account: string) => void;
 }
 
-const axisTick = { fontSize: 10, fill: 'hsl(var(--muted-foreground))' } as const;
+const axisTick = { fontSize: 10, fill: '#FFFFFF' } as const;
 
 export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoolDetailProps) {
   const series = useMemo(() => {
