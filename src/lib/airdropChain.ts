@@ -838,7 +838,11 @@ export async function getResourcePricing(): Promise<ResourcePricing> {
         (config.reserve_buffer_bps ?? 300),
       historicalBytesPerCheese:
         cheeseReceived > 0 && bytesBought > 0 ? bytesBought / cheeseReceived : null,
+      liquidWax: assetAmount(Array.isArray(poolWaxRes) ? poolWaxRes[0] : undefined),
+      minLiquidReserve: assetAmount(config.min_liquid_reserve),
+      reserveBufferBps: config.reserve_buffer_bps ?? 300,
     },
+
     powerup:
       cpuPrice > 0 && netPrice > 0
         ? {
