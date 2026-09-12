@@ -143,6 +143,7 @@ export function LyticsAccountPanel({ account, onAccountChange, dates, current }:
 
           {holdings.length > 0 && (
             <div className="overflow-x-auto">
+              <p className="text-[10px] text-muted-foreground mb-1">Click a pool to filter the charts below to just that pool.</p>
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-muted-foreground text-[10px] uppercase tracking-wide">
@@ -155,7 +156,14 @@ export function LyticsAccountPanel({ account, onAccountChange, dates, current }:
                 </thead>
                 <tbody>
                   {holdings.map((row) => (
-                    <tr key={row.label} className="border-t border-border/40">
+                    <tr
+                      key={row.label}
+                      onClick={() => setSelectedPool(selectedPool === row.key ? null : row.key)}
+                      title={selectedPool === row.key ? 'Show all pools' : 'Show only this pool'}
+                      className={`border-t border-border/40 cursor-pointer transition-colors ${
+                        selectedPool === row.key ? 'bg-cheese/10' : 'hover:bg-muted/40'
+                      }`}
+                    >
                       <td className="py-1.5 text-foreground whitespace-nowrap">
                         <span className="text-cheese">CHEESE</span> / {row.symbol}
                       </td>
