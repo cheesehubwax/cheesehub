@@ -189,6 +189,8 @@ export interface LpIndexDay {
   pools: LpIndexPool[];
   /** Providers deduplicated across every pool in the day. */
   uniqueAccounts?: number;
+  /** Providers deduplicated within each venue, so a venue filter stays honest. */
+  uniqueByVenue?: Partial<Record<LpVenue, number>>;
   partial?: LpVenue[];
 }
 
