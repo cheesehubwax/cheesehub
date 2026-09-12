@@ -1016,8 +1016,10 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     cancelRef.current = false;
 
     if (isRam) {
-      // One CHEESE transfer per recipient: ram.chz buys RAM into the memo account.
-      const batches = chunk(recipients, Math.max(1, batchSize));
+      // One CHEESE transfer per purchase: ram.chz buys RAM into the memo account.
+      // A share above the per-purchase maximum is delivered as several purchases.
+      const batches = chunk(ramPurchases, Math.max(1, batchSize));
+
       for (let i = 0; i < batches.length; i += 1) {
         if (cancelRef.current) {
           appendBatch({ batch: i + 1, recipients: 0, error: 'Cancelled by user' });
