@@ -171,6 +171,11 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
                       <td className="py-1.5 text-foreground whitespace-nowrap">
                         <span className="text-cheese">CHEESE</span> / {row.symbol}
                       </td>
+                      <td className="py-1.5 whitespace-nowrap">
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/60 bg-background/60 text-muted-foreground">
+                          {LP_VENUE_LABELS[row.venue] ?? row.venue}
+                        </span>
+                      </td>
                       <td className="py-1.5 text-right font-mono text-foreground">{usd(row.usd)}</td>
                       <td className="py-1.5 text-right font-mono text-muted-foreground">{amount(row.cheese, 2)}</td>
                       <td className="py-1.5 text-right font-mono text-muted-foreground">
