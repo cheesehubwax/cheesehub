@@ -51,10 +51,11 @@ export function sliceDays(days: LpIndexDay[], range: LpRange): LpIndexDay[] {
  */
 export function filterDaysByVenue(days: LpIndexDay[], venue: LpVenue | 'all'): LpIndexDay[] {
   if (venue === 'all') return days;
-  return days.map((day) => {
-    const { uniqueAccounts: _drop, ...rest } = day;
-    return { ...rest, pools: poolsForVenue(day.pools, venue) };
-  });
+  return days.map((day) => ({
+    ...day,
+    uniqueAccounts: day.uniqueByVenue?.[venue],
+    pools: poolsForVenue(day.pools, venue),
+  }));
 }
 
 /** Keep only the pools of one venue in a snapshot. */

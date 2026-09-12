@@ -531,13 +531,24 @@ export function poolsForVenue<T extends { venue: LpVenue }>(
 /** Reduce a day file to the pool-level entry stored in the index. */
 export function indexEntryForDay(day: LpDayFile): LpIndexDay {
   const unique = new Set<string>();
-  for (const pool of day.pools) for (const row of pool.providers) unique.add(row.a);
+  const perVenue = new Map<LpVenue, Set<string>>();
+  for (const pool of day.pools) {
+    const venueSet = perVenue.get(pool.venue) ?? new Set<string>();
+    for (const row of pool.providers) {
+      unique.add(row.a);
+      venueSet.add(row.a);
+    }
+    perVenue.set(pool.venue, venueSet);
+  }
+  const uniqueByVenue: Partial<Record<LpVenue, number>> = {};
+  for (const [venue, set] of perVenue) uniqueByVenue[venue] = set.size;
   return {
     date: day.date,
     t: day.t,
     ...(day.cheeseUsd !== undefined ? { cheeseUsd: day.cheeseUsd } : {}),
     ...(day.partial && day.partial.length ? { partial: day.partial } : {}),
     uniqueAccounts: unique.size,
+    uniqueByVenue,
     pools: day.pools.map((pool) => ({
       key: pool.key,
       venue: pool.venue,
