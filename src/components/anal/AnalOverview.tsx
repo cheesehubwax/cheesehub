@@ -9,7 +9,7 @@ import { amount, change, shortDate, tooltipDate, usd, usdPrice } from './format'
 interface AnalOverviewProps {
   /** Recorded days already trimmed to the selected range. */
   days: LpIndexDay[];
-  /** Latest state — live from Alcor when available, otherwise the newest day. */
+  /** Latest full workflow snapshot. */
   current: LpDayFile | null;
   historyLoading: boolean;
   historyEmpty: boolean;
@@ -199,8 +199,8 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
           {historyLoading
             ? 'Loading recorded history...'
             : historyEmpty
-              ? 'No snapshots recorded yet — the first one lands on the next daily run. Figures above are live.'
-              : 'Collecting history — one snapshot is recorded per day.'}
+              ? 'No snapshots recorded yet — figures appear after the first workflow run.'
+              : 'Collecting history from the twice-daily workflow snapshots.'}
         </div>
       )}
     </div>

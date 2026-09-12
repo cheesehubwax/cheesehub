@@ -1,6 +1,5 @@
-// CHEESEAnal — readers for the recorded LP history and the live pool state.
+// CHEESEAnal — readers for workflow-recorded LP history snapshots.
 import { useQuery } from '@tanstack/react-query';
-import { fetchLiveLpSnapshot } from '@/lib/lpLive';
 import { poolsForVenue, type LpDayFile, type LpIndexFile, type LpIndexDay, type LpVenue } from '@/lib/lpPools';
 
 const DEFAULT_OWNER = 'cheesehubwax';
@@ -89,6 +88,7 @@ export function useLpHistoryIndex() {
     isEmpty: !query.isLoading && !query.isError && days.length === 0,
     isLoading: query.isLoading,
     isError: query.isError,
+    refetch: query.refetch,
   };
 }
 
@@ -102,24 +102,6 @@ export function useLpDay(date: string | null) {
     retry: 1,
   });
   return { day: query.data ?? null, isLoading: query.isLoading, isError: query.isError, refetch: query.refetch };
-}
-
-/** Live pool state read straight from the venues — fallback only when no snapshots are recorded yet. */
-export function useLiveLpSnapshot() {
-  const query = useQuery({
-    queryKey: ['cheeseAnal', 'live'],
-    queryFn: fetchLiveLpSnapshot,
-    staleTime: 2 * 60_000,
-    refetchInterval: 5 * 60_000,
-    retry: 1,
-  });
-  return {
-    snapshot: query.data ?? null,
-    failed: query.data?.failed ?? [],
-    isLoading: query.isLoading,
-    isError: query.isError,
-    refetch: query.refetch,
-  };
 }
 
 /** One account's liquidity in one pool on one recorded day. */
