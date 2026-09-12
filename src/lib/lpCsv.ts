@@ -45,7 +45,7 @@ export function downloadSnapshotCsv(snapshot: LpDayFile): void {
 export function downloadPoolHistoryCsv(days: LpIndexDay[], poolKey: string, label: string): void {
   const lines = [
     `# CHEESEAnal history · ${label}`,
-    'date,venue,usd_value,cheese,paired_amount,accounts,positions,cheese_price_usd,cheese_price_in_paired',
+    'date,venue,paired_symbol,usd_value,cheese,paired_amount,accounts,positions,cheese_price_in_paired,cheese_price_usd',
   ];
   for (const day of days) {
     const pool = day.pools.find((p) => p.key === poolKey);
@@ -54,13 +54,14 @@ export function downloadPoolHistoryCsv(days: LpIndexDay[], poolKey: string, labe
       [
         day.date,
         cell(venueLabel(pool.venue)),
+        cell(pool.symbol),
         pool.usd,
         pool.cheese,
         pool.paired,
         pool.accounts,
         pool.positions,
-        pool.priceUsd ?? '',
         pool.priceInPaired ?? '',
+        pool.priceUsd ?? '',
       ].join(','),
     );
   }

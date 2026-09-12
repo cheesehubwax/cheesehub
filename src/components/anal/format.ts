@@ -15,6 +15,20 @@ export function usdPrice(value: number): string {
   return `$${value.toLocaleString('en-US', { maximumSignificantDigits: 4, minimumSignificantDigits: 2 })}`;
 }
 
+/**
+ * CHEESE price expressed in the paired token. Very small prices (WAXWBTC,
+ * WAXWETH) stay readable decimals rather than exponent notation.
+ */
+export function tokenPrice(value: number, symbol?: string): string {
+  if (!Number.isFinite(value) || value <= 0) return '—';
+  const decimals = value >= 1 ? 6 : Math.min(18, Math.max(6, 4 - Math.floor(Math.log10(value))));
+  const text = value
+    .toFixed(decimals)
+    .replace(/(\.\d*?[1-9])0+$/, '$1')
+    .replace(/\.0+$/, '');
+  return symbol ? `${text} ${symbol}` : text;
+}
+
 export function amount(value: number, decimals = 4): string {
   if (!Number.isFinite(value)) return '0';
   if (value !== 0 && Math.abs(value) < 0.0001) return value.toExponential(2);

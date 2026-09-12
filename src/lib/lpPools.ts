@@ -420,6 +420,11 @@ export function buildPoolSnapshot(
   };
 }
 
+/**
+ * USD equivalent of this pair's own CHEESE price. Deliberately has no global
+ * fallback: borrowing the market CHEESE/USD price would make every pool show
+ * the same number, which hides what the pair itself is actually pricing at.
+ */
 function derivePriceUsd(
   priceInPaired: number | undefined,
   prices: { cheeseUsd?: number; pairedUsd?: number },
@@ -427,7 +432,6 @@ function derivePriceUsd(
   if (priceInPaired !== undefined && prices.pairedUsd && prices.pairedUsd > 0) {
     return round(priceInPaired * prices.pairedUsd, 10);
   }
-  if (prices.cheeseUsd && prices.cheeseUsd > 0) return round(prices.cheeseUsd, 10);
   return undefined;
 }
 
