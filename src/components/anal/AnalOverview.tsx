@@ -94,7 +94,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
         {METRICS.map((stat) => {
           const selected = metric === stat.key;
           return (
