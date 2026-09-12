@@ -4,7 +4,7 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { CheeseLogo, UsdLogo } from '@/components/anal/PairLogos';
 import type { LpDayFile, LpIndexDay } from '@/lib/lpPools';
-import { amount, change, shortDate, tooltipDate, usd, usdPrice } from './format';
+import { amount, change, shortDate, tooltipDate, usd } from './format';
 
 interface AnalOverviewProps {
   /** Recorded days already trimmed to the selected range. */
