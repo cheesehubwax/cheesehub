@@ -52,9 +52,14 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
     [rows, selectedPool],
   );
 
-  const selectedPoolLabel = selectedPool
-    ? (holdings.find((h) => h.key === selectedPool)?.label ?? rows.find((r) => r.poolKey === selectedPool)?.label ?? selectedPool)
-    : null;
+  const selectedPoolLabel = useMemo(() => {
+    if (!selectedPool) return null;
+    const hit =
+      holdings.find((h) => h.key === selectedPool) ?? rows.find((r) => r.poolKey === selectedPool) ?? null;
+    if (!hit) return selectedPool;
+    const venue = LP_VENUE_LABELS[hit.venue] ?? hit.venue;
+    return venue ? `${hit.label} · ${venue}` : hit.label;
+  }, [holdings, rows, selectedPool]);
 
   const series = useMemo(() => {
     const byDate = new Map<string, { date: string; usd: number; cheese: number }>();
