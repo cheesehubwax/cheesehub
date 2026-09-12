@@ -29,10 +29,10 @@ async function fetchJson<T>(path: string): Promise<T | null> {
   return (await res.json()) as T;
 }
 
-export type LpRange = '24h' | '7d' | '30d' | '90d' | 'all';
+export type LpRange = '48h' | '7d' | '30d' | '90d' | 'all';
 
 export const LP_RANGES: { key: LpRange; label: string; days: number | null }[] = [
-  { key: '24h', label: '24H', days: 1 },
+  { key: '48h', label: '48H', days: 2 },
   { key: '7d', label: '7D', days: 7 },
   { key: '30d', label: '30D', days: 30 },
   { key: '90d', label: '90D', days: 90 },
