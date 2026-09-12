@@ -73,9 +73,16 @@ export function AirCostPanel() {
             </dd>
             {isRam && ramSkipped > 0 && (
               <dd className="text-xs text-destructive">
-                {ramSkipped.toLocaleString()} skipped — outside contract limits
+                {ramSkipped.toLocaleString()} skipped — below the contract minimum
               </dd>
             )}
+            {isRam && ramExcluded.split > 0 && (
+              <dd className="text-xs text-muted-foreground">
+                {ramExcluded.split.toLocaleString()} paid over several purchases (
+                {ramPurchaseCount.toLocaleString()} purchases total)
+              </dd>
+            )}
+
             {isNft && nftSkipped > 0 && (
               <dd className="text-xs text-destructive">
                 {nftSkipped.toLocaleString()} skipped — share rounds to zero
