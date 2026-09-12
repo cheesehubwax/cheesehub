@@ -78,9 +78,14 @@ async function fetchCheesepowerzNulled(): Promise<number | null> {
   return null;
 }
 
+// Hyperion returns timestamps like `2026-09-11T21:44:52.000` with no timezone
+// marker. Date.parse treats those as LOCAL time, which shifts every event by the
+// viewer's UTC offset and corrupts the 24h/7d/30d windows. Force UTC.
 function timestampMs(action: { '@timestamp'?: string; timestamp?: string }): number {
   const value = action['@timestamp'] || action.timestamp;
-  const parsed = value ? Date.parse(value) : NaN;
+  if (!value) return 0;
+  const normalized = /(?:Z|[+-]\d{2}:?\d{2})$/.test(value) ? value : `${value}Z`;
+  const parsed = Date.parse(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
@@ -152,10 +157,14 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
     }
   };
 
+  // Period figures come ONLY from what each contract actually sent to
+  // eosio.null. Deposits into cheesepowerz are not nulls yet, and counting them
+  // here double-counted cheesepowerz in the 24h/7d/30d columns.
   addActions(nullActions, (data) => data.to === 'eosio.null' && typeof data.from === 'string' ? data.from : null);
-  // cheesepowerz retires what it receives, so its incoming transfers are the
-  // consistent source for its period totals and history fallback.
-  addActions(powerActions, (data) => data.to === 'cheesepowerz' ? 'cheesepowerz' : null);
+
+  // Incoming cheesepowerz transfers are kept as a lifetime-only fallback for
+  // when the contract's authoritative counter is unavailable.
+  const powerInflowLifetime = sumAssetField(powerActions, 'quantity', (data) => data.to === 'cheesepowerz');
 
   const burnerAuthoritative = burnerStats?.total_cheese_burned
     ? parseAssetAmount(burnerStats.total_cheese_burned)
@@ -164,8 +173,8 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
     const values = totals.get(account) ?? { all: 0, day: 0, week: 0, month: 0 };
     const amount = account === 'cheeseburner' && burnerAuthoritative !== null
       ? burnerAuthoritative
-      : account === 'cheesepowerz' && powerTotal !== null
-        ? powerTotal
+      : account === 'cheesepowerz'
+        ? (powerTotal !== null ? powerTotal : Math.max(values.all, powerInflowLifetime))
         : values.all;
     return {
       contract: account,
