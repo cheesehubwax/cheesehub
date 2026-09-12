@@ -416,6 +416,9 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
           'eosio.ram',
           'eosio.stake',
           'swap.alcor',
+          'swap.taco',
+          'swap.box',
+          'lptoken.box',
           sendContract,
           snapContract,
         ].filter(
