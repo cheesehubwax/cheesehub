@@ -35,9 +35,17 @@ export function amount(value: number, decimals = 4): string {
   return value.toLocaleString('en-US', { maximumFractionDigits: decimals });
 }
 
+/** Axis-friendly date. Handles both `YYYY-MM-DD` and 12h slot `YYYY-MM-DDTHH` keys. */
 export function shortDate(date: string): string {
-  const d = new Date(`${date}T00:00:00Z`);
+  const d = new Date(`${date.slice(0, 10)}T00:00:00Z`);
   return d.toLocaleDateString([], { day: 'numeric', month: 'short', timeZone: 'UTC' });
+}
+
+/** Tooltip date — adds the slot time when the key is a 12h slot, e.g. "12 Sep · 12:00 UTC". */
+export function tooltipDate(date: string): string {
+  const slot = date.length > 10 ? date.slice(11) : '';
+  const base = shortDate(date);
+  return slot ? `${base} · ${slot}:00 UTC` : base;
 }
 
 /** Percentage change, formatted with a sign, or null when there is no basis. */
