@@ -19,7 +19,14 @@ export interface RamPricing {
   feeBps: number;
   /** Lifetime bytes-per-CHEESE from contract stats, for sanity display. */
   historicalBytesPerCheese: number | null;
+  /** Liquid WAX the ram.chz account currently holds. */
+  liquidWax: number;
+  /** WAX the contract must keep untouched (config min_liquid_reserve). */
+  minLiquidReserve: number;
+  /** Extra safety buffer the contract keeps on top of the reserve. */
+  reserveBufferBps: number;
 }
+
 
 export interface PowerupPricing {
   /** WAX price to power up 100% of chain weight for the powerup window. */
