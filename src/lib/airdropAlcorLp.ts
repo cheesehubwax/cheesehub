@@ -48,6 +48,9 @@ interface RawPosition {
   liquidity?: string | number;
   closed?: boolean;
   inRange?: boolean;
+  /** Current USD value of the position — what Alcor's UI shows. */
+  totalValue?: number;
+  /** USD value originally deposited; only a fallback, it drifts badly. */
   depositedUSDTotal?: number;
 }
 
