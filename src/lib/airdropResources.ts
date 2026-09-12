@@ -111,6 +111,33 @@ export function cheeseForBytes(bytes: number, p: ResourcePricing): number | null
   return ceilCheese((bytes / per) * RAM_MARGIN);
 }
 
+/**
+ * WAX the RAM contract can actually spend on purchases right now: its liquid
+ * balance, less the reserve it must keep, less the configured safety buffer.
+ */
+export function spendableWax(p: ResourcePricing): number {
+  const free = p.ram.liquidWax - p.ram.minLiquidReserve;
+  if (!(free > 0)) return 0;
+  const buffer = Math.min(0.5, Math.max(0, (p.ram.reserveBufferBps ?? 0) / 10_000));
+  return free * (1 - buffer);
+}
+
+/** WAX the contract spends buying RAM for a given CHEESE amount. */
+export function waxCostForCheese(cheese: number, p: ResourcePricing): number | null {
+  if (!(cheese > 0) || !(p.waxPerCheese > 0)) return null;
+  return cheese * p.waxPerCheese;
+}
+
+/** Largest CHEESE spend the contract's spendable WAX can cover. */
+export function maxCheeseForPool(p: ResourcePricing): number | null {
+  if (!(p.waxPerCheese > 0)) return null;
+  const wax = spendableWax(p);
+  if (!(wax > 0)) return 0;
+  const f = 10 ** CHEESE_PRECISION;
+  return Math.floor((wax / p.waxPerCheese) * f) / f;
+}
+
+
 // ---------------------------------------------------------------------------
 // CPU / NET powerup
 // ---------------------------------------------------------------------------
