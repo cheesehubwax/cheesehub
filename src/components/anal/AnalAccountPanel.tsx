@@ -62,6 +62,7 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
     if (!selectedPool) return null;
     return holdings.find((h) => h.key === selectedPool) ?? rows.find((r) => r.poolKey === selectedPool) ?? null;
   }, [holdings, rows, selectedPool]);
+  const selectedPoolLabel = selectedPoolRow?.label ?? null;
 
   const series = useMemo(() => {
     const byDate = new Map<string, { date: string; usd: number; cheese: number }>();
@@ -239,7 +240,8 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
-                  Position value (USD){selectedPoolLabel ? ` — ${selectedPoolLabel}` : ''}
+                  <span>Position value (USD){selectedPoolLabel ? ` — ${selectedPoolLabel}` : ''}</span>
+                  {selectedPoolRow ? <VenueLabel venue={selectedPoolRow.venue} className="ml-1 normal-case" /> : null}
                 </div>
                 <div className="h-36">
                   <ResponsiveContainer width="100%" height="100%">
@@ -262,7 +264,8 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
 
               <div>
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
-                  CHEESE in positions{selectedPoolLabel ? ` — ${selectedPoolLabel}` : ''}
+                  <span>CHEESE in positions{selectedPoolLabel ? ` — ${selectedPoolLabel}` : ''}</span>
+                  {selectedPoolRow ? <VenueLabel venue={selectedPoolRow.venue} className="ml-1 normal-case" /> : null}
                 </div>
                 <div className="h-36">
                   <ResponsiveContainer width="100%" height="100%">
