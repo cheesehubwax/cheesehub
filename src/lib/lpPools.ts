@@ -132,6 +132,11 @@ export interface LpIndexDay {
   t: number;
   cheeseUsd?: number;
   pools: LpIndexPool[];
+  /**
+   * Providers deduplicated across every pool in the day. Older index entries
+   * predate this field — callers should fall back to summing pool accounts.
+   */
+  uniqueAccounts?: number;
 }
 
 export interface LpIndexFile {
@@ -279,10 +284,13 @@ export function buildPoolSnapshot(
 
 /** Reduce a day file to the pool-level entry stored in the index. */
 export function indexEntryForDay(day: LpDayFile): LpIndexDay {
+  const unique = new Set<string>();
+  for (const pool of day.pools) for (const row of pool.providers) unique.add(row.a);
   return {
     date: day.date,
     t: day.t,
     ...(day.cheeseUsd !== undefined ? { cheeseUsd: day.cheeseUsd } : {}),
+    uniqueAccounts: unique.size,
     pools: day.pools.map((pool) => ({
       key: pool.key,
       usd: pool.usd,
