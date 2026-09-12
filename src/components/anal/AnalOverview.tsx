@@ -77,6 +77,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
     cheese: amount(totals.cheese, 0),
     accounts: String(totals.accounts),
     positions: String(totals.positions),
+    price: usdPrice(totals.price),
   };
 
   return (
