@@ -124,7 +124,7 @@ export function AirSnapshotCard() {
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="token">Token</TabsTrigger>
             <TabsTrigger value="nft">NFT collection</TabsTrigger>
-            <TabsTrigger value="lp">Alcor LP</TabsTrigger>
+            <TabsTrigger value="lp">LP</TabsTrigger>
           </TabsList>
         </Tabs>
 
