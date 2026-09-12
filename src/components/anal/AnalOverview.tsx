@@ -83,7 +83,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         {METRICS.map((stat) => {
           const selected = metric === stat.key;
           return (
@@ -92,18 +92,25 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
               type="button"
               onClick={() => setMetric(stat.key)}
               aria-pressed={selected}
-              className={`rounded-lg border p-3 text-left transition-colors ${
+              className="rounded-lg border p-3 text-left transition-colors"
+              style={
                 selected
-                  ? 'bg-primary/15 border-primary/60 shadow-[0_0_0_1px_hsl(var(--primary)/0.4)]'
-                  : 'bg-background/40 border-border/40 hover:border-primary/40'
-              }`}
+                  ? {
+                      backgroundColor: `${stat.color}1F`,
+                      borderColor: `${stat.color}99`,
+                      boxShadow: `0 0 0 1px ${stat.color}66`,
+                    }
+                  : undefined
+              }
             >
               <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                 {stat.key === 'usd' ? <UsdLogo /> : null}
-                {stat.key === 'cheese' || stat.key === 'price' ? <CheeseLogo /> : null}
+                {stat.key === 'cheese' ? <CheeseLogo /> : null}
                 {stat.label}
               </div>
-              <div className="text-lg font-mono font-semibold text-cheese">{statValues[stat.key]}</div>
+              <div className="text-lg font-mono font-semibold" style={{ color: stat.color }}>
+                {statValues[stat.key]}
+              </div>
             </button>
           );
         })}
