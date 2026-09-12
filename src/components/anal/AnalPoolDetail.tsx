@@ -211,9 +211,18 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
               <tr className="text-muted-foreground text-[10px] uppercase tracking-wide">
                 <th className="text-left font-medium py-2">#</th>
                 <th className="text-left font-medium py-2">Account</th>
-                <th className="text-right font-medium py-2">USD</th>
-                <th className="text-right font-medium py-2">CHEESE</th>
-                <th className="text-right font-medium py-2">{pool.symbol}</th>
+                <th className="text-right font-medium py-2">
+                  <span className="inline-flex items-center justify-end gap-1"><UsdcLogo />USD</span>
+                </th>
+                <th className="text-right font-medium py-2">
+                  <span className="inline-flex items-center justify-end gap-1"><CheeseLogo />CHEESE</span>
+                </th>
+                <th className="text-right font-medium py-2">
+                  <span className="inline-flex items-center justify-end gap-1">
+                    <TokenLogo contract={pool.contract ?? ''} symbol={pool.symbol} size="sm" />
+                    {pool.symbol}
+                  </span>
+                </th>
                 <th className="text-right font-medium py-2">Positions</th>
               </tr>
             </thead>
