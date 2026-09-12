@@ -124,6 +124,7 @@ export function useLiveLpSnapshot() {
 export interface LpAccountHistoryRow {
   date: string;
   poolKey: string;
+  venue: LpVenue;
   label: string;
   symbol: string;
   usd: number;
