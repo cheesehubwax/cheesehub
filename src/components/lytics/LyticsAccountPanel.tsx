@@ -236,11 +236,11 @@ export function LyticsAccountPanel({ account, onAccountChange, dates, current }:
                       <Line type="monotone" dataKey="cheese" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                     </LineChart>
                   </ResponsiveContainer>
-                 </div>
-               </div>
-             </div>
+                </div>
+              </div>
             </div>
-          ) : (
+          </div>
+        ) : (
             <p className="text-xs text-muted-foreground text-center py-2">
               {isLoading
                 ? 'Loading recorded history for this account...'
