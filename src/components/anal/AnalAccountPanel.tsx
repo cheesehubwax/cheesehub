@@ -1,5 +1,5 @@
 // CHEESEAnal — drill-down into one account's liquidity across every tracked pool.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,11 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
   const [query, setQuery] = useState('');
   const [selectedPool, setSelectedPool] = useState<string | null>(null);
   const { rows, isLoading } = useLpAccountHistory(account, dates);
+
+  // Always start from the full account overview when the account changes.
+  useEffect(() => {
+    setSelectedPool(null);
+  }, [account]);
 
   /** Today's holdings per pool, from the live/latest snapshot. */
   const holdings = useMemo(() => {
@@ -151,7 +156,20 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
 
           {holdings.length > 0 && (
             <div className="overflow-x-auto">
-              <p className="text-[10px] text-muted-foreground mb-1">Click a pool to filter the charts below to just that pool.</p>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[10px] text-muted-foreground">Click a pool to filter the charts below to just that pool.</p>
+                {selectedPool && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-[10px] text-cheese hover:text-cheese hover:bg-cheese/10"
+                    onClick={() => setSelectedPool(null)}
+                  >
+                    Show all pools
+                  </Button>
+                )}
+              </div>
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-muted-foreground text-[10px] uppercase tracking-wide">
