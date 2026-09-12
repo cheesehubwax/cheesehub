@@ -22,7 +22,11 @@ Both are classic pool exchanges: each provider holds a share token, so a provide
 **CHEESEAir (`/air`)**
 - The "liquidity providers" snapshot mode gains the same venue choice, and All combines Alcor, Taco and Defibox providers into one list ranked by total USD value, so an airdrop can reach every CHEESE liquidity provider.
 
-**History note:** the recorded days you already have stay valid and keep showing, but they only contain Alcor. Taco and Defibox lines start from the first new snapshot, so those series begin partway along the chart.
+**Prices**
+- Each snapshot also records the CHEESE price in every tracked pair, on every venue: price in the paired token, and the same price converted to USD.
+- CHEESEAnal gets a price series per pair, so you can compare CHEESE/WAX on Alcor against Taco and Defibox over time, plus the venue-average CHEESE price.
+
+**History reset:** since Taco, Defibox and the new price fields would otherwise start partway along the charts, we wipe the stored days and re-run from day one. The workflow already supports this — Actions → CHEESEAnal LP History → Run workflow with `reset` set to `1`, which clears the data branch and records a fresh first snapshot on the new format.
 
 ## Technical detail
 
