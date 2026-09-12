@@ -22,7 +22,11 @@ Both are classic pool exchanges: each provider holds a share token, so a provide
 **CHEESEAir (`/air`)**
 - The "liquidity providers" snapshot mode gains the same venue choice, and All combines Alcor, Taco and Defibox providers into one list ranked by total USD value, so an airdrop can reach every CHEESE liquidity provider.
 
-**History note:** the recorded days you already have stay valid and keep showing, but they only contain Alcor. Taco and Defibox lines start from the first new snapshot, so those series begin partway along the chart.
+**Prices**
+- Each snapshot also records the CHEESE price in every tracked pair, on every venue: price in the paired token, and the same price converted to USD.
+- CHEESEAnal gets a price series per pair, so you can compare CHEESE/WAX on Alcor against Taco and Defibox over time, plus the venue-average CHEESE price.
+
+**History reset:** since Taco, Defibox and the new price fields would otherwise start partway along the charts, we wipe the stored days and re-run from day one. The workflow already supports this — Actions → CHEESEAnal LP History → Run workflow with `reset` set to `1`, which clears the data branch and records a fresh first snapshot on the new format.
 
 ## Technical detail
 
@@ -38,6 +42,8 @@ Code changes:
 - `src/lib/lpLive.ts` and `src/hooks/useLpHistory.ts` — live read and history read per venue, plus venue-aware filtering/aggregation helpers.
 - `src/components/anal/*` and `src/pages/CheeseAnal.tsx` — venue toggle, venue-aware overview/pool/account views, venue column in CSV (`src/lib/lpCsv.ts`).
 - `src/lib/airdropAlcorLp.ts` (renamed concept, kept file plus new venue readers) and the CHEESEAir snapshot card — venue selector and merged provider list.
-- Unit tests for the pro-rata share maths, the >$100 rule, legacy-key fallback, and merged provider aggregation.
+- Unit tests for the pro-rata share maths, the >$100 rule, price derivation, and merged provider aggregation.
 
-Nothing about the data branch, workflow schedule, or existing stored files changes; new fields are additive.
+Prices: added to `LpPoolSnapshot`/`LpIndexPool` as `priceInPaired` and `priceUsd`. Alcor pairs use the pool's current tick price; Taco and Defibox use `reserveOther / reserveCheese`; USD comes from the WAXUSDC bridge. Chart selectors in `AnalOverview`/`AnalPoolDetail` gain a price metric.
+
+Since history is wiped and re-recorded with `reset=1`, no backwards-compatible key fallback is needed — pair keys become venue-scoped (`alcor:wax-eosio.token`) outright. Workflow schedule and data-branch layout are unchanged.
