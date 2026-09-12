@@ -5,7 +5,7 @@ import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { Button } from '@/components/ui/button';
 import { downloadPoolHistoryCsv } from '@/lib/lpCsv';
 import { LP_VENUE_LABELS, type LpDayFile, type LpIndexDay, type LpPoolSnapshot } from '@/lib/lpPools';
-import { amount, shortDate, usd, usdPrice } from './format';
+import { amount, shortDate, tokenPrice, usd, usdPrice } from './format';
 
 interface AnalPoolDetailProps {
   pool: LpPoolSnapshot | null;
@@ -30,7 +30,8 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
               cheese: row.cheese,
               paired: row.paired,
               accounts: row.accounts,
-              price: row.priceUsd ?? day.cheeseUsd ?? 0,
+              // This pair's own CHEESE price, in the paired token.
+              price: row.priceInPaired ?? 0,
             }
           : null;
       })
@@ -84,9 +85,9 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
           { label: 'CHEESE', value: amount(pool.cheese, 0) },
           { label: pool.symbol, value: amount(pool.paired, 4) },
           {
-            label: 'CHEESE price',
-            value: pool.priceUsd
-              ? `${usdPrice(pool.priceUsd)}${pool.priceInPaired ? ` · ${amount(pool.priceInPaired, 8)} ${pool.symbol}` : ''}`
+            label: `CHEESE price in ${pool.symbol}`,
+            value: pool.priceInPaired
+              ? `${tokenPrice(pool.priceInPaired, pool.symbol)}${pool.priceUsd ? ` · ${usdPrice(pool.priceUsd)}` : ''}`
               : '—',
           },
           { label: 'Providers', value: `${pool.accounts} (${pool.positions} pos)` },
@@ -168,15 +169,15 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
 
           <div>
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
-              CHEESE price in this pool (USD)
+              CHEESE price in {pool.symbol}
             </div>
             <div className="h-36">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                   <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
-                  <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => usdPrice(v)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
-                  <Tooltip content={tooltip((v) => usdPrice(v), 'text-cheese')} />
+                  <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => tokenPrice(v)} tick={axisTick} width={80} stroke="hsl(var(--border))" />
+                  <Tooltip content={tooltip((v) => tokenPrice(v, pool.symbol), 'text-cheese')} />
                   <Line type="monotone" dataKey="price" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
