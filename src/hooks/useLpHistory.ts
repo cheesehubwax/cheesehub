@@ -98,3 +98,66 @@ export function useLiveLpSnapshot() {
     refetch: query.refetch,
   };
 }
+
+/** One account's liquidity in one pool on one recorded day. */
+export interface LpAccountHistoryRow {
+  date: string;
+  poolKey: string;
+  label: string;
+  symbol: string;
+  usd: number;
+  cheese: number;
+  paired: number;
+  positions: number;
+}
+
+/** Never pull more than this many day files for one account view. */
+const MAX_ACCOUNT_DAYS = 90;
+const DAY_FETCH_CONCURRENCY = 6;
+
+async function fetchAccountHistory(account: string, dates: string[]): Promise<LpAccountHistoryRow[]> {
+  const wanted = dates.slice(-MAX_ACCOUNT_DAYS);
+  const rows: LpAccountHistoryRow[] = [];
+
+  for (let i = 0; i < wanted.length; i += DAY_FETCH_CONCURRENCY) {
+    const chunk = wanted.slice(i, i + DAY_FETCH_CONCURRENCY);
+    const results = await Promise.all(
+      chunk.map((date) =>
+        fetchJson<LpDayFile>(`days/${date}.json`).catch(() => null),
+      ),
+    );
+    for (const day of results) {
+      if (!day || !Array.isArray(day.pools)) continue;
+      for (const pool of day.pools) {
+        const row = pool.providers?.find((p) => p.a === account);
+        if (!row) continue;
+        rows.push({
+          date: day.date,
+          poolKey: pool.key,
+          label: pool.label,
+          symbol: pool.symbol,
+          usd: row.usd,
+          cheese: row.cheese,
+          paired: row.paired,
+          positions: row.pos,
+        });
+      }
+    }
+  }
+
+  return rows.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** Recorded history of one account across every tracked pool. */
+export function useLpAccountHistory(account: string | null, dates: string[]) {
+  const key = dates.slice(-MAX_ACCOUNT_DAYS).join(',');
+  const query = useQuery({
+    queryKey: ['cheeseLytics', 'account', account, key],
+    queryFn: () => fetchAccountHistory(account as string, dates),
+    enabled: Boolean(account) && dates.length > 0,
+    staleTime: 30 * 60_000,
+    retry: 1,
+  });
+  return { rows: query.data ?? [], isLoading: query.isLoading, isError: query.isError };
+}
+
