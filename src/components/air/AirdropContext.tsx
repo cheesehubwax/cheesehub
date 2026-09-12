@@ -1124,11 +1124,17 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
         );
         appendBatch(
           result.success
-            ? { batch: i + 1, recipients: batch.length, txId: result.txId ?? undefined }
+            ? {
+                batch: i + 1,
+                recipients: batch.length,
+                txId: result.txId ?? undefined,
+                items: batch.map((r) => ({ account: r.account, units: r.units })),
+              }
             : {
                 batch: i + 1,
                 recipients: batch.length,
                 error: shortError(result.error ?? new Error('Transaction failed')),
+                items: batch.map((r) => ({ account: r.account, units: r.units })),
               },
         );
         if (i < batches.length - 1) await new Promise((r) => setTimeout(r, 1200));
@@ -1160,11 +1166,17 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
         );
         appendBatch(
           result.success
-            ? { batch: i + 1, recipients: batch.length, txId: result.txId ?? undefined }
+            ? {
+                batch: i + 1,
+                recipients: batch.length,
+                txId: result.txId ?? undefined,
+                items: batch.map((a) => ({ account: a.account, assetIds: a.assetIds })),
+              }
             : {
                 batch: i + 1,
                 recipients: batch.length,
                 error: shortError(result.error ?? new Error('Transaction failed')),
+                items: batch.map((a) => ({ account: a.account, assetIds: a.assetIds })),
               },
         );
         if (i < batches.length - 1) await new Promise((r) => setTimeout(r, 1200));
@@ -1199,11 +1211,17 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
       );
       appendBatch(
         result.success
-          ? { batch: i + 1, recipients: batch.length, txId: result.txId ?? undefined }
+          ? {
+              batch: i + 1,
+              recipients: batch.length,
+              txId: result.txId ?? undefined,
+              items: batch.map((r) => ({ account: r.account, units: r.units })),
+            }
           : {
               batch: i + 1,
               recipients: batch.length,
               error: shortError(result.error ?? new Error('Transaction failed')),
+              items: batch.map((r) => ({ account: r.account, units: r.units })),
             },
       );
       if (i < batches.length - 1) await new Promise((r) => setTimeout(r, 1200));
