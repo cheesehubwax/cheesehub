@@ -182,9 +182,8 @@ export async function getAlcorLpHolders(pair: AlcorPair): Promise<LpHolderSnapsh
       const account = pos.owner ?? '';
       if (!account) continue;
       if (pos.closed === true) continue;
-      if (pos.inRange !== true) continue;
       if (!(Number(pos.liquidity ?? 0) > 0)) continue;
-      const usd = Number(pos.depositedUSDTotal ?? 0);
+      const usd = Number(pos.totalValue ?? pos.depositedUSDTotal ?? 0);
       if (!(usd > 0)) continue;
       positions += 1;
       usdByAccount.set(account, (usdByAccount.get(account) ?? 0) + usd);
