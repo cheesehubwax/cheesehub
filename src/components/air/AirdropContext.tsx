@@ -1261,51 +1261,88 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     queryClient,
   ]);
 
-  const downloadCsv = useCallback(() => {
-    const quotedMemo = `"${memo.replace(/"/g, '""')}"`;
-    const stamp = snapshotAt?.slice(0, 19).replace(/[:T]/g, '-') ?? 'report';
-    let lines: string[];
-    let name: string;
+  const downloadSnapshotCsv = useCallback(() => {
+    if (!snapshot) return;
+    const what =
+      snapshotMode === 'token'
+        ? `token ${snapSymbol.toUpperCase()}@${snapContract}`
+        : snapshotMode === 'nft'
+          ? `NFT collection ${snapCollection}${snapSchema ? ` / schema ${snapSchema}` : ''}${snapTemplate ? ` / template ${snapTemplate}` : ''}`
+          : `Alcor LP ${lpPair ? pairLabel(lpPair) : 'pair'}`;
+    const { name, lines } = buildSnapshotCsv({
+      what,
+      source: snapshot.source,
+      truncated: snapshot.truncated,
+      at: snapshotAt,
+      holders: sortedHolders,
+      selected,
+    });
+    downloadCsvFile(name, lines);
+  }, [
+    snapshot,
+    snapshotMode,
+    snapContract,
+    snapSymbol,
+    snapCollection,
+    snapSchema,
+    snapTemplate,
+    lpPair,
+    snapshotAt,
+    sortedHolders,
+    selected,
+  ]);
+
+  const downloadResultsCsv = useCallback(() => {
+    if (batchLog.length === 0) return;
+    const at = snapshotAt;
     if (isRam) {
-      const perCheeseBytes = pricing ? (bytesPerCheese(pricing) ?? 0) : 0;
-      lines = [`account,cheese,est_kb`];
-      for (const r of recipients) {
-        const cheese = Number(r.units) / 10 ** CHEESE_PRECISION;
-        lines.push(`${r.account},${formatCheese(cheese)},${((cheese * perCheeseBytes) / 1024).toFixed(2)}`);
-      }
-      name = `airdrop-ram-${stamp}.csv`;
-    } else if (isNft) {
-      lines = ['account,nfts,asset_ids,collection,template_id,memo'];
-      for (const a of nftAssignments) {
-        lines.push(
-          `${a.account},${a.assetIds.length},"${a.assetIds.join(' ')}",${nftCollection},${nftTemplateId ?? ''},${quotedMemo}`,
-        );
-      }
-
-      name = `airdrop-nft-${nftCollection || 'assets'}-${stamp}.csv`;
-
-    } else {
-      lines = ['account,amount,token,memo'];
-      for (const r of recipients) {
-        lines.push(
-          `${r.account},${formatUnits(r.units, precision)},${sendSymbol.toUpperCase()},${quotedMemo}`,
-        );
-      }
-      name = `airdrop-${sendSymbol.toLowerCase()}-${stamp}.csv`;
+      const { name, lines } = buildResultsCsv({
+        kind: 'ram',
+        planned: ramPurchases,
+        belowMin: ramBelowMin,
+        minCheese: ramLimits?.minCheese ?? null,
+        bytesPerCheese: pricing ? (bytesPerCheese(pricing) ?? 0) : 0,
+        log: batchLog,
+        at,
+      });
+      downloadCsvFile(name, lines);
+      return;
     }
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = name;
-    a.click();
-    URL.revokeObjectURL(url);
+    if (isNft) {
+      const assigned = new Set(nftAssignments.map((a) => a.account));
+      const { name, lines } = buildResultsCsv({
+        kind: 'nft',
+        collection: nftCollection,
+        templateId: nftTemplateId,
+        memo,
+        planned: nftAssignments,
+        skippedAccounts: chosenHolders.map((h) => h.account).filter((a) => !assigned.has(a)),
+        log: batchLog,
+        at,
+      });
+      downloadCsvFile(name, lines);
+      return;
+    }
+    const { name, lines } = buildResultsCsv({
+      kind: 'token',
+      symbol: sendSymbol,
+      precision,
+      memo,
+      planned: recipients,
+      log: batchLog,
+      at,
+    });
+    downloadCsvFile(name, lines);
   }, [
     isNft,
     isRam,
+    batchLog,
+    ramPurchases,
+    ramBelowMin,
+    ramLimits,
     pricing,
-
     nftAssignments,
+    chosenHolders,
     nftCollection,
     nftTemplateId,
     recipients,
@@ -1422,7 +1459,8 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     requestCancel,
     canRun,
     runAirdrop,
-    downloadCsv,
+    downloadSnapshotCsv,
+    downloadResultsCsv,
   };
 
   return <AirdropContext.Provider value={value}>{children}</AirdropContext.Provider>;
