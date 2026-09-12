@@ -134,6 +134,27 @@ export function AirDistributionCard() {
                   nobody is left out. {ramPurchaseCount.toLocaleString()} purchases in total.
                 </p>
               )}
+              {ramPoolWax && ramPoolWax.overBy > 0 && (
+                <div className="mt-2 rounded-md border border-destructive/40 bg-destructive/5 p-2">
+                  <p className="text-xs text-destructive">
+                    This RAM airdrop exceeds the liquid WAX pool. It needs about{' '}
+                    {ramPoolWax.needed.toFixed(4)} WAX and the pool can currently spend about{' '}
+                    {ramPoolWax.spendable.toFixed(4)} WAX.
+                  </p>
+                  {ramPoolMaxViable && (
+                    <button
+                      type="button"
+                      onClick={applyRamPoolMax}
+                      className="mt-2 rounded border border-cheese/40 bg-cheese/10 px-2 py-1 text-xs font-medium text-cheese transition-colors hover:bg-cheese/20"
+                    >
+                      Use {ramPoolMaxViable.text}{' '}
+                      {ramUnit === 'cheese' ? CHEESE_SYMBOL : 'KB'}
+                      {mode === 'fixed' ? ' per holder' : ' total'} — the most the pool can cover
+                    </button>
+                  )}
+                </div>
+              )}
+
 
             </div>
 
