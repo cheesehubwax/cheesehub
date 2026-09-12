@@ -111,7 +111,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
         {METRICS.map((stat) => {
           const selected = metric === stat.key;
           return (
@@ -147,7 +147,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
       </div>
 
       {series.length >= 1 ? (
-        <div className="h-48">
+        <div className="h-96">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <defs>
