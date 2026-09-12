@@ -160,13 +160,13 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
               <XAxis
                 dataKey="date"
                 tickFormatter={shortDate}
-                tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                tick={{ fontSize: 10, fill: '#FFFFFF' }}
                 stroke="hsl(var(--border))"
               />
               <YAxis
                 domain={['auto', 'auto']}
                 tickFormatter={(v: number) => active.format(v)}
-                tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                tick={{ fontSize: 10, fill: '#FFFFFF' }}
                 stroke="hsl(var(--border))"
                 width={64}
               />

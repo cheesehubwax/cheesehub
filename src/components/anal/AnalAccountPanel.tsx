@@ -19,7 +19,7 @@ interface AnalAccountPanelProps {
   current: LpDayFile | null;
 }
 
-const axisTick = { fontSize: 10, fill: 'hsl(var(--muted-foreground))' } as const;
+const axisTick = { fontSize: 10, fill: '#FFFFFF' } as const;
 
 export function AnalAccountPanel({ account, onAccountChange, dates, current }: AnalAccountPanelProps) {
   const [query, setQuery] = useState('');
