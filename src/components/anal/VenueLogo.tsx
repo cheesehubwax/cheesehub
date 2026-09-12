@@ -1,13 +1,15 @@
-import alcorAsset from '@/assets/venues/alcor.png.asset.json';
-import defiboxAsset from '@/assets/venues/defibox.png.asset.json';
-import tacoSwapAsset from '@/assets/venues/tacoswap.png.asset.json';
+// Real image files (not CDN asset pointers) so the logos also work on the
+// GitHub Pages deployment, which cannot serve Lovable /__l5e/ asset URLs.
+import alcorLogo from '@/assets/venues/alcor.png';
+import defiboxLogo from '@/assets/venues/defibox.png';
+import tacoSwapLogo from '@/assets/venues/tacoswap.png';
 import { cn } from '@/lib/utils';
 import { LP_VENUE_LABELS, type LpVenue } from '@/lib/lpPools';
 
 const VENUE_LOGOS: Record<LpVenue, string> = {
-  alcor: alcorAsset.url,
-  taco: tacoSwapAsset.url,
-  defibox: defiboxAsset.url,
+  alcor: alcorLogo,
+  taco: tacoSwapLogo,
+  defibox: defiboxLogo,
 };
 
 interface VenueLogoProps {
