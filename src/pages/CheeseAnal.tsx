@@ -21,7 +21,7 @@ import {
 import { downloadSnapshotCsv } from '@/lib/lpCsv';
 import { LP_VENUES, LP_VENUE_LABELS, type LpVenue } from '@/lib/lpPools';
 import { playRandomFart } from '@/lib/fartSounds';
-import cheeseOrb from '@/assets/cheeseram.png';
+import cheeseAnalOrb from '@/assets/cheeseanal.png';
 
 const VENUE_TABS: { key: LpVenue | 'all'; label: string }[] = [
   { key: 'all', label: 'All venues' },
@@ -70,7 +70,7 @@ const CheeseAnal = () => {
               className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer"
               onClick={playRandomFart}
             >
-              <img src={cheeseOrb} alt="CHEESEAnal" className="w-24 h-24 object-contain" />
+              <img src={cheeseAnalOrb} alt="CHEESEAnal" className="w-24 h-24 object-contain" />
             </div>
 
             <div className="text-center space-y-4">
