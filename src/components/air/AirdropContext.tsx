@@ -22,7 +22,7 @@ import {
   estimateNftResources,
   estimateRamAirdropResources,
   estimateResources,
-  filterRamRecipients,
+  planRamPurchases,
   formatQuantity,
   formatUnits,
   resourceWarnings,
