@@ -745,7 +745,7 @@ export async function getResourcePricing(): Promise<ResourcePricing> {
   const config = configRes.rows?.[0] ?? {};
   const marketId = config.alcor_market_id ?? 0;
 
-  const [poolRes, ramRes, powerRes, statsRes] = await Promise.all([
+  const [poolRes, ramRes, powerRes, statsRes, poolWaxRes] = await Promise.all([
     marketId
       ? chainPost<{ rows?: AlcorPoolRow[] }>("/v1/chain/get_table_rows", {
           code: "swap.alcor",
