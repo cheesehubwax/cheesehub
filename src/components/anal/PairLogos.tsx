@@ -47,3 +47,8 @@ export function PairLabel({ symbol, contract, size = 'sm', className }: PairLogo
 export function CheeseLogo({ size = 'sm', className }: { size?: 'sm' | 'md' | 'lg'; className?: string }) {
   return <TokenLogo contract={CHEESE_CONTRACT} symbol="CHEESE" size={size} className={className} />;
 }
+
+/** USD figures are always represented by the WAXUSDC logo. */
+export function UsdcLogo({ size = 'sm', className }: { size?: 'sm' | 'md' | 'lg'; className?: string }) {
+  return <TokenLogo contract="alien.worlds" symbol="WAXUSDC" size={size} className={className} />;
+}
