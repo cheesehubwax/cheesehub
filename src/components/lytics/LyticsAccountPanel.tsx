@@ -183,9 +183,26 @@ export function LyticsAccountPanel({ account, onAccountChange, dates, current }:
           )}
 
           {series.length >= 1 ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground">
+                  Showing: {selectedPoolLabel ?? 'All pools'}
+                </span>
+                {selectedPool && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPool(null)}
+                    className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-cheese/15 text-cheese border border-cheese/30 hover:bg-cheese/25 transition-colors"
+                  >
+                    All pools ×
+                  </button>
+                )}
+              </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Position value (USD)</div>
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                  Position value (USD){selectedPoolLabel ? ` — ${selectedPoolLabel}` : ''}
+                </div>
                 <div className="h-36">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
