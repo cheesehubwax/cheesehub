@@ -82,46 +82,24 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        {[
-          {
-            label: `CHEESE price in ${pool.symbol}`,
-            value: pool.priceInPaired
-              ? tokenPrice(pool.priceInPaired, pool.symbol)
-              : '—',
-            logo: <TokenLogo contract={pool.contract ?? ''} symbol={pool.symbol} size="sm" />,
-          },
-          { label: 'USD value', value: usd(pool.usd), logo: <UsdLogo /> },
-          { label: 'CHEESE', value: amount(pool.cheese, 0), logo: <CheeseLogo /> },
-          {
-            label: pool.symbol,
-            value: amount(pool.paired, 4),
-            logo: <TokenLogo contract={pool.contract ?? ''} symbol={pool.symbol} size="sm" />,
-          },
-          { label: 'Providers', value: `${pool.accounts} (${pool.positions} pos)`, logo: null },
-        ].map((stat) => (
-          <div key={stat.label} className="rounded-lg bg-background/40 border border-border/40 p-3">
-            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-              {stat.logo}
-              {stat.label}
-            </div>
-            <div className="text-sm font-mono font-semibold text-foreground">{stat.value}</div>
-          </div>
-        ))}
-      </div>
-
       {hasSeries ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          <div>
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
-              CHEESE price in {pool.symbol}
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="rounded-xl bg-background/40 border border-border/40 p-4 space-y-3">
+            <div className="rounded-lg bg-background/60 border border-border/40 p-3 text-center">
+              <div className="flex items-center justify-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                <TokenLogo contract={pool.contract ?? ''} symbol={pool.symbol} size="sm" />
+                CHEESE price in {pool.symbol}
+              </div>
+              <div className="text-sm font-mono font-semibold text-foreground">
+                {pool.priceInPaired ? tokenPrice(pool.priceInPaired, pool.symbol) : '—'}
+              </div>
             </div>
             <div className="h-36">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                   <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
-                  <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => tokenPrice(v)} tick={axisTick} width={80} stroke="hsl(var(--border))" />
+                  <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => tokenPrice(v)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
                   <Tooltip content={tooltip((v) => tokenPrice(v, pool.symbol), 'text-cheese')} />
                   <Line type="monotone" dataKey="price" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                 </LineChart>
@@ -129,8 +107,14 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
             </div>
           </div>
 
-          <div>
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Pool value (USD)</div>
+          <div className="rounded-xl bg-background/40 border border-border/40 p-4 space-y-3">
+            <div className="rounded-lg bg-background/60 border border-border/40 p-3 text-center">
+              <div className="flex items-center justify-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                <UsdLogo />
+                Pool value (USD)
+              </div>
+              <div className="text-sm font-mono font-semibold text-foreground">{usd(pool.usd)}</div>
+            </div>
             <div className="h-36">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
@@ -142,7 +126,7 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                   <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
-                  <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => usd(v)} tick={axisTick} width={60} stroke="hsl(var(--border))" />
+                  <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => usd(v)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
                   <Tooltip content={tooltip((v) => usd(v), 'text-cheese')} />
                   <Area type="monotone" dataKey="usd" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#analPoolUsd)" dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                 </AreaChart>
@@ -150,14 +134,20 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
             </div>
           </div>
 
-          <div>
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">CHEESE in pool</div>
+          <div className="rounded-xl bg-background/40 border border-border/40 p-4 space-y-3">
+            <div className="rounded-lg bg-background/60 border border-border/40 p-3 text-center">
+              <div className="flex items-center justify-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                <CheeseLogo />
+                CHEESE in pool
+              </div>
+              <div className="text-sm font-mono font-semibold text-foreground">{amount(pool.cheese, 0)}</div>
+            </div>
             <div className="h-36">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                   <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
-                  <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => amount(v, 0)} tick={axisTick} width={60} stroke="hsl(var(--border))" />
+                  <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => amount(v, 0)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
                   <Tooltip content={tooltip((v) => `${amount(v, 4)} CHEESE`, 'text-cheese')} />
                   <Line type="monotone" dataKey="cheese" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                 </LineChart>
@@ -165,14 +155,20 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
             </div>
           </div>
 
-          <div>
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">{pool.symbol} in pool</div>
+          <div className="rounded-xl bg-background/40 border border-border/40 p-4 space-y-3">
+            <div className="rounded-lg bg-background/60 border border-border/40 p-3 text-center">
+              <div className="flex items-center justify-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                <TokenLogo contract={pool.contract ?? ''} symbol={pool.symbol} size="sm" />
+                {pool.symbol} in pool
+              </div>
+              <div className="text-sm font-mono font-semibold text-foreground">{amount(pool.paired, 4)}</div>
+            </div>
             <div className="h-36">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                   <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
-                  <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => amount(v, 2)} tick={axisTick} width={60} stroke="hsl(var(--border))" />
+                  <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => amount(v, 2)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
                   <Tooltip content={tooltip((v) => `${amount(v, 6)} ${pool.symbol}`, 'text-foreground')} />
                   <Line type="monotone" dataKey="paired" stroke="#FFFFFF" strokeWidth={2} dot={{ r: 3, fill: '#FFFFFF', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                 </LineChart>
@@ -180,14 +176,19 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
             </div>
           </div>
 
-          <div>
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Provider accounts</div>
+          <div className="rounded-xl bg-background/40 border border-border/40 p-4 space-y-3">
+            <div className="rounded-lg bg-background/60 border border-border/40 p-3 text-center">
+              <div className="flex items-center justify-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                Provider accounts
+              </div>
+              <div className="text-sm font-mono font-semibold text-foreground">{`${pool.accounts} (${pool.positions} pos)`}</div>
+            </div>
             <div className="h-36">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                   <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
-                  <YAxis domain={['auto', 'auto']} allowDecimals={false} tick={axisTick} width={40} stroke="hsl(var(--border))" />
+                  <YAxis domain={['auto', 'auto']} allowDecimals={false} tick={axisTick} width={70} stroke="hsl(var(--border))" />
                   <Tooltip content={tooltip((v) => `${v} accounts`, 'text-foreground')} />
                   <Line type="monotone" dataKey="accounts" stroke="#22c55e" strokeWidth={2} dot={{ r: 3, fill: '#22c55e', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                 </LineChart>
