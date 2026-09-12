@@ -775,6 +775,8 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     cheeseBalance,
     ramCheeseTotal,
     ramExcluded,
+    ramPurchaseCount,
+
     ramLimits,
     isNft,
     mode,
