@@ -1,10 +1,10 @@
 /**
  * CHEESEAnal LP snapshot sampler.
  *
- * Once a day, reads every fee tier of the tracked CHEESE pairs on Alcor and
- * records, per pool: total USD value, CHEESE held, paired token held, provider
- * count and position count — plus one row per provider account with the same
- * figures. Run by .github/workflows/lp-history.yml.
+ * Once a day, reads every CHEESE pool on Alcor, Taco and Defibox and records,
+ * per pool: total USD value, CHEESE held, paired token held, provider count,
+ * position count and the CHEESE price in that pair — plus one row per provider
+ * account with the same figures. Run by .github/workflows/lp-history.yml.
  *
  * Env:
  *   LP_HISTORY_DIR  directory of the data branch checkout (required).
@@ -13,19 +13,29 @@
  */
 
 import {
-  TRACKED_LP_PAIRS,
+  alcorCheesePairs,
   buildPoolSnapshot,
   indexEntryForDay,
   mergeIndexDay,
   poolsForPair,
   round,
+  selectVenuePairs,
   utcDay,
+  venuePair,
   type LpDayFile,
   type LpIndexFile,
   type LpPoolSnapshot,
+  type LpVenue,
   type RawPool,
   type RawPosition,
 } from "../../src/lib/lpPools";
+import {
+  cheeseUsdFrom,
+  fetchUsdPrices,
+  priceKey,
+  snapshotAmmVenue,
+  type UsdPrices,
+} from "../../src/lib/lpVenues";
 
 const ALCOR_API = "https://wax.alcor.exchange/api/v2";
 const TIMEOUT_MS = 25_000;
@@ -54,25 +64,37 @@ async function fetchJson<T>(path: string): Promise<T> {
   throw lastError instanceof Error ? lastError : new Error(`Alcor ${path} unavailable`);
 }
 
-/** USD price of 1 CHEESE, derived via the WAXUSDC bridge like the frontend does. */
-async function fetchCheeseUsd(): Promise<number | undefined> {
-  try {
-    const tokens = await fetchJson<
-      { id?: string; symbol?: string; contract?: string; system_price?: number | string }[]
-    >("/tokens");
-    const find = (symbol: string, contract: string) =>
-      tokens.find(
-        (t) =>
-          t.id === `${symbol.toLowerCase()}-${contract}` ||
-          (t.symbol === symbol && t.contract === contract),
-      );
-    const waxPerCheese = Number(find("CHEESE", "cheeseburger")?.system_price ?? 0);
-    const waxPerUsdc = Number(find("WAXUSDC", "eth.token")?.system_price ?? 0);
-    if (waxPerCheese > 0 && waxPerUsdc > 0) return round(waxPerCheese / waxPerUsdc, 8);
-  } catch (error) {
-    console.warn("CHEESE USD price unavailable:", (error as Error).message);
+/** Alcor pools, read sequentially so the API is never hammered. */
+async function sampleAlcor(prices: UsdPrices): Promise<LpPoolSnapshot[]> {
+  const allPools = await fetchJson<RawPool[]>("/swap/pools");
+  const selected = selectVenuePairs(alcorCheesePairs(allPools));
+  const cheeseUsd = cheeseUsdFrom(prices);
+  const snapshots: LpPoolSnapshot[] = [];
+
+  for (const { pair } of selected) {
+    const pools = poolsForPair(allPools, pair);
+    if (pools.length === 0) continue;
+    const withPositions: { pool: RawPool; positions: RawPosition[] }[] = [];
+    for (const pool of pools) {
+      // Sequential on purpose: Alcor rate-limits bursts, and a partial day is
+      // worse than a slow one.
+      const positions = await fetchJson<RawPosition[]>(`/swap/pools/${pool.id}/positions`);
+      withPositions.push({ pool, positions: Array.isArray(positions) ? positions : [] });
+      await sleep(400);
+    }
+    const snapshot = buildPoolSnapshot(venuePair("alcor", pair), withPositions, {
+      cheeseUsd,
+      pairedUsd: prices.get(priceKey(pair.symbol, pair.contract)),
+    });
+    if (snapshot.accounts === 0) continue;
+    console.log(
+      `alcor ${snapshot.label}: $${snapshot.usd.toFixed(2)} • ${snapshot.cheese.toFixed(4)} CHEESE • ` +
+        `${snapshot.paired} ${snapshot.symbol} • ${snapshot.accounts} accounts • ` +
+        `${snapshot.positions} positions across ${snapshot.poolIds.length} tier(s)`,
+    );
+    snapshots.push(snapshot);
   }
-  return undefined;
+  return snapshots;
 }
 
 async function readJson<T>(file: string, fallback: T): Promise<T> {
@@ -102,38 +124,41 @@ async function main() {
   }
   if (alreadyHaveDay && force) console.log("Day already recorded, but FORCE=1 — re-recording.");
 
-  const allPools = await fetchJson<RawPool[]>("/swap/pools");
+  const prices = await fetchUsdPrices();
+  const cheeseUsd = cheeseUsdFrom(prices);
+  console.log(`CHEESE price: ${cheeseUsd !== undefined ? `$${cheeseUsd}` : "unavailable"}.`);
 
   const snapshots: LpPoolSnapshot[] = [];
-  for (const target of TRACKED_LP_PAIRS) {
-    const pools = poolsForPair(allPools, target);
-    if (pools.length === 0) {
-      throw new Error(`No active Alcor pool found for ${target.label}`);
+  const partial: LpVenue[] = [];
+
+  for (const venue of ["alcor", "taco", "defibox"] as const) {
+    try {
+      const pools =
+        venue === "alcor"
+          ? await sampleAlcor(prices)
+          : await snapshotAmmVenue(venue, prices, {
+              pause: () => sleep(300),
+              log: (message) => console.log(message),
+            });
+      if (pools.length === 0) throw new Error(`No CHEESE pools read on ${venue}`);
+      snapshots.push(...pools);
+    } catch (error) {
+      // One venue failing must not cost the whole day.
+      console.warn(`${venue} failed:`, (error as Error).message);
+      partial.push(venue);
     }
-    const withPositions: { pool: RawPool; positions: RawPosition[] }[] = [];
-    for (const pool of pools) {
-      // Sequential on purpose: Alcor rate-limits bursts, and a partial day is
-      // worse than a slow one.
-      const positions = await fetchJson<RawPosition[]>(`/swap/pools/${pool.id}/positions`);
-      withPositions.push({ pool, positions: Array.isArray(positions) ? positions : [] });
-      await sleep(400);
-    }
-    const snapshot = buildPoolSnapshot(target, withPositions);
-    console.log(
-      `${target.label}: $${snapshot.usd.toFixed(2)} • ${snapshot.cheese.toFixed(4)} CHEESE • ` +
-        `${snapshot.paired} ${target.symbol} • ${snapshot.accounts} accounts • ` +
-        `${snapshot.positions} positions across ${snapshot.poolIds.length} tier(s)`,
-    );
-    snapshots.push(snapshot);
   }
 
-  const cheeseUsd = await fetchCheeseUsd();
+  if (snapshots.length === 0) throw new Error("No venue could be read — refusing to record a day");
+
+  snapshots.sort((a, b) => b.usd - a.usd || a.key.localeCompare(b.key));
 
   const day: LpDayFile = {
     date,
     t: now,
-    ...(cheeseUsd !== undefined ? { cheeseUsd } : {}),
+    ...(cheeseUsd !== undefined ? { cheeseUsd: round(cheeseUsd, 8) } : {}),
     pools: snapshots,
+    ...(partial.length ? { partial } : {}),
   };
 
   await Bun.write(dayFile, `${JSON.stringify(day)}\n`);
@@ -144,7 +169,10 @@ async function main() {
   };
   await Bun.write(indexFile, `${JSON.stringify(nextIndex)}\n`);
 
-  console.log(`Recorded ${date} (${nextIndex.days.length} days in index).`);
+  console.log(
+    `Recorded ${date}: ${snapshots.length} pools (${nextIndex.days.length} days in index)` +
+      `${partial.length ? ` — missing ${partial.join(", ")}` : ""}.`,
+  );
 }
 
 main().catch((error) => {
