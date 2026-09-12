@@ -53,6 +53,28 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
   }
 
   const hasSeries = series.length >= 1;
+  const volumeSeries = series.filter((row) => row.volumeUsd !== null || row.volumeCheese !== null);
+  const latestVolume = volumeSeries[volumeSeries.length - 1] ?? null;
+
+  const volumeTooltip = ({
+    active,
+    payload,
+  }: {
+    active?: boolean;
+    payload?: { payload?: { date: string; volumeUsd: number | null; volumeCheese: number | null } }[];
+  }) => {
+    const row = active && payload?.length ? payload[0].payload : null;
+    if (!row) return null;
+    return (
+      <div className="bg-background/95 border border-border px-2 py-1 rounded text-xs font-mono">
+        <div className="text-cheese">{row.volumeUsd !== null ? usd(row.volumeUsd) : 'no USD volume'}</div>
+        <div className="text-foreground">
+          {row.volumeCheese !== null ? `${amount(row.volumeCheese, 2)} CHEESE` : 'no CHEESE volume'}
+        </div>
+        <div className="text-muted-foreground">{tooltipDate(String(row.date ?? ''))}</div>
+      </div>
+    );
+  };
 
   const tooltip = (formatter: (value: number) => string, className: string) =>
     ({ active, payload }: { active?: boolean; payload?: { value?: unknown; payload?: { date: string } }[] }) =>
