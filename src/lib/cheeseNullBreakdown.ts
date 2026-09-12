@@ -78,9 +78,14 @@ async function fetchCheesepowerzNulled(): Promise<number | null> {
   return null;
 }
 
+// Hyperion returns timestamps like `2026-09-11T21:44:52.000` with no timezone
+// marker. Date.parse treats those as LOCAL time, which shifts every event by the
+// viewer's UTC offset and corrupts the 24h/7d/30d windows. Force UTC.
 function timestampMs(action: { '@timestamp'?: string; timestamp?: string }): number {
   const value = action['@timestamp'] || action.timestamp;
-  const parsed = value ? Date.parse(value) : NaN;
+  if (!value) return 0;
+  const normalized = /(?:Z|[+-]\d{2}:?\d{2})$/.test(value) ? value : `${value}Z`;
+  const parsed = Date.parse(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
