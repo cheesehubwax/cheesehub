@@ -39,9 +39,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
       positions += pool.positions;
       for (const row of pool.providers) accounts.add(row.a);
     }
-    const priced = [...pools].sort((a, b) => b.usd - a.usd).find((p) => (p.priceUsd ?? 0) > 0);
-    const price = current?.cheeseUsd && current.cheeseUsd > 0 ? current.cheeseUsd : (priced?.priceUsd ?? 0);
-    return { value, cheese, positions, accounts: accounts.size, pools: pools.length, price };
+    return { value, cheese, positions, accounts: accounts.size, pools: pools.length };
   }, [current]);
 
   const series = useMemo(
@@ -53,7 +51,6 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
         accounts:
           day.uniqueAccounts ?? day.pools.reduce((sum, p) => sum + p.accounts, 0),
         positions: day.pools.reduce((sum, p) => sum + p.positions, 0),
-        price: dayPrice(day),
       })),
     [days],
   );
@@ -70,7 +67,6 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
     cheese: amount(totals.cheese, 0),
     accounts: String(totals.accounts),
     positions: String(totals.positions),
-    price: usdPrice(totals.price),
   };
 
   return (
