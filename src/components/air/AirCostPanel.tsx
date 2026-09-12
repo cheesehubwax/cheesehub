@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { formatUnits, RAM_BYTES_PER_NFT } from '@/lib/airdrop';
 import { formatCheese } from '@/lib/airdropResources';
-import { CHEESE_SYMBOL, MIN_RAM_PURCHASE_CHEESE } from '@/lib/airdropCheese';
+import { CHEESE_RAM_CONTRACT, CHEESE_SYMBOL, MIN_RAM_PURCHASE_CHEESE } from '@/lib/airdropCheese';
 import { RAM_BYTES_PER_ROW, useAirdrop } from '@/components/air/AirdropContext';
 
 function Metric({ label, value, sub }: { label: string; value: string; sub?: string }) {
