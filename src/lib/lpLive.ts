@@ -66,7 +66,8 @@ async function readAlcor(prices: UsdPrices): Promise<{ pools: LpPoolSnapshot[]; 
         cheeseUsd,
         pairedUsd: prices.get(priceKey(pair.symbol, pair.contract)),
       });
-      if (snapshot.accounts > 0) pools.push(snapshot);
+      // Alcor publishes rolling 24h volume; Taco/Defibox do not.
+      if (snapshot.accounts > 0) pools.push({ ...snapshot, ...alcorPairVolume(tiers) });
     }),
   );
 
