@@ -200,6 +200,15 @@ export function AirCostPanel() {
                   full amount. {ramPurchaseCount.toLocaleString()} purchases in total.
                 </p>
               )}
+              {ramPoolWax && ramPoolWax.overBy > 0 && (
+                <p className="mt-1 text-xs text-destructive">
+                  Exceeds the liquid WAX pool: this drop needs about{' '}
+                  {ramPoolWax.needed.toFixed(4)} WAX from {CHEESE_RAM_CONTRACT} and the pool can
+                  currently spend about {ramPoolWax.spendable.toFixed(4)} WAX. Lower the amount in
+                  the Distribution box or wait for the pool to refill.
+                </p>
+              )}
+
 
             </>
           ) : (
