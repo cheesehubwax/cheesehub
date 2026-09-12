@@ -657,10 +657,13 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     };
   }, [recipientAccounts, rowKey, rowCacheVersion]);
 
+  /** RAM mode: every contract purchase is one action, so slices count too. */
+  const ramPurchaseCount = ramPurchases.length;
+
   const estimate = useMemo(
     () =>
       isRam
-        ? estimateRamAirdropResources(recipients.length, Math.max(1, batchSize))
+        ? estimateRamAirdropResources(ramPurchaseCount, Math.max(1, batchSize))
         : isNft
           ? estimateNftResources(
               nftAssignments.length,
@@ -673,8 +676,18 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
               ramPrice?.waxPerNewRow ?? 0.028,
               rowStats.checked > 0 ? rowStats.newRows : null,
             ),
-    [isRam, isNft, nftAssignments.length, recipients.length, batchSize, ramPrice, rowStats],
+    [
+      isRam,
+      isNft,
+      nftAssignments.length,
+      recipients.length,
+      ramPurchaseCount,
+      batchSize,
+      ramPrice,
+      rowStats,
+    ],
   );
+
 
   const warnings = useMemo(() => {
     if (isRam) {
