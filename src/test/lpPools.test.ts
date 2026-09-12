@@ -10,6 +10,7 @@ import {
   mergeIndexDay,
   poolsForPair,
   utcDay,
+  utcSlot,
   type RawPool,
   type RawPosition,
 } from '@/lib/lpPools';
