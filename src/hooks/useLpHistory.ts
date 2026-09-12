@@ -46,8 +46,8 @@ export function sliceDays(days: LpIndexDay[], range: LpRange): LpIndexDay[] {
 }
 
 /**
- * Keep only the pools of one venue in every recorded day. `uniqueAccounts` is
- * dropped for a single venue because it was deduplicated across all of them.
+ * Keep only the pools of one venue in every recorded day, swapping in that
+ * venue's own deduplicated provider count so the chart matches the stat box.
  */
 export function filterDaysByVenue(days: LpIndexDay[], venue: LpVenue | 'all'): LpIndexDay[] {
   if (venue === 'all') return days;

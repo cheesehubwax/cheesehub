@@ -1,7 +1,7 @@
 // CHEESEAnal — one row per tracked CHEESE pool with day-over-day change.
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
-import type { LpDayFile, LpIndexDay } from '@/lib/lpPools';
-import { amount, change, usd } from './format';
+import { LP_VENUE_LABELS, type LpDayFile, type LpIndexDay } from '@/lib/lpPools';
+import { amount, change, usd, usdPrice } from './format';
 
 interface AnalPoolTableProps {
   current: LpDayFile | null;
