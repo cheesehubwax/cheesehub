@@ -371,7 +371,7 @@ export async function fetchDefiboxCandidates(prices: UsdPrices): Promise<AmmPool
   return out;
 }
 
-/** Group candidates by pair and keep tracked pairs plus anything over $100. */
+/** Group candidates by pair and keep the largest pairs over $100. */
 export function selectAmmPairs(candidates: AmmPoolCandidate[]): {
   pair: TrackedPair;
   tvlUsd: number;
