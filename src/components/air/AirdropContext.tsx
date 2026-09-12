@@ -29,6 +29,8 @@ import {
   totalUnits,
   RAM_BYTES_PER_NFT,
   type AirdropRecipient,
+  type RamPurchase,
+
   type DistributionMode,
   type NftAssignment,
   type ResourceWarning,
