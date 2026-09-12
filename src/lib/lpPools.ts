@@ -1,8 +1,8 @@
-// CHEESELytics — shared definition of the tracked CHEESE liquidity pools and the
+// CHEESEAnal — shared definition of the tracked CHEESE liquidity pools and the
 // pure aggregation used to turn Alcor position rows into a daily snapshot.
 //
 // This module is imported both by the app (src/hooks/useLpHistory.ts, the
-// CHEESELytics page) and by the standalone sampler (scripts/lp-history/sample.ts)
+// CHEESEAnal page) and by the standalone sampler (scripts/lp-history/sample.ts)
 // that runs under Bun in GitHub Actions, so it must stay dependency-free.
 
 export const CHEESE_SYMBOL = 'CHEESE';
@@ -29,7 +29,7 @@ function pair(symbol: string, contract: string): TrackedPair {
   };
 }
 
-/** The pools CHEESELytics snapshots once a day. */
+/** The pools CHEESEAnal snapshots once a day. */
 export const TRACKED_LP_PAIRS: TrackedPair[] = [
   pair('WAX', 'eosio.token'),
   pair('WAXUSDC', 'eth.token'),

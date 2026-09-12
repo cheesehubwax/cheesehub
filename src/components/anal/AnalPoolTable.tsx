@@ -1,9 +1,9 @@
-// CHEESELytics — one row per tracked CHEESE pool with day-over-day change.
+// CHEESEAnal — one row per tracked CHEESE pool with day-over-day change.
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import type { LpDayFile, LpIndexDay } from '@/lib/lpPools';
 import { amount, change, usd } from './format';
 
-interface LyticsPoolTableProps {
+interface AnalPoolTableProps {
   current: LpDayFile | null;
   /** Recorded days, oldest first — used only for the change column. */
   days: LpIndexDay[];
@@ -13,14 +13,14 @@ interface LyticsPoolTableProps {
   isLoading: boolean;
 }
 
-export function LyticsPoolTable({
+export function AnalPoolTable({
   current,
   days,
   selectedKey,
   onSelect,
   failed,
   isLoading,
-}: LyticsPoolTableProps) {
+}: AnalPoolTableProps) {
   const previous = days.length >= 2 ? days[days.length - 2] : null;
   const pools = [...(current?.pools ?? [])].sort((a, b) => b.usd - a.usd);
 

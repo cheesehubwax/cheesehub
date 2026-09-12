@@ -1,4 +1,4 @@
-// CHEESELytics — history charts and provider list for one selected pool.
+// CHEESEAnal — history charts and provider list for one selected pool.
 import { useMemo } from 'react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
@@ -7,7 +7,7 @@ import { downloadPoolHistoryCsv } from '@/lib/lpCsv';
 import type { LpDayFile, LpIndexDay, LpPoolSnapshot } from '@/lib/lpPools';
 import { amount, shortDate, usd } from './format';
 
-interface LyticsPoolDetailProps {
+interface AnalPoolDetailProps {
   pool: LpPoolSnapshot | null;
   /** Recorded days trimmed to the selected range. */
   days: LpIndexDay[];
@@ -17,7 +17,7 @@ interface LyticsPoolDetailProps {
 
 const axisTick = { fontSize: 10, fill: 'hsl(var(--muted-foreground))' } as const;
 
-export function LyticsPoolDetail({ pool, days, current, onSelectAccount }: LyticsPoolDetailProps) {
+export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoolDetailProps) {
   const series = useMemo(() => {
     if (!pool) return [];
     return days
@@ -96,7 +96,7 @@ export function LyticsPoolDetail({ pool, days, current, onSelectAccount }: Lytic
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="lyticsPoolUsd" x1="0" y1="0" x2="0" y2="1">
+                    <linearGradient id="analPoolUsd" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.35} />
                       <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                     </linearGradient>
@@ -105,7 +105,7 @@ export function LyticsPoolDetail({ pool, days, current, onSelectAccount }: Lytic
                   <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
                   <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => usd(v)} tick={axisTick} width={60} stroke="hsl(var(--border))" />
                   <Tooltip content={tooltip((v) => usd(v), 'text-cheese')} />
-                  <Area type="monotone" dataKey="usd" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#lyticsPoolUsd)" dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }} activeDot={{ r: 4 }} />
+                  <Area type="monotone" dataKey="usd" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#analPoolUsd)" dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>

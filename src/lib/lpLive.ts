@@ -1,4 +1,4 @@
-// CHEESELytics — live read of the tracked CHEESE pools straight from Alcor.
+// CHEESEAnal — live read of the tracked CHEESE pools straight from Alcor.
 //
 // The daily snapshots (see scripts/lp-history) power the charts; this read powers
 // the "today" figures so the page is useful before/between recorded days.

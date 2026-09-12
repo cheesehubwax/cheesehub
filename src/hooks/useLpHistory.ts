@@ -1,4 +1,4 @@
-// CHEESELytics — readers for the recorded LP history and the live pool state.
+// CHEESEAnal — readers for the recorded LP history and the live pool state.
 import { useQuery } from '@tanstack/react-query';
 import { fetchLiveLpSnapshot } from '@/lib/lpLive';
 import type { LpDayFile, LpIndexFile, LpIndexDay } from '@/lib/lpPools';
@@ -48,7 +48,7 @@ export function sliceDays(days: LpIndexDay[], range: LpRange): LpIndexDay[] {
 /** Pool-level totals per recorded day (small file, always loaded). */
 export function useLpHistoryIndex() {
   const query = useQuery({
-    queryKey: ['cheeseLytics', 'index'],
+    queryKey: ['cheeseAnal', 'index'],
     queryFn: async () => (await fetchJson<LpIndexFile>('lp-history-index.json')) ?? null,
     staleTime: 10 * 60_000,
     refetchInterval: 30 * 60_000,
@@ -72,7 +72,7 @@ export function useLpHistoryIndex() {
 /** Full per-account rows for one recorded day. */
 export function useLpDay(date: string | null) {
   const query = useQuery({
-    queryKey: ['cheeseLytics', 'day', date],
+    queryKey: ['cheeseAnal', 'day', date],
     queryFn: async () => (await fetchJson<LpDayFile>(`days/${date}.json`)) ?? null,
     enabled: Boolean(date),
     staleTime: 60 * 60_000,
@@ -84,7 +84,7 @@ export function useLpDay(date: string | null) {
 /** Live pool state read straight from Alcor, for the "today" figures. */
 export function useLiveLpSnapshot() {
   const query = useQuery({
-    queryKey: ['cheeseLytics', 'live'],
+    queryKey: ['cheeseAnal', 'live'],
     queryFn: fetchLiveLpSnapshot,
     staleTime: 2 * 60_000,
     refetchInterval: 5 * 60_000,
@@ -152,7 +152,7 @@ async function fetchAccountHistory(account: string, dates: string[]): Promise<Lp
 export function useLpAccountHistory(account: string | null, dates: string[]) {
   const key = dates.slice(-MAX_ACCOUNT_DAYS).join(',');
   const query = useQuery({
-    queryKey: ['cheeseLytics', 'account', account, key],
+    queryKey: ['cheeseAnal', 'account', account, key],
     queryFn: () => fetchAccountHistory(account as string, dates),
     enabled: Boolean(account) && dates.length > 0,
     staleTime: 30 * 60_000,

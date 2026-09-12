@@ -1,4 +1,4 @@
-// CHEESELytics — drill-down into one account's liquidity across every tracked pool.
+// CHEESEAnal — drill-down into one account's liquidity across every tracked pool.
 import { useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
@@ -9,7 +9,7 @@ import { downloadAccountHistoryCsv } from '@/lib/lpCsv';
 import type { LpDayFile } from '@/lib/lpPools';
 import { amount, shortDate, usd } from './format';
 
-interface LyticsAccountPanelProps {
+interface AnalAccountPanelProps {
   account: string | null;
   onAccountChange: (account: string | null) => void;
   /** UTC dates of the recorded days in the selected range, oldest first. */
@@ -19,7 +19,7 @@ interface LyticsAccountPanelProps {
 
 const axisTick = { fontSize: 10, fill: 'hsl(var(--muted-foreground))' } as const;
 
-export function LyticsAccountPanel({ account, onAccountChange, dates, current }: LyticsAccountPanelProps) {
+export function AnalAccountPanel({ account, onAccountChange, dates, current }: AnalAccountPanelProps) {
   const [query, setQuery] = useState('');
   const [selectedPool, setSelectedPool] = useState<string | null>(null);
   const { rows, isLoading } = useLpAccountHistory(account, dates);
@@ -207,7 +207,7 @@ export function LyticsAccountPanel({ account, onAccountChange, dates, current }:
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                       <defs>
-                        <linearGradient id="lyticsAccountUsd" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id="analAccountUsd" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.35} />
                           <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                         </linearGradient>
@@ -216,7 +216,7 @@ export function LyticsAccountPanel({ account, onAccountChange, dates, current }:
                       <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
                       <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => usd(v)} tick={axisTick} width={60} stroke="hsl(var(--border))" />
                       <Tooltip content={tooltip((v) => usd(v), 'text-cheese')} />
-                      <Area type="monotone" dataKey="usd" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#lyticsAccountUsd)" dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }} activeDot={{ r: 4 }} />
+                      <Area type="monotone" dataKey="usd" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#analAccountUsd)" dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>

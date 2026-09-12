@@ -1,5 +1,5 @@
 /**
- * CHEESELytics LP snapshot sampler.
+ * CHEESEAnal LP snapshot sampler.
  *
  * Once a day, reads every fee tier of the tracked CHEESE pairs on Alcor and
  * records, per pool: total USD value, CHEESE held, paired token held, provider

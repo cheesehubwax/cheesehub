@@ -1,11 +1,11 @@
-// CHEESELytics — combined liquidity across every tracked CHEESE pool.
+// CHEESEAnal — combined liquidity across every tracked CHEESE pool.
 import { useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import type { LpDayFile, LpIndexDay } from '@/lib/lpPools';
 import { amount, change, shortDate, usd } from './format';
 
-interface LyticsOverviewProps {
+interface AnalOverviewProps {
   /** Recorded days already trimmed to the selected range. */
   days: LpIndexDay[];
   /** Latest state — live from Alcor when available, otherwise the newest day. */
@@ -23,7 +23,7 @@ const METRICS: { key: MetricKey; label: string; format: (v: number) => string }[
   { key: 'positions', label: 'Positions', format: (v) => String(Math.round(v)) },
 ];
 
-export function LyticsOverview({ days, current, historyLoading, historyEmpty }: LyticsOverviewProps) {
+export function AnalOverview({ days, current, historyLoading, historyEmpty }: AnalOverviewProps) {
   const [metric, setMetric] = useState<MetricKey>('usd');
 
   const totals = useMemo(() => {
@@ -109,7 +109,7 @@ export function LyticsOverview({ days, current, historyLoading, historyEmpty }: 
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <defs>
-                <linearGradient id="lyticsTotalGradient" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id="analTotalGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.35} />
                   <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                 </linearGradient>
@@ -145,7 +145,7 @@ export function LyticsOverview({ days, current, historyLoading, historyEmpty }: 
                 dataKey={metric}
                 stroke="hsl(var(--primary))"
                 strokeWidth={2}
-                fill="url(#lyticsTotalGradient)"
+                fill="url(#analTotalGradient)"
                 dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }}
                 activeDot={{ r: 4 }}
               />

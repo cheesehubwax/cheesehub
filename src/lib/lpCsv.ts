@@ -1,4 +1,4 @@
-// CHEESELytics — CSV exports for a pool snapshot and for one account's history.
+// CHEESEAnal — CSV exports for a pool snapshot and for one account's history.
 import { downloadCsvFile } from '@/lib/airdropCsv';
 import type { LpDayFile, LpIndexDay } from '@/lib/lpPools';
 
@@ -10,7 +10,7 @@ function cell(value: string | number): string {
 /** Every provider of every tracked pool, for one snapshot. */
 export function downloadSnapshotCsv(snapshot: LpDayFile): void {
   const lines = [
-    `# CHEESELytics pool snapshot · ${snapshot.date} · taken ${new Date(snapshot.t).toISOString()}`,
+    `# CHEESEAnal pool snapshot · ${snapshot.date} · taken ${new Date(snapshot.t).toISOString()}`,
     ...(snapshot.cheeseUsd ? [`# CHEESE price used: $${snapshot.cheeseUsd}`] : []),
     'pool,paired_token,account,usd_value,cheese,paired_amount,positions,positions_in_range',
   ];
@@ -30,13 +30,13 @@ export function downloadSnapshotCsv(snapshot: LpDayFile): void {
       );
     }
   }
-  downloadCsvFile(`cheeselytics-snapshot-${snapshot.date}.csv`, lines);
+  downloadCsvFile(`cheeseanal-snapshot-${snapshot.date}.csv`, lines);
 }
 
 /** Pool-level totals per recorded day. */
 export function downloadPoolHistoryCsv(days: LpIndexDay[], poolKey: string, label: string): void {
   const lines = [
-    `# CHEESELytics history · ${label}`,
+    `# CHEESEAnal history · ${label}`,
     'date,usd_value,cheese,paired_amount,accounts,positions',
   ];
   for (const day of days) {
@@ -44,7 +44,7 @@ export function downloadPoolHistoryCsv(days: LpIndexDay[], poolKey: string, labe
     if (!pool) continue;
     lines.push([day.date, pool.usd, pool.cheese, pool.paired, pool.accounts, pool.positions].join(','));
   }
-  downloadCsvFile(`cheeselytics-${poolKey}-history.csv`, lines);
+  downloadCsvFile(`cheeseanal-${poolKey}-history.csv`, lines);
 }
 
 export interface AccountHistoryRow {
@@ -60,7 +60,7 @@ export interface AccountHistoryRow {
 /** One account's position across pools and days. */
 export function downloadAccountHistoryCsv(account: string, rows: AccountHistoryRow[], poolKey?: string): void {
   const lines = [
-    `# CHEESELytics account history · ${account}${poolKey ? ` · ${poolKey}` : ''}`,
+    `# CHEESEAnal account history · ${account}${poolKey ? ` · ${poolKey}` : ''}`,
     'date,pool,paired_token,usd_value,cheese,paired_amount,positions',
   ];
   for (const row of rows) {
@@ -68,5 +68,5 @@ export function downloadAccountHistoryCsv(account: string, rows: AccountHistoryR
       [row.date, cell(row.pool), cell(row.symbol), row.usd, row.cheese, row.paired, row.positions].join(','),
     );
   }
-  downloadCsvFile(`cheeselytics-account-${account}${poolKey ? `-${poolKey}` : ''}.csv`, lines);
+  downloadCsvFile(`cheeseanal-account-${account}${poolKey ? `-${poolKey}` : ''}.csv`, lines);
 }
