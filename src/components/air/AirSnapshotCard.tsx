@@ -75,6 +75,7 @@ export function AirSnapshotCard() {
     snapshotAt,
     snapshotError,
     loadSnapshot,
+    downloadSnapshotCsv,
     busy,
   } = useAirdrop();
 
@@ -236,19 +237,24 @@ export function AirSnapshotCard() {
         </Button>
 
         {snapshot && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            {snapshot.holders.length.toLocaleString()}
-            {snapshotMode === 'lp' ? ' liquidity providers' : ' holders'}
-            {snapshot.truncated && ' (truncated)'} · via {snapshot.source}
-            {snapshotMode === 'lp' && lpPoolsScanned !== null && (
-              <>
-                {' '}
-                · {lpPoolsScanned} pool{lpPoolsScanned === 1 ? '' : 's'}
-                {lpPositions !== null && ` · ${lpPositions.toLocaleString()} positions`}
-              </>
-            )}
-            {snapshotAt && ` · ${new Date(snapshotAt).toLocaleTimeString()}`}
-          </p>
+          <>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {snapshot.holders.length.toLocaleString()}
+              {snapshotMode === 'lp' ? ' liquidity providers' : ' holders'}
+              {snapshot.truncated && ' (truncated)'} · via {snapshot.source}
+              {snapshotMode === 'lp' && lpPoolsScanned !== null && (
+                <>
+                  {' '}
+                  · {lpPoolsScanned} pool{lpPoolsScanned === 1 ? '' : 's'}
+                  {lpPositions !== null && ` · ${lpPositions.toLocaleString()} positions`}
+                </>
+              )}
+              {snapshotAt && ` · ${new Date(snapshotAt).toLocaleTimeString()}`}
+            </p>
+            <Button variant="outline" size="sm" onClick={downloadSnapshotCsv} className="mt-2 w-full">
+              Download snapshot CSV
+            </Button>
+          </>
         )}
 
 
