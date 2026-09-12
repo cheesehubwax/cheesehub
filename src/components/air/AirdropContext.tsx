@@ -44,7 +44,7 @@ import {
   type InventoryCollection,
   type InventoryTemplate,
 } from '@/lib/airdropChain';
-import { getAlcorLpHolders, type AlcorPair } from '@/lib/airdropAlcorLp';
+import { getVenueLpHolders, type VenueLpPair } from '@/lib/airdropVenueLp';
 import {
   CHEESE_CONTRACT,
   CHEESE_CPU_CONTRACT,
@@ -89,7 +89,7 @@ import {
   downloadCsvFile,
   type CsvBatchItem,
 } from '@/lib/airdropCsv';
-import { pairLabel } from '@/lib/airdropAlcorLp';
+import { venueLabel, venuePairLabel } from '@/lib/airdropVenueLp';
 
 /** Where the recipient list comes from. */
 export type SnapshotMode = 'token' | 'nft' | 'lp';
@@ -185,10 +185,10 @@ interface AirdropContextValue {
   // snapshot
   snapshotMode: SnapshotMode;
   setSnapshotMode: (mode: SnapshotMode) => void;
-  lpPairs: AlcorPair[];
+  lpPairs: VenueLpPair[];
   lpPairsLoading: boolean;
-  lpPair: AlcorPair | null;
-  setLpPair: (pair: AlcorPair | null) => void;
+  lpPair: VenueLpPair | null;
+  setLpPair: (pair: VenueLpPair | null) => void;
   lpPoolsScanned: number | null;
   lpPositions: number | null;
   snapContract: string;
@@ -325,7 +325,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
 
   // ---- Snapshot ---------------------------------------------------------
   const [snapshotMode, setSnapshotMode] = useState<SnapshotMode>('token');
-  const [lpPair, setLpPair] = useState<AlcorPair | null>(null);
+  const [lpPair, setLpPair] = useState<VenueLpPair | null>(null);
   const [lpPoolsScanned, setLpPoolsScanned] = useState<number | null>(null);
   const [lpPositions, setLpPositions] = useState<number | null>(null);
   const lpPairsQuery = useAirAlcorPairs(snapshotMode === 'lp');
@@ -394,7 +394,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
       let snap: HolderSnapshot;
       if (snapshotMode === 'lp') {
         if (!lpPair) throw new Error('Pick a liquidity pair first');
-        const lpSnap = await getAlcorLpHolders(lpPair);
+        const lpSnap = await getVenueLpHolders(lpPair);
         setLpPoolsScanned(lpSnap.poolsScanned);
         setLpPositions(lpSnap.positions);
         snap = lpSnap;
@@ -1267,7 +1267,9 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
         ? `token ${snapSymbol.toUpperCase()}@${snapContract}`
         : snapshotMode === 'nft'
           ? `NFT collection ${snapCollection}${snapSchema ? ` / schema ${snapSchema}` : ''}${snapTemplate ? ` / template ${snapTemplate}` : ''}`
-          : `Alcor LP ${lpPair ? pairLabel(lpPair) : 'pair'}`;
+          : lpPair
+            ? `${venueLabel(lpPair.venue)} LP ${venuePairLabel(lpPair)}`
+            : 'LP pair';
     const { name, lines } = buildSnapshotCsv({
       what,
       source: snapshot.source,
