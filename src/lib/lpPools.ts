@@ -194,6 +194,10 @@ export interface LpIndexPool {
   positions: number;
   priceInPaired?: number;
   priceUsd?: number;
+  /** Rolling 24h trading volume in USD, when recorded for this snapshot. */
+  volumeUsd24?: number;
+  /** Rolling 24h trading volume of the CHEESE leg, when recorded. */
+  volumeCheese24?: number;
 }
 
 export interface LpIndexDay {
