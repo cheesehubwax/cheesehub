@@ -14,14 +14,22 @@ interface AnalOverviewProps {
   historyEmpty: boolean;
 }
 
-type MetricKey = 'usd' | 'cheese' | 'accounts' | 'positions';
+type MetricKey = 'usd' | 'cheese' | 'accounts' | 'positions' | 'price';
 
 const METRICS: { key: MetricKey; label: string; format: (v: number) => string }[] = [
   { key: 'usd', label: 'Total liquidity', format: usd },
   { key: 'cheese', label: 'CHEESE in pools', format: (v) => amount(v, 0) },
   { key: 'accounts', label: 'Providers', format: (v) => String(Math.round(v)) },
   { key: 'positions', label: 'Positions', format: (v) => String(Math.round(v)) },
+  { key: 'price', label: 'CHEESE price', format: usdPrice },
 ];
+
+/** CHEESE price for a day: the recorded price, else the deepest pool's price. */
+function dayPrice(day: LpIndexDay): number {
+  if (day.cheeseUsd && day.cheeseUsd > 0) return day.cheeseUsd;
+  const deepest = [...day.pools].sort((a, b) => b.usd - a.usd).find((p) => (p.priceUsd ?? 0) > 0);
+  return deepest?.priceUsd ?? 0;
+}
 
 export function AnalOverview({ days, current, historyLoading, historyEmpty }: AnalOverviewProps) {
   const [metric, setMetric] = useState<MetricKey>('usd');
