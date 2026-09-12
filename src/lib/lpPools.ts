@@ -628,6 +628,8 @@ export function indexEntryForDay(day: LpDayFile): LpIndexDay {
       positions: pool.positions,
       ...(pool.priceInPaired !== undefined ? { priceInPaired: pool.priceInPaired } : {}),
       ...(pool.priceUsd !== undefined ? { priceUsd: pool.priceUsd } : {}),
+      ...(pool.volumeUsd24 !== undefined ? { volumeUsd24: pool.volumeUsd24 } : {}),
+      ...(pool.volumeCheese24 !== undefined ? { volumeCheese24: pool.volumeCheese24 } : {}),
     })),
   };
 }
