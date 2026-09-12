@@ -28,6 +28,10 @@ export function AirDistributionCard() {
     ramLimits,
     ramMinViable,
     applyRamMinViable,
+    ramPoolWax,
+    ramPoolMaxViable,
+    applyRamPoolMax,
+
     selectedCount,
     nftPoolSize,
 
