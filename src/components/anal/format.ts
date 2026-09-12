@@ -8,6 +8,13 @@ export function usd(value: number): string {
   return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/** Token price in USD — keeps precision on sub-cent values like CHEESE. */
+export function usdPrice(value: number): string {
+  if (!Number.isFinite(value) || value === 0) return '$0';
+  if (Math.abs(value) >= 1) return usd(value);
+  return `$${value.toLocaleString('en-US', { maximumSignificantDigits: 4, minimumSignificantDigits: 2 })}`;
+}
+
 export function amount(value: number, decimals = 4): string {
   if (!Number.isFinite(value)) return '0';
   if (value !== 0 && Math.abs(value) < 0.0001) return value.toExponential(2);

@@ -1,7 +1,7 @@
 // CHEESEAnal — readers for the recorded LP history and the live pool state.
 import { useQuery } from '@tanstack/react-query';
 import { fetchLiveLpSnapshot } from '@/lib/lpLive';
-import type { LpDayFile, LpIndexFile, LpIndexDay } from '@/lib/lpPools';
+import { poolsForVenue, type LpDayFile, type LpIndexFile, type LpIndexDay, type LpVenue } from '@/lib/lpPools';
 
 const DEFAULT_OWNER = 'cheesehubwax';
 const DEFAULT_REPO = 'cheesehub';
