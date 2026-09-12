@@ -4,8 +4,8 @@ import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, T
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { Button } from '@/components/ui/button';
 import { downloadPoolHistoryCsv } from '@/lib/lpCsv';
-import type { LpDayFile, LpIndexDay, LpPoolSnapshot } from '@/lib/lpPools';
-import { amount, shortDate, usd } from './format';
+import { LP_VENUE_LABELS, type LpDayFile, type LpIndexDay, type LpPoolSnapshot } from '@/lib/lpPools';
+import { amount, shortDate, usd, usdPrice } from './format';
 
 interface AnalPoolDetailProps {
   pool: LpPoolSnapshot | null;
