@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
-import { CheeseLogo, PairLabel, UsdcLogo } from '@/components/anal/PairLogos';
+import { CheeseLogo, PairLabel, WaxUsdcLogo } from '@/components/anal/PairLogos';
 import { VenueLabel } from '@/components/anal/VenueLogo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

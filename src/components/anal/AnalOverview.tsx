@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
-import { CheeseLogo, UsdcLogo } from '@/components/anal/PairLogos';
+import { CheeseLogo, WaxUsdcLogo } from '@/components/anal/PairLogos';
 import type { LpDayFile, LpIndexDay } from '@/lib/lpPools';
 import { amount, change, shortDate, tooltipDate, usd, usdPrice } from './format';
 
