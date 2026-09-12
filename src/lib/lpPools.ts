@@ -100,6 +100,12 @@ export interface RawPool {
   priceA?: number;
   /** Price of tokenB expressed in tokenA. */
   priceB?: number;
+  /** Alcor's rolling 24h volume of tokenA. */
+  volumeA24?: number;
+  /** Alcor's rolling 24h volume of tokenB. */
+  volumeB24?: number;
+  /** Alcor's rolling 24h volume in USD. */
+  volumeUSD24?: number;
 }
 
 export interface RawPosition {
