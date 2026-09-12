@@ -276,20 +276,19 @@ export function alcorCheesePairs(pools: RawPool[]): { pair: TrackedPair; tvlUsd:
 }
 
 /**
- * Which pairs to record for one venue: every tracked pair that exists there,
- * plus the largest untracked pairs above the USD floor.
+ * Which pairs to record for one venue: any pair — tracked or not — whose
+ * combined USD value clears the floor, largest first. Tracked pairs are
+ * capped the same way as extras so the snapshot stays small.
  */
 export function selectVenuePairs<T extends { pair: TrackedPair; tvlUsd: number }>(
   candidates: T[],
   minUsd = MIN_TRACKED_POOL_USD,
   maxExtra = MAX_EXTRA_PAIRS_PER_VENUE,
 ): T[] {
-  const tracked = candidates.filter((c) => isTrackedPairKey(c.pair.key));
-  const extra = candidates
-    .filter((c) => !isTrackedPairKey(c.pair.key) && c.tvlUsd > minUsd)
+  return candidates
+    .filter((c) => c.tvlUsd > minUsd)
     .sort((a, b) => b.tvlUsd - a.tvlUsd)
     .slice(0, maxExtra);
-  return [...tracked, ...extra];
 }
 
 /**
