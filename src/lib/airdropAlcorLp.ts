@@ -150,10 +150,13 @@ function formatUsd(value: number): string {
 }
 
 /**
- * Liquidity providers of every fee tier of one pair, weighted by the USD value
- * of their open, in-range positions. Weights across pools are summed per
- * account, and accounts with no USD value are dropped (they cannot receive a
- * pro-rata share).
+ * Liquidity providers of every fee tier of one pair, weighted by the *current*
+ * USD value of their open positions — the same figure Alcor's own UI shows.
+ * `depositedUSDTotal` is only the value at deposit time and drifts far from
+ * reality, so it is used solely as a fallback. Out-of-range positions still
+ * count: the funds are in the pool and Alcor's TVL includes them. Weights are
+ * summed per account, and accounts with no USD value are dropped (they cannot
+ * receive a pro-rata share).
  */
 export async function getAlcorLpHolders(pair: AlcorPair): Promise<LpHolderSnapshot> {
   const results = await Promise.allSettled(
