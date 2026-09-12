@@ -111,7 +111,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-8">
         {METRICS.map((stat) => {
           const selected = metric === stat.key;
           return (
@@ -120,7 +120,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
               type="button"
               onClick={() => setMetric(stat.key)}
               aria-pressed={selected}
-              className="rounded-lg border border-border/50 p-2 text-center transition-colors flex flex-col items-center justify-center"
+              className="rounded-lg border border-border/50 px-2 py-1.5 text-center transition-colors flex flex-col items-center justify-center whitespace-nowrap"
               style={
                 selected
                   ? {
@@ -138,7 +138,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
                 {stat.key === 'volume' ? <UsdLogo /> : null}
                 {stat.label}
               </div>
-              <div className="text-base font-mono font-semibold text-white leading-tight">
+              <div className="text-sm font-mono font-semibold text-white leading-tight">
                 {statValues[stat.key]}
               </div>
             </button>
