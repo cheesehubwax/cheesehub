@@ -195,7 +195,7 @@ export async function getAlcorLpHolders(pair: AlcorPair): Promise<LpHolderSnapsh
     .sort((a, b) => b.weight - a.weight);
 
   if (holders.length === 0) {
-    throw new Error(`No in-range liquidity providers found for ${pairLabel(pair)}`);
+    throw new Error(`No open liquidity positions found for ${pairLabel(pair)}`);
   }
 
   return {
