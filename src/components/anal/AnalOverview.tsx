@@ -120,25 +120,25 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
               type="button"
               onClick={() => setMetric(stat.key)}
               aria-pressed={selected}
-              className="rounded-lg border p-3 text-left transition-colors"
+              className="rounded-lg border border-border/50 p-3 text-left transition-colors"
               style={
                 selected
                   ? {
-                      backgroundColor: `${stat.color}1F`,
+                      backgroundColor: `${stat.color}33`,
                       borderColor: `${stat.color}99`,
                       boxShadow: `0 0 0 1px ${stat.color}66`,
                     }
                   : undefined
               }
             >
-              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-white/80">
                 {stat.key === 'price' ? <CheeseLogo /> : null}
                 {stat.key === 'usd' ? <UsdLogo /> : null}
                 {stat.key === 'cheese' ? <CheeseLogo /> : null}
                 {stat.key === 'volume' ? <UsdLogo /> : null}
                 {stat.label}
               </div>
-              <div className="text-lg font-mono font-semibold" style={{ color: stat.color }}>
+              <div className="text-lg font-mono font-semibold text-white">
                 {statValues[stat.key]}
               </div>
             </button>
