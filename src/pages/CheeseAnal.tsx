@@ -30,7 +30,7 @@ const VENUE_TABS: { key: LpVenue | 'all'; label: string }[] = [
 ];
 
 const CheeseAnal = () => {
-  const [range, setRange] = useState<LpRange>('30d');
+  const [range, setRange] = useState<LpRange>('all');
   const [venue, setVenue] = useState<LpVenue | 'all'>('all');
   const [poolKey, setPoolKey] = useState<string | null>(null);
   const [account, setAccount] = useState<string | null>(null);
