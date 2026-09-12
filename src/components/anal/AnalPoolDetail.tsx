@@ -165,6 +165,23 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
               </ResponsiveContainer>
             </div>
           </div>
+
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+              CHEESE price in this pool (USD)
+            </div>
+            <div className="h-36">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
+                  <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
+                  <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => usdPrice(v)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
+                  <Tooltip content={tooltip((v) => usdPrice(v), 'text-cheese')} />
+                  <Line type="monotone" dataKey="price" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }} activeDot={{ r: 4 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </div>
       ) : (
         <p className="text-xs text-muted-foreground text-center py-4">
