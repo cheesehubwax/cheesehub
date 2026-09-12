@@ -123,6 +123,16 @@ export function AirDistributionCard() {
                   )}
                 </div>
               )}
+              {ramExcluded.split > 0 && (
+                <p className="mt-2 rounded-md border border-cheese/30 bg-cheese/5 p-2 text-xs text-muted-foreground">
+                  {ramExcluded.split.toLocaleString()} holder
+                  {ramExcluded.split === 1 ? '' : 's'} get more than the{' '}
+                  {ramLimits ? formatCheese(ramLimits.maxCheese) : '—'} {CHEESE_SYMBOL} the contract
+                  allows in a single purchase, so their share is sent as several purchases —
+                  nobody is left out. {ramPurchaseCount.toLocaleString()} purchases in total.
+                </p>
+              )}
+
             </div>
 
             <p className="mb-2 rounded-md border border-border bg-background p-2 text-xs text-muted-foreground">
