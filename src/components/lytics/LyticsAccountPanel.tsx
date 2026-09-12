@@ -223,7 +223,9 @@ export function LyticsAccountPanel({ account, onAccountChange, dates, current }:
               </div>
 
               <div>
-                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">CHEESE in positions</div>
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+                  CHEESE in positions{selectedPoolLabel ? ` — ${selectedPoolLabel}` : ''}
+                </div>
                 <div className="h-36">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
@@ -234,8 +236,9 @@ export function LyticsAccountPanel({ account, onAccountChange, dates, current }:
                       <Line type="monotone" dataKey="cheese" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                     </LineChart>
                   </ResponsiveContainer>
-                </div>
-              </div>
+                 </div>
+               </div>
+             </div>
             </div>
           ) : (
             <p className="text-xs text-muted-foreground text-center py-2">
