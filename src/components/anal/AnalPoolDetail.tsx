@@ -94,7 +94,7 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
           {
             label: `CHEESE price in ${pool.symbol}`,
             value: pool.priceInPaired
-              ? `${tokenPrice(pool.priceInPaired, pool.symbol)}${pool.priceUsd ? ` · ${usdPrice(pool.priceUsd)}` : ''}`
+              ? tokenPrice(pool.priceInPaired, pool.symbol)
               : '—',
             logo: <TokenLogo contract={pool.contract ?? ''} symbol={pool.symbol} size="sm" />,
           },
