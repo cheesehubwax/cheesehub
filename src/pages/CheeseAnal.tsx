@@ -36,13 +36,15 @@ const CheeseAnal = () => {
   const [account, setAccount] = useState<string | null>(null);
 
   const { days, updatedAt, isEmpty, isLoading: historyLoading, isError: historyError } = useLpHistoryIndex();
-  const { snapshot: live, failed, isLoading: liveLoading, isError: liveError, refetch } = useLiveLpSnapshot();
+  const { snapshot: live, failed, isError: liveError, refetch: refetchLive } = useLiveLpSnapshot();
 
   const latestRecordedDate = days.length ? days[days.length - 1].date : null;
-  // Only needed as a fallback when the live read fails.
-  const { day: latestDay } = useLpDay(live ? null : latestRecordedDate);
+  // Value boxes read the latest recorded snapshot so they always match the
+  // rightmost graph point; the live read is only a fallback before the first
+  // snapshot exists.
+  const { day: latestDay, isLoading: latestDayLoading, refetch: refetchDay } = useLpDay(latestRecordedDate);
 
-  const snapshot = live ?? latestDay;
+  const snapshot = latestDay ?? live;
   const current = useMemo(() => filterSnapshotByVenue(snapshot, venue), [snapshot, venue]);
   const ranged = useMemo(
     () => filterDaysByVenue(sliceDays(days, range), venue),
