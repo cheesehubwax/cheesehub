@@ -9,6 +9,7 @@ import { AnalOverview } from '@/components/anal/AnalOverview';
 import { AnalPoolDetail } from '@/components/anal/AnalPoolDetail';
 import { AnalPoolTable } from '@/components/anal/AnalPoolTable';
 import { AllVenueLogos, VenueLogo } from '@/components/anal/VenueLogo';
+import { tooltipDate } from '@/components/anal/format';
 import {
   LP_RANGES,
   filterDaysByVenue,
@@ -155,7 +156,7 @@ const CheeseAnal = () => {
 
         {liveError && !current && (
           <p className="w-full text-xs text-red-400">
-            Live pool data is temporarily unavailable — showing recorded snapshots only.
+            No snapshot history and live pool data is temporarily unavailable — nothing to show yet.
           </p>
         )}
         {historyError && (
@@ -170,7 +171,7 @@ const CheeseAnal = () => {
           selectedKey={poolKey}
           onSelect={setPoolKey}
           failed={failed}
-          isLoading={liveLoading}
+          isLoading={latestDayLoading}
         />
 
         <AnalPoolDetail
@@ -186,8 +187,8 @@ const CheeseAnal = () => {
           Alcor figures come from Alcor's own position data: open positions count whether or not they are in range,
           valued at their current USD value. Taco and Defibox are constant-product pools, so each provider's share of
           the pool is worked out from their LP tokens and valued at market prices. Every tracked pair is recorded on
-          each venue, plus any other CHEESE pair holding more than $100. Headline figures are live; charts are built
-          from one recorded snapshot per day.
+           each venue, plus any other CHEESE pair holding more than $100. Headline figures and charts are both built
+           from the recorded snapshots, taken twice daily.
         </p>
       </main>
     </Layout>
