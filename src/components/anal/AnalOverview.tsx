@@ -155,10 +155,10 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
               <Area
                 type="monotone"
                 dataKey={metric}
-                stroke="hsl(var(--primary))"
+                stroke={active.color}
                 strokeWidth={2}
                 fill="url(#analTotalGradient)"
-                dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }}
+                dot={{ r: 3, fill: active.color, strokeWidth: 0 }}
                 activeDot={{ r: 4 }}
               />
             </AreaChart>
