@@ -141,6 +141,13 @@ interface AirdropContextValue {
   ramMinViable: { cheese: number; text: string } | null;
   /** RAM mode: fill the amount field with `ramMinViable`. */
   applyRamMinViable: () => void;
+  /** RAM mode: WAX this drop needs from the pool vs what the pool can spend. */
+  ramPoolWax: { needed: number; spendable: number; overBy: number } | null;
+  /** RAM mode: largest amount (in the selected unit) the pool can cover. */
+  ramPoolMaxViable: { cheese: number; text: string } | null;
+  /** RAM mode: fill the amount field with `ramPoolMaxViable`. */
+  applyRamPoolMax: () => void;
+
   /** Holders ticked in the table, before contract-limit filtering. */
   selectedCount: number;
 
