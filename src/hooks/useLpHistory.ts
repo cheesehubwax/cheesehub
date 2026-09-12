@@ -101,10 +101,10 @@ export function useLpDay(date: string | null) {
     staleTime: 60 * 60_000,
     retry: 1,
   });
-  return { day: query.data ?? null, isLoading: query.isLoading, isError: query.isError };
+  return { day: query.data ?? null, isLoading: query.isLoading, isError: query.isError, refetch: query.refetch };
 }
 
-/** Live pool state read straight from Alcor, for the "today" figures. */
+/** Live pool state read straight from the venues — fallback only when no snapshots are recorded yet. */
 export function useLiveLpSnapshot() {
   const query = useQuery({
     queryKey: ['cheeseAnal', 'live'],
