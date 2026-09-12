@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import type { LpDayFile, LpIndexDay } from '@/lib/lpPools';
-import { amount, change, shortDate, usd } from './format';
+import { amount, change, shortDate, usd, usdPrice } from './format';
 
 interface AnalOverviewProps {
   /** Recorded days already trimmed to the selected range. */
