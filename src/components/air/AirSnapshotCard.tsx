@@ -218,8 +218,8 @@ export function AirSnapshotCard() {
               </PopoverContent>
             </Popover>
             <p className="text-xs text-muted-foreground">
-              Snapshots every fee tier of the pair. Only open, in-range positions count, weighted
-              by their USD value.
+              Snapshots every fee tier of the pair. Every open position counts, weighted by its
+              current USD value.
             </p>
           </div>
         )}
