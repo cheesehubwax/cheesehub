@@ -44,7 +44,7 @@ export function LyticsPoolDetail({ pool, days, current, onSelectAccount }: Lytic
     );
   }
 
-  const hasSeries = series.length >= 2;
+  const hasSeries = series.length >= 1;
 
   const tooltip = (formatter: (value: number) => string, className: string) =>
     ({ active, payload }: { active?: boolean; payload?: { value?: unknown; payload?: { date: string } }[] }) =>
@@ -105,7 +105,7 @@ export function LyticsPoolDetail({ pool, days, current, onSelectAccount }: Lytic
                   <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
                   <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => usd(v)} tick={axisTick} width={60} stroke="hsl(var(--border))" />
                   <Tooltip content={tooltip((v) => usd(v), 'text-cheese')} />
-                  <Area type="monotone" dataKey="usd" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#lyticsPoolUsd)" />
+                  <Area type="monotone" dataKey="usd" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#lyticsPoolUsd)" dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -120,7 +120,7 @@ export function LyticsPoolDetail({ pool, days, current, onSelectAccount }: Lytic
                   <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
                   <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => amount(v, 0)} tick={axisTick} width={60} stroke="hsl(var(--border))" />
                   <Tooltip content={tooltip((v) => `${amount(v, 4)} CHEESE`, 'text-cheese')} />
-                  <Line type="monotone" dataKey="cheese" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="cheese" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -135,7 +135,7 @@ export function LyticsPoolDetail({ pool, days, current, onSelectAccount }: Lytic
                   <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
                   <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => amount(v, 2)} tick={axisTick} width={60} stroke="hsl(var(--border))" />
                   <Tooltip content={tooltip((v) => `${amount(v, 6)} ${pool.symbol}`, 'text-foreground')} />
-                  <Line type="monotone" dataKey="paired" stroke="#FFFFFF" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="paired" stroke="#FFFFFF" strokeWidth={2} dot={{ r: 3, fill: '#FFFFFF', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -150,7 +150,7 @@ export function LyticsPoolDetail({ pool, days, current, onSelectAccount }: Lytic
                   <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
                   <YAxis domain={['auto', 'auto']} allowDecimals={false} tick={axisTick} width={40} stroke="hsl(var(--border))" />
                   <Tooltip content={tooltip((v) => `${v} accounts`, 'text-foreground')} />
-                  <Line type="monotone" dataKey="accounts" stroke="#22c55e" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="accounts" stroke="#22c55e" strokeWidth={2} dot={{ r: 3, fill: '#22c55e', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -158,7 +158,7 @@ export function LyticsPoolDetail({ pool, days, current, onSelectAccount }: Lytic
         </div>
       ) : (
         <p className="text-xs text-muted-foreground text-center py-4">
-          Charts appear once at least two days have been recorded.
+          Charts appear once a snapshot has been recorded.
         </p>
       )}
 
