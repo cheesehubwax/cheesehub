@@ -42,6 +42,8 @@ Code changes:
 - `src/lib/lpLive.ts` and `src/hooks/useLpHistory.ts` — live read and history read per venue, plus venue-aware filtering/aggregation helpers.
 - `src/components/anal/*` and `src/pages/CheeseAnal.tsx` — venue toggle, venue-aware overview/pool/account views, venue column in CSV (`src/lib/lpCsv.ts`).
 - `src/lib/airdropAlcorLp.ts` (renamed concept, kept file plus new venue readers) and the CHEESEAir snapshot card — venue selector and merged provider list.
-- Unit tests for the pro-rata share maths, the >$100 rule, legacy-key fallback, and merged provider aggregation.
+- Unit tests for the pro-rata share maths, the >$100 rule, price derivation, and merged provider aggregation.
 
-Nothing about the data branch, workflow schedule, or existing stored files changes; new fields are additive.
+Prices: added to `LpPoolSnapshot`/`LpIndexPool` as `priceInPaired` and `priceUsd`. Alcor pairs use the pool's current tick price; Taco and Defibox use `reserveOther / reserveCheese`; USD comes from the WAXUSDC bridge. Chart selectors in `AnalOverview`/`AnalPoolDetail` gain a price metric.
+
+Since history is wiped and re-recorded with `reset=1`, no backwards-compatible key fallback is needed — pair keys become venue-scoped (`alcor:wax-eosio.token`) outright. Workflow schedule and data-branch layout are unchanged.
