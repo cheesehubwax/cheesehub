@@ -1,7 +1,7 @@
 // CHEESEAnal — one row per tracked CHEESE pool with day-over-day change.
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { LP_VENUE_LABELS, type LpDayFile, type LpIndexDay } from '@/lib/lpPools';
-import { amount, change, usd, usdPrice } from './format';
+import { amount, change, tokenPrice, usd, usdPrice } from './format';
 
 interface AnalPoolTableProps {
   current: LpDayFile | null;
@@ -52,7 +52,7 @@ export function AnalPoolTable({
                 <th className="text-right font-medium py-2">USD value</th>
                 <th className="text-right font-medium py-2">CHEESE</th>
                 <th className="text-right font-medium py-2">Paired token</th>
-                <th className="text-right font-medium py-2">CHEESE price</th>
+                <th className="text-right font-medium py-2">CHEESE price (in pair)</th>
                 <th className="text-right font-medium py-2">Accounts</th>
                 <th className="text-right font-medium py-2">24h</th>
               </tr>
@@ -90,7 +90,16 @@ export function AnalPoolTable({
                       {amount(pool.paired, 4)} {pool.symbol}
                     </td>
                     <td className="py-2 text-right font-mono text-muted-foreground">
-                      {pool.priceUsd ? usdPrice(pool.priceUsd) : '—'}
+                      {pool.priceInPaired ? (
+                        <>
+                          <div className="text-foreground">{tokenPrice(pool.priceInPaired, pool.symbol)}</div>
+                          {pool.priceUsd ? (
+                            <div className="text-[10px] text-muted-foreground">{usdPrice(pool.priceUsd)}</div>
+                          ) : null}
+                        </>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                     <td className="py-2 text-right font-mono text-muted-foreground">{pool.accounts}</td>
                     <td
