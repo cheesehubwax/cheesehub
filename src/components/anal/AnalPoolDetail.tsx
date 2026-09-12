@@ -192,7 +192,7 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
 
       <div>
         <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">
-          Providers {current?.date ? `· ${current.date}` : ''}
+          Providers {current?.date ? `· ${tooltipDate(current.date)}` : ''}
         </div>
         <div className="overflow-x-auto max-h-80 overflow-y-auto">
           <table className="w-full text-xs">
