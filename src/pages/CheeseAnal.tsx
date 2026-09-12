@@ -9,6 +9,7 @@ import { AnalOverview } from '@/components/anal/AnalOverview';
 import { AnalPoolDetail } from '@/components/anal/AnalPoolDetail';
 import { AnalPoolTable } from '@/components/anal/AnalPoolTable';
 import { AllVenueLogos, VenueLogo } from '@/components/anal/VenueLogo';
+import { tooltipDate } from '@/components/anal/format';
 import {
   LP_RANGES,
   filterDaysByVenue,
@@ -36,13 +37,15 @@ const CheeseAnal = () => {
   const [account, setAccount] = useState<string | null>(null);
 
   const { days, updatedAt, isEmpty, isLoading: historyLoading, isError: historyError } = useLpHistoryIndex();
-  const { snapshot: live, failed, isLoading: liveLoading, isError: liveError, refetch } = useLiveLpSnapshot();
+  const { snapshot: live, failed, isError: liveError, refetch: refetchLive } = useLiveLpSnapshot();
 
   const latestRecordedDate = days.length ? days[days.length - 1].date : null;
-  // Only needed as a fallback when the live read fails.
-  const { day: latestDay } = useLpDay(live ? null : latestRecordedDate);
+  // Value boxes read the latest recorded snapshot so they always match the
+  // rightmost graph point; the live read is only a fallback before the first
+  // snapshot exists.
+  const { day: latestDay, isLoading: latestDayLoading, refetch: refetchDay } = useLpDay(latestRecordedDate);
 
-  const snapshot = live ?? latestDay;
+  const snapshot = latestDay ?? live;
   const current = useMemo(() => filterSnapshotByVenue(snapshot, venue), [snapshot, venue]);
   const ranged = useMemo(
     () => filterDaysByVenue(sliceDays(days, range), venue),
@@ -115,9 +118,13 @@ const CheeseAnal = () => {
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-muted-foreground">
               {days.length} day{days.length === 1 ? '' : 's'} recorded
-              {updatedAt ? ` · last ${new Date(updatedAt).toLocaleDateString()}` : ''}
+              {current?.date
+                ? ` · values from ${tooltipDate(current.date)} snapshot`
+                : updatedAt
+                  ? ` · last ${new Date(updatedAt).toLocaleDateString()}`
+                  : ''}
             </span>
-            <Button size="sm" variant="ghost" onClick={() => refetch()}>
+            <Button size="sm" variant="ghost" onClick={() => { refetchDay(); refetchLive(); }}>
               Refresh
             </Button>
             <Button size="sm" variant="outline" disabled={!current} onClick={() => current && downloadSnapshotCsv(current)}>
@@ -149,7 +156,7 @@ const CheeseAnal = () => {
 
         {liveError && !current && (
           <p className="w-full text-xs text-red-400">
-            Live pool data is temporarily unavailable — showing recorded snapshots only.
+            No snapshot history and live pool data is temporarily unavailable — nothing to show yet.
           </p>
         )}
         {historyError && (
@@ -164,7 +171,7 @@ const CheeseAnal = () => {
           selectedKey={poolKey}
           onSelect={setPoolKey}
           failed={failed}
-          isLoading={liveLoading}
+          isLoading={latestDayLoading}
         />
 
         <AnalPoolDetail
@@ -180,8 +187,8 @@ const CheeseAnal = () => {
           Alcor figures come from Alcor's own position data: open positions count whether or not they are in range,
           valued at their current USD value. Taco and Defibox are constant-product pools, so each provider's share of
           the pool is worked out from their LP tokens and valued at market prices. Every tracked pair is recorded on
-          each venue, plus any other CHEESE pair holding more than $100. Headline figures are live; charts are built
-          from one recorded snapshot per day.
+           each venue, plus any other CHEESE pair holding more than $100. Headline figures and charts are both built
+           from the recorded snapshots, taken twice daily.
         </p>
       </main>
     </Layout>
