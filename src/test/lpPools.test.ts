@@ -141,7 +141,9 @@ describe('index bookkeeping', () => {
     cheeseUsd: 0.0123,
     pools: [
       {
-        key: waxPair.key,
+        key: `alcor:${waxPair.key}`,
+        venue: 'alcor' as const,
+        pairKey: waxPair.key,
         symbol: 'WAX',
         contract: 'eosio.token',
         label: waxPair.label,
@@ -159,7 +161,10 @@ describe('index bookkeeping', () => {
   it('strips provider rows from the index entry', () => {
     const entry = indexEntryForDay(day);
     expect(entry.pools[0]).toEqual({
-      key: waxPair.key,
+      key: `alcor:${waxPair.key}`,
+      venue: 'alcor',
+      pairKey: waxPair.key,
+      symbol: 'WAX',
       usd: 100,
       cheese: 50,
       paired: 25,
@@ -167,6 +172,7 @@ describe('index bookkeeping', () => {
       positions: 3,
     });
     expect(entry.cheeseUsd).toBe(0.0123);
+    expect(entry.uniqueByVenue).toEqual({ alcor: 1 });
   });
 
   it('replaces an existing day and keeps the series sorted', () => {
