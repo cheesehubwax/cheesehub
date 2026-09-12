@@ -2,7 +2,7 @@
 import { useMemo } from 'react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
-import { CheeseLogo, PairLabel, UsdcLogo } from '@/components/anal/PairLogos';
+import { CheeseLogo, PairLabel, WaxUsdcLogo } from '@/components/anal/PairLogos';
 import { TokenLogo } from '@/components/TokenLogo';
 import { VenueLabel } from '@/components/anal/VenueLogo';
 import { Button } from '@/components/ui/button';
@@ -84,7 +84,7 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {[
-          { label: 'USD value', value: usd(pool.usd), logo: <UsdcLogo /> },
+          { label: 'USD value', value: usd(pool.usd), logo: <WaxUsdcLogo /> },
           { label: 'CHEESE', value: amount(pool.cheese, 0), logo: <CheeseLogo /> },
           {
             label: pool.symbol,
@@ -212,7 +212,7 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
                 <th className="text-left font-medium py-2">#</th>
                 <th className="text-left font-medium py-2">Account</th>
                 <th className="text-right font-medium py-2">
-                  <span className="inline-flex items-center justify-end gap-1"><UsdcLogo />USD</span>
+                  <span className="inline-flex items-center justify-end gap-1"><WaxUsdcLogo />USD</span>
                 </th>
                 <th className="text-right font-medium py-2">
                   <span className="inline-flex items-center justify-end gap-1"><CheeseLogo />CHEESE</span>
