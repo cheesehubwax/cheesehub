@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLpAccountHistory } from '@/hooks/useLpHistory';
 import { downloadAccountHistoryCsv } from '@/lib/lpCsv';
-import type { LpDayFile } from '@/lib/lpPools';
+import { LP_VENUE_LABELS, type LpDayFile } from '@/lib/lpPools';
 import { amount, shortDate, usd } from './format';
 
 interface AnalAccountPanelProps {
@@ -30,7 +30,9 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
     return current.pools
       .map((pool) => {
         const row = pool.providers.find((p) => p.a === account);
-        return row ? { key: pool.key, label: pool.label, symbol: pool.symbol, ...row } : null;
+        return row
+          ? { key: pool.key, venue: pool.venue, label: pool.label, symbol: pool.symbol, ...row }
+          : null;
       })
       .filter((row): row is NonNullable<typeof row> => row !== null)
       .sort((a, b) => b.usd - a.usd);
@@ -50,9 +52,14 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
     [rows, selectedPool],
   );
 
-  const selectedPoolLabel = selectedPool
-    ? (holdings.find((h) => h.key === selectedPool)?.label ?? rows.find((r) => r.poolKey === selectedPool)?.label ?? selectedPool)
-    : null;
+  const selectedPoolLabel = useMemo(() => {
+    if (!selectedPool) return null;
+    const hit =
+      holdings.find((h) => h.key === selectedPool) ?? rows.find((r) => r.poolKey === selectedPool) ?? null;
+    if (!hit) return selectedPool;
+    const venue = LP_VENUE_LABELS[hit.venue] ?? hit.venue;
+    return venue ? `${hit.label} · ${venue}` : hit.label;
+  }, [holdings, rows, selectedPool]);
 
   const series = useMemo(() => {
     const byDate = new Map<string, { date: string; usd: number; cheese: number }>();
@@ -126,6 +133,7 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
                   account,
                   chartRows.map((r) => ({
                     date: r.date,
+                    venue: r.venue,
                     pool: r.label,
                     symbol: r.symbol,
                     usd: r.usd,
@@ -148,6 +156,7 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
                 <thead>
                   <tr className="text-muted-foreground text-[10px] uppercase tracking-wide">
                     <th className="text-left font-medium py-2">Pool</th>
+                    <th className="text-left font-medium py-2">Venue</th>
                     <th className="text-right font-medium py-2">USD</th>
                     <th className="text-right font-medium py-2">CHEESE</th>
                     <th className="text-right font-medium py-2">Paired</th>
@@ -157,7 +166,7 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
                 <tbody>
                   {holdings.map((row) => (
                     <tr
-                      key={row.label}
+                      key={row.key}
                       onClick={() => setSelectedPool(selectedPool === row.key ? null : row.key)}
                       title={selectedPool === row.key ? 'Show all pools' : 'Show only this pool'}
                       className={`border-t border-border/40 cursor-pointer transition-colors ${
@@ -166,6 +175,11 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
                     >
                       <td className="py-1.5 text-foreground whitespace-nowrap">
                         <span className="text-cheese">CHEESE</span> / {row.symbol}
+                      </td>
+                      <td className="py-1.5 whitespace-nowrap">
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/60 bg-background/60 text-muted-foreground">
+                          {LP_VENUE_LABELS[row.venue] ?? row.venue}
+                        </span>
                       </td>
                       <td className="py-1.5 text-right font-mono text-foreground">{usd(row.usd)}</td>
                       <td className="py-1.5 text-right font-mono text-muted-foreground">{amount(row.cheese, 2)}</td>

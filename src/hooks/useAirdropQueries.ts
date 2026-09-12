@@ -10,7 +10,7 @@ import {
   getTokenStat,
   getWalletTokens,
 } from '@/lib/airdropChain';
-import { fetchAlcorPairs } from '@/lib/airdropAlcorLp';
+import { fetchVenueLpPairs } from '@/lib/airdropVenueLp';
 
 const ACCOUNT_RE = /^[a-z1-5.]{1,12}$/;
 
@@ -107,11 +107,11 @@ export function useAirInventoryAssets(
   });
 }
 
-/** Every Alcor pair (all fee tiers merged) for the LP snapshot picker. */
+/** Every Alcor, Taco and Defibox pair for the LP snapshot picker. */
 export function useAirAlcorPairs(enabled: boolean) {
   return useQuery({
-    queryKey: ['air-alcor-pairs'],
-    queryFn: fetchAlcorPairs,
+    queryKey: ['air-venue-lp-pairs'],
+    queryFn: fetchVenueLpPairs,
     enabled,
     staleTime: 5 * 60 * 1000,
     retry: 1,

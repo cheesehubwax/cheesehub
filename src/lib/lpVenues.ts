@@ -442,3 +442,82 @@ export async function snapshotAmmVenue(
 
   return snapshots;
 }
+
+/* ------------------------------------------- generic (any pair) AMM reading */
+
+/** One constant-product pool of any token pair — used by CHEESEAir's picker. */
+export interface AnyAmmPool {
+  venue: 'taco' | 'defibox';
+  /** Share-token symbol. */
+  shareSymbol: string;
+  /** Contract issuing the share token. */
+  shareContract: string;
+  totalShares: number;
+  symbolA: string;
+  contractA: string;
+  reserveA: number;
+  symbolB: string;
+  contractB: string;
+  reserveB: number;
+}
+
+/** Every pool on Taco or Defibox, regardless of which tokens it pairs. */
+export async function fetchAllAmmPools(venue: 'taco' | 'defibox'): Promise<AnyAmmPool[]> {
+  if (venue === 'taco') {
+    const rows = await readTable<TacoPairRow>(TACO_CONTRACT, TACO_CONTRACT, 'pairs');
+    const out: AnyAmmPool[] = [];
+    for (const row of rows) {
+      const shareSymbol = (row.id ?? '').toUpperCase();
+      const symbolA = assetSymbol(row.pool1?.quantity);
+      const symbolB = assetSymbol(row.pool2?.quantity);
+      const contractA = row.pool1?.contract ?? '';
+      const contractB = row.pool2?.contract ?? '';
+      const reserveA = assetAmount(row.pool1?.quantity);
+      const reserveB = assetAmount(row.pool2?.quantity);
+      const totalShares = assetAmount(row.supply);
+      if (!shareSymbol || !symbolA || !symbolB || !contractA || !contractB) continue;
+      if (!(reserveA > 0) || !(reserveB > 0) || !(totalShares > 0)) continue;
+      out.push({
+        venue,
+        shareSymbol,
+        shareContract: TACO_CONTRACT,
+        totalShares,
+        symbolA,
+        contractA,
+        reserveA,
+        symbolB,
+        contractB,
+        reserveB,
+      });
+    }
+    return out;
+  }
+
+  const rows = await readTable<DefiboxPairRow>(DEFIBOX_CONTRACT, DEFIBOX_CONTRACT, 'pairs');
+  const out: AnyAmmPool[] = [];
+  for (const row of rows) {
+    const id = Number(row.id ?? 0);
+    const symbolA = symbolCodeOf(row.token0?.symbol);
+    const symbolB = symbolCodeOf(row.token1?.symbol);
+    const contractA = row.token0?.contract ?? '';
+    const contractB = row.token1?.contract ?? '';
+    const reserveA = assetAmount(row.reserve0);
+    const reserveB = assetAmount(row.reserve1);
+    const totalShares = Number(row.liquidity_token ?? 0);
+    if (!(id > 0) || !symbolA || !symbolB || !contractA || !contractB) continue;
+    if (!(reserveA > 0) || !(reserveB > 0) || !(totalShares > 0)) continue;
+    out.push({
+      venue,
+      shareSymbol: defiboxLpSymbol(id),
+      shareContract: DEFIBOX_LP_CONTRACT,
+      totalShares,
+      symbolA,
+      contractA,
+      reserveA,
+      symbolB,
+      contractB,
+      reserveB,
+    });
+  }
+  return out;
+}

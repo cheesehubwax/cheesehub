@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   TRACKED_LP_PAIRS,
+  venuePair,
   assetAmount,
   assetSymbol,
   buildPoolSnapshot,
@@ -99,7 +100,7 @@ describe('buildPoolSnapshot', () => {
   ];
 
   it('aggregates per account and per pool across fee tiers', () => {
-    const snapshot = buildPoolSnapshot(waxPair, [
+    const snapshot = buildPoolSnapshot(venuePair('alcor', waxPair), [
       { pool, positions },
       { pool: flipped, positions: flippedPositions },
     ]);
@@ -128,7 +129,7 @@ describe('buildPoolSnapshot', () => {
   });
 
   it('ranks providers by USD value, highest first', () => {
-    const snapshot = buildPoolSnapshot(waxPair, [{ pool, positions }, { pool: flipped, positions: flippedPositions }]);
+    const snapshot = buildPoolSnapshot(venuePair('alcor', waxPair), [{ pool, positions }, { pool: flipped, positions: flippedPositions }]);
     const values = snapshot.providers.map((p) => p.usd);
     expect(values).toEqual([...values].sort((a, b) => b - a));
   });
@@ -141,7 +142,9 @@ describe('index bookkeeping', () => {
     cheeseUsd: 0.0123,
     pools: [
       {
-        key: waxPair.key,
+        key: `alcor:${waxPair.key}`,
+        venue: 'alcor' as const,
+        pairKey: waxPair.key,
         symbol: 'WAX',
         contract: 'eosio.token',
         label: waxPair.label,
@@ -159,7 +162,10 @@ describe('index bookkeeping', () => {
   it('strips provider rows from the index entry', () => {
     const entry = indexEntryForDay(day);
     expect(entry.pools[0]).toEqual({
-      key: waxPair.key,
+      key: `alcor:${waxPair.key}`,
+      venue: 'alcor',
+      pairKey: waxPair.key,
+      symbol: 'WAX',
       usd: 100,
       cheese: 50,
       paired: 25,
@@ -167,6 +173,7 @@ describe('index bookkeeping', () => {
       positions: 3,
     });
     expect(entry.cheeseUsd).toBe(0.0123);
+    expect(entry.uniqueByVenue).toEqual({ alcor: 1 });
   });
 
   it('replaces an existing day and keeps the series sorted', () => {

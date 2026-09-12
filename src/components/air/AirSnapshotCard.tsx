@@ -15,7 +15,13 @@ import {
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { Check, ChevronsUpDown, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { filterPairs, formatFee, pairLabel, type AlcorPair } from '@/lib/airdropAlcorLp';
+import { formatFee } from '@/lib/airdropAlcorLp';
+import {
+  filterVenuePairs,
+  venueLabel,
+  venuePairLabel,
+  type VenueLpPair,
+} from '@/lib/airdropVenueLp';
 import { getTokenLogoUrl } from '@/lib/tokenLogos';
 import { ACCOUNT_RE, useAirdrop, type SnapshotMode } from '@/components/air/AirdropContext';
 
@@ -40,8 +46,17 @@ function TokenLogo({ contract, symbol }: { contract: string; symbol: string }) {
   );
 }
 
+/** Small venue tag so Alcor / Taco / Defibox pairs are told apart. */
+function VenueTag({ pair }: { pair: VenueLpPair }) {
+  return (
+    <span className="shrink-0 rounded border border-border/60 bg-background/60 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+      {venueLabel(pair.venue)}
+    </span>
+  );
+}
+
 /** Overlapping logo pair shown to the left of the pair symbols. */
-function PairLogos({ pair }: { pair: AlcorPair }) {
+function PairLogos({ pair }: { pair: VenueLpPair }) {
   return (
     <span className="flex shrink-0 items-center -space-x-1">
       <TokenLogo contract={pair.contractA} symbol={pair.symbolA} />
@@ -50,6 +65,11 @@ function PairLogos({ pair }: { pair: AlcorPair }) {
   );
 }
 
+
+/** Pools behind a pair: fee tiers on Alcor, share pools on Taco / Defibox. */
+function poolCount(pair: VenueLpPair): number {
+  return pair.alcor?.poolIds.length ?? pair.pools?.length ?? 0;
+}
 
 export function AirSnapshotCard() {
   const {
@@ -81,7 +101,7 @@ export function AirSnapshotCard() {
 
   const [pairOpen, setPairOpen] = useState(false);
   const [pairQuery, setPairQuery] = useState('');
-  const pairMatches = useMemo(() => filterPairs(lpPairs, pairQuery), [lpPairs, pairQuery]);
+  const pairMatches = useMemo(() => filterVenuePairs(lpPairs, pairQuery), [lpPairs, pairQuery]);
 
   const loading = busy === 'snapshot';
   const disabled =
@@ -104,7 +124,7 @@ export function AirSnapshotCard() {
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="token">Token</TabsTrigger>
             <TabsTrigger value="nft">NFT collection</TabsTrigger>
-            <TabsTrigger value="lp">Alcor LP</TabsTrigger>
+            <TabsTrigger value="lp">LP</TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -160,7 +180,8 @@ export function AirSnapshotCard() {
                   {lpPair ? (
                     <span className="flex min-w-0 items-center gap-2">
                       <PairLogos pair={lpPair} />
-                      <span className="truncate">{pairLabel(lpPair)}</span>
+                      <span className="truncate">{venuePairLabel(lpPair)}</span>
+                      <VenueTag pair={lpPair} />
                     </span>
                   ) : (
                     'Select a liquidity pair'
@@ -178,11 +199,11 @@ export function AirSnapshotCard() {
                   <CommandInput
                     value={pairQuery}
                     onValueChange={setPairQuery}
-                    placeholder="Search pair (e.g. cheese)"
+                    placeholder="Search pair or venue (e.g. cheese, taco)"
                   />
                   <CommandList>
                     <CommandEmpty>
-                      {lpPairsLoading ? 'Loading Alcor pools…' : 'No pair found.'}
+                      {lpPairsLoading ? 'Loading Alcor, Taco and Defibox pools…' : 'No pair found.'}
                     </CommandEmpty>
                     {pairMatches.map((pair) => (
                       <CommandItem
@@ -202,14 +223,17 @@ export function AirSnapshotCard() {
                         />
                         <PairLogos pair={pair} />
                         <span className="ml-2 min-w-0 flex-1">
-                          <span className="block truncate">{pairLabel(pair)}</span>
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span className="truncate">{venuePairLabel(pair)}</span>
+                            <VenueTag pair={pair} />
+                          </span>
                           <span className="block truncate text-[10px] text-muted-foreground">
                             {pair.contractA} / {pair.contractB}
                           </span>
                         </span>
                         <span className="ml-2 shrink-0 text-right text-muted-foreground">
-                          {pair.poolIds.length} pool{pair.poolIds.length === 1 ? '' : 's'} ·{' '}
-                          {pair.fees.map(formatFee).join(', ')}
+                          {poolCount(pair)} pool{poolCount(pair) === 1 ? '' : 's'}
+                          {pair.fees?.length ? ` · ${pair.fees.map(formatFee).join(', ')}` : ''}
                         </span>
 
                       </CommandItem>
@@ -219,7 +243,8 @@ export function AirSnapshotCard() {
               </PopoverContent>
             </Popover>
             <p className="text-xs text-muted-foreground">
-              Snapshots every fee tier of the pair. Every open position counts, weighted by its
+              Snapshots every pool of the pair on the chosen venue. On Alcor every open position
+              counts; on Taco and Defibox each provider's share of the pool counts. Weighted by
               current USD value.
             </p>
           </div>
