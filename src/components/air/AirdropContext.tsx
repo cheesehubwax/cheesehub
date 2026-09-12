@@ -22,13 +22,15 @@ import {
   estimateNftResources,
   estimateRamAirdropResources,
   estimateResources,
-  filterRamRecipients,
+  planRamPurchases,
   formatQuantity,
   formatUnits,
   resourceWarnings,
   totalUnits,
   RAM_BYTES_PER_NFT,
   type AirdropRecipient,
+  type RamPurchase,
+
   type DistributionMode,
   type NftAssignment,
   type ResourceWarning,
@@ -125,8 +127,16 @@ interface AirdropContextValue {
   ramBytesTotal: number;
   /** RAM mode: per-purchase CHEESE limits enforced by the RAM contract. */
   ramLimits: { minCheese: number; maxCheese: number } | null;
-  /** RAM mode: recipients dropped because their share breaks a contract limit. */
-  ramExcluded: { belowMin: number; aboveMax: number };
+  /**
+   * RAM mode: `belowMin` = accounts skipped because their whole share is under
+   * the contract minimum; `split` = accounts paid over several purchases.
+   */
+  ramExcluded: { belowMin: number; split: number };
+  /** RAM mode: account -> how many purchases deliver that account's share. */
+  ramPurchaseCounts: Map<string, number>;
+  /** RAM mode: total number of contract purchases in the run. */
+  ramPurchaseCount: number;
+
   /** RAM mode: smallest amount (in the selected unit) that includes every ticked holder. */
   ramMinViable: { cheese: number; text: string } | null;
   /** RAM mode: fill the amount field with `ramMinViable`. */
@@ -476,25 +486,34 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
   );
   const selectedCount = chosenHolders.length;
 
-  const { recipients, ramExcluded } = useMemo<{
+  const { recipients, ramPurchases, ramPurchaseCounts, ramExcluded } = useMemo<{
     recipients: AirdropRecipient[];
-    ramExcluded: { belowMin: number; aboveMax: number };
+    ramPurchases: RamPurchase[];
+    ramPurchaseCounts: Map<string, number>;
+    ramExcluded: { belowMin: number; split: number };
   }>(() => {
-    const none = { recipients: [], ramExcluded: { belowMin: 0, aboveMax: 0 } };
+    const none = {
+      recipients: [],
+      ramPurchases: [],
+      ramPurchaseCounts: new Map<string, number>(),
+      ramExcluded: { belowMin: 0, split: 0 },
+    };
     const text = isRam ? ramCheeseText : amountText;
     if (!snapshot || !text) return none;
     try {
       const all = computeAmounts(chosenHolders, mode, text, effPrecision);
-      if (!isRam) return { recipients: all, ramExcluded: { belowMin: 0, aboveMax: 0 } };
+      if (!isRam) return { ...none, recipients: all };
       const base = 10 ** CHEESE_PRECISION;
       const minUnits = ramLimits ? BigInt(Math.round(ramLimits.minCheese * base)) : 0n;
       const maxUnits = ramLimits ? BigInt(Math.round(ramLimits.maxCheese * base)) : 0n;
-      const filtered = filterRamRecipients(all, minUnits, maxUnits);
+      const plan = planRamPurchases(all, minUnits, maxUnits);
       return {
-        recipients: filtered.included,
+        recipients: plan.included,
+        ramPurchases: plan.purchases,
+        ramPurchaseCounts: plan.purchaseCounts,
         ramExcluded: {
-          belowMin: filtered.belowMin.length,
-          aboveMax: filtered.aboveMax.length,
+          belowMin: plan.belowMin.length,
+          split: plan.splitCount,
         },
       };
     } catch {
@@ -510,6 +529,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     isRam,
     ramLimits,
   ]);
+
 
   const total = useMemo(() => totalUnits(recipients), [recipients]);
 
@@ -637,10 +657,13 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     };
   }, [recipientAccounts, rowKey, rowCacheVersion]);
 
+  /** RAM mode: every contract purchase is one action, so slices count too. */
+  const ramPurchaseCount = ramPurchases.length;
+
   const estimate = useMemo(
     () =>
       isRam
-        ? estimateRamAirdropResources(recipients.length, Math.max(1, batchSize))
+        ? estimateRamAirdropResources(ramPurchaseCount, Math.max(1, batchSize))
         : isNft
           ? estimateNftResources(
               nftAssignments.length,
@@ -653,8 +676,18 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
               ramPrice?.waxPerNewRow ?? 0.028,
               rowStats.checked > 0 ? rowStats.newRows : null,
             ),
-    [isRam, isNft, nftAssignments.length, recipients.length, batchSize, ramPrice, rowStats],
+    [
+      isRam,
+      isNft,
+      nftAssignments.length,
+      recipients.length,
+      ramPurchaseCount,
+      batchSize,
+      ramPrice,
+      rowStats,
+    ],
   );
+
 
   const warnings = useMemo(() => {
     if (isRam) {
@@ -684,12 +717,13 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
           message: `${ramExcluded.belowMin} recipient${ramExcluded.belowMin === 1 ? '' : 's'} skipped: their share is below the ${formatCheese(ramLimits.minCheese)} ${CHEESE_SYMBOL} minimum per purchase. Raise the amount or deselect holders.`,
         });
       }
-      if (ramExcluded.aboveMax > 0 && ramLimits) {
+      if (ramExcluded.split > 0 && ramLimits) {
         out.push({
           level: 'warn',
-          message: `${ramExcluded.aboveMax} recipient${ramExcluded.aboveMax === 1 ? '' : 's'} skipped: their share is above the ${formatCheese(ramLimits.maxCheese)} ${CHEESE_SYMBOL} maximum per purchase. Lower the amount or split the drop.`,
+          message: `${ramExcluded.split} recipient${ramExcluded.split === 1 ? '' : 's'} get more than the ${formatCheese(ramLimits.maxCheese)} ${CHEESE_SYMBOL} maximum per purchase, so their share is sent as several purchases (${ramPurchaseCount} purchases in total).`,
         });
       }
+
       return out;
     }
     if (isNft) {
@@ -741,6 +775,8 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     cheeseBalance,
     ramCheeseTotal,
     ramExcluded,
+    ramPurchaseCount,
+
     ramLimits,
     isNft,
     mode,
@@ -982,8 +1018,10 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     cancelRef.current = false;
 
     if (isRam) {
-      // One CHEESE transfer per recipient: ram.chz buys RAM into the memo account.
-      const batches = chunk(recipients, Math.max(1, batchSize));
+      // One CHEESE transfer per purchase: ram.chz buys RAM into the memo account.
+      // A share above the per-purchase maximum is delivered as several purchases.
+      const batches = chunk(ramPurchases, Math.max(1, batchSize));
+
       for (let i = 0; i < batches.length; i += 1) {
         if (cancelRef.current) {
           appendBatch({ batch: i + 1, recipients: 0, error: 'Cancelled by user' });
@@ -1109,6 +1147,8 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     nftAssignments,
     nftShortfall,
     recipients,
+    ramPurchases,
+
     pricing,
     requiredRamCheese,
     suggestedCpuCheese,
@@ -1191,6 +1231,9 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     ramBytesTotal,
     ramLimits,
     ramExcluded,
+    ramPurchaseCounts,
+    ramPurchaseCount,
+
     ramMinViable,
     applyRamMinViable,
     selectedCount,

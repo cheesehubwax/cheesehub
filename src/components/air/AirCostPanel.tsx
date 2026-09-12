@@ -24,6 +24,8 @@ export function AirCostPanel() {
     ramCheeseTotal,
     ramBytesTotal,
     ramExcluded,
+    ramPurchaseCount,
+
     ramMinViable,
     ramLimits,
     selectedCount,
@@ -52,7 +54,7 @@ export function AirCostPanel() {
 
   // CPU pricing is calibrated from the connected account's own stake weight.
   const unavailable = actor ? 'unavailable' : 'connect wallet';
-  const ramSkipped = ramExcluded.belowMin + ramExcluded.aboveMax;
+  const ramSkipped = ramExcluded.belowMin;
 
 
   return (
@@ -73,9 +75,16 @@ export function AirCostPanel() {
             </dd>
             {isRam && ramSkipped > 0 && (
               <dd className="text-xs text-destructive">
-                {ramSkipped.toLocaleString()} skipped — outside contract limits
+                {ramSkipped.toLocaleString()} skipped — below the contract minimum
               </dd>
             )}
+            {isRam && ramExcluded.split > 0 && (
+              <dd className="text-xs text-muted-foreground">
+                {ramExcluded.split.toLocaleString()} paid over several purchases (
+                {ramPurchaseCount.toLocaleString()} purchases total)
+              </dd>
+            )}
+
             {isNft && nftSkipped > 0 && (
               <dd className="text-xs text-destructive">
                 {nftSkipped.toLocaleString()} skipped — share rounds to zero
@@ -182,14 +191,16 @@ export function AirCostPanel() {
                     : ' Some selected holders have no balance, so a pro-rata split can never reach the minimum for them — deselect them or use an equal split.'}
                 </p>
               )}
-              {ramExcluded.aboveMax > 0 && (
-                <p className="mt-1 text-xs text-destructive">
-                  {ramExcluded.aboveMax.toLocaleString()} recipient
-                  {ramExcluded.aboveMax === 1 ? '' : 's'} skipped: their share is above the{' '}
+              {ramExcluded.split > 0 && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {ramExcluded.split.toLocaleString()} recipient
+                  {ramExcluded.split === 1 ? '' : 's'} get more than the{' '}
                   {ramLimits ? formatCheese(ramLimits.maxCheese) : '—'} {CHEESE_SYMBOL} maximum per
-                  purchase. Lower the amount or run those accounts separately.
+                  purchase, so their share is sent as several purchases — they still receive their
+                  full amount. {ramPurchaseCount.toLocaleString()} purchases in total.
                 </p>
               )}
+
             </>
           ) : (
 

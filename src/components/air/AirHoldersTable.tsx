@@ -23,6 +23,8 @@ export function AirHoldersTable() {
     isRam,
     sendSymbol,
     recipients,
+    ramPurchaseCounts,
+
     nftAssignments,
     precision,
     cheesePerRamKb,
@@ -83,9 +85,11 @@ export function AirHoldersTable() {
         {isRam && (
           <p className="mb-2 text-xs text-muted-foreground">
             In RAM mode the last column is the {CHEESE_SYMBOL} spent buying RAM for that account —
-            nobody receives {CHEESE_SYMBOL} or WAX. Rows without an amount fall outside the RAM
-            contract&apos;s per-purchase limits and are skipped.
+            nobody receives {CHEESE_SYMBOL} or WAX. Rows without an amount fall below the RAM
+            contract&apos;s minimum per purchase and are skipped. Shares above the maximum per
+            purchase are delivered as several purchases to the same account.
           </p>
+
         )}
 
 
@@ -171,7 +175,13 @@ export function AirHoldersTable() {
                                 KB
                               </span>
                             )}
+                            {isRam && (ramPurchaseCounts.get(h.account) ?? 1) > 1 && (
+                              <span className="block text-xs text-cheese">
+                                {ramPurchaseCounts.get(h.account)} purchases
+                              </span>
+                            )}
                           </>
+
                         ) : (
                           '—'
                         )}
