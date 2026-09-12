@@ -100,6 +100,12 @@ export interface RawPool {
   priceA?: number;
   /** Price of tokenB expressed in tokenA. */
   priceB?: number;
+  /** Alcor's rolling 24h volume of tokenA. */
+  volumeA24?: number;
+  /** Alcor's rolling 24h volume of tokenB. */
+  volumeB24?: number;
+  /** Alcor's rolling 24h volume in USD. */
+  volumeUSD24?: number;
 }
 
 export interface RawPosition {
@@ -155,6 +161,10 @@ export interface LpPoolSnapshot {
   priceInPaired?: number;
   /** The same price converted to USD. */
   priceUsd?: number;
+  /** Rolling 24h trading volume in USD (Alcor only, recorded once per UTC day). */
+  volumeUsd24?: number;
+  /** Rolling 24h trading volume of the CHEESE leg (Alcor only). */
+  volumeCheese24?: number;
   providers: LpProviderRow[];
 }
 
@@ -184,6 +194,10 @@ export interface LpIndexPool {
   positions: number;
   priceInPaired?: number;
   priceUsd?: number;
+  /** Rolling 24h trading volume in USD, when recorded for this snapshot. */
+  volumeUsd24?: number;
+  /** Rolling 24h trading volume of the CHEESE leg, when recorded. */
+  volumeCheese24?: number;
 }
 
 export interface LpIndexDay {
@@ -265,6 +279,40 @@ export function poolsForPair(pools: RawPool[], target: TrackedPair): RawPool[] {
 /** True when CHEESE sits on the A side of a pool (so amountA is the CHEESE leg). */
 export function cheeseIsTokenA(pool: RawPool): boolean {
   return tokenMatches(pool.tokenA, CHEESE_SYMBOL, CHEESE_CONTRACT);
+}
+
+/**
+ * Rolling 24h volume of a pair, summed across its fee tiers. Alcor publishes
+ * this directly; Taco and Defibox do not, so only Alcor pools carry volume.
+ * Returns `{}` when the payload has no usable volume figures.
+ */
+export function alcorPairVolume(pools: RawPool[]): {
+  volumeUsd24?: number;
+  volumeCheese24?: number;
+} {
+  let usdTotal = 0;
+  let cheeseTotal = 0;
+  let sawUsd = false;
+  let sawCheese = false;
+
+  for (const pool of pools) {
+    const usdVolume = Number(pool.volumeUSD24);
+    if (Number.isFinite(usdVolume) && usdVolume >= 0) {
+      usdTotal += usdVolume;
+      sawUsd = true;
+    }
+    const raw = cheeseIsTokenA(pool) ? pool.volumeA24 : pool.volumeB24;
+    const cheeseVolume = Number(raw);
+    if (Number.isFinite(cheeseVolume) && cheeseVolume >= 0) {
+      cheeseTotal += cheeseVolume;
+      sawCheese = true;
+    }
+  }
+
+  return {
+    ...(sawUsd ? { volumeUsd24: round(usdTotal, 4) } : {}),
+    ...(sawCheese ? { volumeCheese24: round(cheeseTotal, 4) } : {}),
+  };
 }
 
 /**
@@ -580,6 +628,8 @@ export function indexEntryForDay(day: LpDayFile): LpIndexDay {
       positions: pool.positions,
       ...(pool.priceInPaired !== undefined ? { priceInPaired: pool.priceInPaired } : {}),
       ...(pool.priceUsd !== undefined ? { priceUsd: pool.priceUsd } : {}),
+      ...(pool.volumeUsd24 !== undefined ? { volumeUsd24: pool.volumeUsd24 } : {}),
+      ...(pool.volumeCheese24 !== undefined ? { volumeCheese24: pool.volumeCheese24 } : {}),
     })),
   };
 }

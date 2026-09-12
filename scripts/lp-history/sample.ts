@@ -15,6 +15,7 @@
 
 import {
   alcorCheesePairs,
+  alcorPairVolume,
   buildPoolSnapshot,
   indexEntryForDay,
   mergeIndexDay,
@@ -65,8 +66,12 @@ async function fetchJson<T>(path: string): Promise<T> {
   throw lastError instanceof Error ? lastError : new Error(`Alcor ${path} unavailable`);
 }
 
-/** Alcor pools, read sequentially so the API is never hammered. */
-async function sampleAlcor(prices: UsdPrices): Promise<LpPoolSnapshot[]> {
+/**
+ * Alcor pools, read sequentially so the API is never hammered.
+ * `withVolume` is true only on the first snapshot of a UTC day, so the recorded
+ * rolling-24h volume figures never overlap between the day's two snapshots.
+ */
+async function sampleAlcor(prices: UsdPrices, withVolume: boolean): Promise<LpPoolSnapshot[]> {
   const allPools = await fetchJson<RawPool[]>("/swap/pools");
   const selected = selectVenuePairs(alcorCheesePairs(allPools));
   const cheeseUsd = cheeseUsdFrom(prices);
@@ -83,15 +88,19 @@ async function sampleAlcor(prices: UsdPrices): Promise<LpPoolSnapshot[]> {
       withPositions.push({ pool, positions: Array.isArray(positions) ? positions : [] });
       await sleep(400);
     }
-    const snapshot = buildPoolSnapshot(venuePair("alcor", pair), withPositions, {
+    const base = buildPoolSnapshot(venuePair("alcor", pair), withPositions, {
       cheeseUsd,
       pairedUsd: prices.get(priceKey(pair.symbol, pair.contract)),
     });
+    const snapshot: LpPoolSnapshot = withVolume ? { ...base, ...alcorPairVolume(pools) } : base;
     if (snapshot.accounts === 0) continue;
     console.log(
       `alcor ${snapshot.label}: $${snapshot.usd.toFixed(2)} • ${snapshot.cheese.toFixed(4)} CHEESE • ` +
         `${snapshot.paired} ${snapshot.symbol} • ${snapshot.accounts} accounts • ` +
-        `${snapshot.positions} positions across ${snapshot.poolIds.length} tier(s)`,
+        `${snapshot.positions} positions across ${snapshot.poolIds.length} tier(s)` +
+        (snapshot.volumeUsd24 !== undefined
+          ? ` • 24h volume $${snapshot.volumeUsd24.toFixed(2)} / ${(snapshot.volumeCheese24 ?? 0).toFixed(4)} CHEESE`
+          : ""),
     );
     snapshots.push(snapshot);
   }
@@ -125,6 +134,19 @@ async function main() {
   }
   if (alreadyHaveSlot && force) console.log("Slot already recorded, but FORCE=1 — re-recording.");
 
+  // Volume is a rolling 24h figure, so record it once per UTC day only — on the
+  // first snapshot of that day — to keep the series free of overlapping points.
+  const utcDayPrefix = date.slice(0, 10);
+  const earlierSlotToday = index.days.some(
+    (d) => d.date.slice(0, 10) === utcDayPrefix && d.date < date,
+  );
+  const withVolume = !earlierSlotToday;
+  console.log(
+    withVolume
+      ? "First snapshot of this UTC day — recording 24h volume."
+      : "Later snapshot of this UTC day — skipping 24h volume.",
+  );
+
   const prices = await fetchUsdPrices();
   const cheeseUsd = cheeseUsdFrom(prices);
   console.log(`CHEESE price: ${cheeseUsd !== undefined ? `$${cheeseUsd}` : "unavailable"}.`);
@@ -136,7 +158,7 @@ async function main() {
     try {
       const pools =
         venue === "alcor"
-          ? await sampleAlcor(prices)
+          ? await sampleAlcor(prices, withVolume)
           : await snapshotAmmVenue(venue, prices, {
               pause: () => sleep(300),
               log: (message) => console.log(message),

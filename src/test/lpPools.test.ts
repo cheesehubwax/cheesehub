@@ -5,6 +5,7 @@ import {
   assetAmount,
   assetSymbol,
   buildPoolSnapshot,
+  alcorPairVolume,
   cheeseIsTokenA,
   indexEntryForDay,
   mergeIndexDay,
@@ -56,6 +57,20 @@ describe('poolsForPair', () => {
   it('knows which side CHEESE sits on', () => {
     expect(cheeseIsTokenA({ id: 1, tokenA: cheese, tokenB: wax })).toBe(true);
     expect(cheeseIsTokenA({ id: 2, tokenA: wax, tokenB: cheese })).toBe(false);
+  });
+});
+
+describe('alcorPairVolume', () => {
+  it('sums USD volume and the CHEESE leg across fee tiers, either side', () => {
+    const tiers: RawPool[] = [
+      { id: 1, tokenA: cheese, tokenB: wax, volumeUSD24: 68.5, volumeA24: 9421.25, volumeB24: 15011.06 },
+      { id: 2, tokenA: wax, tokenB: cheese, volumeUSD24: 10, volumeA24: 100, volumeB24: 500 },
+    ];
+    expect(alcorPairVolume(tiers)).toEqual({ volumeUsd24: 78.5, volumeCheese24: 9921.25 });
+  });
+
+  it('omits fields entirely when the payload carries no volume', () => {
+    expect(alcorPairVolume([{ id: 1, tokenA: cheese, tokenB: wax }])).toEqual({});
   });
 });
 
