@@ -2,9 +2,10 @@
 import { useMemo } from 'react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+import { VenueLabel } from '@/components/anal/VenueLogo';
 import { Button } from '@/components/ui/button';
 import { downloadPoolHistoryCsv } from '@/lib/lpCsv';
-import { LP_VENUE_LABELS, type LpDayFile, type LpIndexDay, type LpPoolSnapshot } from '@/lib/lpPools';
+import { type LpDayFile, type LpIndexDay, type LpPoolSnapshot } from '@/lib/lpPools';
 import { amount, shortDate, tokenPrice, tooltipDate, usd, usdPrice } from './format';
 
 interface AnalPoolDetailProps {
@@ -66,7 +67,7 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
             <span className="text-cheese">CHEESE</span> / {pool.symbol}
           </span>
           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/60 bg-background/60 text-muted-foreground">
-            {LP_VENUE_LABELS[pool.venue] ?? pool.venue}
+            <VenueLabel venue={pool.venue} />
           </span>
         </div>
         <Button

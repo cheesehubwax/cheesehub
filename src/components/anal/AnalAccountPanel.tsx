@@ -2,11 +2,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+import { VenueLabel } from '@/components/anal/VenueLogo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLpAccountHistory } from '@/hooks/useLpHistory';
 import { downloadAccountHistoryCsv } from '@/lib/lpCsv';
-import { LP_VENUE_LABELS, type LpDayFile } from '@/lib/lpPools';
+import { type LpDayFile } from '@/lib/lpPools';
 import { amount, shortDate, tooltipDate, usd } from './format';
 
 interface AnalAccountPanelProps {
@@ -57,14 +58,11 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
     [rows, selectedPool],
   );
 
-  const selectedPoolLabel = useMemo(() => {
+  const selectedPoolRow = useMemo(() => {
     if (!selectedPool) return null;
-    const hit =
-      holdings.find((h) => h.key === selectedPool) ?? rows.find((r) => r.poolKey === selectedPool) ?? null;
-    if (!hit) return selectedPool;
-    const venue = LP_VENUE_LABELS[hit.venue] ?? hit.venue;
-    return venue ? `${hit.label} · ${venue}` : hit.label;
+    return holdings.find((h) => h.key === selectedPool) ?? rows.find((r) => r.poolKey === selectedPool) ?? null;
   }, [holdings, rows, selectedPool]);
+  const selectedPoolLabel = selectedPoolRow?.label ?? null;
 
   const series = useMemo(() => {
     const byDate = new Map<string, { date: string; usd: number; cheese: number }>();
@@ -196,7 +194,7 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
                       </td>
                       <td className="py-1.5 whitespace-nowrap">
                         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/60 bg-background/60 text-muted-foreground">
-                          {LP_VENUE_LABELS[row.venue] ?? row.venue}
+                          <VenueLabel venue={row.venue} />
                         </span>
                       </td>
                       <td className="py-1.5 text-right font-mono text-foreground">{usd(row.usd)}</td>
@@ -218,7 +216,16 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-muted-foreground">
-                  Showing: {selectedPoolLabel ?? 'All pools'}
+                  Showing:{' '}
+                  {selectedPoolRow ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <span>{selectedPoolRow.label}</span>
+                      <span>·</span>
+                      <VenueLabel venue={selectedPoolRow.venue} />
+                    </span>
+                  ) : (
+                    'All pools'
+                  )}
                 </span>
                 {selectedPool && (
                   <button
@@ -233,7 +240,8 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
-                  Position value (USD){selectedPoolLabel ? ` — ${selectedPoolLabel}` : ''}
+                  <span>Position value (USD){selectedPoolLabel ? ` — ${selectedPoolLabel}` : ''}</span>
+                  {selectedPoolRow ? <VenueLabel venue={selectedPoolRow.venue} className="ml-1 normal-case" /> : null}
                 </div>
                 <div className="h-36">
                   <ResponsiveContainer width="100%" height="100%">
@@ -256,7 +264,8 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
 
               <div>
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
-                  CHEESE in positions{selectedPoolLabel ? ` — ${selectedPoolLabel}` : ''}
+                  <span>CHEESE in positions{selectedPoolLabel ? ` — ${selectedPoolLabel}` : ''}</span>
+                  {selectedPoolRow ? <VenueLabel venue={selectedPoolRow.venue} className="ml-1 normal-case" /> : null}
                 </div>
                 <div className="h-36">
                   <ResponsiveContainer width="100%" height="100%">

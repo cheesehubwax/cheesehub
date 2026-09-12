@@ -1,6 +1,7 @@
 // CHEESEAnal — one row per tracked CHEESE pool with day-over-day change.
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
-import { LP_VENUE_LABELS, type LpDayFile, type LpIndexDay } from '@/lib/lpPools';
+import { VenueLabel } from '@/components/anal/VenueLogo';
+import { type LpDayFile, type LpIndexDay } from '@/lib/lpPools';
 import { amount, change, tokenPrice, usd, usdPrice } from './format';
 
 interface AnalPoolTableProps {
@@ -81,7 +82,7 @@ export function AnalPoolTable({
                     </td>
                     <td className="py-2 whitespace-nowrap">
                       <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/60 bg-background/60 text-muted-foreground">
-                        {LP_VENUE_LABELS[pool.venue] ?? pool.venue}
+                        <VenueLabel venue={pool.venue} />
                       </span>
                     </td>
                     <td className="py-2 text-right font-mono text-foreground">{usd(pool.usd)}</td>
