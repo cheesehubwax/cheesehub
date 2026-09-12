@@ -704,12 +704,13 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
           message: `${ramExcluded.belowMin} recipient${ramExcluded.belowMin === 1 ? '' : 's'} skipped: their share is below the ${formatCheese(ramLimits.minCheese)} ${CHEESE_SYMBOL} minimum per purchase. Raise the amount or deselect holders.`,
         });
       }
-      if (ramExcluded.aboveMax > 0 && ramLimits) {
+      if (ramExcluded.split > 0 && ramLimits) {
         out.push({
           level: 'warn',
-          message: `${ramExcluded.aboveMax} recipient${ramExcluded.aboveMax === 1 ? '' : 's'} skipped: their share is above the ${formatCheese(ramLimits.maxCheese)} ${CHEESE_SYMBOL} maximum per purchase. Lower the amount or split the drop.`,
+          message: `${ramExcluded.split} recipient${ramExcluded.split === 1 ? '' : 's'} get more than the ${formatCheese(ramLimits.maxCheese)} ${CHEESE_SYMBOL} maximum per purchase, so their share is sent as several purchases (${ramPurchaseCount} purchases in total).`,
         });
       }
+
       return out;
     }
     if (isNft) {
