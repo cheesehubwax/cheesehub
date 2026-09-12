@@ -73,13 +73,24 @@ export function AnalPoolTable({
                     <td className="py-2 font-medium text-foreground whitespace-nowrap">
                       <span className="text-cheese">CHEESE</span> / {pool.symbol}
                       <span className="ml-2 text-[10px] text-muted-foreground">
-                        {pool.poolIds.length} tier{pool.poolIds.length === 1 ? '' : 's'}
+                        {pool.poolIds.length}{' '}
+                        {pool.venue === 'alcor'
+                          ? `tier${pool.poolIds.length === 1 ? '' : 's'}`
+                          : `pool${pool.poolIds.length === 1 ? '' : 's'}`}
+                      </span>
+                    </td>
+                    <td className="py-2 whitespace-nowrap">
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/60 bg-background/60 text-muted-foreground">
+                        {LP_VENUE_LABELS[pool.venue] ?? pool.venue}
                       </span>
                     </td>
                     <td className="py-2 text-right font-mono text-foreground">{usd(pool.usd)}</td>
                     <td className="py-2 text-right font-mono text-muted-foreground">{amount(pool.cheese, 0)}</td>
                     <td className="py-2 text-right font-mono text-muted-foreground">
                       {amount(pool.paired, 4)} {pool.symbol}
+                    </td>
+                    <td className="py-2 text-right font-mono text-muted-foreground">
+                      {pool.priceUsd ? usdPrice(pool.priceUsd) : '—'}
                     </td>
                     <td className="py-2 text-right font-mono text-muted-foreground">{pool.accounts}</td>
                     <td
