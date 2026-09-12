@@ -392,28 +392,68 @@ export function estimateRamAirdropResources(
   };
 }
 
-export interface RamRecipientFilter {
+export interface RamPurchase {
+  account: string;
+  units: bigint;
+}
+
+export interface RamPlan {
+  /** One row per account, carrying that account's full share. */
   included: AirdropRecipient[];
+  /** Flat list of contract-legal purchases (an account may appear more than once). */
+  purchases: RamPurchase[];
+  /** account -> how many purchases it takes to deliver that account's share. */
+  purchaseCounts: Map<string, number>;
+  /** Accounts whose whole share is under the contract minimum — impossible to send. */
   belowMin: AirdropRecipient[];
-  aboveMax: AirdropRecipient[];
+  /** How many accounts need more than one purchase. */
+  splitCount: number;
 }
 
 /**
- * The RAM contract enforces per-purchase CHEESE limits, so any recipient whose
- * share falls outside them has to be dropped before the run.
+ * Split one account's share into purchases that each respect the contract's
+ * per-purchase min/max. The share is spread as evenly as possible so no slice
+ * lands under the minimum.
  */
-export function filterRamRecipients(
+export function sliceRamUnits(units: bigint, minUnits: bigint, maxUnits: bigint): bigint[] {
+  if (units <= 0n) return [];
+  if (maxUnits <= 0n || units <= maxUnits) return [units];
+  let n = (units + maxUnits - 1n) / maxUnits;
+  // Never create a slice below the minimum (only reachable with odd configs).
+  while (n > 1n && minUnits > 0n && units / n < minUnits) n -= 1n;
+  const base = units / n;
+  const remainder = units % n;
+  const out: bigint[] = [];
+  for (let i = 0n; i < n; i += 1n) out.push(i < remainder ? base + 1n : base);
+  return out;
+}
+
+/**
+ * The RAM contract enforces per-purchase CHEESE limits. Shares above the
+ * maximum are split into several purchases for the same account; shares below
+ * the minimum cannot be sent at all and are reported separately.
+ */
+export function planRamPurchases(
   recipients: AirdropRecipient[],
   minUnits: bigint,
   maxUnits: bigint,
-): RamRecipientFilter {
+): RamPlan {
   const included: AirdropRecipient[] = [];
+  const purchases: RamPurchase[] = [];
+  const purchaseCounts = new Map<string, number>();
   const belowMin: AirdropRecipient[] = [];
-  const aboveMax: AirdropRecipient[] = [];
+  let splitCount = 0;
   for (const r of recipients) {
-    if (minUnits > 0n && r.units < minUnits) belowMin.push(r);
-    else if (maxUnits > 0n && r.units > maxUnits) aboveMax.push(r);
-    else included.push(r);
+    if (r.units <= 0n || (minUnits > 0n && r.units < minUnits)) {
+      belowMin.push(r);
+      continue;
+    }
+    const slices = sliceRamUnits(r.units, minUnits, maxUnits);
+    included.push(r);
+    purchaseCounts.set(r.account, slices.length);
+    if (slices.length > 1) splitCount += 1;
+    for (const units of slices) purchases.push({ account: r.account, units });
   }
-  return { included, belowMin, aboveMax };
+  return { included, purchases, purchaseCounts, belowMin, splitCount };
 }
+
