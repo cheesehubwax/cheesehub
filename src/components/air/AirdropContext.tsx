@@ -257,7 +257,10 @@ interface AirdropContextValue {
   requestCancel: () => void;
   canRun: boolean;
   runAirdrop: () => Promise<void>;
-  downloadCsv: () => void;
+  /** Download the holder list exactly as snapshotted. */
+  downloadSnapshotCsv: () => void;
+  /** Download who actually received what, joined to each batch's transaction. */
+  downloadResultsCsv: () => void;
 }
 
 const AirdropContext = createContext<AirdropContextValue | null>(null);
@@ -507,17 +510,20 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
   );
   const selectedCount = chosenHolders.length;
 
-  const { recipients, ramPurchases, ramPurchaseCounts, ramExcluded } = useMemo<{
+  const { recipients, ramPurchases, ramPurchaseCounts, ramExcluded, ramBelowMin } = useMemo<{
     recipients: AirdropRecipient[];
     ramPurchases: RamPurchase[];
     ramPurchaseCounts: Map<string, number>;
     ramExcluded: { belowMin: number; split: number };
+    /** RAM mode: selected accounts whose share is below the contract minimum. */
+    ramBelowMin: AirdropRecipient[];
   }>(() => {
     const none = {
       recipients: [],
       ramPurchases: [],
       ramPurchaseCounts: new Map<string, number>(),
       ramExcluded: { belowMin: 0, split: 0 },
+      ramBelowMin: [],
     };
     const text = isRam ? ramCheeseText : amountText;
     if (!snapshot || !text) return none;
@@ -536,6 +542,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
           belowMin: plan.belowMin.length,
           split: plan.splitCount,
         },
+        ramBelowMin: plan.belowMin,
       };
     } catch {
       return none;
