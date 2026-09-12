@@ -15,7 +15,7 @@ interface AnalOverviewProps {
   historyEmpty: boolean;
 }
 
-type MetricKey = 'price' | 'usd' | 'cheese' | 'accounts' | 'positions';
+type MetricKey = 'price' | 'usd' | 'cheese' | 'accounts' | 'positions' | 'volume';
 
 const METRICS: { key: MetricKey; label: string; color: string; format: (v: number) => string }[] = [
   { key: 'price', label: 'CHEESE price', color: '#FACC15', format: usdPrice },
@@ -23,6 +23,7 @@ const METRICS: { key: MetricKey; label: string; color: string; format: (v: numbe
   { key: 'cheese', label: 'CHEESE in pools', color: '#22C55E', format: (v) => amount(v, 0) },
   { key: 'accounts', label: 'Providers', color: '#FFFFFF', format: (v) => String(Math.round(v)) },
   { key: 'positions', label: 'Positions', color: '#EC4899', format: (v) => String(Math.round(v)) },
+  { key: 'volume', label: 'Total volume', color: '#38BDF8', format: usd },
 ];
 
 export function AnalOverview({ days, current, historyLoading, historyEmpty }: AnalOverviewProps) {
@@ -52,24 +53,40 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
 
   const series = useMemo(
     () =>
-      days.map((day) => ({
-        date: day.date,
-        price: day.cheeseUsd ?? 0,
-        usd: day.pools.reduce((sum, p) => sum + p.usd, 0),
-        cheese: day.pools.reduce((sum, p) => sum + p.cheese, 0),
-        accounts:
-          day.uniqueAccounts ?? day.pools.reduce((sum, p) => sum + p.accounts, 0),
-        positions: day.pools.reduce((sum, p) => sum + p.positions, 0),
-      })),
+      days.map((day) => {
+        const recordedVolumes = day.pools
+          .map((pool) => pool.volumeUsd24)
+          .filter((value): value is number => value !== undefined);
+        return {
+          date: day.date,
+          price: day.cheeseUsd ?? 0,
+          usd: day.pools.reduce((sum, p) => sum + p.usd, 0),
+          cheese: day.pools.reduce((sum, p) => sum + p.cheese, 0),
+          accounts:
+            day.uniqueAccounts ?? day.pools.reduce((sum, p) => sum + p.accounts, 0),
+          positions: day.pools.reduce((sum, p) => sum + p.positions, 0),
+          volume: recordedVolumes.length > 0
+            ? recordedVolumes.reduce((sum, value) => sum + value, 0)
+            : null,
+        };
+      }),
     [days],
   );
 
   const active = METRICS.find((m) => m.key === metric) ?? METRICS[0];
 
+  const comparableValues = series
+    .map((row) => row[metric])
+    .filter((value): value is number => value !== null);
   const delta =
-    series.length >= 2
-      ? change(series[series.length - 1][metric], series[series.length - 2][metric])
+    comparableValues.length >= 2
+      ? change(comparableValues[comparableValues.length - 1], comparableValues[comparableValues.length - 2])
       : null;
+
+  const recordedVolume = series
+    .map((row) => row.volume)
+    .filter((value): value is number => value !== null);
+  const totalVolume = recordedVolume.reduce((sum, value) => sum + value, 0);
 
   const statValues: Record<MetricKey, string> = {
     price: usdPrice(totals.price),
@@ -77,6 +94,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
     cheese: amount(totals.cheese, 0),
     accounts: String(totals.accounts),
     positions: String(totals.positions),
+    volume: recordedVolume.length > 0 ? usd(totalVolume) : '—',
   };
 
   return (
@@ -84,7 +102,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
       <div className="flex items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-2">
           <OpenMojiIcon emoji="📊" size={18} />
-          <span className="text-sm font-medium text-foreground">CHEESE liquidity overview</span>
+          <span className="text-sm font-medium text-foreground">CHEESE Overview</span>
         </div>
         {delta && (
           <span className={`text-xs font-mono ${delta.up ? 'text-green-400' : 'text-red-400'}`}>
@@ -93,7 +111,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-4">
         {METRICS.map((stat) => {
           const selected = metric === stat.key;
           return (
@@ -117,6 +135,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
                 {stat.key === 'price' ? <CheeseLogo /> : null}
                 {stat.key === 'usd' ? <UsdLogo /> : null}
                 {stat.key === 'cheese' ? <CheeseLogo /> : null}
+                {stat.key === 'volume' ? <UsdLogo /> : null}
                 {stat.label}
               </div>
               <div className="text-lg font-mono font-semibold" style={{ color: stat.color }}>
