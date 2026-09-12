@@ -30,6 +30,7 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
               cheese: row.cheese,
               paired: row.paired,
               accounts: row.accounts,
+              price: row.priceUsd ?? day.cheeseUsd ?? 0,
             }
           : null;
       })
@@ -63,6 +64,9 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
           <span className="text-sm font-medium text-foreground">
             <span className="text-cheese">CHEESE</span> / {pool.symbol}
           </span>
+          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/60 bg-background/60 text-muted-foreground">
+            {LP_VENUE_LABELS[pool.venue] ?? pool.venue}
+          </span>
         </div>
         <Button
           size="sm"
@@ -74,11 +78,17 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {[
           { label: 'USD value', value: usd(pool.usd) },
           { label: 'CHEESE', value: amount(pool.cheese, 0) },
           { label: pool.symbol, value: amount(pool.paired, 4) },
+          {
+            label: 'CHEESE price',
+            value: pool.priceUsd
+              ? `${usdPrice(pool.priceUsd)}${pool.priceInPaired ? ` · ${amount(pool.priceInPaired, 8)} ${pool.symbol}` : ''}`
+              : '—',
+          },
           { label: 'Providers', value: `${pool.accounts} (${pool.positions} pos)` },
         ].map((stat) => (
           <div key={stat.label} className="rounded-lg bg-background/40 border border-border/40 p-3">
