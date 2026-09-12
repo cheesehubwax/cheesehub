@@ -49,6 +49,6 @@ export function CheeseLogo({ size = 'sm', className }: { size?: 'sm' | 'md' | 'l
 }
 
 /** USD figures are always represented by the WAXUSDC logo. */
-export function UsdcLogo({ size = 'sm', className }: { size?: 'sm' | 'md' | 'lg'; className?: string }) {
-  return <TokenLogo contract="alien.worlds" symbol="WAXUSDC" size={size} className={className} />;
+export function WaxUsdcLogo({ size = 'sm', className }: { size?: 'sm' | 'md' | 'lg'; className?: string }) {
+  return <TokenLogo contract="eth.token" symbol="WAXUSDC" size={size} className={className} />;
 }

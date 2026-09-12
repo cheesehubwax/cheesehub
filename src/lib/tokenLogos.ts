@@ -39,7 +39,7 @@ function useFallbackMap() {
   const fallbackMap: Record<string, string> = {
     'WAX': 'eosio.token',
     'CHEESE': 'cheeseburger',
-    'WAXUSDC': 'alien.worlds',
+    'WAXUSDC': 'eth.token',
     'TLM': 'alien.worlds',
     'NEFTY': 'token.nefty',
     'WAXP': 'eosio.token',
