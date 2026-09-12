@@ -26,7 +26,7 @@ const METRICS: { key: MetricKey; label: string; color: string; format: (v: numbe
 ];
 
 export function AnalOverview({ days, current, historyLoading, historyEmpty }: AnalOverviewProps) {
-  const [metric, setMetric] = useState<MetricKey>('usd');
+  const [metric, setMetric] = useState<MetricKey>('price');
 
   const totals = useMemo(() => {
     const pools = current?.pools ?? [];
@@ -40,7 +40,14 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
       positions += pool.positions;
       for (const row of pool.providers) accounts.add(row.a);
     }
-    return { value, cheese, positions, accounts: accounts.size, pools: pools.length };
+    return {
+      value,
+      cheese,
+      positions,
+      accounts: accounts.size,
+      pools: pools.length,
+      price: current?.cheeseUsd ?? 0,
+    };
   }, [current]);
 
   const series = useMemo(
