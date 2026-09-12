@@ -111,7 +111,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
               }`}
             >
               <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                {stat.key === 'usd' ? <UsdcLogo /> : null}
+                {stat.key === 'usd' ? <WaxUsdcLogo /> : null}
                 {stat.key === 'cheese' || stat.key === 'price' ? <CheeseLogo /> : null}
                 {stat.label}
               </div>

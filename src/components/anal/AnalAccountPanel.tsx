@@ -182,7 +182,7 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
                     <th className="text-left font-medium py-2">Pool</th>
                     <th className="text-left font-medium py-2">Venue</th>
                     <th className="text-right font-medium py-2">
-                      <span className="inline-flex items-center justify-end gap-1"><UsdcLogo />USD</span>
+                      <span className="inline-flex items-center justify-end gap-1"><WaxUsdcLogo />USD</span>
                     </th>
                     <th className="text-right font-medium py-2">
                       <span className="inline-flex items-center justify-end gap-1"><CheeseLogo />CHEESE</span>
