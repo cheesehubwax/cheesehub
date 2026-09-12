@@ -31,7 +31,7 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
     setSelectedPool(null);
   }, [account]);
 
-  /** Today's holdings per pool, from the live/latest snapshot. */
+  /** Holdings per pool from the latest workflow snapshot. */
   const holdings = useMemo(() => {
     if (!account || !current) return [];
     return current.pools

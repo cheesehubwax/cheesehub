@@ -36,7 +36,7 @@ export function AnalPoolTable({
 
       {failed.length > 0 && (
         <p className="mb-2 text-xs text-red-400">
-          Could not read {failed.join(', ')} right now — those pools are left out rather than shown as zero.
+          The {failed.join(', ')} data was unavailable when this snapshot was recorded — those pools are left out rather than shown as zero.
         </p>
       )}
 

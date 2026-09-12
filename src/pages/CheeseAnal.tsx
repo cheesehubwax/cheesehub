@@ -15,7 +15,6 @@ import {
   filterDaysByVenue,
   filterSnapshotByVenue,
   sliceDays,
-  useLiveLpSnapshot,
   useLpDay,
   useLpHistoryIndex,
   type LpRange,
@@ -36,16 +35,26 @@ const CheeseAnal = () => {
   const [poolKey, setPoolKey] = useState<string | null>(null);
   const [account, setAccount] = useState<string | null>(null);
 
-  const { days, updatedAt, isEmpty, isLoading: historyLoading, isError: historyError } = useLpHistoryIndex();
-  const { snapshot: live, failed, isError: liveError, refetch: refetchLive } = useLiveLpSnapshot();
+  const {
+    days,
+    updatedAt,
+    isEmpty,
+    isLoading: historyLoading,
+    isError: historyError,
+    refetch: refetchHistory,
+  } = useLpHistoryIndex();
 
   const latestRecordedDate = days.length ? days[days.length - 1].date : null;
-  // Value boxes read the latest recorded snapshot so they always match the
-  // rightmost graph point; the live read is only a fallback before the first
-  // snapshot exists.
-  const { day: latestDay, isLoading: latestDayLoading, refetch: refetchDay } = useLpDay(latestRecordedDate);
+  // Every current value and table row comes from the newest workflow snapshot,
+  // matching the rightmost graph point. CHEESEAnal never substitutes live data.
+  const {
+    day: latestDay,
+    isLoading: latestDayLoading,
+    isError: latestDayError,
+    refetch: refetchDay,
+  } = useLpDay(latestRecordedDate);
 
-  const snapshot = latestDay ?? live;
+  const snapshot = latestDay;
   const current = useMemo(() => filterSnapshotByVenue(snapshot, venue), [snapshot, venue]);
   const ranged = useMemo(
     () => filterDaysByVenue(sliceDays(days, range), venue),
@@ -124,7 +133,7 @@ const CheeseAnal = () => {
                   ? ` · last ${new Date(updatedAt).toLocaleDateString()}`
                   : ''}
             </span>
-            <Button size="sm" variant="ghost" onClick={() => { refetchDay(); refetchLive(); }}>
+            <Button size="sm" variant="ghost" onClick={() => { refetchHistory(); refetchDay(); }}>
               Refresh
             </Button>
             <Button size="sm" variant="outline" disabled={!current} onClick={() => current && downloadSnapshotCsv(current)}>
@@ -154,9 +163,14 @@ const CheeseAnal = () => {
           ))}
         </div>
 
-        {liveError && !current && (
+        {latestDayError && latestRecordedDate && !current && (
           <p className="w-full text-xs text-red-400">
-            No snapshot history and live pool data is temporarily unavailable — nothing to show yet.
+            The newest recorded snapshot could not be loaded right now. No live figures have been substituted.
+          </p>
+        )}
+        {isEmpty && !historyLoading && (
+          <p className="w-full text-xs text-muted-foreground">
+            No workflow snapshots have been recorded yet. CHEESEAnal will remain empty until the first snapshot is available.
           </p>
         )}
         {historyError && (
@@ -170,7 +184,7 @@ const CheeseAnal = () => {
           days={ranged}
           selectedKey={poolKey}
           onSelect={setPoolKey}
-          failed={failed}
+          failed={current?.partial ?? []}
           isLoading={latestDayLoading}
         />
 
