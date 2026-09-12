@@ -102,6 +102,23 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
       {hasSeries ? (
         <div className="grid gap-4 md:grid-cols-2">
           <div>
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+              CHEESE price in {pool.symbol}
+            </div>
+            <div className="h-36">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
+                  <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
+                  <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => tokenPrice(v)} tick={axisTick} width={80} stroke="hsl(var(--border))" />
+                  <Tooltip content={tooltip((v) => tokenPrice(v, pool.symbol), 'text-cheese')} />
+                  <Line type="monotone" dataKey="price" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }} activeDot={{ r: 4 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div>
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Pool value (USD)</div>
             <div className="h-36">
               <ResponsiveContainer width="100%" height="100%">
@@ -162,23 +179,6 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
                   <YAxis domain={['auto', 'auto']} allowDecimals={false} tick={axisTick} width={40} stroke="hsl(var(--border))" />
                   <Tooltip content={tooltip((v) => `${v} accounts`, 'text-foreground')} />
                   <Line type="monotone" dataKey="accounts" stroke="#22c55e" strokeWidth={2} dot={{ r: 3, fill: '#22c55e', strokeWidth: 0 }} activeDot={{ r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div>
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
-              CHEESE price in {pool.symbol}
-            </div>
-            <div className="h-36">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
-                  <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
-                  <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => tokenPrice(v)} tick={axisTick} width={80} stroke="hsl(var(--border))" />
-                  <Tooltip content={tooltip((v) => tokenPrice(v, pool.symbol), 'text-cheese')} />
-                  <Line type="monotone" dataKey="price" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
