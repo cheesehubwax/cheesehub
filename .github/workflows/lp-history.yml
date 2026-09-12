@@ -1,0 +1,80 @@
+name: CHEESELytics LP History
+
+on:
+  schedule:
+    # One snapshot per UTC day. Three ticks because GitHub's shared cron queue
+    # often delays or drops them — the sampler records only when the current UTC
+    # day has no snapshot yet, so the extra ticks are free no-ops.
+    - cron: "41 1 * * *"
+    - cron: "41 4 * * *"
+    - cron: "41 9 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Set to '1' to re-record even when today already has a snapshot"
+        required: false
+        default: "0"
+
+concurrency:
+  group: lp-history
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Prepare data branch checkout
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git clone --depth 1 --branch lp-history-data "$REPO_URL" /tmp/lp-data 2>/dev/null; then
+            echo "Existing lp-history-data branch checked out."
+          else
+            echo "Creating orphan lp-history-data branch..."
+            git clone --depth 1 "$REPO_URL" /tmp/lp-data
+            cd /tmp/lp-data
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git checkout --orphan lp-history-data
+            git rm -rf --quiet . || true
+            mkdir -p data/days
+            echo '{"updatedAt":0,"days":[]}' > data/lp-history-index.json
+            printf '%s\n' "# CHEESELytics LP history" "" "Data-only branch written by .github/workflows/lp-history.yml." > README.md
+            git add -A
+            git commit -m "chore: init CHEESELytics LP history data branch"
+            git push -u origin lp-history-data
+          fi
+          mkdir -p /tmp/lp-data/data/days
+
+      - name: Snapshot CHEESE liquidity pools
+        working-directory: scripts/lp-history
+        env:
+          LP_HISTORY_DIR: /tmp/lp-data/data
+          FORCE: ${{ github.event.inputs.force }}
+        run: bun run sample.ts
+
+      - name: Commit snapshot
+        run: |
+          set -euo pipefail
+          cd /tmp/lp-data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A data
+          if git diff --cached --quiet; then
+            echo "No change to commit."
+            exit 0
+          fi
+          git commit -m "chore: CHEESE LP snapshot $(date -u +'%Y-%m-%d')"
+          git push origin lp-history-data
