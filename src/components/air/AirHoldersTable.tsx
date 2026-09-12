@@ -23,6 +23,8 @@ export function AirHoldersTable() {
     isRam,
     sendSymbol,
     recipients,
+    ramPurchaseCounts,
+
     nftAssignments,
     precision,
     cheesePerRamKb,
