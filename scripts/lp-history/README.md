@@ -1,4 +1,4 @@
-# CHEESELytics LP history sampler
+# CHEESEAnal LP history sampler
 
 Records one snapshot per UTC day of every tracked CHEESE liquidity pool on Alcor
 (all fee tiers), including a row per provider account.

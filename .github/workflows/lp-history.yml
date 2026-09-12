@@ -1,4 +1,4 @@
-name: CHEESELytics LP History
+name: CHEESEAnal LP History
 
 on:
   schedule:
@@ -55,9 +55,9 @@ jobs:
             git rm -rf --quiet . || true
             mkdir -p data/days
             echo '{"updatedAt":0,"days":[]}' > data/lp-history-index.json
-            printf '%s\n' "# CHEESELytics LP history" "" "Data-only branch written by .github/workflows/lp-history.yml." > README.md
+            printf '%s\n' "# CHEESEAnal LP history" "" "Data-only branch written by .github/workflows/lp-history.yml." > README.md
             git add -A
-            git commit -m "chore: init CHEESELytics LP history data branch"
+            git commit -m "chore: init CHEESEAnal LP history data branch"
             git push -u origin lp-history-data
           fi
           mkdir -p /tmp/lp-data/data/days

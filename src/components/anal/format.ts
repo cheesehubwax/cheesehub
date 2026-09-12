@@ -1,4 +1,4 @@
-// CHEESELytics — small shared formatters.
+// CHEESEAnal — small shared formatters.
 
 export function usd(value: number): string {
   if (!Number.isFinite(value)) return '$0.00';

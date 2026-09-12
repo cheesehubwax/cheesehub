@@ -1,13 +1,13 @@
-// CHEESELytics — analytics for the CHEESE liquidity pools on Alcor.
-// Intentionally not linked from the header yet: reachable at /cheeselytics only.
+// CHEESEAnal — anaanal for the CHEESE liquidity pools on Alcor.
+// Intentionally not linked from the header yet: reachable at /cheeseanal only.
 import { useMemo, useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { Button } from '@/components/ui/button';
-import { LyticsAccountPanel } from '@/components/lytics/LyticsAccountPanel';
-import { LyticsOverview } from '@/components/lytics/LyticsOverview';
-import { LyticsPoolDetail } from '@/components/lytics/LyticsPoolDetail';
-import { LyticsPoolTable } from '@/components/lytics/LyticsPoolTable';
+import { AnalAccountPanel } from '@/components/anal/AnalAccountPanel';
+import { AnalOverview } from '@/components/anal/AnalOverview';
+import { AnalPoolDetail } from '@/components/anal/AnalPoolDetail';
+import { AnalPoolTable } from '@/components/anal/AnalPoolTable';
 import {
   LP_RANGES,
   sliceDays,
@@ -21,7 +21,7 @@ import { TRACKED_LP_PAIRS } from '@/lib/lpPools';
 import { playRandomFart } from '@/lib/fartSounds';
 import cheeseOrb from '@/assets/cheeseram.png';
 
-const CheeseLytics = () => {
+const CheeseAnal = () => {
   const [range, setRange] = useState<LpRange>('30d');
   const [poolKey, setPoolKey] = useState<string | null>(TRACKED_LP_PAIRS[0]?.key ?? null);
   const [account, setAccount] = useState<string | null>(null);
@@ -48,7 +48,7 @@ const CheeseLytics = () => {
               className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer"
               onClick={playRandomFart}
             >
-              <img src={cheeseOrb} alt="CHEESELytics" className="w-24 h-24 object-contain" />
+              <img src={cheeseOrb} alt="CHEESEAnal" className="w-24 h-24 object-contain" />
             </div>
 
             <div className="text-center space-y-4">
@@ -56,7 +56,7 @@ const CheeseLytics = () => {
                 <OpenMojiIcon emoji="📈" size={26} />
                 <h1 className="text-3xl md:text-4xl font-bold">
                   <span className="text-cheese">CHEESE</span>
-                  <span className="text-foreground">Lytics</span>
+                  <span className="text-foreground">Anal</span>
                 </h1>
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">
                   BETA
@@ -112,9 +112,9 @@ const CheeseLytics = () => {
           <p className="w-full text-xs text-red-400">Recorded history could not be loaded right now.</p>
         )}
 
-        <LyticsOverview days={ranged} current={current} historyLoading={historyLoading} historyEmpty={isEmpty} />
+        <AnalOverview days={ranged} current={current} historyLoading={historyLoading} historyEmpty={isEmpty} />
 
-        <LyticsPoolTable
+        <AnalPoolTable
           current={current}
           days={ranged}
           selectedKey={poolKey}
@@ -123,14 +123,14 @@ const CheeseLytics = () => {
           isLoading={liveLoading}
         />
 
-        <LyticsPoolDetail
+        <AnalPoolDetail
           pool={selectedPool}
           days={ranged}
           current={current}
           onSelectAccount={(name) => setAccount(name)}
         />
 
-        <LyticsAccountPanel account={account} onAccountChange={setAccount} dates={dates} current={current} />
+        <AnalAccountPanel account={account} onAccountChange={setAccount} dates={dates} current={current} />
 
         <p className="text-[10px] text-muted-foreground text-center max-w-2xl">
           Pool figures come from Alcor's own position data: open positions count whether or not they are in range,
@@ -142,4 +142,4 @@ const CheeseLytics = () => {
   );
 };
 
-export default CheeseLytics;
+export default CheeseAnal;
