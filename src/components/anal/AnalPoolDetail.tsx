@@ -2,7 +2,8 @@
 import { useMemo } from 'react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
-import { PairLabel } from '@/components/anal/PairLogos';
+import { CheeseLogo, PairLabel, UsdcLogo } from '@/components/anal/PairLogos';
+import { TokenLogo } from '@/components/TokenLogo';
 import { VenueLabel } from '@/components/anal/VenueLogo';
 import { Button } from '@/components/ui/button';
 import { downloadPoolHistoryCsv } from '@/lib/lpCsv';
@@ -83,19 +84,27 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {[
-          { label: 'USD value', value: usd(pool.usd) },
-          { label: 'CHEESE', value: amount(pool.cheese, 0) },
-          { label: pool.symbol, value: amount(pool.paired, 4) },
+          { label: 'USD value', value: usd(pool.usd), logo: <UsdcLogo /> },
+          { label: 'CHEESE', value: amount(pool.cheese, 0), logo: <CheeseLogo /> },
+          {
+            label: pool.symbol,
+            value: amount(pool.paired, 4),
+            logo: <TokenLogo contract={pool.contract ?? ''} symbol={pool.symbol} size="sm" />,
+          },
           {
             label: `CHEESE price in ${pool.symbol}`,
             value: pool.priceInPaired
               ? `${tokenPrice(pool.priceInPaired, pool.symbol)}${pool.priceUsd ? ` · ${usdPrice(pool.priceUsd)}` : ''}`
               : '—',
+            logo: <TokenLogo contract={pool.contract ?? ''} symbol={pool.symbol} size="sm" />,
           },
-          { label: 'Providers', value: `${pool.accounts} (${pool.positions} pos)` },
+          { label: 'Providers', value: `${pool.accounts} (${pool.positions} pos)`, logo: null },
         ].map((stat) => (
           <div key={stat.label} className="rounded-lg bg-background/40 border border-border/40 p-3">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{stat.label}</div>
+            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+              {stat.logo}
+              {stat.label}
+            </div>
             <div className="text-sm font-mono font-semibold text-foreground">{stat.value}</div>
           </div>
         ))}
