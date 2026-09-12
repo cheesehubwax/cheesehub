@@ -161,6 +161,10 @@ export interface LpPoolSnapshot {
   priceInPaired?: number;
   /** The same price converted to USD. */
   priceUsd?: number;
+  /** Rolling 24h trading volume in USD (Alcor only, recorded once per UTC day). */
+  volumeUsd24?: number;
+  /** Rolling 24h trading volume of the CHEESE leg (Alcor only). */
+  volumeCheese24?: number;
   providers: LpProviderRow[];
 }
 
