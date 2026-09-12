@@ -1,5 +1,5 @@
 // CHEESEAnal — analytics for the CHEESE liquidity pools on Alcor.
-// Intentionally not linked from the header yet: reachable at /cheeseanal only.
+// Intentionally not linked from the header yet: reachable at /anal only.
 import { useMemo, useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
