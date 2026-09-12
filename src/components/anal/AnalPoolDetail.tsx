@@ -220,6 +220,46 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
               </ResponsiveContainer>
             </div>
           </div>
+
+          <div className="space-y-1">
+            <div className="w-fit mx-auto px-2 py-1 rounded-md bg-background/60 border border-border/40 text-center">
+              <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                <UsdLogo />
+                Volume (24h)
+              </div>
+              <div className="text-sm font-mono font-semibold text-foreground leading-tight">
+                {latestVolume?.volumeUsd !== null && latestVolume?.volumeUsd !== undefined
+                  ? usd(latestVolume.volumeUsd)
+                  : '—'}
+              </div>
+              <div className="text-[10px] font-mono text-muted-foreground leading-tight">
+                {latestVolume?.volumeCheese !== null && latestVolume?.volumeCheese !== undefined
+                  ? `${amount(latestVolume.volumeCheese, 0)} CHEESE`
+                  : ''}
+              </div>
+            </div>
+            {volumeSeries.length > 0 ? (
+              <div className="h-36">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
+                    <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
+                    <YAxis yAxisId="usd" domain={['auto', 'auto']} tickFormatter={(v: number) => usd(v)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
+                    <YAxis yAxisId="cheese" orientation="right" domain={['auto', 'auto']} tickFormatter={(v: number) => amount(v, 0)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
+                    <Tooltip content={volumeTooltip} />
+                    <Line yAxisId="usd" type="monotone" dataKey="volumeUsd" stroke="#38BDF8" strokeWidth={2} connectNulls={false} dot={{ r: 3, fill: '#38BDF8', strokeWidth: 0 }} activeDot={{ r: 4 }} />
+                    <Line yAxisId="cheese" type="monotone" dataKey="volumeCheese" stroke="#FACC15" strokeWidth={2} connectNulls={false} dot={{ r: 3, fill: '#FACC15', strokeWidth: 0 }} activeDot={{ r: 4 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="h-36 flex items-center justify-center text-center text-[11px] text-muted-foreground px-4">
+                {pool.venue === 'alcor'
+                  ? 'Volume history starts with the next daily snapshot.'
+                  : 'Volume is not published by this exchange.'}
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <p className="text-xs text-muted-foreground text-center py-4">
