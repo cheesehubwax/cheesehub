@@ -156,6 +156,7 @@ async function fetchAccountHistory(account: string, dates: string[]): Promise<Lp
         rows.push({
           date: day.date,
           poolKey: pool.key,
+          venue: pool.venue ?? 'alcor',
           label: pool.label,
           symbol: pool.symbol,
           usd: row.usd,
