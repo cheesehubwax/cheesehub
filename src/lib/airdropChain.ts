@@ -664,6 +664,8 @@ interface RamChzConfig {
   buy_spread_bps?: number;
   buy_slippage_bps?: number;
   reserve_buffer_bps?: number;
+  min_liquid_reserve?: string;
+
 }
 
 interface AlcorPoolRow {
