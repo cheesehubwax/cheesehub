@@ -250,43 +250,53 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
                 )}
               </div>
             <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
-                  <span>Position value (USD){selectedPoolLabel ? ` — ${selectedPoolLabel}` : ''}</span>
-                  {selectedPoolRow ? <VenueLabel venue={selectedPoolRow.venue} className="ml-1 normal-case" /> : null}
+              <div className="space-y-1">
+                <div className="w-fit mx-auto px-2 py-1 rounded-md bg-background/60 border border-border/40 text-center">
+                  <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <UsdLogo />
+                    Position value (USD){selectedPoolLabel ? ` — ${selectedPoolLabel}` : ''}
+                  </div>
+                  <div className="text-sm font-mono font-semibold text-foreground leading-tight">
+                    {usd(selectedPoolRow?.usd ?? totalNow)}
+                  </div>
                 </div>
                 <div className="h-36">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                       <defs>
                         <linearGradient id="analAccountUsd" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.35} />
-                          <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                          <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.35} />
+                          <stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                       <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
-                      <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => usd(v)} tick={axisTick} width={60} stroke="hsl(var(--border))" />
+                      <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => usd(v)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
                       <Tooltip content={tooltip((v) => usd(v), 'text-cheese')} />
-                      <Area type="monotone" dataKey="usd" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#analAccountUsd)" dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }} activeDot={{ r: 4 }} />
+                      <Area type="monotone" dataKey="usd" stroke="#3B82F6" strokeWidth={2} fill="url(#analAccountUsd)" dot={{ r: 3, fill: '#3B82F6', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              <div>
-                <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
-                  <span>CHEESE in positions{selectedPoolLabel ? ` — ${selectedPoolLabel}` : ''}</span>
-                  {selectedPoolRow ? <VenueLabel venue={selectedPoolRow.venue} className="ml-1 normal-case" /> : null}
+              <div className="space-y-1">
+                <div className="w-fit mx-auto px-2 py-1 rounded-md bg-background/60 border border-border/40 text-center">
+                  <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                    <CheeseLogo />
+                    CHEESE in positions{selectedPoolLabel ? ` — ${selectedPoolLabel}` : ''}
+                  </div>
+                  <div className="text-sm font-mono font-semibold text-foreground leading-tight">
+                    {amount(selectedPoolRow?.cheese ?? cheeseNow, 0)}
+                  </div>
                 </div>
                 <div className="h-36">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                       <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
-                      <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => amount(v, 0)} tick={axisTick} width={60} stroke="hsl(var(--border))" />
+                      <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => amount(v, 0)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
                       <Tooltip content={tooltip((v) => `${amount(v, 4)} CHEESE`, 'text-cheese')} />
-                      <Line type="monotone" dataKey="cheese" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }} activeDot={{ r: 4 }} />
+                      <Line type="monotone" dataKey="cheese" stroke="#22C55E" strokeWidth={2} dot={{ r: 3, fill: '#22C55E', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
