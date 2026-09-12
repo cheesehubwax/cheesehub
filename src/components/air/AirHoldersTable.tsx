@@ -173,7 +173,13 @@ export function AirHoldersTable() {
                                 KB
                               </span>
                             )}
+                            {isRam && (ramPurchaseCounts.get(h.account) ?? 1) > 1 && (
+                              <span className="block text-xs text-cheese">
+                                {ramPurchaseCounts.get(h.account)} purchases
+                              </span>
+                            )}
                           </>
+
                         ) : (
                           '—'
                         )}
