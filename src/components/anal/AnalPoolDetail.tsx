@@ -35,6 +35,9 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
               accounts: row.accounts,
               // This pair's own CHEESE price, in the paired token.
               price: row.priceInPaired ?? 0,
+              // Volume is recorded once per UTC day, so gaps are expected.
+              volumeUsd: row.volumeUsd24 ?? null,
+              volumeCheese: row.volumeCheese24 ?? null,
             }
           : null;
       })
