@@ -1,15 +1,16 @@
 /**
  * CHEESEAnal LP snapshot sampler.
  *
- * Once a day, reads every CHEESE pool on Alcor, Taco and Defibox and records,
- * per pool: total USD value, CHEESE held, paired token held, provider count,
- * position count and the CHEESE price in that pair — plus one row per provider
- * account with the same figures. Run by .github/workflows/lp-history.yml.
+ * Twice a day (once per UTC 12h slot, keyed `YYYY-MM-DDTHH`), reads every
+ * CHEESE pool on Alcor, Taco and Defibox and records, per pool: total USD
+ * value, CHEESE held, paired token held, provider count, position count and
+ * the CHEESE price in that pair — plus one row per provider account with the
+ * same figures. Run by .github/workflows/lp-history.yml.
  *
  * Env:
  *   LP_HISTORY_DIR  directory of the data branch checkout (required).
- *                   Writes <dir>/lp-history-index.json and <dir>/days/<date>.json
- *   FORCE=1         re-record even when today's UTC day already has a snapshot
+ *                   Writes <dir>/lp-history-index.json and <dir>/days/<slot>.json
+ *   FORCE=1         re-record even when the current 12h slot already has a snapshot
  */
 
 import {
@@ -20,7 +21,7 @@ import {
   poolsForPair,
   round,
   selectVenuePairs,
-  utcDay,
+  utcSlot,
   venuePair,
   type LpDayFile,
   type LpIndexFile,
@@ -111,18 +112,18 @@ async function main() {
   const force = process.env.FORCE === "1";
 
   const now = Date.now();
-  const date = utcDay(now);
+  const date = utcSlot(now);
   const indexFile = `${dir}/lp-history-index.json`;
   const dayFile = `${dir}/days/${date}.json`;
 
   const index = await readJson<LpIndexFile>(indexFile, { updatedAt: 0, days: [] });
-  const alreadyHaveDay = index.days.some((d) => d.date === date);
-  console.log(`Now ${new Date(now).toISOString()} → UTC day ${date}.`);
-  if (alreadyHaveDay && !force) {
-    console.log("Day already recorded — skipping.");
+  const alreadyHaveSlot = index.days.some((d) => d.date === date);
+  console.log(`Now ${new Date(now).toISOString()} → UTC 12h slot ${date}.`);
+  if (alreadyHaveSlot && !force) {
+    console.log("Slot already recorded — skipping.");
     return;
   }
-  if (alreadyHaveDay && force) console.log("Day already recorded, but FORCE=1 — re-recording.");
+  if (alreadyHaveSlot && force) console.log("Slot already recorded, but FORCE=1 — re-recording.");
 
   const prices = await fetchUsdPrices();
   const cheeseUsd = cheeseUsdFrom(prices);
@@ -149,7 +150,7 @@ async function main() {
     }
   }
 
-  if (snapshots.length === 0) throw new Error("No venue could be read — refusing to record a day");
+  if (snapshots.length === 0) throw new Error("No venue could be read — refusing to record a snapshot");
 
   snapshots.sort((a, b) => b.usd - a.usd || a.key.localeCompare(b.key));
 
@@ -170,7 +171,7 @@ async function main() {
   await Bun.write(indexFile, `${JSON.stringify(nextIndex)}\n`);
 
   console.log(
-    `Recorded ${date}: ${snapshots.length} pools (${nextIndex.days.length} days in index)` +
+    `Recorded ${date}: ${snapshots.length} pools (${nextIndex.days.length} snapshots in index)` +
       `${partial.length ? ` — missing ${partial.join(", ")}` : ""}.`,
   );
 }

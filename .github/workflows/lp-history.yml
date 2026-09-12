@@ -2,16 +2,20 @@ name: CHEESEAnal LP History
 
 on:
   schedule:
-    # One snapshot per UTC day. Three ticks because GitHub's shared cron queue
-    # often delays or drops them — the sampler records only when the current UTC
-    # day has no snapshot yet, so the extra ticks are free no-ops.
+    # Two snapshots per UTC day: one in the 00:00-11:59 slot and one in the
+    # 12:00-23:59 slot. Each slot has three ticks because GitHub's shared cron
+    # queue often delays or drops them — the sampler records only when the
+    # current slot has no snapshot yet, so the extra ticks are free no-ops.
     - cron: "41 1 * * *"
     - cron: "41 4 * * *"
     - cron: "41 9 * * *"
+    - cron: "41 13 * * *"
+    - cron: "41 16 * * *"
+    - cron: "41 21 * * *"
   workflow_dispatch:
     inputs:
       force:
-        description: "Set to '1' to re-record even when today already has a snapshot"
+        description: "Set to '1' to re-record even when this 12h slot already has a snapshot"
         required: false
         default: "0"
       reset:
@@ -85,5 +89,5 @@ jobs:
             echo "No change to commit."
             exit 0
           fi
-          git commit -m "chore: CHEESE LP snapshot $(date -u +'%Y-%m-%d')"
+          git commit -m "chore: CHEESE LP snapshot $(date -u +'%Y-%m-%dT%H:%MZ')"
           git push origin lp-history-data
