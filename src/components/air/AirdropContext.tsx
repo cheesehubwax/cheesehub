@@ -593,7 +593,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     if (!isRam || !pricing) return null;
     const maxTotal = maxCheeseForPool(pricing);
     if (maxTotal === null || !(maxTotal > 0)) return null;
-    const divisor = mode === 'fixed' ? Math.max(1, recipientsForPoolSplit) : 1;
+    const divisor = mode === 'fixed' ? Math.max(1, selectedCount) : 1;
     const f = 10 ** CHEESE_PRECISION;
     const cheese = Math.floor((maxTotal / divisor) * f) / f;
     if (!(cheese > 0)) return null;
