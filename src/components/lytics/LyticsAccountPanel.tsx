@@ -157,7 +157,7 @@ export function LyticsAccountPanel({ account, onAccountChange, dates, current }:
             </div>
           )}
 
-          {series.length >= 2 ? (
+          {series.length >= 1 ? (
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Position value (USD)</div>
@@ -174,7 +174,7 @@ export function LyticsAccountPanel({ account, onAccountChange, dates, current }:
                       <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
                       <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => usd(v)} tick={axisTick} width={60} stroke="hsl(var(--border))" />
                       <Tooltip content={tooltip((v) => usd(v), 'text-cheese')} />
-                      <Area type="monotone" dataKey="usd" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#lyticsAccountUsd)" />
+                      <Area type="monotone" dataKey="usd" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#lyticsAccountUsd)" dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -189,7 +189,7 @@ export function LyticsAccountPanel({ account, onAccountChange, dates, current }:
                       <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
                       <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => amount(v, 0)} tick={axisTick} width={60} stroke="hsl(var(--border))" />
                       <Tooltip content={tooltip((v) => `${amount(v, 4)} CHEESE`, 'text-cheese')} />
-                      <Line type="monotone" dataKey="cheese" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="cheese" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -199,7 +199,7 @@ export function LyticsAccountPanel({ account, onAccountChange, dates, current }:
             <p className="text-xs text-muted-foreground text-center py-2">
               {isLoading
                 ? 'Loading recorded history for this account...'
-                : 'No recorded history for this account yet — charts appear once two days are recorded.'}
+                : 'Charts appear once a snapshot has been recorded.'}
             </p>
           )}
         </>
