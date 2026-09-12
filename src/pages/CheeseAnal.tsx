@@ -175,9 +175,11 @@ const CheeseAnal = () => {
         <AnalAccountPanel account={account} onAccountChange={setAccount} dates={dates} current={current} />
 
         <p className="text-[10px] text-muted-foreground text-center max-w-2xl">
-          Pool figures come from Alcor's own position data: open positions count whether or not they are in range,
-          valued at their current USD value. Headline figures are live; charts are built from one recorded snapshot
-          per day.
+          Alcor figures come from Alcor's own position data: open positions count whether or not they are in range,
+          valued at their current USD value. Taco and Defibox are constant-product pools, so each provider's share of
+          the pool is worked out from their LP tokens and valued at market prices. Every tracked pair is recorded on
+          each venue, plus any other CHEESE pair holding more than $100. Headline figures are live; charts are built
+          from one recorded snapshot per day.
         </p>
       </main>
     </Layout>
