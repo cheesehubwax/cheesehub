@@ -48,6 +48,9 @@ interface RawPosition {
   liquidity?: string | number;
   closed?: boolean;
   inRange?: boolean;
+  /** Current USD value of the position — what Alcor's UI shows. */
+  totalValue?: number;
+  /** USD value originally deposited; only a fallback, it drifts badly. */
   depositedUSDTotal?: number;
 }
 
@@ -147,10 +150,13 @@ function formatUsd(value: number): string {
 }
 
 /**
- * Liquidity providers of every fee tier of one pair, weighted by the USD value
- * of their open, in-range positions. Weights across pools are summed per
- * account, and accounts with no USD value are dropped (they cannot receive a
- * pro-rata share).
+ * Liquidity providers of every fee tier of one pair, weighted by the *current*
+ * USD value of their open positions — the same figure Alcor's own UI shows.
+ * `depositedUSDTotal` is only the value at deposit time and drifts far from
+ * reality, so it is used solely as a fallback. Out-of-range positions still
+ * count: the funds are in the pool and Alcor's TVL includes them. Weights are
+ * summed per account, and accounts with no USD value are dropped (they cannot
+ * receive a pro-rata share).
  */
 export async function getAlcorLpHolders(pair: AlcorPair): Promise<LpHolderSnapshot> {
   const results = await Promise.allSettled(
@@ -176,9 +182,8 @@ export async function getAlcorLpHolders(pair: AlcorPair): Promise<LpHolderSnapsh
       const account = pos.owner ?? '';
       if (!account) continue;
       if (pos.closed === true) continue;
-      if (pos.inRange !== true) continue;
       if (!(Number(pos.liquidity ?? 0) > 0)) continue;
-      const usd = Number(pos.depositedUSDTotal ?? 0);
+      const usd = Number(pos.totalValue ?? pos.depositedUSDTotal ?? 0);
       if (!(usd > 0)) continue;
       positions += 1;
       usdByAccount.set(account, (usdByAccount.get(account) ?? 0) + usd);
@@ -190,7 +195,7 @@ export async function getAlcorLpHolders(pair: AlcorPair): Promise<LpHolderSnapsh
     .sort((a, b) => b.weight - a.weight);
 
   if (holders.length === 0) {
-    throw new Error(`No in-range liquidity providers found for ${pairLabel(pair)}`);
+    throw new Error(`No open liquidity positions found for ${pairLabel(pair)}`);
   }
 
   return {
