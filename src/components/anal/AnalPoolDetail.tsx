@@ -2,6 +2,7 @@
 import { useMemo } from 'react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+import { PairLabel } from '@/components/anal/PairLogos';
 import { VenueLabel } from '@/components/anal/VenueLogo';
 import { Button } from '@/components/ui/button';
 import { downloadPoolHistoryCsv } from '@/lib/lpCsv';
@@ -64,7 +65,7 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
         <div className="flex items-center gap-2">
           <OpenMojiIcon emoji="🔍" size={18} />
           <span className="text-sm font-medium text-foreground">
-            <span className="text-cheese">CHEESE</span> / {pool.symbol}
+            <PairLabel symbol={pool.symbol} contract={pool.contract} size="md" />
           </span>
           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/60 bg-background/60 text-muted-foreground">
             <VenueLabel venue={pool.venue} />
