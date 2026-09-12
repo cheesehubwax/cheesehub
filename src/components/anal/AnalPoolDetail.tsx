@@ -5,7 +5,7 @@ import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { Button } from '@/components/ui/button';
 import { downloadPoolHistoryCsv } from '@/lib/lpCsv';
 import { LP_VENUE_LABELS, type LpDayFile, type LpIndexDay, type LpPoolSnapshot } from '@/lib/lpPools';
-import { amount, shortDate, usd, usdPrice } from './format';
+import { amount, shortDate, tokenPrice, usd, usdPrice } from './format';
 
 interface AnalPoolDetailProps {
   pool: LpPoolSnapshot | null;
@@ -30,7 +30,8 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
               cheese: row.cheese,
               paired: row.paired,
               accounts: row.accounts,
-              price: row.priceUsd ?? day.cheeseUsd ?? 0,
+              // This pair's own CHEESE price, in the paired token.
+              price: row.priceInPaired ?? 0,
             }
           : null;
       })
@@ -84,9 +85,9 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
           { label: 'CHEESE', value: amount(pool.cheese, 0) },
           { label: pool.symbol, value: amount(pool.paired, 4) },
           {
-            label: 'CHEESE price',
-            value: pool.priceUsd
-              ? `${usdPrice(pool.priceUsd)}${pool.priceInPaired ? ` · ${amount(pool.priceInPaired, 8)} ${pool.symbol}` : ''}`
+            label: `CHEESE price in ${pool.symbol}`,
+            value: pool.priceInPaired
+              ? `${tokenPrice(pool.priceInPaired, pool.symbol)}${pool.priceUsd ? ` · ${usdPrice(pool.priceUsd)}` : ''}`
               : '—',
           },
           { label: 'Providers', value: `${pool.accounts} (${pool.positions} pos)` },
