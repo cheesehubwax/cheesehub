@@ -58,17 +58,17 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
           .map((pool) => pool.volumeUsd24)
           .filter((value): value is number => value !== undefined);
         return {
-        date: day.date,
-        price: day.cheeseUsd ?? 0,
-        usd: day.pools.reduce((sum, p) => sum + p.usd, 0),
-        cheese: day.pools.reduce((sum, p) => sum + p.cheese, 0),
-        accounts:
-          day.uniqueAccounts ?? day.pools.reduce((sum, p) => sum + p.accounts, 0),
-        positions: day.pools.reduce((sum, p) => sum + p.positions, 0),
-        volume: recordedVolumes.length > 0
-          ? recordedVolumes.reduce((sum, value) => sum + value, 0)
-          : null,
-      };
+          date: day.date,
+          price: day.cheeseUsd ?? 0,
+          usd: day.pools.reduce((sum, p) => sum + p.usd, 0),
+          cheese: day.pools.reduce((sum, p) => sum + p.cheese, 0),
+          accounts:
+            day.uniqueAccounts ?? day.pools.reduce((sum, p) => sum + p.accounts, 0),
+          positions: day.pools.reduce((sum, p) => sum + p.positions, 0),
+          volume: recordedVolumes.length > 0
+            ? recordedVolumes.reduce((sum, value) => sum + value, 0)
+            : null,
+        };
       }),
     [days],
   );
@@ -174,7 +174,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
                 content={({ active: isActive, payload }) =>
                   isActive && payload?.length ? (
                     <div className="bg-background/95 border border-border px-2 py-1 rounded text-xs font-mono">
-                       <div className="text-cheese">{active.format(Number(payload[0].value))}</div>
+                      <div className="text-cheese">{active.format(Number(payload[0].value))}</div>
                       <div className="text-muted-foreground">
                         {tooltipDate(String(payload[0].payload.date))}
                       </div>
