@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import type { LpDayFile, LpIndexDay } from '@/lib/lpPools';
-import { amount, change, shortDate, usd, usdPrice } from './format';
+import { amount, change, shortDate, tooltipDate, usd, usdPrice } from './format';
 
 interface AnalOverviewProps {
   /** Recorded days already trimmed to the selected range. */
@@ -146,7 +146,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
                     <div className="bg-background/95 border border-border px-2 py-1 rounded text-xs font-mono">
                       <div className="text-cheese">{active.format(Number(payload[0].value))}</div>
                       <div className="text-muted-foreground">
-                        {active.label} · {shortDate(String(payload[0].payload.date))}
+                        {tooltipDate(String(payload[0].payload.date))}
                       </div>
                     </div>
                   ) : null

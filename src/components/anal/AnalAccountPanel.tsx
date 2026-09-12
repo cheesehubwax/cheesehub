@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { useLpAccountHistory } from '@/hooks/useLpHistory';
 import { downloadAccountHistoryCsv } from '@/lib/lpCsv';
 import { LP_VENUE_LABELS, type LpDayFile } from '@/lib/lpPools';
-import { amount, shortDate, usd } from './format';
+import { amount, shortDate, tooltipDate, usd } from './format';
 
 interface AnalAccountPanelProps {
   account: string | null;
@@ -88,7 +88,7 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
       active && payload?.length ? (
         <div className="bg-background/95 border border-border px-2 py-1 rounded text-xs font-mono">
           <div className={className}>{formatter(Number(payload[0].value))}</div>
-          <div className="text-muted-foreground">{shortDate(String(payload[0].payload?.date ?? ''))}</div>
+          <div className="text-muted-foreground">{tooltipDate(String(payload[0].payload?.date ?? ''))}</div>
         </div>
       ) : null;
 

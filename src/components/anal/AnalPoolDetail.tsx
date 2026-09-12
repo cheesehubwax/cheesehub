@@ -5,7 +5,7 @@ import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { Button } from '@/components/ui/button';
 import { downloadPoolHistoryCsv } from '@/lib/lpCsv';
 import { LP_VENUE_LABELS, type LpDayFile, type LpIndexDay, type LpPoolSnapshot } from '@/lib/lpPools';
-import { amount, shortDate, tokenPrice, usd, usdPrice } from './format';
+import { amount, shortDate, tokenPrice, tooltipDate, usd, usdPrice } from './format';
 
 interface AnalPoolDetailProps {
   pool: LpPoolSnapshot | null;
@@ -53,7 +53,7 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
       active && payload?.length ? (
         <div className="bg-background/95 border border-border px-2 py-1 rounded text-xs font-mono">
           <div className={className}>{formatter(Number(payload[0].value))}</div>
-          <div className="text-muted-foreground">{shortDate(String(payload[0].payload?.date ?? ''))}</div>
+          <div className="text-muted-foreground">{tooltipDate(String(payload[0].payload?.date ?? ''))}</div>
         </div>
       ) : null;
 
