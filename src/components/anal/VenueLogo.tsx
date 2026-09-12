@@ -21,7 +21,11 @@ export function VenueLogo({ venue, className }: VenueLogoProps) {
       src={VENUE_LOGOS[venue]}
       alt=""
       aria-hidden="true"
-      className={cn('h-4 w-4 shrink-0 object-contain', className)}
+      className={cn(
+        'h-4 shrink-0 object-contain',
+        venue === 'defibox' ? 'w-12' : 'w-4',
+        className,
+      )}
     />
   );
 }
@@ -42,10 +46,10 @@ export function VenueLabel({ venue, className }: VenueLabelProps) {
 
 export function AllVenueLogos({ className }: { className?: string }) {
   return (
-    <span className={cn('inline-flex items-center -space-x-1', className)} aria-hidden="true">
+    <span className={cn('inline-flex items-center gap-1', className)} aria-hidden="true">
       <VenueLogo venue="alcor" className="h-4 w-4" />
       <VenueLogo venue="taco" className="h-4 w-4" />
-      <VenueLogo venue="defibox" className="h-4 w-4" />
+      <VenueLogo venue="defibox" className="h-3 w-10" />
     </span>
   );
 }

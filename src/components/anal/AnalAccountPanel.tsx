@@ -58,13 +58,9 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
     [rows, selectedPool],
   );
 
-  const selectedPoolLabel = useMemo(() => {
+  const selectedPoolRow = useMemo(() => {
     if (!selectedPool) return null;
-    const hit =
-      holdings.find((h) => h.key === selectedPool) ?? rows.find((r) => r.poolKey === selectedPool) ?? null;
-    if (!hit) return selectedPool;
-    const venue = LP_VENUE_LABELS[hit.venue] ?? hit.venue;
-    return venue ? `${hit.label} · ${venue}` : hit.label;
+    return holdings.find((h) => h.key === selectedPool) ?? rows.find((r) => r.poolKey === selectedPool) ?? null;
   }, [holdings, rows, selectedPool]);
 
   const series = useMemo(() => {
@@ -219,7 +215,16 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-muted-foreground">
-                  Showing: {selectedPoolLabel ?? 'All pools'}
+                  Showing:{' '}
+                  {selectedPoolRow ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <span>{selectedPoolRow.label}</span>
+                      <span>·</span>
+                      <VenueLabel venue={selectedPoolRow.venue} />
+                    </span>
+                  ) : (
+                    'All pools'
+                  )}
                 </span>
                 {selectedPool && (
                   <button
