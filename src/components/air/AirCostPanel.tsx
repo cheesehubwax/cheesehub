@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { formatUnits, RAM_BYTES_PER_NFT } from '@/lib/airdrop';
 import { formatCheese } from '@/lib/airdropResources';
-import { CHEESE_SYMBOL, MIN_RAM_PURCHASE_CHEESE } from '@/lib/airdropCheese';
+import { CHEESE_RAM_CONTRACT, CHEESE_SYMBOL, MIN_RAM_PURCHASE_CHEESE } from '@/lib/airdropCheese';
 import { RAM_BYTES_PER_ROW, useAirdrop } from '@/components/air/AirdropContext';
 
 function Metric({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -25,6 +25,8 @@ export function AirCostPanel() {
     ramBytesTotal,
     ramExcluded,
     ramPurchaseCount,
+    ramPoolWax,
+
 
     ramMinViable,
     ramLimits,
@@ -200,6 +202,15 @@ export function AirCostPanel() {
                   full amount. {ramPurchaseCount.toLocaleString()} purchases in total.
                 </p>
               )}
+              {ramPoolWax && ramPoolWax.overBy > 0 && (
+                <p className="mt-1 text-xs text-destructive">
+                  Exceeds the liquid WAX pool: this drop needs about{' '}
+                  {ramPoolWax.needed.toFixed(4)} WAX from {CHEESE_RAM_CONTRACT} and the pool can
+                  currently spend about {ramPoolWax.spendable.toFixed(4)} WAX. Lower the amount in
+                  the Distribution box or wait for the pool to refill.
+                </p>
+              )}
+
 
             </>
           ) : (

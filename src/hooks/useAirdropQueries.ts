@@ -61,7 +61,10 @@ export function useAirResourcePricing() {
     queryKey: ['air-resource-pricing'],
     queryFn: getResourcePricing,
     staleTime: 60 * 1000,
+    // The RAM pool's liquid WAX moves as others buy, so keep the figure fresh.
+    refetchInterval: 60 * 1000,
     retry: 1,
+
   });
 }
 

@@ -65,8 +65,13 @@ import {
   cheeseForCpuUs,
   cpuUsPerCheese,
   formatCheese,
+  maxCheeseForPool,
+  spendableWax,
   splitPurchases,
+  waxCostForCheese,
   weightCalibration,
+  RAM_MARGIN,
+
 } from '@/lib/airdropResources';
 import {
   useAirAccountResources,
@@ -141,6 +146,13 @@ interface AirdropContextValue {
   ramMinViable: { cheese: number; text: string } | null;
   /** RAM mode: fill the amount field with `ramMinViable`. */
   applyRamMinViable: () => void;
+  /** RAM mode: WAX this drop needs from the pool vs what the pool can spend. */
+  ramPoolWax: { needed: number; spendable: number; overBy: number } | null;
+  /** RAM mode: largest amount (in the selected unit) the pool can cover. */
+  ramPoolMaxViable: { cheese: number; text: string } | null;
+  /** RAM mode: fill the amount field with `ramPoolMaxViable`. */
+  applyRamPoolMax: () => void;
+
   /** Holders ticked in the table, before contract-limit filtering. */
   selectedCount: number;
 
@@ -573,6 +585,47 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     if (ramMinViable) setAmountText(ramMinViable.text);
   }, [ramMinViable]);
 
+  /**
+   * RAM mode: the WAX the CHEESERam pool would have to spend on this drop
+   * against what it can actually release right now. `null` when unpriceable.
+   */
+  const ramPoolWax = useMemo<{ needed: number; spendable: number; overBy: number } | null>(() => {
+    if (!isRam || !pricing || !(ramCheeseTotal > 0)) return null;
+    const needed = waxCostForCheese(ramCheeseTotal, pricing);
+    if (needed === null) return null;
+    const spendable = spendableWax(pricing);
+    return { needed, spendable, overBy: Math.max(0, needed - spendable) };
+  }, [isRam, pricing, ramCheeseTotal]);
+
+  /**
+   * RAM mode: the largest amount (in the selected unit) the pool's spendable
+   * WAX can cover. In fixed mode this is the per-holder figure.
+   */
+  const ramPoolMaxViable = useMemo<{ cheese: number; text: string } | null>(() => {
+    if (!isRam || !pricing) return null;
+    const maxTotal = maxCheeseForPool(pricing);
+    if (maxTotal === null || !(maxTotal > 0)) return null;
+    const divisor = mode === 'fixed' ? Math.max(1, selectedCount) : 1;
+    const f = 10 ** CHEESE_PRECISION;
+    const cheese = Math.floor((maxTotal / divisor) * f) / f;
+    if (!(cheese > 0)) return null;
+    if (ramUnit === 'cheese') return { cheese, text: formatCheese(cheese) };
+    const per = bytesPerCheese(pricing);
+    if (!per || per <= 0) return null;
+    // Round down so converting back to CHEESE stays inside the pool limit.
+    // KB entries convert back to CHEESE with RAM_MARGIN applied, so shave that
+    // margin off here and round down — the refill must stay inside the pool.
+    const kb = Math.floor((((cheese / RAM_MARGIN) * per) / 1024) * 100) / 100;
+    if (!(kb > 0)) return null;
+    return { cheese, text: String(kb) };
+  }, [isRam, pricing, mode, ramUnit, selectedCount]);
+
+
+  const applyRamPoolMax = useCallback(() => {
+    if (ramPoolMaxViable) setAmountText(ramPoolMaxViable.text);
+  }, [ramPoolMaxViable]);
+
+
 
 
 
@@ -711,12 +764,19 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
           message: `This RAM airdrop spends ${formatCheese(ramCheeseTotal)} ${CHEESE_SYMBOL} but your balance is ${formatCheese(cheeseBalance)} ${CHEESE_SYMBOL} (CPU/NET top-ups are extra).`,
         });
       }
+      if (ramPoolWax && ramPoolWax.overBy > 0) {
+        out.push({
+          level: 'error',
+          message: `This RAM airdrop needs about ${ramPoolWax.needed.toFixed(4)} WAX from the ${CHEESE_RAM_CONTRACT} pool, which can currently spend about ${ramPoolWax.spendable.toFixed(4)} WAX. Lower the amount or wait for the pool to refill.`,
+        });
+      }
       if (ramExcluded.belowMin > 0 && ramLimits) {
         out.push({
           level: 'warn',
           message: `${ramExcluded.belowMin} recipient${ramExcluded.belowMin === 1 ? '' : 's'} skipped: their share is below the ${formatCheese(ramLimits.minCheese)} ${CHEESE_SYMBOL} minimum per purchase. Raise the amount or deselect holders.`,
         });
       }
+
       if (ramExcluded.split > 0 && ramLimits) {
         out.push({
           level: 'warn',
@@ -780,7 +840,10 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     ramLimits,
     isNft,
     mode,
+    ramPoolWax,
     nftShortfall,
+
+
     nftAssignments.length,
     nftAllocation.capped,
     nftAllocation.skipped,
@@ -1236,6 +1299,10 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
 
     ramMinViable,
     applyRamMinViable,
+    ramPoolWax,
+    ramPoolMaxViable,
+    applyRamPoolMax,
+
     selectedCount,
 
 

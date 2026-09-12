@@ -664,6 +664,8 @@ interface RamChzConfig {
   buy_spread_bps?: number;
   buy_slippage_bps?: number;
   reserve_buffer_bps?: number;
+  min_liquid_reserve?: string;
+
 }
 
 interface AlcorPoolRow {
@@ -745,7 +747,7 @@ export async function getResourcePricing(): Promise<ResourcePricing> {
   const config = configRes.rows?.[0] ?? {};
   const marketId = config.alcor_market_id ?? 0;
 
-  const [poolRes, ramRes, powerRes, statsRes] = await Promise.all([
+  const [poolRes, ramRes, powerRes, statsRes, poolWaxRes] = await Promise.all([
     marketId
       ? chainPost<{ rows?: AlcorPoolRow[] }>("/v1/chain/get_table_rows", {
           code: "swap.alcor",
@@ -783,6 +785,13 @@ export async function getResourcePricing(): Promise<ResourcePricing> {
       json: true,
       limit: 1,
     }).catch(() => ({ rows: [] })),
+    // Liquid WAX the RAM contract can actually spend on purchases.
+    chainPost<string[]>("/v1/chain/get_currency_balance", {
+      code: "eosio.token",
+      account: CHEESE_RAM_CONTRACT,
+      symbol: "WAX",
+    }).catch(() => [] as string[]),
+
   ]);
 
   // CHEESE/WAX price: pool spot, sanity-checked against the contract's own
@@ -831,7 +840,11 @@ export async function getResourcePricing(): Promise<ResourcePricing> {
         (config.reserve_buffer_bps ?? 300),
       historicalBytesPerCheese:
         cheeseReceived > 0 && bytesBought > 0 ? bytesBought / cheeseReceived : null,
+      liquidWax: assetAmount(Array.isArray(poolWaxRes) ? poolWaxRes[0] : undefined),
+      minLiquidReserve: assetAmount(config.min_liquid_reserve),
+      reserveBufferBps: config.reserve_buffer_bps ?? 300,
     },
+
     powerup:
       cpuPrice > 0 && netPrice > 0
         ? {
