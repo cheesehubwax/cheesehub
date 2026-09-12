@@ -93,7 +93,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
         {METRICS.map((stat) => {
           const selected = metric === stat.key;
           return (
@@ -114,6 +114,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
               }
             >
               <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                {stat.key === 'price' ? <CheeseLogo /> : null}
                 {stat.key === 'usd' ? <UsdLogo /> : null}
                 {stat.key === 'cheese' ? <CheeseLogo /> : null}
                 {stat.label}
