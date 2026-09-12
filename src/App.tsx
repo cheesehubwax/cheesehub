@@ -62,7 +62,7 @@ const App = () => {
                 {/* CHEESEAir — intentionally not linked from the header */}
                 <Route path="/air" element={<Air />} />
                 {/* CHEESEAnal — intentionally not linked from the header */}
-                <Route path="/cheeseanal" element={<CheeseAnal />} />
+                <Route path="/anal" element={<CheeseAnal />} />
                 <Route path="/bannerads" element={<BannerAds />} />
 
                 <Route path="/disclaimer" element={<Disclaimer />} />
