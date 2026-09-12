@@ -8,7 +8,7 @@ import { VenueLabel } from '@/components/anal/VenueLogo';
 import { Button } from '@/components/ui/button';
 import { downloadPoolHistoryCsv } from '@/lib/lpCsv';
 import { type LpDayFile, type LpIndexDay, type LpPoolSnapshot } from '@/lib/lpPools';
-import { amount, shortDate, tokenPrice, tooltipDate, usd, usdPrice } from './format';
+import { amount, shortDate, tokenPrice, tooltipDate, usd } from './format';
 
 interface AnalPoolDetailProps {
   pool: LpPoolSnapshot | null;
