@@ -45,6 +45,27 @@ export function sliceDays(days: LpIndexDay[], range: LpRange): LpIndexDay[] {
   return days.slice(-config.days);
 }
 
+/**
+ * Keep only the pools of one venue in every recorded day. `uniqueAccounts` is
+ * dropped for a single venue because it was deduplicated across all of them.
+ */
+export function filterDaysByVenue(days: LpIndexDay[], venue: LpVenue | 'all'): LpIndexDay[] {
+  if (venue === 'all') return days;
+  return days.map((day) => {
+    const { uniqueAccounts: _drop, ...rest } = day;
+    return { ...rest, pools: poolsForVenue(day.pools, venue) };
+  });
+}
+
+/** Keep only the pools of one venue in a snapshot. */
+export function filterSnapshotByVenue<T extends LpDayFile>(
+  snapshot: T | null,
+  venue: LpVenue | 'all',
+): T | null {
+  if (!snapshot || venue === 'all') return snapshot;
+  return { ...snapshot, pools: poolsForVenue(snapshot.pools, venue) };
+}
+
 /** Pool-level totals per recorded day (small file, always loaded). */
 export function useLpHistoryIndex() {
   const query = useQuery({
