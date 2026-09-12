@@ -58,9 +58,9 @@ export interface AccountHistoryRow {
 }
 
 /** One account's position across pools and days. */
-export function downloadAccountHistoryCsv(account: string, rows: AccountHistoryRow[]): void {
+export function downloadAccountHistoryCsv(account: string, rows: AccountHistoryRow[], poolKey?: string): void {
   const lines = [
-    `# CHEESELytics account history · ${account}`,
+    `# CHEESELytics account history · ${account}${poolKey ? ` · ${poolKey}` : ''}`,
     'date,pool,paired_token,usd_value,cheese,paired_amount,positions',
   ];
   for (const row of rows) {
@@ -68,5 +68,5 @@ export function downloadAccountHistoryCsv(account: string, rows: AccountHistoryR
       [row.date, cell(row.pool), cell(row.symbol), row.usd, row.cheese, row.paired, row.positions].join(','),
     );
   }
-  downloadCsvFile(`cheeselytics-account-${account}.csv`, lines);
+  downloadCsvFile(`cheeselytics-account-${account}${poolKey ? `-${poolKey}` : ''}.csv`, lines);
 }
