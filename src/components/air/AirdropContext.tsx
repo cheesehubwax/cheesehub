@@ -573,6 +573,44 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     if (ramMinViable) setAmountText(ramMinViable.text);
   }, [ramMinViable]);
 
+  /**
+   * RAM mode: the WAX the CHEESERam pool would have to spend on this drop
+   * against what it can actually release right now. `null` when unpriceable.
+   */
+  const ramPoolWax = useMemo<{ needed: number; spendable: number; overBy: number } | null>(() => {
+    if (!isRam || !pricing || !(ramCheeseTotal > 0)) return null;
+    const needed = waxCostForCheese(ramCheeseTotal, pricing);
+    if (needed === null) return null;
+    const spendable = spendableWax(pricing);
+    return { needed, spendable, overBy: Math.max(0, needed - spendable) };
+  }, [isRam, pricing, ramCheeseTotal]);
+
+  /**
+   * RAM mode: the largest amount (in the selected unit) the pool's spendable
+   * WAX can cover. In fixed mode this is the per-holder figure.
+   */
+  const ramPoolMaxViable = useMemo<{ cheese: number; text: string } | null>(() => {
+    if (!isRam || !pricing) return null;
+    const maxTotal = maxCheeseForPool(pricing);
+    if (maxTotal === null || !(maxTotal > 0)) return null;
+    const divisor = mode === 'fixed' ? Math.max(1, recipientsForPoolSplit) : 1;
+    const f = 10 ** CHEESE_PRECISION;
+    const cheese = Math.floor((maxTotal / divisor) * f) / f;
+    if (!(cheese > 0)) return null;
+    if (ramUnit === 'cheese') return { cheese, text: formatCheese(cheese) };
+    const per = bytesPerCheese(pricing);
+    if (!per || per <= 0) return null;
+    // Round down so converting back to CHEESE stays inside the pool limit.
+    const kb = Math.floor(((cheese * per) / 1024) * 100) / 100;
+    if (!(kb > 0)) return null;
+    return { cheese, text: String(kb) };
+  }, [isRam, pricing, mode, ramUnit, recipientsForPoolSplit]);
+
+  const applyRamPoolMax = useCallback(() => {
+    if (ramPoolMaxViable) setAmountText(ramPoolMaxViable.text);
+  }, [ramPoolMaxViable]);
+
+
 
 
 
