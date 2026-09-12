@@ -47,7 +47,8 @@ export function LyticsOverview({ days, current, historyLoading, historyEmpty }: 
         date: day.date,
         usd: day.pools.reduce((sum, p) => sum + p.usd, 0),
         cheese: day.pools.reduce((sum, p) => sum + p.cheese, 0),
-        accounts: day.pools.reduce((sum, p) => sum + p.accounts, 0),
+        accounts:
+          day.uniqueAccounts ?? day.pools.reduce((sum, p) => sum + p.accounts, 0),
         positions: day.pools.reduce((sum, p) => sum + p.positions, 0),
       })),
     [days],
