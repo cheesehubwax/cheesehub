@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLpAccountHistory } from '@/hooks/useLpHistory';
 import { downloadAccountHistoryCsv } from '@/lib/lpCsv';
-import type { LpDayFile } from '@/lib/lpPools';
+import { LP_VENUE_LABELS, type LpDayFile } from '@/lib/lpPools';
 import { amount, shortDate, usd } from './format';
 
 interface AnalAccountPanelProps {
@@ -30,7 +30,9 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
     return current.pools
       .map((pool) => {
         const row = pool.providers.find((p) => p.a === account);
-        return row ? { key: pool.key, label: pool.label, symbol: pool.symbol, ...row } : null;
+        return row
+          ? { key: pool.key, venue: pool.venue, label: pool.label, symbol: pool.symbol, ...row }
+          : null;
       })
       .filter((row): row is NonNullable<typeof row> => row !== null)
       .sort((a, b) => b.usd - a.usd);
@@ -126,6 +128,7 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
                   account,
                   chartRows.map((r) => ({
                     date: r.date,
+                    venue: r.venue,
                     pool: r.label,
                     symbol: r.symbol,
                     usd: r.usd,
