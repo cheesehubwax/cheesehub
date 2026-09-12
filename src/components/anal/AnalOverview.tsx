@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+import { CheeseLogo } from '@/components/anal/PairLogos';
 import type { LpDayFile, LpIndexDay } from '@/lib/lpPools';
 import { amount, change, shortDate, tooltipDate, usd, usdPrice } from './format';
 
@@ -109,7 +110,10 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
                   : 'bg-background/40 border-border/40 hover:border-primary/40'
               }`}
             >
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{stat.label}</div>
+              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                {stat.key === 'cheese' || stat.key === 'price' ? <CheeseLogo /> : null}
+                {stat.label}
+              </div>
               <div className="text-lg font-mono font-semibold text-cheese">{statValues[stat.key]}</div>
             </button>
           );

@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+import { PairLabel } from '@/components/anal/PairLogos';
 import { VenueLabel } from '@/components/anal/VenueLogo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,7 +38,14 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
       .map((pool) => {
         const row = pool.providers.find((p) => p.a === account);
         return row
-          ? { key: pool.key, venue: pool.venue, label: pool.label, symbol: pool.symbol, ...row }
+          ? {
+              key: pool.key,
+              venue: pool.venue,
+              label: pool.label,
+              symbol: pool.symbol,
+              contract: pool.contract,
+              ...row,
+            }
           : null;
       })
       .filter((row): row is NonNullable<typeof row> => row !== null)
@@ -190,7 +198,7 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
                       }`}
                     >
                       <td className="py-1.5 text-foreground whitespace-nowrap">
-                        <span className="text-cheese">CHEESE</span> / {row.symbol}
+                        <PairLabel symbol={row.symbol} contract={row.contract} />
                       </td>
                       <td className="py-1.5 whitespace-nowrap">
                         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/60 bg-background/60 text-muted-foreground">
