@@ -4,7 +4,7 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { CheeseLogo, UsdLogo } from '@/components/anal/PairLogos';
 import type { LpDayFile, LpIndexDay } from '@/lib/lpPools';
-import { amount, change, shortDate, tooltipDate, usd, usdPrice } from './format';
+import { amount, change, shortDate, tooltipDate, usd } from './format';
 
 interface AnalOverviewProps {
   /** Recorded days already trimmed to the selected range. */
@@ -15,22 +15,14 @@ interface AnalOverviewProps {
   historyEmpty: boolean;
 }
 
-type MetricKey = 'usd' | 'cheese' | 'accounts' | 'positions' | 'price';
+type MetricKey = 'usd' | 'cheese' | 'accounts' | 'positions';
 
-const METRICS: { key: MetricKey; label: string; format: (v: number) => string }[] = [
-  { key: 'usd', label: 'Total liquidity', format: usd },
-  { key: 'cheese', label: 'CHEESE in pools', format: (v) => amount(v, 0) },
-  { key: 'accounts', label: 'Providers', format: (v) => String(Math.round(v)) },
-  { key: 'positions', label: 'Positions', format: (v) => String(Math.round(v)) },
-  { key: 'price', label: 'CHEESE price', format: usdPrice },
+const METRICS: { key: MetricKey; label: string; color: string; format: (v: number) => string }[] = [
+  { key: 'usd', label: 'Total liquidity', color: '#3B82F6', format: usd },
+  { key: 'cheese', label: 'CHEESE in pools', color: '#22C55E', format: (v) => amount(v, 0) },
+  { key: 'accounts', label: 'Providers', color: '#FFFFFF', format: (v) => String(Math.round(v)) },
+  { key: 'positions', label: 'Positions', color: '#EC4899', format: (v) => String(Math.round(v)) },
 ];
-
-/** CHEESE price for a day: the recorded price, else the deepest pool's price. */
-function dayPrice(day: LpIndexDay): number {
-  if (day.cheeseUsd && day.cheeseUsd > 0) return day.cheeseUsd;
-  const deepest = [...day.pools].sort((a, b) => b.usd - a.usd).find((p) => (p.priceUsd ?? 0) > 0);
-  return deepest?.priceUsd ?? 0;
-}
 
 export function AnalOverview({ days, current, historyLoading, historyEmpty }: AnalOverviewProps) {
   const [metric, setMetric] = useState<MetricKey>('usd');
@@ -47,9 +39,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
       positions += pool.positions;
       for (const row of pool.providers) accounts.add(row.a);
     }
-    const priced = [...pools].sort((a, b) => b.usd - a.usd).find((p) => (p.priceUsd ?? 0) > 0);
-    const price = current?.cheeseUsd && current.cheeseUsd > 0 ? current.cheeseUsd : (priced?.priceUsd ?? 0);
-    return { value, cheese, positions, accounts: accounts.size, pools: pools.length, price };
+    return { value, cheese, positions, accounts: accounts.size, pools: pools.length };
   }, [current]);
 
   const series = useMemo(
@@ -61,7 +51,6 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
         accounts:
           day.uniqueAccounts ?? day.pools.reduce((sum, p) => sum + p.accounts, 0),
         positions: day.pools.reduce((sum, p) => sum + p.positions, 0),
-        price: dayPrice(day),
       })),
     [days],
   );
@@ -78,7 +67,6 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
     cheese: amount(totals.cheese, 0),
     accounts: String(totals.accounts),
     positions: String(totals.positions),
-    price: usdPrice(totals.price),
   };
 
   return (
@@ -95,7 +83,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         {METRICS.map((stat) => {
           const selected = metric === stat.key;
           return (
@@ -104,18 +92,25 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
               type="button"
               onClick={() => setMetric(stat.key)}
               aria-pressed={selected}
-              className={`rounded-lg border p-3 text-left transition-colors ${
+              className="rounded-lg border p-3 text-left transition-colors"
+              style={
                 selected
-                  ? 'bg-primary/15 border-primary/60 shadow-[0_0_0_1px_hsl(var(--primary)/0.4)]'
-                  : 'bg-background/40 border-border/40 hover:border-primary/40'
-              }`}
+                  ? {
+                      backgroundColor: `${stat.color}1F`,
+                      borderColor: `${stat.color}99`,
+                      boxShadow: `0 0 0 1px ${stat.color}66`,
+                    }
+                  : undefined
+              }
             >
               <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                 {stat.key === 'usd' ? <UsdLogo /> : null}
-                {stat.key === 'cheese' || stat.key === 'price' ? <CheeseLogo /> : null}
+                {stat.key === 'cheese' ? <CheeseLogo /> : null}
                 {stat.label}
               </div>
-              <div className="text-lg font-mono font-semibold text-cheese">{statValues[stat.key]}</div>
+              <div className="text-lg font-mono font-semibold" style={{ color: stat.color }}>
+                {statValues[stat.key]}
+              </div>
             </button>
           );
         })}
@@ -127,8 +122,8 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
             <AreaChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="analTotalGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  <stop offset="0%" stopColor={active.color} stopOpacity={0.35} />
+                  <stop offset="100%" stopColor={active.color} stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
@@ -160,10 +155,10 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
               <Area
                 type="monotone"
                 dataKey={metric}
-                stroke="hsl(var(--primary))"
+                stroke={active.color}
                 strokeWidth={2}
                 fill="url(#analTotalGradient)"
-                dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }}
+                dot={{ r: 3, fill: active.color, strokeWidth: 0 }}
                 activeDot={{ r: 4 }}
               />
             </AreaChart>
