@@ -1,4 +1,4 @@
-// CHEESEAnal — analytics for the CHEESE liquidity pools on Alcor.
+// CHEESEAnal — analytics for the CHEESE liquidity pools on Alcor, Taco and Defibox.
 // Intentionally not linked from the header yet: reachable at /anal only.
 import { useMemo, useState } from 'react';
 import { Layout } from '@/components/Layout';
@@ -10,6 +10,8 @@ import { AnalPoolDetail } from '@/components/anal/AnalPoolDetail';
 import { AnalPoolTable } from '@/components/anal/AnalPoolTable';
 import {
   LP_RANGES,
+  filterDaysByVenue,
+  filterSnapshotByVenue,
   sliceDays,
   useLiveLpSnapshot,
   useLpDay,
@@ -17,13 +19,19 @@ import {
   type LpRange,
 } from '@/hooks/useLpHistory';
 import { downloadSnapshotCsv } from '@/lib/lpCsv';
-import { TRACKED_LP_PAIRS } from '@/lib/lpPools';
+import { LP_VENUES, LP_VENUE_LABELS, type LpVenue } from '@/lib/lpPools';
 import { playRandomFart } from '@/lib/fartSounds';
 import cheeseOrb from '@/assets/cheeseram.png';
 
+const VENUE_TABS: { key: LpVenue | 'all'; label: string }[] = [
+  { key: 'all', label: 'All venues' },
+  ...LP_VENUES.map((v) => ({ key: v, label: LP_VENUE_LABELS[v] })),
+];
+
 const CheeseAnal = () => {
   const [range, setRange] = useState<LpRange>('30d');
-  const [poolKey, setPoolKey] = useState<string | null>(TRACKED_LP_PAIRS[0]?.key ?? null);
+  const [venue, setVenue] = useState<LpVenue | 'all'>('all');
+  const [poolKey, setPoolKey] = useState<string | null>(null);
   const [account, setAccount] = useState<string | null>(null);
 
   const { days, updatedAt, isEmpty, isLoading: historyLoading, isError: historyError } = useLpHistoryIndex();
@@ -33,10 +41,24 @@ const CheeseAnal = () => {
   // Only needed as a fallback when the live read fails.
   const { day: latestDay } = useLpDay(live ? null : latestRecordedDate);
 
-  const current = live ?? latestDay;
-  const ranged = useMemo(() => sliceDays(days, range), [days, range]);
+  const snapshot = live ?? latestDay;
+  const current = useMemo(() => filterSnapshotByVenue(snapshot, venue), [snapshot, venue]);
+  const ranged = useMemo(
+    () => filterDaysByVenue(sliceDays(days, range), venue),
+    [days, range, venue],
+  );
   const dates = useMemo(() => ranged.map((d) => d.date), [ranged]);
-  const selectedPool = current?.pools.find((p) => p.key === poolKey) ?? null;
+  // Fall back to the biggest pool so a venue switch never leaves an empty panel.
+  const selectedPool = useMemo(() => {
+    const pools = current?.pools ?? [];
+    return pools.find((p) => p.key === poolKey) ?? [...pools].sort((a, b) => b.usd - a.usd)[0] ?? null;
+  }, [current, poolKey]);
+
+  const venueCounts = useMemo(() => {
+    const counts = new Map<LpVenue | 'all', number>([['all', snapshot?.pools.length ?? 0]]);
+    for (const v of LP_VENUES) counts.set(v, (snapshot?.pools ?? []).filter((p) => p.venue === v).length);
+    return counts;
+  }, [snapshot]);
 
   return (
     <Layout>
