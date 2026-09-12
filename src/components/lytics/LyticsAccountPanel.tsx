@@ -68,7 +68,7 @@ export function LyticsAccountPanel({ account, onAccountChange, dates, current }:
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const name = query.trim().toLowerCase();
-    if (name) onAccountChange(name);
+    if (name) selectAccount(name);
   };
 
   const tooltip = (formatter: (value: number) => string, className: string) =>
@@ -98,7 +98,7 @@ export function LyticsAccountPanel({ account, onAccountChange, dates, current }:
             Look up
           </Button>
           {account && (
-            <Button type="button" size="sm" variant="ghost" onClick={() => onAccountChange(null)}>
+            <Button type="button" size="sm" variant="ghost" onClick={() => selectAccount(null)}>
               Clear
             </Button>
           )}
@@ -120,11 +120,11 @@ export function LyticsAccountPanel({ account, onAccountChange, dates, current }:
               size="sm"
               variant="outline"
               className="ml-auto"
-              disabled={rows.length === 0}
+              disabled={chartRows.length === 0}
               onClick={() =>
                 downloadAccountHistoryCsv(
                   account,
-                  rows.map((r) => ({
+                  chartRows.map((r) => ({
                     date: r.date,
                     pool: r.label,
                     symbol: r.symbol,
@@ -133,10 +133,11 @@ export function LyticsAccountPanel({ account, onAccountChange, dates, current }:
                     paired: r.paired,
                     positions: r.positions,
                   })),
+                  selectedPool ?? undefined,
                 )
               }
             >
-              Account history CSV
+              {selectedPool ? 'Pool history CSV' : 'Account history CSV'}
             </Button>
           </div>
 
