@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   TRACKED_LP_PAIRS,
+  venuePair,
   assetAmount,
   assetSymbol,
   buildPoolSnapshot,
@@ -99,7 +100,7 @@ describe('buildPoolSnapshot', () => {
   ];
 
   it('aggregates per account and per pool across fee tiers', () => {
-    const snapshot = buildPoolSnapshot(waxPair, [
+    const snapshot = buildPoolSnapshot(venuePair('alcor', waxPair), [
       { pool, positions },
       { pool: flipped, positions: flippedPositions },
     ]);
@@ -128,7 +129,7 @@ describe('buildPoolSnapshot', () => {
   });
 
   it('ranks providers by USD value, highest first', () => {
-    const snapshot = buildPoolSnapshot(waxPair, [{ pool, positions }, { pool: flipped, positions: flippedPositions }]);
+    const snapshot = buildPoolSnapshot(venuePair('alcor', waxPair), [{ pool, positions }, { pool: flipped, positions: flippedPositions }]);
     const values = snapshot.providers.map((p) => p.usd);
     expect(values).toEqual([...values].sort((a, b) => b - a));
   });

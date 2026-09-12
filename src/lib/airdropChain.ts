@@ -100,7 +100,7 @@ export interface Holder {
 export interface HolderSnapshot {
   holders: Holder[];
   truncated: boolean;
-  source: "lightapi" | "atomicassets" | "chain-fallback" | "alcor-lp";
+  source: "lightapi" | "atomicassets" | "chain-fallback" | "alcor-lp" | "taco-lp" | "defibox-lp";
   /** False when balances are unknown (fallback path) — pro-rata unavailable. */
   hasBalances: boolean;
 }
