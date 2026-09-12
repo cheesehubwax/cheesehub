@@ -22,7 +22,7 @@ export function AirRunPanel() {
     runAirdrop,
     cancelRequested,
     requestCancel,
-    downloadCsv,
+    downloadResultsCsv,
     purchaseLog,
     batchLog,
     termsAccepted,
@@ -79,9 +79,9 @@ export function AirRunPanel() {
               {cancelRequested ? 'Cancelling…' : 'Cancel after current batch'}
             </Button>
           )}
-          {recipientCount > 0 && (
-            <Button variant="outline" onClick={downloadCsv}>
-              Download CSV
+          {runState === 'done' && batchLog.length > 0 && (
+            <Button variant="outline" onClick={downloadResultsCsv}>
+              Download results CSV
             </Button>
           )}
         </div>

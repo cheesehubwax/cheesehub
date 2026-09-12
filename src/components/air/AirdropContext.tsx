@@ -24,7 +24,6 @@ import {
   estimateResources,
   planRamPurchases,
   formatQuantity,
-  formatUnits,
   resourceWarnings,
   totalUnits,
   RAM_BYTES_PER_NFT,
