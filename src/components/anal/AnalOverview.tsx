@@ -15,9 +15,10 @@ interface AnalOverviewProps {
   historyEmpty: boolean;
 }
 
-type MetricKey = 'usd' | 'cheese' | 'accounts' | 'positions';
+type MetricKey = 'price' | 'usd' | 'cheese' | 'accounts' | 'positions';
 
 const METRICS: { key: MetricKey; label: string; color: string; format: (v: number) => string }[] = [
+  { key: 'price', label: 'CHEESE price', color: '#FACC15', format: usdPrice },
   { key: 'usd', label: 'Total liquidity', color: '#3B82F6', format: usd },
   { key: 'cheese', label: 'CHEESE in pools', color: '#22C55E', format: (v) => amount(v, 0) },
   { key: 'accounts', label: 'Providers', color: '#FFFFFF', format: (v) => String(Math.round(v)) },
