@@ -198,4 +198,20 @@ describe('index bookkeeping', () => {
   it('uses UTC calendar days', () => {
     expect(utcDay(Date.UTC(2026, 8, 12, 23, 59))).toBe('2026-09-12');
   });
+
+  it('keys snapshots by 12h UTC slot', () => {
+    expect(utcSlot(Date.UTC(2026, 8, 12, 0, 0))).toBe('2026-09-12T00');
+    expect(utcSlot(Date.UTC(2026, 8, 12, 11, 59))).toBe('2026-09-12T00');
+    expect(utcSlot(Date.UTC(2026, 8, 12, 12, 0))).toBe('2026-09-12T12');
+    expect(utcSlot(Date.UTC(2026, 8, 12, 23, 59))).toBe('2026-09-12T12');
+  });
+
+  it('sorts legacy day keys before the slots of the same day', () => {
+    const days = [
+      { date: '2026-09-12T12', t: 0, pools: [] },
+      { date: '2026-09-12', t: 0, pools: [] },
+    ];
+    const merged = mergeIndexDay(days, { date: '2026-09-12T00', t: 0, pools: [] });
+    expect(merged.map((d) => d.date)).toEqual(['2026-09-12', '2026-09-12T00', '2026-09-12T12']);
+  });
 });
