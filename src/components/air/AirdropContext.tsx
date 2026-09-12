@@ -84,6 +84,13 @@ import {
   useAirWalletTokens,
   useAirAlcorPairs,
 } from '@/hooks/useAirdropQueries';
+import {
+  buildResultsCsv,
+  buildSnapshotCsv,
+  downloadCsvFile,
+  type CsvBatchItem,
+} from '@/lib/airdropCsv';
+import { pairLabel } from '@/lib/airdropAlcorLp';
 
 /** Where the recipient list comes from. */
 export type SnapshotMode = 'token' | 'nft' | 'lp';
@@ -112,6 +119,8 @@ export interface BatchLogEntry {
   recipients: number;
   txId?: string;
   error?: string;
+  /** Per-recipient payload of the batch, used by the results CSV export. */
+  items?: CsvBatchItem[];
 }
 
 interface AirdropContextValue {
