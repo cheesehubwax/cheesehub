@@ -72,6 +72,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
       : null;
 
   const statValues: Record<MetricKey, string> = {
+    price: usdPrice(totals.price),
     usd: usd(totals.value),
     cheese: amount(totals.cheese, 0),
     accounts: String(totals.accounts),
