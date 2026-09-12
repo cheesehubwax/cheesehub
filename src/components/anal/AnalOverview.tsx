@@ -4,7 +4,7 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { CheeseLogo, UsdLogo } from '@/components/anal/PairLogos';
 import type { LpDayFile, LpIndexDay } from '@/lib/lpPools';
-import { amount, change, shortDate, tooltipDate, usd } from './format';
+import { amount, change, shortDate, tooltipDate, usd, usdPrice } from './format';
 
 interface AnalOverviewProps {
   /** Recorded days already trimmed to the selected range. */
@@ -15,9 +15,10 @@ interface AnalOverviewProps {
   historyEmpty: boolean;
 }
 
-type MetricKey = 'usd' | 'cheese' | 'accounts' | 'positions';
+type MetricKey = 'price' | 'usd' | 'cheese' | 'accounts' | 'positions';
 
 const METRICS: { key: MetricKey; label: string; color: string; format: (v: number) => string }[] = [
+  { key: 'price', label: 'CHEESE price', color: '#FACC15', format: usdPrice },
   { key: 'usd', label: 'Total liquidity', color: '#3B82F6', format: usd },
   { key: 'cheese', label: 'CHEESE in pools', color: '#22C55E', format: (v) => amount(v, 0) },
   { key: 'accounts', label: 'Providers', color: '#FFFFFF', format: (v) => String(Math.round(v)) },
@@ -25,7 +26,7 @@ const METRICS: { key: MetricKey; label: string; color: string; format: (v: numbe
 ];
 
 export function AnalOverview({ days, current, historyLoading, historyEmpty }: AnalOverviewProps) {
-  const [metric, setMetric] = useState<MetricKey>('usd');
+  const [metric, setMetric] = useState<MetricKey>('price');
 
   const totals = useMemo(() => {
     const pools = current?.pools ?? [];
@@ -39,13 +40,21 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
       positions += pool.positions;
       for (const row of pool.providers) accounts.add(row.a);
     }
-    return { value, cheese, positions, accounts: accounts.size, pools: pools.length };
+    return {
+      value,
+      cheese,
+      positions,
+      accounts: accounts.size,
+      pools: pools.length,
+      price: current?.cheeseUsd ?? 0,
+    };
   }, [current]);
 
   const series = useMemo(
     () =>
       days.map((day) => ({
         date: day.date,
+        price: day.cheeseUsd ?? 0,
         usd: day.pools.reduce((sum, p) => sum + p.usd, 0),
         cheese: day.pools.reduce((sum, p) => sum + p.cheese, 0),
         accounts:
@@ -63,6 +72,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
       : null;
 
   const statValues: Record<MetricKey, string> = {
+    price: usdPrice(totals.price),
     usd: usd(totals.value),
     cheese: amount(totals.cheese, 0),
     accounts: String(totals.accounts),
@@ -83,7 +93,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
         )}
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
         {METRICS.map((stat) => {
           const selected = metric === stat.key;
           return (
@@ -104,6 +114,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
               }
             >
               <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+                {stat.key === 'price' ? <CheeseLogo /> : null}
                 {stat.key === 'usd' ? <UsdLogo /> : null}
                 {stat.key === 'cheese' ? <CheeseLogo /> : null}
                 {stat.label}
