@@ -601,10 +601,13 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     const per = bytesPerCheese(pricing);
     if (!per || per <= 0) return null;
     // Round down so converting back to CHEESE stays inside the pool limit.
-    const kb = Math.floor(((cheese * per) / 1024) * 100) / 100;
+    // KB entries convert back to CHEESE with RAM_MARGIN applied, so shave that
+    // margin off here and round down — the refill must stay inside the pool.
+    const kb = Math.floor((((cheese / RAM_MARGIN) * per) / 1024) * 100) / 100;
     if (!(kb > 0)) return null;
     return { cheese, text: String(kb) };
-  }, [isRam, pricing, mode, ramUnit, recipientsForPoolSplit]);
+  }, [isRam, pricing, mode, ramUnit, selectedCount]);
+
 
   const applyRamPoolMax = useCallback(() => {
     if (ramPoolMaxViable) setAmountText(ramPoolMaxViable.text);
