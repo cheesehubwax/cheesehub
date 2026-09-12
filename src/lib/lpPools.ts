@@ -158,9 +158,9 @@ export interface LpPoolSnapshot {
   providers: LpProviderRow[];
 }
 
-/** A full day file stored on the data branch. */
+/** A full snapshot file stored on the data branch. */
 export interface LpDayFile {
-  /** UTC day, `YYYY-MM-DD`. */
+  /** Snapshot key — a UTC 12h slot `YYYY-MM-DDTHH`, or a legacy UTC day `YYYY-MM-DD`. */
   date: string;
   /** Sample time, epoch ms. */
   t: number;
@@ -208,6 +208,17 @@ export interface LpIndexFile {
 /** UTC calendar day of an epoch-ms timestamp, `YYYY-MM-DD`. */
 export function utcDay(t: number): string {
   return new Date(t).toISOString().slice(0, 10);
+}
+
+/**
+ * 12-hour sampling slot of an epoch-ms timestamp, `YYYY-MM-DDTHH` (00 or 12).
+ * LP snapshots are keyed by slot so two snapshots per UTC day can coexist.
+ * Slot keys sort lexicographically, and a legacy `YYYY-MM-DD` day key sorts
+ * before either slot of the same day.
+ */
+export function utcSlot(t: number): string {
+  const iso = new Date(t).toISOString();
+  return `${iso.slice(0, 10)}T${Number(iso.slice(11, 13)) < 12 ? '00' : '12'}`;
 }
 
 export function round(value: number, decimals: number): number {
@@ -573,8 +584,11 @@ export function indexEntryForDay(day: LpDayFile): LpIndexDay {
   };
 }
 
-/** Merge a day into an index, replacing any existing entry for the same date. */
-export function mergeIndexDay(days: LpIndexDay[], day: LpIndexDay, maxDays = 800): LpIndexDay[] {
+/**
+ * Merge a snapshot into an index, replacing any existing entry with the same
+ * key. Keys are 12h slots (`YYYY-MM-DDTHH`) — 1600 entries ≈ 800 days.
+ */
+export function mergeIndexDay(days: LpIndexDay[], day: LpIndexDay, maxDays = 1600): LpIndexDay[] {
   const kept = days.filter((d) => d && d.date && d.date !== day.date);
   return [...kept, day].sort((x, y) => x.date.localeCompare(y.date)).slice(-maxDays);
 }
