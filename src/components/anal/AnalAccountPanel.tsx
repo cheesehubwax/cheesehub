@@ -161,7 +161,7 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
                 <tbody>
                   {holdings.map((row) => (
                     <tr
-                      key={row.label}
+                      key={row.key}
                       onClick={() => setSelectedPool(selectedPool === row.key ? null : row.key)}
                       title={selectedPool === row.key ? 'Show all pools' : 'Show only this pool'}
                       className={`border-t border-border/40 cursor-pointer transition-colors ${
