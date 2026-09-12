@@ -1,4 +1,4 @@
-// CHEESEAnal — analytics for the CHEESE liquidity pools on Alcor.
+// CHEESEAnal — analytics for the CHEESE liquidity pools on Alcor, Taco and Defibox.
 // Intentionally not linked from the header yet: reachable at /anal only.
 import { useMemo, useState } from 'react';
 import { Layout } from '@/components/Layout';
@@ -10,6 +10,8 @@ import { AnalPoolDetail } from '@/components/anal/AnalPoolDetail';
 import { AnalPoolTable } from '@/components/anal/AnalPoolTable';
 import {
   LP_RANGES,
+  filterDaysByVenue,
+  filterSnapshotByVenue,
   sliceDays,
   useLiveLpSnapshot,
   useLpDay,
@@ -17,13 +19,19 @@ import {
   type LpRange,
 } from '@/hooks/useLpHistory';
 import { downloadSnapshotCsv } from '@/lib/lpCsv';
-import { TRACKED_LP_PAIRS } from '@/lib/lpPools';
+import { LP_VENUES, LP_VENUE_LABELS, type LpVenue } from '@/lib/lpPools';
 import { playRandomFart } from '@/lib/fartSounds';
 import cheeseOrb from '@/assets/cheeseram.png';
 
+const VENUE_TABS: { key: LpVenue | 'all'; label: string }[] = [
+  { key: 'all', label: 'All venues' },
+  ...LP_VENUES.map((v) => ({ key: v, label: LP_VENUE_LABELS[v] })),
+];
+
 const CheeseAnal = () => {
   const [range, setRange] = useState<LpRange>('30d');
-  const [poolKey, setPoolKey] = useState<string | null>(TRACKED_LP_PAIRS[0]?.key ?? null);
+  const [venue, setVenue] = useState<LpVenue | 'all'>('all');
+  const [poolKey, setPoolKey] = useState<string | null>(null);
   const [account, setAccount] = useState<string | null>(null);
 
   const { days, updatedAt, isEmpty, isLoading: historyLoading, isError: historyError } = useLpHistoryIndex();
@@ -33,10 +41,24 @@ const CheeseAnal = () => {
   // Only needed as a fallback when the live read fails.
   const { day: latestDay } = useLpDay(live ? null : latestRecordedDate);
 
-  const current = live ?? latestDay;
-  const ranged = useMemo(() => sliceDays(days, range), [days, range]);
+  const snapshot = live ?? latestDay;
+  const current = useMemo(() => filterSnapshotByVenue(snapshot, venue), [snapshot, venue]);
+  const ranged = useMemo(
+    () => filterDaysByVenue(sliceDays(days, range), venue),
+    [days, range, venue],
+  );
   const dates = useMemo(() => ranged.map((d) => d.date), [ranged]);
-  const selectedPool = current?.pools.find((p) => p.key === poolKey) ?? null;
+  // Fall back to the biggest pool so a venue switch never leaves an empty panel.
+  const selectedPool = useMemo(() => {
+    const pools = current?.pools ?? [];
+    return pools.find((p) => p.key === poolKey) ?? [...pools].sort((a, b) => b.usd - a.usd)[0] ?? null;
+  }, [current, poolKey]);
+
+  const venueCounts = useMemo(() => {
+    const counts = new Map<LpVenue | 'all', number>([['all', snapshot?.pools.length ?? 0]]);
+    for (const v of LP_VENUES) counts.set(v, (snapshot?.pools ?? []).filter((p) => p.venue === v).length);
+    return counts;
+  }, [snapshot]);
 
   return (
     <Layout>
@@ -64,8 +86,8 @@ const CheeseAnal = () => {
                 <OpenMojiIcon emoji="📈" size={26} />
               </div>
               <p className="text-muted-foreground max-w-2xl mx-auto">
-                Daily snapshots of every $CHEESE liquidity pool on Alcor — pool value, token balances, provider
-                counts and per-account positions, tracked over time
+                Daily snapshots of every $CHEESE liquidity pool on Alcor, Taco and Defibox — pool value, token
+                balances, CHEESE price, provider counts and per-account positions, tracked over time
               </p>
             </div>
           </div>
@@ -103,6 +125,26 @@ const CheeseAnal = () => {
           </div>
         </div>
 
+        {/* Venue filter */}
+        <div className="w-full flex flex-wrap items-center gap-1">
+          {VENUE_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setVenue(tab.key)}
+              aria-pressed={venue === tab.key}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide border transition-colors ${
+                venue === tab.key
+                  ? 'bg-cheese/15 text-cheese border-cheese/40'
+                  : 'text-muted-foreground border-border/40 hover:text-foreground hover:border-primary/40'
+              }`}
+            >
+              {tab.label}
+              <span className="ml-1 text-[10px] opacity-70">{venueCounts.get(tab.key) ?? 0}</span>
+            </button>
+          ))}
+        </div>
+
         {liveError && !current && (
           <p className="w-full text-xs text-red-400">
             Live pool data is temporarily unavailable — showing recorded snapshots only.
@@ -133,9 +175,11 @@ const CheeseAnal = () => {
         <AnalAccountPanel account={account} onAccountChange={setAccount} dates={dates} current={current} />
 
         <p className="text-[10px] text-muted-foreground text-center max-w-2xl">
-          Pool figures come from Alcor's own position data: open positions count whether or not they are in range,
-          valued at their current USD value. Headline figures are live; charts are built from one recorded snapshot
-          per day.
+          Alcor figures come from Alcor's own position data: open positions count whether or not they are in range,
+          valued at their current USD value. Taco and Defibox are constant-product pools, so each provider's share of
+          the pool is worked out from their LP tokens and valued at market prices. Every tracked pair is recorded on
+          each venue, plus any other CHEESE pair holding more than $100. Headline figures are live; charts are built
+          from one recorded snapshot per day.
         </p>
       </main>
     </Layout>

@@ -4,8 +4,8 @@ import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, T
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { Button } from '@/components/ui/button';
 import { downloadPoolHistoryCsv } from '@/lib/lpCsv';
-import type { LpDayFile, LpIndexDay, LpPoolSnapshot } from '@/lib/lpPools';
-import { amount, shortDate, usd } from './format';
+import { LP_VENUE_LABELS, type LpDayFile, type LpIndexDay, type LpPoolSnapshot } from '@/lib/lpPools';
+import { amount, shortDate, usd, usdPrice } from './format';
 
 interface AnalPoolDetailProps {
   pool: LpPoolSnapshot | null;
@@ -30,6 +30,7 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
               cheese: row.cheese,
               paired: row.paired,
               accounts: row.accounts,
+              price: row.priceUsd ?? day.cheeseUsd ?? 0,
             }
           : null;
       })
@@ -63,6 +64,9 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
           <span className="text-sm font-medium text-foreground">
             <span className="text-cheese">CHEESE</span> / {pool.symbol}
           </span>
+          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/60 bg-background/60 text-muted-foreground">
+            {LP_VENUE_LABELS[pool.venue] ?? pool.venue}
+          </span>
         </div>
         <Button
           size="sm"
@@ -74,11 +78,17 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {[
           { label: 'USD value', value: usd(pool.usd) },
           { label: 'CHEESE', value: amount(pool.cheese, 0) },
           { label: pool.symbol, value: amount(pool.paired, 4) },
+          {
+            label: 'CHEESE price',
+            value: pool.priceUsd
+              ? `${usdPrice(pool.priceUsd)}${pool.priceInPaired ? ` · ${amount(pool.priceInPaired, 8)} ${pool.symbol}` : ''}`
+              : '—',
+          },
           { label: 'Providers', value: `${pool.accounts} (${pool.positions} pos)` },
         ].map((stat) => (
           <div key={stat.label} className="rounded-lg bg-background/40 border border-border/40 p-3">
@@ -151,6 +161,23 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
                   <YAxis domain={['auto', 'auto']} allowDecimals={false} tick={axisTick} width={40} stroke="hsl(var(--border))" />
                   <Tooltip content={tooltip((v) => `${v} accounts`, 'text-foreground')} />
                   <Line type="monotone" dataKey="accounts" stroke="#22c55e" strokeWidth={2} dot={{ r: 3, fill: '#22c55e', strokeWidth: 0 }} activeDot={{ r: 4 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">
+              CHEESE price in this pool (USD)
+            </div>
+            <div className="h-36">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
+                  <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
+                  <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => usdPrice(v)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
+                  <Tooltip content={tooltip((v) => usdPrice(v), 'text-cheese')} />
+                  <Line type="monotone" dataKey="price" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

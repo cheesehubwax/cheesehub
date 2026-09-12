@@ -1,7 +1,7 @@
 // CHEESEAnal — one row per tracked CHEESE pool with day-over-day change.
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
-import type { LpDayFile, LpIndexDay } from '@/lib/lpPools';
-import { amount, change, usd } from './format';
+import { LP_VENUE_LABELS, type LpDayFile, type LpIndexDay } from '@/lib/lpPools';
+import { amount, change, usd, usdPrice } from './format';
 
 interface AnalPoolTableProps {
   current: LpDayFile | null;
@@ -48,9 +48,11 @@ export function AnalPoolTable({
             <thead>
               <tr className="text-muted-foreground text-[10px] uppercase tracking-wide">
                 <th className="text-left font-medium py-2">Pool</th>
+                <th className="text-left font-medium py-2">Venue</th>
                 <th className="text-right font-medium py-2">USD value</th>
                 <th className="text-right font-medium py-2">CHEESE</th>
                 <th className="text-right font-medium py-2">Paired token</th>
+                <th className="text-right font-medium py-2">CHEESE price</th>
                 <th className="text-right font-medium py-2">Accounts</th>
                 <th className="text-right font-medium py-2">24h</th>
               </tr>
@@ -71,13 +73,24 @@ export function AnalPoolTable({
                     <td className="py-2 font-medium text-foreground whitespace-nowrap">
                       <span className="text-cheese">CHEESE</span> / {pool.symbol}
                       <span className="ml-2 text-[10px] text-muted-foreground">
-                        {pool.poolIds.length} tier{pool.poolIds.length === 1 ? '' : 's'}
+                        {pool.poolIds.length}{' '}
+                        {pool.venue === 'alcor'
+                          ? `tier${pool.poolIds.length === 1 ? '' : 's'}`
+                          : `pool${pool.poolIds.length === 1 ? '' : 's'}`}
+                      </span>
+                    </td>
+                    <td className="py-2 whitespace-nowrap">
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/60 bg-background/60 text-muted-foreground">
+                        {LP_VENUE_LABELS[pool.venue] ?? pool.venue}
                       </span>
                     </td>
                     <td className="py-2 text-right font-mono text-foreground">{usd(pool.usd)}</td>
                     <td className="py-2 text-right font-mono text-muted-foreground">{amount(pool.cheese, 0)}</td>
                     <td className="py-2 text-right font-mono text-muted-foreground">
                       {amount(pool.paired, 4)} {pool.symbol}
+                    </td>
+                    <td className="py-2 text-right font-mono text-muted-foreground">
+                      {pool.priceUsd ? usdPrice(pool.priceUsd) : '—'}
                     </td>
                     <td className="py-2 text-right font-mono text-muted-foreground">{pool.accounts}</td>
                     <td

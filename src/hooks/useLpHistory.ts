@@ -1,7 +1,7 @@
 // CHEESEAnal — readers for the recorded LP history and the live pool state.
 import { useQuery } from '@tanstack/react-query';
 import { fetchLiveLpSnapshot } from '@/lib/lpLive';
-import type { LpDayFile, LpIndexFile, LpIndexDay } from '@/lib/lpPools';
+import { poolsForVenue, type LpDayFile, type LpIndexFile, type LpIndexDay, type LpVenue } from '@/lib/lpPools';
 
 const DEFAULT_OWNER = 'cheesehubwax';
 const DEFAULT_REPO = 'cheesehub';
@@ -43,6 +43,28 @@ export function sliceDays(days: LpIndexDay[], range: LpRange): LpIndexDay[] {
   const config = LP_RANGES.find((r) => r.key === range);
   if (!config?.days) return days;
   return days.slice(-config.days);
+}
+
+/**
+ * Keep only the pools of one venue in every recorded day, swapping in that
+ * venue's own deduplicated provider count so the chart matches the stat box.
+ */
+export function filterDaysByVenue(days: LpIndexDay[], venue: LpVenue | 'all'): LpIndexDay[] {
+  if (venue === 'all') return days;
+  return days.map((day) => ({
+    ...day,
+    uniqueAccounts: day.uniqueByVenue?.[venue],
+    pools: poolsForVenue(day.pools, venue),
+  }));
+}
+
+/** Keep only the pools of one venue in a snapshot. */
+export function filterSnapshotByVenue<T extends LpDayFile>(
+  snapshot: T | null,
+  venue: LpVenue | 'all',
+): T | null {
+  if (!snapshot || venue === 'all') return snapshot;
+  return { ...snapshot, pools: poolsForVenue(snapshot.pools, venue) };
 }
 
 /** Pool-level totals per recorded day (small file, always loaded). */
@@ -103,6 +125,7 @@ export function useLiveLpSnapshot() {
 export interface LpAccountHistoryRow {
   date: string;
   poolKey: string;
+  venue: LpVenue;
   label: string;
   symbol: string;
   usd: number;
@@ -134,6 +157,7 @@ async function fetchAccountHistory(account: string, dates: string[]): Promise<Lp
         rows.push({
           date: day.date,
           poolKey: pool.key,
+          venue: pool.venue ?? 'alcor',
           label: pool.label,
           symbol: pool.symbol,
           usd: row.usd,
