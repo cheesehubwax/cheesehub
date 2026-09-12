@@ -1,0 +1,8 @@
+{
+  "name": "lp-history",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun run sample.ts"
+  }
+}
