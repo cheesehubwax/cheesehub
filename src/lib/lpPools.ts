@@ -282,6 +282,40 @@ export function cheeseIsTokenA(pool: RawPool): boolean {
 }
 
 /**
+ * Rolling 24h volume of a pair, summed across its fee tiers. Alcor publishes
+ * this directly; Taco and Defibox do not, so only Alcor pools carry volume.
+ * Returns `{}` when the payload has no usable volume figures.
+ */
+export function alcorPairVolume(pools: RawPool[]): {
+  volumeUsd24?: number;
+  volumeCheese24?: number;
+} {
+  let usdTotal = 0;
+  let cheeseTotal = 0;
+  let sawUsd = false;
+  let sawCheese = false;
+
+  for (const pool of pools) {
+    const usdVolume = Number(pool.volumeUSD24);
+    if (Number.isFinite(usdVolume) && usdVolume >= 0) {
+      usdTotal += usdVolume;
+      sawUsd = true;
+    }
+    const raw = cheeseIsTokenA(pool) ? pool.volumeA24 : pool.volumeB24;
+    const cheeseVolume = Number(raw);
+    if (Number.isFinite(cheeseVolume) && cheeseVolume >= 0) {
+      cheeseTotal += cheeseVolume;
+      sawCheese = true;
+    }
+  }
+
+  return {
+    ...(sawUsd ? { volumeUsd24: round(usdTotal, 4) } : {}),
+    ...(sawCheese ? { volumeCheese24: round(cheeseTotal, 4) } : {}),
+  };
+}
+
+/**
  * Every CHEESE pair listed on Alcor, keyed by paired token, with the summed TVL
  * of its fee tiers. Used to decide which untracked pairs are worth recording.
  */
