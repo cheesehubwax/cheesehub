@@ -752,12 +752,19 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
           message: `This RAM airdrop spends ${formatCheese(ramCheeseTotal)} ${CHEESE_SYMBOL} but your balance is ${formatCheese(cheeseBalance)} ${CHEESE_SYMBOL} (CPU/NET top-ups are extra).`,
         });
       }
+      if (ramPoolWax && ramPoolWax.overBy > 0) {
+        out.push({
+          level: 'error',
+          message: `This RAM airdrop needs about ${ramPoolWax.needed.toFixed(4)} WAX from the ${CHEESE_RAM_CONTRACT} pool, which can currently spend about ${ramPoolWax.spendable.toFixed(4)} WAX. Lower the amount or wait for the pool to refill.`,
+        });
+      }
       if (ramExcluded.belowMin > 0 && ramLimits) {
         out.push({
           level: 'warn',
           message: `${ramExcluded.belowMin} recipient${ramExcluded.belowMin === 1 ? '' : 's'} skipped: their share is below the ${formatCheese(ramLimits.minCheese)} ${CHEESE_SYMBOL} minimum per purchase. Raise the amount or deselect holders.`,
         });
       }
+
       if (ramExcluded.split > 0 && ramLimits) {
         out.push({
           level: 'warn',
