@@ -19,7 +19,11 @@ export const LP_VENUE_LABELS: Record<LpVenue, string> = {
   defibox: 'Defibox',
 };
 
-/** Untracked pairs are only recorded once they hold more than this in USD. */
+/**
+ * Untracked pairs are only recorded once they hold more than this in USD.
+ * Tracked pairs are always recorded, however small — the floor must never be
+ * applied to them, or recorded days silently lose pools the live view shows.
+ */
 export const MIN_TRACKED_POOL_USD = 100;
 
 /** Never record more than this many extra (untracked) pairs per venue. */
