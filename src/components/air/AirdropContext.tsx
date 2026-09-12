@@ -828,7 +828,8 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     ramLimits,
     isNft,
     mode,
-    nftShortfall,
+    ramPoolWax,
+
     nftAssignments.length,
     nftAllocation.capped,
     nftAllocation.skipped,
