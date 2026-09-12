@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
-import { PairLabel } from '@/components/anal/PairLogos';
+import { CheeseLogo, PairLabel, UsdcLogo } from '@/components/anal/PairLogos';
 import { VenueLabel } from '@/components/anal/VenueLogo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -181,8 +181,12 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
                   <tr className="text-muted-foreground text-[10px] uppercase tracking-wide">
                     <th className="text-left font-medium py-2">Pool</th>
                     <th className="text-left font-medium py-2">Venue</th>
-                    <th className="text-right font-medium py-2">USD</th>
-                    <th className="text-right font-medium py-2">CHEESE</th>
+                    <th className="text-right font-medium py-2">
+                      <span className="inline-flex items-center justify-end gap-1"><UsdcLogo />USD</span>
+                    </th>
+                    <th className="text-right font-medium py-2">
+                      <span className="inline-flex items-center justify-end gap-1"><CheeseLogo />CHEESE</span>
+                    </th>
                     <th className="text-right font-medium py-2">Paired</th>
                     <th className="text-right font-medium py-2">Positions</th>
                   </tr>
