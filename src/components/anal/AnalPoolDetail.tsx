@@ -35,9 +35,8 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
               accounts: row.accounts,
               // This pair's own CHEESE price, in the paired token.
               price: row.priceInPaired ?? 0,
-              // Volume is recorded once per UTC day, so gaps are expected.
+               // USD volume is recorded once per UTC day, so gaps are expected.
               volumeUsd: row.volumeUsd24 ?? null,
-              volumeCheese: row.volumeCheese24 ?? null,
             }
           : null;
       })
@@ -53,28 +52,8 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
   }
 
   const hasSeries = series.length >= 1;
-  const volumeSeries = series.filter((row) => row.volumeUsd !== null || row.volumeCheese !== null);
+  const volumeSeries = series.filter((row) => row.volumeUsd !== null);
   const latestVolume = volumeSeries[volumeSeries.length - 1] ?? null;
-
-  const volumeTooltip = ({
-    active,
-    payload,
-  }: {
-    active?: boolean;
-    payload?: { payload?: { date: string; volumeUsd: number | null; volumeCheese: number | null } }[];
-  }) => {
-    const row = active && payload?.length ? payload[0].payload : null;
-    if (!row) return null;
-    return (
-      <div className="bg-background/95 border border-border px-2 py-1 rounded text-xs font-mono">
-        <div className="text-cheese">{row.volumeUsd !== null ? usd(row.volumeUsd) : 'no USD volume'}</div>
-        <div className="text-foreground">
-          {row.volumeCheese !== null ? `${amount(row.volumeCheese, 2)} CHEESE` : 'no CHEESE volume'}
-        </div>
-        <div className="text-muted-foreground">{tooltipDate(String(row.date ?? ''))}</div>
-      </div>
-    );
-  };
 
   const tooltip = (formatter: (value: number) => string, className: string) =>
     ({ active, payload }: { active?: boolean; payload?: { value?: unknown; payload?: { date: string } }[] }) =>
@@ -232,11 +211,6 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
                   ? usd(latestVolume.volumeUsd)
                   : '—'}
               </div>
-              <div className="text-[10px] font-mono text-muted-foreground leading-tight">
-                {latestVolume?.volumeCheese !== null && latestVolume?.volumeCheese !== undefined
-                  ? `${amount(latestVolume.volumeCheese, 0)} CHEESE`
-                  : ''}
-              </div>
             </div>
             {volumeSeries.length > 0 ? (
               <div className="h-36">
@@ -244,11 +218,9 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
                   <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                     <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
-                    <YAxis yAxisId="usd" domain={['auto', 'auto']} tickFormatter={(v: number) => usd(v)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
-                    <YAxis yAxisId="cheese" orientation="right" domain={['auto', 'auto']} tickFormatter={(v: number) => amount(v, 0)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
-                    <Tooltip content={volumeTooltip} />
-                    <Line yAxisId="usd" type="monotone" dataKey="volumeUsd" stroke="#38BDF8" strokeWidth={2} connectNulls={false} dot={{ r: 3, fill: '#38BDF8', strokeWidth: 0 }} activeDot={{ r: 4 }} />
-                    <Line yAxisId="cheese" type="monotone" dataKey="volumeCheese" stroke="#FACC15" strokeWidth={2} connectNulls={false} dot={{ r: 3, fill: '#FACC15', strokeWidth: 0 }} activeDot={{ r: 4 }} />
+                    <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => usd(v)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
+                    <Tooltip content={tooltip((v) => usd(v), 'text-cheese')} />
+                    <Line type="monotone" dataKey="volumeUsd" stroke="#38BDF8" strokeWidth={2} connectNulls={false} dot={{ r: 3, fill: '#38BDF8', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
