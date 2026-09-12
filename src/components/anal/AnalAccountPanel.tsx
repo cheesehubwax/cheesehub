@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+import { VenueLabel } from '@/components/anal/VenueLogo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLpAccountHistory } from '@/hooks/useLpHistory';
@@ -196,7 +197,7 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
                       </td>
                       <td className="py-1.5 whitespace-nowrap">
                         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/60 bg-background/60 text-muted-foreground">
-                          {LP_VENUE_LABELS[row.venue] ?? row.venue}
+                          <VenueLabel venue={row.venue} />
                         </span>
                       </td>
                       <td className="py-1.5 text-right font-mono text-foreground">{usd(row.usd)}</td>

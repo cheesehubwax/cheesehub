@@ -8,6 +8,7 @@ import { AnalAccountPanel } from '@/components/anal/AnalAccountPanel';
 import { AnalOverview } from '@/components/anal/AnalOverview';
 import { AnalPoolDetail } from '@/components/anal/AnalPoolDetail';
 import { AnalPoolTable } from '@/components/anal/AnalPoolTable';
+import { AllVenueLogos, VenueLogo } from '@/components/anal/VenueLogo';
 import {
   LP_RANGES,
   filterDaysByVenue,
@@ -133,12 +134,13 @@ const CheeseAnal = () => {
               type="button"
               onClick={() => setVenue(tab.key)}
               aria-pressed={venue === tab.key}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide border transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide border transition-colors ${
                 venue === tab.key
                   ? 'bg-cheese/15 text-cheese border-cheese/40'
                   : 'text-muted-foreground border-border/40 hover:text-foreground hover:border-primary/40'
               }`}
             >
+              {tab.key === 'all' ? <AllVenueLogos /> : <VenueLogo venue={tab.key} />}
               {tab.label}
               <span className="ml-1 text-[10px] opacity-70">{venueCounts.get(tab.key) ?? 0}</span>
             </button>
