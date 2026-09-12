@@ -84,18 +84,18 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {[
-          { label: 'USD value', value: usd(pool.usd), logo: <UsdLogo /> },
-          { label: 'CHEESE', value: amount(pool.cheese, 0), logo: <CheeseLogo /> },
-          {
-            label: pool.symbol,
-            value: amount(pool.paired, 4),
-            logo: <TokenLogo contract={pool.contract ?? ''} symbol={pool.symbol} size="sm" />,
-          },
           {
             label: `CHEESE price in ${pool.symbol}`,
             value: pool.priceInPaired
               ? tokenPrice(pool.priceInPaired, pool.symbol)
               : '—',
+            logo: <TokenLogo contract={pool.contract ?? ''} symbol={pool.symbol} size="sm" />,
+          },
+          { label: 'USD value', value: usd(pool.usd), logo: <UsdLogo /> },
+          { label: 'CHEESE', value: amount(pool.cheese, 0), logo: <CheeseLogo /> },
+          {
+            label: pool.symbol,
+            value: amount(pool.paired, 4),
             logo: <TokenLogo contract={pool.contract ?? ''} symbol={pool.symbol} size="sm" />,
           },
           { label: 'Providers', value: `${pool.accounts} (${pool.positions} pos)`, logo: null },
