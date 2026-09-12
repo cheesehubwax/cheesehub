@@ -1,5 +1,5 @@
 // CHEESELytics — combined liquidity across every tracked CHEESE pool.
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import type { LpDayFile, LpIndexDay } from '@/lib/lpPools';
@@ -14,7 +14,18 @@ interface LyticsOverviewProps {
   historyEmpty: boolean;
 }
 
+type MetricKey = 'usd' | 'cheese' | 'accounts' | 'positions';
+
+const METRICS: { key: MetricKey; label: string; format: (v: number) => string }[] = [
+  { key: 'usd', label: 'Total liquidity', format: usd },
+  { key: 'cheese', label: 'CHEESE in pools', format: (v) => amount(v, 0) },
+  { key: 'accounts', label: 'Providers', format: (v) => String(Math.round(v)) },
+  { key: 'positions', label: 'Positions', format: (v) => String(Math.round(v)) },
+];
+
 export function LyticsOverview({ days, current, historyLoading, historyEmpty }: LyticsOverviewProps) {
+  const [metric, setMetric] = useState<MetricKey>('usd');
+
   const totals = useMemo(() => {
     const pools = current?.pools ?? [];
     const accounts = new Set<string>();
@@ -36,19 +47,25 @@ export function LyticsOverview({ days, current, historyLoading, historyEmpty }: 
         date: day.date,
         usd: day.pools.reduce((sum, p) => sum + p.usd, 0),
         cheese: day.pools.reduce((sum, p) => sum + p.cheese, 0),
+        accounts: day.pools.reduce((sum, p) => sum + p.accounts, 0),
+        positions: day.pools.reduce((sum, p) => sum + p.positions, 0),
       })),
     [days],
   );
 
-  const delta =
-    series.length >= 2 ? change(series[series.length - 1].usd, series[series.length - 2].usd) : null;
+  const active = METRICS.find((m) => m.key === metric) ?? METRICS[0];
 
-  const stats: { label: string; value: string }[] = [
-    { label: 'Total liquidity', value: usd(totals.value) },
-    { label: 'CHEESE in pools', value: amount(totals.cheese, 0) },
-    { label: 'Providers', value: String(totals.accounts) },
-    { label: 'Positions', value: String(totals.positions) },
-  ];
+  const delta =
+    series.length >= 2
+      ? change(series[series.length - 1][metric], series[series.length - 2][metric])
+      : null;
+
+  const statValues: Record<MetricKey, string> = {
+    usd: usd(totals.value),
+    cheese: amount(totals.cheese, 0),
+    accounts: String(totals.accounts),
+    positions: String(totals.positions),
+  };
 
   return (
     <div className="w-full rounded-xl bg-card border border-border/50 p-4">
@@ -65,15 +82,28 @@ export function LyticsOverview({ days, current, historyLoading, historyEmpty }: 
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        {stats.map((stat) => (
-          <div key={stat.label} className="rounded-lg bg-background/40 border border-border/40 p-3">
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{stat.label}</div>
-            <div className="text-lg font-mono font-semibold text-cheese">{stat.value}</div>
-          </div>
-        ))}
+        {METRICS.map((stat) => {
+          const selected = metric === stat.key;
+          return (
+            <button
+              key={stat.key}
+              type="button"
+              onClick={() => setMetric(stat.key)}
+              aria-pressed={selected}
+              className={`rounded-lg border p-3 text-left transition-colors ${
+                selected
+                  ? 'bg-primary/15 border-primary/60 shadow-[0_0_0_1px_hsl(var(--primary)/0.4)]'
+                  : 'bg-background/40 border-border/40 hover:border-primary/40'
+              }`}
+            >
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{stat.label}</div>
+              <div className="text-lg font-mono font-semibold text-cheese">{statValues[stat.key]}</div>
+            </button>
+          );
+        })}
       </div>
 
-      {series.length >= 2 ? (
+      {series.length >= 1 ? (
         <div className="h-48">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
@@ -92,18 +122,18 @@ export function LyticsOverview({ days, current, historyLoading, historyEmpty }: 
               />
               <YAxis
                 domain={['auto', 'auto']}
-                tickFormatter={(v: number) => usd(v)}
+                tickFormatter={(v: number) => active.format(v)}
                 tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
                 stroke="hsl(var(--border))"
                 width={64}
               />
               <Tooltip
-                content={({ active, payload }) =>
-                  active && payload?.length ? (
+                content={({ active: isActive, payload }) =>
+                  isActive && payload?.length ? (
                     <div className="bg-background/95 border border-border px-2 py-1 rounded text-xs font-mono">
-                      <div className="text-cheese">{usd(Number(payload[0].value))}</div>
+                      <div className="text-cheese">{active.format(Number(payload[0].value))}</div>
                       <div className="text-muted-foreground">
-                        {shortDate(String(payload[0].payload.date))}
+                        {active.label} · {shortDate(String(payload[0].payload.date))}
                       </div>
                     </div>
                   ) : null
@@ -111,10 +141,12 @@ export function LyticsOverview({ days, current, historyLoading, historyEmpty }: 
               />
               <Area
                 type="monotone"
-                dataKey="usd"
+                dataKey={metric}
                 stroke="hsl(var(--primary))"
                 strokeWidth={2}
                 fill="url(#lyticsTotalGradient)"
+                dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }}
+                activeDot={{ r: 4 }}
               />
             </AreaChart>
           </ResponsiveContainer>
