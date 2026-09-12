@@ -23,6 +23,8 @@ export function AirDistributionCard() {
     ramUnit,
     setRamUnit,
     ramExcluded,
+    ramPurchaseCount,
+
     ramLimits,
     ramMinViable,
     applyRamMinViable,
