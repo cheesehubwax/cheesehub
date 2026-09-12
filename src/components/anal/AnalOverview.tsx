@@ -54,6 +54,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
     () =>
       days.map((day) => ({
         date: day.date,
+        price: day.cheeseUsd ?? 0,
         usd: day.pools.reduce((sum, p) => sum + p.usd, 0),
         cheese: day.pools.reduce((sum, p) => sum + p.cheese, 0),
         accounts:
