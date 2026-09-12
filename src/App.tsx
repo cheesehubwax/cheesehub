@@ -18,6 +18,7 @@ import Farm from "./pages/Farm";
 import CheeseNull from "./pages/CheeseNull";
 import Drip from "./pages/Drip";
 import Air from "./pages/Air";
+import CheeseLytics from "./pages/CheeseLytics";
 import BannerAds from "./pages/BannerAds";
 import Disclaimer from "./pages/Disclaimer";
 import Terms from "./pages/Terms";
