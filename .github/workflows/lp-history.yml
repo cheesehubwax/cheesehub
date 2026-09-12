@@ -14,6 +14,10 @@ on:
         description: "Set to '1' to re-record even when today already has a snapshot"
         required: false
         default: "0"
+      reset:
+        description: "Set to '1' to wipe ALL recorded history, then record a fresh snapshot"
+        required: false
+        default: "0"
 
 concurrency:
   group: lp-history
@@ -57,6 +61,11 @@ jobs:
             git push -u origin lp-history-data
           fi
           mkdir -p /tmp/lp-data/data/days
+          if [ "${{ github.event.inputs.reset }}" = "1" ]; then
+            echo "Reset requested — wiping all recorded snapshots."
+            rm -f /tmp/lp-data/data/days/*.json
+            echo '{"updatedAt":0,"days":[]}' > /tmp/lp-data/data/lp-history-index.json
+          fi
 
       - name: Snapshot CHEESE liquidity pools
         working-directory: scripts/lp-history
