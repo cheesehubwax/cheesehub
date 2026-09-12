@@ -783,6 +783,13 @@ export async function getResourcePricing(): Promise<ResourcePricing> {
       json: true,
       limit: 1,
     }).catch(() => ({ rows: [] })),
+    // Liquid WAX the RAM contract can actually spend on purchases.
+    chainPost<string[]>("/v1/chain/get_currency_balance", {
+      code: "eosio.token",
+      account: CHEESE_RAM_CONTRACT,
+      symbol: "WAX",
+    }).catch(() => [] as string[]),
+
   ]);
 
   // CHEESE/WAX price: pool spot, sanity-checked against the contract's own
