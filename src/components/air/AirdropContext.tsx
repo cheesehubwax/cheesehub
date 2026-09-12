@@ -476,25 +476,34 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
   );
   const selectedCount = chosenHolders.length;
 
-  const { recipients, ramExcluded } = useMemo<{
+  const { recipients, ramPurchases, ramPurchaseCounts, ramExcluded } = useMemo<{
     recipients: AirdropRecipient[];
-    ramExcluded: { belowMin: number; aboveMax: number };
+    ramPurchases: RamPurchase[];
+    ramPurchaseCounts: Map<string, number>;
+    ramExcluded: { belowMin: number; split: number };
   }>(() => {
-    const none = { recipients: [], ramExcluded: { belowMin: 0, aboveMax: 0 } };
+    const none = {
+      recipients: [],
+      ramPurchases: [],
+      ramPurchaseCounts: new Map<string, number>(),
+      ramExcluded: { belowMin: 0, split: 0 },
+    };
     const text = isRam ? ramCheeseText : amountText;
     if (!snapshot || !text) return none;
     try {
       const all = computeAmounts(chosenHolders, mode, text, effPrecision);
-      if (!isRam) return { recipients: all, ramExcluded: { belowMin: 0, aboveMax: 0 } };
+      if (!isRam) return { ...none, recipients: all };
       const base = 10 ** CHEESE_PRECISION;
       const minUnits = ramLimits ? BigInt(Math.round(ramLimits.minCheese * base)) : 0n;
       const maxUnits = ramLimits ? BigInt(Math.round(ramLimits.maxCheese * base)) : 0n;
-      const filtered = filterRamRecipients(all, minUnits, maxUnits);
+      const plan = planRamPurchases(all, minUnits, maxUnits);
       return {
-        recipients: filtered.included,
+        recipients: plan.included,
+        ramPurchases: plan.purchases,
+        ramPurchaseCounts: plan.purchaseCounts,
         ramExcluded: {
-          belowMin: filtered.belowMin.length,
-          aboveMax: filtered.aboveMax.length,
+          belowMin: plan.belowMin.length,
+          split: plan.splitCount,
         },
       };
     } catch {
@@ -510,6 +519,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     isRam,
     ramLimits,
   ]);
+
 
   const total = useMemo(() => totalUnits(recipients), [recipients]);
 
