@@ -21,6 +21,7 @@ const axisTick = { fontSize: 10, fill: 'hsl(var(--muted-foreground))' } as const
 
 export function LyticsAccountPanel({ account, onAccountChange, dates, current }: LyticsAccountPanelProps) {
   const [query, setQuery] = useState('');
+  const [selectedPool, setSelectedPool] = useState<string | null>(null);
   const { rows, isLoading } = useLpAccountHistory(account, dates);
 
   /** Today's holdings per pool, from the live/latest snapshot. */
@@ -29,7 +30,7 @@ export function LyticsAccountPanel({ account, onAccountChange, dates, current }:
     return current.pools
       .map((pool) => {
         const row = pool.providers.find((p) => p.a === account);
-        return row ? { label: pool.label, symbol: pool.symbol, ...row } : null;
+        return row ? { key: pool.key, label: pool.label, symbol: pool.symbol, ...row } : null;
       })
       .filter((row): row is NonNullable<typeof row> => row !== null)
       .sort((a, b) => b.usd - a.usd);
@@ -38,16 +39,31 @@ export function LyticsAccountPanel({ account, onAccountChange, dates, current }:
   const totalNow = holdings.reduce((sum, h) => sum + h.usd, 0);
   const cheeseNow = holdings.reduce((sum, h) => sum + h.cheese, 0);
 
+  const selectAccount = (name: string | null) => {
+    setSelectedPool(null);
+    onAccountChange(name);
+  };
+
+  /** Rows limited to the selected pool (or all rows when nothing is selected). */
+  const chartRows = useMemo(
+    () => (selectedPool ? rows.filter((r) => r.poolKey === selectedPool) : rows),
+    [rows, selectedPool],
+  );
+
+  const selectedPoolLabel = selectedPool
+    ? (holdings.find((h) => h.key === selectedPool)?.label ?? rows.find((r) => r.poolKey === selectedPool)?.label ?? selectedPool)
+    : null;
+
   const series = useMemo(() => {
     const byDate = new Map<string, { date: string; usd: number; cheese: number }>();
-    for (const row of rows) {
+    for (const row of chartRows) {
       const entry = byDate.get(row.date) ?? { date: row.date, usd: 0, cheese: 0 };
       entry.usd += row.usd;
       entry.cheese += row.cheese;
       byDate.set(row.date, entry);
     }
     return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
-  }, [rows]);
+  }, [chartRows]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
