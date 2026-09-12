@@ -24,6 +24,8 @@ export function AirCostPanel() {
     ramCheeseTotal,
     ramBytesTotal,
     ramExcluded,
+    ramPurchaseCount,
+
     ramMinViable,
     ramLimits,
     selectedCount,
