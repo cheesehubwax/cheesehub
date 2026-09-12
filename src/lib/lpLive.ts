@@ -4,6 +4,7 @@
 // the "today" figures so the page is useful before/between recorded days.
 import {
   alcorCheesePairs,
+  alcorPairVolume,
   buildPoolSnapshot,
   poolsForPair,
   selectVenuePairs,
