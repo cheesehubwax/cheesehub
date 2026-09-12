@@ -83,14 +83,14 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
       </div>
 
       {hasSeries ? (
-        <div className="grid gap-6 md:grid-cols-2">
-          <div className="rounded-xl bg-background/40 border border-border/40 p-4 space-y-3">
-            <div className="rounded-lg bg-background/60 border border-border/40 p-3 text-center">
-              <div className="flex items-center justify-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-1">
+            <div className="w-fit mx-auto px-2 py-1 rounded-md bg-background/60 border border-border/40 text-center">
+              <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
                 <TokenLogo contract={pool.contract ?? ''} symbol={pool.symbol} size="sm" />
                 CHEESE price in {pool.symbol}
               </div>
-              <div className="text-sm font-mono font-semibold text-foreground">
+              <div className="text-sm font-mono font-semibold text-foreground leading-tight">
                 {pool.priceInPaired ? tokenPrice(pool.priceInPaired, pool.symbol) : '—'}
               </div>
             </div>
@@ -107,13 +107,13 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
             </div>
           </div>
 
-          <div className="rounded-xl bg-background/40 border border-border/40 p-4 space-y-3">
-            <div className="rounded-lg bg-background/60 border border-border/40 p-3 text-center">
-              <div className="flex items-center justify-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+          <div className="space-y-1">
+            <div className="w-fit mx-auto px-2 py-1 rounded-md bg-background/60 border border-border/40 text-center">
+              <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
                 <UsdLogo />
                 Pool value (USD)
               </div>
-              <div className="text-sm font-mono font-semibold text-foreground">{usd(pool.usd)}</div>
+              <div className="text-sm font-mono font-semibold text-foreground leading-tight">{usd(pool.usd)}</div>
             </div>
             <div className="h-36">
               <ResponsiveContainer width="100%" height="100%">
@@ -134,13 +134,13 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
             </div>
           </div>
 
-          <div className="rounded-xl bg-background/40 border border-border/40 p-4 space-y-3">
-            <div className="rounded-lg bg-background/60 border border-border/40 p-3 text-center">
-              <div className="flex items-center justify-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+          <div className="space-y-1">
+            <div className="w-fit mx-auto px-2 py-1 rounded-md bg-background/60 border border-border/40 text-center">
+              <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
                 <CheeseLogo />
                 CHEESE in pool
               </div>
-              <div className="text-sm font-mono font-semibold text-foreground">{amount(pool.cheese, 0)}</div>
+              <div className="text-sm font-mono font-semibold text-foreground leading-tight">{amount(pool.cheese, 0)}</div>
             </div>
             <div className="h-36">
               <ResponsiveContainer width="100%" height="100%">
@@ -155,13 +155,13 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
             </div>
           </div>
 
-          <div className="rounded-xl bg-background/40 border border-border/40 p-4 space-y-3">
-            <div className="rounded-lg bg-background/60 border border-border/40 p-3 text-center">
-              <div className="flex items-center justify-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+          <div className="space-y-1">
+            <div className="w-fit mx-auto px-2 py-1 rounded-md bg-background/60 border border-border/40 text-center">
+              <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
                 <TokenLogo contract={pool.contract ?? ''} symbol={pool.symbol} size="sm" />
                 {pool.symbol} in pool
               </div>
-              <div className="text-sm font-mono font-semibold text-foreground">{amount(pool.paired, 4)}</div>
+              <div className="text-sm font-mono font-semibold text-foreground leading-tight">{amount(pool.paired, 4)}</div>
             </div>
             <div className="h-36">
               <ResponsiveContainer width="100%" height="100%">
@@ -176,12 +176,12 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
             </div>
           </div>
 
-          <div className="rounded-xl bg-background/40 border border-border/40 p-4 space-y-3">
-            <div className="rounded-lg bg-background/60 border border-border/40 p-3 text-center">
-              <div className="flex items-center justify-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+          <div className="space-y-1">
+            <div className="w-fit mx-auto px-2 py-1 rounded-md bg-background/60 border border-border/40 text-center">
+              <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
                 Provider accounts
               </div>
-              <div className="text-sm font-mono font-semibold text-foreground">{`${pool.accounts} (${pool.positions} pos)`}</div>
+              <div className="text-sm font-mono font-semibold text-foreground leading-tight">{`${pool.accounts} (${pool.positions} pos)`}</div>
             </div>
             <div className="h-36">
               <ResponsiveContainer width="100%" height="100%">
