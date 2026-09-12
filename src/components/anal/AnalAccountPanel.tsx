@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLpAccountHistory } from '@/hooks/useLpHistory';
 import { downloadAccountHistoryCsv } from '@/lib/lpCsv';
-import { LP_VENUE_LABELS, type LpDayFile } from '@/lib/lpPools';
+import { type LpDayFile } from '@/lib/lpPools';
 import { amount, shortDate, tooltipDate, usd } from './format';
 
 interface AnalAccountPanelProps {
