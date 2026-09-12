@@ -1,31 +1,22 @@
-# CHEESELytics — selectable metric chart for the pool detail panel
+# CHEESELytics — make the pool detail charts show from the first snapshot
 
-## What changes
+## Problem
 
-The pool detail panel (below the pool table) currently shows four small charts side by side.
-It will work like the main overview instead: the four stat boxes become selectors, and one
-chart beneath shows the chosen metric's history for the selected pool.
-
-- **USD value** — default
-- **CHEESE in pool**
-- **Paired token in pool** (label uses the pool's symbol, e.g. WAX, HOLE)
-- **Accounts** (providers in the pool)
+The pool detail panel keeps its existing four small charts (USD value, CHEESE in pool,
+paired token, accounts). But they only render once two days are recorded, so with the
+current single snapshot the user sees "Charts appear once at least two days have been
+recorded" and no charts at all.
 
 ## Changes — all in `src/components/lytics/LyticsPoolDetail.tsx`
 
-1. Turn the four stat boxes into buttons with a selected highlight (same style as the
-   overview). Default selection: USD value. Selection resets to USD when a different pool
-   is selected.
-2. Replace the 2x2 grid of four mini charts with a single chart that plots the selected
-   metric across the recorded days for that pool. USD keeps the filled area style; other
-   metrics use the same area chart with per-metric formatting for axis and tooltip.
-3. Show the chart from the very first snapshot (dots on the line, like the overview) —
-   the "two days needed" message goes away; keep a message only for zero recorded days.
-4. Keep the existing "Pool history CSV" button, provider table, and all other content
-   unchanged. The paired-token tooltip keeps its higher-precision formatting.
+1. Lower the chart gate from 2+ days to 1+ day so the four charts appear immediately.
+2. Enable point dots on all four charts' lines/areas so a single snapshot renders as a
+   visible dot (mirrors the overview chart behavior).
+3. Keep a message only for the zero-days case ("Charts appear once a snapshot has been
+   recorded").
+4. Everything else — stat boxes, provider table, CSV button, chart styling — stays as is.
 
 ## Verification
 
-- With the one existing snapshot: selecting each box swaps the chart, axis formatting and
-  tooltip correctly; single day renders as a dot.
+- With the one existing snapshot, selecting a pool shows all four charts, each with a dot.
 - `bunx tsgo --noEmit` and the production build pass.
