@@ -24,7 +24,6 @@ import {
   estimateResources,
   planRamPurchases,
   formatQuantity,
-  formatUnits,
   resourceWarnings,
   totalUnits,
   RAM_BYTES_PER_NFT,
@@ -84,6 +83,13 @@ import {
   useAirWalletTokens,
   useAirAlcorPairs,
 } from '@/hooks/useAirdropQueries';
+import {
+  buildResultsCsv,
+  buildSnapshotCsv,
+  downloadCsvFile,
+  type CsvBatchItem,
+} from '@/lib/airdropCsv';
+import { pairLabel } from '@/lib/airdropAlcorLp';
 
 /** Where the recipient list comes from. */
 export type SnapshotMode = 'token' | 'nft' | 'lp';
@@ -112,6 +118,8 @@ export interface BatchLogEntry {
   recipients: number;
   txId?: string;
   error?: string;
+  /** Per-recipient payload of the batch, used by the results CSV export. */
+  items?: CsvBatchItem[];
 }
 
 interface AirdropContextValue {
@@ -248,7 +256,10 @@ interface AirdropContextValue {
   requestCancel: () => void;
   canRun: boolean;
   runAirdrop: () => Promise<void>;
-  downloadCsv: () => void;
+  /** Download the holder list exactly as snapshotted. */
+  downloadSnapshotCsv: () => void;
+  /** Download who actually received what, joined to each batch's transaction. */
+  downloadResultsCsv: () => void;
 }
 
 const AirdropContext = createContext<AirdropContextValue | null>(null);
@@ -498,17 +509,20 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
   );
   const selectedCount = chosenHolders.length;
 
-  const { recipients, ramPurchases, ramPurchaseCounts, ramExcluded } = useMemo<{
+  const { recipients, ramPurchases, ramPurchaseCounts, ramExcluded, ramBelowMin } = useMemo<{
     recipients: AirdropRecipient[];
     ramPurchases: RamPurchase[];
     ramPurchaseCounts: Map<string, number>;
     ramExcluded: { belowMin: number; split: number };
+    /** RAM mode: selected accounts whose share is below the contract minimum. */
+    ramBelowMin: AirdropRecipient[];
   }>(() => {
     const none = {
       recipients: [],
       ramPurchases: [],
       ramPurchaseCounts: new Map<string, number>(),
       ramExcluded: { belowMin: 0, split: 0 },
+      ramBelowMin: [],
     };
     const text = isRam ? ramCheeseText : amountText;
     if (!snapshot || !text) return none;
@@ -527,6 +541,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
           belowMin: plan.belowMin.length,
           split: plan.splitCount,
         },
+        ramBelowMin: plan.belowMin,
       };
     } catch {
       return none;
@@ -1108,11 +1123,17 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
         );
         appendBatch(
           result.success
-            ? { batch: i + 1, recipients: batch.length, txId: result.txId ?? undefined }
+            ? {
+                batch: i + 1,
+                recipients: batch.length,
+                txId: result.txId ?? undefined,
+                items: batch.map((r) => ({ account: r.account, units: r.units })),
+              }
             : {
                 batch: i + 1,
                 recipients: batch.length,
                 error: shortError(result.error ?? new Error('Transaction failed')),
+                items: batch.map((r) => ({ account: r.account, units: r.units })),
               },
         );
         if (i < batches.length - 1) await new Promise((r) => setTimeout(r, 1200));
@@ -1144,11 +1165,17 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
         );
         appendBatch(
           result.success
-            ? { batch: i + 1, recipients: batch.length, txId: result.txId ?? undefined }
+            ? {
+                batch: i + 1,
+                recipients: batch.length,
+                txId: result.txId ?? undefined,
+                items: batch.map((a) => ({ account: a.account, assetIds: a.assetIds })),
+              }
             : {
                 batch: i + 1,
                 recipients: batch.length,
                 error: shortError(result.error ?? new Error('Transaction failed')),
+                items: batch.map((a) => ({ account: a.account, assetIds: a.assetIds })),
               },
         );
         if (i < batches.length - 1) await new Promise((r) => setTimeout(r, 1200));
@@ -1183,11 +1210,17 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
       );
       appendBatch(
         result.success
-          ? { batch: i + 1, recipients: batch.length, txId: result.txId ?? undefined }
+          ? {
+              batch: i + 1,
+              recipients: batch.length,
+              txId: result.txId ?? undefined,
+              items: batch.map((r) => ({ account: r.account, units: r.units })),
+            }
           : {
               batch: i + 1,
               recipients: batch.length,
               error: shortError(result.error ?? new Error('Transaction failed')),
+              items: batch.map((r) => ({ account: r.account, units: r.units })),
             },
       );
       if (i < batches.length - 1) await new Promise((r) => setTimeout(r, 1200));
@@ -1227,51 +1260,88 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     queryClient,
   ]);
 
-  const downloadCsv = useCallback(() => {
-    const quotedMemo = `"${memo.replace(/"/g, '""')}"`;
-    const stamp = snapshotAt?.slice(0, 19).replace(/[:T]/g, '-') ?? 'report';
-    let lines: string[];
-    let name: string;
+  const downloadSnapshotCsv = useCallback(() => {
+    if (!snapshot) return;
+    const what =
+      snapshotMode === 'token'
+        ? `token ${snapSymbol.toUpperCase()}@${snapContract}`
+        : snapshotMode === 'nft'
+          ? `NFT collection ${snapCollection}${snapSchema ? ` / schema ${snapSchema}` : ''}${snapTemplate ? ` / template ${snapTemplate}` : ''}`
+          : `Alcor LP ${lpPair ? pairLabel(lpPair) : 'pair'}`;
+    const { name, lines } = buildSnapshotCsv({
+      what,
+      source: snapshot.source,
+      truncated: snapshot.truncated,
+      at: snapshotAt,
+      holders: sortedHolders,
+      selected,
+    });
+    downloadCsvFile(name, lines);
+  }, [
+    snapshot,
+    snapshotMode,
+    snapContract,
+    snapSymbol,
+    snapCollection,
+    snapSchema,
+    snapTemplate,
+    lpPair,
+    snapshotAt,
+    sortedHolders,
+    selected,
+  ]);
+
+  const downloadResultsCsv = useCallback(() => {
+    if (batchLog.length === 0) return;
+    const at = snapshotAt;
     if (isRam) {
-      const perCheeseBytes = pricing ? (bytesPerCheese(pricing) ?? 0) : 0;
-      lines = [`account,cheese,est_kb`];
-      for (const r of recipients) {
-        const cheese = Number(r.units) / 10 ** CHEESE_PRECISION;
-        lines.push(`${r.account},${formatCheese(cheese)},${((cheese * perCheeseBytes) / 1024).toFixed(2)}`);
-      }
-      name = `airdrop-ram-${stamp}.csv`;
-    } else if (isNft) {
-      lines = ['account,nfts,asset_ids,collection,template_id,memo'];
-      for (const a of nftAssignments) {
-        lines.push(
-          `${a.account},${a.assetIds.length},"${a.assetIds.join(' ')}",${nftCollection},${nftTemplateId ?? ''},${quotedMemo}`,
-        );
-      }
-
-      name = `airdrop-nft-${nftCollection || 'assets'}-${stamp}.csv`;
-
-    } else {
-      lines = ['account,amount,token,memo'];
-      for (const r of recipients) {
-        lines.push(
-          `${r.account},${formatUnits(r.units, precision)},${sendSymbol.toUpperCase()},${quotedMemo}`,
-        );
-      }
-      name = `airdrop-${sendSymbol.toLowerCase()}-${stamp}.csv`;
+      const { name, lines } = buildResultsCsv({
+        kind: 'ram',
+        planned: ramPurchases,
+        belowMin: ramBelowMin,
+        minCheese: ramLimits?.minCheese ?? null,
+        bytesPerCheese: pricing ? (bytesPerCheese(pricing) ?? 0) : 0,
+        log: batchLog,
+        at,
+      });
+      downloadCsvFile(name, lines);
+      return;
     }
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = name;
-    a.click();
-    URL.revokeObjectURL(url);
+    if (isNft) {
+      const assigned = new Set(nftAssignments.map((a) => a.account));
+      const { name, lines } = buildResultsCsv({
+        kind: 'nft',
+        collection: nftCollection,
+        templateId: nftTemplateId,
+        memo,
+        planned: nftAssignments,
+        skippedAccounts: chosenHolders.map((h) => h.account).filter((a) => !assigned.has(a)),
+        log: batchLog,
+        at,
+      });
+      downloadCsvFile(name, lines);
+      return;
+    }
+    const { name, lines } = buildResultsCsv({
+      kind: 'token',
+      symbol: sendSymbol,
+      precision,
+      memo,
+      planned: recipients,
+      log: batchLog,
+      at,
+    });
+    downloadCsvFile(name, lines);
   }, [
     isNft,
     isRam,
+    batchLog,
+    ramPurchases,
+    ramBelowMin,
+    ramLimits,
     pricing,
-
     nftAssignments,
+    chosenHolders,
     nftCollection,
     nftTemplateId,
     recipients,
@@ -1388,7 +1458,8 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     requestCancel,
     canRun,
     runAirdrop,
-    downloadCsv,
+    downloadSnapshotCsv,
+    downloadResultsCsv,
   };
 
   return <AirdropContext.Provider value={value}>{children}</AirdropContext.Provider>;
