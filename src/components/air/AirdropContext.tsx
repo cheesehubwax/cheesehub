@@ -65,8 +65,13 @@ import {
   cheeseForCpuUs,
   cpuUsPerCheese,
   formatCheese,
+  maxCheeseForPool,
+  spendableWax,
   splitPurchases,
+  waxCostForCheese,
   weightCalibration,
+  RAM_MARGIN,
+
 } from '@/lib/airdropResources';
 import {
   useAirAccountResources,
