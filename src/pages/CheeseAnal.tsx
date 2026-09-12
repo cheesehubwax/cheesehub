@@ -117,9 +117,13 @@ const CheeseAnal = () => {
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-muted-foreground">
               {days.length} day{days.length === 1 ? '' : 's'} recorded
-              {updatedAt ? ` · last ${new Date(updatedAt).toLocaleDateString()}` : ''}
+              {current?.date
+                ? ` · values from ${tooltipDate(current.date)} snapshot`
+                : updatedAt
+                  ? ` · last ${new Date(updatedAt).toLocaleDateString()}`
+                  : ''}
             </span>
-            <Button size="sm" variant="ghost" onClick={() => refetch()}>
+            <Button size="sm" variant="ghost" onClick={() => { refetchDay(); refetchLive(); }}>
               Refresh
             </Button>
             <Button size="sm" variant="outline" disabled={!current} onClick={() => current && downloadSnapshotCsv(current)}>
