@@ -235,6 +235,28 @@ export function utcSlot(t: number): string {
   return `${iso.slice(0, 10)}T${Number(iso.slice(11, 13)) < 12 ? '00' : '12'}`;
 }
 
+/**
+ * Recorded snapshot closest to 24 hours before `currentT`. Used for true 24h
+ * comparisons with twice-daily snapshots. Returns null when every recorded
+ * entry is less than 12h older than `currentT` — too recent for a meaningful
+ * 24h compare, so callers should show no change rather than a ~12h one.
+ */
+export function dayAbout24hBefore(days: LpIndexDay[], currentT: number): LpIndexDay | null {
+  const target = currentT - 24 * 60 * 60_000;
+  let best: LpIndexDay | null = null;
+  let bestDist = Infinity;
+  for (const day of days) {
+    if (day.t >= currentT) continue;
+    const dist = Math.abs(day.t - target);
+    if (dist < bestDist) {
+      best = day;
+      bestDist = dist;
+    }
+  }
+  if (!best || currentT - best.t < 12 * 60 * 60_000) return null;
+  return best;
+}
+
 export function round(value: number, decimals: number): number {
   return Number.isFinite(value) ? Number(value.toFixed(decimals)) : 0;
 }

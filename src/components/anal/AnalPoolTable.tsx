@@ -2,7 +2,7 @@
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { CheeseLogo, PairLabel, UsdLogo } from '@/components/anal/PairLogos';
 import { VenueLabel } from '@/components/anal/VenueLogo';
-import { type LpDayFile, type LpIndexDay } from '@/lib/lpPools';
+import { dayAbout24hBefore, type LpDayFile, type LpIndexDay } from '@/lib/lpPools';
 import { amount, change, tokenPrice, usd, usdPrice } from './format';
 
 interface AnalPoolTableProps {
