@@ -55,13 +55,13 @@ export function AnalPoolTable({
                 <th className="text-right font-medium py-2">
                   <span className="inline-flex items-center justify-end gap-1"><UsdLogo />USD value</span>
                 </th>
+                <th className="text-right font-medium py-2">24h</th>
                 <th className="text-right font-medium py-2">
                   <span className="inline-flex items-center justify-end gap-1"><CheeseLogo />CHEESE</span>
                 </th>
                 <th className="text-right font-medium py-2">Paired token</th>
                 <th className="text-right font-medium py-2">CHEESE price (in pair)</th>
                 <th className="text-right font-medium py-2">Accounts</th>
-                <th className="text-right font-medium py-2">24h</th>
               </tr>
             </thead>
             <tbody>
