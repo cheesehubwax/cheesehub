@@ -2,14 +2,18 @@ import { OpenMojiIcon } from "@/components/OpenMojiIcon";
 
 interface DropStatsBarProps {
   activeOfficialDrops: number;
-  totalSold: number;
-  cheeseNulled: number;
-  xCheeseValue: number;
-  cheeseReserve: number;
+  totalSold: number | null;
+  cheeseNulled: number | null;
+  xCheeseValue: number | null;
+  cheeseReserve: number | null;
   isLoading: boolean;
 }
 
 export function DropStatsBar({ activeOfficialDrops, totalSold, cheeseNulled, xCheeseValue, cheeseReserve, isLoading }: DropStatsBarProps) {
+  // null means every history source failed — never show that as 0.
+  const show = (value: number | null) =>
+    isLoading || value === null ? "-" : value.toLocaleString();
+
   const statItems = [
     {
       label: "Active Official Drops",
@@ -18,22 +22,22 @@ export function DropStatsBar({ activeOfficialDrops, totalSold, cheeseNulled, xCh
     },
     {
       label: "$CHEESE Collected",
-      value: isLoading ? "-" : totalSold.toLocaleString(),
+      value: show(totalSold),
       emoji: "🧀",
     },
     {
       label: "$CHEESE Nulled",
-      value: isLoading ? "-" : cheeseNulled.toLocaleString(),
+      value: show(cheeseNulled),
       emoji: "⛔",
     },
     {
       label: "xCHEESE Value",
-      value: isLoading ? "-" : xCheeseValue.toLocaleString(),
+      value: show(xCheeseValue),
       emoji: "✖️",
     },
     {
       label: "cheesereserv",
-      value: isLoading ? "-" : cheeseReserve.toLocaleString(),
+      value: show(cheeseReserve),
       emoji: "🏦",
     },
   ];
