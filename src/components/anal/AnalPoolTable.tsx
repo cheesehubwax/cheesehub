@@ -55,13 +55,13 @@ export function AnalPoolTable({
                 <th className="text-right font-medium py-2">
                   <span className="inline-flex items-center justify-end gap-1"><UsdLogo />USD value</span>
                 </th>
+                <th className="text-right font-medium py-2">24h</th>
                 <th className="text-right font-medium py-2">
                   <span className="inline-flex items-center justify-end gap-1"><CheeseLogo />CHEESE</span>
                 </th>
                 <th className="text-right font-medium py-2">Paired token</th>
                 <th className="text-right font-medium py-2">CHEESE price (in pair)</th>
                 <th className="text-right font-medium py-2">Accounts</th>
-                <th className="text-right font-medium py-2">24h</th>
               </tr>
             </thead>
             <tbody>
@@ -92,6 +92,13 @@ export function AnalPoolTable({
                       </span>
                     </td>
                     <td className="py-2 text-right font-mono text-foreground">{usd(pool.usd)}</td>
+                    <td
+                      className={`py-2 text-right font-mono ${
+                        delta ? (delta.up ? 'text-green-400' : 'text-red-400') : 'text-muted-foreground'
+                      }`}
+                    >
+                      {delta ? delta.text : '—'}
+                    </td>
                     <td className="py-2 text-right font-mono text-muted-foreground">{amount(pool.cheese, 0)}</td>
                     <td className="py-2 text-right font-mono text-muted-foreground">
                       {amount(pool.paired, 4)} {pool.symbol}
@@ -109,13 +116,6 @@ export function AnalPoolTable({
                       )}
                     </td>
                     <td className="py-2 text-right font-mono text-muted-foreground">{pool.accounts}</td>
-                    <td
-                      className={`py-2 text-right font-mono ${
-                        delta ? (delta.up ? 'text-green-400' : 'text-red-400') : 'text-muted-foreground'
-                      }`}
-                    >
-                      {delta ? delta.text : '—'}
-                    </td>
                   </tr>
                 );
               })}
