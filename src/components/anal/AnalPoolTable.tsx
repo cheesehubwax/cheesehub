@@ -61,6 +61,7 @@ export function AnalPoolTable({
                 </th>
                 <th className="text-right font-medium py-2">Paired token</th>
                 <th className="text-right font-medium py-2">CHEESE price (in pair)</th>
+                <th className="text-right font-medium py-2">24h price</th>
                 <th className="text-right font-medium py-2">Accounts</th>
               </tr>
             </thead>
