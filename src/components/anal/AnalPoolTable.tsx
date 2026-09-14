@@ -69,6 +69,9 @@ export function AnalPoolTable({
               {pools.map((pool) => {
                 const before = previous?.pools.find((p) => p.key === pool.key);
                 const delta = before ? change(pool.usd, before.usd) : null;
+                const priceDelta = before?.priceInPaired
+                  ? change(pool.priceInPaired ?? 0, before.priceInPaired)
+                  : null;
                 const selected = pool.key === selectedKey;
                 return (
                   <tr
