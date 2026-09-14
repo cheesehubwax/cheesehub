@@ -1,6 +1,9 @@
 import { ATOMIC_API, CHEESE_CONFIG, NFTHIVE_CONFIG } from '@/lib/waxConfig';
 import { fetchWithFallback } from '@/lib/fetchWithFallback';
+import { fetchActionsUnion, sumAssetField } from '@/lib/hyperionHistory';
+import { fetchTableRows } from '@/lib/waxRpcFallback';
 import type { NFTDrop, AtomicSale, AtomicTemplate, AtomicDrop, NFTHiveDrop, DropPrice } from '@/types/drop';
+
 
 // =============================================================================
 // Global Image Preload Tracking
@@ -859,12 +862,6 @@ export async function fetchUserDrops(account: string): Promise<Array<{
 }
 
 // Fetch CHEESE drop stats
-const HYPERION_ENDPOINTS_DROPS = [
-  'https://wax.eosusa.io/v2/history/get_actions',
-  'https://wax.eosphere.io/v2/history/get_actions',
-];
-const DROPS_BATCH_SIZE = 1000;
-const DROPS_MAX_ACTIONS = 10000;
 const DROPS_START_DATE = '2026-03-24T00:00:00.000Z';
 
 function parseCheeseAmount(str: string): number {
@@ -872,131 +869,115 @@ function parseCheeseAmount(str: string): number {
   return parseFloat(str.split(' ')[0]) || 0;
 }
 
-async function fetchCheeseTransfersHyperion(
+/**
+ * Sum CHEESE transfers across the UNION of several history providers.
+ * A single provider can answer HTTP 200 with a near-empty index (observed:
+ * eosusa returning 0 of 178 nfthivedrops transfers), which previously made
+ * these stats read as ~0. Returns null when every provider failed.
+ */
+async function sumCheeseTransfers(
   params: { from?: string; to?: string },
-): Promise<number> {
-  for (const endpoint of HYPERION_ENDPOINTS_DROPS) {
-    try {
-      let total = 0;
-      let skip = 0;
+): Promise<number | null> {
+  let query = `act.account=cheeseburger&act.name=transfer&after=${DROPS_START_DATE}`;
+  if (params.from) query += `&transfer.from=${params.from}`;
+  if (params.to) query += `&transfer.to=${params.to}`;
 
-      while (skip < DROPS_MAX_ACTIONS) {
-        let url = `${endpoint}?act.account=cheeseburger&act.name=transfer&after=${DROPS_START_DATE}&limit=${DROPS_BATCH_SIZE}&skip=${skip}`;
-        if (params.from) url += `&transfer.from=${params.from}`;
-        if (params.to) url += `&transfer.to=${params.to}`;
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`Hyperion error: ${response.status}`);
-
-        const data = await response.json();
-        const actions = data.actions;
-        if (!actions || actions.length === 0) break;
-
-        for (const action of actions) {
-          const d = action.act?.data;
-          if (d?.quantity) {
-            total += parseCheeseAmount(d.quantity);
-          }
-        }
-
-        if (actions.length < DROPS_BATCH_SIZE) break;
-        skip += DROPS_BATCH_SIZE;
-      }
-
-      return total;
-    } catch (err) {
-      console.error(`CHEESE transfer fetch failed for ${endpoint} (${params.from ?? '*'}->${params.to ?? '*'}):`, err);
-      continue;
-    }
+  try {
+    const { actions } = await fetchActionsUnion(query, { timeoutMs: 15000 });
+    return sumAssetField(actions, 'quantity');
+  } catch (err) {
+    console.error(`CHEESE transfer union failed (${params.from ?? '*'}->${params.to ?? '*'}):`, err);
+    return null;
   }
-  return 0;
 }
 
 export interface CheeseDropStats {
   activeDrops: number;
-  totalSold: number;
-  cheeseNulled: number;
-  xCheeseValue: number;
-  cheeseReserve: number;
+  totalSold: number | null;
+  cheeseNulled: number | null;
+  xCheeseValue: number | null;
+  cheeseReserve: number | null;
+}
+
+/** Read every row of a nfthivedrops table through the multi-endpoint reader. */
+async function fetchAllDropRows<T extends Record<string, unknown>>(table: string): Promise<T[]> {
+  const rows: T[] = [];
+  let lowerBound = '';
+  let more = true;
+
+  while (more) {
+    const response = await fetchTableRows<T>({
+      code: 'nfthivedrops',
+      scope: 'nfthivedrops',
+      table,
+      limit: 1000,
+      ...(lowerBound ? { lower_bound: lowerBound } : {}),
+    });
+    rows.push(...response.rows);
+    more = response.more && !!response.next_key;
+    if (more) lowerBound = response.next_key as string;
+  }
+
+  return rows;
 }
 
 export async function fetchCheeseDropStats(): Promise<CheeseDropStats> {
-  try {
-    const [dropsResponse, totalSold, cheeseNulled, xCheeseValue, cheeseReserve] = await Promise.all([
-      fetch('https://wax.eosusa.io/v1/chain/get_table_rows', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          json: true,
-          code: 'nfthivedrops',
-          scope: 'nfthivedrops',
-          table: 'drops',
-          limit: 1000,
-        }),
+  const [allDrops, allPrices, totalSold, cheeseNulled, xCheeseValue, cheeseReserve] = await Promise.all([
+    fetchAllDropRows<{ drop_id: number; collection_name?: string; start_time?: number; end_time?: number }>('drops')
+      .catch((err) => {
+        console.error('Failed to read nfthivedrops drops table:', err);
+        return [] as Array<{ drop_id: number; collection_name?: string; start_time?: number; end_time?: number }>;
       }),
-      fetchCheeseTransfersHyperion({ from: 'nfthivedrops' }),
-      fetchCheeseTransfersHyperion({ from: 'cheesenftwax', to: 'eosio.null' }),
-      fetchCheeseTransfersHyperion({ from: 'cheesenftwax', to: 'xcheeseliqst' }),
-      fetchCheeseTransfersHyperion({ from: 'cheesenftwax', to: 'cheesereserv' }),
-    ]);
-
-    const dropsData = await dropsResponse.json();
-    const allDrops = dropsData.rows || [];
-
-    const pricesResponse = await fetch('https://wax.eosusa.io/v1/chain/get_table_rows', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        json: true,
-        code: 'nfthivedrops',
-        scope: 'nfthivedrops',
-        table: 'dropprices',
-        limit: 1000,
+    fetchAllDropRows<{ drop_id: number; token_symbol?: string; token_contract?: string }>('dropprices')
+      .catch((err) => {
+        console.error('Failed to read nfthivedrops dropprices table:', err);
+        return [] as Array<{ drop_id: number; token_symbol?: string; token_contract?: string }>;
       }),
-    });
+    sumCheeseTransfers({ from: 'nfthivedrops' }),
+    sumCheeseTransfers({ from: 'cheesenftwax', to: 'eosio.null' }),
+    sumCheeseTransfers({ from: 'cheesenftwax', to: 'xcheeseliqst' }),
+    sumCheeseTransfers({ from: 'cheesenftwax', to: 'cheesereserv' }),
+  ]);
 
-    const pricesData = await pricesResponse.json();
-    const allPrices = pricesData.rows || [];
+  const cheeseDropIds = new Set<number>();
 
-    const cheeseDropIds = new Set<number>();
-
-    for (const price of allPrices) {
-      const tokenSymbol = price.token_symbol || '';
-      const tokenContract = price.token_contract || '';
-      if (tokenSymbol.includes('CHEESE') || tokenContract === 'cheeseburger') {
-        cheeseDropIds.add(price.drop_id);
-      }
+  for (const price of allPrices) {
+    const tokenSymbol = price.token_symbol || '';
+    const tokenContract = price.token_contract || '';
+    if (tokenSymbol.includes('CHEESE') || tokenContract === 'cheeseburger') {
+      cheeseDropIds.add(price.drop_id);
     }
-
-    for (const drop of allDrops) {
-      if (drop.collection_name === CHEESE_CONFIG.collectionName) {
-        cheeseDropIds.add(drop.drop_id);
-      }
-    }
-
-    const now = Math.floor(Date.now() / 1000);
-    let activeDrops = 0;
-
-    for (const drop of allDrops) {
-      if (!cheeseDropIds.has(drop.drop_id)) continue;
-      const startTime = drop.start_time || 0;
-      const endTime = drop.end_time || 0;
-      const isStarted = startTime === 0 || startTime <= now;
-      const isNotEnded = endTime === 0 || endTime > now;
-      if (isStarted && isNotEnded) activeDrops++;
-    }
-
-    return {
-      activeDrops,
-      totalSold: Math.floor(totalSold),
-      cheeseNulled: Math.floor(cheeseNulled),
-      xCheeseValue: Math.floor(xCheeseValue),
-      cheeseReserve: Math.floor(cheeseReserve),
-    };
-  } catch (error) {
-    console.error('Error fetching CHEESE drop stats:', error);
-    return { activeDrops: 0, totalSold: 0, cheeseNulled: 0, xCheeseValue: 0, cheeseReserve: 0 };
   }
+
+  for (const drop of allDrops) {
+    if (drop.collection_name === CHEESE_CONFIG.collectionName) {
+      cheeseDropIds.add(drop.drop_id);
+    }
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  let activeDrops = 0;
+
+  for (const drop of allDrops) {
+    if (!cheeseDropIds.has(drop.drop_id)) continue;
+    const startTime = drop.start_time || 0;
+    const endTime = drop.end_time || 0;
+    const isStarted = startTime === 0 || startTime <= now;
+    const isNotEnded = endTime === 0 || endTime > now;
+    if (isStarted && isNotEnded) activeDrops++;
+  }
+
+  const floorOrNull = (value: number | null) => (value === null ? null : Math.floor(value));
+
+  return {
+    activeDrops,
+    totalSold: floorOrNull(totalSold),
+    cheeseNulled: floorOrNull(cheeseNulled),
+    xCheeseValue: floorOrNull(xCheeseValue),
+    cheeseReserve: floorOrNull(cheeseReserve),
+  };
 }
+
 
 // =============================================================================
 // NFT fetching by schema (for DAO voting)
