@@ -119,6 +119,13 @@ export function AnalPoolTable({
                         '—'
                       )}
                     </td>
+                    <td
+                      className={`py-2 text-right font-mono ${
+                        priceDelta ? (priceDelta.up ? 'text-green-400' : 'text-red-400') : 'text-muted-foreground'
+                      }`}
+                    >
+                      {priceDelta ? priceDelta.text : '—'}
+                    </td>
                     <td className="py-2 text-right font-mono text-muted-foreground">{pool.accounts}</td>
                   </tr>
                 );
