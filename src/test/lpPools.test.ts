@@ -7,6 +7,7 @@ import {
   buildPoolSnapshot,
   alcorPairVolume,
   cheeseIsTokenA,
+  dayAbout24hBefore,
   indexEntryForDay,
   mergeIndexDay,
   poolsForPair,
@@ -229,5 +230,32 @@ describe('index bookkeeping', () => {
     ];
     const merged = mergeIndexDay(days, { date: '2026-09-12T00', t: 0, pools: [] });
     expect(merged.map((d) => d.date)).toEqual(['2026-09-12', '2026-09-12T00', '2026-09-12T12']);
+  });
+});
+
+describe('dayAbout24hBefore', () => {
+  const HOUR = 60 * 60_000;
+  const day = (t: number, date: string) => ({ date, t, pools: [] });
+  const base = Date.UTC(2026, 8, 13, 12, 41); // current snapshot time
+
+  it('picks the snapshot closest to 24h before the current one', () => {
+    const days = [
+      day(base - 36 * HOUR, '2026-09-12T00'),
+      day(base - 25 * HOUR, '2026-09-12T12'),
+      day(base - 12 * HOUR, '2026-09-13T00'),
+      day(base, '2026-09-13T12'),
+    ];
+    expect(dayAbout24hBefore(days, base)?.date).toBe('2026-09-12T12');
+  });
+
+  it('returns null when all history is less than 12h older', () => {
+    const days = [day(base - 6 * HOUR, '2026-09-13T00')];
+    expect(dayAbout24hBefore(days, base)).toBeNull();
+    expect(dayAbout24hBefore([], base)).toBeNull();
+  });
+
+  it('ignores entries at or after the current snapshot', () => {
+    const days = [day(base + HOUR, '2026-09-13T13'), day(base, '2026-09-13T12')];
+    expect(dayAbout24hBefore(days, base)).toBeNull();
   });
 });
