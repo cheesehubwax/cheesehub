@@ -304,10 +304,11 @@ const Drops = () => {
       <div className="container pb-12 flex flex-col items-center gap-6">
         <DropStatsBar
           activeOfficialDrops={enrichedOfficialDrops.length}
-          totalSold={cheeseStats?.totalSold ?? 0}
-          cheeseNulled={cheeseStats?.cheeseNulled ?? 0}
-          xCheeseValue={cheeseStats?.xCheeseValue ?? 0}
-          cheeseReserve={cheeseStats?.cheeseReserve ?? 0}
+          totalSold={cheeseStats?.totalSold ?? null}
+          cheeseNulled={cheeseStats?.cheeseNulled ?? null}
+          xCheeseValue={cheeseStats?.xCheeseValue ?? null}
+          cheeseReserve={cheeseStats?.cheeseReserve ?? null}
+
           isLoading={isLoading || isLoadingStats}
         />
         <p className="text-sm text-muted-foreground">
