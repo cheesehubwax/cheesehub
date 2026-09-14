@@ -52,7 +52,7 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
   }
 
   const hasSeries = series.length >= 1;
-  const volumeSeries = series.filter((row) => row.volumeUsd !== null);
+  const volumeSeries = series.filter((row): row is typeof row & { volumeUsd: number } => row.volumeUsd !== null);
   const latestVolume = volumeSeries[volumeSeries.length - 1] ?? null;
 
   const tooltip = (formatter: (value: number) => string, className: string) =>
