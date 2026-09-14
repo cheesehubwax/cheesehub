@@ -52,7 +52,7 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
   }
 
   const hasSeries = series.length >= 1;
-  const volumeSeries = series.filter((row) => row.volumeUsd !== null);
+  const volumeSeries = series.filter((row): row is typeof row & { volumeUsd: number } => row.volumeUsd !== null);
   const latestVolume = volumeSeries[volumeSeries.length - 1] ?? null;
 
   const tooltip = (formatter: (value: number) => string, className: string) =>
@@ -215,7 +215,7 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
             {volumeSeries.length > 0 ? (
               <div className="h-36">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  <LineChart data={volumeSeries} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                     <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
                     <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => usd(v)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
