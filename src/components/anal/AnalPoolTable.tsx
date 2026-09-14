@@ -61,6 +61,7 @@ export function AnalPoolTable({
                 </th>
                 <th className="text-right font-medium py-2">Paired token</th>
                 <th className="text-right font-medium py-2">CHEESE price (in pair)</th>
+                <th className="text-right font-medium py-2">24h price</th>
                 <th className="text-right font-medium py-2">Accounts</th>
               </tr>
             </thead>
@@ -68,6 +69,9 @@ export function AnalPoolTable({
               {pools.map((pool) => {
                 const before = previous?.pools.find((p) => p.key === pool.key);
                 const delta = before ? change(pool.usd, before.usd) : null;
+                const priceDelta = before?.priceInPaired
+                  ? change(pool.priceInPaired ?? 0, before.priceInPaired)
+                  : null;
                 const selected = pool.key === selectedKey;
                 return (
                   <tr
@@ -114,6 +118,13 @@ export function AnalPoolTable({
                       ) : (
                         '—'
                       )}
+                    </td>
+                    <td
+                      className={`py-2 text-right font-mono ${
+                        priceDelta ? (priceDelta.up ? 'text-green-400' : 'text-red-400') : 'text-muted-foreground'
+                      }`}
+                    >
+                      {priceDelta ? priceDelta.text : '—'}
                     </td>
                     <td className="py-2 text-right font-mono text-muted-foreground">{pool.accounts}</td>
                   </tr>
