@@ -92,6 +92,13 @@ export function AnalPoolTable({
                       </span>
                     </td>
                     <td className="py-2 text-right font-mono text-foreground">{usd(pool.usd)}</td>
+                    <td
+                      className={`py-2 text-right font-mono ${
+                        delta ? (delta.up ? 'text-green-400' : 'text-red-400') : 'text-muted-foreground'
+                      }`}
+                    >
+                      {delta ? delta.text : '—'}
+                    </td>
                     <td className="py-2 text-right font-mono text-muted-foreground">{amount(pool.cheese, 0)}</td>
                     <td className="py-2 text-right font-mono text-muted-foreground">
                       {amount(pool.paired, 4)} {pool.symbol}
@@ -109,13 +116,6 @@ export function AnalPoolTable({
                       )}
                     </td>
                     <td className="py-2 text-right font-mono text-muted-foreground">{pool.accounts}</td>
-                    <td
-                      className={`py-2 text-right font-mono ${
-                        delta ? (delta.up ? 'text-green-400' : 'text-red-400') : 'text-muted-foreground'
-                      }`}
-                    >
-                      {delta ? delta.text : '—'}
-                    </td>
                   </tr>
                 );
               })}
