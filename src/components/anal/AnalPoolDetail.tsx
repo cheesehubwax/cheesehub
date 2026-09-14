@@ -2,25 +2,29 @@
 import { useMemo } from 'react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
-import { CheeseLogo, PairLabel, UsdLogo } from '@/components/anal/PairLogos';
+import { CheeseLogo, PairLabel, PairLogos, UsdLogo } from '@/components/anal/PairLogos';
 import { TokenLogo } from '@/components/TokenLogo';
 import { VenueLabel } from '@/components/anal/VenueLogo';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { downloadPoolHistoryCsv } from '@/lib/lpCsv';
 import { type LpDayFile, type LpIndexDay, type LpPoolSnapshot } from '@/lib/lpPools';
 import { amount, shortDate, tokenPrice, tooltipDate, usd } from './format';
 
 interface AnalPoolDetailProps {
   pool: LpPoolSnapshot | null;
+  /** All pools visible for the current venue, in table order. */
+  pools: LpPoolSnapshot[];
   /** Recorded days trimmed to the selected range. */
   days: LpIndexDay[];
   current: LpDayFile | null;
   onSelectAccount: (account: string) => void;
+  onSelectPool: (key: string) => void;
 }
 
 const axisTick = { fontSize: 10, fill: '#FFFFFF' } as const;
 
-export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoolDetailProps) {
+export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, onSelectPool }: AnalPoolDetailProps) {
   const series = useMemo(() => {
     if (!pool) return [];
     return days
@@ -42,6 +46,11 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
       })
       .filter((row): row is NonNullable<typeof row> => row !== null);
   }, [days, pool]);
+
+  const sortedPools = useMemo(
+    () => [...pools].sort((a, b) => b.usd - a.usd),
+    [pools],
+  );
 
   if (!pool) {
     return (
@@ -67,15 +76,30 @@ export function AnalPoolDetail({ pool, days, current, onSelectAccount }: AnalPoo
   return (
     <div className="w-full rounded-xl bg-card border border-border/50 p-4 space-y-4">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <OpenMojiIcon emoji="🔍" size={18} />
-          <span className="text-sm font-medium text-foreground">
-            <PairLabel symbol={pool.symbol} contract={pool.contract} size="md" />
-          </span>
-          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/60 bg-background/60 text-muted-foreground">
-            <VenueLabel venue={pool.venue} />
-          </span>
-        </div>
+        <Select value={pool.key} onValueChange={onSelectPool} disabled={sortedPools.length === 0}>
+          <SelectTrigger className="h-auto w-auto border-0 bg-transparent p-1.5 pr-2 rounded-md gap-2 shadow-none hover:bg-background/50 focus:ring-0 focus:ring-offset-0 [&>svg]:text-muted-foreground">
+            <OpenMojiIcon emoji="🔍" size={18} />
+            <span className="text-sm font-medium text-foreground">
+              <PairLabel symbol={pool.symbol} contract={pool.contract} size="md" />
+            </span>
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/60 bg-background/60 text-muted-foreground">
+              <VenueLabel venue={pool.venue} />
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            {sortedPools.map((p) => (
+              <SelectItem key={p.key} value={p.key}>
+                <span className="inline-flex items-center gap-2">
+                  <PairLogos symbol={p.symbol} contract={p.contract} size="sm" />
+                  <span className="text-foreground">CHEESE / {p.symbol}</span>
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/60 bg-background/60 text-muted-foreground">
+                    <VenueLabel venue={p.venue} />
+                  </span>
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Button
           size="sm"
           variant="outline"

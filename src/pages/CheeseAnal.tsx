@@ -190,9 +190,11 @@ const CheeseAnal = () => {
 
         <AnalPoolDetail
           pool={selectedPool}
+          pools={current?.pools ?? []}
           days={ranged}
           current={current}
           onSelectAccount={(name) => setAccount(name)}
+          onSelectPool={setPoolKey}
         />
 
         <AnalAccountPanel account={account} onAccountChange={setAccount} dates={dates} current={current} />
