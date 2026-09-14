@@ -3,15 +3,18 @@ name: RAM Price History
 on:
   schedule:
     # Two samples per UTC day: one in the 00:00-11:59 slot and one in the
-    # 12:00-23:59 slot. Each slot has three ticks because GitHub's shared cron
-    # queue often delays or drops them. The sampler records only when the
-    # current slot has no sample yet, so the extra ticks are free no-ops.
+    # 12:00-23:59 slot. Each slot gets four ticks spread evenly across it,
+    # because GitHub's shared cron queue often delays ticks by hours or drops
+    # them entirely. The sampler records only when the current slot has no
+    # sample yet, so the extra ticks are free no-ops.
     - cron: "23 0 * * *"
-    - cron: "23 2 * * *"
-    - cron: "23 5 * * *"
+    - cron: "23 3 * * *"
+    - cron: "23 6 * * *"
+    - cron: "23 9 * * *"
     - cron: "23 12 * * *"
-    - cron: "23 14 * * *"
-    - cron: "23 17 * * *"
+    - cron: "23 15 * * *"
+    - cron: "23 18 * * *"
+    - cron: "23 21 * * *"
   workflow_dispatch:
     inputs:
       force:

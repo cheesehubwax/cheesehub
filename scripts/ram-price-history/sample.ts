@@ -167,6 +167,17 @@ async function main() {
     console.log("Slot already filled, but FORCE=1 — recording anyway.");
   }
 
+  // Surface dropped cron ticks: if the previous 12h slot never got a sample,
+  // GitHub skipped every tick in it and the series has a visible gap.
+  const previousSlot = currentSlot - SLOT_LENGTH_MS;
+  if (!history.some((r) => slotStart(r.t) === previousSlot)) {
+    console.warn(
+      `Gap detected — no sample was ever recorded for the ${slotLabel(previousSlot)}. ` +
+        "GitHub's cron queue likely dropped every tick in that slot.",
+    );
+  }
+
+
 
   // Both reads must succeed; a partial sample would poison the series.
   const [waxPerByte, rates] = await Promise.all([fetchRamPricePerByte(), fetchAlcorRates()]);

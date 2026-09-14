@@ -134,6 +134,17 @@ async function main() {
   }
   if (alreadyHaveSlot && force) console.log("Slot already recorded, but FORCE=1 — re-recording.");
 
+  // Surface dropped cron ticks: if the previous 12h slot never got a snapshot,
+  // GitHub skipped every tick in it and the recorded series has a visible gap.
+  const previousSlot = utcSlot(now - 12 * 60 * 60 * 1000);
+  if (!index.days.some((d) => d.date === previousSlot)) {
+    console.warn(
+      `Gap detected — no snapshot was ever recorded for slot ${previousSlot}. ` +
+        "GitHub's cron queue likely dropped every tick in that slot.",
+    );
+  }
+
+
   // Volume is a rolling 24h figure, so record it once per UTC day only — on the
   // first snapshot of that day — to keep the series free of overlapping points.
   const utcDayPrefix = date.slice(0, 10);

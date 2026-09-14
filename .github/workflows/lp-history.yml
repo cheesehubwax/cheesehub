@@ -3,14 +3,17 @@ name: CHEESEAnal LP History
 on:
   schedule:
     # Two snapshots per UTC day: one in the 00:00-11:59 slot and one in the
-    # 12:00-23:59 slot. Each slot has three ticks because GitHub's shared cron
-    # queue often delays or drops them — the sampler records only when the
-    # current slot has no snapshot yet, so the extra ticks are free no-ops.
-    - cron: "41 1 * * *"
-    - cron: "41 4 * * *"
+    # 12:00-23:59 slot. Each slot gets four ticks spread evenly across it,
+    # because GitHub's shared cron queue often delays ticks by hours or drops
+    # them entirely — the sampler records only when the current slot has no
+    # snapshot yet, so the extra ticks are free no-ops.
+    - cron: "41 0 * * *"
+    - cron: "41 3 * * *"
+    - cron: "41 6 * * *"
     - cron: "41 9 * * *"
-    - cron: "41 13 * * *"
-    - cron: "41 16 * * *"
+    - cron: "41 12 * * *"
+    - cron: "41 15 * * *"
+    - cron: "41 18 * * *"
     - cron: "41 21 * * *"
   workflow_dispatch:
     inputs:
