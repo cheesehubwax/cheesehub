@@ -2,7 +2,7 @@
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { CheeseLogo, PairLabel, UsdLogo } from '@/components/anal/PairLogos';
 import { VenueLabel } from '@/components/anal/VenueLogo';
-import { type LpDayFile, type LpIndexDay } from '@/lib/lpPools';
+import { dayAbout24hBefore, type LpDayFile, type LpIndexDay } from '@/lib/lpPools';
 import { amount, change, tokenPrice, usd, usdPrice } from './format';
 
 interface AnalPoolTableProps {
@@ -23,7 +23,8 @@ export function AnalPoolTable({
   failed,
   isLoading,
 }: AnalPoolTableProps) {
-  const previous = days.length >= 2 ? days[days.length - 2] : null;
+  // True 24h compare: the recorded snapshot closest to 24h before the current one.
+  const previous = current ? dayAbout24hBefore(days, current.t) : null;
   const pools = [...(current?.pools ?? [])].sort((a, b) => b.usd - a.usd);
 
   return (
