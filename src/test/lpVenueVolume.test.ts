@@ -2,7 +2,7 @@ import { describe, expect, it, vi, afterEach } from 'vitest';
 import { fetchDefiboxPairVolume, fetchTacoPairVolume, sumPairVolume } from '@/lib/lpVenues';
 
 const prices = new Map<string, number>([
-  ['CHEESE-cheeserules1', 0.008],
+  ['CHEESE-cheeseburger', 0.008],
   ['WAX-eosio.token', 0.005],
 ]);
 
@@ -36,7 +36,7 @@ describe('fetchDefiboxPairVolume', () => {
         {
           id: 1305,
           symbol0: 'CHEESE',
-          contract0: 'cheeserules1',
+          contract0: 'cheeseburger',
           symbol1: 'WAXUSDC',
           contract1: 'eth.token',
           reserve0: '1000.0000 CHEESE',
@@ -51,7 +51,7 @@ describe('fetchDefiboxPairVolume', () => {
           symbol0: 'WAX',
           contract0: 'eosio.token',
           symbol1: 'CHEESE',
-          contract1: 'cheeserules1',
+          contract1: 'cheeseburger',
           reserve0: '13214.51816951 WAX',
           reserve1: '8621.1289 CHEESE',
           volume: 1202.43,
