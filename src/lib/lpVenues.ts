@@ -243,6 +243,14 @@ export interface AmmPoolCandidate {
   reserveCheese: number;
   reservePaired: number;
   usd: number;
+  /** Key this pool's volume is published under (Defibox pair id / Taco pair id). */
+  volumeKey: string;
+}
+
+/** Rolling 24h volume of one pool or pair, as recorded in a snapshot. */
+export interface VenueVolume {
+  volumeUsd24?: number;
+  volumeCheese24?: number;
 }
 
 interface TacoPairRow {
