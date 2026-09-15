@@ -2,8 +2,8 @@ import { describe, expect, it, vi, afterEach } from 'vitest';
 import { fetchDefiboxPairVolume, fetchTacoPairVolume, sumPairVolume } from '@/lib/lpVenues';
 
 const prices = new Map<string, number>([
-  ['CHEESE@cheeserules1', 0.008],
-  ['WAX@eosio.token', 0.005],
+  ['CHEESE-cheeserules1', 0.008],
+  ['WAX-eosio.token', 0.005],
 ]);
 
 function mockFetch(handler: (url: string) => unknown) {
