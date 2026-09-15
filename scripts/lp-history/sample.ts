@@ -173,6 +173,7 @@ async function main() {
           : await snapshotAmmVenue(venue, prices, {
               pause: () => sleep(300),
               log: (message) => console.log(message),
+              withVolume,
             });
       if (pools.length === 0) throw new Error(`No CHEESE pools read on ${venue}`);
       snapshots.push(...pools);

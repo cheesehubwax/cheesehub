@@ -305,7 +305,8 @@ export function cheeseIsTokenA(pool: RawPool): boolean {
 
 /**
  * Rolling 24h volume of a pair, summed across its fee tiers. Alcor publishes
- * this directly; Taco and Defibox do not, so only Alcor pools carry volume.
+ * this directly; Defibox publishes its own figure and Taco's is added up from
+ * its swap records (both handled in lpVenues).
  * Returns `{}` when the payload has no usable volume figures.
  */
 export function alcorPairVolume(pools: RawPool[]): {
