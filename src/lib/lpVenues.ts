@@ -381,6 +381,183 @@ export async function fetchDefiboxCandidates(prices: UsdPrices): Promise<AmmPool
   return out;
 }
 
+/* --------------------------------------------------------- 24h pair volume */
+
+interface DefiboxMarketRow {
+  id?: number;
+  symbol0?: string;
+  symbol1?: string;
+  contract0?: string;
+  contract1?: string;
+  reserve0?: string;
+  reserve1?: string;
+  volume?: number | string;
+  volume_symbol?: string;
+  volume_wax?: number | string;
+}
+
+/**
+ * Defibox's own 24h volume per CHEESE pool, keyed by pair id — the same figure
+ * its market pages show. `volume` is denominated in `volume_symbol`, so the
+ * CHEESE leg is converted through the pool's reserve ratio when the published
+ * leg is the paired token; USD comes from the WAX-equivalent figure.
+ */
+export async function fetchDefiboxPairVolume(prices: UsdPrices): Promise<Map<string, VenueVolume>> {
+  const payload = await fetchJson<{ data?: DefiboxMarketRow[]; waxUsdtPrice?: number | string }>(
+    `${DEFIBOX_API}/swap/getMarket`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
+  );
+  const waxFromPrices = prices.get(priceKey('WAX', 'eosio.token')) ?? 0;
+  const waxUsd = waxFromPrices > 0 ? waxFromPrices : Number(payload.waxUsdtPrice ?? 0);
+  const cheeseUsd = cheeseUsdFrom(prices);
+  const out = new Map<string, VenueVolume>();
+
+  for (const row of payload.data ?? []) {
+    const id = Number(row.id ?? 0);
+    if (!(id > 0)) continue;
+    const symbols = [(row.symbol0 ?? '').toUpperCase(), (row.symbol1 ?? '').toUpperCase()];
+    const cheeseIndex = symbols.indexOf(CHEESE_SYMBOL);
+    if (cheeseIndex === -1) continue;
+    const contracts = [row.contract0 ?? '', row.contract1 ?? ''];
+    if (contracts[cheeseIndex] !== CHEESE_CONTRACT) continue;
+
+    const volume = Number(row.volume ?? 0);
+    if (!Number.isFinite(volume) || volume < 0) continue;
+    const volumeSymbol = (row.volume_symbol ?? '').toUpperCase();
+    const reserveCheese = assetAmount(cheeseIndex === 0 ? row.reserve0 : row.reserve1);
+    const reservePaired = assetAmount(cheeseIndex === 0 ? row.reserve1 : row.reserve0);
+    const pairedSymbol = symbols[cheeseIndex === 0 ? 1 : 0];
+
+    let cheese: number | undefined;
+    if (volumeSymbol === CHEESE_SYMBOL) cheese = volume;
+    else if (volumeSymbol === pairedSymbol && reservePaired > 0 && reserveCheese > 0) {
+      cheese = volume * (reserveCheese / reservePaired);
+    }
+
+    const waxVolume = Number(row.volume_wax ?? 0);
+    let usd: number | undefined;
+    if (Number.isFinite(waxVolume) && waxVolume >= 0 && waxUsd > 0) usd = waxVolume * waxUsd;
+    else if (cheese !== undefined && cheeseUsd !== undefined) usd = cheese * cheeseUsd;
+
+    out.set(String(id), {
+      ...(usd !== undefined ? { volumeUsd24: round(usd, 4) } : {}),
+      ...(cheese !== undefined ? { volumeCheese24: round(cheese, 4) } : {}),
+    });
+  }
+  return out;
+}
+
+interface TacoExchangeLog {
+  trx_id?: string;
+  action_ordinal?: number;
+  global_sequence?: number | string;
+  timestamp?: string;
+  '@timestamp'?: string;
+  act?: { data?: { id?: string; quantity_in?: string; quantity_out?: string } };
+}
+
+const TACO_VOLUME_PAGE = 1000;
+const TACO_VOLUME_MAX_PAGES = 30;
+const TACO_VOLUME_BUDGET_MS = 150_000;
+
+/**
+ * Taco publishes no volume figure anywhere, so a pool's 24h volume is added up
+ * from its own `exchangelog` records. The sweep walks back through the last 24
+ * hours with a `before` cursor (skip-paging is capped by Hyperion) and throws
+ * rather than returning an understated total when it cannot finish.
+ */
+export async function fetchTacoPairVolume(
+  prices: UsdPrices,
+  now = Date.now(),
+): Promise<Map<string, VenueVolume>> {
+  const since = new Date(now - 24 * 60 * 60 * 1000).toISOString().slice(0, 19);
+  const deadline = now + TACO_VOLUME_BUDGET_MS;
+  const cheeseUsd = cheeseUsdFrom(prices);
+  const seen = new Set<string>();
+  const cheeseByPair = new Map<string, number>();
+  let before: string | undefined;
+  let complete = false;
+
+  for (let page = 0; page < TACO_VOLUME_MAX_PAGES; page++) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new Error('Taco volume read ran out of time');
+    const query =
+      `?account=${TACO_CONTRACT}&act.name=exchangelog&sort=desc&limit=${TACO_VOLUME_PAGE}` +
+      `&after=${since}${before ? `&before=${before}` : ''}`;
+    const data = await withFailover(HYPERION_ENDPOINTS, (base) =>
+      fetchJson<{ actions?: TacoExchangeLog[] }>(
+        `${base.replace(/\/$/, '')}/v2/history/get_actions${query}`,
+        undefined,
+        Math.min(HOLDERS_TIMEOUT_MS, remaining),
+      ),
+    );
+    const actions = data.actions ?? [];
+    let oldest: string | undefined;
+
+    for (const action of actions) {
+      const stamp = action.timestamp ?? action['@timestamp'] ?? '';
+      if (stamp && (!oldest || stamp < oldest)) oldest = stamp;
+      const identity =
+        action.global_sequence !== undefined && action.global_sequence !== null
+          ? `gs:${action.global_sequence}`
+          : `${action.trx_id ?? ''}:${action.action_ordinal ?? 0}`;
+      if (seen.has(identity)) continue;
+      seen.add(identity);
+
+      const record = action.act?.data;
+      const pairId = String(record?.id ?? '').toUpperCase();
+      if (!record || !pairId) continue;
+      // Exactly one leg of a swap is CHEESE, so the first match is the volume.
+      for (const quantity of [record.quantity_in, record.quantity_out]) {
+        if (typeof quantity !== 'string' || assetSymbol(quantity) !== CHEESE_SYMBOL) continue;
+        const amount = assetAmount(quantity);
+        if (amount > 0) cheeseByPair.set(pairId, (cheeseByPair.get(pairId) ?? 0) + amount);
+        break;
+      }
+    }
+
+    if (actions.length < TACO_VOLUME_PAGE || !oldest) {
+      complete = true;
+      break;
+    }
+    before = oldest;
+  }
+
+  if (!complete) throw new Error('Taco volume read hit its page limit — refusing a partial total');
+
+  const out = new Map<string, VenueVolume>();
+  for (const [pairId, cheese] of cheeseByPair) {
+    out.set(pairId, {
+      ...(cheeseUsd !== undefined ? { volumeUsd24: round(cheese * cheeseUsd, 4) } : {}),
+      volumeCheese24: round(cheese, 4),
+    });
+  }
+  return out;
+}
+
+/** Total volume of a pair across its pools; `{}` when nothing was published. */
+export function sumPairVolume(parts: (VenueVolume | undefined)[]): VenueVolume {
+  let usd = 0;
+  let cheese = 0;
+  let sawUsd = false;
+  let sawCheese = false;
+  for (const part of parts) {
+    if (!part) continue;
+    if (part.volumeUsd24 !== undefined && Number.isFinite(part.volumeUsd24)) {
+      usd += part.volumeUsd24;
+      sawUsd = true;
+    }
+    if (part.volumeCheese24 !== undefined && Number.isFinite(part.volumeCheese24)) {
+      cheese += part.volumeCheese24;
+      sawCheese = true;
+    }
+  }
+  return {
+    ...(sawUsd ? { volumeUsd24: round(usd, 4) } : {}),
+    ...(sawCheese ? { volumeCheese24: round(cheese, 4) } : {}),
+  };
+}
+
 /** Group candidates by pair and keep tracked pairs plus anything over $100. */
 export function selectAmmPairs(candidates: AmmPoolCandidate[]): {
   pair: TrackedPair;
