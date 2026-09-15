@@ -93,8 +93,10 @@ export async function fetchLiveLpSnapshot(): Promise<LpDayFile & { failed: strin
 
   const [alcor, taco, defibox] = await Promise.allSettled([
     readAlcor(prices),
+    // Taco's volume needs a 24h sweep of its swap records, far too slow for a
+    // live read; Defibox publishes its figure directly, so that one is cheap.
     snapshotAmmVenue('taco', prices),
-    snapshotAmmVenue('defibox', prices),
+    snapshotAmmVenue('defibox', prices, { withVolume: true }),
   ]);
 
   if (alcor.status === 'fulfilled') {
