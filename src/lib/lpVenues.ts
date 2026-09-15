@@ -366,6 +366,7 @@ export async function fetchDefiboxCandidates(prices: UsdPrices): Promise<AmmPool
       pair,
       shareSymbol: defiboxLpSymbol(id),
       shareContract: DEFIBOX_LP_CONTRACT,
+      volumeKey: String(id),
       totalShares,
       reserveCheese,
       reservePaired,
