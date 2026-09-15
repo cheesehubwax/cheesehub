@@ -87,6 +87,9 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
     .map((row) => row.volume)
     .filter((value): value is number => value !== null);
   const totalVolume = recordedVolume.reduce((sum, value) => sum + value, 0);
+  const chartSeries = metric === 'volume'
+    ? series.filter((row): row is typeof row & { volume: number } => row.volume !== null)
+    : series;
 
   const statValues: Record<MetricKey, string> = {
     price: usdPrice(totals.price),
@@ -149,7 +152,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
       {series.length >= 1 ? (
         <div className="h-96">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <AreaChart data={chartSeries} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="analTotalGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor={active.color} stopOpacity={0.35} />
