@@ -35,6 +35,10 @@ const CHAIN_ENDPOINTS = [
 const LIGHT_API_ENDPOINTS = ['https://lightapi.eosamsterdam.net', 'https://wax.light-api.net'];
 
 const ALCOR_API = 'https://wax.alcor.exchange/api/v2';
+/** Defibox's public market API — the source of its published 24h volume. */
+const DEFIBOX_API = 'https://wax.defibox.io/api';
+/** Hyperion mirrors used for Taco's swap records. */
+const HYPERION_ENDPOINTS = ['https://wax.eosphere.io', 'https://wax.cryptolions.io', 'https://wax.hivebp.io'];
 
 const TIMEOUT_MS = 20_000;
 const HOLDERS_TIMEOUT_MS = 30_000;
