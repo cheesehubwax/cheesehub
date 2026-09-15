@@ -317,6 +317,7 @@ export async function fetchTacoCandidates(prices: UsdPrices): Promise<AmmPoolCan
       pair,
       shareSymbol,
       shareContract: TACO_CONTRACT,
+      volumeKey: shareSymbol,
       totalShares,
       reserveCheese,
       reservePaired,
