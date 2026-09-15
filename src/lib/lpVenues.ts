@@ -638,14 +638,20 @@ export async function snapshotAmmVenue(
       });
       if (options.pause) await options.pause();
     }
-    const snapshot = buildAmmPoolSnapshot(venuePair(venue, entry.pair), inputs, {
+    const base = buildAmmPoolSnapshot(venuePair(venue, entry.pair), inputs, {
       cheeseUsd,
       pairedUsd,
     });
+    const snapshot: LpPoolSnapshot = volumes
+      ? { ...base, ...sumPairVolume(entry.pools.map((p) => volumes!.get(p.volumeKey))) }
+      : base;
     if (snapshot.accounts === 0) continue;
     options.log?.(
       `${venue} ${snapshot.label}: $${snapshot.usd.toFixed(2)} • ` +
-        `${snapshot.cheese.toFixed(4)} CHEESE • ${snapshot.accounts} accounts`,
+        `${snapshot.cheese.toFixed(4)} CHEESE • ${snapshot.accounts} accounts` +
+        (snapshot.volumeUsd24 !== undefined
+          ? ` • 24h volume $${snapshot.volumeUsd24.toFixed(2)}`
+          : ''),
     );
     snapshots.push(snapshot);
   }
