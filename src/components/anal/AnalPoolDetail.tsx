@@ -250,9 +250,7 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
               </div>
             ) : (
               <div className="h-36 flex items-center justify-center text-center text-[11px] text-muted-foreground px-4">
-                {pool.venue === 'alcor'
-                  ? 'Volume history starts with the next daily snapshot.'
-                  : 'Volume is not published by this exchange.'}
+                Volume history starts with the next daily snapshot.
               </div>
             )}
           </div>
