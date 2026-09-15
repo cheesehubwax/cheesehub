@@ -592,11 +592,17 @@ export function selectAmmPairs(candidates: AmmPoolCandidate[]): {
  * every share holder, and split the reserves pro-rata.
  *
  * `onProgress` lets the sampler log as it goes; `pause` lets it throttle.
+ * `withVolume` adds the venue's rolling 24h volume; a volume failure is logged
+ * and skipped so it can never cost the liquidity snapshot.
  */
 export async function snapshotAmmVenue(
   venue: 'taco' | 'defibox',
   prices: UsdPrices,
-  options: { pause?: () => Promise<void>; log?: (message: string) => void } = {},
+  options: {
+    pause?: () => Promise<void>;
+    log?: (message: string) => void;
+    withVolume?: boolean;
+  } = {},
 ): Promise<LpPoolSnapshot[]> {
   const candidates =
     venue === 'taco'
@@ -605,6 +611,18 @@ export async function snapshotAmmVenue(
   const selected = selectAmmPairs(candidates);
   const cheeseUsd = cheeseUsdFrom(prices);
   const snapshots: LpPoolSnapshot[] = [];
+
+  let volumes: Map<string, VenueVolume> | null = null;
+  if (options.withVolume) {
+    try {
+      volumes =
+        venue === 'defibox'
+          ? await fetchDefiboxPairVolume(prices)
+          : await fetchTacoPairVolume(prices);
+    } catch (error) {
+      options.log?.(`${venue} 24h volume unavailable: ${(error as Error).message}`);
+    }
+  }
 
   for (const entry of selected) {
     const pairedUsd = prices.get(priceKey(entry.pair.symbol, entry.pair.contract));
