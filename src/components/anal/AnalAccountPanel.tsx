@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+import { HistoricalNote } from '@/components/anal/HistoricalNote';
 import { CheeseLogo, PairLabel, UsdLogo } from '@/components/anal/PairLogos';
 import { VenueLabel } from '@/components/anal/VenueLogo';
 import { Button } from '@/components/ui/button';
