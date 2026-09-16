@@ -9,7 +9,7 @@ import { AnalOverview } from '@/components/anal/AnalOverview';
 import { AnalPoolDetail } from '@/components/anal/AnalPoolDetail';
 import { AnalPoolTable } from '@/components/anal/AnalPoolTable';
 import { AllVenueLogos, VenueLogo } from '@/components/anal/VenueLogo';
-import { tooltipDate } from '@/components/anal/format';
+import { HistoricalNote } from '@/components/anal/HistoricalNote';
 import {
   LP_RANGES,
   filterDaysByVenue,
