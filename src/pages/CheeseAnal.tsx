@@ -102,18 +102,9 @@ const CheeseAnal = () => {
                 Twice-daily snapshots of every $CHEESE liquidity pool on Alcor, Taco and Defibox — pool value, token
                 balances, CHEESE price, provider counts and per-account positions, tracked over time
               </p>
-              <p className="text-xs italic text-muted-foreground max-w-2xl mx-auto">
-                *This is not current or live data, consider it historical. For live data go{' '}
-                <a
-                  href="https://flopsterino.github.io/waxterminal/token/CHEESE@cheeseburger"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-cheese hover:underline"
-                >
-                  here
-                </a>
-                .
-              </p>
+              <div className="max-w-2xl mx-auto flex justify-center">
+                <HistoricalNote />
+              </div>
             </div>
           </div>
         </div>
