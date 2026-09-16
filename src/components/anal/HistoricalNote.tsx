@@ -5,7 +5,7 @@ const WAXTERMINAL_URL = 'https://flopsterino.github.io/waxterminal/token/CHEESE@
  */
 export function HistoricalNote() {
   return (
-    <span className="inline-flex items-center gap-1 text-[13px] italic text-bright-white whitespace-nowrap">
+    <span className="inline-flex items-center gap-1 text-[13px] italic text-white whitespace-nowrap">
       <span>*</span>
       <span>This is not current or live data, consider it historical. For live data go</span>
       <a
