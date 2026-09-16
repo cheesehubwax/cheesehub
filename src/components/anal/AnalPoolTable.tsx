@@ -1,5 +1,6 @@
 // CHEESEAnal — one row per tracked CHEESE pool with day-over-day change.
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+import { HistoricalNote } from '@/components/anal/HistoricalNote';
 import { CheeseLogo, PairLabel, UsdLogo } from '@/components/anal/PairLogos';
 import { VenueLabel } from '@/components/anal/VenueLogo';
 import { dayAbout24hBefore, type LpDayFile, type LpIndexDay } from '@/lib/lpPools';
@@ -29,10 +30,13 @@ export function AnalPoolTable({
 
   return (
     <div className="w-full rounded-xl bg-card border border-border/50 p-4">
-      <div className="flex items-center gap-2 mb-3">
-        <OpenMojiIcon emoji="💧" size={18} />
-        <span className="text-sm font-medium text-foreground">Pools</span>
-        <span className="text-[10px] text-muted-foreground">tap a pool for detail</span>
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          <OpenMojiIcon emoji="💧" size={18} />
+          <span className="text-sm font-medium text-foreground">Pools</span>
+          <span className="text-[10px] text-muted-foreground">tap a pool for detail</span>
+        </div>
+        <HistoricalNote />
       </div>
 
       {failed.length > 0 && (

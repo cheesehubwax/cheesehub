@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+import { HistoricalNote } from '@/components/anal/HistoricalNote';
 import { CheeseLogo, PairLabel, UsdLogo } from '@/components/anal/PairLogos';
 import { VenueLabel } from '@/components/anal/VenueLogo';
 import { Button } from '@/components/ui/button';
@@ -101,9 +102,12 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
   return (
     <div className="w-full rounded-xl bg-card border border-border/50 p-4 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <OpenMojiIcon emoji="👤" size={18} />
-          <span className="text-sm font-medium text-foreground">Account detail</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
+            <OpenMojiIcon emoji="👤" size={18} />
+            <span className="text-sm font-medium text-foreground">Account detail</span>
+          </div>
+          <HistoricalNote />
         </div>
         <form onSubmit={submit} className="flex items-center gap-2">
           <Input

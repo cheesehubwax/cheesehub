@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { CheeseLogo, PairLabel, PairLogos, UsdLogo } from '@/components/anal/PairLogos';
+import { HistoricalNote } from '@/components/anal/HistoricalNote';
 import { TokenLogo } from '@/components/TokenLogo';
 import { VenueLabel } from '@/components/anal/VenueLogo';
 import { Button } from '@/components/ui/button';
@@ -100,6 +101,7 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
             ))}
           </SelectContent>
         </Select>
+        <HistoricalNote />
         <Button
           size="sm"
           variant="outline"
