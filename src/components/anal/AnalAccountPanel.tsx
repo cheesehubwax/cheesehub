@@ -101,9 +101,12 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
   return (
     <div className="w-full rounded-xl bg-card border border-border/50 p-4 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <OpenMojiIcon emoji="👤" size={18} />
-          <span className="text-sm font-medium text-foreground">Account detail</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
+            <OpenMojiIcon emoji="👤" size={18} />
+            <span className="text-sm font-medium text-foreground">Account detail</span>
+          </div>
+          <HistoricalNote />
         </div>
         <form onSubmit={submit} className="flex items-center gap-2">
           <Input

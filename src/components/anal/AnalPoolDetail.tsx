@@ -100,6 +100,9 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
             ))}
           </SelectContent>
         </Select>
+        <div className="flex items-center gap-2">
+          <HistoricalNote />
+        </div>
         <Button
           size="sm"
           variant="outline"
