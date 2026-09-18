@@ -181,7 +181,13 @@ const CheeseAnal = () => {
           <p className="w-full text-xs text-red-400">Recorded history could not be loaded right now.</p>
         )}
 
-        <AnalOverview days={ranged} current={current} historyLoading={historyLoading} historyEmpty={isEmpty} />
+        <AnalOverview
+          days={ranged}
+          current={current}
+          historyLoading={historyLoading}
+          historyEmpty={isEmpty}
+          venue={venue}
+        />
 
         <AnalPoolTable
           current={current}

@@ -3,7 +3,9 @@ import { useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { CheeseLogo, UsdLogo } from '@/components/anal/PairLogos';
-import type { LpDayFile, LpIndexDay } from '@/lib/lpPools';
+import { diffSnapshots, waxUsdFromPools } from '@/components/anal/snapshotDiff';
+import { useLpDay } from '@/hooks/useLpHistory';
+import type { LpDayFile, LpIndexDay, LpVenue } from '@/lib/lpPools';
 import { amount, change, shortDate, tooltipDate, usd, usdPrice } from './format';
 
 interface AnalOverviewProps {
@@ -13,6 +15,8 @@ interface AnalOverviewProps {
   current: LpDayFile | null;
   historyLoading: boolean;
   historyEmpty: boolean;
+  /** Active venue filter, so account diffs match what is on screen. */
+  venue: LpVenue | 'all';
 }
 
 type MetricKey = 'price' | 'usd' | 'cheese' | 'accounts' | 'positions' | 'volume';
@@ -26,8 +30,17 @@ const METRICS: { key: MetricKey; label: string; color: string; format: (v: numbe
   { key: 'volume', label: 'Total volume', color: '#38BDF8', format: usd },
 ];
 
-export function AnalOverview({ days, current, historyLoading, historyEmpty }: AnalOverviewProps) {
+/** Keep tooltip account lists readable. */
+const MAX_NAMES = 4;
+
+function nameList(names: string[]): string {
+  if (names.length <= MAX_NAMES) return names.join(', ');
+  return `${names.slice(0, MAX_NAMES).join(', ')} +${names.length - MAX_NAMES} more`;
+}
+
+export function AnalOverview({ days, current, historyLoading, historyEmpty, venue }: AnalOverviewProps) {
   const [metric, setMetric] = useState<MetricKey>('price');
+  const [hovered, setHovered] = useState<string | null>(null);
 
   const totals = useMemo(() => {
     const pools = current?.pools ?? [];
@@ -68,12 +81,30 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
           volume: recordedVolumes.length > 0
             ? recordedVolumes.reduce((sum, value) => sum + value, 0)
             : null,
+          waxUsd: waxUsdFromPools(day.pools),
         };
       }),
     [days],
   );
 
   const active = METRICS.find((m) => m.key === metric) ?? METRICS[0];
+
+  // Provider / position attribution needs the full snapshot files, pulled only
+  // for the hovered point and then cached by react-query.
+  const needsAccounts = metric === 'accounts' || metric === 'positions';
+  const hoveredIndex = hovered ? series.findIndex((row) => row.date === hovered) : -1;
+  const previousDate = hoveredIndex > 0 ? series[hoveredIndex - 1].date : null;
+  const { day: hoveredDay, isLoading: hoveredLoading } = useLpDay(
+    needsAccounts && hovered ? hovered : null,
+  );
+  const { day: previousDay, isLoading: previousLoading } = useLpDay(
+    needsAccounts && previousDate ? previousDate : null,
+  );
+  const accountDiff = useMemo(
+    () => (needsAccounts ? diffSnapshots(hoveredDay, previousDay, venue) : null),
+    [needsAccounts, hoveredDay, previousDay, venue],
+  );
+  const accountsLoading = needsAccounts && Boolean(previousDate) && (hoveredLoading || previousLoading);
 
   const comparableValues = series
     .map((row) => row[metric])
@@ -98,6 +129,65 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
     accounts: String(totals.accounts),
     positions: String(totals.positions),
     volume: recordedVolume.length > 0 ? usd(totalVolume) : '—',
+  };
+
+  /** Extra tooltip lines for the hovered snapshot. */
+  const tooltipExtras = (date: string, value: number): string[] => {
+    const lines: string[] = [];
+    const index = series.findIndex((row) => row.date === date);
+    if (index < 0) return lines;
+
+    if (metric === 'usd') {
+      const waxUsd = series[index].waxUsd;
+      if (waxUsd && waxUsd > 0) lines.push(`${amount(value / waxUsd, 0)} WAX`);
+    }
+
+    if (metric === 'price' || metric === 'cheese' || metric === 'volume') {
+      // Compare against the previous snapshot that actually recorded this metric.
+      let previous: number | null = null;
+      for (let i = index - 1; i >= 0; i -= 1) {
+        const candidate = series[i][metric];
+        if (candidate !== null && candidate !== undefined) {
+          previous = candidate as number;
+          break;
+        }
+      }
+      const pct = previous !== null ? change(value, previous) : null;
+      if (pct) lines.push(`${pct.text} since last snapshot`);
+    }
+
+    if (needsAccounts) {
+      const previous = index > 0 ? series[index - 1][metric] : null;
+      const diffCount = previous !== null ? Math.round(value) - Math.round(previous as number) : null;
+      if (diffCount !== null) {
+        lines.push(`${diffCount > 0 ? '+' : ''}${diffCount} since last snapshot`);
+      }
+      if (index === 0) {
+        lines.push('first recorded snapshot');
+      } else if (accountsLoading) {
+        lines.push('loading accounts...');
+      } else if (accountDiff) {
+        if (metric === 'accounts') {
+          if (accountDiff.joined.length) lines.push(`joined: ${nameList(accountDiff.joined)}`);
+          if (accountDiff.left.length) lines.push(`left: ${nameList(accountDiff.left)}`);
+          if (!accountDiff.joined.length && !accountDiff.left.length) lines.push('no provider changes');
+        } else {
+          const moves = accountDiff.positionChanges;
+          if (moves.length) {
+            lines.push(
+              ...moves
+                .slice(0, MAX_NAMES)
+                .map((m) => `${m.account} ${m.delta > 0 ? '+' : ''}${m.delta}`),
+            );
+            if (moves.length > MAX_NAMES) lines.push(`+${moves.length - MAX_NAMES} more accounts`);
+          } else {
+            lines.push('no position changes');
+          }
+        }
+      }
+    }
+
+    return lines;
   };
 
   return (
@@ -152,7 +242,14 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
       {series.length >= 1 ? (
         <div className="h-96">
           <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartSeries} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <AreaChart
+                data={chartSeries}
+                margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+                onMouseMove={(state: { activeLabel?: string | number }) =>
+                  setHovered(state?.activeLabel != null ? String(state.activeLabel) : null)
+                }
+                onMouseLeave={() => setHovered(null)}
+              >
               <defs>
                 <linearGradient id="analTotalGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor={active.color} stopOpacity={0.35} />
@@ -174,16 +271,22 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty }: An
                 width={64}
               />
               <Tooltip
-                content={({ active: isActive, payload }) =>
-                  isActive && payload?.length ? (
-                    <div className="bg-background/95 border border-border px-2 py-1 rounded text-xs font-mono">
-                      <div className="text-cheese">{active.format(Number(payload[0].value))}</div>
-                      <div className="text-muted-foreground">
-                        {tooltipDate(String(payload[0].payload.date))}
-                      </div>
+                content={({ active: isActive, payload }) => {
+                  if (!isActive || !payload?.length) return null;
+                  const value = Number(payload[0].value);
+                  const date = String(payload[0].payload.date);
+                  return (
+                    <div className="bg-background/95 border border-border px-2 py-1 rounded text-xs font-mono max-w-[260px]">
+                      <div className="text-cheese">{active.format(value)}</div>
+                      {tooltipExtras(date, value).map((line) => (
+                        <div key={line} className="text-white/90 break-words">
+                          {line}
+                        </div>
+                      ))}
+                      <div className="text-muted-foreground">{tooltipDate(date)}</div>
                     </div>
-                  ) : null
-                }
+                  );
+                }}
               />
               <Area
                 type="monotone"
