@@ -226,12 +226,18 @@ export function planCompound(
   // Hold back a small buffer of every claimed token so rounding or a late
   // reward can never make the deposit exceed the wallet balance.
   const remaining = new Map<string, AvailableBalance>();
-  available.forEach((value, key) =>
-    remaining.set(key, {
+  // Snapshot of the buffered starting balances, so a side that ran out can be
+  // told apart from a side that never received anything.
+  const started = new Map<string, AvailableBalance>();
+  available.forEach((value, key) => {
+    const buffered = {
       precision: value.precision,
+      known: value.known,
       balance: floorTo(Math.max(0, value.balance) * (1 - COMPOUND_BUFFER_RATE), value.precision),
-    }),
-  );
+    };
+    remaining.set(key, { ...buffered });
+    started.set(key, { ...buffered });
+  });
 
   const compoundable: CompoundPlanEntry[] = [];
   const skipped: CompoundSkip[] = [];
