@@ -90,7 +90,7 @@ export function AnalPoolTable({
                     }`}
                   >
                     <td className="py-2 font-medium text-foreground whitespace-nowrap">
-                      <PairLabel symbol={pool.symbol} contract={pool.contract} />
+                      <PairLabel symbol={pool.symbol} contract={pool.contract} base={token} />
                       <span className="ml-2 text-[10px] text-muted-foreground">
                         {pool.poolIds.length}{' '}
                         {pool.venue === 'alcor'
