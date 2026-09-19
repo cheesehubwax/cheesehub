@@ -148,7 +148,7 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
           <SelectTrigger className="h-auto w-auto border-0 bg-transparent p-1.5 pr-2 rounded-md gap-2 shadow-none hover:bg-background/50 focus:ring-0 focus:ring-offset-0 [&>svg]:text-muted-foreground">
             <OpenMojiIcon emoji="🔍" size={18} />
             <span className="text-sm font-medium text-foreground">
-              <PairLabel symbol={pool.symbol} contract={pool.contract} size="md" />
+              <PairLabel symbol={pool.symbol} contract={pool.contract} base={token} size="md" />
             </span>
             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/60 bg-background/60 text-muted-foreground">
               <VenueLabel venue={pool.venue} />
