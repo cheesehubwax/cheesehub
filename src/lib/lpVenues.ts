@@ -1,17 +1,17 @@
-// CHEESEAnal — readers for the constant-product CHEESE pools on Taco and
-// Defibox, plus the USD price table used to value their reserves.
+// CHEESEAnal — readers for the constant-product pools of a base token (CHEESE or
+// HOLE) on Taco and Defibox, plus the USD price table used to value reserves.
 //
 // Deliberately self-contained (plain `fetch` only) so the same module runs in
 // the browser and under Bun inside the daily sampler.
 
 import {
-  CHEESE_CONTRACT,
-  CHEESE_SYMBOL,
+  CHEESE_TOKEN,
   MIN_TRACKED_POOL_USD,
   MAX_EXTRA_PAIRS_PER_VENUE,
   assetAmount,
   assetSymbol,
   buildAmmPoolSnapshot,
+  isTrackedPairKey,
   pairFor,
   positionUsdValue,
   round,
@@ -19,6 +19,7 @@ import {
   venuePair,
   type AmmPoolInput,
   type LpPoolSnapshot,
+  type LpToken,
   type LpVenue,
   type TrackedPair,
 } from './lpPools';
@@ -155,8 +156,9 @@ export async function fetchUsdPrices(): Promise<UsdPrices> {
   return prices;
 }
 
-export function cheeseUsdFrom(prices: UsdPrices): number | undefined {
-  const value = prices.get(priceKey(CHEESE_SYMBOL, CHEESE_CONTRACT));
+/** USD price of the base token (CHEESE unless another is given). */
+export function cheeseUsdFrom(prices: UsdPrices, base: LpToken = CHEESE_TOKEN): number | undefined {
+  const value = prices.get(priceKey(base.symbol.toUpperCase(), base.contract));
   return value && value > 0 ? value : undefined;
 }
 
@@ -293,8 +295,12 @@ function symbolCodeOf(raw: unknown): string {
   return (parts[parts.length - 1] ?? '').trim().toUpperCase();
 }
 
-/** Every CHEESE pool on Taco, with reserves and a USD estimate. */
-export async function fetchTacoCandidates(prices: UsdPrices): Promise<AmmPoolCandidate[]> {
+/** Every base-token pool on Taco, with reserves and a USD estimate. */
+export async function fetchTacoCandidates(
+  prices: UsdPrices,
+  base: LpToken = CHEESE_TOKEN,
+): Promise<AmmPoolCandidate[]> {
+  const baseSymbol = base.symbol.toUpperCase();
   const rows = await readTable<TacoPairRow>(TACO_CONTRACT, TACO_CONTRACT, 'pairs');
   const out: AmmPoolCandidate[] = [];
   for (const row of rows) {
@@ -302,10 +308,10 @@ export async function fetchTacoCandidates(prices: UsdPrices): Promise<AmmPoolCan
     if (!shareSymbol) continue;
     const legs = [row.pool1, row.pool2];
     const symbols = legs.map((leg) => assetSymbol(leg?.quantity));
-    const cheeseIndex = symbols.indexOf(CHEESE_SYMBOL);
+    const cheeseIndex = symbols.indexOf(baseSymbol);
     if (cheeseIndex === -1) continue;
     const cheeseLeg = legs[cheeseIndex];
-    if ((cheeseLeg?.contract ?? '') !== CHEESE_CONTRACT) continue;
+    if ((cheeseLeg?.contract ?? '') !== base.contract) continue;
     const otherLeg = legs[cheeseIndex === 0 ? 1 : 0];
     const pairedSymbol = assetSymbol(otherLeg?.quantity);
     const pairedContract = otherLeg?.contract ?? '';
@@ -316,7 +322,7 @@ export async function fetchTacoCandidates(prices: UsdPrices): Promise<AmmPoolCan
     const totalShares = assetAmount(row.supply);
     if (!(reserveCheese > 0) || !(reservePaired > 0) || !(totalShares > 0)) continue;
 
-    const pair = pairFor(pairedSymbol, pairedContract);
+    const pair = pairFor(pairedSymbol, pairedContract, base);
     out.push({
       venue: 'taco',
       pair,
@@ -329,7 +335,7 @@ export async function fetchTacoCandidates(prices: UsdPrices): Promise<AmmPoolCan
       usd: positionUsdValue(
         reserveCheese,
         reservePaired,
-        cheeseUsdFrom(prices),
+        cheeseUsdFrom(prices, base),
         prices.get(priceKey(pairedSymbol, pairedContract)),
       ),
     });
@@ -337,8 +343,12 @@ export async function fetchTacoCandidates(prices: UsdPrices): Promise<AmmPoolCan
   return out;
 }
 
-/** Every CHEESE pool on Defibox, with reserves and a USD estimate. */
-export async function fetchDefiboxCandidates(prices: UsdPrices): Promise<AmmPoolCandidate[]> {
+/** Every base-token pool on Defibox, with reserves and a USD estimate. */
+export async function fetchDefiboxCandidates(
+  prices: UsdPrices,
+  base: LpToken = CHEESE_TOKEN,
+): Promise<AmmPoolCandidate[]> {
+  const baseSymbol = base.symbol.toUpperCase();
   const rows = await readTable<DefiboxPairRow>(DEFIBOX_CONTRACT, DEFIBOX_CONTRACT, 'pairs');
   const out: AmmPoolCandidate[] = [];
   for (const row of rows) {
@@ -350,8 +360,8 @@ export async function fetchDefiboxCandidates(prices: UsdPrices): Promise<AmmPool
     ];
     const cheeseIndex = legs.findIndex(
       (leg) =>
-        symbolCodeOf(leg.token?.symbol) === CHEESE_SYMBOL &&
-        (leg.token?.contract ?? '') === CHEESE_CONTRACT,
+        symbolCodeOf(leg.token?.symbol) === baseSymbol &&
+        (leg.token?.contract ?? '') === base.contract,
     );
     if (cheeseIndex === -1) continue;
     const cheeseLeg = legs[cheeseIndex];
@@ -365,7 +375,7 @@ export async function fetchDefiboxCandidates(prices: UsdPrices): Promise<AmmPool
     const totalShares = Number(row.liquidity_token ?? 0);
     if (!(reserveCheese > 0) || !(reservePaired > 0) || !(totalShares > 0)) continue;
 
-    const pair = pairFor(pairedSymbol, pairedContract);
+    const pair = pairFor(pairedSymbol, pairedContract, base);
     out.push({
       venue: 'defibox',
       pair,
@@ -378,7 +388,7 @@ export async function fetchDefiboxCandidates(prices: UsdPrices): Promise<AmmPool
       usd: positionUsdValue(
         reserveCheese,
         reservePaired,
-        cheeseUsdFrom(prices),
+        cheeseUsdFrom(prices, base),
         prices.get(priceKey(pairedSymbol, pairedContract)),
       ),
     });
@@ -402,29 +412,33 @@ interface DefiboxMarketRow {
 }
 
 /**
- * Defibox's own 24h volume per CHEESE pool, keyed by pair id — the same figure
- * its market pages show. `volume` is denominated in `volume_symbol`, so the
- * CHEESE leg is converted through the pool's reserve ratio when the published
+ * Defibox's own 24h volume per base-token pool, keyed by pair id — the same
+ * figure its market pages show. `volume` is denominated in `volume_symbol`, so
+ * the base leg is converted through the pool's reserve ratio when the published
  * leg is the paired token; USD comes from the WAX-equivalent figure.
  */
-export async function fetchDefiboxPairVolume(prices: UsdPrices): Promise<Map<string, VenueVolume>> {
+export async function fetchDefiboxPairVolume(
+  prices: UsdPrices,
+  base: LpToken = CHEESE_TOKEN,
+): Promise<Map<string, VenueVolume>> {
+  const baseSymbol = base.symbol.toUpperCase();
   const payload = await fetchJson<{ data?: DefiboxMarketRow[]; waxUsdtPrice?: number | string }>(
     `${DEFIBOX_API}/swap/getMarket`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
   );
   const waxFromPrices = prices.get(priceKey('WAX', 'eosio.token')) ?? 0;
   const waxUsd = waxFromPrices > 0 ? waxFromPrices : Number(payload.waxUsdtPrice ?? 0);
-  const cheeseUsd = cheeseUsdFrom(prices);
+  const cheeseUsd = cheeseUsdFrom(prices, base);
   const out = new Map<string, VenueVolume>();
 
   for (const row of payload.data ?? []) {
     const id = Number(row.id ?? 0);
     if (!(id > 0)) continue;
     const symbols = [(row.symbol0 ?? '').toUpperCase(), (row.symbol1 ?? '').toUpperCase()];
-    const cheeseIndex = symbols.indexOf(CHEESE_SYMBOL);
+    const cheeseIndex = symbols.indexOf(baseSymbol);
     if (cheeseIndex === -1) continue;
     const contracts = [row.contract0 ?? '', row.contract1 ?? ''];
-    if (contracts[cheeseIndex] !== CHEESE_CONTRACT) continue;
+    if (contracts[cheeseIndex] !== base.contract) continue;
 
     const volume = Number(row.volume ?? 0);
     if (!Number.isFinite(volume) || volume < 0) continue;
@@ -434,7 +448,7 @@ export async function fetchDefiboxPairVolume(prices: UsdPrices): Promise<Map<str
     const pairedSymbol = symbols[cheeseIndex === 0 ? 1 : 0];
 
     let cheese: number | undefined;
-    if (volumeSymbol === CHEESE_SYMBOL) cheese = volume;
+    if (volumeSymbol === baseSymbol) cheese = volume;
     else if (volumeSymbol === pairedSymbol && reservePaired > 0 && reserveCheese > 0) {
       cheese = volume * (reserveCheese / reservePaired);
     }
@@ -474,12 +488,14 @@ const TACO_VOLUME_BUDGET_MS = 150_000;
 export async function fetchTacoPairVolume(
   prices: UsdPrices,
   now = Date.now(),
+  base: LpToken = CHEESE_TOKEN,
 ): Promise<Map<string, VenueVolume>> {
+  const baseSymbol = base.symbol.toUpperCase();
   const since = new Date(now - 24 * 60 * 60 * 1000).toISOString().slice(0, 19);
   // `now` defines the historical 24h window and may be supplied by tests or
   // callers replaying an older period; the network deadline must use wall time.
   const deadline = Date.now() + TACO_VOLUME_BUDGET_MS;
-  const cheeseUsd = cheeseUsdFrom(prices);
+  const cheeseUsd = cheeseUsdFrom(prices, base);
   const seen = new Set<string>();
   const cheeseByPair = new Map<string, number>();
   let before: string | undefined;
@@ -514,9 +530,9 @@ export async function fetchTacoPairVolume(
       const record = action.act?.data;
       const pairId = String(record?.id ?? '').toUpperCase();
       if (!record || !pairId) continue;
-      // Exactly one leg of a swap is CHEESE, so the first match is the volume.
+      // At most one leg of a swap is the base token, so the first match is it.
       for (const quantity of [record.quantity_in, record.quantity_out]) {
-        if (typeof quantity !== 'string' || assetSymbol(quantity) !== CHEESE_SYMBOL) continue;
+        if (typeof quantity !== 'string' || assetSymbol(quantity) !== baseSymbol) continue;
         const amount = assetAmount(quantity);
         if (amount > 0) cheeseByPair.set(pairId, (cheeseByPair.get(pairId) ?? 0) + amount);
         break;
@@ -565,8 +581,14 @@ export function sumPairVolume(parts: (VenueVolume | undefined)[]): VenueVolume {
   };
 }
 
-/** Group candidates by pair and keep tracked pairs plus anything over $100. */
-export function selectAmmPairs(candidates: AmmPoolCandidate[]): {
+/**
+ * Group candidates by pair and keep the always-tracked pairs plus anything over
+ * $100. Tokens with no tracked list (HOLE) pass `isTracked: () => false`.
+ */
+export function selectAmmPairs(
+  candidates: AmmPoolCandidate[],
+  isTracked: (pairKey: string) => boolean = isTrackedPairKey,
+): {
   pair: TrackedPair;
   tvlUsd: number;
   pools: AmmPoolCandidate[];
@@ -586,14 +608,15 @@ export function selectAmmPairs(candidates: AmmPoolCandidate[]): {
     [...byPair.values()],
     MIN_TRACKED_POOL_USD,
     MAX_EXTRA_PAIRS_PER_VENUE,
+    isTracked,
   );
 }
 
 /**
- * Full snapshot of one constant-product venue: discover its CHEESE pairs, read
- * every share holder, and split the reserves pro-rata.
+ * Full snapshot of one constant-product venue: discover its pairs of the base
+ * token, read every share holder, and split the reserves pro-rata.
  *
- * `onProgress` lets the sampler log as it goes; `pause` lets it throttle.
+ * `log` lets the sampler report as it goes; `pause` lets it throttle.
  * `withVolume` adds the venue's rolling 24h volume; a volume failure is logged
  * and skipped so it can never cost the liquidity snapshot.
  */
@@ -604,14 +627,19 @@ export async function snapshotAmmVenue(
     pause?: () => Promise<void>;
     log?: (message: string) => void;
     withVolume?: boolean;
+    /** Base token to snapshot pairs of; defaults to CHEESE. */
+    token?: LpToken;
+    /** Which pair keys are always recorded regardless of size. */
+    isTracked?: (pairKey: string) => boolean;
   } = {},
 ): Promise<LpPoolSnapshot[]> {
+  const token = options.token ?? CHEESE_TOKEN;
   const candidates =
     venue === 'taco'
-      ? await fetchTacoCandidates(prices)
-      : await fetchDefiboxCandidates(prices);
-  const selected = selectAmmPairs(candidates);
-  const cheeseUsd = cheeseUsdFrom(prices);
+      ? await fetchTacoCandidates(prices, token)
+      : await fetchDefiboxCandidates(prices, token);
+  const selected = selectAmmPairs(candidates, options.isTracked);
+  const cheeseUsd = cheeseUsdFrom(prices, token);
   const snapshots: LpPoolSnapshot[] = [];
 
   let volumes: Map<string, VenueVolume> | null = null;
@@ -619,8 +647,8 @@ export async function snapshotAmmVenue(
     try {
       volumes =
         venue === 'defibox'
-          ? await fetchDefiboxPairVolume(prices)
-          : await fetchTacoPairVolume(prices);
+          ? await fetchDefiboxPairVolume(prices, token)
+          : await fetchTacoPairVolume(prices, Date.now(), token);
     } catch (error) {
       options.log?.(`${venue} 24h volume unavailable: ${(error as Error).message}`);
     }
@@ -640,17 +668,17 @@ export async function snapshotAmmVenue(
       });
       if (options.pause) await options.pause();
     }
-    const base = buildAmmPoolSnapshot(venuePair(venue, entry.pair), inputs, {
+    const built = buildAmmPoolSnapshot(venuePair(venue, entry.pair), inputs, {
       cheeseUsd,
       pairedUsd,
     });
     const snapshot: LpPoolSnapshot = volumes
-      ? { ...base, ...sumPairVolume(entry.pools.map((p) => volumes!.get(p.volumeKey))) }
-      : base;
+      ? { ...built, ...sumPairVolume(entry.pools.map((p) => volumes!.get(p.volumeKey))) }
+      : built;
     if (snapshot.accounts === 0) continue;
     options.log?.(
       `${venue} ${snapshot.label}: $${snapshot.usd.toFixed(2)} • ` +
-        `${snapshot.cheese.toFixed(4)} CHEESE • ${snapshot.accounts} accounts` +
+        `${snapshot.cheese.toFixed(4)} ${token.symbol} • ${snapshot.accounts} accounts` +
         (snapshot.volumeUsd24 !== undefined
           ? ` • 24h volume $${snapshot.volumeUsd24.toFixed(2)}`
           : ''),

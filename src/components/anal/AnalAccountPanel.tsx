@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLpAccountHistory } from '@/hooks/useLpHistory';
 import { downloadAccountHistoryCsv } from '@/lib/lpCsv';
-import { type LpDayFile, type LpIndexDay } from '@/lib/lpPools';
+import { type LpDayFile, type LpIndexDay, type LpTokenConfig } from '@/lib/lpPools';
 import { amount, change, shortDate, usd } from './format';
 
 interface AnalAccountPanelProps {
@@ -20,15 +20,17 @@ interface AnalAccountPanelProps {
   /** Recorded snapshots in the selected range, oldest first. */
   days: LpIndexDay[];
   current: LpDayFile | null;
+  /** Base token of the open tab. */
+  token: LpTokenConfig;
 }
 
 const axisTick = { fontSize: 10, fill: '#FFFFFF' } as const;
 
-export function AnalAccountPanel({ account, onAccountChange, days, current }: AnalAccountPanelProps) {
+export function AnalAccountPanel({ account, onAccountChange, days, current, token }: AnalAccountPanelProps) {
   const [query, setQuery] = useState('');
   const [selectedPool, setSelectedPool] = useState<string | null>(null);
   const dates = useMemo(() => days.map((day) => day.date), [days]);
-  const { rows, isLoading } = useLpAccountHistory(account, dates);
+  const { rows, isLoading } = useLpAccountHistory(account, dates, token.key);
 
   // Always start from the full account overview when the account changes.
   useEffect(() => {
@@ -128,7 +130,7 @@ export function AnalAccountPanel({ account, onAccountChange, days, current }: An
       if (!selectedPool && changed.length) {
         lines.push(
           ...changed.slice(0, 4).map((entry) =>
-            `${entry.label} ${entry.delta >= 0 ? '+' : '-'}${metric === 'usd' ? usd(Math.abs(entry.delta)) : `${amount(Math.abs(entry.delta), 2)} CHEESE`}`,
+            `${entry.label} ${entry.delta >= 0 ? '+' : '-'}${metric === 'usd' ? usd(Math.abs(entry.delta)) : `${amount(Math.abs(entry.delta), 2)} ${token.symbol}`}`,
           ),
         );
         if (changed.length > 4) lines.push(`+${changed.length - 4} more pools`);
@@ -180,7 +182,7 @@ export function AnalAccountPanel({ account, onAccountChange, days, current }: An
           <div className="flex flex-wrap items-center gap-3">
             <span className="font-mono text-sm text-cheese">{account}</span>
             <span className="text-xs text-muted-foreground">
-              {usd(totalNow)} across {holdings.length} pool{holdings.length === 1 ? '' : 's'} · {amount(cheeseNow, 2)} CHEESE
+              {usd(totalNow)} across {holdings.length} pool{holdings.length === 1 ? '' : 's'} · {amount(cheeseNow, 2)} {token.symbol}
             </span>
             <Button
               size="sm"
@@ -233,7 +235,7 @@ export function AnalAccountPanel({ account, onAccountChange, days, current }: An
                       <span className="inline-flex items-center justify-end gap-1"><UsdLogo />USD</span>
                     </th>
                     <th className="text-right font-medium py-2">
-                      <span className="inline-flex items-center justify-end gap-1"><CheeseLogo />CHEESE</span>
+                      <span className="inline-flex items-center justify-end gap-1"><CheeseLogo base={token} />{token.symbol}</span>
                     </th>
                     <th className="text-right font-medium py-2">Paired</th>
                     <th className="text-right font-medium py-2">Positions</th>
@@ -250,7 +252,7 @@ export function AnalAccountPanel({ account, onAccountChange, days, current }: An
                       }`}
                     >
                       <td className="py-1.5 text-foreground whitespace-nowrap">
-                        <PairLabel symbol={row.symbol} contract={row.contract} />
+                        <PairLabel symbol={row.symbol} contract={row.contract} base={token} />
                       </td>
                       <td className="py-1.5 whitespace-nowrap">
                         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/60 bg-background/60 text-muted-foreground">
@@ -330,8 +332,8 @@ export function AnalAccountPanel({ account, onAccountChange, days, current }: An
               <div className="space-y-1">
                 <div className="w-fit mx-auto px-2 py-1 rounded-md bg-background/60 border border-border/40 text-center">
                   <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                    <CheeseLogo />
-                    CHEESE in positions{selectedPoolLabel ? ` — ${selectedPoolLabel}` : ''}
+                    <CheeseLogo base={token} />
+                    {token.symbol} in positions{selectedPoolLabel ? ` — ${selectedPoolLabel}` : ''}
                   </div>
                   <div className="text-sm font-mono font-semibold text-foreground leading-tight">
                     {amount(selectedPoolRow?.cheese ?? cheeseNow, 0)}
@@ -343,7 +345,7 @@ export function AnalAccountPanel({ account, onAccountChange, days, current }: An
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                       <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
                       <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => amount(v, 0)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
-                      <Tooltip content={(props) => <MiniChartTooltip {...props} format={(v) => `${amount(v, 4)} CHEESE`} valueClass="text-cheese" extras={tooltipExtras('cheese')} />} />
+                      <Tooltip content={(props) => <MiniChartTooltip {...props} format={(v) => `${amount(v, 4)} ${token.symbol}`} valueClass="text-cheese" extras={tooltipExtras('cheese')} />} />
                       <Line type="monotone" dataKey="cheese" stroke="#22C55E" strokeWidth={2} dot={{ r: 3, fill: '#22C55E', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                     </LineChart>
                   </ResponsiveContainer>

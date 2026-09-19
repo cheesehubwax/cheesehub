@@ -13,6 +13,9 @@ import {
   poolsForPair,
   utcDay,
   utcSlot,
+  lpTokenConfig,
+  pairFor,
+  HOLE_TOKEN,
   type RawPool,
   type RawPosition,
 } from '@/lib/lpPools';
@@ -257,5 +260,51 @@ describe('dayAbout24hBefore', () => {
   it('ignores entries at or after the current snapshot', () => {
     const days = [day(base + HOUR, '2026-09-13T13'), day(base, '2026-09-13T12')];
     expect(dayAbout24hBefore(days, base)).toBeNull();
+  });
+});
+
+describe('HOLE as the base token', () => {
+  const holeCheesePair = venuePair('alcor', pairFor('CHEESE', 'cheeseburger'));
+  const pools: RawPool[] = [
+    { id: 11051, fee: 3000, active: true, tokenA: cheese, tokenB: hole },
+    { id: 11055, fee: 3000, active: true, tokenA: wax, tokenB: hole },
+  ];
+
+  it('matches the CHEESE pair from the HOLE side', () => {
+    expect(poolsForPair(pools, holeCheesePair, HOLE_TOKEN).map((p) => p.id)).toEqual([11051]);
+    expect(cheeseIsTokenA({ id: 11051, tokenA: cheese, tokenB: hole }, HOLE_TOKEN)).toBe(false);
+    expect(cheeseIsTokenA({ id: 11055, tokenA: wax, tokenB: hole }, HOLE_TOKEN)).toBe(false);
+  });
+
+  it('measures HOLE on its own side of the pool', () => {
+    const positions: RawPosition[] = [
+      {
+        id: 1,
+        owner: 'hole.cheese',
+        pool: 11051,
+        amountA: '100.0000 CHEESE',
+        amountB: '50.0000 HOLE',
+        totalValue: '12.5',
+        inRange: true,
+      },
+    ];
+    const snap = buildPoolSnapshot(
+      holeCheesePair,
+      [{ pool: pools[0], positions }],
+      { cheeseUsd: 0.019, pairedUsd: 0.016 },
+      HOLE_TOKEN,
+    );
+    expect(snap.symbol).toBe('CHEESE');
+    // HOLE is tokenB here, so the base amount comes from amountB.
+    expect(snap.cheese).toBeCloseTo(50, 4);
+    expect(snap.paired).toBeCloseTo(100, 4);
+    expect(snap.accounts).toBe(1);
+  });
+
+
+  it('keeps token data paths separate', () => {
+    expect(lpTokenConfig('cheese').dataPath).toBe('');
+    expect(lpTokenConfig('hole').dataPath).toBe('hole');
+    expect(lpTokenConfig('hole').contract).toBe('hole.cheese');
   });
 });

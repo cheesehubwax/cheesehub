@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { useLpDay } from '@/hooks/useLpHistory';
 import { downloadPoolHistoryCsv } from '@/lib/lpCsv';
-import { type LpDayFile, type LpIndexDay, type LpPoolSnapshot } from '@/lib/lpPools';
+import { type LpDayFile, type LpIndexDay, type LpPoolSnapshot, type LpTokenConfig } from '@/lib/lpPools';
 import { amount, change, shortDate, tokenPrice, tooltipDate, usd } from './format';
 
 interface AnalPoolDetailProps {
@@ -24,6 +24,8 @@ interface AnalPoolDetailProps {
   current: LpDayFile | null;
   onSelectAccount: (account: string) => void;
   onSelectPool: (key: string) => void;
+  /** Base token of the open tab. */
+  token: LpTokenConfig;
 }
 
 const axisTick = { fontSize: 10, fill: '#FFFFFF' } as const;
@@ -34,7 +36,7 @@ function nameList(names: string[]): string {
   return `${names.slice(0, MAX_NAMES).join(', ')} +${names.length - MAX_NAMES} more`;
 }
 
-export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, onSelectPool }: AnalPoolDetailProps) {
+export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, onSelectPool, token }: AnalPoolDetailProps) {
   const [hovered, setHovered] = useState<string | null>(null);
   const series = useMemo(() => {
     if (!pool) return [];
@@ -70,8 +72,8 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
   const latestVolume = volumeSeries[volumeSeries.length - 1] ?? null;
   const hoveredIndex = hovered ? series.findIndex((row) => row.date === hovered) : -1;
   const previousDate = hoveredIndex > 0 ? series[hoveredIndex - 1].date : null;
-  const { day: hoveredDay, isLoading: hoveredLoading } = useLpDay(hovered);
-  const { day: previousDay, isLoading: previousLoading } = useLpDay(previousDate);
+  const { day: hoveredDay, isLoading: hoveredLoading } = useLpDay(hovered, token.key);
+  const { day: previousDay, isLoading: previousLoading } = useLpDay(previousDate, token.key);
   const poolDiff = useMemo(
     () => (pool && hovered ? diffPoolSnapshots(hoveredDay, previousDay, pool.key) : null),
     [pool, hovered, hoveredDay, previousDay],
@@ -146,7 +148,7 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
           <SelectTrigger className="h-auto w-auto border-0 bg-transparent p-1.5 pr-2 rounded-md gap-2 shadow-none hover:bg-background/50 focus:ring-0 focus:ring-offset-0 [&>svg]:text-muted-foreground">
             <OpenMojiIcon emoji="🔍" size={18} />
             <span className="text-sm font-medium text-foreground">
-              <PairLabel symbol={pool.symbol} contract={pool.contract} size="md" />
+              <PairLabel symbol={pool.symbol} contract={pool.contract} base={token} size="md" />
             </span>
             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/60 bg-background/60 text-muted-foreground">
               <VenueLabel venue={pool.venue} />
@@ -156,8 +158,8 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
             {sortedPools.map((p) => (
               <SelectItem key={p.key} value={p.key}>
                 <span className="inline-flex items-center gap-2">
-                  <PairLogos symbol={p.symbol} contract={p.contract} size="sm" />
-                  <span className="text-foreground">CHEESE / {p.symbol}</span>
+                  <PairLogos symbol={p.symbol} contract={p.contract} base={token} size="sm" />
+                  <span className="text-foreground">{token.symbol} / {p.symbol}</span>
                   <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/60 bg-background/60 text-muted-foreground">
                     <VenueLabel venue={p.venue} />
                   </span>
@@ -183,7 +185,7 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
             <div className="w-fit mx-auto px-2 py-1 rounded-md bg-background/60 border border-border/40 text-center">
               <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
                 <TokenLogo contract={pool.contract ?? ''} symbol={pool.symbol} size="sm" />
-                CHEESE price in {pool.symbol}
+                {token.symbol} price in {pool.symbol}
               </div>
               <div className="text-sm font-mono font-semibold text-foreground leading-tight">
                 {pool.priceInPaired ? tokenPrice(pool.priceInPaired, pool.symbol) : '—'}
@@ -232,8 +234,8 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
           <div className="space-y-1">
             <div className="w-fit mx-auto px-2 py-1 rounded-md bg-background/60 border border-border/40 text-center">
               <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                <CheeseLogo />
-                CHEESE in pool
+                <CheeseLogo base={token} />
+                {token.symbol} in pool
               </div>
               <div className="text-sm font-mono font-semibold text-foreground leading-tight">{amount(pool.cheese, 0)}</div>
             </div>
@@ -243,7 +245,7 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                   <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
                   <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => amount(v, 0)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
-                  <Tooltip content={(props) => <MiniChartTooltip {...props} format={(v) => `${amount(v, 4)} CHEESE`} valueClass="text-cheese" extras={extras('cheese')} />} />
+                  <Tooltip content={(props) => <MiniChartTooltip {...props} format={(v) => `${amount(v, 4)} ${token.symbol}`} valueClass="text-cheese" extras={extras('cheese')} />} />
                   <Line type="monotone" dataKey="cheese" stroke="#22C55E" strokeWidth={2} dot={{ r: 3, fill: '#22C55E', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -342,7 +344,7 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
                   <span className="inline-flex items-center justify-end gap-1"><UsdLogo />USD</span>
                 </th>
                 <th className="text-right font-medium py-2">
-                  <span className="inline-flex items-center justify-end gap-1"><CheeseLogo />CHEESE</span>
+                  <span className="inline-flex items-center justify-end gap-1"><CheeseLogo base={token} />{token.symbol}</span>
                 </th>
                 <th className="text-right font-medium py-2">
                   <span className="inline-flex items-center justify-end gap-1">

@@ -1,5 +1,6 @@
-// CHEESEAnal — shared definition of the tracked CHEESE liquidity pools and the
-// pure aggregation used to turn exchange data into a daily snapshot.
+// CHEESEAnal — shared definition of the tracked liquidity pools of a base token
+// (CHEESE or HOLE) and the pure aggregation used to turn exchange data into a
+// snapshot.
 //
 // This module is imported both by the app (src/hooks/useLpHistory.ts, the
 // CHEESEAnal page) and by the standalone sampler (scripts/lp-history/sample.ts)
@@ -7,6 +8,34 @@
 
 export const CHEESE_SYMBOL = 'CHEESE';
 export const CHEESE_CONTRACT = 'cheeseburger';
+
+/** A token CHEESEAnal can track liquidity for. */
+export interface LpToken {
+  symbol: string;
+  contract: string;
+}
+
+export const CHEESE_TOKEN: LpToken = { symbol: CHEESE_SYMBOL, contract: CHEESE_CONTRACT };
+export const HOLE_TOKEN: LpToken = { symbol: 'HOLE', contract: 'hole.cheese' };
+
+/** Which recorded history set the page is showing. */
+export type LpTokenKey = 'cheese' | 'hole';
+
+export interface LpTokenConfig extends LpToken {
+  key: LpTokenKey;
+  /** Sub-path of the recorded data for this token ('' = the original files). */
+  dataPath: string;
+}
+
+export const LP_TOKENS: LpTokenConfig[] = [
+  { key: 'cheese', ...CHEESE_TOKEN, dataPath: '' },
+  { key: 'hole', ...HOLE_TOKEN, dataPath: 'hole' },
+];
+
+export function lpTokenConfig(key: LpTokenKey): LpTokenConfig {
+  return LP_TOKENS.find((t) => t.key === key) ?? LP_TOKENS[0];
+}
+
 
 /** Exchanges CHEESEAnal reads liquidity from. */
 export type LpVenue = 'alcor' | 'taco' | 'defibox';
@@ -48,12 +77,12 @@ export interface VenuePair extends TrackedPair {
   pairKey: string;
 }
 
-export function pairFor(symbol: string, contract: string): TrackedPair {
+export function pairFor(symbol: string, contract: string, base: LpToken = CHEESE_TOKEN): TrackedPair {
   return {
     key: `${symbol.toLowerCase()}-${contract}`,
     symbol: symbol.toUpperCase(),
     contract,
-    label: `${CHEESE_SYMBOL} / ${symbol.toUpperCase()}`,
+    label: `${base.symbol} / ${symbol.toUpperCase()}`,
   };
 }
 
@@ -282,25 +311,29 @@ function tokenMatches(token: RawPoolToken | undefined, symbol: string, contract:
 }
 
 /**
- * Every active pool (all fee tiers) of CHEESE against `target`, sorted by id so
- * stored `poolIds` stay stable between days.
+ * Every active pool (all fee tiers) of the base token against `target`, sorted
+ * by id so stored `poolIds` stay stable between days.
  */
-export function poolsForPair(pools: RawPool[], target: TrackedPair): RawPool[] {
+export function poolsForPair(
+  pools: RawPool[],
+  target: TrackedPair,
+  base: LpToken = CHEESE_TOKEN,
+): RawPool[] {
   return pools
     .filter((pool) => {
       if (pool.active === 0 || pool.active === false) return false;
-      const cheeseA = tokenMatches(pool.tokenA, CHEESE_SYMBOL, CHEESE_CONTRACT);
-      const cheeseB = tokenMatches(pool.tokenB, CHEESE_SYMBOL, CHEESE_CONTRACT);
-      if (!cheeseA && !cheeseB) return false;
-      const other = cheeseA ? pool.tokenB : pool.tokenA;
+      const baseA = tokenMatches(pool.tokenA, base.symbol, base.contract);
+      const baseB = tokenMatches(pool.tokenB, base.symbol, base.contract);
+      if (!baseA && !baseB) return false;
+      const other = baseA ? pool.tokenB : pool.tokenA;
       return tokenMatches(other, target.symbol, target.contract);
     })
     .sort((x, y) => x.id - y.id);
 }
 
-/** True when CHEESE sits on the A side of a pool (so amountA is the CHEESE leg). */
-export function cheeseIsTokenA(pool: RawPool): boolean {
-  return tokenMatches(pool.tokenA, CHEESE_SYMBOL, CHEESE_CONTRACT);
+/** True when the base token sits on the A side (so amountA is the base leg). */
+export function cheeseIsTokenA(pool: RawPool, base: LpToken = CHEESE_TOKEN): boolean {
+  return tokenMatches(pool.tokenA, base.symbol, base.contract);
 }
 
 /**
@@ -309,7 +342,7 @@ export function cheeseIsTokenA(pool: RawPool): boolean {
  * its swap records (both handled in lpVenues).
  * Returns `{}` when the payload has no usable volume figures.
  */
-export function alcorPairVolume(pools: RawPool[]): {
+export function alcorPairVolume(pools: RawPool[], base: LpToken = CHEESE_TOKEN): {
   volumeUsd24?: number;
   volumeCheese24?: number;
 } {
@@ -324,7 +357,7 @@ export function alcorPairVolume(pools: RawPool[]): {
       usdTotal += usdVolume;
       sawUsd = true;
     }
-    const raw = cheeseIsTokenA(pool) ? pool.volumeA24 : pool.volumeB24;
+    const raw = cheeseIsTokenA(pool, base) ? pool.volumeA24 : pool.volumeB24;
     const cheeseVolume = Number(raw);
     if (Number.isFinite(cheeseVolume) && cheeseVolume >= 0) {
       cheeseTotal += cheeseVolume;
@@ -339,21 +372,24 @@ export function alcorPairVolume(pools: RawPool[]): {
 }
 
 /**
- * Every CHEESE pair listed on Alcor, keyed by paired token, with the summed TVL
- * of its fee tiers. Used to decide which untracked pairs are worth recording.
+ * Every pair of the base token listed on Alcor, keyed by paired token, with the
+ * summed TVL of its fee tiers. Used to decide which pairs are worth recording.
  */
-export function alcorCheesePairs(pools: RawPool[]): { pair: TrackedPair; tvlUsd: number }[] {
+export function alcorCheesePairs(
+  pools: RawPool[],
+  base: LpToken = CHEESE_TOKEN,
+): { pair: TrackedPair; tvlUsd: number }[] {
   const byPair = new Map<string, { pair: TrackedPair; tvlUsd: number }>();
   for (const pool of pools) {
     if (pool.active === 0 || pool.active === false) continue;
-    const cheeseA = tokenMatches(pool.tokenA, CHEESE_SYMBOL, CHEESE_CONTRACT);
-    const cheeseB = tokenMatches(pool.tokenB, CHEESE_SYMBOL, CHEESE_CONTRACT);
-    if (!cheeseA && !cheeseB) continue;
-    const other = cheeseA ? pool.tokenB : pool.tokenA;
+    const baseA = tokenMatches(pool.tokenA, base.symbol, base.contract);
+    const baseB = tokenMatches(pool.tokenB, base.symbol, base.contract);
+    if (!baseA && !baseB) continue;
+    const other = baseA ? pool.tokenB : pool.tokenA;
     const symbol = (other?.symbol ?? '').toUpperCase();
     const contract = other?.contract ?? '';
     if (!symbol || !contract) continue;
-    const pair = pairFor(symbol, contract);
+    const pair = pairFor(symbol, contract, base);
     const entry = byPair.get(pair.key) ?? { pair, tvlUsd: 0 };
     entry.tvlUsd += Number(pool.tvlUSD ?? 0);
     byPair.set(pair.key, entry);
@@ -362,17 +398,20 @@ export function alcorCheesePairs(pools: RawPool[]): { pair: TrackedPair; tvlUsd:
 }
 
 /**
- * Which pairs to record for one venue: every tracked pair that exists there,
- * plus the largest untracked pairs above the USD floor.
+ * Which pairs to record for one venue: every always-tracked pair that exists
+ * there, plus the largest other pairs above the USD floor. Tokens without an
+ * explicit tracked list (HOLE) pass `isTracked: () => false` so every recorded
+ * pair has to clear the floor on its own.
  */
 export function selectVenuePairs<T extends { pair: TrackedPair; tvlUsd: number }>(
   candidates: T[],
   minUsd = MIN_TRACKED_POOL_USD,
   maxExtra = MAX_EXTRA_PAIRS_PER_VENUE,
+  isTracked: (pairKey: string) => boolean = isTrackedPairKey,
 ): T[] {
-  const tracked = candidates.filter((c) => isTrackedPairKey(c.pair.key));
+  const tracked = candidates.filter((c) => isTracked(c.pair.key));
   const extra = candidates
-    .filter((c) => !isTrackedPairKey(c.pair.key) && c.tvlUsd > minUsd)
+    .filter((c) => !isTracked(c.pair.key) && c.tvlUsd > minUsd)
     .sort((a, b) => b.tvlUsd - a.tvlUsd)
     .slice(0, maxExtra);
   return [...tracked, ...extra];
@@ -421,6 +460,7 @@ export function buildPoolSnapshot(
   target: VenuePair,
   pools: { pool: RawPool; positions: RawPosition[] }[],
   prices: { cheeseUsd?: number; pairedUsd?: number } = {},
+  base: LpToken = CHEESE_TOKEN,
 ): LpPoolSnapshot {
   const byAccount = new Map<string, LpProviderRow>();
   let positions = 0;
@@ -429,7 +469,8 @@ export function buildPoolSnapshot(
   let pairedTotal = 0;
 
   for (const { pool, positions: rows } of pools) {
-    const cheeseFirst = cheeseIsTokenA(pool);
+    const cheeseFirst = cheeseIsTokenA(pool, base);
+
     for (const row of rows) {
       const account = (row.owner ?? '').trim();
       if (!account) continue;
@@ -440,9 +481,9 @@ export function buildPoolSnapshot(
       const amountA = assetAmount(row.amountA);
       const amountB = assetAmount(row.amountB);
       // Prefer the asset symbol when present — it is authoritative about which
-      // leg is CHEESE even if a pool row ever came back in an odd order.
+      // leg is the base token even if a pool row came back in an odd order.
       const symbolA = assetSymbol(row.amountA);
-      const cheeseSideIsA = symbolA ? symbolA === CHEESE_SYMBOL : cheeseFirst;
+      const cheeseSideIsA = symbolA ? symbolA === base.symbol.toUpperCase() : cheeseFirst;
       const cheese = cheeseSideIsA ? amountA : amountB;
       const paired = cheeseSideIsA ? amountB : amountA;
 
@@ -472,13 +513,13 @@ export function buildPoolSnapshot(
 
   const providers = finaliseProviders(byAccount);
 
-  // CHEESE price from the deepest fee tier of the pair.
+  // Base-token price from the deepest fee tier of the pair.
   const deepest = [...pools].sort(
     (a, b) => Number(b.pool.liquidity ?? 0) - Number(a.pool.liquidity ?? 0),
   )[0]?.pool;
   let priceInPaired: number | undefined;
   if (deepest) {
-    const raw = cheeseIsTokenA(deepest) ? deepest.priceA : deepest.priceB;
+    const raw = cheeseIsTokenA(deepest, base) ? deepest.priceA : deepest.priceB;
     if (Number.isFinite(Number(raw)) && Number(raw) > 0) priceInPaired = round(Number(raw), 12);
   }
   const priceUsd = derivePriceUsd(priceInPaired, prices);

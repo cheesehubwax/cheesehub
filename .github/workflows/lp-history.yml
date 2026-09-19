@@ -67,21 +67,36 @@ jobs:
             git commit -m "chore: init CHEESEAnal LP history data branch"
             git push -u origin lp-history-data
           fi
-          mkdir -p /tmp/lp-data/data/days
+          mkdir -p /tmp/lp-data/data/days /tmp/lp-data/data/hole/days
           if [ "${{ github.event.inputs.reset }}" = "1" ]; then
             echo "Reset requested — wiping all recorded snapshots."
             rm -f /tmp/lp-data/data/days/*.json
             echo '{"updatedAt":0,"days":[]}' > /tmp/lp-data/data/lp-history-index.json
+            rm -f /tmp/lp-data/data/hole/days/*.json
+            echo '{"updatedAt":0,"days":[]}' > /tmp/lp-data/data/hole/lp-history-index.json
           fi
 
       - name: Snapshot CHEESE liquidity pools
         working-directory: scripts/lp-history
         env:
           LP_HISTORY_DIR: /tmp/lp-data/data
+          LP_TOKEN: cheese
+          FORCE: ${{ github.event.inputs.force }}
+        run: bun run sample.ts
+
+      # HOLE is recorded separately so a HOLE failure can never cost the CHEESE
+      # snapshot that has already been written to the checkout.
+      - name: Snapshot HOLE liquidity pools
+        continue-on-error: true
+        working-directory: scripts/lp-history
+        env:
+          LP_HISTORY_DIR: /tmp/lp-data/data
+          LP_TOKEN: hole
           FORCE: ${{ github.event.inputs.force }}
         run: bun run sample.ts
 
       - name: Commit snapshot
+        if: always()
         run: |
           set -euo pipefail
           cd /tmp/lp-data
@@ -92,5 +107,5 @@ jobs:
             echo "No change to commit."
             exit 0
           fi
-          git commit -m "chore: CHEESE LP snapshot $(date -u +'%Y-%m-%dT%H:%MZ')"
+          git commit -m "chore: CHEESE + HOLE LP snapshot $(date -u +'%Y-%m-%dT%H:%MZ')"
           git push origin lp-history-data

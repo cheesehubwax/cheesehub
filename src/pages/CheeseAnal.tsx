@@ -10,6 +10,7 @@ import { AnalPoolDetail } from '@/components/anal/AnalPoolDetail';
 import { AnalPoolTable } from '@/components/anal/AnalPoolTable';
 import { AllVenueLogos, VenueLogo } from '@/components/anal/VenueLogo';
 import { HistoricalNote } from '@/components/anal/HistoricalNote';
+import { CheeseLogo } from '@/components/anal/PairLogos';
 import { tooltipDate } from '@/components/anal/format';
 import {
   LP_RANGES,
@@ -21,7 +22,7 @@ import {
   type LpRange,
 } from '@/hooks/useLpHistory';
 import { downloadSnapshotCsv } from '@/lib/lpCsv';
-import { LP_VENUES, LP_VENUE_LABELS, type LpVenue } from '@/lib/lpPools';
+import { LP_TOKENS, LP_VENUES, LP_VENUE_LABELS, lpTokenConfig, type LpTokenKey, type LpVenue } from '@/lib/lpPools';
 import { playRandomFart } from '@/lib/fartSounds';
 import cheeseAnalOrb from '@/assets/cheeseanal.png';
 
@@ -33,8 +34,19 @@ const VENUE_TABS: { key: LpVenue | 'all'; label: string }[] = [
 const CheeseAnal = () => {
   const [range, setRange] = useState<LpRange>('all');
   const [venue, setVenue] = useState<LpVenue | 'all'>('all');
+  const [tokenKey, setTokenKey] = useState<LpTokenKey>('cheese');
   const [poolKey, setPoolKey] = useState<string | null>(null);
   const [account, setAccount] = useState<string | null>(null);
+  const token = lpTokenConfig(tokenKey);
+
+  /** A pool or account from one token's snapshots means nothing on the other tab. */
+  const switchToken = (next: LpTokenKey) => {
+    if (next === tokenKey) return;
+    setTokenKey(next);
+    setPoolKey(null);
+    setAccount(null);
+  };
+
 
   const {
     days,
@@ -43,7 +55,7 @@ const CheeseAnal = () => {
     isLoading: historyLoading,
     isError: historyError,
     refetch: refetchHistory,
-  } = useLpHistoryIndex();
+  } = useLpHistoryIndex(tokenKey);
 
   const latestRecordedDate = days.length ? days[days.length - 1].date : null;
   // Every current value and table row comes from the newest workflow snapshot,
@@ -53,7 +65,7 @@ const CheeseAnal = () => {
     isLoading: latestDayLoading,
     isError: latestDayError,
     refetch: refetchDay,
-  } = useLpDay(latestRecordedDate);
+  } = useLpDay(latestRecordedDate, tokenKey);
 
   const snapshot = latestDay;
   const current = useMemo(() => filterSnapshotByVenue(snapshot, venue), [snapshot, venue]);
@@ -100,8 +112,8 @@ const CheeseAnal = () => {
                 <OpenMojiIcon emoji="📈" size={26} />
               </div>
               <p className="text-muted-foreground max-w-2xl mx-auto">
-                Twice-daily snapshots of every $CHEESE liquidity pool on Alcor, Taco and Defibox — pool value, token
-                balances, CHEESE price, provider counts and per-account positions, tracked over time
+                Twice-daily snapshots of every ${token.symbol} liquidity pool on Alcor, Taco and Defibox — pool value,
+                token balances, {token.symbol} price, provider counts and per-account positions, tracked over time
               </p>
               <div className="max-w-2xl mx-auto flex justify-center">
                 <HistoricalNote />
@@ -112,6 +124,26 @@ const CheeseAnal = () => {
       </section>
 
       <main className="container pb-12 flex flex-col items-center gap-6">
+        {/* Token switch — each token has its own recorded snapshot history */}
+        <div className="w-full flex items-center gap-1">
+          {LP_TOKENS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => switchToken(tab.key)}
+              aria-pressed={tokenKey === tab.key}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold tracking-wide border transition-colors ${
+                tokenKey === tab.key
+                  ? 'bg-cheese/15 text-cheese border-cheese/40'
+                  : 'text-muted-foreground border-border/40 hover:text-foreground hover:border-primary/40'
+              }`}
+            >
+              <CheeseLogo base={tab} />
+              {tab.symbol}
+            </button>
+          ))}
+        </div>
+
         {/* Range switch + exports */}
         <div className="w-full flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1">
@@ -187,6 +219,7 @@ const CheeseAnal = () => {
           historyLoading={historyLoading}
           historyEmpty={isEmpty}
           venue={venue}
+          token={token}
         />
 
         <AnalPoolTable
@@ -196,6 +229,7 @@ const CheeseAnal = () => {
           onSelect={setPoolKey}
           failed={current?.partial ?? []}
           isLoading={latestDayLoading}
+          token={token}
         />
 
         <AnalPoolDetail
@@ -205,9 +239,17 @@ const CheeseAnal = () => {
           current={current}
           onSelectAccount={(name) => setAccount(name)}
           onSelectPool={setPoolKey}
+          token={token}
         />
 
-        <AnalAccountPanel account={account} onAccountChange={setAccount} days={ranged} current={current} />
+        <AnalAccountPanel
+          account={account}
+          onAccountChange={setAccount}
+          days={ranged}
+          current={current}
+          token={token}
+        />
+
 
         <p className="text-[10px] text-muted-foreground text-center max-w-2xl">
           Alcor figures come from Alcor's own position data: open positions count whether or not they are in range,
