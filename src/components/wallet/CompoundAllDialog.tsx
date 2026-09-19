@@ -14,6 +14,7 @@ import { waxRpcCall } from '@/lib/waxRpcFallback';
 import {
   AvailableBalance,
   COMPOUND_FEE_ACCOUNT,
+  COMPOUND_SLIPPAGE_TOLERANCE,
   COMPOUND_FEE_MEMO,
   CompoundCandidate,
   CompoundPlan,
@@ -302,6 +303,7 @@ export function CompoundAllDialog({
           entry.tokenA.quantity,
           entry.tokenB.contract,
           entry.tokenB.quantity,
+          COMPOUND_SLIPPAGE_TOLERANCE,
         ),
       );
       const actions = [...feeActions, ...depositActions];
