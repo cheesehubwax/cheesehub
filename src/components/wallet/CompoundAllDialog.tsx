@@ -317,8 +317,12 @@ export function CompoundAllDialog({
       onOpenChange(false);
     } catch (err: any) {
       setStage('preview');
+      const raw = err?.message || 'Failed to add liquidity';
+      const slippage = /slippage/i.test(raw);
       setError(
-        `${err?.message || 'Failed to add liquidity'} — your rewards were already claimed and are safe in your wallet. You can retry the compound step.`,
+        slippage
+          ? 'The pool price moved while you were signing, so the deposit was rejected. Your rewards are safe in your wallet — press "Re-check balances" and try again.'
+          : `${raw} — your rewards were already claimed and are safe in your wallet. You can retry the compound step.`,
       );
     } finally {
       closeWharfkitModals();
