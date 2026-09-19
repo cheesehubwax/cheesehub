@@ -153,7 +153,7 @@ export function AnalAccountPanel({ account, onAccountChange, days, current, toke
             <OpenMojiIcon emoji="👤" size={18} />
             <span className="text-sm font-medium text-foreground">Account detail</span>
           </div>
-          <HistoricalNote />
+          <HistoricalNote token={token} />
         </div>
         <form onSubmit={submit} className="flex items-center gap-2">
           <Input
