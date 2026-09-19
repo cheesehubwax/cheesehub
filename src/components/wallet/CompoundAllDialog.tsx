@@ -19,6 +19,7 @@ import {
   MAX_COMPOUND_POSITIONS,
   balanceKey,
   buildBalanceReadList,
+  buildClaimedBalances,
   buildCompoundFeeTotals,
   paysBothTokens,
   planCompound,
