@@ -184,8 +184,8 @@ export function planCompound(
       continue;
     }
 
-    const balA = remaining.get(keyA);
-    const balB = remaining.get(keyB);
+    const balA = findBalance(remaining, candidate.tokenA.contract, candidate.tokenA.symbol);
+    const balB = findBalance(remaining, candidate.tokenB.contract, candidate.tokenB.symbol);
 
     if (!balA || !balB || balA.balance <= 0 || balB.balance <= 0) {
       skipped.push({
