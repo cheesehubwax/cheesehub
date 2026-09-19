@@ -125,23 +125,78 @@ export function paysBothTokens(
 }
 
 /**
- * Resolve a balance entry for a token, trying the exact contract:symbol key
- * first and falling back to a symbol-only (case-insensitive) match so pool
- * tokens sourced without a contract still find their claimed balance.
+ * Resolve the map key holding a token's balance, trying the exact
+ * contract:symbol key first and falling back to a symbol-only
+ * (case-insensitive) match so pool tokens sourced without a contract still
+ * find their claimed balance.
  */
-function findBalance(
+function findBalanceKey(
   map: ReadonlyMap<string, AvailableBalance>,
-  contract: string,
+  contract: string | undefined,
   symbol: string,
-): AvailableBalance | undefined {
-  const exact = map.get(balanceKey(contract, symbol));
-  if (exact) return exact;
+): string | undefined {
+  if (contract) {
+    const exact = balanceKey(contract, symbol);
+    if (map.has(exact)) return exact;
+  }
   const sym = symbol.toUpperCase();
-  for (const [key, value] of map) {
+  for (const key of map.keys()) {
     const keySym = (key.includes(':') ? key.split(':')[1] : key).toUpperCase();
-    if (keySym === sym) return value;
+    if (keySym === sym) return key;
   }
   return undefined;
+}
+
+/** Resolve a balance entry for a token (see `findBalanceKey`). */
+function findBalance(
+  map: ReadonlyMap<string, AvailableBalance>,
+  contract: string | undefined,
+  symbol: string,
+): AvailableBalance | undefined {
+  const key = findBalanceKey(map, contract, symbol);
+  return key ? map.get(key) : undefined;
+}
+
+/**
+ * Tokens whose wallet balance must be read before a plan can be built.
+ *
+ * Reward token keys sometimes arrive without an issuing contract (the Alcor
+ * incentive record was not resolved), which makes the balance request fail.
+ * Merge them with the pool's own token records and the static token registry so
+ * every symbol is read with a real contract whenever one is discoverable.
+ */
+export function buildBalanceReadList(
+  candidates: readonly CompoundCandidate[],
+): Array<{ contract?: string; symbol: string }> {
+  const bySymbol = new Map<string, { contract?: string; symbol: string }>();
+
+  const consider = (contract: string | undefined, symbol: string) => {
+    const sym = symbol.trim();
+    if (!sym) return;
+    const key = sym.toUpperCase();
+    const existing = bySymbol.get(key);
+    const resolved = contract?.trim() || undefined;
+    if (existing?.contract) return;
+    bySymbol.set(key, { contract: resolved, symbol: existing?.symbol || sym });
+  };
+
+  candidates.forEach(c => {
+    c.rewardTokenKeys.forEach(rawKey => {
+      const idx = rawKey.indexOf(':');
+      const contract = idx >= 0 ? rawKey.slice(0, idx) : '';
+      const symbol = idx >= 0 ? rawKey.slice(idx + 1) : rawKey;
+      consider(contract, symbol);
+    });
+    consider(c.tokenA.contract, c.tokenA.symbol);
+    consider(c.tokenB.contract, c.tokenB.symbol);
+  });
+
+  // Last resort: the app's static registry knows the contract for most tokens.
+  return Array.from(bySymbol.values()).map(entry => {
+    if (entry.contract) return entry;
+    const known = getTokenConfig(entry.symbol.toUpperCase());
+    return known ? { contract: known.contract, symbol: entry.symbol } : entry;
+  });
 }
 
 function floorTo(amount: number, precision: number): number {
