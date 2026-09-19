@@ -10,6 +10,7 @@ import { AnalPoolDetail } from '@/components/anal/AnalPoolDetail';
 import { AnalPoolTable } from '@/components/anal/AnalPoolTable';
 import { AllVenueLogos, VenueLogo } from '@/components/anal/VenueLogo';
 import { HistoricalNote } from '@/components/anal/HistoricalNote';
+import { CheeseLogo } from '@/components/anal/PairLogos';
 import { tooltipDate } from '@/components/anal/format';
 import {
   LP_RANGES,
