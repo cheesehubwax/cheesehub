@@ -1,11 +1,11 @@
-// CHEESEAnal — combined liquidity across every tracked CHEESE pool.
+// CHEESEAnal — combined liquidity across every tracked pool of the open token.
 import { useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { CheeseLogo, UsdLogo } from '@/components/anal/PairLogos';
 import { diffSnapshots, waxUsdFromPools } from '@/components/anal/snapshotDiff';
 import { useLpDay } from '@/hooks/useLpHistory';
-import type { LpDayFile, LpIndexDay, LpVenue } from '@/lib/lpPools';
+import type { LpDayFile, LpIndexDay, LpTokenConfig, LpVenue } from '@/lib/lpPools';
 import { amount, change, shortDate, tooltipDate, usd, usdPrice } from './format';
 
 interface AnalOverviewProps {
@@ -17,18 +17,22 @@ interface AnalOverviewProps {
   historyEmpty: boolean;
   /** Active venue filter, so account diffs match what is on screen. */
   venue: LpVenue | 'all';
+  /** Base token of the open tab. */
+  token: LpTokenConfig;
 }
 
 type MetricKey = 'price' | 'usd' | 'cheese' | 'accounts' | 'positions' | 'volume';
 
-const METRICS: { key: MetricKey; label: string; color: string; format: (v: number) => string }[] = [
-  { key: 'price', label: 'CHEESE price', color: '#FACC15', format: usdPrice },
-  { key: 'usd', label: 'Total liquidity', color: '#3B82F6', format: usd },
-  { key: 'cheese', label: 'CHEESE in pools', color: '#22C55E', format: (v) => amount(v, 0) },
-  { key: 'accounts', label: 'Providers', color: '#FFFFFF', format: (v) => String(Math.round(v)) },
-  { key: 'positions', label: 'Positions', color: '#EC4899', format: (v) => String(Math.round(v)) },
-  { key: 'volume', label: 'Total volume', color: '#38BDF8', format: usd },
-];
+function metricsFor(symbol: string): { key: MetricKey; label: string; color: string; format: (v: number) => string }[] {
+  return [
+    { key: 'price', label: `${symbol} price`, color: '#FACC15', format: usdPrice },
+    { key: 'usd', label: 'Total liquidity', color: '#3B82F6', format: usd },
+    { key: 'cheese', label: `${symbol} in pools`, color: '#22C55E', format: (v) => amount(v, 0) },
+    { key: 'accounts', label: 'Providers', color: '#FFFFFF', format: (v) => String(Math.round(v)) },
+    { key: 'positions', label: 'Positions', color: '#EC4899', format: (v) => String(Math.round(v)) },
+    { key: 'volume', label: 'Total volume', color: '#38BDF8', format: usd },
+  ];
+}
 
 /** Keep tooltip account lists readable. */
 const MAX_NAMES = 4;
@@ -38,9 +42,11 @@ function nameList(names: string[]): string {
   return `${names.slice(0, MAX_NAMES).join(', ')} +${names.length - MAX_NAMES} more`;
 }
 
-export function AnalOverview({ days, current, historyLoading, historyEmpty, venue }: AnalOverviewProps) {
+export function AnalOverview({ days, current, historyLoading, historyEmpty, venue, token }: AnalOverviewProps) {
   const [metric, setMetric] = useState<MetricKey>('price');
   const [hovered, setHovered] = useState<string | null>(null);
+  const METRICS = useMemo(() => metricsFor(token.symbol), [token.symbol]);
+
 
   const totals = useMemo(() => {
     const pools = current?.pools ?? [];
