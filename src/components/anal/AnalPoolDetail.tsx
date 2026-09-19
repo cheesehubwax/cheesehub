@@ -245,7 +245,7 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                   <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
                   <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => amount(v, 0)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
-                  <Tooltip content={(props) => <MiniChartTooltip {...props} format={(v) => `${amount(v, 4)} CHEESE`} valueClass="text-cheese" extras={extras('cheese')} />} />
+                  <Tooltip content={(props) => <MiniChartTooltip {...props} format={(v) => `${amount(v, 4)} ${token.symbol}`} valueClass="text-cheese" extras={extras('cheese')} />} />
                   <Line type="monotone" dataKey="cheese" stroke="#22C55E" strokeWidth={2} dot={{ r: 3, fill: '#22C55E', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
