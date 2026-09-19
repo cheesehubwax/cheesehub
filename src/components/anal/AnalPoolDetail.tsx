@@ -344,7 +344,7 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
                   <span className="inline-flex items-center justify-end gap-1"><UsdLogo />USD</span>
                 </th>
                 <th className="text-right font-medium py-2">
-                  <span className="inline-flex items-center justify-end gap-1"><CheeseLogo />CHEESE</span>
+                  <span className="inline-flex items-center justify-end gap-1"><CheeseLogo base={token} />{token.symbol}</span>
                 </th>
                 <th className="text-right font-medium py-2">
                   <span className="inline-flex items-center justify-end gap-1">
