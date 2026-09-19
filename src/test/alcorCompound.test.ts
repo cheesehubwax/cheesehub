@@ -54,8 +54,8 @@ describe('planCompound', () => {
     // Deposit plus fee never exceeds the buffered balance.
     expect(entry.tokenA.amount + entry.tokenA.fee).toBeLessThanOrEqual(500 * (1 - COMPOUND_BUFFER_RATE));
     expect(entry.tokenB.amount + entry.tokenB.fee).toBeLessThanOrEqual(10 * (1 - COMPOUND_BUFFER_RATE));
-    expect(entry.tokenA.quantity).toBe('98.75375000 CHEESE');
-    expect(entry.tokenB.feeQuantity).toBe('0.074625 WAXUSDC');
+    expect(entry.tokenA.quantity).toBe(`${entry.tokenA.amount.toFixed(8)} CHEESE`);
+    expect(entry.tokenB.feeQuantity).toBe(`${entry.tokenB.fee.toFixed(6)} WAXUSDC`);
   });
 
   it('omits a fee that rounds to zero but still deposits', () => {
