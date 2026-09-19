@@ -460,6 +460,7 @@ export function buildPoolSnapshot(
   target: VenuePair,
   pools: { pool: RawPool; positions: RawPosition[] }[],
   prices: { cheeseUsd?: number; pairedUsd?: number } = {},
+  base: LpToken = CHEESE_TOKEN,
 ): LpPoolSnapshot {
   const byAccount = new Map<string, LpProviderRow>();
   let positions = 0;
