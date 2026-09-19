@@ -65,10 +65,10 @@ export function AnalPoolTable({
                 </th>
                 <th className="text-right font-medium py-2">24h</th>
                 <th className="text-right font-medium py-2">
-                  <span className="inline-flex items-center justify-end gap-1"><CheeseLogo />CHEESE</span>
+                  <span className="inline-flex items-center justify-end gap-1"><CheeseLogo base={token} />{token.symbol}</span>
                 </th>
                 <th className="text-right font-medium py-2">Paired token</th>
-                <th className="text-right font-medium py-2">CHEESE price (in pair)</th>
+                <th className="text-right font-medium py-2">{token.symbol} price (in pair)</th>
                 <th className="text-right font-medium py-2">24h price</th>
                 <th className="text-right font-medium py-2">Accounts</th>
               </tr>
