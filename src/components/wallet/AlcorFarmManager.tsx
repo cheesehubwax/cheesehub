@@ -869,6 +869,18 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
         }}
         onTransactionComplete={onTransactionComplete}
       />
+
+      <CompoundAllDialog
+        open={compoundOpen}
+        onOpenChange={setCompoundOpen}
+        positions={compoundPositions}
+        onTransactionSuccess={(title, description, txId) => {
+          onTransactionSuccess?.(title, description, txId);
+          setTimeout(() => refetch(), 3000);
+        }}
+        onTransactionComplete={onTransactionComplete}
+      />
+
     </div>
   );
 }
