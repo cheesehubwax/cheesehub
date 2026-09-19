@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ExternalLink, TrendingUp, Percent, Coins, ChevronDown, ChevronUp, Plus, RefreshCw, Zap, Wifi, Database, Clock, LogOut } from 'lucide-react';
+import { Loader2, ExternalLink, TrendingUp, Percent, Coins, ChevronDown, ChevronUp, Plus, RefreshCw, Zap, Wifi, Database, Clock, LogOut, Recycle } from 'lucide-react';
 import { useWax } from '@/context/WaxContext';
 import { useAlcorFarms, UnstakedIncentivesMap, UnstakedLPPosition } from '@/hooks/useAlcorFarms';
 import { useAlcorTokenPrices } from '@/hooks/useAlcorTokenPrices';
@@ -510,6 +510,21 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
           <Button size="sm" variant="ghost" onClick={() => { setIsRefreshing(true); refetch(); setTimeout(() => setIsRefreshing(false), 1000); }} disabled={isTransacting || isRefreshing} className="h-8 w-8 p-0">
             <RefreshCw className={cn("h-4 w-4 transition-transform", isRefreshing && "animate-spin")} />
           </Button>
+          {compoundableCount > 0 && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="sm" onClick={() => setCompoundOpen(true)} disabled={isTransacting} className="h-8 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white gap-1.5">
+                    <Recycle className="h-3.5 w-3.5" />Compound All ({compoundableCount})
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-center max-w-[220px]">
+                  <p className="text-xs">Claim your rewards, then add them straight back into the same pools. Pools whose rewards only cover one token are skipped.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
