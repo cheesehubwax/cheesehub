@@ -21,7 +21,7 @@ import {
   type LpRange,
 } from '@/hooks/useLpHistory';
 import { downloadSnapshotCsv } from '@/lib/lpCsv';
-import { LP_VENUES, LP_VENUE_LABELS, type LpVenue } from '@/lib/lpPools';
+import { LP_TOKENS, LP_VENUES, LP_VENUE_LABELS, lpTokenConfig, type LpTokenKey, type LpVenue } from '@/lib/lpPools';
 import { playRandomFart } from '@/lib/fartSounds';
 import cheeseAnalOrb from '@/assets/cheeseanal.png';
 
@@ -33,8 +33,19 @@ const VENUE_TABS: { key: LpVenue | 'all'; label: string }[] = [
 const CheeseAnal = () => {
   const [range, setRange] = useState<LpRange>('all');
   const [venue, setVenue] = useState<LpVenue | 'all'>('all');
+  const [tokenKey, setTokenKey] = useState<LpTokenKey>('cheese');
   const [poolKey, setPoolKey] = useState<string | null>(null);
   const [account, setAccount] = useState<string | null>(null);
+  const token = lpTokenConfig(tokenKey);
+
+  /** A pool or account from one token's snapshots means nothing on the other tab. */
+  const switchToken = (next: LpTokenKey) => {
+    if (next === tokenKey) return;
+    setTokenKey(next);
+    setPoolKey(null);
+    setAccount(null);
+  };
+
 
   const {
     days,
