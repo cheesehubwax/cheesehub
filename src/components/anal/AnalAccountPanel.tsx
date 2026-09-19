@@ -77,6 +77,7 @@ export function AnalAccountPanel({ account, onAccountChange, days, current }: An
   const selectedPoolLabel = selectedPoolRow?.label ?? null;
 
   const series = useMemo(() => {
+    if (chartRows.length === 0) return [];
     const byDate = new Map<string, { date: string; usd: number; cheese: number }>();
     for (const row of chartRows) {
       const entry = byDate.get(row.date) ?? { date: row.date, usd: 0, cheese: 0 };
@@ -84,13 +85,15 @@ export function AnalAccountPanel({ account, onAccountChange, days, current }: An
       entry.cheese += row.cheese;
       byDate.set(row.date, entry);
     }
-    return [...byDate.values()]
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .map((entry) => ({
-        ...entry,
-        waxUsd: waxUsdFromPools(days.find((day) => day.date === entry.date)?.pools ?? []),
-      }));
-  }, [chartRows, days]);
+    return days.map((day) => {
+      const entry = byDate.get(day.date) ?? { date: day.date, usd: 0, cheese: 0 };
+      const relevantVenue = selectedPoolRow?.venue;
+      const incomplete = relevantVenue
+        ? day.partial?.includes(relevantVenue) === true
+        : (day.partial?.length ?? 0) > 0;
+      return { ...entry, waxUsd: waxUsdFromPools(day.pools), incomplete };
+    });
+  }, [chartRows, days, selectedPoolRow]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,7 +105,7 @@ export function AnalAccountPanel({ account, onAccountChange, days, current }: An
     const lines: string[] = [];
     const index = series.findIndex((entry) => entry.date === date);
     if (index === 0) lines.push('first recorded snapshot');
-    if (index > 0) {
+    if (index > 0 && !series[index].incomplete && !series[index - 1].incomplete) {
       const pct = change(value, series[index - 1][metric]);
       if (pct) lines.push(`${pct.text} since last snapshot`);
 
@@ -130,6 +133,8 @@ export function AnalAccountPanel({ account, onAccountChange, days, current }: An
         );
         if (changed.length > 4) lines.push(`+${changed.length - 4} more pools`);
       }
+    } else if (index > 0) {
+      lines.push('change unavailable — partial snapshot');
     }
     if (metric === 'usd') {
       const waxUsd = series[index]?.waxUsd;
