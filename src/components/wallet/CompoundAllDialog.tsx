@@ -140,19 +140,10 @@ export function CompoundAllDialog({
     [candidates],
   );
 
-  // Read balances for the reward tokens themselves — they carry authoritative
-  // contract data, whereas pool tokens sourced from fallback reads may not.
-  const tokensToRead = useMemo(() => {
-    const seen = new Map<string, { contract: string; symbol: string }>();
-    eligibleCandidates.forEach(c => {
-      c.rewardTokenKeys.forEach(key => {
-        if (seen.has(key)) return;
-        const idx = key.indexOf(':');
-        seen.set(key, { contract: key.slice(0, idx), symbol: key.slice(idx + 1) });
-      });
-    });
-    return Array.from(seen.values());
-  }, [eligibleCandidates]);
+  // Read balances for every token involved: reward tokens plus the pool's own
+  // tokens, with the static registry filling in any missing contract. A reward
+  // record without a contract would otherwise produce a failed read.
+  const tokensToRead = useMemo(() => buildBalanceReadList(eligibleCandidates), [eligibleCandidates]);
 
   const claims = useMemo(() => {
     const map = new Map<string, { incentiveId: number; posId: number }>();
