@@ -279,13 +279,13 @@ describe('HOLE as the base token', () => {
   it('measures HOLE on its own side of the pool', () => {
     const positions: RawPosition[] = [
       {
-        id: 1,
         owner: 'hole.cheese',
-        pool: 11051,
+        liquidity: '1000',
+        closed: false,
+        inRange: true,
+        totalValue: 12.5,
         amountA: '100.0000 CHEESE',
         amountB: '50.0000 HOLE',
-        totalValue: '12.5',
-        inRange: true,
       },
     ];
     const snap = buildPoolSnapshot(
