@@ -276,16 +276,40 @@ export function planCompound(
 
     const balA = findBalance(remaining, candidate.tokenA.contract, candidate.tokenA.symbol);
     const balB = findBalance(remaining, candidate.tokenB.contract, candidate.tokenB.symbol);
+    const startA = findBalance(started, candidate.tokenA.contract, candidate.tokenA.symbol);
+    const startB = findBalance(started, candidate.tokenB.contract, candidate.tokenB.symbol);
 
-    if (!balA || !balB || balA.balance <= 0 || balB.balance <= 0) {
+    // A balance that could not be read must never be reported as "nothing left".
+    const unknownSide = !balA || balA.known === false
+      ? candidate.tokenA.symbol
+      : !balB || balB.known === false
+        ? candidate.tokenB.symbol
+        : null;
+
+    if (unknownSide) {
+      skipped.push({
+        positionId: candidate.positionId,
+        pair,
+        reason: 'balance-unknown',
+        detail: `Couldn't read your ${unknownSide} balance — use "Re-check balances" to try again.`,
+      });
+      continue;
+    }
+
+    if (balA.balance <= 0 || balB.balance <= 0) {
+      const shortSymbol = balA.balance <= 0 ? candidate.tokenA.symbol : candidate.tokenB.symbol;
+      const startBalance = (balA.balance <= 0 ? startA?.balance : startB?.balance) ?? 0;
       skipped.push({
         positionId: candidate.positionId,
         pair,
         reason: 'no-balance',
-        detail: 'No claimed balance left for both sides of this pair.',
+        detail: startBalance > 0
+          ? `Claimed ${shortSymbol} was used by a larger position in this pair.`
+          : `No ${shortSymbol} arrived from this claim.`,
       });
       continue;
     }
+
 
     if (candidate.tokenA.amount <= 0 || candidate.tokenB.amount <= 0) {
       skipped.push({
