@@ -72,8 +72,8 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
   const latestVolume = volumeSeries[volumeSeries.length - 1] ?? null;
   const hoveredIndex = hovered ? series.findIndex((row) => row.date === hovered) : -1;
   const previousDate = hoveredIndex > 0 ? series[hoveredIndex - 1].date : null;
-  const { day: hoveredDay, isLoading: hoveredLoading } = useLpDay(hovered);
-  const { day: previousDay, isLoading: previousLoading } = useLpDay(previousDate);
+  const { day: hoveredDay, isLoading: hoveredLoading } = useLpDay(hovered, token.key);
+  const { day: previousDay, isLoading: previousLoading } = useLpDay(previousDate, token.key);
   const poolDiff = useMemo(
     () => (pool && hovered ? diffPoolSnapshots(hoveredDay, previousDay, pool.key) : null),
     [pool, hovered, hoveredDay, previousDay],
