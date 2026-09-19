@@ -530,9 +530,9 @@ export async function fetchTacoPairVolume(
       const record = action.act?.data;
       const pairId = String(record?.id ?? '').toUpperCase();
       if (!record || !pairId) continue;
-      // Exactly one leg of a swap is CHEESE, so the first match is the volume.
+      // At most one leg of a swap is the base token, so the first match is it.
       for (const quantity of [record.quantity_in, record.quantity_out]) {
-        if (typeof quantity !== 'string' || assetSymbol(quantity) !== CHEESE_SYMBOL) continue;
+        if (typeof quantity !== 'string' || assetSymbol(quantity) !== baseSymbol) continue;
         const amount = assetAmount(quantity);
         if (amount > 0) cheeseByPair.set(pairId, (cheeseByPair.get(pairId) ?? 0) + amount);
         break;
