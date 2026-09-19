@@ -581,8 +581,14 @@ export function sumPairVolume(parts: (VenueVolume | undefined)[]): VenueVolume {
   };
 }
 
-/** Group candidates by pair and keep tracked pairs plus anything over $100. */
-export function selectAmmPairs(candidates: AmmPoolCandidate[]): {
+/**
+ * Group candidates by pair and keep the always-tracked pairs plus anything over
+ * $100. Tokens with no tracked list (HOLE) pass `isTracked: () => false`.
+ */
+export function selectAmmPairs(
+  candidates: AmmPoolCandidate[],
+  isTracked: (pairKey: string) => boolean = isTrackedPairKey,
+): {
   pair: TrackedPair;
   tvlUsd: number;
   pools: AmmPoolCandidate[];
@@ -602,14 +608,15 @@ export function selectAmmPairs(candidates: AmmPoolCandidate[]): {
     [...byPair.values()],
     MIN_TRACKED_POOL_USD,
     MAX_EXTRA_PAIRS_PER_VENUE,
+    isTracked,
   );
 }
 
 /**
- * Full snapshot of one constant-product venue: discover its CHEESE pairs, read
- * every share holder, and split the reserves pro-rata.
+ * Full snapshot of one constant-product venue: discover its pairs of the base
+ * token, read every share holder, and split the reserves pro-rata.
  *
- * `onProgress` lets the sampler log as it goes; `pause` lets it throttle.
+ * `log` lets the sampler report as it goes; `pause` lets it throttle.
  * `withVolume` adds the venue's rolling 24h volume; a volume failure is logged
  * and skipped so it can never cost the liquidity snapshot.
  */
@@ -620,14 +627,19 @@ export async function snapshotAmmVenue(
     pause?: () => Promise<void>;
     log?: (message: string) => void;
     withVolume?: boolean;
+    /** Base token to snapshot pairs of; defaults to CHEESE. */
+    token?: LpToken;
+    /** Which pair keys are always recorded regardless of size. */
+    isTracked?: (pairKey: string) => boolean;
   } = {},
 ): Promise<LpPoolSnapshot[]> {
+  const token = options.token ?? CHEESE_TOKEN;
   const candidates =
     venue === 'taco'
-      ? await fetchTacoCandidates(prices)
-      : await fetchDefiboxCandidates(prices);
-  const selected = selectAmmPairs(candidates);
-  const cheeseUsd = cheeseUsdFrom(prices);
+      ? await fetchTacoCandidates(prices, token)
+      : await fetchDefiboxCandidates(prices, token);
+  const selected = selectAmmPairs(candidates, options.isTracked);
+  const cheeseUsd = cheeseUsdFrom(prices, token);
   const snapshots: LpPoolSnapshot[] = [];
 
   let volumes: Map<string, VenueVolume> | null = null;
@@ -635,8 +647,8 @@ export async function snapshotAmmVenue(
     try {
       volumes =
         venue === 'defibox'
-          ? await fetchDefiboxPairVolume(prices)
-          : await fetchTacoPairVolume(prices);
+          ? await fetchDefiboxPairVolume(prices, token)
+          : await fetchTacoPairVolume(prices, Date.now(), token);
     } catch (error) {
       options.log?.(`${venue} 24h volume unavailable: ${(error as Error).message}`);
     }
@@ -656,17 +668,17 @@ export async function snapshotAmmVenue(
       });
       if (options.pause) await options.pause();
     }
-    const base = buildAmmPoolSnapshot(venuePair(venue, entry.pair), inputs, {
+    const built = buildAmmPoolSnapshot(venuePair(venue, entry.pair), inputs, {
       cheeseUsd,
       pairedUsd,
     });
     const snapshot: LpPoolSnapshot = volumes
-      ? { ...base, ...sumPairVolume(entry.pools.map((p) => volumes!.get(p.volumeKey))) }
-      : base;
+      ? { ...built, ...sumPairVolume(entry.pools.map((p) => volumes!.get(p.volumeKey))) }
+      : built;
     if (snapshot.accounts === 0) continue;
     options.log?.(
       `${venue} ${snapshot.label}: $${snapshot.usd.toFixed(2)} • ` +
-        `${snapshot.cheese.toFixed(4)} CHEESE • ${snapshot.accounts} accounts` +
+        `${snapshot.cheese.toFixed(4)} ${token.symbol} • ${snapshot.accounts} accounts` +
         (snapshot.volumeUsd24 !== undefined
           ? ` • 24h volume $${snapshot.volumeUsd24.toFixed(2)}`
           : ''),
