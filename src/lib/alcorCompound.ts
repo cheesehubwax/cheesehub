@@ -59,6 +59,7 @@ export interface CompoundPlanEntry {
 
 export type CompoundSkipReason =
   | 'rewards-one-sided'
+  | 'balance-unknown'
   | 'no-balance'
   | 'dust'
   | 'missing-ticks'
