@@ -348,6 +348,7 @@ function transformOnChainPool(pool: OnChainPool): any {
     },
     fee: pool.fee,
     tick: pool.currSlot?.tick || 0,
+    sqrtPriceX64: pool.currSlot?.sqrtPriceX64 || '0',
   };
 }
 
@@ -588,6 +589,20 @@ export async function fetchPoolDetails(poolId: number): Promise<any | null> {
     console.error(`[Alcor] Failed to fetch pool ${poolId}:`, blockchainError);
     return null;
   }
+}
+
+/**
+ * Fetch the pool's current price slot (sqrt price + tick). Needed to size a
+ * concentrated-liquidity deposit at the exact ratio the pool will accept.
+ * Works with both the Alcor API shape (flat fields) and the on-chain shape.
+ */
+export async function fetchPoolSlot(poolId: number): Promise<PoolSlot | null> {
+  const pool: any = await fetchPoolDetails(poolId);
+  if (!pool) return null;
+  const sqrtPriceX64 = String(pool.sqrtPriceX64 ?? pool.currSlot?.sqrtPriceX64 ?? '');
+  const tick = Number(pool.tick ?? pool.currSlot?.tick);
+  if (!sqrtPriceX64 || sqrtPriceX64 === '0' || !Number.isFinite(tick)) return null;
+  return { sqrtPriceX64, tick };
 }
 
 /**
