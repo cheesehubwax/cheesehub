@@ -440,7 +440,8 @@ export function CompoundAllDialog({
                 ))}
                 <p className="text-[11px] text-muted-foreground">
                   Only the rewards from this claim are used — tokens you already held are never touched. 0.75% of each
-                  deposit supports HOLE.
+                  deposit supports HOLE. Pool prices move constantly, so the pool may use a little less than shown;
+                  any small remainder is credited to your Alcor balance and can be withdrawn there.
                 </p>
               </div>
             ) : (
