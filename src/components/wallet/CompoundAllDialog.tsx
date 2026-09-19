@@ -230,6 +230,7 @@ export function CompoundAllDialog({
           entry.tokenB.quantity,
         ),
       );
+      const actions = [...feeActions, ...depositActions];
       const result = await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       const txId = result.resolved?.transaction.id?.toString() || null;
       onTransactionSuccess?.(
