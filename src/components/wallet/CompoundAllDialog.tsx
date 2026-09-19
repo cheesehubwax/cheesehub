@@ -8,7 +8,8 @@ import { toast } from 'sonner';
 import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
 import { TokenLogo } from '@/components/TokenLogo';
 import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
-import { buildClaimRewardsAction, buildIncreaseLiquidityAction, AlcorFarmPosition } from '@/lib/alcorFarms';
+import { buildClaimRewardsAction, buildIncreaseLiquidityAction, fetchPoolSlot, AlcorFarmPosition } from '@/lib/alcorFarms';
+import type { PoolSlot } from '@/lib/alcorV3Amounts';
 import { waxRpcCall } from '@/lib/waxRpcFallback';
 import {
   AvailableBalance,
@@ -95,6 +96,27 @@ async function readBalances(
   return map;
 }
 
+/**
+ * Read the live price slot of each pool. The deposit must be sized at the exact
+ * ratio the pool accepts, otherwise Alcor rejects it with "Price slippage check".
+ */
+async function readPoolSlots(poolIds: number[]): Promise<Map<number, PoolSlot | null>> {
+  const unique = Array.from(new Set(poolIds));
+  const slots = await Promise.all(
+    unique.map(async id => {
+      try {
+        return await fetchPoolSlot(id);
+      } catch {
+        return null;
+      }
+    }),
+  );
+  const map = new Map<number, PoolSlot | null>();
+  unique.forEach((id, i) => map.set(id, slots[i]));
+  return map;
+}
+
+
 export function CompoundAllDialog({
   open,
   onOpenChange,
@@ -163,6 +185,13 @@ export function CompoundAllDialog({
     return Array.from(map.values());
   }, [positions]);
 
+  // Attach the live pool price to each candidate right before planning.
+  const withSlots = useCallback(async (): Promise<CompoundCandidate[]> => {
+    const slots = await readPoolSlots(eligibleCandidates.map(c => c.poolId));
+    return candidates.map(c => ({ ...c, slot: slots.get(c.poolId) ?? null }));
+  }, [candidates, eligibleCandidates]);
+
+
   const runClaimAndPlan = useCallback(async () => {
     if (!session || !accountName) return;
     setError(null);
@@ -206,12 +235,12 @@ export function CompoundAllDialog({
       if (increased) break;
     }
 
-    // Only the claim delta is available to compound.
-    const built = planCompound(candidates, buildClaimedBalances(before, after), MAX_COMPOUND_POSITIONS);
+    // Only the claim delta is available to compound, sized at the live pool ratio.
+    const built = planCompound(await withSlots(), buildClaimedBalances(before, after), MAX_COMPOUND_POSITIONS);
     setPlan(built);
     setStage('preview');
     onTransactionComplete?.();
-  }, [session, accountName, tokensToRead, claims, candidates, onTransactionComplete]);
+  }, [session, accountName, tokensToRead, claims, withSlots, onTransactionComplete]);
 
   // Re-read balances and rebuild the plan without claiming again — recovery for
   // a balance read that failed the first time round. Still measured against the
@@ -221,22 +250,28 @@ export function CompoundAllDialog({
     setError(null);
     setRechecking(true);
     try {
-      const after = await readBalances(accountName, tokensToRead);
+      const [after, candidatesWithSlots] = await Promise.all([
+        readBalances(accountName, tokensToRead),
+        withSlots(),
+      ]);
       const built = planCompound(
-        candidates,
+        candidatesWithSlots,
         buildClaimedBalances(beforeBalances, after),
         MAX_COMPOUND_POSITIONS,
       );
       setPlan(built);
-      if (built.compoundable.length === 0 && built.skipped.every(s => s.reason === 'balance-unknown')) {
-        setError('Still could not read your balances. Your rewards are safe in your wallet — try again in a moment.');
+      if (
+        built.compoundable.length === 0 &&
+        built.skipped.every(s => s.reason === 'balance-unknown' || s.reason === 'pool-price-unknown')
+      ) {
+        setError('Still could not read your balances or the pool prices. Your rewards are safe in your wallet — try again in a moment.');
       }
     } catch {
       setError('Could not read your balances just now. Your rewards are safe in your wallet — try again in a moment.');
     } finally {
       setRechecking(false);
     }
-  }, [accountName, tokensToRead, candidates, beforeBalances]);
+  }, [accountName, tokensToRead, withSlots, beforeBalances]);
 
 
 
@@ -282,8 +317,12 @@ export function CompoundAllDialog({
       onOpenChange(false);
     } catch (err: any) {
       setStage('preview');
+      const raw = err?.message || 'Failed to add liquidity';
+      const slippage = /slippage/i.test(raw);
       setError(
-        `${err?.message || 'Failed to add liquidity'} — your rewards were already claimed and are safe in your wallet. You can retry the compound step.`,
+        slippage
+          ? 'The pool price moved while you were signing, so the deposit was rejected. Your rewards are safe in your wallet — press "Re-check balances" and try again.'
+          : `${raw} — your rewards were already claimed and are safe in your wallet. You can retry the compound step.`,
       );
     } finally {
       closeWharfkitModals();
@@ -317,8 +356,9 @@ export function CompoundAllDialog({
                 </p>
                 <p>
                   Only pools whose rewards cover both tokens can be compounded ({eligibleCandidates.length} of{' '}
-                  {candidates.length} position{candidates.length !== 1 ? 's' : ''}). The smaller reward side goes in
-                  full, matched by the other token. Anything left over stays in your wallet.
+                  {candidates.length} position{candidates.length !== 1 ? 's' : ''}), and the position must still be
+                  inside its price range. Deposits are sized at the exact ratio the pool accepts, so the smaller reward
+                  side goes in as far as it can and anything left over stays in your wallet.
                 </p>
                 <p>
                   Only the tokens this claim pays out are used — tokens already in your wallet are never spent. A 0.75%

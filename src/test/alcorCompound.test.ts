@@ -10,9 +10,39 @@ import {
   paysBothTokens,
   planCompound,
 } from '@/lib/alcorCompound';
+import { PoolSlot, poolDepositRatio, sqrtPriceAtTick } from '@/lib/alcorV3Amounts';
 
 const CHEESE = { contract: 'cheeseburger', symbol: 'CHEESE' };
 const USDC = { contract: 'eth.token', symbol: 'WAXUSDC' };
+
+/** Encode a float sqrt price as a Q64.64 string. */
+function sqrtPriceX64(x: number): string {
+  const hi = Math.floor(x);
+  const frac = x - hi;
+  return (BigInt(hi) * 2n ** 64n + BigInt(Math.round(frac * 2 ** 64))).toString();
+}
+
+/**
+ * Build a pool slot whose in-range deposit ratio (token B per token A, in
+ * display units) equals the target. Solves the quadratic that comes from
+ * rawB / rawA = (sqrtP - sqrtL) * sqrtP * sqrtU / (sqrtU - sqrtP).
+ */
+function slotForRatio(
+  target: number,
+  tickLower = -100,
+  tickUpper = 100,
+  precisionA = 8,
+  precisionB = 6,
+): PoolSlot {
+  const sqrtL = sqrtPriceAtTick(tickLower);
+  const sqrtU = sqrtPriceAtTick(tickUpper);
+  const r = target / Math.pow(10, precisionA - precisionB);
+  const b = sqrtL * sqrtU - r;
+  const x = (b + Math.sqrt(b * b + 4 * sqrtU * sqrtU * r)) / (2 * sqrtU);
+  return { sqrtPriceX64: sqrtPriceX64(x), tick: 0 };
+}
+
+const DEFAULT_SLOT = slotForRatio(0.1);
 
 function candidate(overrides: Partial<CompoundCandidate> = {}): CompoundCandidate {
   return {
@@ -24,6 +54,7 @@ function candidate(overrides: Partial<CompoundCandidate> = {}): CompoundCandidat
     tokenB: { ...USDC, amount: 100 },
     usdValue: 500,
     rewardTokenKeys: [balanceKey(CHEESE.contract, CHEESE.symbol), balanceKey(USDC.contract, USDC.symbol)],
+    slot: DEFAULT_SLOT,
     ...overrides,
   };
 }
@@ -51,7 +82,10 @@ describe('planCompound', () => {
     expect(entry.tokenA.fee).toBeCloseTo(entry.tokenA.gross * COMPOUND_FEE_RATE, 6);
     expect(entry.tokenB.fee).toBeCloseTo(entry.tokenB.gross * COMPOUND_FEE_RATE, 5);
     expect(entry.tokenA.amount).toBeCloseTo(entry.tokenA.gross - entry.tokenA.fee, 6);
-    expect(entry.tokenB.amount).toBeCloseTo(entry.tokenB.gross - entry.tokenB.fee, 6);
+    // Token B is re-aligned onto the pool ratio, so it may sit one unit below
+    // gross minus fee — never above it.
+    expect(entry.tokenB.amount).toBeLessThanOrEqual(entry.tokenB.gross - entry.tokenB.fee);
+    expect(entry.tokenB.amount).toBeCloseTo(entry.tokenB.gross - entry.tokenB.fee, 4);
     // Deposit plus fee never exceeds what was claimed.
     expect(entry.tokenA.amount + entry.tokenA.fee).toBeLessThanOrEqual(500);
     expect(entry.tokenB.amount + entry.tokenB.fee).toBeLessThanOrEqual(10);
@@ -61,7 +95,7 @@ describe('planCompound', () => {
 
   it('omits a fee that rounds to zero but still deposits', () => {
     const plan = planCompound(
-      [candidate()],
+      [candidate({ slot: slotForRatio(0.004, -100, 100, 2, 2) })],
       balances([
         [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 5, precision: 2 }],
         [balanceKey(USDC.contract, USDC.symbol), { balance: 0.02, precision: 2 }],
@@ -111,8 +145,8 @@ describe('planCompound', () => {
 
   it('skips dust that rounds to zero at token precision', () => {
     const plan = planCompound(
-      // Ratio so lopsided that the matched side rounds away entirely.
-      [candidate({ tokenA: { ...CHEESE, amount: 1_000_000 }, tokenB: { ...USDC, amount: 1 } })],
+      // Pool ratio so lopsided that the matched side rounds away entirely.
+      [candidate({ slot: slotForRatio(1e-6, -100, 100, 8, 2) })],
       balances([
         [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 1, precision: 8 }],
         [balanceKey(USDC.contract, USDC.symbol), { balance: 1, precision: 2 }],
@@ -121,6 +155,46 @@ describe('planCompound', () => {
 
     expect(plan.compoundable).toHaveLength(0);
     expect(plan.skipped[0].reason).toBe('dust');
+  });
+
+  it('skips a position whose range no longer covers the pool price', () => {
+    const plan = planCompound(
+      [candidate({ slot: { ...DEFAULT_SLOT, tick: 200 } })],
+      balances([
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 500, precision: 8 }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 10, precision: 6 }],
+      ]),
+    );
+
+    expect(plan.compoundable).toHaveLength(0);
+    expect(plan.skipped[0].reason).toBe('out-of-range');
+  });
+
+  it('skips a position when the pool price could not be read', () => {
+    const plan = planCompound(
+      [candidate({ slot: null })],
+      balances([
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 500, precision: 8 }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 10, precision: 6 }],
+      ]),
+    );
+
+    expect(plan.compoundable).toHaveLength(0);
+    expect(plan.skipped[0].reason).toBe('pool-price-unknown');
+  });
+
+  it('sizes the deposit at the pool ratio, not the amounts already in the position', () => {
+    const plan = planCompound(
+      // Position holdings imply 1:1, the pool slot says 0.1 — the pool wins.
+      [candidate({ tokenA: { ...CHEESE, amount: 100 }, tokenB: { ...USDC, amount: 100 } })],
+      balances([
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 500, precision: 8 }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 10, precision: 6 }],
+      ]),
+    );
+
+    const entry = plan.compoundable[0];
+    expect(entry.tokenB.amount / entry.tokenA.amount).toBeCloseTo(0.1, 4);
   });
 
   it('skips positions with missing tick data', () => {
@@ -245,8 +319,8 @@ describe('unreadable balances', () => {
         candidate({ positionId: 2, usdValue: 100 }),
       ],
       balances([
-        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 1000, precision: 8, known: true }],
-        [balanceKey(USDC.contract, USDC.symbol), { balance: 2, precision: 0, known: true }],
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 150, precision: 8, known: true }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 10, precision: 6, known: true }],
       ]),
     );
     const consumed = shared.skipped.find(s => s.positionId === 2);
@@ -339,3 +413,23 @@ describe('buildClaimedBalances', () => {
   });
 });
 
+
+describe('poolDepositRatio', () => {
+  it('matches the ratio implied by the pool reserves for a full-range position', () => {
+    // Alcor pool 1252 (CHEESE/WAX): tick 96521, reserves 155119.3603 CHEESE (4dp)
+    // and 241246.46467914 WAX (8dp) → roughly 1.555 WAX per CHEESE.
+    const slot = { sqrtPriceX64: '2300109684333533264855', tick: 96521 };
+    const { state, ratio } = poolDepositRatio(slot, 96521 - 6000, 96521 + 6000, 4, 8);
+    expect(state).toBe('in-range');
+    expect(ratio).not.toBeNull();
+    expect(ratio as number).toBeGreaterThan(0.5);
+    expect(ratio as number).toBeLessThan(5);
+  });
+
+  it('reports positions below and above their range', () => {
+    const slot = { sqrtPriceX64: '18446744073709551616', tick: 0 };
+    expect(poolDepositRatio(slot, 100, 200, 8, 8).state).toBe('below-range');
+    expect(poolDepositRatio(slot, -200, -100, 8, 8).state).toBe('above-range');
+    expect(poolDepositRatio(slot, 100, 200, 8, 8).ratio).toBeNull();
+  });
+});
