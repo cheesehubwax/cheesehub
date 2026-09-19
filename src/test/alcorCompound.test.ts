@@ -264,6 +264,7 @@ describe('planCompound', () => {
 describe('selected-position filtering', () => {
   it('fees are computed only from the positions the user kept selected', () => {
     const WAX = { contract: 'eosio.token', symbol: 'WAX' };
+    const HOLE = { contract: 'hole.cheese', symbol: 'HOLE' };
     const plan = planCompound(
       [
         candidate({ positionId: 1, usdValue: 900 }),
@@ -272,14 +273,15 @@ describe('selected-position filtering', () => {
           poolId: 11,
           usdValue: 100,
           tokenA: { ...WAX, amount: 500 },
-          tokenB: { ...CHEESE, amount: 5000 },
-          rewardTokenKeys: [balanceKey(WAX.contract, WAX.symbol), balanceKey(CHEESE.contract, CHEESE.symbol)],
+          tokenB: { ...HOLE, amount: 5000 },
+          rewardTokenKeys: [balanceKey(WAX.contract, WAX.symbol), balanceKey(HOLE.contract, HOLE.symbol)],
         }),
       ],
       balances([
         [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 500, precision: 8 }],
         [balanceKey(USDC.contract, USDC.symbol), { balance: 50, precision: 6 }],
         [balanceKey(WAX.contract, WAX.symbol), { balance: 50, precision: 8 }],
+        [balanceKey(HOLE.contract, HOLE.symbol), { balance: 500, precision: 8 }],
       ]),
     );
     expect(plan.compoundable).toHaveLength(2);
