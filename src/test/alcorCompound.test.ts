@@ -107,18 +107,29 @@ describe('planCompound', () => {
   });
 
   it('caps the number of compounded positions per click', () => {
+    // Distinct token pair per position so balances never limit the count.
     const many = Array.from({ length: 22 }, (_, i) =>
-      candidate({ positionId: i + 1, poolId: i + 1, usdValue: 1000 - i }),
+      candidate({
+        positionId: i + 1,
+        poolId: i + 1,
+        usdValue: 1000 - i,
+        tokenA: { contract: `tok${i}.a`, symbol: `AAA${i}`, amount: 1000 },
+        tokenB: { contract: `tok${i}.b`, symbol: `BBB${i}`, amount: 100 },
+        rewardTokenKeys: [balanceKey(`tok${i}.a`, `AAA${i}`), balanceKey(`tok${i}.b`, `BBB${i}`)],
+      }),
     );
     const plan = planCompound(
       many,
-      balances([
-        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 100000, precision: 8 }],
-        [balanceKey(USDC.contract, USDC.symbol), { balance: 10000, precision: 6 }],
-      ]),
+      balances(
+        many.flatMap((c) => [
+          [balanceKey(c.tokenA.contract, c.tokenA.symbol), { balance: 500, precision: 8 }] as [string, AvailableBalance],
+          [balanceKey(c.tokenB.contract, c.tokenB.symbol), { balance: 10, precision: 6 }] as [string, AvailableBalance],
+        ]),
+      ),
     );
 
     expect(plan.compoundable).toHaveLength(20);
     expect(plan.skipped.filter(s => s.reason === 'position-cap')).toHaveLength(2);
   });
+
 });
