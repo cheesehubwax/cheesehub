@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
 import { TokenLogo } from '@/components/TokenLogo';
 import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
+import { Checkbox } from '@/components/ui/checkbox';
 import { buildClaimRewardsAction, buildIncreaseLiquidityAction, fetchPoolSlot, AlcorFarmPosition } from '@/lib/alcorFarms';
 import type { PoolSlot } from '@/lib/alcorV3Amounts';
 import { waxRpcCall } from '@/lib/waxRpcFallback';
@@ -135,6 +136,9 @@ export function CompoundAllDialog({
   // Balances read immediately before the claim — the baseline the claim delta is
   // measured against.
   const [beforeBalances, setBeforeBalances] = useState<Map<string, AvailableBalance>>(new Map());
+  // Positions the user unticked in the preview. Keyed by position ID so a
+  // re-check that produces the same plan keeps their choices.
+  const [deselectedIds, setDeselectedIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     if (open) {
@@ -145,6 +149,7 @@ export function CompoundAllDialog({
       setClaimTxId(null);
       setRechecking(false);
       setBeforeBalances(new Map());
+      setDeselectedIds(new Set());
     }
   }, [open]);
 
@@ -239,6 +244,8 @@ export function CompoundAllDialog({
     // Only the claim delta is available to compound, sized at the live pool ratio.
     const built = planCompound(await withSlots(), buildClaimedBalances(before, after), MAX_COMPOUND_POSITIONS);
     setPlan(built);
+    // Fresh claim — everything compoundable starts selected.
+    setDeselectedIds(new Set());
     setStage('preview');
     onTransactionComplete?.();
   }, [session, accountName, tokensToRead, claims, withSlots, onTransactionComplete]);
@@ -261,6 +268,9 @@ export function CompoundAllDialog({
         MAX_COMPOUND_POSITIONS,
       );
       setPlan(built);
+      // Keep the user's unticked positions, but drop any no longer in the plan.
+      const stillCompoundable = new Set(built.compoundable.map(e => e.positionId));
+      setDeselectedIds(prev => new Set([...prev].filter(id => stillCompoundable.has(id))));
       if (
         built.compoundable.length === 0 &&
         built.skipped.every(s => s.reason === 'balance-unknown' || s.reason === 'pool-price-unknown')
