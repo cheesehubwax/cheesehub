@@ -14,6 +14,7 @@ import {
   utcDay,
   utcSlot,
   lpTokenConfig,
+  pairFor,
   HOLE_TOKEN,
   type RawPool,
   type RawPosition,
@@ -263,7 +264,7 @@ describe('dayAbout24hBefore', () => {
 });
 
 describe('HOLE as the base token', () => {
-  const holeCheesePair = venuePair('alcor', 'CHEESE', 'cheeseburger');
+  const holeCheesePair = venuePair('alcor', pairFor('CHEESE', 'cheeseburger'));
   const pools: RawPool[] = [
     { id: 11051, fee: 3000, active: true, tokenA: cheese, tokenB: hole },
     { id: 11055, fee: 3000, active: true, tokenA: wax, tokenB: hole },
