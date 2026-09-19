@@ -77,12 +77,12 @@ export interface VenuePair extends TrackedPair {
   pairKey: string;
 }
 
-export function pairFor(symbol: string, contract: string): TrackedPair {
+export function pairFor(symbol: string, contract: string, base: LpToken = CHEESE_TOKEN): TrackedPair {
   return {
     key: `${symbol.toLowerCase()}-${contract}`,
     symbol: symbol.toUpperCase(),
     contract,
-    label: `${CHEESE_SYMBOL} / ${symbol.toUpperCase()}`,
+    label: `${base.symbol} / ${symbol.toUpperCase()}`,
   };
 }
 
