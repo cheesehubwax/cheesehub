@@ -263,14 +263,23 @@ describe('planCompound', () => {
 
 describe('selected-position filtering', () => {
   it('fees are computed only from the positions the user kept selected', () => {
+    const WAX = { contract: 'eosio.token', symbol: 'WAX' };
     const plan = planCompound(
       [
         candidate({ positionId: 1, usdValue: 900 }),
-        candidate({ positionId: 2, poolId: 11, usdValue: 100 }),
+        candidate({
+          positionId: 2,
+          poolId: 11,
+          usdValue: 100,
+          tokenA: { ...WAX, amount: 500 },
+          tokenB: { ...CHEESE, amount: 5000 },
+          rewardTokenKeys: [balanceKey(WAX.contract, WAX.symbol), balanceKey(CHEESE.contract, CHEESE.symbol)],
+        }),
       ],
       balances([
         [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 500, precision: 8 }],
         [balanceKey(USDC.contract, USDC.symbol), { balance: 50, precision: 6 }],
+        [balanceKey(WAX.contract, WAX.symbol), { balance: 50, precision: 8 }],
       ]),
     );
     expect(plan.compoundable).toHaveLength(2);
@@ -280,7 +289,10 @@ describe('selected-position filtering', () => {
     expect(selectedEntries.map(e => e.positionId)).toEqual([1]);
 
     const selectedTotals = buildCompoundFeeTotals(selectedEntries);
+    // Position 1 pays no WAX fee at all once it is the only selected entry.
+    expect(selectedTotals.some(t => t.symbol === 'WAX')).toBe(false);
     const allTotals = buildCompoundFeeTotals(plan.compoundable);
+    expect(allTotals.some(t => t.symbol === 'WAX')).toBe(true);
     selectedTotals.forEach(sel => {
       const all = allTotals.find(t => t.symbol === sel.symbol)!;
       const expected = selectedEntries.reduce(
@@ -288,7 +300,7 @@ describe('selected-position filtering', () => {
         0,
       );
       expect(sel.quantity).toBe(`${expected.toFixed(sel.precision)} ${sel.symbol}`);
-      // Excluding position 2 must reduce the fee total.
+      // Excluding position 2 must reduce the shared CHEESE fee total.
       expect(sel.amount).toBeLessThan(all.amount);
     });
   });
