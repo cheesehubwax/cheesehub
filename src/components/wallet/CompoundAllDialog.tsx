@@ -235,12 +235,12 @@ export function CompoundAllDialog({
       if (increased) break;
     }
 
-    // Only the claim delta is available to compound.
-    const built = planCompound(candidates, buildClaimedBalances(before, after), MAX_COMPOUND_POSITIONS);
+    // Only the claim delta is available to compound, sized at the live pool ratio.
+    const built = planCompound(await withSlots(), buildClaimedBalances(before, after), MAX_COMPOUND_POSITIONS);
     setPlan(built);
     setStage('preview');
     onTransactionComplete?.();
-  }, [session, accountName, tokensToRead, claims, candidates, onTransactionComplete]);
+  }, [session, accountName, tokensToRead, claims, withSlots, onTransactionComplete]);
 
   // Re-read balances and rebuild the plan without claiming again — recovery for
   // a balance read that failed the first time round. Still measured against the
