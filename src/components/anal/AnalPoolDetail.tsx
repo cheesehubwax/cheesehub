@@ -36,7 +36,7 @@ function nameList(names: string[]): string {
   return `${names.slice(0, MAX_NAMES).join(', ')} +${names.length - MAX_NAMES} more`;
 }
 
-export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, onSelectPool }: AnalPoolDetailProps) {
+export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, onSelectPool, token }: AnalPoolDetailProps) {
   const [hovered, setHovered] = useState<string | null>(null);
   const series = useMemo(() => {
     if (!pool) return [];
