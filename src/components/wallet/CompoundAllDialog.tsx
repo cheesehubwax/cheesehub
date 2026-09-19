@@ -116,6 +116,7 @@ export function CompoundAllDialog({
       setPlan(null);
       setError(null);
       setClaimTxId(null);
+      setRechecking(false);
     }
   }, [open]);
 
@@ -412,6 +413,16 @@ export function CompoundAllDialog({
                 <AlertDescription className="text-xs">{error}</AlertDescription>
               </Alert>
             )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              disabled={stage === 'compounding' || rechecking}
+              onClick={recheckBalances}
+            >
+              {rechecking ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Re-check balances'}
+            </Button>
 
             <div className="flex gap-2">
               <Button
