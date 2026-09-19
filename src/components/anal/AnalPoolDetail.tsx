@@ -24,6 +24,8 @@ interface AnalPoolDetailProps {
   current: LpDayFile | null;
   onSelectAccount: (account: string) => void;
   onSelectPool: (key: string) => void;
+  /** Base token of the open tab. */
+  token: LpTokenConfig;
 }
 
 const axisTick = { fontSize: 10, fill: '#FFFFFF' } as const;
