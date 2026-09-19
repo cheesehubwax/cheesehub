@@ -18,6 +18,7 @@ import {
   CompoundPlan,
   MAX_COMPOUND_POSITIONS,
   balanceKey,
+  buildBalanceReadList,
   buildCompoundFeeTotals,
   paysBothTokens,
   planCompound,
@@ -106,6 +107,7 @@ export function CompoundAllDialog({
   const [plan, setPlan] = useState<CompoundPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [claimTxId, setClaimTxId] = useState<string | null>(null);
+  const [rechecking, setRechecking] = useState(false);
 
   useEffect(() => {
     if (open) {
