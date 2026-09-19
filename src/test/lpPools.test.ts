@@ -4,6 +4,7 @@ import {
   venuePair,
   assetAmount,
   assetSymbol,
+  alcorCheesePairs,
   buildPoolSnapshot,
   alcorPairVolume,
   cheeseIsTokenA,
@@ -11,6 +12,7 @@ import {
   indexEntryForDay,
   mergeIndexDay,
   poolsForPair,
+  selectVenuePairs,
   utcDay,
   utcSlot,
   lpTokenConfig,
@@ -61,6 +63,42 @@ describe('poolsForPair', () => {
   it('knows which side CHEESE sits on', () => {
     expect(cheeseIsTokenA({ id: 1, tokenA: cheese, tokenB: wax })).toBe(true);
     expect(cheeseIsTokenA({ id: 2, tokenA: wax, tokenB: cheese })).toBe(false);
+  });
+});
+
+describe('alcorCheesePairs', () => {
+  const prices = new Map([
+    ['CHEESE-cheeseburger', 0.025],
+    ['HOLE-hole.cheese', 0.058],
+    ['WAX-eosio.token', 0.04],
+  ]);
+
+  it('derives TVL from reserves when Alcor reports tvlUSD 0 (HOLE/CHEESE pool 11051)', () => {
+    const pools: RawPool[] = [
+      // Real shape of Alcor pool 11051: tvlUSD 0 despite thousands in reserves.
+      {
+        id: 11051, active: true, tvlUSD: 0,
+        tokenA: { ...cheese, quantity: 125144.4886 },
+        tokenB: { ...hole, quantity: 68460.92018773 },
+      },
+      { id: 11055, active: true, tvlUSD: 13.4, tokenA: { ...wax, quantity: 335 }, tokenB: { ...hole, quantity: 0 } },
+    ];
+    const pairs = alcorCheesePairs(pools, HOLE_TOKEN, prices);
+    const holeCheese = pairs.find((p) => p.pair.key === 'cheese-cheeseburger')!;
+    // 125144.4886 * 0.025 + 68460.92018773 * 0.058 ≈ 7099 — Alcor's 0 is ignored.
+    expect(holeCheese.tvlUsd).toBeGreaterThan(7000);
+    const selected = selectVenuePairs(pairs, 100, 12, () => false);
+    expect(selected.map((s) => s.pair.key)).toEqual(['cheese-cheeseburger']);
+  });
+
+  it('falls back to Alcor tvlUSD when a token has no known USD price', () => {
+    const pools: RawPool[] = [
+      { id: 1, active: true, tvlUSD: 250, tokenA: cheese, tokenB: { symbol: 'MYSTERY', contract: 'x.token', quantity: 5 } },
+    ];
+    const pairs = alcorCheesePairs(pools, HOLE_TOKEN === undefined ? undefined : HOLE_TOKEN, new Map());
+    expect(pairs).toHaveLength(0); // no HOLE pools here
+    const asCheese = alcorCheesePairs(pools, undefined, new Map());
+    expect(asCheese[0].tvlUsd).toBe(250);
   });
 });
 
