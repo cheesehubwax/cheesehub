@@ -203,7 +203,7 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty, venu
       <div className="flex items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-2">
           <OpenMojiIcon emoji="📊" size={18} />
-          <span className="text-sm font-medium text-foreground">CHEESE Overview</span>
+          <span className="text-sm font-medium text-foreground">{token.symbol} Overview</span>
         </div>
         {delta && (
           <span className={`text-xs font-mono ${delta.up ? 'text-green-400' : 'text-red-400'}`}>
