@@ -12,10 +12,13 @@ import { buildClaimRewardsAction, buildIncreaseLiquidityAction, AlcorFarmPositio
 import { waxRpcCall } from '@/lib/waxRpcFallback';
 import {
   AvailableBalance,
+  COMPOUND_FEE_ACCOUNT,
+  COMPOUND_FEE_MEMO,
   CompoundCandidate,
   CompoundPlan,
   MAX_COMPOUND_POSITIONS,
   balanceKey,
+  buildCompoundFeeTotals,
   paysBothTokens,
   planCompound,
 } from '@/lib/alcorCompound';
@@ -203,7 +206,18 @@ export function CompoundAllDialog({
     setError(null);
     setStage('compounding');
     try {
-      const actions = plan.compoundable.flatMap(entry =>
+      const feeActions = buildCompoundFeeTotals(plan.compoundable).map(fee => ({
+        account: fee.contract,
+        name: 'transfer',
+        authorization: [{ actor: accountName, permission: 'active' }],
+        data: {
+          from: accountName,
+          to: COMPOUND_FEE_ACCOUNT,
+          quantity: fee.quantity,
+          memo: COMPOUND_FEE_MEMO,
+        },
+      }));
+      const depositActions = plan.compoundable.flatMap(entry =>
         buildIncreaseLiquidityAction(
           accountName,
           entry.positionId,
@@ -216,6 +230,7 @@ export function CompoundAllDialog({
           entry.tokenB.quantity,
         ),
       );
+      const actions = [...feeActions, ...depositActions];
       const result = await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       const txId = result.resolved?.transaction.id?.toString() || null;
       onTransactionSuccess?.(
@@ -265,6 +280,10 @@ export function CompoundAllDialog({
                   Only pools whose rewards cover both tokens can be compounded ({eligibleCandidates.length} of{' '}
                   {candidates.length} position{candidates.length !== 1 ? 's' : ''}). The smaller reward side goes in
                   full, matched by the other token. Anything left over stays in your wallet.
+                </p>
+                <p>
+                  A 0.75% fee on each deposit is sent to {COMPOUND_FEE_ACCOUNT}, and a small amount of every token is
+                  left untouched in your wallet.
                 </p>
               </AlertDescription>
             </Alert>
@@ -327,9 +346,20 @@ export function CompoundAllDialog({
                     <div className="font-mono text-xs text-right text-cheese">
                       <div>{entry.tokenA.amount.toFixed(Math.min(6, entry.tokenA.precision))} {entry.tokenA.symbol}</div>
                       <div>{entry.tokenB.amount.toFixed(Math.min(6, entry.tokenB.precision))} {entry.tokenB.symbol}</div>
+                      {(entry.tokenA.fee > 0 || entry.tokenB.fee > 0) && (
+                        <div className="text-[10px] text-muted-foreground">
+                          fee {entry.tokenA.fee.toFixed(Math.min(6, entry.tokenA.precision))} {entry.tokenA.symbol}
+                          {entry.tokenB.fee > 0 && (
+                            <> · {entry.tokenB.fee.toFixed(Math.min(6, entry.tokenB.precision))} {entry.tokenB.symbol}</>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
+                <p className="text-[11px] text-muted-foreground">
+                  0.75% of each deposit supports HOLE, and a small amount of every token stays in your wallet.
+                </p>
               </div>
             ) : (
               <Alert>

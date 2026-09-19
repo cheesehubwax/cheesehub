@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   AvailableBalance,
+  COMPOUND_BUFFER_RATE,
+  COMPOUND_FEE_RATE,
   CompoundCandidate,
   balanceKey,
+  buildCompoundFeeTotals,
   paysBothTokens,
   planCompound,
 } from '@/lib/alcorCompound';
@@ -29,7 +32,7 @@ function balances(entries: Array<[string, AvailableBalance]>) {
 }
 
 describe('planCompound', () => {
-  it('pairs the smaller side in full and matches the larger side', () => {
+  it('pairs the smaller side in full, withholds the buffer and takes the 0.75% fee', () => {
     const plan = planCompound(
       [candidate()],
       balances([
@@ -40,11 +43,55 @@ describe('planCompound', () => {
 
     expect(plan.skipped).toHaveLength(0);
     expect(plan.compoundable).toHaveLength(1);
-    // ratio = 0.1 → 10 WAXUSDC pairs with 100 CHEESE
-    expect(plan.compoundable[0].tokenA.amount).toBeCloseTo(100, 6);
-    expect(plan.compoundable[0].tokenB.amount).toBeCloseTo(10, 6);
-    expect(plan.compoundable[0].tokenA.quantity).toBe('100.00000000 CHEESE');
-    expect(plan.compoundable[0].tokenB.quantity).toBe('10.000000 WAXUSDC');
+    const entry = plan.compoundable[0];
+    // 0.5% buffer: 9.95 WAXUSDC usable → ratio 0.1 → 99.5 CHEESE gross
+    expect(entry.tokenA.gross).toBeCloseTo(99.5, 6);
+    expect(entry.tokenB.gross).toBeCloseTo(9.95, 4);
+    expect(entry.tokenA.fee).toBeCloseTo(entry.tokenA.gross * COMPOUND_FEE_RATE, 6);
+    expect(entry.tokenB.fee).toBeCloseTo(entry.tokenB.gross * COMPOUND_FEE_RATE, 5);
+    expect(entry.tokenA.amount).toBeCloseTo(entry.tokenA.gross - entry.tokenA.fee, 6);
+    expect(entry.tokenB.amount).toBeCloseTo(entry.tokenB.gross - entry.tokenB.fee, 6);
+    // Deposit plus fee never exceeds the buffered balance.
+    expect(entry.tokenA.amount + entry.tokenA.fee).toBeLessThanOrEqual(500 * (1 - COMPOUND_BUFFER_RATE));
+    expect(entry.tokenB.amount + entry.tokenB.fee).toBeLessThanOrEqual(10 * (1 - COMPOUND_BUFFER_RATE));
+    expect(entry.tokenA.quantity).toBe(`${entry.tokenA.amount.toFixed(8)} CHEESE`);
+    expect(entry.tokenB.feeQuantity).toBe(`${entry.tokenB.fee.toFixed(6)} WAXUSDC`);
+  });
+
+  it('omits a fee that rounds to zero but still deposits', () => {
+    const plan = planCompound(
+      [candidate()],
+      balances([
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 5, precision: 2 }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 0.02, precision: 2 }],
+      ]),
+    );
+
+    expect(plan.compoundable).toHaveLength(1);
+    const entry = plan.compoundable[0];
+    expect(entry.tokenB.fee).toBe(0);
+    expect(entry.tokenB.amount).toBeGreaterThan(0);
+    expect(buildCompoundFeeTotals(plan.compoundable).some(f => f.symbol === 'WAXUSDC')).toBe(false);
+  });
+
+  it('aggregates fees per token across positions', () => {
+    const plan = planCompound(
+      [
+        candidate({ positionId: 1, usdValue: 900 }),
+        candidate({ positionId: 2, poolId: 11, usdValue: 100 }),
+      ],
+      balances([
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 150, precision: 8 }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 12, precision: 6 }],
+      ]),
+    );
+
+    const totals = buildCompoundFeeTotals(plan.compoundable);
+    expect(totals).toHaveLength(2);
+    const cheeseFee = totals.find(t => t.symbol === 'CHEESE')!;
+    const expected = plan.compoundable.reduce((sum, e) => sum + e.tokenA.fee, 0);
+    expect(cheeseFee.amount).toBeCloseTo(expected, 6);
+    expect(cheeseFee.contract).toBe(CHEESE.contract);
   });
 
   it('skips positions whose rewards cover only one side', () => {
@@ -63,10 +110,11 @@ describe('planCompound', () => {
 
   it('skips dust that rounds to zero at token precision', () => {
     const plan = planCompound(
-      [candidate()],
+      // Ratio so lopsided that the matched side rounds away entirely.
+      [candidate({ tokenA: { ...CHEESE, amount: 1_000_000 }, tokenB: { ...USDC, amount: 1 } })],
       balances([
-        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 0.000001, precision: 8 }],
-        [balanceKey(USDC.contract, USDC.symbol), { balance: 0.0000001, precision: 6 }],
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 1, precision: 8 }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 1, precision: 2 }],
       ]),
     );
 
