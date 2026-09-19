@@ -247,7 +247,8 @@ export function buildClaimedBalances(
  * - A position only compounds when its farms pay out BOTH of its pool tokens.
  * - Only the amounts paid by this claim are used (see `buildClaimedBalances`);
  *   pre-existing wallet holdings are never spent.
- * - The smaller side is used in full, the larger side matched at the position ratio.
+ * - The smaller side is used in full, the other side matched at the exact ratio
+ *   the pool will accept (from its live price and the position's tick range).
  * - Balances are shared: positions are served in descending USD value and each
  *   allocation is deducted, so the total never exceeds what was actually claimed.
  * - Amounts that round to zero at the token precision are skipped as dust.
@@ -389,7 +390,7 @@ export function planCompound(
     let depositA = floorTo(grossA - feeA, balA.precision);
     const maxDepositB = floorTo(grossB - feeB, balB.precision);
     // Keep the deposit on the pool's ratio, never spending more than allocated.
-    let depositB = Math.min(floorTo(depositA * ratio, balB.precision), maxDepositB);
+    const depositB = Math.min(floorTo(depositA * ratio, balB.precision), maxDepositB);
     if (depositB < floorTo(depositA * ratio, balB.precision)) {
       depositA = Math.min(depositA, floorTo(depositB / ratio, balA.precision));
     }
