@@ -65,14 +65,6 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
     [pools],
   );
 
-  if (!pool) {
-    return (
-      <div className="w-full rounded-xl bg-card border border-border/50 p-6 text-center text-xs text-muted-foreground">
-        Select a pool above to see its history and providers.
-      </div>
-    );
-  }
-
   const hasSeries = series.length >= 1;
   const volumeSeries = series.filter((row): row is typeof row & { volumeUsd: number } => row.volumeUsd !== null);
   const latestVolume = volumeSeries[volumeSeries.length - 1] ?? null;
@@ -138,6 +130,14 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
       setHovered(state?.activeLabel != null ? String(state.activeLabel) : null),
     onMouseLeave: () => setHovered(null),
   };
+
+  if (!pool) {
+    return (
+      <div className="w-full rounded-xl bg-card border border-border/50 p-6 text-center text-xs text-muted-foreground">
+        Select a pool above to see its history and providers.
+      </div>
+    );
+  }
 
   return (
     <div className="w-full rounded-xl bg-card border border-border/50 p-4 space-y-4">
