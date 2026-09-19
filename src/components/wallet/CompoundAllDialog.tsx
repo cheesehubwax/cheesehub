@@ -384,7 +384,8 @@ export function CompoundAllDialog({
                   </div>
                 ))}
                 <p className="text-[11px] text-muted-foreground">
-                  0.75% of each deposit supports HOLE, and a small amount of every token stays in your wallet.
+                  Only the rewards from this claim are used — tokens you already held are never touched. 0.75% of each
+                  deposit supports HOLE.
                 </p>
               </div>
             ) : (
