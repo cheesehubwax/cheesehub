@@ -15,9 +15,17 @@ import { PoolSlot, poolDepositRatio, sqrtPriceAtTick } from '@/lib/alcorV3Amount
 const CHEESE = { contract: 'cheeseburger', symbol: 'CHEESE' };
 const USDC = { contract: 'eth.token', symbol: 'WAXUSDC' };
 
+/** Encode a float sqrt price as a Q64.64 string. */
+function sqrtPriceX64(x: number): string {
+  const hi = Math.floor(x);
+  const frac = x - hi;
+  return (BigInt(hi) * 2n ** 64n + BigInt(Math.round(frac * 2 ** 64))).toString();
+}
+
 /**
  * Build a pool slot whose in-range deposit ratio (token B per token A, in
- * display units) matches the target, by searching for the sqrt price.
+ * display units) equals the target. Solves the quadratic that comes from
+ * rawB / rawA = (sqrtP - sqrtL) * sqrtP * sqrtU / (sqrtU - sqrtP).
  */
 function slotForRatio(
   target: number,
@@ -28,18 +36,10 @@ function slotForRatio(
 ): PoolSlot {
   const sqrtL = sqrtPriceAtTick(tickLower);
   const sqrtU = sqrtPriceAtTick(tickUpper);
-  let lo = sqrtL;
-  let hi = sqrtU;
-  for (let i = 0; i < 200; i++) {
-    const mid = (lo + hi) / 2;
-    const slot: PoolSlot = { sqrtPriceX64: String(BigInt(Math.round(mid * 2 ** 32)) * (2n ** 32n)), tick: 0 };
-    const { ratio } = poolDepositRatio(slot, tickLower, tickUpper, precisionA, precisionB);
-    if (ratio === null) break;
-    if (ratio < target) lo = mid;
-    else hi = mid;
-  }
-  const mid = (lo + hi) / 2;
-  return { sqrtPriceX64: String(BigInt(Math.round(mid * 2 ** 32)) * (2n ** 32n)), tick: 0 };
+  const r = target / Math.pow(10, precisionA - precisionB);
+  const b = sqrtL * sqrtU - r;
+  const x = (b + Math.sqrt(b * b + 4 * sqrtU * sqrtU * r)) / (2 * sqrtU);
+  return { sqrtPriceX64: sqrtPriceX64(x), tick: 0 };
 }
 
 const DEFAULT_SLOT = slotForRatio(0.1);
@@ -92,7 +92,7 @@ describe('planCompound', () => {
 
   it('omits a fee that rounds to zero but still deposits', () => {
     const plan = planCompound(
-      [candidate()],
+      [candidate({ slot: slotForRatio(0.004, -100, 100, 2, 2) })],
       balances([
         [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 5, precision: 2 }],
         [balanceKey(USDC.contract, USDC.symbol), { balance: 0.02, precision: 2 }],
