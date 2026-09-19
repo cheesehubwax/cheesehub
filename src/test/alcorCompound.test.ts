@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   AvailableBalance,
-  COMPOUND_BUFFER_RATE,
   COMPOUND_FEE_RATE,
   CompoundCandidate,
   balanceKey,
   buildBalanceReadList,
+  buildClaimedBalances,
   buildCompoundFeeTotals,
   paysBothTokens,
   planCompound,
