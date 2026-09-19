@@ -412,29 +412,33 @@ interface DefiboxMarketRow {
 }
 
 /**
- * Defibox's own 24h volume per CHEESE pool, keyed by pair id — the same figure
- * its market pages show. `volume` is denominated in `volume_symbol`, so the
- * CHEESE leg is converted through the pool's reserve ratio when the published
+ * Defibox's own 24h volume per base-token pool, keyed by pair id — the same
+ * figure its market pages show. `volume` is denominated in `volume_symbol`, so
+ * the base leg is converted through the pool's reserve ratio when the published
  * leg is the paired token; USD comes from the WAX-equivalent figure.
  */
-export async function fetchDefiboxPairVolume(prices: UsdPrices): Promise<Map<string, VenueVolume>> {
+export async function fetchDefiboxPairVolume(
+  prices: UsdPrices,
+  base: LpToken = CHEESE_TOKEN,
+): Promise<Map<string, VenueVolume>> {
+  const baseSymbol = base.symbol.toUpperCase();
   const payload = await fetchJson<{ data?: DefiboxMarketRow[]; waxUsdtPrice?: number | string }>(
     `${DEFIBOX_API}/swap/getMarket`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
   );
   const waxFromPrices = prices.get(priceKey('WAX', 'eosio.token')) ?? 0;
   const waxUsd = waxFromPrices > 0 ? waxFromPrices : Number(payload.waxUsdtPrice ?? 0);
-  const cheeseUsd = cheeseUsdFrom(prices);
+  const cheeseUsd = cheeseUsdFrom(prices, base);
   const out = new Map<string, VenueVolume>();
 
   for (const row of payload.data ?? []) {
     const id = Number(row.id ?? 0);
     if (!(id > 0)) continue;
     const symbols = [(row.symbol0 ?? '').toUpperCase(), (row.symbol1 ?? '').toUpperCase()];
-    const cheeseIndex = symbols.indexOf(CHEESE_SYMBOL);
+    const cheeseIndex = symbols.indexOf(baseSymbol);
     if (cheeseIndex === -1) continue;
     const contracts = [row.contract0 ?? '', row.contract1 ?? ''];
-    if (contracts[cheeseIndex] !== CHEESE_CONTRACT) continue;
+    if (contracts[cheeseIndex] !== base.contract) continue;
 
     const volume = Number(row.volume ?? 0);
     if (!Number.isFinite(volume) || volume < 0) continue;
