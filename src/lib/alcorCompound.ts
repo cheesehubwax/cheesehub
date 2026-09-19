@@ -81,17 +81,27 @@ export function tokenMatchKey(contract: string | undefined, symbol: string): str
   return contract ? `${contract}:${sym}` : sym;
 }
 
+/** True when the reward set pays out the given token. */
+export function paysToken(
+  rewardTokenKeys: readonly string[],
+  token: { contract?: string; symbol: string },
+): boolean {
+  const sym = token.symbol.toUpperCase();
+  return rewardTokenKeys.some((k) => {
+    const key = k.toUpperCase();
+    if (token.contract && key === tokenMatchKey(token.contract, token.symbol)) return true;
+    const keySym = key.includes(':') ? key.split(':')[1] : key;
+    return keySym === sym;
+  });
+}
+
 /** True when the reward set pays out both pool tokens. */
 export function paysBothTokens(
   rewardTokenKeys: readonly string[],
   tokenA: { contract?: string; symbol: string },
   tokenB: { contract?: string; symbol: string },
 ): boolean {
-  const full = new Set(rewardTokenKeys.map(k => k.toUpperCase()));
-  const symbols = new Set(rewardTokenKeys.map(k => (k.includes(':') ? k.split(':')[1] : k).toUpperCase()));
-  const has = (t: { contract?: string; symbol: string }) =>
-    full.has(tokenMatchKey(t.contract, t.symbol)) || symbols.has(t.symbol.toUpperCase());
-  return has(tokenA) && has(tokenB);
+  return paysToken(rewardTokenKeys, tokenA) && paysToken(rewardTokenKeys, tokenB);
 }
 
 /**
