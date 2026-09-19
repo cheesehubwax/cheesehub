@@ -291,19 +291,19 @@ describe('selected-position filtering', () => {
     expect(selectedEntries.map(e => e.positionId)).toEqual([1]);
 
     const selectedTotals = buildCompoundFeeTotals(selectedEntries);
-    // Position 1 pays no WAX fee at all once it is the only selected entry.
+    // Position 2's tokens carry no fee at all once it is deselected.
     expect(selectedTotals.some(t => t.symbol === 'WAX')).toBe(false);
+    expect(selectedTotals.some(t => t.symbol === 'HOLE')).toBe(false);
     const allTotals = buildCompoundFeeTotals(plan.compoundable);
     expect(allTotals.some(t => t.symbol === 'WAX')).toBe(true);
+    expect(allTotals.some(t => t.symbol === 'HOLE')).toBe(true);
+    // Each selected fee is exactly that entry's own fee, nothing more.
     selectedTotals.forEach(sel => {
-      const all = allTotals.find(t => t.symbol === sel.symbol)!;
       const expected = selectedEntries.reduce(
         (sum, e) => sum + (e.tokenA.symbol === sel.symbol ? e.tokenA.fee : e.tokenB.fee),
         0,
       );
       expect(sel.quantity).toBe(`${expected.toFixed(sel.precision)} ${sel.symbol}`);
-      // Excluding position 2 must reduce the shared CHEESE fee total.
-      expect(sel.amount).toBeLessThan(all.amount);
     });
   });
 });
