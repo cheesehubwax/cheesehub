@@ -201,6 +201,28 @@ export function CompoundAllDialog({
     onTransactionComplete?.();
   }, [session, accountName, tokensToRead, claims, candidates, onTransactionComplete]);
 
+  // Re-read balances and rebuild the plan without claiming again — recovery for
+  // a balance read that failed the first time round.
+  const recheckBalances = useCallback(async () => {
+    if (!accountName) return;
+    setError(null);
+    setRechecking(true);
+    try {
+      const balances = await readBalances(accountName, tokensToRead);
+      const built = planCompound(candidates, balances, MAX_COMPOUND_POSITIONS);
+      setPlan(built);
+      if (built.compoundable.length === 0 && built.skipped.every(s => s.reason === 'balance-unknown')) {
+        setError('Still could not read your balances. Your rewards are safe in your wallet — try again in a moment.');
+      }
+    } catch {
+      setError('Could not read your balances just now. Your rewards are safe in your wallet — try again in a moment.');
+    } finally {
+      setRechecking(false);
+    }
+  }, [accountName, tokensToRead, candidates]);
+
+
+
   const runCompound = useCallback(async () => {
     if (!session || !accountName || !plan || plan.compoundable.length === 0) return;
     setError(null);
