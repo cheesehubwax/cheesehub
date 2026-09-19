@@ -13,6 +13,8 @@ import { TokenLogo } from '@/components/TokenLogo';
 import { toast } from 'sonner';
 import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
 import { IncreaseLiquidityDialog } from './IncreaseLiquidityDialog';
+import { CompoundAllDialog, CompoundPosition } from './CompoundAllDialog';
+
 import { CreateAlcorFarmDialog } from './CreateAlcorFarmDialog';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
@@ -86,6 +88,8 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
   const [increaseLiquidityPosition, setIncreaseLiquidityPosition] = useState<AlcorFarmPosition | null>(null);
   const [createFarmOpen, setCreateFarmOpen] = useState(false);
   const [optimisticallyRemovedIds, setOptimisticallyRemovedIds] = useState<Set<string>>(new Set());
+  const [compoundOpen, setCompoundOpen] = useState(false);
+
 
   const farmsList = Array.isArray(stakedFarms) ? stakedFarms : [];
   const unstakedList = Array.isArray(unstakedPositions) ? unstakedPositions : [];
