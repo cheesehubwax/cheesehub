@@ -130,7 +130,7 @@ export function AnalAccountPanel({ account, onAccountChange, days, current, toke
       if (!selectedPool && changed.length) {
         lines.push(
           ...changed.slice(0, 4).map((entry) =>
-            `${entry.label} ${entry.delta >= 0 ? '+' : '-'}${metric === 'usd' ? usd(Math.abs(entry.delta)) : `${amount(Math.abs(entry.delta), 2)} CHEESE`}`,
+            `${entry.label} ${entry.delta >= 0 ? '+' : '-'}${metric === 'usd' ? usd(Math.abs(entry.delta)) : `${amount(Math.abs(entry.delta), 2)} ${token.symbol}`}`,
           ),
         );
         if (changed.length > 4) lines.push(`+${changed.length - 4} more pools`);
