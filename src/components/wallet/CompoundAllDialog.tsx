@@ -19,6 +19,7 @@ import {
   MAX_COMPOUND_POSITIONS,
   balanceKey,
   buildBalanceReadList,
+  buildClaimedBalances,
   buildCompoundFeeTotals,
   paysBothTokens,
   planCompound,
@@ -108,6 +109,9 @@ export function CompoundAllDialog({
   const [error, setError] = useState<string | null>(null);
   const [claimTxId, setClaimTxId] = useState<string | null>(null);
   const [rechecking, setRechecking] = useState(false);
+  // Balances read immediately before the claim — the baseline the claim delta is
+  // measured against.
+  const [beforeBalances, setBeforeBalances] = useState<Map<string, AvailableBalance>>(new Map());
 
   useEffect(() => {
     if (open) {
@@ -117,6 +121,7 @@ export function CompoundAllDialog({
       setError(null);
       setClaimTxId(null);
       setRechecking(false);
+      setBeforeBalances(new Map());
     }
   }, [open]);
 
@@ -162,12 +167,15 @@ export function CompoundAllDialog({
     if (!session || !accountName) return;
     setError(null);
 
+    // Balances before the claim: everything here belongs to the user already and
+    // must never be compounded.
     let before: Map<string, AvailableBalance>;
     try {
       before = await readBalances(accountName, tokensToRead);
     } catch {
       before = new Map();
     }
+    setBeforeBalances(before);
 
     setStage('claiming');
     let txId: string | null = null;
@@ -198,21 +206,27 @@ export function CompoundAllDialog({
       if (increased) break;
     }
 
-    const built = planCompound(candidates, after, MAX_COMPOUND_POSITIONS);
+    // Only the claim delta is available to compound.
+    const built = planCompound(candidates, buildClaimedBalances(before, after), MAX_COMPOUND_POSITIONS);
     setPlan(built);
     setStage('preview');
     onTransactionComplete?.();
   }, [session, accountName, tokensToRead, claims, candidates, onTransactionComplete]);
 
   // Re-read balances and rebuild the plan without claiming again — recovery for
-  // a balance read that failed the first time round.
+  // a balance read that failed the first time round. Still measured against the
+  // pre-claim snapshot, so re-checking never widens what can be spent.
   const recheckBalances = useCallback(async () => {
     if (!accountName) return;
     setError(null);
     setRechecking(true);
     try {
-      const balances = await readBalances(accountName, tokensToRead);
-      const built = planCompound(candidates, balances, MAX_COMPOUND_POSITIONS);
+      const after = await readBalances(accountName, tokensToRead);
+      const built = planCompound(
+        candidates,
+        buildClaimedBalances(beforeBalances, after),
+        MAX_COMPOUND_POSITIONS,
+      );
       setPlan(built);
       if (built.compoundable.length === 0 && built.skipped.every(s => s.reason === 'balance-unknown')) {
         setError('Still could not read your balances. Your rewards are safe in your wallet — try again in a moment.');
@@ -222,7 +236,7 @@ export function CompoundAllDialog({
     } finally {
       setRechecking(false);
     }
-  }, [accountName, tokensToRead, candidates]);
+  }, [accountName, tokensToRead, candidates, beforeBalances]);
 
 
 
@@ -307,8 +321,8 @@ export function CompoundAllDialog({
                   full, matched by the other token. Anything left over stays in your wallet.
                 </p>
                 <p>
-                  A 0.75% fee on each deposit is sent to {COMPOUND_FEE_ACCOUNT}, and a small amount of every token is
-                  left untouched in your wallet.
+                  Only the tokens this claim pays out are used — tokens already in your wallet are never spent. A 0.75%
+                  fee on each deposit is sent to {COMPOUND_FEE_ACCOUNT}.
                 </p>
               </AlertDescription>
             </Alert>
@@ -383,7 +397,8 @@ export function CompoundAllDialog({
                   </div>
                 ))}
                 <p className="text-[11px] text-muted-foreground">
-                  0.75% of each deposit supports HOLE, and a small amount of every token stays in your wallet.
+                  Only the rewards from this claim are used — tokens you already held are never touched. 0.75% of each
+                  deposit supports HOLE.
                 </p>
               </div>
             ) : (

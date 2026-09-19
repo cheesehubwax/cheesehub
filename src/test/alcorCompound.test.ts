@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   AvailableBalance,
-  COMPOUND_BUFFER_RATE,
   COMPOUND_FEE_RATE,
   CompoundCandidate,
   balanceKey,
   buildBalanceReadList,
+  buildClaimedBalances,
   buildCompoundFeeTotals,
   paysBothTokens,
   planCompound,
@@ -33,7 +33,7 @@ function balances(entries: Array<[string, AvailableBalance]>) {
 }
 
 describe('planCompound', () => {
-  it('pairs the smaller side in full, withholds the buffer and takes the 0.75% fee', () => {
+  it('pairs the smaller side in full and takes the 0.75% fee, using the whole claimed amount', () => {
     const plan = planCompound(
       [candidate()],
       balances([
@@ -45,16 +45,16 @@ describe('planCompound', () => {
     expect(plan.skipped).toHaveLength(0);
     expect(plan.compoundable).toHaveLength(1);
     const entry = plan.compoundable[0];
-    // 0.5% buffer: 9.95 WAXUSDC usable → ratio 0.1 → 99.5 CHEESE gross
-    expect(entry.tokenA.gross).toBeCloseTo(99.5, 6);
-    expect(entry.tokenB.gross).toBeCloseTo(9.95, 4);
+    // All 10 claimed WAXUSDC goes in → ratio 0.1 → 100 CHEESE gross
+    expect(entry.tokenA.gross).toBeCloseTo(100, 6);
+    expect(entry.tokenB.gross).toBeCloseTo(10, 4);
     expect(entry.tokenA.fee).toBeCloseTo(entry.tokenA.gross * COMPOUND_FEE_RATE, 6);
     expect(entry.tokenB.fee).toBeCloseTo(entry.tokenB.gross * COMPOUND_FEE_RATE, 5);
     expect(entry.tokenA.amount).toBeCloseTo(entry.tokenA.gross - entry.tokenA.fee, 6);
     expect(entry.tokenB.amount).toBeCloseTo(entry.tokenB.gross - entry.tokenB.fee, 6);
-    // Deposit plus fee never exceeds the buffered balance.
-    expect(entry.tokenA.amount + entry.tokenA.fee).toBeLessThanOrEqual(500 * (1 - COMPOUND_BUFFER_RATE));
-    expect(entry.tokenB.amount + entry.tokenB.fee).toBeLessThanOrEqual(10 * (1 - COMPOUND_BUFFER_RATE));
+    // Deposit plus fee never exceeds what was claimed.
+    expect(entry.tokenA.amount + entry.tokenA.fee).toBeLessThanOrEqual(500);
+    expect(entry.tokenB.amount + entry.tokenB.fee).toBeLessThanOrEqual(10);
     expect(entry.tokenA.quantity).toBe(`${entry.tokenA.amount.toFixed(8)} CHEESE`);
     expect(entry.tokenB.feeQuantity).toBe(`${entry.tokenB.fee.toFixed(6)} WAXUSDC`);
   });
@@ -275,6 +275,67 @@ describe('buildBalanceReadList', () => {
   it('does not duplicate a token shared by several positions', () => {
     const list = buildBalanceReadList([candidate({ positionId: 1 }), candidate({ positionId: 2 })]);
     expect(list).toHaveLength(2);
+  });
+});
+
+describe('buildClaimedBalances', () => {
+  const cheeseKey = balanceKey(CHEESE.contract, CHEESE.symbol);
+  const usdcKey = balanceKey(USDC.contract, USDC.symbol);
+
+  it('only exposes the amount the claim added, never pre-existing holdings', () => {
+    const claimed = buildClaimedBalances(
+      balances([
+        [cheeseKey, { balance: 4000, precision: 8 }],
+        [usdcKey, { balance: 25, precision: 6 }],
+      ]),
+      balances([
+        [cheeseKey, { balance: 4100, precision: 8 }],
+        [usdcKey, { balance: 35, precision: 6 }],
+      ]),
+    );
+
+    expect(claimed.get(cheeseKey)).toMatchObject({ balance: 100, known: true });
+    expect(claimed.get(usdcKey)).toMatchObject({ balance: 10, known: true });
+  });
+
+  it('spends none of a wallet holding when the claim paid nothing', () => {
+    const claimed = buildClaimedBalances(
+      balances([[cheeseKey, { balance: 4000, precision: 8 }]]),
+      balances([[cheeseKey, { balance: 4000, precision: 8 }]]),
+    );
+    expect(claimed.get(cheeseKey)?.balance).toBe(0);
+
+    const plan = planCompound([candidate()], claimed);
+    expect(plan.compoundable).toHaveLength(0);
+  });
+
+  it('marks a token unknown when either read failed or no baseline exists', () => {
+    const failedAfter = buildClaimedBalances(
+      balances([[cheeseKey, { balance: 10, precision: 8 }]]),
+      balances([[cheeseKey, { balance: 0, precision: 8, known: false }]]),
+    );
+    expect(failedAfter.get(cheeseKey)?.known).toBe(false);
+
+    const noBaseline = buildClaimedBalances(
+      balances([]),
+      balances([[cheeseKey, { balance: 500, precision: 8 }]]),
+    );
+    expect(noBaseline.get(cheeseKey)).toMatchObject({ balance: 0, known: false });
+  });
+
+  it('skips a position honestly when its claim delta could not be measured', () => {
+    const claimed = buildClaimedBalances(
+      balances([[usdcKey, { balance: 5, precision: 6 }]]),
+      balances([
+        [cheeseKey, { balance: 500, precision: 8 }],
+        [usdcKey, { balance: 15, precision: 6 }],
+      ]),
+    );
+
+    const plan = planCompound([candidate()], claimed);
+    expect(plan.compoundable).toHaveLength(0);
+    expect(plan.skipped[0].reason).toBe('balance-unknown');
+    expect(plan.skipped[0].detail).toContain('CHEESE');
   });
 });
 
