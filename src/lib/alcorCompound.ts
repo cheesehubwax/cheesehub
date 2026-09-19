@@ -208,6 +208,20 @@ export function buildBalanceReadList(
   });
 }
 
+/**
+ * True when the position reports its pair in the opposite order to the pool.
+ * The pool's price and ticks are always in the pool's own order, so the deposit
+ * ratio has to be inverted in that case.
+ */
+export function isReversedAgainstPool(candidate: CompoundCandidate): boolean {
+  const poolA = candidate.slot?.tokenA?.symbol;
+  const poolB = candidate.slot?.tokenB?.symbol;
+  if (!poolA || !poolB) return false;
+  const same = (a: string, b: string) => a.toUpperCase() === b.toUpperCase();
+  if (same(poolA, candidate.tokenA.symbol) && same(poolB, candidate.tokenB.symbol)) return false;
+  return same(poolA, candidate.tokenB.symbol) && same(poolB, candidate.tokenA.symbol);
+}
+
 function floorTo(amount: number, precision: number): number {
   const factor = 10 ** precision;
   return Math.floor(amount * factor) / factor;
