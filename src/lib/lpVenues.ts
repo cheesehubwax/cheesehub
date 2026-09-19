@@ -343,8 +343,12 @@ export async function fetchTacoCandidates(
   return out;
 }
 
-/** Every CHEESE pool on Defibox, with reserves and a USD estimate. */
-export async function fetchDefiboxCandidates(prices: UsdPrices): Promise<AmmPoolCandidate[]> {
+/** Every base-token pool on Defibox, with reserves and a USD estimate. */
+export async function fetchDefiboxCandidates(
+  prices: UsdPrices,
+  base: LpToken = CHEESE_TOKEN,
+): Promise<AmmPoolCandidate[]> {
+  const baseSymbol = base.symbol.toUpperCase();
   const rows = await readTable<DefiboxPairRow>(DEFIBOX_CONTRACT, DEFIBOX_CONTRACT, 'pairs');
   const out: AmmPoolCandidate[] = [];
   for (const row of rows) {
@@ -356,8 +360,8 @@ export async function fetchDefiboxCandidates(prices: UsdPrices): Promise<AmmPool
     ];
     const cheeseIndex = legs.findIndex(
       (leg) =>
-        symbolCodeOf(leg.token?.symbol) === CHEESE_SYMBOL &&
-        (leg.token?.contract ?? '') === CHEESE_CONTRACT,
+        symbolCodeOf(leg.token?.symbol) === baseSymbol &&
+        (leg.token?.contract ?? '') === base.contract,
     );
     if (cheeseIndex === -1) continue;
     const cheeseLeg = legs[cheeseIndex];
@@ -371,7 +375,7 @@ export async function fetchDefiboxCandidates(prices: UsdPrices): Promise<AmmPool
     const totalShares = Number(row.liquidity_token ?? 0);
     if (!(reserveCheese > 0) || !(reservePaired > 0) || !(totalShares > 0)) continue;
 
-    const pair = pairFor(pairedSymbol, pairedContract);
+    const pair = pairFor(pairedSymbol, pairedContract, base);
     out.push({
       venue: 'defibox',
       pair,
@@ -384,7 +388,7 @@ export async function fetchDefiboxCandidates(prices: UsdPrices): Promise<AmmPool
       usd: positionUsdValue(
         reserveCheese,
         reservePaired,
-        cheeseUsdFrom(prices),
+        cheeseUsdFrom(prices, base),
         prices.get(priceKey(pairedSymbol, pairedContract)),
       ),
     });
