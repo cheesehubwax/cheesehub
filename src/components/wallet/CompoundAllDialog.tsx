@@ -8,7 +8,8 @@ import { toast } from 'sonner';
 import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
 import { TokenLogo } from '@/components/TokenLogo';
 import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
-import { buildClaimRewardsAction, buildIncreaseLiquidityAction, AlcorFarmPosition } from '@/lib/alcorFarms';
+import { buildClaimRewardsAction, buildIncreaseLiquidityAction, fetchPoolSlot, AlcorFarmPosition } from '@/lib/alcorFarms';
+import type { PoolSlot } from '@/lib/alcorV3Amounts';
 import { waxRpcCall } from '@/lib/waxRpcFallback';
 import {
   AvailableBalance,
@@ -94,6 +95,27 @@ async function readBalances(
   });
   return map;
 }
+
+/**
+ * Read the live price slot of each pool. The deposit must be sized at the exact
+ * ratio the pool accepts, otherwise Alcor rejects it with "Price slippage check".
+ */
+async function readPoolSlots(poolIds: number[]): Promise<Map<number, PoolSlot | null>> {
+  const unique = Array.from(new Set(poolIds));
+  const slots = await Promise.all(
+    unique.map(async id => {
+      try {
+        return await fetchPoolSlot(id);
+      } catch {
+        return null;
+      }
+    }),
+  );
+  const map = new Map<number, PoolSlot | null>();
+  unique.forEach((id, i) => map.set(id, slots[i]));
+  return map;
+}
+
 
 export function CompoundAllDialog({
   open,
