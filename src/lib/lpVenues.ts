@@ -1,17 +1,17 @@
-// CHEESEAnal — readers for the constant-product CHEESE pools on Taco and
-// Defibox, plus the USD price table used to value their reserves.
+// CHEESEAnal — readers for the constant-product pools of a base token (CHEESE or
+// HOLE) on Taco and Defibox, plus the USD price table used to value reserves.
 //
 // Deliberately self-contained (plain `fetch` only) so the same module runs in
 // the browser and under Bun inside the daily sampler.
 
 import {
-  CHEESE_CONTRACT,
-  CHEESE_SYMBOL,
+  CHEESE_TOKEN,
   MIN_TRACKED_POOL_USD,
   MAX_EXTRA_PAIRS_PER_VENUE,
   assetAmount,
   assetSymbol,
   buildAmmPoolSnapshot,
+  isTrackedPairKey,
   pairFor,
   positionUsdValue,
   round,
@@ -19,6 +19,7 @@ import {
   venuePair,
   type AmmPoolInput,
   type LpPoolSnapshot,
+  type LpToken,
   type LpVenue,
   type TrackedPair,
 } from './lpPools';
