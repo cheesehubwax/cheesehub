@@ -250,22 +250,28 @@ export function CompoundAllDialog({
     setError(null);
     setRechecking(true);
     try {
-      const after = await readBalances(accountName, tokensToRead);
+      const [after, candidatesWithSlots] = await Promise.all([
+        readBalances(accountName, tokensToRead),
+        withSlots(),
+      ]);
       const built = planCompound(
-        candidates,
+        candidatesWithSlots,
         buildClaimedBalances(beforeBalances, after),
         MAX_COMPOUND_POSITIONS,
       );
       setPlan(built);
-      if (built.compoundable.length === 0 && built.skipped.every(s => s.reason === 'balance-unknown')) {
-        setError('Still could not read your balances. Your rewards are safe in your wallet — try again in a moment.');
+      if (
+        built.compoundable.length === 0 &&
+        built.skipped.every(s => s.reason === 'balance-unknown' || s.reason === 'pool-price-unknown')
+      ) {
+        setError('Still could not read your balances or the pool prices. Your rewards are safe in your wallet — try again in a moment.');
       }
     } catch {
       setError('Could not read your balances just now. Your rewards are safe in your wallet — try again in a moment.');
     } finally {
       setRechecking(false);
     }
-  }, [accountName, tokensToRead, candidates, beforeBalances]);
+  }, [accountName, tokensToRead, withSlots, beforeBalances]);
 
 
 
