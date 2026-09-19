@@ -3,6 +3,7 @@ import {
   AvailableBalance,
   CompoundCandidate,
   balanceKey,
+  paysBothTokens,
   planCompound,
 } from '@/lib/alcorCompound';
 
@@ -142,12 +143,11 @@ describe('token matching normalisation', () => {
   });
 
   it('finds claimed balances by symbol when the pool token lacks a contract', () => {
-    const candidates = [{
-      ...baseCandidate,
+    const candidates = [candidate({
       tokenA: { contract: '', symbol: 'CHEESE', amount: 100 },
       tokenB: { contract: '', symbol: 'WAX', amount: 200 },
       rewardTokenKeys: ['cheeseburger:CHEESE', 'eosio.token:WAX'],
-    }];
+    })];
     const available = new Map([
       ['cheeseburger:CHEESE', { balance: 10, precision: 8 }],
       ['eosio.token:WAX', { balance: 20, precision: 8 }],
