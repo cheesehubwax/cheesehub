@@ -2,16 +2,19 @@
 
 ## Problem
 
-The Compound All button in the Alcor farm manager only renders when at least one staked position has farms paying out **both** tokens of its own pool (`compoundableCount > 0`). When no position qualifies, the button disappears entirely — so the user can't see it or learn why.
+The Compound All button only renders when `compoundableCount > 0` — at least one staked position whose farms pay out **both** of the pool's tokens, matched by exact `contract:symbol` strings. Two failure modes hide the button even when farms genuinely pay both tokens:
+
+1. Exact string matching is brittle — if the pool's `tokenA`/`tokenB` contract or symbol is missing, differently-cased, or sourced differently from the farm's `rewardToken` (Alcor API vs chain fallback), the match fails silently.
+2. When zero positions qualify, the button disappears entirely with no explanation.
 
 ## Fix
 
-1. **Always show the button** next to Claim All whenever there are staked farm positions, regardless of `compoundableCount`.
-2. **Qualifying positions pre-checked**: positions whose farms pay both pool tokens are included in the compound plan.
-3. **Open the dialog even when 0 qualify**: the existing dialog already lists skipped positions with reasons ("rewards only cover one pool token", etc.), so opening it with zero compoundable positions shows an explanation instead of hiding the button.
-4. Keep the count badge (`Compound All (N)`) showing how many positions will actually compound.
+1. **Robust token matching** in the `compoundableCount` filter: normalize to uppercase, and when one side has a contract and the other doesn't, fall back to symbol-only matching. Apply the same normalization inside `planCompound` in `src/lib/alcorCompound.ts` so the dialog's own filtering can't disagree with the button count.
+2. **Always show the button** whenever there are staked positions with incentives (`compoundPositions.length > 0`), even when 0 qualify — the dialog already lists skipped positions with reasons, so the user sees an explanation instead of nothing.
+3. Keep the count badge (`Compound All (N)`) reflecting how many positions will actually compound.
 
 ## Technical details
 
-- `src/components/wallet/AlcorFarmManager.tsx`: change the render condition at ~line 513 from `compoundableCount > 0` to `compoundPositions.length > 0` (button shows whenever positions with incentives exist). The dialog (`CompoundAllDialog.tsx`) already handles empty/skip lists, so no dialog changes needed.
-- Verify: typecheck + focused vitest + preview build log.
+- `src/components/wallet/AlcorFarmManager.tsx`: normalize match keys (uppercase symbol, contract when present) in the `compoundableCount` memo (~line 221); change render condition (~line 513) to `compoundPositions.length > 0`.
+- `src/lib/alcorCompound.ts`: share a `tokenMatchKey(contract, symbol)` helper used by both files so button count and plan always agree.
+- Verify: typecheck + focused vitest + preview build log; browser check on the farm manager view.
