@@ -93,6 +93,13 @@ export const MAX_COMPOUND_POSITIONS = 20;
 /** Share of every compounded deposit sent to the fee account. */
 export const COMPOUND_FEE_RATE = 0.0075;
 export const COMPOUND_FEE_ACCOUNT = 'hole.cheese';
+/**
+ * Deposit slippage tolerance for compounding. Deliberately wider than the manual
+ * 0.5% default: the pool price moves with every trade between reading it and
+ * signing, and the pool's integer maths differs slightly from ours. Without this
+ * buffer the pool rejects the deposit with "Price slippage check".
+ */
+export const COMPOUND_SLIPPAGE_TOLERANCE = 0.03;
 export const COMPOUND_FEE_MEMO = 'compound fee';
 
 export function balanceKey(contract: string, symbol: string): string {
@@ -206,6 +213,20 @@ export function buildBalanceReadList(
     const known = getTokenConfig(entry.symbol.toUpperCase());
     return known ? { contract: known.contract, symbol: entry.symbol } : entry;
   });
+}
+
+/**
+ * True when the position reports its pair in the opposite order to the pool.
+ * The pool's price and ticks are always in the pool's own order, so the deposit
+ * ratio has to be inverted in that case.
+ */
+export function isReversedAgainstPool(candidate: CompoundCandidate): boolean {
+  const poolA = candidate.slot?.tokenA?.symbol;
+  const poolB = candidate.slot?.tokenB?.symbol;
+  if (!poolA || !poolB) return false;
+  const same = (a: string, b: string) => a.toUpperCase() === b.toUpperCase();
+  if (same(poolA, candidate.tokenA.symbol) && same(poolB, candidate.tokenB.symbol)) return false;
+  return same(poolA, candidate.tokenB.symbol) && same(poolB, candidate.tokenA.symbol);
 }
 
 function floorTo(amount: number, precision: number): number {
@@ -362,15 +383,21 @@ export function planCompound(
       continue;
     }
 
-    const { state, ratio } = poolDepositRatio(
+    // The pool's price and ticks are expressed in the pool's own token order.
+    // If the position reports the pair the other way round, the ratio must be
+    // inverted or every deposit is rejected.
+    const reversed = isReversedAgainstPool(candidate);
+    const poolRatio = poolDepositRatio(
       candidate.slot,
       candidate.tickLower,
       candidate.tickUpper,
-      balA.precision,
-      balB.precision,
+      reversed ? balB.precision : balA.precision,
+      reversed ? balA.precision : balB.precision,
     );
+    const state = poolRatio.state;
+    const ratio = poolRatio.ratio && reversed ? 1 / poolRatio.ratio : poolRatio.ratio;
 
-    if (state !== 'in-range' || !ratio) {
+    if (state !== 'in-range' || !ratio || !Number.isFinite(ratio)) {
       skipped.push({
         positionId: candidate.positionId,
         pair,
