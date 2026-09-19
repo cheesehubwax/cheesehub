@@ -285,19 +285,19 @@ describe('HOLE as the base token', () => {
         inRange: true,
       },
     ];
-    const snap = buildPoolSnapshot(holeCheesePair, pools, { CHEESE: 0.016 }, HOLE_TOKEN)!;
-    expect(snap).toBeTruthy();
-    const withPositions = buildPoolSnapshot(
+    const snap = buildPoolSnapshot(
       holeCheesePair,
-      pools,
-      { CHEESE: 0.016 },
+      [{ pool: pools[0], positions }],
+      { cheeseUsd: 0.019, pairedUsd: 0.016 },
       HOLE_TOKEN,
-      positions,
     );
-    if (withPositions) {
-      expect(withPositions.symbol).toBe('CHEESE');
-    }
+    expect(snap.symbol).toBe('CHEESE');
+    // HOLE is tokenB here, so the base amount comes from amountB.
+    expect(snap.cheese).toBeCloseTo(50, 4);
+    expect(snap.paired).toBeCloseTo(100, 4);
+    expect(snap.accounts).toBe(1);
   });
+
 
   it('keeps token data paths separate', () => {
     expect(lpTokenConfig('cheese').dataPath).toBe('');
