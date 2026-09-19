@@ -123,6 +123,26 @@ const CheeseAnal = () => {
       </section>
 
       <main className="container pb-12 flex flex-col items-center gap-6">
+        {/* Token switch — each token has its own recorded snapshot history */}
+        <div className="w-full flex items-center gap-1">
+          {LP_TOKENS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => switchToken(tab.key)}
+              aria-pressed={tokenKey === tab.key}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold tracking-wide border transition-colors ${
+                tokenKey === tab.key
+                  ? 'bg-cheese/15 text-cheese border-cheese/40'
+                  : 'text-muted-foreground border-border/40 hover:text-foreground hover:border-primary/40'
+              }`}
+            >
+              <CheeseLogo base={tab} />
+              {tab.symbol}
+            </button>
+          ))}
+        </div>
+
         {/* Range switch + exports */}
         <div className="w-full flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1">
