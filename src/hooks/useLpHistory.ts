@@ -137,7 +137,11 @@ export interface LpAccountHistoryRow {
 const MAX_ACCOUNT_DAYS = 90;
 const DAY_FETCH_CONCURRENCY = 6;
 
-async function fetchAccountHistory(account: string, dates: string[]): Promise<LpAccountHistoryRow[]> {
+async function fetchAccountHistory(
+  account: string,
+  dates: string[],
+  token: LpTokenKey,
+): Promise<LpAccountHistoryRow[]> {
   const wanted = dates.slice(-MAX_ACCOUNT_DAYS);
   const rows: LpAccountHistoryRow[] = [];
 
@@ -145,7 +149,7 @@ async function fetchAccountHistory(account: string, dates: string[]): Promise<Lp
     const chunk = wanted.slice(i, i + DAY_FETCH_CONCURRENCY);
     const results = await Promise.all(
       chunk.map((date) =>
-        fetchJson<LpDayFile>(`days/${date}.json`).catch(() => null),
+        fetchJson<LpDayFile>(tokenPath(token, `days/${date}.json`)).catch(() => null),
       ),
     );
     for (const day of results) {
@@ -172,11 +176,15 @@ async function fetchAccountHistory(account: string, dates: string[]): Promise<Lp
 }
 
 /** Recorded history of one account across every tracked pool. */
-export function useLpAccountHistory(account: string | null, dates: string[]) {
+export function useLpAccountHistory(
+  account: string | null,
+  dates: string[],
+  token: LpTokenKey = 'cheese',
+) {
   const key = dates.slice(-MAX_ACCOUNT_DAYS).join(',');
   const query = useQuery({
-    queryKey: ['cheeseAnal', 'account', account, key],
-    queryFn: () => fetchAccountHistory(account as string, dates),
+    queryKey: ['cheeseAnal', token, 'account', account, key],
+    queryFn: () => fetchAccountHistory(account as string, dates, token),
     enabled: Boolean(account) && dates.length > 0,
     staleTime: 30 * 60_000,
     retry: 1,
