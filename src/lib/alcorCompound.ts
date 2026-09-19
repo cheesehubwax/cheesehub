@@ -362,15 +362,21 @@ export function planCompound(
       continue;
     }
 
-    const { state, ratio } = poolDepositRatio(
+    // The pool's price and ticks are expressed in the pool's own token order.
+    // If the position reports the pair the other way round, the ratio must be
+    // inverted or every deposit is rejected.
+    const reversed = isReversedAgainstPool(candidate);
+    const poolRatio = poolDepositRatio(
       candidate.slot,
       candidate.tickLower,
       candidate.tickUpper,
-      balA.precision,
-      balB.precision,
+      reversed ? balB.precision : balA.precision,
+      reversed ? balA.precision : balB.precision,
     );
+    const state = poolRatio.state;
+    const ratio = poolRatio.ratio && reversed ? 1 / poolRatio.ratio : poolRatio.ratio;
 
-    if (state !== 'in-range' || !ratio) {
+    if (state !== 'in-range' || !ratio || !Number.isFinite(ratio)) {
       skipped.push({
         positionId: candidate.positionId,
         pair,
