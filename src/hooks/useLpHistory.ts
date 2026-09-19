@@ -82,10 +82,11 @@ export function filterSnapshotByVenue<T extends LpDayFile>(
 }
 
 /** Pool-level totals per recorded day (small file, always loaded). */
-export function useLpHistoryIndex() {
+export function useLpHistoryIndex(token: LpTokenKey = 'cheese') {
   const query = useQuery({
-    queryKey: ['cheeseAnal', 'index'],
-    queryFn: async () => (await fetchJson<LpIndexFile>('lp-history-index.json')) ?? null,
+    queryKey: ['cheeseAnal', token, 'index'],
+    queryFn: async () =>
+      (await fetchJson<LpIndexFile>(tokenPath(token, 'lp-history-index.json'))) ?? null,
     staleTime: 10 * 60_000,
     refetchInterval: 30 * 60_000,
     retry: 1,
@@ -107,10 +108,11 @@ export function useLpHistoryIndex() {
 }
 
 /** Full per-account rows for one recorded day. */
-export function useLpDay(date: string | null) {
+export function useLpDay(date: string | null, token: LpTokenKey = 'cheese') {
   const query = useQuery({
-    queryKey: ['cheeseAnal', 'day', date],
-    queryFn: async () => (await fetchJson<LpDayFile>(`days/${date}.json`)) ?? null,
+    queryKey: ['cheeseAnal', token, 'day', date],
+    queryFn: async () =>
+      (await fetchJson<LpDayFile>(tokenPath(token, `days/${date}.json`))) ?? null,
     enabled: Boolean(date),
     staleTime: 60 * 60_000,
     retry: 1,
