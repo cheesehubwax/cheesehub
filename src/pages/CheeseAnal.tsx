@@ -207,7 +207,7 @@ const CheeseAnal = () => {
           onSelectPool={setPoolKey}
         />
 
-        <AnalAccountPanel account={account} onAccountChange={setAccount} dates={dates} current={current} />
+        <AnalAccountPanel account={account} onAccountChange={setAccount} days={ranged} current={current} />
 
         <p className="text-[10px] text-muted-foreground text-center max-w-2xl">
           Alcor figures come from Alcor's own position data: open positions count whether or not they are in range,
