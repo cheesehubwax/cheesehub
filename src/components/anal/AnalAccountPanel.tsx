@@ -182,7 +182,7 @@ export function AnalAccountPanel({ account, onAccountChange, days, current, toke
           <div className="flex flex-wrap items-center gap-3">
             <span className="font-mono text-sm text-cheese">{account}</span>
             <span className="text-xs text-muted-foreground">
-              {usd(totalNow)} across {holdings.length} pool{holdings.length === 1 ? '' : 's'} · {amount(cheeseNow, 2)} CHEESE
+              {usd(totalNow)} across {holdings.length} pool{holdings.length === 1 ? '' : 's'} · {amount(cheeseNow, 2)} {token.symbol}
             </span>
             <Button
               size="sm"
