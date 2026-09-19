@@ -64,7 +64,7 @@ const CheeseAnal = () => {
     isLoading: latestDayLoading,
     isError: latestDayError,
     refetch: refetchDay,
-  } = useLpDay(latestRecordedDate);
+  } = useLpDay(latestRecordedDate, tokenKey);
 
   const snapshot = latestDay;
   const current = useMemo(() => filterSnapshotByVenue(snapshot, venue), [snapshot, venue]);
