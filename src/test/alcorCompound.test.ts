@@ -10,9 +10,39 @@ import {
   paysBothTokens,
   planCompound,
 } from '@/lib/alcorCompound';
+import { PoolSlot, poolDepositRatio, sqrtPriceAtTick } from '@/lib/alcorV3Amounts';
 
 const CHEESE = { contract: 'cheeseburger', symbol: 'CHEESE' };
 const USDC = { contract: 'eth.token', symbol: 'WAXUSDC' };
+
+/**
+ * Build a pool slot whose in-range deposit ratio (token B per token A, in
+ * display units) matches the target, by searching for the sqrt price.
+ */
+function slotForRatio(
+  target: number,
+  tickLower = -100,
+  tickUpper = 100,
+  precisionA = 8,
+  precisionB = 6,
+): PoolSlot {
+  const sqrtL = sqrtPriceAtTick(tickLower);
+  const sqrtU = sqrtPriceAtTick(tickUpper);
+  let lo = sqrtL;
+  let hi = sqrtU;
+  for (let i = 0; i < 200; i++) {
+    const mid = (lo + hi) / 2;
+    const slot: PoolSlot = { sqrtPriceX64: String(BigInt(Math.round(mid * 2 ** 32)) * (2n ** 32n)), tick: 0 };
+    const { ratio } = poolDepositRatio(slot, tickLower, tickUpper, precisionA, precisionB);
+    if (ratio === null) break;
+    if (ratio < target) lo = mid;
+    else hi = mid;
+  }
+  const mid = (lo + hi) / 2;
+  return { sqrtPriceX64: String(BigInt(Math.round(mid * 2 ** 32)) * (2n ** 32n)), tick: 0 };
+}
+
+const DEFAULT_SLOT = slotForRatio(0.1);
 
 function candidate(overrides: Partial<CompoundCandidate> = {}): CompoundCandidate {
   return {
@@ -24,6 +54,7 @@ function candidate(overrides: Partial<CompoundCandidate> = {}): CompoundCandidat
     tokenB: { ...USDC, amount: 100 },
     usdValue: 500,
     rewardTokenKeys: [balanceKey(CHEESE.contract, CHEESE.symbol), balanceKey(USDC.contract, USDC.symbol)],
+    slot: DEFAULT_SLOT,
     ...overrides,
   };
 }
@@ -111,8 +142,8 @@ describe('planCompound', () => {
 
   it('skips dust that rounds to zero at token precision', () => {
     const plan = planCompound(
-      // Ratio so lopsided that the matched side rounds away entirely.
-      [candidate({ tokenA: { ...CHEESE, amount: 1_000_000 }, tokenB: { ...USDC, amount: 1 } })],
+      // Pool ratio so lopsided that the matched side rounds away entirely.
+      [candidate({ slot: slotForRatio(1e-6, -100, 100, 8, 2) })],
       balances([
         [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 1, precision: 8 }],
         [balanceKey(USDC.contract, USDC.symbol), { balance: 1, precision: 2 }],
