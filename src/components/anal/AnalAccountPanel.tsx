@@ -3,28 +3,31 @@ import { useEffect, useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { HistoricalNote } from '@/components/anal/HistoricalNote';
+import { MiniChartTooltip } from '@/components/anal/MiniChartTooltip';
+import { waxUsdFromPools } from '@/components/anal/snapshotDiff';
 import { CheeseLogo, PairLabel, UsdLogo } from '@/components/anal/PairLogos';
 import { VenueLabel } from '@/components/anal/VenueLogo';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLpAccountHistory } from '@/hooks/useLpHistory';
 import { downloadAccountHistoryCsv } from '@/lib/lpCsv';
-import { type LpDayFile } from '@/lib/lpPools';
-import { amount, shortDate, tooltipDate, usd } from './format';
+import { type LpDayFile, type LpIndexDay } from '@/lib/lpPools';
+import { amount, change, shortDate, usd } from './format';
 
 interface AnalAccountPanelProps {
   account: string | null;
   onAccountChange: (account: string | null) => void;
-  /** UTC dates of the recorded days in the selected range, oldest first. */
-  dates: string[];
+  /** Recorded snapshots in the selected range, oldest first. */
+  days: LpIndexDay[];
   current: LpDayFile | null;
 }
 
 const axisTick = { fontSize: 10, fill: '#FFFFFF' } as const;
 
-export function AnalAccountPanel({ account, onAccountChange, dates, current }: AnalAccountPanelProps) {
+export function AnalAccountPanel({ account, onAccountChange, days, current }: AnalAccountPanelProps) {
   const [query, setQuery] = useState('');
   const [selectedPool, setSelectedPool] = useState<string | null>(null);
+  const dates = useMemo(() => days.map((day) => day.date), [days]);
   const { rows, isLoading } = useLpAccountHistory(account, dates);
 
   // Always start from the full account overview when the account changes.
@@ -81,8 +84,13 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
       entry.cheese += row.cheese;
       byDate.set(row.date, entry);
     }
-    return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
-  }, [chartRows]);
+    return [...byDate.values()]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((entry) => ({
+        ...entry,
+        waxUsd: waxUsdFromPools(days.find((day) => day.date === entry.date)?.pools ?? []),
+      }));
+  }, [chartRows, days]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,14 +98,45 @@ export function AnalAccountPanel({ account, onAccountChange, dates, current }: A
     if (name) selectAccount(name);
   };
 
-  const tooltip = (formatter: (value: number) => string, className: string) =>
-    ({ active, payload }: { active?: boolean; payload?: { value?: unknown; payload?: { date: string } }[] }) =>
-      active && payload?.length ? (
-        <div className="bg-background/95 border border-border px-2 py-1 rounded text-xs font-mono">
-          <div className={className}>{formatter(Number(payload[0].value))}</div>
-          <div className="text-muted-foreground">{tooltipDate(String(payload[0].payload?.date ?? ''))}</div>
-        </div>
-      ) : null;
+  const tooltipExtras = (metric: 'usd' | 'cheese') => (date: string, value: number): string[] => {
+    const lines: string[] = [];
+    const index = series.findIndex((entry) => entry.date === date);
+    if (index === 0) lines.push('first recorded snapshot');
+    if (index > 0) {
+      const pct = change(value, series[index - 1][metric]);
+      if (pct) lines.push(`${pct.text} since last snapshot`);
+
+      const currentByPool = new Map(
+        chartRows.filter((row) => row.date === date).map((row) => [row.poolKey, row]),
+      );
+      const previousByPool = new Map(
+        chartRows.filter((row) => row.date === series[index - 1].date).map((row) => [row.poolKey, row]),
+      );
+      const changed = [...new Set([...currentByPool.keys(), ...previousByPool.keys()])]
+        .map((key) => {
+          const now = currentByPool.get(key);
+          const before = previousByPool.get(key);
+          const delta = (now?.[metric] ?? 0) - (before?.[metric] ?? 0);
+          const label = now?.label ?? before?.label ?? key;
+          return { label, delta };
+        })
+        .filter((entry) => Math.abs(entry.delta) > 0.00000001)
+        .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+      if (!selectedPool && changed.length) {
+        lines.push(
+          ...changed.slice(0, 4).map((entry) =>
+            `${entry.label} ${entry.delta >= 0 ? '+' : '-'}${metric === 'usd' ? usd(Math.abs(entry.delta)) : `${amount(Math.abs(entry.delta), 2)} CHEESE`}`,
+          ),
+        );
+        if (changed.length > 4) lines.push(`+${changed.length - 4} more pools`);
+      }
+    }
+    if (metric === 'usd') {
+      const waxUsd = series[index]?.waxUsd;
+      if (waxUsd && waxUsd > 0) lines.push(`${amount(value / waxUsd, 0)} WAX`);
+    }
+    return lines;
+  };
 
   return (
     <div className="w-full rounded-xl bg-card border border-border/50 p-4 space-y-4">
