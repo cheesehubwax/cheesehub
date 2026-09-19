@@ -1,6 +1,7 @@
 // Alcor Farms library for interacting with Alcor Exchange API and swap.alcor contract
 // Includes blockchain fallback for resilience when Alcor API is unavailable
 import { waxRpcCall, fetchTableRows } from './waxRpcFallback';
+import type { PoolSlot } from './alcorV3Amounts';
 
 // Contract name for transactions
 const ALCOR_SWAP_CONTRACT = 'swap.alcor';

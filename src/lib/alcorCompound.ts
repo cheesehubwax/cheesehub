@@ -3,6 +3,7 @@
 // work out how much of each pair can be re-added to each position.
 
 import { getTokenConfig } from '@/lib/tokenRegistry';
+import { PoolSlot, poolDepositRatio } from '@/lib/alcorV3Amounts';
 
 
 export interface CompoundTokenRef {
