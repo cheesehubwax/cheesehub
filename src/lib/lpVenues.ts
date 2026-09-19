@@ -488,12 +488,14 @@ const TACO_VOLUME_BUDGET_MS = 150_000;
 export async function fetchTacoPairVolume(
   prices: UsdPrices,
   now = Date.now(),
+  base: LpToken = CHEESE_TOKEN,
 ): Promise<Map<string, VenueVolume>> {
+  const baseSymbol = base.symbol.toUpperCase();
   const since = new Date(now - 24 * 60 * 60 * 1000).toISOString().slice(0, 19);
   // `now` defines the historical 24h window and may be supplied by tests or
   // callers replaying an older period; the network deadline must use wall time.
   const deadline = Date.now() + TACO_VOLUME_BUDGET_MS;
-  const cheeseUsd = cheeseUsdFrom(prices);
+  const cheeseUsd = cheeseUsdFrom(prices, base);
   const seen = new Set<string>();
   const cheeseByPair = new Map<string, number>();
   let before: string | undefined;
