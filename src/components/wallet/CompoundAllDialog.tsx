@@ -1,0 +1,400 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertTriangle, Info, Loader2, Recycle } from 'lucide-react';
+import { useWax } from '@/context/WaxContext';
+import { toast } from 'sonner';
+import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
+import { TokenLogo } from '@/components/TokenLogo';
+import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
+import { buildClaimRewardsAction, buildIncreaseLiquidityAction, AlcorFarmPosition } from '@/lib/alcorFarms';
+import { waxRpcCall } from '@/lib/waxRpcFallback';
+import {
+  AvailableBalance,
+  CompoundCandidate,
+  CompoundPlan,
+  MAX_COMPOUND_POSITIONS,
+  balanceKey,
+  planCompound,
+} from '@/lib/alcorCompound';
+
+export interface CompoundPosition {
+  positionId: number;
+  poolId: number;
+  tickLower: number;
+  tickUpper: number;
+  tokenA: { contract: string; symbol: string; amount: number };
+  tokenB: { contract: string; symbol: string; amount: number };
+  usdValue: number;
+  incentives: AlcorFarmPosition[];
+}
+
+interface CompoundAllDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  positions: CompoundPosition[];
+  onTransactionSuccess?: (title: string, description: string, txId: string | null) => void;
+  onTransactionComplete?: () => void;
+}
+
+type Stage = 'confirm' | 'claiming' | 'waiting' | 'preview' | 'compounding' | 'done';
+
+const POLL_ATTEMPTS = 12;
+const POLL_DELAY_MS = 2000;
+
+function parseBalance(raw: string | undefined): AvailableBalance {
+  if (!raw) return { balance: 0, precision: 8 };
+  const [amountStr] = raw.split(' ');
+  const decimals = amountStr.split('.')[1]?.length ?? 0;
+  return { balance: parseFloat(amountStr) || 0, precision: decimals };
+}
+
+async function readBalance(account: string, contract: string, symbol: string): Promise<AvailableBalance> {
+  try {
+    const rows = await waxRpcCall<string[]>(
+      '/v1/chain/get_currency_balance',
+      { code: contract, account, symbol },
+      6000,
+    );
+    return parseBalance(rows?.[0]);
+  } catch {
+    return { balance: 0, precision: 8 };
+  }
+}
+
+async function readBalances(
+  account: string,
+  tokens: Array<{ contract: string; symbol: string }>,
+): Promise<Map<string, AvailableBalance>> {
+  const map = new Map<string, AvailableBalance>();
+  const results = await Promise.all(tokens.map(t => readBalance(account, t.contract, t.symbol)));
+  tokens.forEach((t, i) => {
+    const existing = map.get(balanceKey(t.contract, t.symbol));
+    const value = results[i];
+    // Keep the largest reported precision if the same token appears twice.
+    if (!existing || value.precision > existing.precision) {
+      map.set(balanceKey(t.contract, t.symbol), value);
+    }
+  });
+  return map;
+}
+
+export function CompoundAllDialog({
+  open,
+  onOpenChange,
+  positions,
+  onTransactionSuccess,
+  onTransactionComplete,
+}: CompoundAllDialogProps) {
+  const { session, accountName } = useWax();
+  const [stage, setStage] = useState<Stage>('confirm');
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [plan, setPlan] = useState<CompoundPlan | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [claimTxId, setClaimTxId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setStage('confirm');
+      setTermsAccepted(false);
+      setPlan(null);
+      setError(null);
+      setClaimTxId(null);
+    }
+  }, [open]);
+
+  const candidates = useMemo<CompoundCandidate[]>(
+    () =>
+      positions.map(pos => ({
+        positionId: pos.positionId,
+        poolId: pos.poolId,
+        tickLower: pos.tickLower,
+        tickUpper: pos.tickUpper,
+        tokenA: pos.tokenA,
+        tokenB: pos.tokenB,
+        usdValue: pos.usdValue,
+        rewardTokenKeys: Array.from(
+          new Set(pos.incentives.map(i => balanceKey(i.rewardToken.contract, i.rewardToken.symbol))),
+        ),
+      })),
+    [positions],
+  );
+
+  // Positions whose farms pay out both pool tokens — the ones that can compound.
+  const eligibleCandidates = useMemo(
+    () =>
+      candidates.filter(c => {
+        const rewards = new Set(c.rewardTokenKeys);
+        return (
+          rewards.has(balanceKey(c.tokenA.contract, c.tokenA.symbol)) &&
+          rewards.has(balanceKey(c.tokenB.contract, c.tokenB.symbol))
+        );
+      }),
+    [candidates],
+  );
+
+  const tokensToRead = useMemo(() => {
+    const seen = new Map<string, { contract: string; symbol: string }>();
+    eligibleCandidates.forEach(c => {
+      seen.set(balanceKey(c.tokenA.contract, c.tokenA.symbol), c.tokenA);
+      seen.set(balanceKey(c.tokenB.contract, c.tokenB.symbol), c.tokenB);
+    });
+    return Array.from(seen.values());
+  }, [eligibleCandidates]);
+
+  const claims = useMemo(() => {
+    const map = new Map<string, { incentiveId: number; posId: number }>();
+    positions.forEach(pos => {
+      pos.incentives.forEach(i => {
+        map.set(`${i.incentiveId}-${i.positionId}`, { incentiveId: i.incentiveId, posId: i.positionId });
+      });
+    });
+    return Array.from(map.values());
+  }, [positions]);
+
+  const runClaimAndPlan = useCallback(async () => {
+    if (!session || !accountName) return;
+    setError(null);
+
+    let before: Map<string, AvailableBalance>;
+    try {
+      before = await readBalances(accountName, tokensToRead);
+    } catch {
+      before = new Map();
+    }
+
+    setStage('claiming');
+    let txId: string | null = null;
+    try {
+      const result = await session.transact(
+        { actions: buildClaimRewardsAction(accountName, claims) },
+        { transactPlugins: getTransactPlugins(session) },
+      );
+      txId = result.resolved?.transaction.id?.toString() || null;
+      setClaimTxId(txId);
+    } catch (err: any) {
+      setStage('confirm');
+      setError(err?.message || 'Failed to claim rewards. Nothing was compounded.');
+      closeWharfkitModals();
+      return;
+    }
+    closeWharfkitModals();
+
+    setStage('waiting');
+    let after = before;
+    for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt++) {
+      await new Promise(r => setTimeout(r, POLL_DELAY_MS));
+      after = await readBalances(accountName, tokensToRead);
+      const increased = Array.from(after.entries()).some(([key, value]) => {
+        const prev = before.get(key)?.balance ?? 0;
+        return value.balance > prev;
+      });
+      if (increased) break;
+    }
+
+    const built = planCompound(candidates, after, MAX_COMPOUND_POSITIONS);
+    setPlan(built);
+    setStage('preview');
+    onTransactionComplete?.();
+  }, [session, accountName, tokensToRead, claims, candidates, onTransactionComplete]);
+
+  const runCompound = useCallback(async () => {
+    if (!session || !accountName || !plan || plan.compoundable.length === 0) return;
+    setError(null);
+    setStage('compounding');
+    try {
+      const actions = plan.compoundable.flatMap(entry =>
+        buildIncreaseLiquidityAction(
+          accountName,
+          entry.positionId,
+          entry.poolId,
+          entry.tickLower,
+          entry.tickUpper,
+          entry.tokenA.contract,
+          entry.tokenA.quantity,
+          entry.tokenB.contract,
+          entry.tokenB.quantity,
+        ),
+      );
+      const result = await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
+      const txId = result.resolved?.transaction.id?.toString() || null;
+      onTransactionSuccess?.(
+        'Rewards Compounded!',
+        `Added rewards back into ${plan.compoundable.length} position${plan.compoundable.length !== 1 ? 's' : ''}`,
+        txId,
+      );
+      setStage('done');
+      onTransactionComplete?.();
+      onOpenChange(false);
+    } catch (err: any) {
+      setStage('preview');
+      setError(
+        `${err?.message || 'Failed to add liquidity'} — your rewards were already claimed and are safe in your wallet. You can retry the compound step.`,
+      );
+    } finally {
+      closeWharfkitModals();
+      setTimeout(() => closeWharfkitModals(), 300);
+    }
+  }, [session, accountName, plan, onTransactionSuccess, onTransactionComplete, onOpenChange]);
+
+  const busy = stage === 'claiming' || stage === 'waiting' || stage === 'compounding';
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!busy) onOpenChange(v); }}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Recycle className="h-4 w-4 text-cheese" />
+            Compound All Rewards
+          </DialogTitle>
+          <DialogDescription>
+            Claim your farm rewards, then put them straight back into the same pools.
+          </DialogDescription>
+        </DialogHeader>
+
+        {stage === 'confirm' && (
+          <div className="space-y-4">
+            <Alert className="bg-muted/40">
+              <Info className="h-4 w-4" />
+              <AlertDescription className="text-xs space-y-1">
+                <p>
+                  Step 1 claims rewards from {claims.length} farm{claims.length !== 1 ? 's' : ''}. Step 2 adds them back
+                  into up to {MAX_COMPOUND_POSITIONS} positions in one transaction.
+                </p>
+                <p>
+                  Only pools whose rewards cover both tokens can be compounded ({eligibleCandidates.length} of{' '}
+                  {candidates.length} position{candidates.length !== 1 ? 's' : ''}). The smaller reward side goes in
+                  full, matched by the other token. Anything left over stays in your wallet.
+                </p>
+              </AlertDescription>
+            </Alert>
+
+            {eligibleCandidates.length === 0 && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  None of your farms pay out both tokens of their pool, so nothing can be compounded right now. Use
+                  Claim All instead.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="text-xs">{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <TermsCheckbox id="compound-terms" checked={termsAccepted} onCheckedChange={setTermsAccepted} />
+
+            <Button
+              className="w-full bg-cheese hover:bg-cheese-dark text-primary-foreground"
+              disabled={!termsAccepted || eligibleCandidates.length === 0 || !session}
+              onClick={runClaimAndPlan}
+            >
+              Claim &amp; Continue
+            </Button>
+          </div>
+        )}
+
+        {(stage === 'claiming' || stage === 'waiting') && (
+          <div className="py-8 flex flex-col items-center gap-3 text-sm text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin text-cheese" />
+            {stage === 'claiming' ? 'Waiting for your claim signature…' : 'Rewards claimed — checking your balances…'}
+          </div>
+        )}
+
+        {(stage === 'preview' || stage === 'compounding') && plan && (
+          <div className="space-y-4">
+            {plan.compoundable.length > 0 ? (
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {plan.compoundable.map(entry => (
+                  <div
+                    key={entry.positionId}
+                    className="flex items-center justify-between gap-2 rounded-md border border-border/50 bg-muted/30 p-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="flex -space-x-2">
+                        <TokenLogo contract={entry.tokenA.contract} symbol={entry.tokenA.symbol} size="sm" />
+                        <TokenLogo contract={entry.tokenB.contract} symbol={entry.tokenB.symbol} size="sm" />
+                      </div>
+                      <div className="text-xs">
+                        <div className="font-medium">{entry.tokenA.symbol}/{entry.tokenB.symbol}</div>
+                        <div className="text-muted-foreground">#{entry.positionId}</div>
+                      </div>
+                    </div>
+                    <div className="font-mono text-xs text-right text-cheese">
+                      <div>{entry.tokenA.amount.toFixed(Math.min(6, entry.tokenA.precision))} {entry.tokenA.symbol}</div>
+                      <div>{entry.tokenB.amount.toFixed(Math.min(6, entry.tokenB.precision))} {entry.tokenB.symbol}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  Your rewards were claimed, but nothing could be paired up for a deposit. The rewards are in your
+                  wallet.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {plan.skipped.length > 0 && (
+              <div className="space-y-1 text-xs text-muted-foreground max-h-32 overflow-y-auto pr-1">
+                <p className="font-medium text-foreground">Skipped ({plan.skipped.length})</p>
+                {plan.skipped.map(skip => (
+                  <p key={`${skip.positionId}-${skip.reason}`}>
+                    {skip.pair} #{skip.positionId} — {skip.detail}
+                  </p>
+                ))}
+              </div>
+            )}
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="text-xs">{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                disabled={stage === 'compounding'}
+                onClick={() => {
+                  if (claimTxId) {
+                    onTransactionSuccess?.(
+                      'Rewards Claimed!',
+                      `Claimed rewards from ${claims.length} incentive(s)`,
+                      claimTxId,
+                    );
+                  } else {
+                    toast.success('Rewards claimed');
+                  }
+                  onOpenChange(false);
+                }}
+              >
+                Keep rewards
+              </Button>
+              <Button
+                className="flex-1 bg-cheese hover:bg-cheese-dark text-primary-foreground"
+                disabled={stage === 'compounding' || plan.compoundable.length === 0}
+                onClick={runCompound}
+              >
+                {stage === 'compounding' ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  `Add to ${plan.compoundable.length} position${plan.compoundable.length !== 1 ? 's' : ''}`
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
