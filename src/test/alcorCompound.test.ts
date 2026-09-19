@@ -246,7 +246,7 @@ describe('unreadable balances', () => {
       ],
       balances([
         [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 1000, precision: 8, known: true }],
-        [balanceKey(USDC.contract, USDC.symbol), { balance: 1, precision: 6, known: true }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 1, precision: 2, known: true }],
       ]),
     );
     const consumed = shared.skipped.find(s => s.positionId === 2);
