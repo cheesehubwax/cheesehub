@@ -210,10 +210,35 @@ function formatQuantity(amount: number, precision: number, symbol: string): stri
 }
 
 /**
+ * Amount of each token that the claim actually paid out: the balance after the
+ * claim minus the balance before it. This is the ONLY pool of tokens compounding
+ * is allowed to spend — whatever the wallet held beforehand is never touched.
+ *
+ * A token counts as unknown when either read failed, or when there is no
+ * before-reading at all, so it can never be mistaken for "nothing arrived".
+ */
+export function buildClaimedBalances(
+  before: ReadonlyMap<string, AvailableBalance>,
+  after: ReadonlyMap<string, AvailableBalance>,
+): Map<string, AvailableBalance> {
+  const claimed = new Map<string, AvailableBalance>();
+  after.forEach((value, key) => {
+    const prev = before.get(key);
+    const precision = Math.max(value.precision, prev?.precision ?? 0);
+    const known = value.known !== false && prev !== undefined && prev.known !== false;
+    const delta = floorTo(Math.max(0, value.balance - (prev?.balance ?? 0)), precision);
+    claimed.set(key, { balance: known ? delta : 0, precision, known });
+  });
+  return claimed;
+}
+
+/**
  * Build the compound plan.
  *
  * Rules:
  * - A position only compounds when its farms pay out BOTH of its pool tokens.
+ * - Only the amounts paid by this claim are used (see `buildClaimedBalances`);
+ *   pre-existing wallet holdings are never spent.
  * - The smaller side is used in full, the larger side matched at the position ratio.
  * - Balances are shared: positions are served in descending USD value and each
  *   allocation is deducted, so the total never exceeds what was actually claimed.
@@ -224,20 +249,18 @@ export function planCompound(
   available: ReadonlyMap<string, AvailableBalance>,
   maxPositions: number = MAX_COMPOUND_POSITIONS,
 ): CompoundPlan {
-  // Hold back a small buffer of every claimed token so rounding or a late
-  // reward can never make the deposit exceed the wallet balance.
   const remaining = new Map<string, AvailableBalance>();
-  // Snapshot of the buffered starting balances, so a side that ran out can be
+  // Snapshot of the starting claimed amounts, so a side that ran out can be
   // told apart from a side that never received anything.
   const started = new Map<string, AvailableBalance>();
   available.forEach((value, key) => {
-    const buffered = {
+    const entry = {
       precision: value.precision,
       known: value.known,
-      balance: floorTo(Math.max(0, value.balance) * (1 - COMPOUND_BUFFER_RATE), value.precision),
+      balance: floorTo(Math.max(0, value.balance), value.precision),
     };
-    remaining.set(key, { ...buffered });
-    started.set(key, { ...buffered });
+    remaining.set(key, { ...entry });
+    started.set(key, { ...entry });
   });
 
   const compoundable: CompoundPlanEntry[] = [];
