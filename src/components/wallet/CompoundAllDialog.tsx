@@ -356,8 +356,9 @@ export function CompoundAllDialog({
                 </p>
                 <p>
                   Only pools whose rewards cover both tokens can be compounded ({eligibleCandidates.length} of{' '}
-                  {candidates.length} position{candidates.length !== 1 ? 's' : ''}). The smaller reward side goes in
-                  full, matched by the other token. Anything left over stays in your wallet.
+                  {candidates.length} position{candidates.length !== 1 ? 's' : ''}), and the position must still be
+                  inside its price range. Deposits are sized at the exact ratio the pool accepts, so the smaller reward
+                  side goes in as far as it can and anything left over stays in your wallet.
                 </p>
                 <p>
                   Only the tokens this claim pays out are used — tokens already in your wallet are never spent. A 0.75%
