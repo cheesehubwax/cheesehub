@@ -283,11 +283,13 @@ describe('selected-position filtering', () => {
     const allTotals = buildCompoundFeeTotals(plan.compoundable);
     selectedTotals.forEach(sel => {
       const all = allTotals.find(t => t.symbol === sel.symbol)!;
-      const expected = selectedEntries
-        .reduce((sum, e) => sum + (e.tokenA.symbol === sel.symbol ? e.tokenA.fee : e.tokenB.fee), 0);
-      expect(sel.quantity.startsWith(expected.toFixed(all.quantity.split('.')[1].split(' ')[0].length))).toBe(true);
+      const expected = selectedEntries.reduce(
+        (sum, e) => sum + (e.tokenA.symbol === sel.symbol ? e.tokenA.fee : e.tokenB.fee),
+        0,
+      );
+      expect(sel.quantity).toBe(`${expected.toFixed(sel.precision)} ${sel.symbol}`);
       // Excluding position 2 must reduce the fee total.
-      expect(parseFloat(sel.quantity)).toBeLessThan(parseFloat(all.quantity));
+      expect(sel.amount).toBeLessThan(all.amount);
     });
   });
 });
