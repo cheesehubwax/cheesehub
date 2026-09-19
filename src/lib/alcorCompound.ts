@@ -2,6 +2,9 @@
 // Given LP positions and the token balances available after a claim,
 // work out how much of each pair can be re-added to each position.
 
+import { getTokenConfig } from '@/lib/tokenRegistry';
+
+
 export interface CompoundTokenRef {
   contract: string;
   symbol: string;
