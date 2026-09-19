@@ -93,6 +93,13 @@ export const MAX_COMPOUND_POSITIONS = 20;
 /** Share of every compounded deposit sent to the fee account. */
 export const COMPOUND_FEE_RATE = 0.0075;
 export const COMPOUND_FEE_ACCOUNT = 'hole.cheese';
+/**
+ * Deposit slippage tolerance for compounding. Deliberately wider than the manual
+ * 0.5% default: the pool price moves with every trade between reading it and
+ * signing, and the pool's integer maths differs slightly from ours. Without this
+ * buffer the pool rejects the deposit with "Price slippage check".
+ */
+export const COMPOUND_SLIPPAGE_TOLERANCE = 0.03;
 export const COMPOUND_FEE_MEMO = 'compound fee';
 
 export function balanceKey(contract: string, symbol: string): string {
