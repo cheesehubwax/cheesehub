@@ -82,7 +82,10 @@ describe('planCompound', () => {
     expect(entry.tokenA.fee).toBeCloseTo(entry.tokenA.gross * COMPOUND_FEE_RATE, 6);
     expect(entry.tokenB.fee).toBeCloseTo(entry.tokenB.gross * COMPOUND_FEE_RATE, 5);
     expect(entry.tokenA.amount).toBeCloseTo(entry.tokenA.gross - entry.tokenA.fee, 6);
-    expect(entry.tokenB.amount).toBeCloseTo(entry.tokenB.gross - entry.tokenB.fee, 6);
+    // Token B is re-aligned onto the pool ratio, so it may sit one unit below
+    // gross minus fee — never above it.
+    expect(entry.tokenB.amount).toBeLessThanOrEqual(entry.tokenB.gross - entry.tokenB.fee);
+    expect(entry.tokenB.amount).toBeCloseTo(entry.tokenB.gross - entry.tokenB.fee, 4);
     // Deposit plus fee never exceeds what was claimed.
     expect(entry.tokenA.amount + entry.tokenA.fee).toBeLessThanOrEqual(500);
     expect(entry.tokenB.amount + entry.tokenB.fee).toBeLessThanOrEqual(10);
@@ -316,8 +319,8 @@ describe('unreadable balances', () => {
         candidate({ positionId: 2, usdValue: 100 }),
       ],
       balances([
-        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 1000, precision: 8, known: true }],
-        [balanceKey(USDC.contract, USDC.symbol), { balance: 2, precision: 0, known: true }],
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 150, precision: 8, known: true }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 10, precision: 6, known: true }],
       ]),
     );
     const consumed = shared.skipped.find(s => s.positionId === 2);
