@@ -1,16 +1,19 @@
 // CHEESEAnal — history charts and provider list for one selected pool.
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { CheeseLogo, PairLabel, PairLogos, UsdLogo } from '@/components/anal/PairLogos';
 import { HistoricalNote } from '@/components/anal/HistoricalNote';
+import { MiniChartTooltip } from '@/components/anal/MiniChartTooltip';
+import { diffPoolSnapshots, waxUsdFromPools } from '@/components/anal/snapshotDiff';
 import { TokenLogo } from '@/components/TokenLogo';
 import { VenueLabel } from '@/components/anal/VenueLogo';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
+import { useLpDay } from '@/hooks/useLpHistory';
 import { downloadPoolHistoryCsv } from '@/lib/lpCsv';
 import { type LpDayFile, type LpIndexDay, type LpPoolSnapshot } from '@/lib/lpPools';
-import { amount, shortDate, tokenPrice, tooltipDate, usd } from './format';
+import { amount, change, shortDate, tokenPrice, tooltipDate, usd } from './format';
 
 interface AnalPoolDetailProps {
   pool: LpPoolSnapshot | null;
@@ -24,8 +27,15 @@ interface AnalPoolDetailProps {
 }
 
 const axisTick = { fontSize: 10, fill: '#FFFFFF' } as const;
+const MAX_NAMES = 4;
+
+function nameList(names: string[]): string {
+  if (names.length <= MAX_NAMES) return names.join(', ');
+  return `${names.slice(0, MAX_NAMES).join(', ')} +${names.length - MAX_NAMES} more`;
+}
 
 export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, onSelectPool }: AnalPoolDetailProps) {
+  const [hovered, setHovered] = useState<string | null>(null);
   const series = useMemo(() => {
     if (!pool) return [];
     return days
@@ -38,10 +48,12 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
               cheese: row.cheese,
               paired: row.paired,
               accounts: row.accounts,
+               positions: row.positions,
               // This pair's own CHEESE price, in the paired token.
               price: row.priceInPaired ?? 0,
               // USD volume is recorded once per UTC day, so gaps are expected.
               volumeUsd: row.volumeUsd24 ?? null,
+               waxUsd: waxUsdFromPools(day.pools),
             }
           : null;
       })
@@ -53,6 +65,72 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
     [pools],
   );
 
+  const hasSeries = series.length >= 1;
+  const volumeSeries = series.filter((row): row is typeof row & { volumeUsd: number } => row.volumeUsd !== null);
+  const latestVolume = volumeSeries[volumeSeries.length - 1] ?? null;
+  const hoveredIndex = hovered ? series.findIndex((row) => row.date === hovered) : -1;
+  const previousDate = hoveredIndex > 0 ? series[hoveredIndex - 1].date : null;
+  const { day: hoveredDay, isLoading: hoveredLoading } = useLpDay(hovered);
+  const { day: previousDay, isLoading: previousLoading } = useLpDay(previousDate);
+  const poolDiff = useMemo(
+    () => (pool && hovered ? diffPoolSnapshots(hoveredDay, previousDay, pool.key) : null),
+    [pool, hovered, hoveredDay, previousDay],
+  );
+
+  const previousValue = (date: string, key: 'price' | 'usd' | 'cheese' | 'paired' | 'accounts' | 'volumeUsd') => {
+    const index = series.findIndex((row) => row.date === date);
+    for (let i = index - 1; i >= 0; i -= 1) {
+      const candidate = series[i][key];
+      if (candidate !== null && candidate !== undefined) return Number(candidate);
+    }
+    return null;
+  };
+
+  const extras = (key: 'price' | 'usd' | 'cheese' | 'paired' | 'accounts' | 'volumeUsd') =>
+    (date: string, value: number): string[] => {
+      const lines: string[] = [];
+      const index = series.findIndex((row) => row.date === date);
+      const previous = previousValue(date, key);
+      const pct = previous !== null ? change(value, previous) : null;
+      if (pct) lines.push(`${pct.text} since last snapshot`);
+      else if (index === 0) lines.push('first recorded snapshot');
+
+      if (key === 'usd') {
+        const waxUsd = series[index]?.waxUsd;
+        if (waxUsd && waxUsd > 0) lines.push(`${amount(value / waxUsd, 0)} WAX`);
+      }
+      if (key === 'accounts') {
+        const previousPositions = index > 0 ? series[index - 1].positions : null;
+        const currentPositions = series[index]?.positions;
+        if (previous !== null) lines.push(`${value - previous >= 0 ? '+' : ''}${Math.round(value - previous)} accounts`);
+        if (previousPositions !== null && currentPositions !== undefined) {
+          const delta = currentPositions - previousPositions;
+          lines.push(`${delta >= 0 ? '+' : ''}${delta} positions`);
+        }
+        if (index > 0 && (hoveredLoading || previousLoading)) {
+          lines.push('loading accounts...');
+        } else if (poolDiff) {
+          if (poolDiff.joined.length) lines.push(`joined: ${nameList(poolDiff.joined)}`);
+          if (poolDiff.left.length) lines.push(`left: ${nameList(poolDiff.left)}`);
+          const moves = poolDiff.positionChanges.filter(
+            (move) => !poolDiff.joined.includes(move.account) && !poolDiff.left.includes(move.account),
+          );
+          if (moves.length) {
+            lines.push(...moves.slice(0, MAX_NAMES).map((move) => `${move.account} ${move.delta > 0 ? '+' : ''}${move.delta} positions`));
+            if (moves.length > MAX_NAMES) lines.push(`+${moves.length - MAX_NAMES} more accounts`);
+          }
+          if (!poolDiff.joined.length && !poolDiff.left.length && !moves.length) lines.push('no provider changes');
+        }
+      }
+      return lines;
+    };
+
+  const chartHover = {
+    onMouseMove: (state: { activeLabel?: string | number }) =>
+      setHovered(state?.activeLabel != null ? String(state.activeLabel) : null),
+    onMouseLeave: () => setHovered(null),
+  };
+
   if (!pool) {
     return (
       <div className="w-full rounded-xl bg-card border border-border/50 p-6 text-center text-xs text-muted-foreground">
@@ -60,19 +138,6 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
       </div>
     );
   }
-
-  const hasSeries = series.length >= 1;
-  const volumeSeries = series.filter((row): row is typeof row & { volumeUsd: number } => row.volumeUsd !== null);
-  const latestVolume = volumeSeries[volumeSeries.length - 1] ?? null;
-
-  const tooltip = (formatter: (value: number) => string, className: string) =>
-    ({ active, payload }: { active?: boolean; payload?: { value?: unknown; payload?: { date: string } }[] }) =>
-      active && payload?.length ? (
-        <div className="bg-background/95 border border-border px-2 py-1 rounded text-xs font-mono">
-          <div className={className}>{formatter(Number(payload[0].value))}</div>
-          <div className="text-muted-foreground">{tooltipDate(String(payload[0].payload?.date ?? ''))}</div>
-        </div>
-      ) : null;
 
   return (
     <div className="w-full rounded-xl bg-card border border-border/50 p-4 space-y-4">
@@ -126,11 +191,11 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
             </div>
             <div className="h-36">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} {...chartHover}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                   <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
                   <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => tokenPrice(v)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
-                  <Tooltip content={tooltip((v) => tokenPrice(v, pool.symbol), 'text-cheese')} />
+                  <Tooltip content={(props) => <MiniChartTooltip {...props} format={(v) => tokenPrice(v, pool.symbol)} valueClass="text-cheese" extras={extras('price')} />} />
                   <Line type="monotone" dataKey="price" stroke="#FACC15" strokeWidth={2} dot={{ r: 3, fill: '#FACC15', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -147,7 +212,7 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
             </div>
             <div className="h-36">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <AreaChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} {...chartHover}>
                   <defs>
                     <linearGradient id="analPoolUsd" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.35} />
@@ -157,7 +222,7 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                   <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
                   <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => usd(v)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
-                  <Tooltip content={tooltip((v) => usd(v), 'text-cheese')} />
+                  <Tooltip content={(props) => <MiniChartTooltip {...props} format={usd} valueClass="text-cheese" extras={extras('usd')} />} />
                   <Area type="monotone" dataKey="usd" stroke="#3B82F6" strokeWidth={2} fill="url(#analPoolUsd)" dot={{ r: 3, fill: '#3B82F6', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -174,11 +239,11 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
             </div>
             <div className="h-36">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} {...chartHover}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                   <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
                   <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => amount(v, 0)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
-                  <Tooltip content={tooltip((v) => `${amount(v, 4)} CHEESE`, 'text-cheese')} />
+                  <Tooltip content={(props) => <MiniChartTooltip {...props} format={(v) => `${amount(v, 4)} CHEESE`} valueClass="text-cheese" extras={extras('cheese')} />} />
                   <Line type="monotone" dataKey="cheese" stroke="#22C55E" strokeWidth={2} dot={{ r: 3, fill: '#22C55E', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -195,11 +260,11 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
             </div>
             <div className="h-36">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} {...chartHover}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                   <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
                   <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => amount(v, 2)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
-                  <Tooltip content={tooltip((v) => `${amount(v, 6)} ${pool.symbol}`, 'text-foreground')} />
+                  <Tooltip content={(props) => <MiniChartTooltip {...props} format={(v) => `${amount(v, 6)} ${pool.symbol}`} valueClass="text-foreground" extras={extras('paired')} />} />
                   <Line type="monotone" dataKey="paired" stroke="#EC4899" strokeWidth={2} dot={{ r: 3, fill: '#EC4899', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -215,11 +280,11 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
             </div>
             <div className="h-36">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} {...chartHover}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                   <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
                   <YAxis domain={['auto', 'auto']} allowDecimals={false} tick={axisTick} width={70} stroke="hsl(var(--border))" />
-                  <Tooltip content={tooltip((v) => `${v} accounts`, 'text-foreground')} />
+                  <Tooltip content={(props) => <MiniChartTooltip {...props} format={(v) => `${Math.round(v)} accounts`} valueClass="text-foreground" extras={extras('accounts')} />} />
                   <Line type="monotone" dataKey="accounts" stroke="#FFFFFF" strokeWidth={2} dot={{ r: 3, fill: '#FFFFFF', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -241,11 +306,11 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
             {volumeSeries.length > 0 ? (
               <div className="h-36">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={volumeSeries} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  <LineChart data={volumeSeries} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} {...chartHover}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                     <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
                     <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => usd(v)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
-                    <Tooltip content={tooltip((v) => usd(v), 'text-cheese')} />
+                    <Tooltip content={(props) => <MiniChartTooltip {...props} format={usd} valueClass="text-cheese" extras={extras('volumeUsd')} />} />
                     <Line type="monotone" dataKey="volumeUsd" stroke="#38BDF8" strokeWidth={2} connectNulls={false} dot={{ r: 3, fill: '#38BDF8', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                   </LineChart>
                 </ResponsiveContainer>

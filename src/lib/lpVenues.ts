@@ -476,7 +476,9 @@ export async function fetchTacoPairVolume(
   now = Date.now(),
 ): Promise<Map<string, VenueVolume>> {
   const since = new Date(now - 24 * 60 * 60 * 1000).toISOString().slice(0, 19);
-  const deadline = now + TACO_VOLUME_BUDGET_MS;
+  // `now` defines the historical 24h window and may be supplied by tests or
+  // callers replaying an older period; the network deadline must use wall time.
+  const deadline = Date.now() + TACO_VOLUME_BUDGET_MS;
   const cheeseUsd = cheeseUsdFrom(prices);
   const seen = new Set<string>();
   const cheeseByPair = new Map<string, number>();

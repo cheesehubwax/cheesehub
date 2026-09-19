@@ -28,6 +28,13 @@ function positionsByAccount(day: LpDayFile, venue: LpVenue | 'all'): Map<string,
   return out;
 }
 
+function positionsByAccountInPool(day: LpDayFile, poolKey: string): Map<string, number> {
+  const out = new Map<string, number>();
+  const pool = day.pools.find((row) => row.key === poolKey);
+  for (const row of pool?.providers ?? []) out.set(row.a, row.pos ?? 0);
+  return out;
+}
+
 export interface AccountChange {
   account: string;
   delta: number;
@@ -71,5 +78,39 @@ export function diffSnapshots(
   left.sort();
   positionChanges.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || a.account.localeCompare(b.account));
 
+  return { joined, left, positionChanges };
+}
+
+/** Diff provider membership and open-position counts inside one recorded pool. */
+export function diffPoolSnapshots(
+  current: LpDayFile | null,
+  previous: LpDayFile | null,
+  poolKey: string,
+): SnapshotDiff | null {
+  if (!current || !previous) return null;
+  const venue = current.pools.find((pool) => pool.key === poolKey)?.venue
+    ?? previous.pools.find((pool) => pool.key === poolKey)?.venue;
+  if (!venue || current.partial?.includes(venue) || previous.partial?.includes(venue)) return null;
+
+  const now = positionsByAccountInPool(current, poolKey);
+  const before = positionsByAccountInPool(previous, poolKey);
+  const joined: string[] = [];
+  const left: string[] = [];
+  const positionChanges: AccountChange[] = [];
+
+  for (const [account, pos] of now) {
+    if (!before.has(account)) joined.push(account);
+    const delta = pos - (before.get(account) ?? 0);
+    if (delta !== 0) positionChanges.push({ account, delta });
+  }
+  for (const [account, pos] of before) {
+    if (now.has(account)) continue;
+    left.push(account);
+    if (pos !== 0) positionChanges.push({ account, delta: -pos });
+  }
+
+  joined.sort();
+  left.sort();
+  positionChanges.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || a.account.localeCompare(b.account));
   return { joined, left, positionChanges };
 }
