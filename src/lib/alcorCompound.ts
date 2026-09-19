@@ -84,8 +84,6 @@ export const MAX_COMPOUND_POSITIONS = 20;
 
 /** Share of every compounded deposit sent to the fee account. */
 export const COMPOUND_FEE_RATE = 0.0075;
-/** Share of each claimed balance deliberately left in the user's wallet. */
-export const COMPOUND_BUFFER_RATE = 0.005;
 export const COMPOUND_FEE_ACCOUNT = 'hole.cheese';
 export const COMPOUND_FEE_MEMO = 'compound fee';
 
