@@ -185,7 +185,7 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
             <div className="w-fit mx-auto px-2 py-1 rounded-md bg-background/60 border border-border/40 text-center">
               <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
                 <TokenLogo contract={pool.contract ?? ''} symbol={pool.symbol} size="sm" />
-                CHEESE price in {pool.symbol}
+                {token.symbol} price in {pool.symbol}
               </div>
               <div className="text-sm font-mono font-semibold text-foreground leading-tight">
                 {pool.priceInPaired ? tokenPrice(pool.priceInPaired, pool.symbol) : '—'}
