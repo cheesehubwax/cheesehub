@@ -102,9 +102,11 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty, venu
   const previousDate = hoveredIndex > 0 ? series[hoveredIndex - 1].date : null;
   const { day: hoveredDay, isLoading: hoveredLoading } = useLpDay(
     needsAccounts && hovered ? hovered : null,
+    token.key,
   );
   const { day: previousDay, isLoading: previousLoading } = useLpDay(
     needsAccounts && previousDate ? previousDate : null,
+    token.key,
   );
   const accountDiff = useMemo(
     () => (needsAccounts ? diffSnapshots(hoveredDay, previousDay, venue) : null),
