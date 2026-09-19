@@ -70,6 +70,50 @@ export function balanceKey(contract: string, symbol: string): string {
   return `${contract}:${symbol}`;
 }
 
+/**
+ * Normalised key for matching tokens across data sources. Symbols are
+ * upper-cased and the contract included only when present, so pool tokens
+ * (Alcor API or chain fallback) and farm reward tokens still match when one
+ * side is missing a contract or uses different casing.
+ */
+export function tokenMatchKey(contract: string | undefined, symbol: string): string {
+  const sym = symbol.toUpperCase();
+  return contract ? `${contract}:${sym}` : sym;
+}
+
+/** True when the reward set pays out both pool tokens. */
+export function paysBothTokens(
+  rewardTokenKeys: readonly string[],
+  tokenA: { contract?: string; symbol: string },
+  tokenB: { contract?: string; symbol: string },
+): boolean {
+  const full = new Set(rewardTokenKeys.map(k => k.toUpperCase()));
+  const symbols = new Set(rewardTokenKeys.map(k => (k.includes(':') ? k.split(':')[1] : k).toUpperCase()));
+  const has = (t: { contract?: string; symbol: string }) =>
+    full.has(tokenMatchKey(t.contract, t.symbol)) || symbols.has(t.symbol.toUpperCase());
+  return has(tokenA) && has(tokenB);
+}
+
+/**
+ * Resolve a balance entry for a token, trying the exact contract:symbol key
+ * first and falling back to a symbol-only (case-insensitive) match so pool
+ * tokens sourced without a contract still find their claimed balance.
+ */
+function findBalance(
+  map: ReadonlyMap<string, AvailableBalance>,
+  contract: string,
+  symbol: string,
+): AvailableBalance | undefined {
+  const exact = map.get(balanceKey(contract, symbol));
+  if (exact) return exact;
+  const sym = symbol.toUpperCase();
+  for (const [key, value] of map) {
+    const keySym = (key.includes(':') ? key.split(':')[1] : key).toUpperCase();
+    if (keySym === sym) return value;
+  }
+  return undefined;
+}
+
 function floorTo(amount: number, precision: number): number {
   const factor = 10 ** precision;
   return Math.floor(amount * factor) / factor;
