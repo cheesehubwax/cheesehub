@@ -95,8 +95,9 @@ describe('alcorCheesePairs', () => {
     const pools: RawPool[] = [
       { id: 1, active: true, tvlUSD: 250, tokenA: cheese, tokenB: { symbol: 'MYSTERY', contract: 'x.token', quantity: 5 } },
     ];
-    const pairs = alcorCheesePairs(pools, HOLE_TOKEN === undefined ? undefined : HOLE_TOKEN, new Map());
-    expect(pairs).toHaveLength(0); // no HOLE pools here
+    // CHEESE has a price but zero reserves here; MYSTERY has neither.
+    const pairs = alcorCheesePairs(pools, HOLE_TOKEN, new Map());
+    expect(pairs).toHaveLength(0); // no HOLE pools in this fixture
     const asCheese = alcorCheesePairs(pools, undefined, new Map());
     expect(asCheese[0].tvlUsd).toBe(250);
   });
