@@ -210,7 +210,13 @@ async function main() {
               token,
               isTracked,
             });
-      if (pools.length === 0) throw new Error(`No ${token.symbol} pools read on ${venue}`);
+      // With a tracked pair list, zero pools means the read failed. For a
+      // discovery-only token it just means nothing there clears the minimum.
+      if (pools.length === 0) {
+        if (tokenKey === "cheese") throw new Error(`No ${token.symbol} pools read on ${venue}`);
+        console.log(`${venue}: no ${token.symbol} pools above the minimum.`);
+        continue;
+      }
       snapshots.push(...pools);
     } catch (error) {
       // One venue failing must not cost the whole day.
