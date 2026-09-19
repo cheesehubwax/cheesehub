@@ -286,12 +286,17 @@ export function CompoundAllDialog({
 
 
 
+  const selectedEntries = useMemo(
+    () => (plan ? plan.compoundable.filter(e => !deselectedIds.has(e.positionId)) : []),
+    [plan, deselectedIds],
+  );
+
   const runCompound = useCallback(async () => {
-    if (!session || !accountName || !plan || plan.compoundable.length === 0) return;
+    if (!session || !accountName || selectedEntries.length === 0) return;
     setError(null);
     setStage('compounding');
     try {
-      const feeActions = buildCompoundFeeTotals(plan.compoundable).map(fee => ({
+      const feeActions = buildCompoundFeeTotals(selectedEntries).map(fee => ({
         account: fee.contract,
         name: 'transfer',
         authorization: [{ actor: accountName, permission: 'active' }],
