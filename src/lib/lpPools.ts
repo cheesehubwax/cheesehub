@@ -469,7 +469,8 @@ export function buildPoolSnapshot(
   let pairedTotal = 0;
 
   for (const { pool, positions: rows } of pools) {
-    const cheeseFirst = cheeseIsTokenA(pool);
+    const cheeseFirst = cheeseIsTokenA(pool, base);
+
     for (const row of rows) {
       const account = (row.owner ?? '').trim();
       if (!account) continue;
