@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLpAccountHistory } from '@/hooks/useLpHistory';
 import { downloadAccountHistoryCsv } from '@/lib/lpCsv';
-import { type LpDayFile, type LpIndexDay } from '@/lib/lpPools';
+import { type LpDayFile, type LpIndexDay, type LpTokenConfig } from '@/lib/lpPools';
 import { amount, change, shortDate, usd } from './format';
 
 interface AnalAccountPanelProps {
@@ -20,15 +20,17 @@ interface AnalAccountPanelProps {
   /** Recorded snapshots in the selected range, oldest first. */
   days: LpIndexDay[];
   current: LpDayFile | null;
+  /** Base token of the open tab. */
+  token: LpTokenConfig;
 }
 
 const axisTick = { fontSize: 10, fill: '#FFFFFF' } as const;
 
-export function AnalAccountPanel({ account, onAccountChange, days, current }: AnalAccountPanelProps) {
+export function AnalAccountPanel({ account, onAccountChange, days, current, token }: AnalAccountPanelProps) {
   const [query, setQuery] = useState('');
   const [selectedPool, setSelectedPool] = useState<string | null>(null);
   const dates = useMemo(() => days.map((day) => day.date), [days]);
-  const { rows, isLoading } = useLpAccountHistory(account, dates);
+  const { rows, isLoading } = useLpAccountHistory(account, dates, token.key);
 
   // Always start from the full account overview when the account changes.
   useEffect(() => {
