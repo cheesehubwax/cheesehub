@@ -158,13 +158,11 @@ export function planCompound(
 
   for (const candidate of ordered) {
     const pair = `${candidate.tokenA.symbol}/${candidate.tokenB.symbol}`;
-    const keyA = balanceKey(candidate.tokenA.contract, candidate.tokenA.symbol);
-    const keyB = balanceKey(candidate.tokenB.contract, candidate.tokenB.symbol);
-    const bothA = paysBothTokens(candidate.rewardTokenKeys, candidate.tokenA, candidate.tokenA);
-    const bothB = paysBothTokens(candidate.rewardTokenKeys, candidate.tokenB, candidate.tokenB);
+    const hasA = paysToken(candidate.rewardTokenKeys, candidate.tokenA);
+    const hasB = paysToken(candidate.rewardTokenKeys, candidate.tokenB);
 
-    if (!bothA || !bothB) {
-      const missing = !bothA ? candidate.tokenA.symbol : candidate.tokenB.symbol;
+    if (!hasA || !hasB) {
+      const missing = !hasA ? candidate.tokenA.symbol : candidate.tokenB.symbol;
       skipped.push({
         positionId: candidate.positionId,
         pair,
