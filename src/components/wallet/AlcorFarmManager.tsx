@@ -219,13 +219,13 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
   }, [groupedPositions]);
 
   const compoundableCount = useMemo(() => {
-    return compoundPositions.filter((pos) => {
-      const rewards = new Set(pos.incentives.map(i => `${i.rewardToken.contract}:${i.rewardToken.symbol}`));
-      return (
-        rewards.has(`${pos.tokenA.contract}:${pos.tokenA.symbol}`) &&
-        rewards.has(`${pos.tokenB.contract}:${pos.tokenB.symbol}`)
-      );
-    }).length;
+    return compoundPositions.filter((pos) =>
+      paysBothTokens(
+        pos.incentives.map(i => balanceKey(i.rewardToken.contract, i.rewardToken.symbol)),
+        pos.tokenA,
+        pos.tokenB,
+      ),
+    ).length;
   }, [compoundPositions]);
 
 
