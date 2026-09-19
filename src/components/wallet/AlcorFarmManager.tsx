@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
 import { IncreaseLiquidityDialog } from './IncreaseLiquidityDialog';
 import { CompoundAllDialog, CompoundPosition } from './CompoundAllDialog';
+import { balanceKey, paysBothTokens } from '@/lib/alcorCompound';
 
 import { CreateAlcorFarmDialog } from './CreateAlcorFarmDialog';
 import { cn } from '@/lib/utils';
@@ -219,13 +220,13 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
   }, [groupedPositions]);
 
   const compoundableCount = useMemo(() => {
-    return compoundPositions.filter((pos) => {
-      const rewards = new Set(pos.incentives.map(i => `${i.rewardToken.contract}:${i.rewardToken.symbol}`));
-      return (
-        rewards.has(`${pos.tokenA.contract}:${pos.tokenA.symbol}`) &&
-        rewards.has(`${pos.tokenB.contract}:${pos.tokenB.symbol}`)
-      );
-    }).length;
+    return compoundPositions.filter((pos) =>
+      paysBothTokens(
+        pos.incentives.map(i => balanceKey(i.rewardToken.contract, i.rewardToken.symbol)),
+        pos.tokenA,
+        pos.tokenB,
+      ),
+    ).length;
   }, [compoundPositions]);
 
 
@@ -510,7 +511,7 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
           <Button size="sm" variant="ghost" onClick={() => { setIsRefreshing(true); refetch(); setTimeout(() => setIsRefreshing(false), 1000); }} disabled={isTransacting || isRefreshing} className="h-8 w-8 p-0">
             <RefreshCw className={cn("h-4 w-4 transition-transform", isRefreshing && "animate-spin")} />
           </Button>
-          {compoundableCount > 0 && (
+          {compoundPositions.length > 0 && (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>

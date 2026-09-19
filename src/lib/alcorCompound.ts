@@ -70,6 +70,60 @@ export function balanceKey(contract: string, symbol: string): string {
   return `${contract}:${symbol}`;
 }
 
+/**
+ * Normalised key for matching tokens across data sources. Symbols are
+ * upper-cased and the contract included only when present, so pool tokens
+ * (Alcor API or chain fallback) and farm reward tokens still match when one
+ * side is missing a contract or uses different casing.
+ */
+export function tokenMatchKey(contract: string | undefined, symbol: string): string {
+  const sym = symbol.toUpperCase();
+  return contract ? `${contract}:${sym}` : sym;
+}
+
+/** True when the reward set pays out the given token. */
+export function paysToken(
+  rewardTokenKeys: readonly string[],
+  token: { contract?: string; symbol: string },
+): boolean {
+  const sym = token.symbol.toUpperCase();
+  return rewardTokenKeys.some((k) => {
+    const key = k.toUpperCase();
+    if (token.contract && key === tokenMatchKey(token.contract, token.symbol)) return true;
+    const keySym = key.includes(':') ? key.split(':')[1] : key;
+    return keySym === sym;
+  });
+}
+
+/** True when the reward set pays out both pool tokens. */
+export function paysBothTokens(
+  rewardTokenKeys: readonly string[],
+  tokenA: { contract?: string; symbol: string },
+  tokenB: { contract?: string; symbol: string },
+): boolean {
+  return paysToken(rewardTokenKeys, tokenA) && paysToken(rewardTokenKeys, tokenB);
+}
+
+/**
+ * Resolve a balance entry for a token, trying the exact contract:symbol key
+ * first and falling back to a symbol-only (case-insensitive) match so pool
+ * tokens sourced without a contract still find their claimed balance.
+ */
+function findBalance(
+  map: ReadonlyMap<string, AvailableBalance>,
+  contract: string,
+  symbol: string,
+): AvailableBalance | undefined {
+  const exact = map.get(balanceKey(contract, symbol));
+  if (exact) return exact;
+  const sym = symbol.toUpperCase();
+  for (const [key, value] of map) {
+    const keySym = (key.includes(':') ? key.split(':')[1] : key).toUpperCase();
+    if (keySym === sym) return value;
+  }
+  return undefined;
+}
+
 function floorTo(amount: number, precision: number): number {
   const factor = 10 ** precision;
   return Math.floor(amount * factor) / factor;
@@ -104,12 +158,11 @@ export function planCompound(
 
   for (const candidate of ordered) {
     const pair = `${candidate.tokenA.symbol}/${candidate.tokenB.symbol}`;
-    const keyA = balanceKey(candidate.tokenA.contract, candidate.tokenA.symbol);
-    const keyB = balanceKey(candidate.tokenB.contract, candidate.tokenB.symbol);
-    const rewards = new Set(candidate.rewardTokenKeys);
+    const hasA = paysToken(candidate.rewardTokenKeys, candidate.tokenA);
+    const hasB = paysToken(candidate.rewardTokenKeys, candidate.tokenB);
 
-    if (!rewards.has(keyA) || !rewards.has(keyB)) {
-      const missing = !rewards.has(keyA) ? candidate.tokenA.symbol : candidate.tokenB.symbol;
+    if (!hasA || !hasB) {
+      const missing = !hasA ? candidate.tokenA.symbol : candidate.tokenB.symbol;
       skipped.push({
         positionId: candidate.positionId,
         pair,
@@ -139,8 +192,8 @@ export function planCompound(
       continue;
     }
 
-    const balA = remaining.get(keyA);
-    const balB = remaining.get(keyB);
+    const balA = findBalance(remaining, candidate.tokenA.contract, candidate.tokenA.symbol);
+    const balB = findBalance(remaining, candidate.tokenB.contract, candidate.tokenB.symbol);
 
     if (!balA || !balB || balA.balance <= 0 || balB.balance <= 0) {
       skipped.push({
