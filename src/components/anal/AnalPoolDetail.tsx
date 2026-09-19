@@ -1,16 +1,19 @@
 // CHEESEAnal — history charts and provider list for one selected pool.
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { CheeseLogo, PairLabel, PairLogos, UsdLogo } from '@/components/anal/PairLogos';
 import { HistoricalNote } from '@/components/anal/HistoricalNote';
+import { MiniChartTooltip } from '@/components/anal/MiniChartTooltip';
+import { diffPoolSnapshots, waxUsdFromPools } from '@/components/anal/snapshotDiff';
 import { TokenLogo } from '@/components/TokenLogo';
 import { VenueLabel } from '@/components/anal/VenueLogo';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
+import { useLpDay } from '@/hooks/useLpHistory';
 import { downloadPoolHistoryCsv } from '@/lib/lpCsv';
 import { type LpDayFile, type LpIndexDay, type LpPoolSnapshot } from '@/lib/lpPools';
-import { amount, shortDate, tokenPrice, tooltipDate, usd } from './format';
+import { amount, change, shortDate, tokenPrice, tooltipDate, usd } from './format';
 
 interface AnalPoolDetailProps {
   pool: LpPoolSnapshot | null;
@@ -26,6 +29,7 @@ interface AnalPoolDetailProps {
 const axisTick = { fontSize: 10, fill: '#FFFFFF' } as const;
 
 export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, onSelectPool }: AnalPoolDetailProps) {
+  const [hovered, setHovered] = useState<string | null>(null);
   const series = useMemo(() => {
     if (!pool) return [];
     return days
@@ -38,10 +42,12 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
               cheese: row.cheese,
               paired: row.paired,
               accounts: row.accounts,
+               positions: row.positions,
               // This pair's own CHEESE price, in the paired token.
               price: row.priceInPaired ?? 0,
               // USD volume is recorded once per UTC day, so gaps are expected.
               volumeUsd: row.volumeUsd24 ?? null,
+               waxUsd: waxUsdFromPools(day.pools),
             }
           : null;
       })
@@ -64,15 +70,68 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
   const hasSeries = series.length >= 1;
   const volumeSeries = series.filter((row): row is typeof row & { volumeUsd: number } => row.volumeUsd !== null);
   const latestVolume = volumeSeries[volumeSeries.length - 1] ?? null;
+  const hoveredIndex = hovered ? series.findIndex((row) => row.date === hovered) : -1;
+  const previousDate = hoveredIndex > 0 ? series[hoveredIndex - 1].date : null;
+  const { day: hoveredDay, isLoading: hoveredLoading } = useLpDay(hovered);
+  const { day: previousDay, isLoading: previousLoading } = useLpDay(previousDate);
+  const poolDiff = useMemo(
+    () => (pool && hovered ? diffPoolSnapshots(hoveredDay, previousDay, pool.key) : null),
+    [pool, hovered, hoveredDay, previousDay],
+  );
 
-  const tooltip = (formatter: (value: number) => string, className: string) =>
-    ({ active, payload }: { active?: boolean; payload?: { value?: unknown; payload?: { date: string } }[] }) =>
-      active && payload?.length ? (
-        <div className="bg-background/95 border border-border px-2 py-1 rounded text-xs font-mono">
-          <div className={className}>{formatter(Number(payload[0].value))}</div>
-          <div className="text-muted-foreground">{tooltipDate(String(payload[0].payload?.date ?? ''))}</div>
-        </div>
-      ) : null;
+  const previousValue = (date: string, key: 'price' | 'usd' | 'cheese' | 'paired' | 'accounts' | 'volumeUsd') => {
+    const index = series.findIndex((row) => row.date === date);
+    for (let i = index - 1; i >= 0; i -= 1) {
+      const candidate = series[i][key];
+      if (candidate !== null && candidate !== undefined) return Number(candidate);
+    }
+    return null;
+  };
+
+  const extras = (key: 'price' | 'usd' | 'cheese' | 'paired' | 'accounts' | 'volumeUsd') =>
+    (date: string, value: number): string[] => {
+      const lines: string[] = [];
+      const index = series.findIndex((row) => row.date === date);
+      const previous = previousValue(date, key);
+      const pct = previous !== null ? change(value, previous) : null;
+      if (pct) lines.push(`${pct.text} since last snapshot`);
+      else if (index === 0) lines.push('first recorded snapshot');
+
+      if (key === 'usd') {
+        const waxUsd = series[index]?.waxUsd;
+        if (waxUsd && waxUsd > 0) lines.push(`${amount(value / waxUsd, 0)} WAX`);
+      }
+      if (key === 'accounts') {
+        const previousPositions = index > 0 ? series[index - 1].positions : null;
+        const currentPositions = series[index]?.positions;
+        if (previous !== null) lines.push(`${value - previous >= 0 ? '+' : ''}${Math.round(value - previous)} accounts`);
+        if (previousPositions !== null && currentPositions !== undefined) {
+          const delta = currentPositions - previousPositions;
+          lines.push(`${delta >= 0 ? '+' : ''}${delta} positions`);
+        }
+        if (index > 0 && (hoveredLoading || previousLoading)) {
+          lines.push('loading accounts...');
+        } else if (poolDiff) {
+          if (poolDiff.joined.length) lines.push(`joined: ${nameList(poolDiff.joined)}`);
+          if (poolDiff.left.length) lines.push(`left: ${nameList(poolDiff.left)}`);
+          const moves = poolDiff.positionChanges.filter(
+            (move) => !poolDiff.joined.includes(move.account) && !poolDiff.left.includes(move.account),
+          );
+          if (moves.length) {
+            lines.push(...moves.slice(0, MAX_NAMES).map((move) => `${move.account} ${move.delta > 0 ? '+' : ''}${move.delta} positions`));
+            if (moves.length > MAX_NAMES) lines.push(`+${moves.length - MAX_NAMES} more accounts`);
+          }
+          if (!poolDiff.joined.length && !poolDiff.left.length && !moves.length) lines.push('no provider changes');
+        }
+      }
+      return lines;
+    };
+
+  const chartHover = {
+    onMouseMove: (state: { activeLabel?: string | number }) =>
+      setHovered(state?.activeLabel != null ? String(state.activeLabel) : null),
+    onMouseLeave: () => setHovered(null),
+  };
 
   return (
     <div className="w-full rounded-xl bg-card border border-border/50 p-4 space-y-4">
