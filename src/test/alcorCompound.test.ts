@@ -245,7 +245,7 @@ describe('unreadable balances', () => {
         candidate({ positionId: 2, usdValue: 100 }),
       ],
       balances([
-        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 1000, precision: 8, known: true }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 2, precision: 0, known: true }],
         [balanceKey(USDC.contract, USDC.symbol), { balance: 1, precision: 2, known: true }],
       ]),
     );
