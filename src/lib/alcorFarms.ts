@@ -988,15 +988,18 @@ export function buildIncreaseLiquidityAction(
     : DEFAULT_DEPOSIT_SLIPPAGE;
   const slippageMultiplier = 1 - tolerance;
 
-  const tokenAAmount = parseFloat(tokenAQuantity.split(' ')[0]);
-  const tokenASymbol = tokenAQuantity.split(' ')[1];
-  const tokenADecimals = tokenAQuantity.split(' ')[0].split('.')[1]?.length || 0;
-  const minTokenA = (tokenAAmount * slippageMultiplier).toFixed(tokenADecimals) + ' ' + tokenASymbol;
+  // Floor the minimums at token precision — rounding up would push the minimum
+  // above what the pool can actually use and trip the slippage assertion.
+  const minQuantity = (quantity: string): string => {
+    const [rawAmount, symbol] = quantity.split(' ');
+    const decimals = rawAmount.split('.')[1]?.length || 0;
+    const factor = 10 ** decimals;
+    const floored = Math.floor(parseFloat(rawAmount) * slippageMultiplier * factor) / factor;
+    return `${Math.max(floored, 0).toFixed(decimals)} ${symbol}`;
+  };
 
-  const tokenBAmount = parseFloat(tokenBQuantity.split(' ')[0]);
-  const tokenBSymbol = tokenBQuantity.split(' ')[1];
-  const tokenBDecimals = tokenBQuantity.split(' ')[0].split('.')[1]?.length || 0;
-  const minTokenB = (tokenBAmount * slippageMultiplier).toFixed(tokenBDecimals) + ' ' + tokenBSymbol;
+  const minTokenA = minQuantity(tokenAQuantity);
+  const minTokenB = minQuantity(tokenBQuantity);
 
   return [
     // Transfer token A with "deposit" memo (required by Alcor)
