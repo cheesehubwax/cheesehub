@@ -218,6 +218,7 @@ const CheeseAnal = () => {
           historyLoading={historyLoading}
           historyEmpty={isEmpty}
           venue={venue}
+          token={token}
         />
 
         <AnalPoolTable
@@ -227,6 +228,7 @@ const CheeseAnal = () => {
           onSelect={setPoolKey}
           failed={current?.partial ?? []}
           isLoading={latestDayLoading}
+          token={token}
         />
 
         <AnalPoolDetail
@@ -236,9 +238,17 @@ const CheeseAnal = () => {
           current={current}
           onSelectAccount={(name) => setAccount(name)}
           onSelectPool={setPoolKey}
+          token={token}
         />
 
-        <AnalAccountPanel account={account} onAccountChange={setAccount} days={ranged} current={current} />
+        <AnalAccountPanel
+          account={account}
+          onAccountChange={setAccount}
+          days={ranged}
+          current={current}
+          token={token}
+        />
+
 
         <p className="text-[10px] text-muted-foreground text-center max-w-2xl">
           Alcor figures come from Alcor's own position data: open positions count whether or not they are in range,
