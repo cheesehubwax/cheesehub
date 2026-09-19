@@ -12,10 +12,13 @@ import { buildClaimRewardsAction, buildIncreaseLiquidityAction, AlcorFarmPositio
 import { waxRpcCall } from '@/lib/waxRpcFallback';
 import {
   AvailableBalance,
+  COMPOUND_FEE_ACCOUNT,
+  COMPOUND_FEE_MEMO,
   CompoundCandidate,
   CompoundPlan,
   MAX_COMPOUND_POSITIONS,
   balanceKey,
+  buildCompoundFeeTotals,
   paysBothTokens,
   planCompound,
 } from '@/lib/alcorCompound';
