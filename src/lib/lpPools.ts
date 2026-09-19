@@ -513,13 +513,13 @@ export function buildPoolSnapshot(
 
   const providers = finaliseProviders(byAccount);
 
-  // CHEESE price from the deepest fee tier of the pair.
+  // Base-token price from the deepest fee tier of the pair.
   const deepest = [...pools].sort(
     (a, b) => Number(b.pool.liquidity ?? 0) - Number(a.pool.liquidity ?? 0),
   )[0]?.pool;
   let priceInPaired: number | undefined;
   if (deepest) {
-    const raw = cheeseIsTokenA(deepest) ? deepest.priceA : deepest.priceB;
+    const raw = cheeseIsTokenA(deepest, base) ? deepest.priceA : deepest.priceB;
     if (Number.isFinite(Number(raw)) && Number(raw) > 0) priceInPaired = round(Number(raw), 12);
   }
   const priceUsd = derivePriceUsd(priceInPaired, prices);
