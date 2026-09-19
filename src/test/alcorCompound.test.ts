@@ -269,8 +269,8 @@ describe('selected-position filtering', () => {
         candidate({ positionId: 2, poolId: 11, usdValue: 100 }),
       ],
       balances([
-        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 150, precision: 8 }],
-        [balanceKey(USDC.contract, USDC.symbol), { balance: 12, precision: 6 }],
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 500, precision: 8 }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 50, precision: 6 }],
       ]),
     );
     expect(plan.compoundable).toHaveLength(2);
