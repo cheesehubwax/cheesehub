@@ -162,8 +162,15 @@ export function planCompound(
   available: ReadonlyMap<string, AvailableBalance>,
   maxPositions: number = MAX_COMPOUND_POSITIONS,
 ): CompoundPlan {
+  // Hold back a small buffer of every claimed token so rounding or a late
+  // reward can never make the deposit exceed the wallet balance.
   const remaining = new Map<string, AvailableBalance>();
-  available.forEach((value, key) => remaining.set(key, { ...value }));
+  available.forEach((value, key) =>
+    remaining.set(key, {
+      precision: value.precision,
+      balance: floorTo(Math.max(0, value.balance) * (1 - COMPOUND_BUFFER_RATE), value.precision),
+    }),
+  );
 
   const compoundable: CompoundPlanEntry[] = [];
   const skipped: CompoundSkip[] = [];
@@ -231,10 +238,15 @@ export function planCompound(
 
     const ratio = candidate.tokenB.amount / candidate.tokenA.amount;
     const rawA = Math.min(balA.balance, balB.balance / ratio);
-    const amountA = floorTo(rawA, balA.precision);
-    const amountB = floorTo(Math.min(amountA * ratio, balB.balance), balB.precision);
+    const grossA = floorTo(rawA, balA.precision);
+    const grossB = floorTo(Math.min(grossA * ratio, balB.balance), balB.precision);
 
-    if (amountA <= 0 || amountB <= 0) {
+    const feeA = floorTo(grossA * COMPOUND_FEE_RATE, balA.precision);
+    const feeB = floorTo(grossB * COMPOUND_FEE_RATE, balB.precision);
+    const depositA = floorTo(grossA - feeA, balA.precision);
+    const depositB = floorTo(grossB - feeB, balB.precision);
+
+    if (depositA <= 0 || depositB <= 0) {
       skipped.push({
         positionId: candidate.positionId,
         pair,
@@ -244,8 +256,8 @@ export function planCompound(
       continue;
     }
 
-    balA.balance = floorTo(balA.balance - amountA, balA.precision);
-    balB.balance = floorTo(balB.balance - amountB, balB.precision);
+    balA.balance = floorTo(balA.balance - grossA, balA.precision);
+    balB.balance = floorTo(balB.balance - grossB, balB.precision);
 
     compoundable.push({
       positionId: candidate.positionId,
@@ -255,19 +267,68 @@ export function planCompound(
       tokenA: {
         contract: candidate.tokenA.contract,
         symbol: candidate.tokenA.symbol,
-        amount: amountA,
+        amount: depositA,
         precision: balA.precision,
-        quantity: formatQuantity(amountA, balA.precision, candidate.tokenA.symbol),
+        quantity: formatQuantity(depositA, balA.precision, candidate.tokenA.symbol),
+        gross: grossA,
+        fee: feeA,
+        feeQuantity: formatQuantity(feeA, balA.precision, candidate.tokenA.symbol),
       },
       tokenB: {
         contract: candidate.tokenB.contract,
         symbol: candidate.tokenB.symbol,
-        amount: amountB,
+        amount: depositB,
         precision: balB.precision,
-        quantity: formatQuantity(amountB, balB.precision, candidate.tokenB.symbol),
+        quantity: formatQuantity(depositB, balB.precision, candidate.tokenB.symbol),
+        gross: grossB,
+        fee: feeB,
+        feeQuantity: formatQuantity(feeB, balB.precision, candidate.tokenB.symbol),
       },
     });
   }
 
   return { compoundable, skipped };
+}
+
+export interface CompoundFeeTotal {
+  contract: string;
+  symbol: string;
+  amount: number;
+  precision: number;
+  quantity: string;
+}
+
+/**
+ * Aggregate the per-leg compound fees into one transfer per token, so the
+ * compound transaction carries a single fee action per token rather than one
+ * per position. Fees that round to zero are omitted.
+ */
+export function buildCompoundFeeTotals(entries: readonly CompoundPlanEntry[]): CompoundFeeTotal[] {
+  const totals = new Map<string, CompoundFeeTotal>();
+
+  const add = (leg: CompoundLeg) => {
+    if (leg.fee <= 0) return;
+    const key = balanceKey(leg.contract, leg.symbol);
+    const existing = totals.get(key);
+    if (existing) {
+      existing.precision = Math.max(existing.precision, leg.precision);
+      existing.amount = floorTo(existing.amount + leg.fee, existing.precision);
+      existing.quantity = formatQuantity(existing.amount, existing.precision, existing.symbol);
+      return;
+    }
+    totals.set(key, {
+      contract: leg.contract,
+      symbol: leg.symbol,
+      amount: leg.fee,
+      precision: leg.precision,
+      quantity: formatQuantity(leg.fee, leg.precision, leg.symbol),
+    });
+  };
+
+  entries.forEach(entry => {
+    add(entry.tokenA);
+    add(entry.tokenB);
+  });
+
+  return Array.from(totals.values()).filter(t => t.amount > 0);
 }
