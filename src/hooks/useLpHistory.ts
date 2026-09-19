@@ -1,6 +1,14 @@
 // CHEESEAnal — readers for workflow-recorded LP history snapshots.
 import { useQuery } from '@tanstack/react-query';
-import { poolsForVenue, type LpDayFile, type LpIndexFile, type LpIndexDay, type LpVenue } from '@/lib/lpPools';
+import {
+  lpTokenConfig,
+  poolsForVenue,
+  type LpDayFile,
+  type LpIndexFile,
+  type LpIndexDay,
+  type LpTokenKey,
+  type LpVenue,
+} from '@/lib/lpPools';
 
 const DEFAULT_OWNER = 'cheesehubwax';
 const DEFAULT_REPO = 'cheesehub';
@@ -17,6 +25,12 @@ function dataUrl(path: string): string {
     if (host.endsWith('.github.io')) owner = host.replace('.github.io', '');
   }
   return `https://raw.githubusercontent.com/${owner}/${DEFAULT_REPO}/${DATA_BRANCH}/data/${path}`;
+}
+
+/** CHEESE keeps the original paths; other tokens live in their own sub-folder. */
+function tokenPath(token: LpTokenKey, path: string): string {
+  const sub = lpTokenConfig(token).dataPath;
+  return sub ? `${sub}/${path}` : path;
 }
 
 async function fetchJson<T>(path: string): Promise<T | null> {
