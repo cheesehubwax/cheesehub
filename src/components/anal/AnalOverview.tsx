@@ -233,9 +233,9 @@ export function AnalOverview({ days, current, historyLoading, historyEmpty, venu
               }
             >
               <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-white/80">
-                {stat.key === 'price' ? <CheeseLogo /> : null}
+                {stat.key === 'price' ? <CheeseLogo base={token} /> : null}
                 {stat.key === 'usd' ? <UsdLogo /> : null}
-                {stat.key === 'cheese' ? <CheeseLogo /> : null}
+                {stat.key === 'cheese' ? <CheeseLogo base={token} /> : null}
                 {stat.key === 'volume' ? <UsdLogo /> : null}
                 {stat.label}
               </div>
