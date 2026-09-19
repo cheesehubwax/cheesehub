@@ -154,6 +154,46 @@ describe('planCompound', () => {
     expect(plan.skipped[0].reason).toBe('dust');
   });
 
+  it('skips a position whose range no longer covers the pool price', () => {
+    const plan = planCompound(
+      [candidate({ slot: { ...DEFAULT_SLOT, tick: 200 } })],
+      balances([
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 500, precision: 8 }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 10, precision: 6 }],
+      ]),
+    );
+
+    expect(plan.compoundable).toHaveLength(0);
+    expect(plan.skipped[0].reason).toBe('out-of-range');
+  });
+
+  it('skips a position when the pool price could not be read', () => {
+    const plan = planCompound(
+      [candidate({ slot: null })],
+      balances([
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 500, precision: 8 }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 10, precision: 6 }],
+      ]),
+    );
+
+    expect(plan.compoundable).toHaveLength(0);
+    expect(plan.skipped[0].reason).toBe('pool-price-unknown');
+  });
+
+  it('sizes the deposit at the pool ratio, not the amounts already in the position', () => {
+    const plan = planCompound(
+      // Position holdings imply 1:1, the pool slot says 0.1 — the pool wins.
+      [candidate({ tokenA: { ...CHEESE, amount: 100 }, tokenB: { ...USDC, amount: 100 } })],
+      balances([
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 500, precision: 8 }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 10, precision: 6 }],
+      ]),
+    );
+
+    const entry = plan.compoundable[0];
+    expect(entry.tokenB.amount / entry.tokenA.amount).toBeCloseTo(0.1, 4);
+  });
+
   it('skips positions with missing tick data', () => {
     const plan = planCompound(
       [candidate({ tickLower: 0, tickUpper: 0 })],
@@ -370,3 +410,23 @@ describe('buildClaimedBalances', () => {
   });
 });
 
+
+describe('poolDepositRatio', () => {
+  it('matches the ratio implied by the pool reserves for a full-range position', () => {
+    // Alcor pool 1252 (CHEESE/WAX): tick 96521, reserves 155119.3603 CHEESE (4dp)
+    // and 241246.46467914 WAX (8dp) → roughly 1.555 WAX per CHEESE.
+    const slot = { sqrtPriceX64: '2300109684333533264855', tick: 96521 };
+    const { state, ratio } = poolDepositRatio(slot, 96521 - 6000, 96521 + 6000, 4, 8);
+    expect(state).toBe('in-range');
+    expect(ratio).not.toBeNull();
+    expect(ratio as number).toBeGreaterThan(0.5);
+    expect(ratio as number).toBeLessThan(5);
+  });
+
+  it('reports positions below and above their range', () => {
+    const slot = { sqrtPriceX64: '18446744073709551616', tick: 0 };
+    expect(poolDepositRatio(slot, 100, 200, 8, 8).state).toBe('below-range');
+    expect(poolDepositRatio(slot, -200, -100, 8, 8).state).toBe('above-range');
+    expect(poolDepositRatio(slot, 100, 200, 8, 8).ratio).toBeNull();
+  });
+});
