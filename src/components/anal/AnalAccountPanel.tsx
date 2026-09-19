@@ -332,8 +332,8 @@ export function AnalAccountPanel({ account, onAccountChange, days, current, toke
               <div className="space-y-1">
                 <div className="w-fit mx-auto px-2 py-1 rounded-md bg-background/60 border border-border/40 text-center">
                   <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                    <CheeseLogo />
-                    CHEESE in positions{selectedPoolLabel ? ` — ${selectedPoolLabel}` : ''}
+                    <CheeseLogo base={token} />
+                    {token.symbol} in positions{selectedPoolLabel ? ` — ${selectedPoolLabel}` : ''}
                   </div>
                   <div className="text-sm font-mono font-semibold text-foreground leading-tight">
                     {amount(selectedPoolRow?.cheese ?? cheeseNow, 0)}
