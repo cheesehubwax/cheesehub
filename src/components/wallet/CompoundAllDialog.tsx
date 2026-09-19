@@ -308,8 +308,8 @@ export function CompoundAllDialog({
                   full, matched by the other token. Anything left over stays in your wallet.
                 </p>
                 <p>
-                  A 0.75% fee on each deposit is sent to {COMPOUND_FEE_ACCOUNT}, and a small amount of every token is
-                  left untouched in your wallet.
+                  Only the tokens this claim pays out are used — tokens already in your wallet are never spent. A 0.75%
+                  fee on each deposit is sent to {COMPOUND_FEE_ACCOUNT}.
                 </p>
               </AlertDescription>
             </Alert>
