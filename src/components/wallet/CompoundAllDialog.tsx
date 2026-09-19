@@ -345,7 +345,7 @@ export function CompoundAllDialog({
       closeWharfkitModals();
       setTimeout(() => closeWharfkitModals(), 300);
     }
-  }, [session, accountName, plan, onTransactionSuccess, onTransactionComplete, onOpenChange]);
+  }, [session, accountName, selectedEntries, onTransactionSuccess, onTransactionComplete, onOpenChange]);
 
   const busy = stage === 'claiming' || stage === 'waiting' || stage === 'compounding';
 
@@ -424,35 +424,72 @@ export function CompoundAllDialog({
           <div className="space-y-4">
             {plan.compoundable.length > 0 ? (
               <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                {plan.compoundable.map(entry => (
-                  <div
-                    key={entry.positionId}
-                    className="flex items-center justify-between gap-2 rounded-md border border-border/50 bg-muted/30 p-2"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="flex -space-x-2">
-                        <TokenLogo contract={entry.tokenA.contract} symbol={entry.tokenA.symbol} size="sm" />
-                        <TokenLogo contract={entry.tokenB.contract} symbol={entry.tokenB.symbol} size="sm" />
+                <div className="flex items-center gap-2 px-1">
+                  <Checkbox
+                    id="compound-select-all"
+                    checked={selectedEntries.length === plan.compoundable.length}
+                    onCheckedChange={(checked) => {
+                      setDeselectedIds(
+                        checked === true
+                          ? new Set()
+                          : new Set(plan.compoundable.map(e => e.positionId)),
+                      );
+                    }}
+                    disabled={stage === 'compounding'}
+                  />
+                  <label htmlFor="compound-select-all" className="text-xs text-muted-foreground cursor-pointer">
+                    {selectedEntries.length} of {plan.compoundable.length} selected
+                  </label>
+                </div>
+                {plan.compoundable.map(entry => {
+                  const isSelected = !deselectedIds.has(entry.positionId);
+                  return (
+                    <div
+                      key={entry.positionId}
+                      className={`flex items-center justify-between gap-2 rounded-md border p-2 ${
+                        isSelected ? 'border-border/50 bg-muted/30' : 'border-border/30 opacity-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id={`compound-entry-${entry.positionId}`}
+                          checked={isSelected}
+                          onCheckedChange={(checked) => {
+                            setDeselectedIds(prev => {
+                              const next = new Set(prev);
+                              if (checked === true) next.delete(entry.positionId);
+                              else next.add(entry.positionId);
+                              return next;
+                            });
+                          }}
+                          disabled={stage === 'compounding'}
+                        />
+                        <label htmlFor={`compound-entry-${entry.positionId}`} className="flex items-center gap-2 cursor-pointer">
+                          <div className="flex -space-x-2">
+                            <TokenLogo contract={entry.tokenA.contract} symbol={entry.tokenA.symbol} size="sm" />
+                            <TokenLogo contract={entry.tokenB.contract} symbol={entry.tokenB.symbol} size="sm" />
+                          </div>
+                          <div className="text-xs">
+                            <div className="font-medium">{entry.tokenA.symbol}/{entry.tokenB.symbol}</div>
+                            <div className="text-muted-foreground">#{entry.positionId}</div>
+                          </div>
+                        </label>
                       </div>
-                      <div className="text-xs">
-                        <div className="font-medium">{entry.tokenA.symbol}/{entry.tokenB.symbol}</div>
-                        <div className="text-muted-foreground">#{entry.positionId}</div>
+                      <div className="font-mono text-xs text-right text-cheese">
+                        <div>{entry.tokenA.amount.toFixed(Math.min(6, entry.tokenA.precision))} {entry.tokenA.symbol}</div>
+                        <div>{entry.tokenB.amount.toFixed(Math.min(6, entry.tokenB.precision))} {entry.tokenB.symbol}</div>
+                        {(entry.tokenA.fee > 0 || entry.tokenB.fee > 0) && (
+                          <div className="text-[10px] text-muted-foreground">
+                            fee {entry.tokenA.fee.toFixed(Math.min(6, entry.tokenA.precision))} {entry.tokenA.symbol}
+                            {entry.tokenB.fee > 0 && (
+                              <> · {entry.tokenB.fee.toFixed(Math.min(6, entry.tokenB.precision))} {entry.tokenB.symbol}</>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <div className="font-mono text-xs text-right text-cheese">
-                      <div>{entry.tokenA.amount.toFixed(Math.min(6, entry.tokenA.precision))} {entry.tokenA.symbol}</div>
-                      <div>{entry.tokenB.amount.toFixed(Math.min(6, entry.tokenB.precision))} {entry.tokenB.symbol}</div>
-                      {(entry.tokenA.fee > 0 || entry.tokenB.fee > 0) && (
-                        <div className="text-[10px] text-muted-foreground">
-                          fee {entry.tokenA.fee.toFixed(Math.min(6, entry.tokenA.precision))} {entry.tokenA.symbol}
-                          {entry.tokenB.fee > 0 && (
-                            <> · {entry.tokenB.fee.toFixed(Math.min(6, entry.tokenB.precision))} {entry.tokenB.symbol}</>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
                 <p className="text-[11px] text-muted-foreground">
                   Only the rewards from this claim are used — tokens you already held are never touched. 0.75% of each
                   deposit supports HOLE. Pool prices move constantly, so the pool may use a little less than shown;
@@ -519,13 +556,13 @@ export function CompoundAllDialog({
               </Button>
               <Button
                 className="flex-1 bg-cheese hover:bg-cheese-dark text-primary-foreground"
-                disabled={stage === 'compounding' || plan.compoundable.length === 0}
+                disabled={stage === 'compounding' || selectedEntries.length === 0}
                 onClick={runCompound}
               >
                 {stage === 'compounding' ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  `Add to ${plan.compoundable.length} position${plan.compoundable.length !== 1 ? 's' : ''}`
+                  `Add to ${selectedEntries.length} position${selectedEntries.length !== 1 ? 's' : ''}`
                 )}
               </Button>
             </div>
