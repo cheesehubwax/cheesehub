@@ -307,7 +307,7 @@ export function CompoundAllDialog({
           memo: COMPOUND_FEE_MEMO,
         },
       }));
-      const depositActions = plan.compoundable.flatMap(entry =>
+      const depositActions = selectedEntries.flatMap(entry =>
         buildIncreaseLiquidityAction(
           accountName,
           entry.positionId,
@@ -326,7 +326,7 @@ export function CompoundAllDialog({
       const txId = result.resolved?.transaction.id?.toString() || null;
       onTransactionSuccess?.(
         'Rewards Compounded!',
-        `Added rewards back into ${plan.compoundable.length} position${plan.compoundable.length !== 1 ? 's' : ''}`,
+        `Added rewards back into ${selectedEntries.length} position${selectedEntries.length !== 1 ? 's' : ''}`,
         txId,
       );
       setStage('done');
