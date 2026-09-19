@@ -133,3 +133,27 @@ describe('planCompound', () => {
   });
 
 });
+
+describe('token matching normalisation', () => {
+  it('matches reward tokens across casing and missing contracts', () => {
+    const rewards = ['cheeseburger:CHEESE', 'eosio.token:WAX'];
+    expect(paysBothTokens(rewards, { contract: 'cheeseburger', symbol: 'cheese' }, { contract: '', symbol: 'WAX' })).toBe(true);
+    expect(paysBothTokens(rewards, { contract: '', symbol: 'HOLE' }, { contract: '', symbol: 'WAX' })).toBe(false);
+  });
+
+  it('finds claimed balances by symbol when the pool token lacks a contract', () => {
+    const candidates = [{
+      ...baseCandidate,
+      tokenA: { contract: '', symbol: 'CHEESE', amount: 100 },
+      tokenB: { contract: '', symbol: 'WAX', amount: 200 },
+      rewardTokenKeys: ['cheeseburger:CHEESE', 'eosio.token:WAX'],
+    }];
+    const available = new Map([
+      ['cheeseburger:CHEESE', { balance: 10, precision: 8 }],
+      ['eosio.token:WAX', { balance: 20, precision: 8 }],
+    ]);
+    const plan = planCompound(candidates, available);
+    expect(plan.compoundable).toHaveLength(1);
+    expect(plan.skipped).toHaveLength(0);
+  });
+});
