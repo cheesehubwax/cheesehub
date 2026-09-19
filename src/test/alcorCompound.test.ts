@@ -33,7 +33,7 @@ function balances(entries: Array<[string, AvailableBalance]>) {
 }
 
 describe('planCompound', () => {
-  it('pairs the smaller side in full, withholds the buffer and takes the 0.75% fee', () => {
+  it('pairs the smaller side in full and takes the 0.75% fee, using the whole claimed amount', () => {
     const plan = planCompound(
       [candidate()],
       balances([
@@ -45,16 +45,16 @@ describe('planCompound', () => {
     expect(plan.skipped).toHaveLength(0);
     expect(plan.compoundable).toHaveLength(1);
     const entry = plan.compoundable[0];
-    // 0.5% buffer: 9.95 WAXUSDC usable → ratio 0.1 → 99.5 CHEESE gross
-    expect(entry.tokenA.gross).toBeCloseTo(99.5, 6);
-    expect(entry.tokenB.gross).toBeCloseTo(9.95, 4);
+    // All 10 claimed WAXUSDC goes in → ratio 0.1 → 100 CHEESE gross
+    expect(entry.tokenA.gross).toBeCloseTo(100, 6);
+    expect(entry.tokenB.gross).toBeCloseTo(10, 4);
     expect(entry.tokenA.fee).toBeCloseTo(entry.tokenA.gross * COMPOUND_FEE_RATE, 6);
     expect(entry.tokenB.fee).toBeCloseTo(entry.tokenB.gross * COMPOUND_FEE_RATE, 5);
     expect(entry.tokenA.amount).toBeCloseTo(entry.tokenA.gross - entry.tokenA.fee, 6);
     expect(entry.tokenB.amount).toBeCloseTo(entry.tokenB.gross - entry.tokenB.fee, 6);
-    // Deposit plus fee never exceeds the buffered balance.
-    expect(entry.tokenA.amount + entry.tokenA.fee).toBeLessThanOrEqual(500 * (1 - COMPOUND_BUFFER_RATE));
-    expect(entry.tokenB.amount + entry.tokenB.fee).toBeLessThanOrEqual(10 * (1 - COMPOUND_BUFFER_RATE));
+    // Deposit plus fee never exceeds what was claimed.
+    expect(entry.tokenA.amount + entry.tokenA.fee).toBeLessThanOrEqual(500);
+    expect(entry.tokenB.amount + entry.tokenB.fee).toBeLessThanOrEqual(10);
     expect(entry.tokenA.quantity).toBe(`${entry.tokenA.amount.toFixed(8)} CHEESE`);
     expect(entry.tokenB.feeQuantity).toBe(`${entry.tokenB.fee.toFixed(6)} WAXUSDC`);
   });
