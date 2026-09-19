@@ -115,6 +115,8 @@ export function isTrackedPairKey(pairKey: string): boolean {
 export interface RawPoolToken {
   symbol?: string;
   contract?: string;
+  /** Whole tokens held by the pool, as Alcor reports it. */
+  quantity?: number;
 }
 
 export interface RawPool {
@@ -374,11 +376,34 @@ export function alcorPairVolume(pools: RawPool[], base: LpToken = CHEESE_TOKEN):
 /**
  * Every pair of the base token listed on Alcor, keyed by paired token, with the
  * summed TVL of its fee tiers. Used to decide which pairs are worth recording.
+ *
+ * TVL is derived from the pool reserves and the given USD prices — Alcor's own
+ * `tvlUSD` is not trustworthy (it reports 0 for real pools, e.g. HOLE/CHEESE
+ * pool 11051 with ~$2,300 of positions). Alcor's figure is only a fallback for
+ * tokens with no known USD price.
  */
 export function alcorCheesePairs(
   pools: RawPool[],
   base: LpToken = CHEESE_TOKEN,
+  prices?: ReadonlyMap<string, number>,
 ): { pair: TrackedPair; tvlUsd: number }[] {
+  const priceOf = (token: RawPoolToken | undefined): number | undefined => {
+    if (!token?.symbol || !token.contract) return undefined;
+    const price = prices?.get(`${token.symbol.toUpperCase()}-${token.contract}`);
+    return price && price > 0 ? price : undefined;
+  };
+  const poolTvlUsd = (pool: RawPool): number => {
+    const a = priceOf(pool.tokenA);
+    const b = priceOf(pool.tokenB);
+    const qtyA = Number(pool.tokenA?.quantity ?? 0);
+    const qtyB = Number(pool.tokenB?.quantity ?? 0);
+    let derived = 0;
+    let priced = false;
+    if (a !== undefined && qtyA > 0) { derived += qtyA * a; priced = true; }
+    if (b !== undefined && qtyB > 0) { derived += qtyB * b; priced = true; }
+    if (priced) return derived;
+    return Number(pool.tvlUSD ?? 0);
+  };
   const byPair = new Map<string, { pair: TrackedPair; tvlUsd: number }>();
   for (const pool of pools) {
     if (pool.active === 0 || pool.active === false) continue;
@@ -391,7 +416,7 @@ export function alcorCheesePairs(
     if (!symbol || !contract) continue;
     const pair = pairFor(symbol, contract, base);
     const entry = byPair.get(pair.key) ?? { pair, tvlUsd: 0 };
-    entry.tvlUsd += Number(pool.tvlUSD ?? 0);
+    entry.tvlUsd += poolTvlUsd(pool);
     byPair.set(pair.key, entry);
   }
   return [...byPair.values()];
