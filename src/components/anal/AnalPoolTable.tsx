@@ -40,7 +40,7 @@ export function AnalPoolTable({
           <span className="text-sm font-medium text-foreground">Pools</span>
           <span className="text-[10px] text-muted-foreground">tap a pool for detail</span>
         </div>
-        <HistoricalNote />
+        <HistoricalNote token={token} />
       </div>
 
       {failed.length > 0 && (

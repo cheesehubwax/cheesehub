@@ -116,7 +116,7 @@ const CheeseAnal = () => {
                 token balances, {token.symbol} price, provider counts and per-account positions, tracked over time
               </p>
               <div className="max-w-2xl mx-auto flex justify-center">
-                <HistoricalNote />
+                <HistoricalNote token={token} />
               </div>
             </div>
           </div>

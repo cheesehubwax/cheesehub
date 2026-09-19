@@ -168,7 +168,7 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
             ))}
           </SelectContent>
         </Select>
-        <HistoricalNote />
+        <HistoricalNote token={token} />
         <Button
           size="sm"
           variant="outline"
