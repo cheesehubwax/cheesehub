@@ -198,6 +198,38 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
     return Array.from(totals.values()).sort((a, b) => b.total - a.total);
   }, [farmsList, liveRewards]);
 
+  // Positions that can feed the Compound All flow: staked positions whose farms
+  // pay out both tokens of their own pool.
+  const compoundPositions = useMemo<CompoundPosition[]>(() => {
+    const list: CompoundPosition[] = [];
+    groupedPositions.forEach((pos) => {
+      if (pos.incentives.length === 0) return;
+      list.push({
+        positionId: pos.positionId,
+        poolId: pos.poolId,
+        tickLower: pos.tickLower,
+        tickUpper: pos.tickUpper,
+        tokenA: pos.tokenA,
+        tokenB: pos.tokenB,
+        usdValue: pos.usdValue,
+        incentives: pos.incentives,
+      });
+    });
+    return list;
+  }, [groupedPositions]);
+
+  const compoundableCount = useMemo(() => {
+    return compoundPositions.filter((pos) => {
+      const rewards = new Set(pos.incentives.map(i => `${i.rewardToken.contract}:${i.rewardToken.symbol}`));
+      return (
+        rewards.has(`${pos.tokenA.contract}:${pos.tokenA.symbol}`) &&
+        rewards.has(`${pos.tokenB.contract}:${pos.tokenB.symbol}`)
+      );
+    }).length;
+  }, [compoundPositions]);
+
+
+
   useEffect(() => {
     if (farmsList.length === 0) return;
     const updateRewards = () => {
