@@ -448,7 +448,7 @@ export async function fetchDefiboxPairVolume(
     const pairedSymbol = symbols[cheeseIndex === 0 ? 1 : 0];
 
     let cheese: number | undefined;
-    if (volumeSymbol === CHEESE_SYMBOL) cheese = volume;
+    if (volumeSymbol === baseSymbol) cheese = volume;
     else if (volumeSymbol === pairedSymbol && reservePaired > 0 && reserveCheese > 0) {
       cheese = volume * (reserveCheese / reservePaired);
     }
