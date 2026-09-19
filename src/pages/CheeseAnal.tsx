@@ -54,7 +54,7 @@ const CheeseAnal = () => {
     isLoading: historyLoading,
     isError: historyError,
     refetch: refetchHistory,
-  } = useLpHistoryIndex();
+  } = useLpHistoryIndex(tokenKey);
 
   const latestRecordedDate = days.length ? days[days.length - 1].date : null;
   // Every current value and table row comes from the newest workflow snapshot,
