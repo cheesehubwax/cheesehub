@@ -30,10 +30,17 @@ export interface AvailableBalance {
 export interface CompoundLeg {
   contract: string;
   symbol: string;
+  /** Amount actually deposited (gross minus the compound fee). */
   amount: number;
   precision: number;
   /** Formatted chain quantity, e.g. "1.23450000 CHEESE". */
   quantity: string;
+  /** Amount allocated to this leg before the compound fee. */
+  gross: number;
+  /** Compound fee taken from the gross amount (may be 0 when it rounds away). */
+  fee: number;
+  /** Formatted fee quantity, e.g. "0.50610000 CHEESE". */
+  feeQuantity: string;
 }
 
 export interface CompoundPlanEntry {
@@ -65,6 +72,13 @@ export interface CompoundPlan {
 }
 
 export const MAX_COMPOUND_POSITIONS = 20;
+
+/** Share of every compounded deposit sent to the fee account. */
+export const COMPOUND_FEE_RATE = 0.0075;
+/** Share of each claimed balance deliberately left in the user's wallet. */
+export const COMPOUND_BUFFER_RATE = 0.005;
+export const COMPOUND_FEE_ACCOUNT = 'hole.cheese';
+export const COMPOUND_FEE_MEMO = 'compound fee';
 
 export function balanceKey(contract: string, symbol: string): string {
   return `${contract}:${symbol}`;
