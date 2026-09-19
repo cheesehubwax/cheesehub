@@ -315,7 +315,7 @@ export function AnalAccountPanel({ account, onAccountChange, days, current }: An
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                       <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
                       <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => usd(v)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
-                      <Tooltip content={tooltip((v) => usd(v), 'text-cheese')} />
+                      <Tooltip content={(props) => <MiniChartTooltip {...props} format={usd} valueClass="text-cheese" extras={tooltipExtras('usd')} />} />
                       <Area type="monotone" dataKey="usd" stroke="#3B82F6" strokeWidth={2} fill="url(#analAccountUsd)" dot={{ r: 3, fill: '#3B82F6', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -338,7 +338,7 @@ export function AnalAccountPanel({ account, onAccountChange, days, current }: An
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
                       <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
                       <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => amount(v, 0)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
-                      <Tooltip content={tooltip((v) => `${amount(v, 4)} CHEESE`, 'text-cheese')} />
+                      <Tooltip content={(props) => <MiniChartTooltip {...props} format={(v) => `${amount(v, 4)} CHEESE`} valueClass="text-cheese" extras={tooltipExtras('cheese')} />} />
                       <Line type="monotone" dataKey="cheese" stroke="#22C55E" strokeWidth={2} dot={{ r: 3, fill: '#22C55E', strokeWidth: 0 }} activeDot={{ r: 4 }} />
                     </LineChart>
                   </ResponsiveContainer>
