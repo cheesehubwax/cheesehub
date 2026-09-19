@@ -111,8 +111,8 @@ const CheeseAnal = () => {
                 <OpenMojiIcon emoji="📈" size={26} />
               </div>
               <p className="text-muted-foreground max-w-2xl mx-auto">
-                Twice-daily snapshots of every $CHEESE liquidity pool on Alcor, Taco and Defibox — pool value, token
-                balances, CHEESE price, provider counts and per-account positions, tracked over time
+                Twice-daily snapshots of every ${token.symbol} liquidity pool on Alcor, Taco and Defibox — pool value,
+                token balances, {token.symbol} price, provider counts and per-account positions, tracked over time
               </p>
               <div className="max-w-2xl mx-auto flex justify-center">
                 <HistoricalNote />
