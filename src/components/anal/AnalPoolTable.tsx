@@ -1,9 +1,9 @@
-// CHEESEAnal — one row per tracked CHEESE pool with day-over-day change.
+// CHEESEAnal — one row per tracked pool of the open token, with 24h change.
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { HistoricalNote } from '@/components/anal/HistoricalNote';
 import { CheeseLogo, PairLabel, UsdLogo } from '@/components/anal/PairLogos';
 import { VenueLabel } from '@/components/anal/VenueLogo';
-import { dayAbout24hBefore, type LpDayFile, type LpIndexDay } from '@/lib/lpPools';
+import { dayAbout24hBefore, type LpDayFile, type LpIndexDay, type LpTokenConfig } from '@/lib/lpPools';
 import { amount, change, tokenPrice, usd, usdPrice } from './format';
 
 interface AnalPoolTableProps {
@@ -14,6 +14,8 @@ interface AnalPoolTableProps {
   onSelect: (key: string) => void;
   failed: string[];
   isLoading: boolean;
+  /** Base token of the open tab. */
+  token: LpTokenConfig;
 }
 
 export function AnalPoolTable({
@@ -23,10 +25,12 @@ export function AnalPoolTable({
   onSelect,
   failed,
   isLoading,
+  token,
 }: AnalPoolTableProps) {
   // True 24h compare: the recorded snapshot closest to 24h before the current one.
   const previous = current ? dayAbout24hBefore(days, current.t) : null;
   const pools = [...(current?.pools ?? [])].sort((a, b) => b.usd - a.usd);
+
 
   return (
     <div className="w-full rounded-xl bg-card border border-border/50 p-4">
