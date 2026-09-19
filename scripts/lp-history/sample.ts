@@ -1,15 +1,18 @@
 /**
  * CHEESEAnal LP snapshot sampler.
  *
- * Twice a day (once per UTC 12h slot, keyed `YYYY-MM-DDTHH`), reads every
- * CHEESE pool on Alcor, Taco and Defibox and records, per pool: total USD
- * value, CHEESE held, paired token held, provider count, position count and
- * the CHEESE price in that pair — plus one row per provider account with the
- * same figures. Run by .github/workflows/lp-history.yml.
+ * Twice a day (once per UTC 12h slot, keyed `YYYY-MM-DDTHH`), reads every pool
+ * of the chosen base token (CHEESE or HOLE) on Alcor, Taco and Defibox and
+ * records, per pool: total USD value, base token held, paired token held,
+ * provider count, position count and the base token's price in that pair — plus
+ * one row per provider account with the same figures.
+ * Run by .github/workflows/lp-history.yml.
  *
  * Env:
  *   LP_HISTORY_DIR  directory of the data branch checkout (required).
- *                   Writes <dir>/lp-history-index.json and <dir>/days/<slot>.json
+ *                   CHEESE writes <dir>/lp-history-index.json and <dir>/days/<slot>.json
+ *                   HOLE writes the same files under <dir>/hole/
+ *   LP_TOKEN        `cheese` (default) or `hole`
  *   FORCE=1         re-record even when the current 12h slot already has a snapshot
  */
 
@@ -18,6 +21,8 @@ import {
   alcorPairVolume,
   buildPoolSnapshot,
   indexEntryForDay,
+  isTrackedPairKey,
+  lpTokenConfig,
   mergeIndexDay,
   poolsForPair,
   round,
@@ -27,6 +32,8 @@ import {
   type LpDayFile,
   type LpIndexFile,
   type LpPoolSnapshot,
+  type LpToken,
+  type LpTokenKey,
   type LpVenue,
   type RawPool,
   type RawPosition,
@@ -71,14 +78,24 @@ async function fetchJson<T>(path: string): Promise<T> {
  * `withVolume` is true only on the first snapshot of a UTC day, so the recorded
  * rolling-24h volume figures never overlap between the day's two snapshots.
  */
-async function sampleAlcor(prices: UsdPrices, withVolume: boolean): Promise<LpPoolSnapshot[]> {
+async function sampleAlcor(
+  prices: UsdPrices,
+  withVolume: boolean,
+  token: LpToken,
+  isTracked: (pairKey: string) => boolean,
+): Promise<LpPoolSnapshot[]> {
   const allPools = await fetchJson<RawPool[]>("/swap/pools");
-  const selected = selectVenuePairs(alcorCheesePairs(allPools));
-  const cheeseUsd = cheeseUsdFrom(prices);
+  const selected = selectVenuePairs(
+    alcorCheesePairs(allPools, token),
+    undefined,
+    undefined,
+    isTracked,
+  );
+  const cheeseUsd = cheeseUsdFrom(prices, token);
   const snapshots: LpPoolSnapshot[] = [];
 
   for (const { pair } of selected) {
-    const pools = poolsForPair(allPools, pair);
+    const pools = poolsForPair(allPools, pair, token);
     if (pools.length === 0) continue;
     const withPositions: { pool: RawPool; positions: RawPosition[] }[] = [];
     for (const pool of pools) {
@@ -88,18 +105,22 @@ async function sampleAlcor(prices: UsdPrices, withVolume: boolean): Promise<LpPo
       withPositions.push({ pool, positions: Array.isArray(positions) ? positions : [] });
       await sleep(400);
     }
-    const base = buildPoolSnapshot(venuePair("alcor", pair), withPositions, {
-      cheeseUsd,
-      pairedUsd: prices.get(priceKey(pair.symbol, pair.contract)),
-    });
-    const snapshot: LpPoolSnapshot = withVolume ? { ...base, ...alcorPairVolume(pools) } : base;
+    const built = buildPoolSnapshot(
+      venuePair("alcor", pair),
+      withPositions,
+      { cheeseUsd, pairedUsd: prices.get(priceKey(pair.symbol, pair.contract)) },
+      token,
+    );
+    const snapshot: LpPoolSnapshot = withVolume
+      ? { ...built, ...alcorPairVolume(pools, token) }
+      : built;
     if (snapshot.accounts === 0) continue;
     console.log(
-      `alcor ${snapshot.label}: $${snapshot.usd.toFixed(2)} • ${snapshot.cheese.toFixed(4)} CHEESE • ` +
+      `alcor ${snapshot.label}: $${snapshot.usd.toFixed(2)} • ${snapshot.cheese.toFixed(4)} ${token.symbol} • ` +
         `${snapshot.paired} ${snapshot.symbol} • ${snapshot.accounts} accounts • ` +
         `${snapshot.positions} positions across ${snapshot.poolIds.length} tier(s)` +
         (snapshot.volumeUsd24 !== undefined
-          ? ` • 24h volume $${snapshot.volumeUsd24.toFixed(2)} / ${(snapshot.volumeCheese24 ?? 0).toFixed(4)} CHEESE`
+          ? ` • 24h volume $${snapshot.volumeUsd24.toFixed(2)} / ${(snapshot.volumeCheese24 ?? 0).toFixed(4)} ${token.symbol}`
           : ""),
     );
     snapshots.push(snapshot);
@@ -120,30 +141,42 @@ async function main() {
   if (!dir) throw new Error("LP_HISTORY_DIR is required");
   const force = process.env.FORCE === "1";
 
+  const tokenKey = (process.env.LP_TOKEN ?? "cheese").toLowerCase() as LpTokenKey;
+  if (tokenKey !== "cheese" && tokenKey !== "hole") {
+    throw new Error(`LP_TOKEN must be 'cheese' or 'hole' (got '${process.env.LP_TOKEN}')`);
+  }
+  const config = lpTokenConfig(tokenKey);
+  const token: LpToken = { symbol: config.symbol, contract: config.contract };
+  // CHEESE keeps its explicit always-recorded pair list; HOLE is discovery only,
+  // so every HOLE pair has to clear the USD floor on its own.
+  const isTracked = tokenKey === "cheese" ? isTrackedPairKey : () => false;
+
+  const root = config.dataPath ? `${dir}/${config.dataPath}` : dir;
   const now = Date.now();
   const date = utcSlot(now);
-  const indexFile = `${dir}/lp-history-index.json`;
-  const dayFile = `${dir}/days/${date}.json`;
+  const indexFile = `${root}/lp-history-index.json`;
+  const dayFile = `${root}/days/${date}.json`;
 
   const index = await readJson<LpIndexFile>(indexFile, { updatedAt: 0, days: [] });
   const alreadyHaveSlot = index.days.some((d) => d.date === date);
-  console.log(`Now ${new Date(now).toISOString()} → UTC 12h slot ${date}.`);
+  console.log(`[${token.symbol}] Now ${new Date(now).toISOString()} → UTC 12h slot ${date}.`);
   if (alreadyHaveSlot && !force) {
-    console.log("Slot already recorded — skipping.");
+    console.log(`[${token.symbol}] Slot already recorded — skipping.`);
     return;
   }
-  if (alreadyHaveSlot && force) console.log("Slot already recorded, but FORCE=1 — re-recording.");
+  if (alreadyHaveSlot && force) {
+    console.log(`[${token.symbol}] Slot already recorded, but FORCE=1 — re-recording.`);
+  }
 
   // Surface dropped cron ticks: if the previous 12h slot never got a snapshot,
   // GitHub skipped every tick in it and the recorded series has a visible gap.
   const previousSlot = utcSlot(now - 12 * 60 * 60 * 1000);
-  if (!index.days.some((d) => d.date === previousSlot)) {
+  if (index.days.length > 0 && !index.days.some((d) => d.date === previousSlot)) {
     console.warn(
       `Gap detected — no snapshot was ever recorded for slot ${previousSlot}. ` +
         "GitHub's cron queue likely dropped every tick in that slot.",
     );
   }
-
 
   // Volume is a rolling 24h figure, so record it once per UTC day only — on the
   // first snapshot of that day — to keep the series free of overlapping points.
@@ -159,8 +192,8 @@ async function main() {
   );
 
   const prices = await fetchUsdPrices();
-  const cheeseUsd = cheeseUsdFrom(prices);
-  console.log(`CHEESE price: ${cheeseUsd !== undefined ? `$${cheeseUsd}` : "unavailable"}.`);
+  const cheeseUsd = cheeseUsdFrom(prices, token);
+  console.log(`${token.symbol} price: ${cheeseUsd !== undefined ? `$${cheeseUsd}` : "unavailable"}.`);
 
   const snapshots: LpPoolSnapshot[] = [];
   const partial: LpVenue[] = [];
@@ -169,13 +202,15 @@ async function main() {
     try {
       const pools =
         venue === "alcor"
-          ? await sampleAlcor(prices, withVolume)
+          ? await sampleAlcor(prices, withVolume, token, isTracked)
           : await snapshotAmmVenue(venue, prices, {
               pause: () => sleep(300),
               log: (message) => console.log(message),
               withVolume,
+              token,
+              isTracked,
             });
-      if (pools.length === 0) throw new Error(`No CHEESE pools read on ${venue}`);
+      if (pools.length === 0) throw new Error(`No ${token.symbol} pools read on ${venue}`);
       snapshots.push(...pools);
     } catch (error) {
       // One venue failing must not cost the whole day.
@@ -184,7 +219,9 @@ async function main() {
     }
   }
 
-  if (snapshots.length === 0) throw new Error("No venue could be read — refusing to record a snapshot");
+  if (snapshots.length === 0) {
+    throw new Error(`No venue could be read for ${token.symbol} — refusing to record a snapshot`);
+  }
 
   snapshots.sort((a, b) => b.usd - a.usd || a.key.localeCompare(b.key));
 
@@ -205,7 +242,8 @@ async function main() {
   await Bun.write(indexFile, `${JSON.stringify(nextIndex)}\n`);
 
   console.log(
-    `Recorded ${date}: ${snapshots.length} pools (${nextIndex.days.length} snapshots in index)` +
+    `[${token.symbol}] Recorded ${date}: ${snapshots.length} pools ` +
+      `(${nextIndex.days.length} snapshots in index)` +
       `${partial.length ? ` — missing ${partial.join(", ")}` : ""}.`,
   );
 }
