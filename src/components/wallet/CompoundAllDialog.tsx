@@ -16,6 +16,7 @@ import {
   CompoundPlan,
   MAX_COMPOUND_POSITIONS,
   balanceKey,
+  paysBothTokens,
   planCompound,
 } from '@/lib/alcorCompound';
 
