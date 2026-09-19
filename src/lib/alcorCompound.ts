@@ -349,25 +349,50 @@ export function planCompound(
     }
 
 
-    if (candidate.tokenA.amount <= 0 || candidate.tokenB.amount <= 0) {
+    // The pool decides the exact ratio it accepts, from its live price and the
+    // position's range. Guessing it causes Alcor's "Price slippage check" to fail.
+    if (!candidate.slot) {
       skipped.push({
         positionId: candidate.positionId,
         pair,
-        reason: 'no-balance',
-        detail: 'Position holds only one token, so no pairing ratio is available.',
+        reason: 'pool-price-unknown',
+        detail: 'Could not read the pool price just now — use "Re-check balances" to try again.',
       });
       continue;
     }
 
-    const ratio = candidate.tokenB.amount / candidate.tokenA.amount;
-    const rawA = Math.min(balA.balance, balB.balance / ratio);
-    const grossA = floorTo(rawA, balA.precision);
+    const { state, ratio } = poolDepositRatio(
+      candidate.slot,
+      candidate.tickLower,
+      candidate.tickUpper,
+      balA.precision,
+      balB.precision,
+    );
+
+    if (state !== 'in-range' || !ratio) {
+      skipped.push({
+        positionId: candidate.positionId,
+        pair,
+        reason: state === 'in-range' ? 'pool-price-unknown' : 'out-of-range',
+        detail: state === 'in-range'
+          ? 'Could not work out the pool deposit ratio — add liquidity on Alcor directly.'
+          : 'Position is outside its price range — only one token can be added, so it was left alone.',
+      });
+      continue;
+    }
+
+    const grossA = floorTo(Math.min(balA.balance, balB.balance / ratio), balA.precision);
     const grossB = floorTo(Math.min(grossA * ratio, balB.balance), balB.precision);
 
     const feeA = floorTo(grossA * COMPOUND_FEE_RATE, balA.precision);
     const feeB = floorTo(grossB * COMPOUND_FEE_RATE, balB.precision);
-    const depositA = floorTo(grossA - feeA, balA.precision);
-    const depositB = floorTo(grossB - feeB, balB.precision);
+    let depositA = floorTo(grossA - feeA, balA.precision);
+    const maxDepositB = floorTo(grossB - feeB, balB.precision);
+    // Keep the deposit on the pool's ratio, never spending more than allocated.
+    let depositB = Math.min(floorTo(depositA * ratio, balB.precision), maxDepositB);
+    if (depositB < floorTo(depositA * ratio, balB.precision)) {
+      depositA = Math.min(depositA, floorTo(depositB / ratio, balA.precision));
+    }
 
     if (depositA <= 0 || depositB <= 0) {
       skipped.push({
