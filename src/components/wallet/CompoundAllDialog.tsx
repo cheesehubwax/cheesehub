@@ -185,6 +185,13 @@ export function CompoundAllDialog({
     return Array.from(map.values());
   }, [positions]);
 
+  // Attach the live pool price to each candidate right before planning.
+  const withSlots = useCallback(async (): Promise<CompoundCandidate[]> => {
+    const slots = await readPoolSlots(eligibleCandidates.map(c => c.poolId));
+    return candidates.map(c => ({ ...c, slot: slots.get(c.poolId) ?? null }));
+  }, [candidates, eligibleCandidates]);
+
+
   const runClaimAndPlan = useCallback(async () => {
     if (!session || !accountName) return;
     setError(null);
