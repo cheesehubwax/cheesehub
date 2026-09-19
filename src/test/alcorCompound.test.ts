@@ -261,6 +261,37 @@ describe('planCompound', () => {
 
 });
 
+describe('selected-position filtering', () => {
+  it('fees are computed only from the positions the user kept selected', () => {
+    const plan = planCompound(
+      [
+        candidate({ positionId: 1, usdValue: 900 }),
+        candidate({ positionId: 2, poolId: 11, usdValue: 100 }),
+      ],
+      balances([
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 150, precision: 8 }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 12, precision: 6 }],
+      ]),
+    );
+    expect(plan.compoundable).toHaveLength(2);
+
+    const deselected = new Set([2]);
+    const selectedEntries = plan.compoundable.filter(e => !deselected.has(e.positionId));
+    expect(selectedEntries.map(e => e.positionId)).toEqual([1]);
+
+    const selectedTotals = buildCompoundFeeTotals(selectedEntries);
+    const allTotals = buildCompoundFeeTotals(plan.compoundable);
+    selectedTotals.forEach(sel => {
+      const all = allTotals.find(t => t.symbol === sel.symbol)!;
+      const expected = selectedEntries
+        .reduce((sum, e) => sum + (e.tokenA.symbol === sel.symbol ? e.tokenA.fee : e.tokenB.fee), 0);
+      expect(sel.quantity.startsWith(expected.toFixed(all.quantity.split('.')[1].split(' ')[0].length))).toBe(true);
+      // Excluding position 2 must reduce the fee total.
+      expect(parseFloat(sel.quantity)).toBeLessThan(parseFloat(all.quantity));
+    });
+  });
+});
+
 describe('token matching normalisation', () => {
   it('matches reward tokens across casing and missing contracts', () => {
     const rewards = ['cheeseburger:CHEESE', 'eosio.token:WAX'];
