@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { useLpDay } from '@/hooks/useLpHistory';
 import { downloadPoolHistoryCsv } from '@/lib/lpCsv';
-import { type LpDayFile, type LpIndexDay, type LpPoolSnapshot } from '@/lib/lpPools';
+import { type LpDayFile, type LpIndexDay, type LpPoolSnapshot, type LpTokenConfig } from '@/lib/lpPools';
 import { amount, change, shortDate, tokenPrice, tooltipDate, usd } from './format';
 
 interface AnalPoolDetailProps {
