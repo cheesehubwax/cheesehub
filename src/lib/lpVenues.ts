@@ -295,8 +295,12 @@ function symbolCodeOf(raw: unknown): string {
   return (parts[parts.length - 1] ?? '').trim().toUpperCase();
 }
 
-/** Every CHEESE pool on Taco, with reserves and a USD estimate. */
-export async function fetchTacoCandidates(prices: UsdPrices): Promise<AmmPoolCandidate[]> {
+/** Every base-token pool on Taco, with reserves and a USD estimate. */
+export async function fetchTacoCandidates(
+  prices: UsdPrices,
+  base: LpToken = CHEESE_TOKEN,
+): Promise<AmmPoolCandidate[]> {
+  const baseSymbol = base.symbol.toUpperCase();
   const rows = await readTable<TacoPairRow>(TACO_CONTRACT, TACO_CONTRACT, 'pairs');
   const out: AmmPoolCandidate[] = [];
   for (const row of rows) {
@@ -304,10 +308,10 @@ export async function fetchTacoCandidates(prices: UsdPrices): Promise<AmmPoolCan
     if (!shareSymbol) continue;
     const legs = [row.pool1, row.pool2];
     const symbols = legs.map((leg) => assetSymbol(leg?.quantity));
-    const cheeseIndex = symbols.indexOf(CHEESE_SYMBOL);
+    const cheeseIndex = symbols.indexOf(baseSymbol);
     if (cheeseIndex === -1) continue;
     const cheeseLeg = legs[cheeseIndex];
-    if ((cheeseLeg?.contract ?? '') !== CHEESE_CONTRACT) continue;
+    if ((cheeseLeg?.contract ?? '') !== base.contract) continue;
     const otherLeg = legs[cheeseIndex === 0 ? 1 : 0];
     const pairedSymbol = assetSymbol(otherLeg?.quantity);
     const pairedContract = otherLeg?.contract ?? '';
@@ -318,7 +322,7 @@ export async function fetchTacoCandidates(prices: UsdPrices): Promise<AmmPoolCan
     const totalShares = assetAmount(row.supply);
     if (!(reserveCheese > 0) || !(reservePaired > 0) || !(totalShares > 0)) continue;
 
-    const pair = pairFor(pairedSymbol, pairedContract);
+    const pair = pairFor(pairedSymbol, pairedContract, base);
     out.push({
       venue: 'taco',
       pair,
@@ -331,7 +335,7 @@ export async function fetchTacoCandidates(prices: UsdPrices): Promise<AmmPoolCan
       usd: positionUsdValue(
         reserveCheese,
         reservePaired,
-        cheeseUsdFrom(prices),
+        cheeseUsdFrom(prices, base),
         prices.get(priceKey(pairedSymbol, pairedContract)),
       ),
     });
