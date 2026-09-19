@@ -48,37 +48,46 @@ const POLL_ATTEMPTS = 12;
 const POLL_DELAY_MS = 2000;
 
 function parseBalance(raw: string | undefined): AvailableBalance {
-  if (!raw) return { balance: 0, precision: 8 };
+  if (!raw) return { balance: 0, precision: 8, known: true };
   const [amountStr] = raw.split(' ');
   const decimals = amountStr.split('.')[1]?.length ?? 0;
-  return { balance: parseFloat(amountStr) || 0, precision: decimals };
+  return { balance: parseFloat(amountStr) || 0, precision: decimals, known: true };
 }
 
-async function readBalance(account: string, contract: string, symbol: string): Promise<AvailableBalance> {
+async function readBalance(
+  account: string,
+  contract: string | undefined,
+  symbol: string,
+): Promise<AvailableBalance> {
+  // Without an issuing contract the chain cannot answer — report it as unknown
+  // rather than pretending the wallet holds nothing.
+  if (!contract) return { balance: 0, precision: 8, known: false };
   try {
-    const rows = await waxRpcCall<string[]>(
+    const rows = await waxRpcCall<string[] | undefined>(
       '/v1/chain/get_currency_balance',
       { code: contract, account, symbol },
       6000,
     );
-    return parseBalance(rows?.[0]);
+    if (!Array.isArray(rows)) return { balance: 0, precision: 8, known: false };
+    return parseBalance(rows[0]);
   } catch {
-    return { balance: 0, precision: 8 };
+    return { balance: 0, precision: 8, known: false };
   }
 }
 
 async function readBalances(
   account: string,
-  tokens: Array<{ contract: string; symbol: string }>,
+  tokens: Array<{ contract?: string; symbol: string }>,
 ): Promise<Map<string, AvailableBalance>> {
   const map = new Map<string, AvailableBalance>();
   const results = await Promise.all(tokens.map(t => readBalance(account, t.contract, t.symbol)));
   tokens.forEach((t, i) => {
-    const existing = map.get(balanceKey(t.contract, t.symbol));
+    const key = balanceKey(t.contract ?? '', t.symbol);
+    const existing = map.get(key);
     const value = results[i];
     // Keep the largest reported precision if the same token appears twice.
     if (!existing || value.precision > existing.precision) {
-      map.set(balanceKey(t.contract, t.symbol), value);
+      map.set(key, value);
     }
   });
   return map;
