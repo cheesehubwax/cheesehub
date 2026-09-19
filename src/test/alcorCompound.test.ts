@@ -278,3 +278,64 @@ describe('buildBalanceReadList', () => {
   });
 });
 
+describe('buildClaimedBalances', () => {
+  const cheeseKey = balanceKey(CHEESE.contract, CHEESE.symbol);
+  const usdcKey = balanceKey(USDC.contract, USDC.symbol);
+
+  it('only exposes the amount the claim added, never pre-existing holdings', () => {
+    const claimed = buildClaimedBalances(
+      balances([
+        [cheeseKey, { balance: 4000, precision: 8 }],
+        [usdcKey, { balance: 25, precision: 6 }],
+      ]),
+      balances([
+        [cheeseKey, { balance: 4100, precision: 8 }],
+        [usdcKey, { balance: 35, precision: 6 }],
+      ]),
+    );
+
+    expect(claimed.get(cheeseKey)).toMatchObject({ balance: 100, known: true });
+    expect(claimed.get(usdcKey)).toMatchObject({ balance: 10, known: true });
+  });
+
+  it('spends none of a wallet holding when the claim paid nothing', () => {
+    const claimed = buildClaimedBalances(
+      balances([[cheeseKey, { balance: 4000, precision: 8 }]]),
+      balances([[cheeseKey, { balance: 4000, precision: 8 }]]),
+    );
+    expect(claimed.get(cheeseKey)?.balance).toBe(0);
+
+    const plan = planCompound([candidate()], claimed);
+    expect(plan.compoundable).toHaveLength(0);
+  });
+
+  it('marks a token unknown when either read failed or no baseline exists', () => {
+    const failedAfter = buildClaimedBalances(
+      balances([[cheeseKey, { balance: 10, precision: 8 }]]),
+      balances([[cheeseKey, { balance: 0, precision: 8, known: false }]]),
+    );
+    expect(failedAfter.get(cheeseKey)?.known).toBe(false);
+
+    const noBaseline = buildClaimedBalances(
+      balances([]),
+      balances([[cheeseKey, { balance: 500, precision: 8 }]]),
+    );
+    expect(noBaseline.get(cheeseKey)).toMatchObject({ balance: 0, known: false });
+  });
+
+  it('skips a position honestly when its claim delta could not be measured', () => {
+    const claimed = buildClaimedBalances(
+      balances([[usdcKey, { balance: 5, precision: 6 }]]),
+      balances([
+        [cheeseKey, { balance: 500, precision: 8 }],
+        [usdcKey, { balance: 15, precision: 6 }],
+      ]),
+    );
+
+    const plan = planCompound([candidate()], claimed);
+    expect(plan.compoundable).toHaveLength(0);
+    expect(plan.skipped[0].reason).toBe('balance-unknown');
+    expect(plan.skipped[0].detail).toContain('CHEESE');
+  });
+});
+
