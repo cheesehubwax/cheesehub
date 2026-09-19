@@ -261,6 +261,53 @@ describe('planCompound', () => {
 
 });
 
+describe('selected-position filtering', () => {
+  it('fees are computed only from the positions the user kept selected', () => {
+    const WAX = { contract: 'eosio.token', symbol: 'WAX' };
+    const HOLE = { contract: 'hole.cheese', symbol: 'HOLE' };
+    const plan = planCompound(
+      [
+        candidate({ positionId: 1, usdValue: 900 }),
+        candidate({
+          positionId: 2,
+          poolId: 11,
+          usdValue: 100,
+          tokenA: { ...WAX, amount: 500 },
+          tokenB: { ...HOLE, amount: 5000 },
+          rewardTokenKeys: [balanceKey(WAX.contract, WAX.symbol), balanceKey(HOLE.contract, HOLE.symbol)],
+        }),
+      ],
+      balances([
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 500, precision: 8 }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 50, precision: 6 }],
+        [balanceKey(WAX.contract, WAX.symbol), { balance: 50, precision: 8 }],
+        [balanceKey(HOLE.contract, HOLE.symbol), { balance: 500, precision: 8 }],
+      ]),
+    );
+    expect(plan.compoundable).toHaveLength(2);
+
+    const deselected = new Set([2]);
+    const selectedEntries = plan.compoundable.filter(e => !deselected.has(e.positionId));
+    expect(selectedEntries.map(e => e.positionId)).toEqual([1]);
+
+    const selectedTotals = buildCompoundFeeTotals(selectedEntries);
+    // Position 2's tokens carry no fee at all once it is deselected.
+    expect(selectedTotals.some(t => t.symbol === 'WAX')).toBe(false);
+    expect(selectedTotals.some(t => t.symbol === 'HOLE')).toBe(false);
+    const allTotals = buildCompoundFeeTotals(plan.compoundable);
+    expect(allTotals.some(t => t.symbol === 'WAX')).toBe(true);
+    expect(allTotals.some(t => t.symbol === 'HOLE')).toBe(true);
+    // Each selected fee is exactly that entry's own fee, nothing more.
+    selectedTotals.forEach(sel => {
+      const expected = selectedEntries.reduce(
+        (sum, e) => sum + (e.tokenA.symbol === sel.symbol ? e.tokenA.fee : e.tokenB.fee),
+        0,
+      );
+      expect(sel.quantity).toBe(`${expected.toFixed(sel.precision)} ${sel.symbol}`);
+    });
+  });
+});
+
 describe('token matching normalisation', () => {
   it('matches reward tokens across casing and missing contracts', () => {
     const rewards = ['cheeseburger:CHEESE', 'eosio.token:WAX'];
