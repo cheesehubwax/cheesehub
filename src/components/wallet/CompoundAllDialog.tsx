@@ -206,7 +206,18 @@ export function CompoundAllDialog({
     setError(null);
     setStage('compounding');
     try {
-      const actions = plan.compoundable.flatMap(entry =>
+      const feeActions = buildCompoundFeeTotals(plan.compoundable).map(fee => ({
+        account: fee.contract,
+        name: 'transfer',
+        authorization: [{ actor: accountName, permission: 'active' }],
+        data: {
+          from: accountName,
+          to: COMPOUND_FEE_ACCOUNT,
+          quantity: fee.quantity,
+          memo: COMPOUND_FEE_MEMO,
+        },
+      }));
+      const depositActions = plan.compoundable.flatMap(entry =>
         buildIncreaseLiquidityAction(
           accountName,
           entry.positionId,
