@@ -123,22 +123,20 @@ export function CompoundAllDialog({
 
   // Positions whose farms pay out both pool tokens — the ones that can compound.
   const eligibleCandidates = useMemo(
-    () =>
-      candidates.filter(c => {
-        const rewards = new Set(c.rewardTokenKeys);
-        return (
-          rewards.has(balanceKey(c.tokenA.contract, c.tokenA.symbol)) &&
-          rewards.has(balanceKey(c.tokenB.contract, c.tokenB.symbol))
-        );
-      }),
+    () => candidates.filter(c => paysBothTokens(c.rewardTokenKeys, c.tokenA, c.tokenB)),
     [candidates],
   );
 
+  // Read balances for the reward tokens themselves — they carry authoritative
+  // contract data, whereas pool tokens sourced from fallback reads may not.
   const tokensToRead = useMemo(() => {
     const seen = new Map<string, { contract: string; symbol: string }>();
     eligibleCandidates.forEach(c => {
-      seen.set(balanceKey(c.tokenA.contract, c.tokenA.symbol), c.tokenA);
-      seen.set(balanceKey(c.tokenB.contract, c.tokenB.symbol), c.tokenB);
+      c.rewardTokenKeys.forEach(key => {
+        if (seen.has(key)) return;
+        const idx = key.indexOf(':');
+        seen.set(key, { contract: key.slice(0, idx), symbol: key.slice(idx + 1) });
+      });
     });
     return Array.from(seen.values());
   }, [eligibleCandidates]);
