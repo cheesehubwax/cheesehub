@@ -960,8 +960,16 @@ export function buildStakeAction(
   };
 }
 
+/** Default deposit slippage tolerance (0.5%) — matches Alcor's own default. */
+export const DEFAULT_DEPOSIT_SLIPPAGE = 0.005;
+
 /**
  * Build increase liquidity action (add to LP position)
+ *
+ * `slippageTolerance` sets how far below the desired amounts the pool may end up
+ * using before it rejects the deposit with "Price slippage check". Automated
+ * flows (Compound All) pass a wider tolerance because the pool price can move
+ * between reading it and signing.
  */
 export function buildIncreaseLiquidityAction(
   accountName: string,
@@ -972,10 +980,13 @@ export function buildIncreaseLiquidityAction(
   tokenAContract: string,
   tokenAQuantity: string,
   tokenBContract: string,
-  tokenBQuantity: string
+  tokenBQuantity: string,
+  slippageTolerance: number = DEFAULT_DEPOSIT_SLIPPAGE
 ): TransactionAction[] {
-  // Parse amounts for min values (apply 0.5% slippage - matches Alcor default)
-  const slippageMultiplier = 0.995;
+  const tolerance = Number.isFinite(slippageTolerance)
+    ? Math.min(Math.max(slippageTolerance, 0), 0.5)
+    : DEFAULT_DEPOSIT_SLIPPAGE;
+  const slippageMultiplier = 1 - tolerance;
 
   const tokenAAmount = parseFloat(tokenAQuantity.split(' ')[0]);
   const tokenASymbol = tokenAQuantity.split(' ')[1];
