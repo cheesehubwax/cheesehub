@@ -86,7 +86,7 @@ async function sampleAlcor(
 ): Promise<LpPoolSnapshot[]> {
   const allPools = await fetchJson<RawPool[]>("/swap/pools");
   const selected = selectVenuePairs(
-    alcorCheesePairs(allPools, token),
+    alcorCheesePairs(allPools, token, prices),
     undefined,
     undefined,
     isTracked,

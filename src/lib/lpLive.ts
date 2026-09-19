@@ -42,7 +42,7 @@ async function fetchJson<T>(path: string): Promise<T> {
 /** Alcor half of the live read: every recorded CHEESE pair, all fee tiers. */
 async function readAlcor(prices: UsdPrices): Promise<{ pools: LpPoolSnapshot[]; failed: string[] }> {
   const allPools = await fetchJson<RawPool[]>('/swap/pools');
-  const selected = selectVenuePairs(alcorCheesePairs(allPools));
+  const selected = selectVenuePairs(alcorCheesePairs(allPools, CHEESE_TOKEN, prices));
   const pools: LpPoolSnapshot[] = [];
   const failed: string[] = [];
   const cheeseUsd = cheeseUsdFrom(prices);
