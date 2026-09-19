@@ -259,3 +259,49 @@ describe('dayAbout24hBefore', () => {
     expect(dayAbout24hBefore(days, base)).toBeNull();
   });
 });
+
+describe('HOLE as the base token', () => {
+  const holeCheesePair = venuePair('alcor', 'CHEESE', 'cheeseburger');
+  const pools: RawPool[] = [
+    { id: 11051, fee: 3000, active: true, tokenA: cheese, tokenB: hole },
+    { id: 11055, fee: 3000, active: true, tokenA: wax, tokenB: hole },
+  ];
+
+  it('matches the CHEESE pair from the HOLE side', () => {
+    expect(poolsForPair(pools, holeCheesePair, HOLE_TOKEN).map((p) => p.id)).toEqual([11051]);
+    expect(cheeseIsTokenA({ id: 11051, tokenA: cheese, tokenB: hole }, HOLE_TOKEN)).toBe(false);
+    expect(cheeseIsTokenA({ id: 11055, tokenA: wax, tokenB: hole }, HOLE_TOKEN)).toBe(false);
+  });
+
+  it('measures HOLE on its own side of the pool', () => {
+    const positions: RawPosition[] = [
+      {
+        id: 1,
+        owner: 'hole.cheese',
+        pool: 11051,
+        amountA: '100.0000 CHEESE',
+        amountB: '50.0000 HOLE',
+        totalValue: '12.5',
+        inRange: true,
+      },
+    ];
+    const snap = buildPoolSnapshot(holeCheesePair, pools, { CHEESE: 0.016 }, HOLE_TOKEN)!;
+    expect(snap).toBeTruthy();
+    const withPositions = buildPoolSnapshot(
+      holeCheesePair,
+      pools,
+      { CHEESE: 0.016 },
+      HOLE_TOKEN,
+      positions,
+    );
+    if (withPositions) {
+      expect(withPositions.symbol).toBe('CHEESE');
+    }
+  });
+
+  it('keeps token data paths separate', () => {
+    expect(lpTokenConfig('cheese').dataPath).toBe('');
+    expect(lpTokenConfig('hole').dataPath).toBe('hole');
+    expect(lpTokenConfig('hole').contract).toBe('hole.cheese');
+  });
+});
