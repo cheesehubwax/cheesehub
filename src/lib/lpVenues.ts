@@ -156,8 +156,9 @@ export async function fetchUsdPrices(): Promise<UsdPrices> {
   return prices;
 }
 
-export function cheeseUsdFrom(prices: UsdPrices): number | undefined {
-  const value = prices.get(priceKey(CHEESE_SYMBOL, CHEESE_CONTRACT));
+/** USD price of the base token (CHEESE unless another is given). */
+export function cheeseUsdFrom(prices: UsdPrices, base: LpToken = CHEESE_TOKEN): number | undefined {
+  const value = prices.get(priceKey(base.symbol.toUpperCase(), base.contract));
   return value && value > 0 ? value : undefined;
 }
 
