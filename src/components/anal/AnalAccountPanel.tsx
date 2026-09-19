@@ -252,7 +252,7 @@ export function AnalAccountPanel({ account, onAccountChange, days, current, toke
                       }`}
                     >
                       <td className="py-1.5 text-foreground whitespace-nowrap">
-                        <PairLabel symbol={row.symbol} contract={row.contract} />
+                        <PairLabel symbol={row.symbol} contract={row.contract} base={token} />
                       </td>
                       <td className="py-1.5 whitespace-nowrap">
                         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/60 bg-background/60 text-muted-foreground">
