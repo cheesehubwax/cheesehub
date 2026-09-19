@@ -24,6 +24,11 @@ export interface CompoundCandidate {
   usdValue: number;
   /** Reward token keys (`contract:symbol`) this position pays out. */
   rewardTokenKeys: string[];
+  /**
+   * Live pool price slot. Required to size the deposit at the exact ratio the
+   * pool accepts; without it the position cannot be compounded safely.
+   */
+  slot?: PoolSlot | null;
 }
 
 export interface AvailableBalance {
@@ -67,6 +72,8 @@ export type CompoundSkipReason =
   | 'no-balance'
   | 'dust'
   | 'missing-ticks'
+  | 'out-of-range'
+  | 'pool-price-unknown'
   | 'position-cap';
 
 export interface CompoundSkip {
