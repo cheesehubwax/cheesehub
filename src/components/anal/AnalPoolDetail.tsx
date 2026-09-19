@@ -158,8 +158,8 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
             {sortedPools.map((p) => (
               <SelectItem key={p.key} value={p.key}>
                 <span className="inline-flex items-center gap-2">
-                  <PairLogos symbol={p.symbol} contract={p.contract} size="sm" />
-                  <span className="text-foreground">CHEESE / {p.symbol}</span>
+                  <PairLogos symbol={p.symbol} contract={p.contract} base={token} size="sm" />
+                  <span className="text-foreground">{token.symbol} / {p.symbol}</span>
                   <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border/60 bg-background/60 text-muted-foreground">
                     <VenueLabel venue={p.venue} />
                   </span>
