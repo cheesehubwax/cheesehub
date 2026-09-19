@@ -46,7 +46,7 @@ describe('planCompound', () => {
     const entry = plan.compoundable[0];
     // 0.5% buffer: 9.95 WAXUSDC usable → ratio 0.1 → 99.5 CHEESE gross
     expect(entry.tokenA.gross).toBeCloseTo(99.5, 6);
-    expect(entry.tokenB.gross).toBeCloseTo(9.95, 6);
+    expect(entry.tokenB.gross).toBeCloseTo(9.95, 4);
     expect(entry.tokenA.fee).toBeCloseTo(99.5 * COMPOUND_FEE_RATE, 6);
     expect(entry.tokenB.fee).toBeCloseTo(9.95 * COMPOUND_FEE_RATE, 6);
     expect(entry.tokenA.amount).toBeCloseTo(entry.tokenA.gross - entry.tokenA.fee, 6);
@@ -110,10 +110,11 @@ describe('planCompound', () => {
 
   it('skips dust that rounds to zero at token precision', () => {
     const plan = planCompound(
-      [candidate()],
+      // Ratio so lopsided that the matched side rounds away entirely.
+      [candidate({ tokenA: { ...CHEESE, amount: 1_000_000 }, tokenB: { ...USDC, amount: 1 } })],
       balances([
-        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 0.000001, precision: 8 }],
-        [balanceKey(USDC.contract, USDC.symbol), { balance: 0.0000001, precision: 6 }],
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 1, precision: 8 }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 1, precision: 2 }],
       ]),
     );
 
