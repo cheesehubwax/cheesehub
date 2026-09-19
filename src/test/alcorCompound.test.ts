@@ -2,15 +2,18 @@ import { describe, expect, it } from 'vitest';
 import {
   AvailableBalance,
   COMPOUND_FEE_RATE,
+  COMPOUND_SLIPPAGE_TOLERANCE,
   CompoundCandidate,
   balanceKey,
   buildBalanceReadList,
   buildClaimedBalances,
   buildCompoundFeeTotals,
+  isReversedAgainstPool,
   paysBothTokens,
   planCompound,
 } from '@/lib/alcorCompound';
 import { PoolSlot, poolDepositRatio, sqrtPriceAtTick } from '@/lib/alcorV3Amounts';
+import { buildIncreaseLiquidityAction } from '@/lib/alcorFarms';
 
 const CHEESE = { contract: 'cheeseburger', symbol: 'CHEESE' };
 const USDC = { contract: 'eth.token', symbol: 'WAXUSDC' };
@@ -431,5 +434,100 @@ describe('poolDepositRatio', () => {
     expect(poolDepositRatio(slot, 100, 200, 8, 8).state).toBe('below-range');
     expect(poolDepositRatio(slot, -200, -100, 8, 8).state).toBe('above-range');
     expect(poolDepositRatio(slot, 100, 200, 8, 8).ratio).toBeNull();
+  });
+});
+
+describe('pool token ordering', () => {
+  it('inverts the ratio when the position reports the pair in the pool order reversed', () => {
+    // Pool order is WAXUSDC/CHEESE while the position reports CHEESE/WAXUSDC.
+    const slot: PoolSlot = {
+      ...slotForRatio(0.1, -100, 100, 6, 8),
+      tokenA: USDC,
+      tokenB: CHEESE,
+    };
+    const c = candidate({ slot });
+
+    expect(isReversedAgainstPool(c)).toBe(true);
+
+    const plan = planCompound(
+      [c],
+      balances([
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 1000, precision: 8 }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 1000, precision: 6 }],
+      ]),
+    );
+
+    expect(plan.compoundable).toHaveLength(1);
+    const entry = plan.compoundable[0];
+    // Pool wants 0.1 CHEESE per WAXUSDC, so the position's B:A ratio is ~10.
+    expect(entry.tokenB.gross / entry.tokenA.gross).toBeGreaterThan(5);
+  });
+
+  it('keeps the ratio as-is when the order already matches the pool', () => {
+    const slot: PoolSlot = { ...DEFAULT_SLOT, tokenA: CHEESE, tokenB: USDC };
+    const c = candidate({ slot });
+
+    expect(isReversedAgainstPool(c)).toBe(false);
+
+    const plan = planCompound(
+      [c],
+      balances([
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 1000, precision: 8 }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 1000, precision: 6 }],
+      ]),
+    );
+
+    expect(plan.compoundable[0].tokenB.gross / plan.compoundable[0].tokenA.gross).toBeCloseTo(0.1, 3);
+  });
+});
+
+describe('deposit minimums', () => {
+  const minsFor = (tolerance?: number) => {
+    const actions = buildIncreaseLiquidityAction(
+      'alice',
+      1,
+      10,
+      -100,
+      100,
+      CHEESE.contract,
+      '100.00000000 CHEESE',
+      USDC.contract,
+      '10.000000 WAXUSDC',
+      tolerance,
+    );
+    const add: any = actions[actions.length - 1];
+    return { min: add.data, name: add.name };
+  };
+
+  it('defaults to the 0.5% tolerance Alcor itself uses', () => {
+    const { min, name } = minsFor();
+    expect(name).toBe('addliquid');
+    expect(min.tokenAMin).toBe('99.50000000 CHEESE');
+    expect(min.tokenBMin).toBe('9.950000 WAXUSDC');
+  });
+
+  it('applies the wider compound buffer so pool price movement does not reject the deposit', () => {
+    const { min } = minsFor(COMPOUND_SLIPPAGE_TOLERANCE);
+    expect(min.tokenAMin).toBe('97.00000000 CHEESE');
+    expect(min.tokenBMin).toBe('9.700000 WAXUSDC');
+    expect(min.tokenADesired).toBe('100.00000000 CHEESE');
+  });
+
+  it('floors the minimum instead of rounding it up above what the pool can use', () => {
+    const actions = buildIncreaseLiquidityAction(
+      'alice',
+      1,
+      10,
+      -100,
+      100,
+      CHEESE.contract,
+      '0.03 CHEESE',
+      USDC.contract,
+      '0.03 WAXUSDC',
+      0.005,
+    );
+    const add: any = actions[actions.length - 1];
+    // 0.03 * 0.995 = 0.02985 → floors to 0.02, never 0.03.
+    expect(add.data.tokenAMin).toBe('0.02 CHEESE');
   });
 });
