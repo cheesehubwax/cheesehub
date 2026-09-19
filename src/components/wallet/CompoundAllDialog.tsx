@@ -281,6 +281,10 @@ export function CompoundAllDialog({
                   {candidates.length} position{candidates.length !== 1 ? 's' : ''}). The smaller reward side goes in
                   full, matched by the other token. Anything left over stays in your wallet.
                 </p>
+                <p>
+                  A 0.75% fee on each deposit is sent to {COMPOUND_FEE_ACCOUNT}, and a small amount of every token is
+                  left untouched in your wallet.
+                </p>
               </AlertDescription>
             </Alert>
 
@@ -342,9 +346,20 @@ export function CompoundAllDialog({
                     <div className="font-mono text-xs text-right text-cheese">
                       <div>{entry.tokenA.amount.toFixed(Math.min(6, entry.tokenA.precision))} {entry.tokenA.symbol}</div>
                       <div>{entry.tokenB.amount.toFixed(Math.min(6, entry.tokenB.precision))} {entry.tokenB.symbol}</div>
+                      {(entry.tokenA.fee > 0 || entry.tokenB.fee > 0) && (
+                        <div className="text-[10px] text-muted-foreground">
+                          fee {entry.tokenA.fee.toFixed(Math.min(6, entry.tokenA.precision))} {entry.tokenA.symbol}
+                          {entry.tokenB.fee > 0 && (
+                            <> · {entry.tokenB.fee.toFixed(Math.min(6, entry.tokenB.precision))} {entry.tokenB.symbol}</>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
+                <p className="text-[11px] text-muted-foreground">
+                  0.75% of each deposit supports HOLE, and a small amount of every token stays in your wallet.
+                </p>
               </div>
             ) : (
               <Alert>
