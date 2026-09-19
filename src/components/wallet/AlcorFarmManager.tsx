@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ExternalLink, TrendingUp, Percent, Coins, ChevronDown, ChevronUp, Plus, RefreshCw, Zap, Wifi, Database, Clock, LogOut } from 'lucide-react';
+import { Loader2, ExternalLink, TrendingUp, Percent, Coins, ChevronDown, ChevronUp, Plus, RefreshCw, Zap, Wifi, Database, Clock, LogOut, Recycle } from 'lucide-react';
 import { useWax } from '@/context/WaxContext';
 import { useAlcorFarms, UnstakedIncentivesMap, UnstakedLPPosition } from '@/hooks/useAlcorFarms';
 import { useAlcorTokenPrices } from '@/hooks/useAlcorTokenPrices';
@@ -13,6 +13,8 @@ import { TokenLogo } from '@/components/TokenLogo';
 import { toast } from 'sonner';
 import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
 import { IncreaseLiquidityDialog } from './IncreaseLiquidityDialog';
+import { CompoundAllDialog, CompoundPosition } from './CompoundAllDialog';
+
 import { CreateAlcorFarmDialog } from './CreateAlcorFarmDialog';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
@@ -86,6 +88,8 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
   const [increaseLiquidityPosition, setIncreaseLiquidityPosition] = useState<AlcorFarmPosition | null>(null);
   const [createFarmOpen, setCreateFarmOpen] = useState(false);
   const [optimisticallyRemovedIds, setOptimisticallyRemovedIds] = useState<Set<string>>(new Set());
+  const [compoundOpen, setCompoundOpen] = useState(false);
+
 
   const farmsList = Array.isArray(stakedFarms) ? stakedFarms : [];
   const unstakedList = Array.isArray(unstakedPositions) ? unstakedPositions : [];
@@ -193,6 +197,38 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
     });
     return Array.from(totals.values()).sort((a, b) => b.total - a.total);
   }, [farmsList, liveRewards]);
+
+  // Positions that can feed the Compound All flow: staked positions whose farms
+  // pay out both tokens of their own pool.
+  const compoundPositions = useMemo<CompoundPosition[]>(() => {
+    const list: CompoundPosition[] = [];
+    groupedPositions.forEach((pos) => {
+      if (pos.incentives.length === 0) return;
+      list.push({
+        positionId: pos.positionId,
+        poolId: pos.poolId,
+        tickLower: pos.tickLower,
+        tickUpper: pos.tickUpper,
+        tokenA: pos.tokenA,
+        tokenB: pos.tokenB,
+        usdValue: pos.usdValue,
+        incentives: pos.incentives,
+      });
+    });
+    return list;
+  }, [groupedPositions]);
+
+  const compoundableCount = useMemo(() => {
+    return compoundPositions.filter((pos) => {
+      const rewards = new Set(pos.incentives.map(i => `${i.rewardToken.contract}:${i.rewardToken.symbol}`));
+      return (
+        rewards.has(`${pos.tokenA.contract}:${pos.tokenA.symbol}`) &&
+        rewards.has(`${pos.tokenB.contract}:${pos.tokenB.symbol}`)
+      );
+    }).length;
+  }, [compoundPositions]);
+
+
 
   useEffect(() => {
     if (farmsList.length === 0) return;
@@ -474,6 +510,21 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
           <Button size="sm" variant="ghost" onClick={() => { setIsRefreshing(true); refetch(); setTimeout(() => setIsRefreshing(false), 1000); }} disabled={isTransacting || isRefreshing} className="h-8 w-8 p-0">
             <RefreshCw className={cn("h-4 w-4 transition-transform", isRefreshing && "animate-spin")} />
           </Button>
+          {compoundableCount > 0 && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="sm" onClick={() => setCompoundOpen(true)} disabled={isTransacting} className="h-8 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white gap-1.5">
+                    <Recycle className="h-3.5 w-3.5" />Compound All ({compoundableCount})
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-center max-w-[220px]">
+                  <p className="text-xs">Claim your rewards, then add them straight back into the same pools. Pools whose rewards only cover one token are skipped.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -818,6 +869,18 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
         }}
         onTransactionComplete={onTransactionComplete}
       />
+
+      <CompoundAllDialog
+        open={compoundOpen}
+        onOpenChange={setCompoundOpen}
+        positions={compoundPositions}
+        onTransactionSuccess={(title, description, txId) => {
+          onTransactionSuccess?.(title, description, txId);
+          setTimeout(() => refetch(), 3000);
+        }}
+        onTransactionComplete={onTransactionComplete}
+      />
+
     </div>
   );
 }
