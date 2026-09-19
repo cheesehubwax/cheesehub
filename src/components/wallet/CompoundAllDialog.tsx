@@ -109,6 +109,9 @@ export function CompoundAllDialog({
   const [error, setError] = useState<string | null>(null);
   const [claimTxId, setClaimTxId] = useState<string | null>(null);
   const [rechecking, setRechecking] = useState(false);
+  // Balances read immediately before the claim — the baseline the claim delta is
+  // measured against.
+  const [beforeBalances, setBeforeBalances] = useState<Map<string, AvailableBalance>>(new Map());
 
   useEffect(() => {
     if (open) {
@@ -118,6 +121,7 @@ export function CompoundAllDialog({
       setError(null);
       setClaimTxId(null);
       setRechecking(false);
+      setBeforeBalances(new Map());
     }
   }, [open]);
 
