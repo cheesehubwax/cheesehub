@@ -5,11 +5,20 @@
 // amounts already sitting in a position causes the pool's "Price slippage
 // check" assertion to fail, so deposits must be sized from the live slot.
 
+export interface PoolTokenRef {
+  contract: string;
+  symbol: string;
+}
+
 export interface PoolSlot {
   /** Q64.64 square root of the raw price (rawB / rawA). */
   sqrtPriceX64: string;
   /** Current tick of the pool. */
   tick: number;
+  /** Pool's own token A (the price and ticks are expressed in this order). */
+  tokenA?: PoolTokenRef;
+  /** Pool's own token B. */
+  tokenB?: PoolTokenRef;
 }
 
 export type RangeState = 'in-range' | 'below-range' | 'above-range';
