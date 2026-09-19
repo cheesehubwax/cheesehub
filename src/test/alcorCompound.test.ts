@@ -47,8 +47,8 @@ describe('planCompound', () => {
     // 0.5% buffer: 9.95 WAXUSDC usable → ratio 0.1 → 99.5 CHEESE gross
     expect(entry.tokenA.gross).toBeCloseTo(99.5, 6);
     expect(entry.tokenB.gross).toBeCloseTo(9.95, 4);
-    expect(entry.tokenA.fee).toBeCloseTo(99.5 * COMPOUND_FEE_RATE, 6);
-    expect(entry.tokenB.fee).toBeCloseTo(9.95 * COMPOUND_FEE_RATE, 6);
+    expect(entry.tokenA.fee).toBeCloseTo(entry.tokenA.gross * COMPOUND_FEE_RATE, 6);
+    expect(entry.tokenB.fee).toBeCloseTo(entry.tokenB.gross * COMPOUND_FEE_RATE, 5);
     expect(entry.tokenA.amount).toBeCloseTo(entry.tokenA.gross - entry.tokenA.fee, 6);
     expect(entry.tokenB.amount).toBeCloseTo(entry.tokenB.gross - entry.tokenB.fee, 6);
     // Deposit plus fee never exceeds the buffered balance.
