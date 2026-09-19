@@ -25,6 +25,11 @@ export interface CompoundCandidate {
 export interface AvailableBalance {
   balance: number;
   precision: number;
+  /**
+   * False when the balance could not actually be read (missing token contract
+   * or a failed chain request). Absent means the balance is trusted.
+   */
+  known?: boolean;
 }
 
 export interface CompoundLeg {
