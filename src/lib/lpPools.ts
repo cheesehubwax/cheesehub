@@ -481,9 +481,9 @@ export function buildPoolSnapshot(
       const amountA = assetAmount(row.amountA);
       const amountB = assetAmount(row.amountB);
       // Prefer the asset symbol when present — it is authoritative about which
-      // leg is CHEESE even if a pool row ever came back in an odd order.
+      // leg is the base token even if a pool row came back in an odd order.
       const symbolA = assetSymbol(row.amountA);
-      const cheeseSideIsA = symbolA ? symbolA === CHEESE_SYMBOL : cheeseFirst;
+      const cheeseSideIsA = symbolA ? symbolA === base.symbol.toUpperCase() : cheeseFirst;
       const cheese = cheeseSideIsA ? amountA : amountB;
       const paired = cheeseSideIsA ? amountB : amountA;
 
