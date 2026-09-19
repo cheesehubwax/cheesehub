@@ -592,18 +592,59 @@ export async function fetchPoolDetails(poolId: number): Promise<any | null> {
   }
 }
 
-/**
- * Fetch the pool's current price slot (sqrt price + tick). Needed to size a
- * concentrated-liquidity deposit at the exact ratio the pool will accept.
- * Works with both the Alcor API shape (flat fields) and the on-chain shape.
- */
-export async function fetchPoolSlot(poolId: number): Promise<PoolSlot | null> {
-  const pool: any = await fetchPoolDetails(poolId);
+/** Pull a slot out of either the API shape (flat) or the chain shape (currSlot). */
+function slotFromPool(pool: any): PoolSlot | null {
   if (!pool) return null;
   const sqrtPriceX64 = String(pool.sqrtPriceX64 ?? pool.currSlot?.sqrtPriceX64 ?? '');
   const tick = Number(pool.tick ?? pool.currSlot?.tick);
   if (!sqrtPriceX64 || sqrtPriceX64 === '0' || !Number.isFinite(tick)) return null;
-  return { sqrtPriceX64, tick };
+
+  const tokenRef = (token: any) => {
+    if (!token) return undefined;
+    const symbol = token.symbol || parseAsset(token.quantity || '').symbol;
+    if (!symbol) return undefined;
+    return { contract: token.contract || '', symbol };
+  };
+
+  return {
+    sqrtPriceX64,
+    tick,
+    tokenA: tokenRef(pool.tokenA),
+    tokenB: tokenRef(pool.tokenB),
+  };
+}
+
+/**
+ * Fetch the pool's current price slot (sqrt price + tick) plus its token order.
+ * Needed to size a concentrated-liquidity deposit at the exact ratio the pool
+ * will accept. Reads the chain table first and uncached: a stale price makes
+ * the pool reject the deposit with "Price slippage check".
+ */
+export async function fetchPoolSlot(poolId: number): Promise<PoolSlot | null> {
+  try {
+    const result = await fetchTableRows<OnChainPool>({
+      code: ALCOR_SWAP_CONTRACT,
+      scope: ALCOR_SWAP_CONTRACT,
+      table: 'pools',
+      lower_bound: String(poolId),
+      upper_bound: String(poolId),
+      limit: 1,
+    });
+    const row = result?.rows?.[0];
+    if (row) {
+      const slot = slotFromPool(row);
+      if (slot) return slot;
+    }
+  } catch (error) {
+    console.warn(`[Alcor] Pool ${poolId} slot read from chain failed, trying API...`, error);
+  }
+
+  try {
+    return slotFromPool(await fetchPoolDetails(poolId));
+  } catch (error) {
+    console.error(`[Alcor] Failed to read pool ${poolId} slot:`, error);
+    return null;
+  }
 }
 
 /**
