@@ -2,6 +2,9 @@
 // Given LP positions and the token balances available after a claim,
 // work out how much of each pair can be re-added to each position.
 
+import { getTokenConfig } from '@/lib/tokenRegistry';
+
+
 export interface CompoundTokenRef {
   contract: string;
   symbol: string;
@@ -25,6 +28,11 @@ export interface CompoundCandidate {
 export interface AvailableBalance {
   balance: number;
   precision: number;
+  /**
+   * False when the balance could not actually be read (missing token contract
+   * or a failed chain request). Absent means the balance is trusted.
+   */
+  known?: boolean;
 }
 
 export interface CompoundLeg {
@@ -54,6 +62,7 @@ export interface CompoundPlanEntry {
 
 export type CompoundSkipReason =
   | 'rewards-one-sided'
+  | 'balance-unknown'
   | 'no-balance'
   | 'dust'
   | 'missing-ticks'
@@ -119,23 +128,78 @@ export function paysBothTokens(
 }
 
 /**
- * Resolve a balance entry for a token, trying the exact contract:symbol key
- * first and falling back to a symbol-only (case-insensitive) match so pool
- * tokens sourced without a contract still find their claimed balance.
+ * Resolve the map key holding a token's balance, trying the exact
+ * contract:symbol key first and falling back to a symbol-only
+ * (case-insensitive) match so pool tokens sourced without a contract still
+ * find their claimed balance.
  */
-function findBalance(
+function findBalanceKey(
   map: ReadonlyMap<string, AvailableBalance>,
-  contract: string,
+  contract: string | undefined,
   symbol: string,
-): AvailableBalance | undefined {
-  const exact = map.get(balanceKey(contract, symbol));
-  if (exact) return exact;
+): string | undefined {
+  if (contract) {
+    const exact = balanceKey(contract, symbol);
+    if (map.has(exact)) return exact;
+  }
   const sym = symbol.toUpperCase();
-  for (const [key, value] of map) {
+  for (const key of map.keys()) {
     const keySym = (key.includes(':') ? key.split(':')[1] : key).toUpperCase();
-    if (keySym === sym) return value;
+    if (keySym === sym) return key;
   }
   return undefined;
+}
+
+/** Resolve a balance entry for a token (see `findBalanceKey`). */
+function findBalance(
+  map: ReadonlyMap<string, AvailableBalance>,
+  contract: string | undefined,
+  symbol: string,
+): AvailableBalance | undefined {
+  const key = findBalanceKey(map, contract, symbol);
+  return key ? map.get(key) : undefined;
+}
+
+/**
+ * Tokens whose wallet balance must be read before a plan can be built.
+ *
+ * Reward token keys sometimes arrive without an issuing contract (the Alcor
+ * incentive record was not resolved), which makes the balance request fail.
+ * Merge them with the pool's own token records and the static token registry so
+ * every symbol is read with a real contract whenever one is discoverable.
+ */
+export function buildBalanceReadList(
+  candidates: readonly CompoundCandidate[],
+): Array<{ contract?: string; symbol: string }> {
+  const bySymbol = new Map<string, { contract?: string; symbol: string }>();
+
+  const consider = (contract: string | undefined, symbol: string) => {
+    const sym = symbol.trim();
+    if (!sym) return;
+    const key = sym.toUpperCase();
+    const existing = bySymbol.get(key);
+    const resolved = contract?.trim() || undefined;
+    if (existing?.contract) return;
+    bySymbol.set(key, { contract: resolved, symbol: existing?.symbol || sym });
+  };
+
+  candidates.forEach(c => {
+    c.rewardTokenKeys.forEach(rawKey => {
+      const idx = rawKey.indexOf(':');
+      const contract = idx >= 0 ? rawKey.slice(0, idx) : '';
+      const symbol = idx >= 0 ? rawKey.slice(idx + 1) : rawKey;
+      consider(contract, symbol);
+    });
+    consider(c.tokenA.contract, c.tokenA.symbol);
+    consider(c.tokenB.contract, c.tokenB.symbol);
+  });
+
+  // Last resort: the app's static registry knows the contract for most tokens.
+  return Array.from(bySymbol.values()).map(entry => {
+    if (entry.contract) return entry;
+    const known = getTokenConfig(entry.symbol.toUpperCase());
+    return known ? { contract: known.contract, symbol: entry.symbol } : entry;
+  });
 }
 
 function floorTo(amount: number, precision: number): number {
@@ -165,12 +229,18 @@ export function planCompound(
   // Hold back a small buffer of every claimed token so rounding or a late
   // reward can never make the deposit exceed the wallet balance.
   const remaining = new Map<string, AvailableBalance>();
-  available.forEach((value, key) =>
-    remaining.set(key, {
+  // Snapshot of the buffered starting balances, so a side that ran out can be
+  // told apart from a side that never received anything.
+  const started = new Map<string, AvailableBalance>();
+  available.forEach((value, key) => {
+    const buffered = {
       precision: value.precision,
+      known: value.known,
       balance: floorTo(Math.max(0, value.balance) * (1 - COMPOUND_BUFFER_RATE), value.precision),
-    }),
-  );
+    };
+    remaining.set(key, { ...buffered });
+    started.set(key, { ...buffered });
+  });
 
   const compoundable: CompoundPlanEntry[] = [];
   const skipped: CompoundSkip[] = [];
@@ -215,16 +285,40 @@ export function planCompound(
 
     const balA = findBalance(remaining, candidate.tokenA.contract, candidate.tokenA.symbol);
     const balB = findBalance(remaining, candidate.tokenB.contract, candidate.tokenB.symbol);
+    const startA = findBalance(started, candidate.tokenA.contract, candidate.tokenA.symbol);
+    const startB = findBalance(started, candidate.tokenB.contract, candidate.tokenB.symbol);
 
-    if (!balA || !balB || balA.balance <= 0 || balB.balance <= 0) {
+    // A balance that could not be read must never be reported as "nothing left".
+    const unknownSide = !balA || balA.known === false
+      ? candidate.tokenA.symbol
+      : !balB || balB.known === false
+        ? candidate.tokenB.symbol
+        : null;
+
+    if (unknownSide) {
+      skipped.push({
+        positionId: candidate.positionId,
+        pair,
+        reason: 'balance-unknown',
+        detail: `Couldn't read your ${unknownSide} balance — use "Re-check balances" to try again.`,
+      });
+      continue;
+    }
+
+    if (balA.balance <= 0 || balB.balance <= 0) {
+      const shortSymbol = balA.balance <= 0 ? candidate.tokenA.symbol : candidate.tokenB.symbol;
+      const startBalance = (balA.balance <= 0 ? startA?.balance : startB?.balance) ?? 0;
       skipped.push({
         positionId: candidate.positionId,
         pair,
         reason: 'no-balance',
-        detail: 'No claimed balance left for both sides of this pair.',
+        detail: startBalance > 0
+          ? `Claimed ${shortSymbol} was used by a larger position in this pair.`
+          : `No ${shortSymbol} arrived from this claim.`,
       });
       continue;
     }
+
 
     if (candidate.tokenA.amount <= 0 || candidate.tokenB.amount <= 0) {
       skipped.push({

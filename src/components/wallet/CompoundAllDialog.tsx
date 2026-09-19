@@ -18,6 +18,7 @@ import {
   CompoundPlan,
   MAX_COMPOUND_POSITIONS,
   balanceKey,
+  buildBalanceReadList,
   buildCompoundFeeTotals,
   paysBothTokens,
   planCompound,
@@ -48,37 +49,46 @@ const POLL_ATTEMPTS = 12;
 const POLL_DELAY_MS = 2000;
 
 function parseBalance(raw: string | undefined): AvailableBalance {
-  if (!raw) return { balance: 0, precision: 8 };
+  if (!raw) return { balance: 0, precision: 8, known: true };
   const [amountStr] = raw.split(' ');
   const decimals = amountStr.split('.')[1]?.length ?? 0;
-  return { balance: parseFloat(amountStr) || 0, precision: decimals };
+  return { balance: parseFloat(amountStr) || 0, precision: decimals, known: true };
 }
 
-async function readBalance(account: string, contract: string, symbol: string): Promise<AvailableBalance> {
+async function readBalance(
+  account: string,
+  contract: string | undefined,
+  symbol: string,
+): Promise<AvailableBalance> {
+  // Without an issuing contract the chain cannot answer — report it as unknown
+  // rather than pretending the wallet holds nothing.
+  if (!contract) return { balance: 0, precision: 8, known: false };
   try {
-    const rows = await waxRpcCall<string[]>(
+    const rows = await waxRpcCall<string[] | undefined>(
       '/v1/chain/get_currency_balance',
       { code: contract, account, symbol },
       6000,
     );
-    return parseBalance(rows?.[0]);
+    if (!Array.isArray(rows)) return { balance: 0, precision: 8, known: false };
+    return parseBalance(rows[0]);
   } catch {
-    return { balance: 0, precision: 8 };
+    return { balance: 0, precision: 8, known: false };
   }
 }
 
 async function readBalances(
   account: string,
-  tokens: Array<{ contract: string; symbol: string }>,
+  tokens: Array<{ contract?: string; symbol: string }>,
 ): Promise<Map<string, AvailableBalance>> {
   const map = new Map<string, AvailableBalance>();
   const results = await Promise.all(tokens.map(t => readBalance(account, t.contract, t.symbol)));
   tokens.forEach((t, i) => {
-    const existing = map.get(balanceKey(t.contract, t.symbol));
+    const key = balanceKey(t.contract ?? '', t.symbol);
+    const existing = map.get(key);
     const value = results[i];
     // Keep the largest reported precision if the same token appears twice.
     if (!existing || value.precision > existing.precision) {
-      map.set(balanceKey(t.contract, t.symbol), value);
+      map.set(key, value);
     }
   });
   return map;
@@ -97,6 +107,7 @@ export function CompoundAllDialog({
   const [plan, setPlan] = useState<CompoundPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [claimTxId, setClaimTxId] = useState<string | null>(null);
+  const [rechecking, setRechecking] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -105,6 +116,7 @@ export function CompoundAllDialog({
       setPlan(null);
       setError(null);
       setClaimTxId(null);
+      setRechecking(false);
     }
   }, [open]);
 
@@ -131,19 +143,10 @@ export function CompoundAllDialog({
     [candidates],
   );
 
-  // Read balances for the reward tokens themselves — they carry authoritative
-  // contract data, whereas pool tokens sourced from fallback reads may not.
-  const tokensToRead = useMemo(() => {
-    const seen = new Map<string, { contract: string; symbol: string }>();
-    eligibleCandidates.forEach(c => {
-      c.rewardTokenKeys.forEach(key => {
-        if (seen.has(key)) return;
-        const idx = key.indexOf(':');
-        seen.set(key, { contract: key.slice(0, idx), symbol: key.slice(idx + 1) });
-      });
-    });
-    return Array.from(seen.values());
-  }, [eligibleCandidates]);
+  // Read balances for every token involved: reward tokens plus the pool's own
+  // tokens, with the static registry filling in any missing contract. A reward
+  // record without a contract would otherwise produce a failed read.
+  const tokensToRead = useMemo(() => buildBalanceReadList(eligibleCandidates), [eligibleCandidates]);
 
   const claims = useMemo(() => {
     const map = new Map<string, { incentiveId: number; posId: number }>();
@@ -200,6 +203,28 @@ export function CompoundAllDialog({
     setStage('preview');
     onTransactionComplete?.();
   }, [session, accountName, tokensToRead, claims, candidates, onTransactionComplete]);
+
+  // Re-read balances and rebuild the plan without claiming again — recovery for
+  // a balance read that failed the first time round.
+  const recheckBalances = useCallback(async () => {
+    if (!accountName) return;
+    setError(null);
+    setRechecking(true);
+    try {
+      const balances = await readBalances(accountName, tokensToRead);
+      const built = planCompound(candidates, balances, MAX_COMPOUND_POSITIONS);
+      setPlan(built);
+      if (built.compoundable.length === 0 && built.skipped.every(s => s.reason === 'balance-unknown')) {
+        setError('Still could not read your balances. Your rewards are safe in your wallet — try again in a moment.');
+      }
+    } catch {
+      setError('Could not read your balances just now. Your rewards are safe in your wallet — try again in a moment.');
+    } finally {
+      setRechecking(false);
+    }
+  }, [accountName, tokensToRead, candidates]);
+
+
 
   const runCompound = useCallback(async () => {
     if (!session || !accountName || !plan || plan.compoundable.length === 0) return;
@@ -388,6 +413,16 @@ export function CompoundAllDialog({
                 <AlertDescription className="text-xs">{error}</AlertDescription>
               </Alert>
             )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              disabled={stage === 'compounding' || rechecking}
+              onClick={recheckBalances}
+            >
+              {rechecking ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Re-check balances'}
+            </Button>
 
             <div className="flex gap-2">
               <Button

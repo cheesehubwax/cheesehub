@@ -5,6 +5,7 @@ import {
   COMPOUND_FEE_RATE,
   CompoundCandidate,
   balanceKey,
+  buildBalanceReadList,
   buildCompoundFeeTotals,
   paysBothTokens,
   planCompound,
@@ -205,3 +206,75 @@ describe('token matching normalisation', () => {
     expect(plan.skipped).toHaveLength(0);
   });
 });
+
+describe('unreadable balances', () => {
+  it('reports a balance that could not be read instead of claiming none is left', () => {
+    const plan = planCompound(
+      [candidate()],
+      balances([
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 0, precision: 8, known: false }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 10, precision: 6, known: true }],
+      ]),
+    );
+
+    expect(plan.compoundable).toHaveLength(0);
+    expect(plan.skipped[0].reason).toBe('balance-unknown');
+    expect(plan.skipped[0].detail).toContain('CHEESE');
+    expect(plan.skipped[0].detail).not.toContain('No claimed balance left');
+  });
+
+  it('treats a missing balance entry as unreadable', () => {
+    const plan = planCompound([candidate()], balances([]));
+    expect(plan.skipped[0].reason).toBe('balance-unknown');
+  });
+
+  it('distinguishes nothing claimed from used by a larger position', () => {
+    const zero = planCompound(
+      [candidate()],
+      balances([
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 500, precision: 8, known: true }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 0, precision: 6, known: true }],
+      ]),
+    );
+    expect(zero.skipped[0].reason).toBe('no-balance');
+    expect(zero.skipped[0].detail).toBe('No WAXUSDC arrived from this claim.');
+
+    const shared = planCompound(
+      [
+        candidate({ positionId: 1, usdValue: 900 }),
+        candidate({ positionId: 2, usdValue: 100 }),
+      ],
+      balances([
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 1000, precision: 8, known: true }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 2, precision: 0, known: true }],
+      ]),
+    );
+    const consumed = shared.skipped.find(s => s.positionId === 2);
+    expect(consumed?.reason).toBe('no-balance');
+    expect(consumed?.detail).toContain('used by a larger position');
+  });
+});
+
+describe('buildBalanceReadList', () => {
+  it('fills a missing reward contract from the pool token, then the registry', () => {
+    const list = buildBalanceReadList([
+      candidate({
+        tokenA: { contract: 'cheeseburger', symbol: 'CHEESE', amount: 100 },
+        tokenB: { contract: '', symbol: 'WAXUSDC', amount: 10 },
+        rewardTokenKeys: [':CHEESE', ':WAXUSDC'],
+      }),
+    ]);
+
+    const cheese = list.find(t => t.symbol.toUpperCase() === 'CHEESE');
+    const usdc = list.find(t => t.symbol.toUpperCase() === 'WAXUSDC');
+    expect(cheese?.contract).toBe('cheeseburger');
+    // No contract anywhere in the position data — resolved from the registry.
+    expect(usdc?.contract).toBe('eth.token');
+  });
+
+  it('does not duplicate a token shared by several positions', () => {
+    const list = buildBalanceReadList([candidate({ positionId: 1 }), candidate({ positionId: 2 })]);
+    expect(list).toHaveLength(2);
+  });
+});
+
