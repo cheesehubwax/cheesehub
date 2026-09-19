@@ -1,5 +1,6 @@
-// CHEESEAnal — shared definition of the tracked CHEESE liquidity pools and the
-// pure aggregation used to turn exchange data into a daily snapshot.
+// CHEESEAnal — shared definition of the tracked liquidity pools of a base token
+// (CHEESE or HOLE) and the pure aggregation used to turn exchange data into a
+// snapshot.
 //
 // This module is imported both by the app (src/hooks/useLpHistory.ts, the
 // CHEESEAnal page) and by the standalone sampler (scripts/lp-history/sample.ts)
@@ -7,6 +8,34 @@
 
 export const CHEESE_SYMBOL = 'CHEESE';
 export const CHEESE_CONTRACT = 'cheeseburger';
+
+/** A token CHEESEAnal can track liquidity for. */
+export interface LpToken {
+  symbol: string;
+  contract: string;
+}
+
+export const CHEESE_TOKEN: LpToken = { symbol: CHEESE_SYMBOL, contract: CHEESE_CONTRACT };
+export const HOLE_TOKEN: LpToken = { symbol: 'HOLE', contract: 'hole.cheese' };
+
+/** Which recorded history set the page is showing. */
+export type LpTokenKey = 'cheese' | 'hole';
+
+export interface LpTokenConfig extends LpToken {
+  key: LpTokenKey;
+  /** Sub-path of the recorded data for this token ('' = the original files). */
+  dataPath: string;
+}
+
+export const LP_TOKENS: LpTokenConfig[] = [
+  { key: 'cheese', ...CHEESE_TOKEN, dataPath: '' },
+  { key: 'hole', ...HOLE_TOKEN, dataPath: 'hole' },
+];
+
+export function lpTokenConfig(key: LpTokenKey): LpTokenConfig {
+  return LP_TOKENS.find((t) => t.key === key) ?? LP_TOKENS[0];
+}
+
 
 /** Exchanges CHEESEAnal reads liquidity from. */
 export type LpVenue = 'alcor' | 'taco' | 'defibox';
