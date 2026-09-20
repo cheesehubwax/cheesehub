@@ -88,6 +88,14 @@ const CheeseAnal = () => {
     return counts;
   }, [snapshot]);
 
+  // The tombstone reads every recorded snapshot, not just the selected range.
+  const allDates = useMemo(() => days.map((d) => d.date), [days]);
+  const {
+    rows: departed,
+    isLoading: departedLoading,
+    isError: departedError,
+  } = useLpDeparted(allDates, tokenKey, venue);
+
   return (
     <Layout>
       <section className="relative pt-20 pb-14 overflow-hidden">
