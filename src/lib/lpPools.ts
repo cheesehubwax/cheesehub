@@ -554,10 +554,9 @@ function cheesePriceAtTick(
   tick: number,
 ): number | undefined {
   const poolTick = Number(pool.tick);
-  const currentAinB = Number(cheeseIsTokenA(pool, CHEESE_TOKEN) ? pool.priceA : pool.priceB);
-  // priceA/priceB follow the pool's own token order, so read the A-in-B price directly.
-  const aInB = Number(pool.priceA);
-  const reference = Number.isFinite(aInB) && aInB > 0 ? aInB : currentAinB;
+  // priceA/priceB follow the pool's own token order, so priceA is already the
+  // price of token A expressed in token B — the same orientation as the ticks.
+  const reference = Number(pool.priceA);
   if (!Number.isFinite(poolTick) || !Number.isFinite(reference) || !(reference > 0)) return undefined;
   if (Math.abs(tick) >= FULL_RANGE_TICK) return undefined;
 
