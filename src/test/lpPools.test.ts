@@ -121,7 +121,7 @@ describe('alcorPairVolume', () => {
 });
 
 describe('buildPoolSnapshot', () => {
-  const pool: RawPool = { id: 1252, fee: 3000, active: true, tokenA: cheese, tokenB: wax };
+  const pool: RawPool = { id: 1252, fee: 3000, active: true, tokenA: cheese, tokenB: wax, tick: 96500, priceA: 1.6 };
   const flipped: RawPool = { id: 10585, fee: 500, active: true, tokenA: wax, tokenB: cheese };
 
   const positions: RawPosition[] = [
@@ -130,6 +130,8 @@ describe('buildPoolSnapshot', () => {
       liquidity: '40447860465',
       closed: false,
       inRange: true,
+      tickLower: -443580,
+      tickUpper: 443580,
       totalValue: 489.5,
       amountA: '32061.4566 CHEESE',
       amountB: '51027.91765505 WAX',
@@ -139,6 +141,9 @@ describe('buildPoolSnapshot', () => {
       liquidity: '10',
       closed: false,
       inRange: false,
+      // The pool sits at 96500, below this range.
+      tickLower: 100000,
+      tickUpper: 101000,
       totalValue: 10.5,
       amountA: '100.0000 CHEESE',
       amountB: '200.00000000 WAX',
