@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Plus, Sprout, Trash2, ChevronDown, AlertTriangle, Info, ExternalLink, Play, Globe, Youtube, BookOpen } from "lucide-react";
+import { Loader2, Plus, Sprout, Trash2, ChevronDown, AlertTriangle, Info, Globe, Youtube, BookOpen } from "lucide-react";
 import {
   FARM_TYPES, FARM_CREATION_FEES, validateFarmName, FARM_TYPE_LABELS, FarmType,
   buildCreateFarmAction, buildAssertPointAction,
