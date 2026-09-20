@@ -33,6 +33,7 @@ import { useCheeseFeePricing } from "@/hooks/useCheeseFeePricing";
 import { useWaxdaoFeePricing } from "@/hooks/useWaxdaoFeePricing";
 import { useToast } from "@/hooks/use-toast";
 import { FeePaymentSelector } from "@/components/shared/FeePaymentSelector";
+import { FarmTutorialVideo } from "@/components/farm/FarmTutorialVideo";
 
 const FAQ_ITEMS = [
   {
@@ -314,30 +315,7 @@ export function CreateFarm() {
             Watch the following video and then enter "{CONFIRMATION_PHRASE}" (without quotes) into the box below. Once you do that, the farm creation form will magically appear.
           </p>
 
-          {/* Embedded YouTube Video */}
-          <div className="aspect-video w-full rounded-lg overflow-hidden bg-muted">
-            <iframe
-              className="h-full w-full border-0"
-              src="https://www.youtube.com/embed/PIV_ojHzkS8?rel=0&playsinline=1"
-              title="How Reward Pools Work On The New WaxDAO NFT Farms"
-              loading="eager"
-              referrerPolicy="strict-origin-when-cross-origin"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-            />
-          </div>
-
-          {/* Fallback link */}
-          <a
-            href="https://www.youtube.com/watch?v=PIV_ojHzkS8"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm text-destructive hover:text-destructive/80 underline"
-          >
-            <Play className="h-4 w-4" />
-            Watch on YouTube
-            <ExternalLink className="h-3 w-3" />
-          </a>
+          <FarmTutorialVideo />
         </div>
 
         {/* Confirmation Gate */}
