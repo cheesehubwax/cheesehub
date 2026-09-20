@@ -24,6 +24,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Lock, Calendar, AlertCircle, Droplets } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
+import { getTokenPrecision, formatAssetAmount, floorToPrecision, padAmountDisplay } from "@/lib/tokenPrecision";
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 
@@ -44,12 +45,28 @@ export function CreateLiquidityLock() {
   const [amount, setAmount] = useState("");
   const [unlockDate, setUnlockDate] = useState("");
   const [unlockTime, setUnlockTime] = useState("00:00");
+  const [precision, setPrecision] = useState<number | null>(null);
 
   useEffect(() => {
     if (accountName) {
       loadLPTokens();
     }
   }, [accountName]);
+
+  // Resolve the selected LP token's real precision from the chain
+  useEffect(() => {
+    let cancelled = false;
+    setPrecision(null);
+    if (!selectedToken) return;
+    const [contract, symbol] = selectedToken.split(":");
+    const balance = lpTokens.find((t) => t.contract === contract && t.symbol === symbol)?.amount;
+    getTokenPrecision(contract, symbol, balance).then((p) => {
+      if (!cancelled) setPrecision(p);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedToken, lpTokens]);
 
   const loadLPTokens = async () => {
     if (!accountName) return;
@@ -101,9 +118,32 @@ export function CreateLiquidityLock() {
 
     setCreating(true);
     try {
-      const decimalPart = tokenInfo.amount.split(".")[1];
-      const precision = decimalPart ? decimalPart.length : 0;
-      const formattedAmount = `${parseFloat(amount).toFixed(precision)} ${tokenInfo.symbol}`;
+      const tokenPrecision =
+        precision ?? (await getTokenPrecision(tokenInfo.contract, tokenInfo.symbol, tokenInfo.amount));
+
+      const requested = floorToPrecision(parseFloat(amount), tokenPrecision);
+      if (requested <= 0) {
+        toast({
+          title: "Amount too small",
+          description: `${tokenInfo.symbol} supports ${tokenPrecision} decimal places.`,
+          variant: "destructive",
+        });
+        setCreating(false);
+        return;
+      }
+
+      const available = floorToPrecision(parseFloat(tokenInfo.amount), tokenPrecision);
+      if (requested > available) {
+        toast({
+          title: "Not enough balance",
+          description: `You only have ${available.toFixed(tokenPrecision)} ${tokenInfo.symbol}.`,
+          variant: "destructive",
+        });
+        setCreating(false);
+        return;
+      }
+
+      const formattedAmount = formatAssetAmount(requested, tokenPrecision, tokenInfo.symbol);
       const unlockTimestamp = Math.floor(unlockDateTime.getTime() / 1000);
 
       await session.transact({
@@ -223,7 +263,7 @@ export function CreateLiquidityLock() {
           </Select>
           {tokenInfo && (
             <p className="text-xs text-muted-foreground">
-              Available: {tokenInfo.amount} {tokenInfo.symbol}
+              Available: {precision !== null ? padAmountDisplay(tokenInfo.amount, precision) : tokenInfo.amount} {tokenInfo.symbol}
             </p>
           )}
         </div>
