@@ -162,6 +162,18 @@ export interface RawPosition {
 
 /* ------------------------------------------------------------- stored shapes */
 
+/** One position's recorded price range, for the in-range hover detail. */
+export interface LpPositionRange {
+  /** CHEESE price in the paired token at the low edge of the range. */
+  lo?: number;
+  /** CHEESE price in the paired token at the high edge of the range. */
+  hi?: number;
+  /** Whether the position was in range at this snapshot. */
+  in: 0 | 1;
+  /** Set when the range spans effectively every price (a full-range position). */
+  full?: 1;
+}
+
 /** One account's aggregated liquidity in a single pair on a single day. */
 export interface LpProviderRow {
   /** Account name. */
@@ -176,6 +188,8 @@ export interface LpProviderRow {
   pos: number;
   /** How many of those positions are currently in range. */
   inRange: number;
+  /** Per-position ranges, newest snapshots only (older day files omit it). */
+  ranges?: LpPositionRange[];
 }
 
 /** One pair's totals plus every provider, for a single day. */
