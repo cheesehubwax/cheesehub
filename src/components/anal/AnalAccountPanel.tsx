@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { HistoricalNote } from '@/components/anal/HistoricalNote';
+import { InRangeCell } from '@/components/anal/InRangeCell';
 import { MiniChartTooltip } from '@/components/anal/MiniChartTooltip';
 import { waxUsdFromPools } from '@/components/anal/snapshotDiff';
 import { CheeseLogo, PairLabel, UsdLogo } from '@/components/anal/PairLogos';
@@ -265,7 +266,11 @@ export function AnalAccountPanel({ account, onAccountChange, days, current, toke
                         {amount(row.paired, 4)} {row.symbol}
                       </td>
                       <td className="py-1.5 text-right font-mono text-muted-foreground">
-                        {row.pos} <span className="text-[10px]">({row.inRange} in range)</span>
+                        <InRangeCell
+                          row={row}
+                          symbol={row.symbol}
+                          poolPrice={current?.pools.find((p) => p.key === row.key)?.priceInPaired}
+                        />
                       </td>
                     </tr>
                   ))}

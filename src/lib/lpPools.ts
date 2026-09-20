@@ -123,6 +123,8 @@ export interface RawPool {
   id: number;
   fee?: number;
   active?: number | boolean;
+  /** Current tick of the pool — the price, in tick space. */
+  tick?: number;
   tokenA?: RawPoolToken;
   tokenB?: RawPoolToken;
   tvlUSD?: number;
@@ -143,7 +145,12 @@ export interface RawPosition {
   owner?: string;
   liquidity?: string | number;
   closed?: boolean;
+  /** Alcor's own claim about the position being in range — only a last resort. */
   inRange?: boolean;
+  /** Lower tick of the position's range. */
+  tickLower?: number;
+  /** Upper tick of the position's range. */
+  tickUpper?: number;
   /** Current USD value of the position — what Alcor's own UI shows. */
   totalValue?: number;
   /** USD value at deposit time; only a fallback, it drifts. */
@@ -154,6 +161,18 @@ export interface RawPosition {
 }
 
 /* ------------------------------------------------------------- stored shapes */
+
+/** One position's recorded price range, for the in-range hover detail. */
+export interface LpPositionRange {
+  /** CHEESE price in the paired token at the low edge of the range. */
+  lo?: number;
+  /** CHEESE price in the paired token at the high edge of the range. */
+  hi?: number;
+  /** Whether the position was in range at this snapshot. */
+  in: 0 | 1;
+  /** Set when the range spans effectively every price (a full-range position). */
+  full?: 1;
+}
 
 /** One account's aggregated liquidity in a single pair on a single day. */
 export interface LpProviderRow {
@@ -169,6 +188,8 @@ export interface LpProviderRow {
   pos: number;
   /** How many of those positions are currently in range. */
   inRange: number;
+  /** Per-position ranges, newest snapshots only (older day files omit it). */
+  ranges?: LpPositionRange[];
 }
 
 /** One pair's totals plus every provider, for a single day. */
@@ -196,6 +217,10 @@ export interface LpPoolSnapshot {
   volumeUsd24?: number;
   /** Rolling 24h trading volume of the CHEESE leg (Alcor only). */
   volumeCheese24?: number;
+  /** Current tick of the deepest pool at snapshot time (Alcor only). */
+  tick?: number;
+  /** How many positions had Alcor's own in-range flag contradicting the recorded data. */
+  rangeMismatch?: number;
   providers: LpProviderRow[];
 }
 
@@ -461,6 +486,112 @@ export function positionUsdValue(
   return 0;
 }
 
+/* -------------------------------------------------------- in-range resolution */
+
+/** Ticks beyond this are Alcor's full-range sentinels — no meaningful price edge. */
+const FULL_RANGE_TICK = 400_000;
+
+/**
+ * Is the pool's price inside the position's own range?
+ *
+ * Returns null when the snapshot has no usable ticks (older day files, or an
+ * API row that omitted them).
+ */
+export function tickInRange(
+  poolTick: number | undefined,
+  tickLower: number | undefined,
+  tickUpper: number | undefined,
+): boolean | null {
+  const t = Number(poolTick);
+  const lo = Number(tickLower);
+  const hi = Number(tickUpper);
+  if (![t, lo, hi].every((v) => Number.isFinite(v))) return null;
+  if (!(hi > lo)) return null;
+  return t >= lo && t < hi;
+}
+
+/**
+ * A position sitting in range always holds both tokens; one holding a single
+ * token cannot be in range. Two empty legs prove nothing.
+ */
+export function balanceInRange(cheese: number, paired: number): boolean | null {
+  const hasCheese = cheese > 0;
+  const hasPaired = paired > 0;
+  if (hasCheese && hasPaired) return true;
+  if (hasCheese || hasPaired) return false;
+  return null;
+}
+
+/**
+ * Decide whether one position was in range, preferring the recorded ticks, then
+ * the token balances, and only falling back to Alcor's own flag when neither is
+ * available. `mismatch` marks rows where Alcor's flag disagrees with the facts.
+ */
+export function resolveInRange(args: {
+  poolTick?: number;
+  tickLower?: number;
+  tickUpper?: number;
+  cheese: number;
+  paired: number;
+  flag?: boolean;
+}): { inRange: boolean; mismatch: boolean } {
+  const byTick = tickInRange(args.poolTick, args.tickLower, args.tickUpper);
+  const byBalance = balanceInRange(args.cheese, args.paired);
+  const resolved = byTick ?? byBalance ?? args.flag === true;
+  const flagKnown = typeof args.flag === 'boolean';
+  const factKnown = byTick !== null || byBalance !== null;
+  return { inRange: resolved, mismatch: flagKnown && factKnown && args.flag !== resolved };
+}
+
+/**
+ * CHEESE price in the paired token at a given tick, scaled off the pool's own
+ * current price so no token precisions are needed. Undefined when the pool row
+ * lacks the data, or when the tick is a full-range sentinel.
+ */
+function cheesePriceAtTick(
+  pool: RawPool,
+  cheeseSideIsA: boolean,
+  tick: number,
+): number | undefined {
+  const poolTick = Number(pool.tick);
+  // priceA/priceB follow the pool's own token order, so priceA is already the
+  // price of token A expressed in token B — the same orientation as the ticks.
+  const reference = Number(pool.priceA);
+  if (!Number.isFinite(poolTick) || !Number.isFinite(reference) || !(reference > 0)) return undefined;
+  if (Math.abs(tick) >= FULL_RANGE_TICK) return undefined;
+
+  const scale = reference / Math.pow(1.0001, poolTick);
+  const priceAinB = scale * Math.pow(1.0001, tick);
+  if (!Number.isFinite(priceAinB) || !(priceAinB > 0)) return undefined;
+  const price = cheeseSideIsA ? priceAinB : 1 / priceAinB;
+  if (!Number.isFinite(price) || !(price > 0)) return undefined;
+  return round(price, 12);
+}
+
+/** Recorded price range of one position, oriented as CHEESE price in the pair. */
+function positionRange(
+  pool: RawPool,
+  cheeseSideIsA: boolean,
+  row: RawPosition,
+  inRange: boolean,
+): LpPositionRange {
+  const lower = Number(row.tickLower);
+  const upper = Number(row.tickUpper);
+  const flag: 0 | 1 = inRange ? 1 : 0;
+  if (
+    !Number.isFinite(lower) ||
+    !Number.isFinite(upper) ||
+    Math.abs(lower) >= FULL_RANGE_TICK ||
+    Math.abs(upper) >= FULL_RANGE_TICK
+  ) {
+    return { in: flag, full: 1 };
+  }
+  const a = cheesePriceAtTick(pool, cheeseSideIsA, lower);
+  const b = cheesePriceAtTick(pool, cheeseSideIsA, upper);
+  if (a === undefined || b === undefined) return { in: flag };
+  return { lo: Math.min(a, b), hi: Math.max(a, b), in: flag };
+}
+
 function finaliseProviders(byAccount: Map<string, LpProviderRow>): LpProviderRow[] {
   return [...byAccount.values()]
     .map((row) => ({
@@ -480,6 +611,10 @@ function finaliseProviders(byAccount: Map<string, LpProviderRow>): LpProviderRow
  * from each position's current `totalValue`, falling back to `depositedUSDTotal`
  * only when the API omits it. Positions with no liquidity, closed positions and
  * ownerless rows are dropped.
+ *
+ * The in-range count is worked out from the pool's tick against each position's
+ * own tick range, cross-checked against its token balances; Alcor's `inRange`
+ * flag is only a last resort and disagreements are counted in `rangeMismatch`.
  */
 export function buildPoolSnapshot(
   target: VenuePair,
@@ -492,6 +627,7 @@ export function buildPoolSnapshot(
   let usdTotal = 0;
   let cheeseTotal = 0;
   let pairedTotal = 0;
+  let mismatches = 0;
 
   for (const { pool, positions: rows } of pools) {
     const cheeseFirst = cheeseIsTokenA(pool, base);
@@ -531,7 +667,17 @@ export function buildPoolSnapshot(
       entry.cheese += Math.max(0, cheese);
       entry.paired += Math.max(0, paired);
       entry.pos += 1;
-      if (row.inRange === true) entry.inRange += 1;
+      const verdict = resolveInRange({
+        poolTick: pool.tick,
+        tickLower: row.tickLower,
+        tickUpper: row.tickUpper,
+        cheese,
+        paired,
+        flag: row.inRange,
+      });
+      if (verdict.inRange) entry.inRange += 1;
+      if (verdict.mismatch) mismatches += 1;
+      (entry.ranges ??= []).push(positionRange(pool, cheeseSideIsA, row, verdict.inRange));
       byAccount.set(account, entry);
     }
   }
@@ -564,6 +710,8 @@ export function buildPoolSnapshot(
     positions,
     ...(priceInPaired !== undefined ? { priceInPaired } : {}),
     ...(priceUsd !== undefined ? { priceUsd } : {}),
+    ...(Number.isFinite(Number(deepest?.tick)) ? { tick: Number(deepest?.tick) } : {}),
+    ...(mismatches > 0 ? { rangeMismatch: mismatches } : {}),
     providers,
   };
 }

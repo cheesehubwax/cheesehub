@@ -4,6 +4,7 @@ import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, T
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { CheeseLogo, PairLabel, PairLogos, UsdLogo } from '@/components/anal/PairLogos';
 import { HistoricalNote } from '@/components/anal/HistoricalNote';
+import { InRangeCell } from '@/components/anal/InRangeCell';
 import { MiniChartTooltip } from '@/components/anal/MiniChartTooltip';
 import { diffPoolSnapshots, waxUsdFromPools } from '@/components/anal/snapshotDiff';
 import { TokenLogo } from '@/components/TokenLogo';
@@ -334,6 +335,12 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
         <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">
           Providers {current?.date ? `· ${tooltipDate(current.date)}` : ''}
         </div>
+        {(pool.rangeMismatch ?? 0) > 0 && (
+          <p className="text-[10px] text-muted-foreground mb-2">
+            {pool.rangeMismatch} position{pool.rangeMismatch === 1 ? '' : 's'} here had the exchange reporting a
+            different in-range state than the recorded price range shows. The price range is used.
+          </p>
+        )}
         <div className="overflow-x-auto max-h-80 overflow-y-auto">
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-card">
@@ -368,7 +375,7 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
                   <td className="py-1.5 text-right font-mono text-muted-foreground">{amount(row.cheese, 2)}</td>
                   <td className="py-1.5 text-right font-mono text-muted-foreground">{amount(row.paired, 4)}</td>
                   <td className="py-1.5 text-right font-mono text-muted-foreground">
-                    {row.pos} <span className="text-[10px]">({row.inRange} in range)</span>
+                    <InRangeCell row={row} symbol={pool.symbol} poolPrice={pool.priceInPaired} />
                   </td>
                 </tr>
               ))}

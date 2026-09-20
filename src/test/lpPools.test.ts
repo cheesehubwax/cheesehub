@@ -6,6 +6,9 @@ import {
   assetSymbol,
   alcorCheesePairs,
   buildPoolSnapshot,
+  balanceInRange,
+  resolveInRange,
+  tickInRange,
   alcorPairVolume,
   cheeseIsTokenA,
   dayAbout24hBefore,
@@ -118,7 +121,7 @@ describe('alcorPairVolume', () => {
 });
 
 describe('buildPoolSnapshot', () => {
-  const pool: RawPool = { id: 1252, fee: 3000, active: true, tokenA: cheese, tokenB: wax };
+  const pool: RawPool = { id: 1252, fee: 3000, active: true, tokenA: cheese, tokenB: wax, tick: 96500, priceA: 1.6 };
   const flipped: RawPool = { id: 10585, fee: 500, active: true, tokenA: wax, tokenB: cheese };
 
   const positions: RawPosition[] = [
@@ -127,6 +130,8 @@ describe('buildPoolSnapshot', () => {
       liquidity: '40447860465',
       closed: false,
       inRange: true,
+      tickLower: -443580,
+      tickUpper: 443580,
       totalValue: 489.5,
       amountA: '32061.4566 CHEESE',
       amountB: '51027.91765505 WAX',
@@ -136,6 +141,9 @@ describe('buildPoolSnapshot', () => {
       liquidity: '10',
       closed: false,
       inRange: false,
+      // The pool sits at 96500, below this range.
+      tickLower: 100000,
+      tickUpper: 101000,
       totalValue: 10.5,
       amountA: '100.0000 CHEESE',
       amountB: '200.00000000 WAX',
@@ -191,6 +199,76 @@ describe('buildPoolSnapshot', () => {
     const snapshot = buildPoolSnapshot(venuePair('alcor', waxPair), [{ pool, positions }, { pool: flipped, positions: flippedPositions }]);
     const values = snapshot.providers.map((p) => p.usd);
     expect(values).toEqual([...values].sort((a, b) => b - a));
+  });
+
+  it('records each position range and counts in-range from the ticks', () => {
+    const snapshot = buildPoolSnapshot(venuePair('alcor', waxPair), [{ pool, positions }]);
+    const top = snapshot.providers[0];
+    expect(snapshot.tick).toBe(96500);
+    expect(top.inRange).toBe(1);
+    expect(top.ranges).toHaveLength(2);
+    expect(top.ranges?.[0]).toEqual({ in: 1, full: 1 });
+    const narrow = top.ranges?.[1];
+    expect(narrow?.in).toBe(0);
+    expect(narrow?.lo).toBeGreaterThan(0);
+    expect(narrow?.hi).toBeGreaterThan(narrow?.lo ?? 0);
+    expect(snapshot.rangeMismatch).toBeUndefined();
+  });
+
+  it('ignores the exchange flag when the ticks contradict it, and counts the disagreement', () => {
+    const lying: RawPosition[] = [
+      {
+        owner: 'liar',
+        liquidity: '10',
+        // Alcor claims in range while the pool sits well below the range.
+        inRange: true,
+        tickLower: 120000,
+        tickUpper: 121000,
+        totalValue: 5,
+        amountA: '100.0000 CHEESE',
+        amountB: '0.00000000 WAX',
+      },
+    ];
+    const snapshot = buildPoolSnapshot(venuePair('alcor', waxPair), [{ pool, positions: lying }]);
+    expect(snapshot.providers[0].inRange).toBe(0);
+    expect(snapshot.rangeMismatch).toBe(1);
+  });
+
+  it('falls back to token balances when a snapshot has no ticks', () => {
+    const noTicks: RawPool = { id: 1252, tokenA: cheese, tokenB: wax };
+    const rows: RawPosition[] = [
+      { owner: 'both', liquidity: '10', totalValue: 9, amountA: '10.0000 CHEESE', amountB: '5.00000000 WAX' },
+      { owner: 'onesided', liquidity: '10', totalValue: 8, amountA: '10.0000 CHEESE' },
+    ];
+    const snapshot = buildPoolSnapshot(venuePair('alcor', waxPair), [{ pool: noTicks, positions: rows }]);
+    const byName = new Map(snapshot.providers.map((p) => [p.a, p]));
+    expect(byName.get('both')?.inRange).toBe(1);
+    expect(byName.get('onesided')?.inRange).toBe(0);
+  });
+});
+
+describe('in-range resolution', () => {
+  it('reads the pool tick against the position range', () => {
+    expect(tickInRange(100, 0, 200)).toBe(true);
+    expect(tickInRange(200, 0, 200)).toBe(false);
+    expect(tickInRange(-1, 0, 200)).toBe(false);
+    expect(tickInRange(undefined, 0, 200)).toBeNull();
+    expect(tickInRange(100, 200, 200)).toBeNull();
+  });
+
+  it('treats both tokens as proof of being in range and one token as proof against', () => {
+    expect(balanceInRange(10, 5)).toBe(true);
+    expect(balanceInRange(10, 0)).toBe(false);
+    expect(balanceInRange(0, 5)).toBe(false);
+    expect(balanceInRange(0, 0)).toBeNull();
+  });
+
+  it('prefers ticks, then balances, then the exchange flag', () => {
+    expect(resolveInRange({ poolTick: 10, tickLower: 0, tickUpper: 100, cheese: 1, paired: 0, flag: false }))
+      .toEqual({ inRange: true, mismatch: true });
+    expect(resolveInRange({ cheese: 1, paired: 0, flag: true })).toEqual({ inRange: false, mismatch: true });
+    expect(resolveInRange({ cheese: 0, paired: 0, flag: true })).toEqual({ inRange: true, mismatch: false });
+    expect(resolveInRange({ cheese: 0, paired: 0 })).toEqual({ inRange: false, mismatch: false });
   });
 });
 
