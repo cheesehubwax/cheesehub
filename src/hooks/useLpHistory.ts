@@ -1,6 +1,8 @@
 // CHEESEAnal — readers for workflow-recorded LP history snapshots.
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
+  departedProviders,
   lpTokenConfig,
   poolsForVenue,
   type LpDayFile,
