@@ -17,6 +17,7 @@ import { Lock, Calendar, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getTokenLogoUrl } from "@/lib/tokenLogos";
 import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
+import { getTokenPrecision, formatAssetAmount, floorToPrecision, padAmountDisplay } from "@/lib/tokenPrecision";
 
 const TOKEN_LOGO_PLACEHOLDER = '/placeholder.svg';
 
