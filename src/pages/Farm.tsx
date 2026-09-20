@@ -15,6 +15,7 @@ import cheeseFarmLogo from "@/assets/cheesefarm.png";
 import { playRandomFart } from "@/lib/fartSounds";
 import { useWax } from "@/context/WaxContext";
 import { useFarmClaimTotals } from "@/hooks/useFarmClaimTotals";
+import { DappAbout, aboutGuides } from "@/components/about/DappAbout";
 
 
 const Farm = () => {
@@ -60,6 +61,7 @@ const Farm = () => {
               <img src={cheeseFarmLogo} alt="CHEESEFarm" className="w-24 h-24 object-contain" />
             </div>
             <div className="text-center space-y-2">
+              <DappAbout {...aboutGuides.farm}>
               <div className="flex items-center justify-center gap-2">
                 <OpenMojiIcon emoji="🌱" size={24} className="text-2xl" />
                 <h1 className="text-3xl md:text-4xl font-bold">
@@ -69,6 +71,7 @@ const Farm = () => {
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
                 <OpenMojiIcon emoji="🌱" size={24} className="text-2xl" />
               </div>
+              </DappAbout>
               <p className="text-muted-foreground max-w-2xl mx-auto">
                 Create and participate in non-custodial NFT staking farms using the WaxDAO V2 smart contracts.
               </p>

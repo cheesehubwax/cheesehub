@@ -19,6 +19,7 @@ import { CHEESE_CONFIG } from "@/lib/waxConfig";
 import { useMemo, useState } from "react";
 import cheeseshoppe from "@/assets/cheeseshoppe.png";
 import { playRandomFart } from "@/lib/fartSounds";
+import { DappAbout, aboutGuides } from "@/components/about/DappAbout";
 
 const Drops = () => {
   const queryClient = useQueryClient();
@@ -131,6 +132,7 @@ const Drops = () => {
               <img src={cheeseshoppe} alt="CHEESEDrop" className="w-24 h-24 object-contain" />
             </div>
             <div className="text-center space-y-2">
+              <DappAbout {...aboutGuides.drops}>
               <div className="flex items-center justify-center gap-2">
                 <OpenMojiIcon emoji="🛒" size={24} className="text-2xl" />
                 <h1 className="text-3xl md:text-4xl font-bold">
@@ -140,6 +142,7 @@ const Drops = () => {
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
                 <OpenMojiIcon emoji="🛒" size={24} className="text-2xl" />
               </div>
+              </DappAbout>
               <p className="text-muted-foreground">Official and unofficial NFT Drops purchasable with $CHEESE tokens</p>
             </div>
           </div>

@@ -10,6 +10,7 @@ import { DaoDetail } from "@/components/dao/DaoDetail";
 
 import cheeseDaoOrb from "@/assets/cheesedao.png";
 import { playRandomFart } from "@/lib/fartSounds";
+import { DappAbout, aboutGuides } from "@/components/about/DappAbout";
 
 const Dao = () => {
   const { daoName } = useParams<{ daoName?: string }>();
@@ -39,6 +40,7 @@ const Dao = () => {
               <img src={cheeseDaoOrb} alt="CHEESE DAO" className="w-24 h-24 object-contain" />
             </div>
             <div className="text-center space-y-2">
+              <DappAbout {...aboutGuides.dao}>
               <div className="flex items-center justify-center gap-2">
                 <OpenMojiIcon emoji="🏛️" size={24} className="text-2xl" />
                 <h1 className="text-3xl md:text-4xl font-bold">
@@ -48,6 +50,7 @@ const Dao = () => {
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
                 <OpenMojiIcon emoji="🏛️" size={24} className="text-2xl" />
               </div>
+              </DappAbout>
               <p className="text-muted-foreground max-w-xl mx-auto text-sm leading-relaxed">
                 Create and Manage DAOs (Decentralized Autonomous Organizations) on WAX Utilizing WAXDAOs Battle Tested Smart Contract. Propose, Vote, Govern and Manage Token and NFT Treasuries with On-Chain Transparency.
               </p>

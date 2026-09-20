@@ -10,6 +10,7 @@ import { ResourceGauges, refreshResourceGauges } from "@/components/shared/Resou
 import cheeseUpOrb from "@/assets/cheeseup.png";
 import { playRandomFart } from "@/lib/fartSounds";
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+import { DappAbout, aboutGuides } from '@/components/about/DappAbout';
 
 
 const PowerUp = () => {
@@ -41,6 +42,7 @@ const PowerUp = () => {
             </div>
 
             <div className="text-center space-y-2">
+              <DappAbout {...aboutGuides.powerup}>
               <div className="flex items-center justify-center gap-2">
                 <OpenMojiIcon emoji="⚡" size={24} className="text-2xl" />
                 <h1 className="text-3xl md:text-4xl font-bold">
@@ -50,6 +52,7 @@ const PowerUp = () => {
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
                 <OpenMojiIcon emoji="⚡" size={24} className="text-2xl" />
               </div>
+              </DappAbout>
               <p className="text-muted-foreground max-w-2xl mx-auto">
                 Power Up your CPU and NET resources using $CHEESE. The $CHEESE is sent to eosio.null and leaves circulation forever
               </p>
