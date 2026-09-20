@@ -623,6 +623,7 @@ export function buildPoolSnapshot(
   let usdTotal = 0;
   let cheeseTotal = 0;
   let pairedTotal = 0;
+  let mismatches = 0;
 
   for (const { pool, positions: rows } of pools) {
     const cheeseFirst = cheeseIsTokenA(pool, base);
