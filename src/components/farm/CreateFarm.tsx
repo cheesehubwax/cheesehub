@@ -318,7 +318,7 @@ export function CreateFarm() {
           <div className="aspect-video w-full rounded-lg overflow-hidden bg-muted">
             <iframe
               className="h-full w-full border-0"
-              src="https://www.youtube-nocookie.com/embed/PIV_ojHzkS8?feature=oembed"
+              src="https://www.youtube.com/embed/PIV_ojHzkS8?rel=0&playsinline=1"
               title="How Reward Pools Work On The New WaxDAO NFT Farms"
               loading="eager"
               referrerPolicy="strict-origin-when-cross-origin"
