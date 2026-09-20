@@ -45,12 +45,28 @@ export function CreateLiquidityLock() {
   const [amount, setAmount] = useState("");
   const [unlockDate, setUnlockDate] = useState("");
   const [unlockTime, setUnlockTime] = useState("00:00");
+  const [precision, setPrecision] = useState<number | null>(null);
 
   useEffect(() => {
     if (accountName) {
       loadLPTokens();
     }
   }, [accountName]);
+
+  // Resolve the selected LP token's real precision from the chain
+  useEffect(() => {
+    let cancelled = false;
+    setPrecision(null);
+    if (!selectedToken) return;
+    const [contract, symbol] = selectedToken.split(":");
+    const balance = lpTokens.find((t) => t.contract === contract && t.symbol === symbol)?.amount;
+    getTokenPrecision(contract, symbol, balance).then((p) => {
+      if (!cancelled) setPrecision(p);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedToken, lpTokens]);
 
   const loadLPTokens = async () => {
     if (!accountName) return;
