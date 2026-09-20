@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { HistoricalNote } from '@/components/anal/HistoricalNote';
+import { InRangeCell } from '@/components/anal/InRangeCell';
 import { MiniChartTooltip } from '@/components/anal/MiniChartTooltip';
 import { waxUsdFromPools } from '@/components/anal/snapshotDiff';
 import { CheeseLogo, PairLabel, UsdLogo } from '@/components/anal/PairLogos';
