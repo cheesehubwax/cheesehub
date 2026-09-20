@@ -8,6 +8,7 @@ import { AnalAccountPanel } from '@/components/anal/AnalAccountPanel';
 import { AnalOverview } from '@/components/anal/AnalOverview';
 import { AnalPoolDetail } from '@/components/anal/AnalPoolDetail';
 import { AnalPoolTable } from '@/components/anal/AnalPoolTable';
+import { AnalTombstone } from '@/components/anal/AnalTombstone';
 import { AllVenueLogos, VenueLogo } from '@/components/anal/VenueLogo';
 import { HistoricalNote } from '@/components/anal/HistoricalNote';
 import { CheeseLogo } from '@/components/anal/PairLogos';
@@ -18,6 +19,7 @@ import {
   filterSnapshotByVenue,
   sliceDays,
   useLpDay,
+  useLpDeparted,
   useLpHistoryIndex,
   type LpRange,
 } from '@/hooks/useLpHistory';
