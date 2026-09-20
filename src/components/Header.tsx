@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { to: "/drip", label: "CHEESDrip", emoji: "💧", prefix: "CHEESE", suffix: "Drip" },
   { to: "/locker", label: "CHEESELock", emoji: "🔐", prefix: "CHEESE", suffix: "Lock" },
   { to: "/drops", label: "CHEESEDrop", emoji: "🛒", prefix: "CHEESE", suffix: "Drop" },
+  { to: "/anal", label: "CHEESEAnal", emoji: "📈", prefix: "CHEESE", suffix: "Anal" },
 ];
 
 function NavLabel({ item }: { item: typeof NAV_ITEMS[number] }) {
