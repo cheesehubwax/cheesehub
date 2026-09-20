@@ -200,7 +200,7 @@ export function CreateLock() {
           </Select>
           {tokenInfo && (
             <p className="text-xs text-muted-foreground">
-              Available: {tokenInfo.amount} {tokenInfo.symbol}
+              Available: {precision !== null ? padAmountDisplay(tokenInfo.amount, precision) : tokenInfo.amount} {tokenInfo.symbol}
             </p>
           )}
         </div>
