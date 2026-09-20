@@ -315,12 +315,14 @@ export function CreateFarm() {
           </p>
 
           {/* Embedded YouTube Video */}
-          <div className="aspect-video w-full rounded-lg overflow-hidden bg-black/20">
+          <div className="aspect-video w-full rounded-lg overflow-hidden bg-muted">
             <iframe
-              className="w-full h-full"
-              src="https://www.youtube.com/embed/PIV_ojHzkS8"
-              title="How to Create a Farm on WaxDAO"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              className="h-full w-full border-0"
+              src="https://www.youtube-nocookie.com/embed/PIV_ojHzkS8?feature=oembed"
+              title="How Reward Pools Work On The New WaxDAO NFT Farms"
+              loading="eager"
+              referrerPolicy="strict-origin-when-cross-origin"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
             />
           </div>
