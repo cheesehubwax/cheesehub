@@ -6,6 +6,7 @@ import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 import cheeseDripOrb from "@/assets/cheesedrop2.png";
 import { playRandomFart } from "@/lib/fartSounds";
+import { DappAbout, aboutGuides } from "@/components/about/DappAbout";
 
 export default function Drip() {
   return (
@@ -23,6 +24,7 @@ export default function Drip() {
             </div>
 
             <div className="text-center space-y-2">
+              <DappAbout {...aboutGuides.drip}>
               <div className="flex items-center justify-center gap-2">
                 <OpenMojiIcon emoji="💧" size={24} className="text-2xl" />
                 <h1 className="text-3xl md:text-4xl font-bold">
@@ -34,6 +36,7 @@ export default function Drip() {
                 </span>
                 <OpenMojiIcon emoji="💧" size={24} className="text-2xl" />
               </div>
+              </DappAbout>
               <p className="text-muted-foreground max-w-lg mx-auto">
                 Create automated slow-drip token payments. Set up trustless payroll, vesting schedules, or recurring payments on WAX.
               </p>
