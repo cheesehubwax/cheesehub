@@ -368,7 +368,7 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
                   <td className="py-1.5 text-right font-mono text-muted-foreground">{amount(row.cheese, 2)}</td>
                   <td className="py-1.5 text-right font-mono text-muted-foreground">{amount(row.paired, 4)}</td>
                   <td className="py-1.5 text-right font-mono text-muted-foreground">
-                    {row.pos} <span className="text-[10px]">({row.inRange} in range)</span>
+                    <InRangeCell row={row} symbol={pool.symbol} poolPrice={pool.priceInPaired} />
                   </td>
                 </tr>
               ))}
