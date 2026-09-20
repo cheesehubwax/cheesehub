@@ -25,12 +25,9 @@ export function AnalTombstone({ rows, isLoading, isError, token, onSelectAccount
     <div className="w-full rounded-xl bg-card border border-border/50 p-4">
       <div className="flex flex-wrap items-center gap-2 mb-2">
         <div className="flex items-center gap-2">
-          <OpenMojiIcon emoji="🪦" size={18} />
+          <OpenMojiIcon emoji="💀" size={18} />
           <span className="text-sm font-medium text-foreground">Tombstone</span>
-          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">
-            BETA
-          </span>
-          <OpenMojiIcon emoji="🪦" size={18} />
+          <OpenMojiIcon emoji="💀" size={18} />
         </div>
         <HistoricalNote token={token} />
       </div>
