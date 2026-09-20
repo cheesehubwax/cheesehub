@@ -486,6 +486,113 @@ export function positionUsdValue(
   return 0;
 }
 
+/* -------------------------------------------------------- in-range resolution */
+
+/** Ticks beyond this are Alcor's full-range sentinels — no meaningful price edge. */
+const FULL_RANGE_TICK = 400_000;
+
+/**
+ * Is the pool's price inside the position's own range?
+ *
+ * Returns null when the snapshot has no usable ticks (older day files, or an
+ * API row that omitted them).
+ */
+export function tickInRange(
+  poolTick: number | undefined,
+  tickLower: number | undefined,
+  tickUpper: number | undefined,
+): boolean | null {
+  const t = Number(poolTick);
+  const lo = Number(tickLower);
+  const hi = Number(tickUpper);
+  if (![t, lo, hi].every((v) => Number.isFinite(v))) return null;
+  if (!(hi > lo)) return null;
+  return t >= lo && t < hi;
+}
+
+/**
+ * A position sitting in range always holds both tokens; one holding a single
+ * token cannot be in range. Two empty legs prove nothing.
+ */
+export function balanceInRange(cheese: number, paired: number): boolean | null {
+  const hasCheese = cheese > 0;
+  const hasPaired = paired > 0;
+  if (hasCheese && hasPaired) return true;
+  if (hasCheese || hasPaired) return false;
+  return null;
+}
+
+/**
+ * Decide whether one position was in range, preferring the recorded ticks, then
+ * the token balances, and only falling back to Alcor's own flag when neither is
+ * available. `mismatch` marks rows where Alcor's flag disagrees with the facts.
+ */
+export function resolveInRange(args: {
+  poolTick?: number;
+  tickLower?: number;
+  tickUpper?: number;
+  cheese: number;
+  paired: number;
+  flag?: boolean;
+}): { inRange: boolean; mismatch: boolean } {
+  const byTick = tickInRange(args.poolTick, args.tickLower, args.tickUpper);
+  const byBalance = balanceInRange(args.cheese, args.paired);
+  const resolved = byTick ?? byBalance ?? args.flag === true;
+  const flagKnown = typeof args.flag === 'boolean';
+  const factKnown = byTick !== null || byBalance !== null;
+  return { inRange: resolved, mismatch: flagKnown && factKnown && args.flag !== resolved };
+}
+
+/**
+ * CHEESE price in the paired token at a given tick, scaled off the pool's own
+ * current price so no token precisions are needed. Undefined when the pool row
+ * lacks the data, or when the tick is a full-range sentinel.
+ */
+function cheesePriceAtTick(
+  pool: RawPool,
+  cheeseSideIsA: boolean,
+  tick: number,
+): number | undefined {
+  const poolTick = Number(pool.tick);
+  const currentAinB = Number(cheeseIsTokenA(pool, CHEESE_TOKEN) ? pool.priceA : pool.priceB);
+  // priceA/priceB follow the pool's own token order, so read the A-in-B price directly.
+  const aInB = Number(pool.priceA);
+  const reference = Number.isFinite(aInB) && aInB > 0 ? aInB : currentAinB;
+  if (!Number.isFinite(poolTick) || !Number.isFinite(reference) || !(reference > 0)) return undefined;
+  if (Math.abs(tick) >= FULL_RANGE_TICK) return undefined;
+
+  const scale = reference / Math.pow(1.0001, poolTick);
+  const priceAinB = scale * Math.pow(1.0001, tick);
+  if (!Number.isFinite(priceAinB) || !(priceAinB > 0)) return undefined;
+  const price = cheeseSideIsA ? priceAinB : 1 / priceAinB;
+  if (!Number.isFinite(price) || !(price > 0)) return undefined;
+  return round(price, 12);
+}
+
+/** Recorded price range of one position, oriented as CHEESE price in the pair. */
+function positionRange(
+  pool: RawPool,
+  cheeseSideIsA: boolean,
+  row: RawPosition,
+  inRange: boolean,
+): LpPositionRange {
+  const lower = Number(row.tickLower);
+  const upper = Number(row.tickUpper);
+  const flag: 0 | 1 = inRange ? 1 : 0;
+  if (
+    !Number.isFinite(lower) ||
+    !Number.isFinite(upper) ||
+    Math.abs(lower) >= FULL_RANGE_TICK ||
+    Math.abs(upper) >= FULL_RANGE_TICK
+  ) {
+    return { in: flag, full: 1 };
+  }
+  const a = cheesePriceAtTick(pool, cheeseSideIsA, lower);
+  const b = cheesePriceAtTick(pool, cheeseSideIsA, upper);
+  if (a === undefined || b === undefined) return { in: flag };
+  return { lo: Math.min(a, b), hi: Math.max(a, b), in: flag };
+}
+
 function finaliseProviders(byAccount: Map<string, LpProviderRow>): LpProviderRow[] {
   return [...byAccount.values()]
     .map((row) => ({
