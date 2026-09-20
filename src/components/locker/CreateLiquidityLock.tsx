@@ -24,6 +24,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Lock, Calendar, AlertCircle, Droplets } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
+import { getTokenPrecision, formatAssetAmount, floorToPrecision, padAmountDisplay } from "@/lib/tokenPrecision";
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 
