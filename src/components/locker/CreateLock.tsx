@@ -89,8 +89,33 @@ export function CreateLock() {
 
     setCreating(true);
     try {
-      const precision = tokenInfo.amount.split(".")[1]?.length || 4;
-      const formattedAmount = `${parseFloat(amount).toFixed(precision)} ${tokenInfo.symbol}`;
+      // Always use the token's real on-chain precision, never the digits the user typed
+      const tokenPrecision =
+        precision ?? (await getTokenPrecision(tokenInfo.contract, tokenInfo.symbol, tokenInfo.amount));
+
+      const requested = floorToPrecision(parseFloat(amount), tokenPrecision);
+      if (requested <= 0) {
+        toast({
+          title: "Amount too small",
+          description: `${tokenInfo.symbol} supports ${tokenPrecision} decimal places.`,
+          variant: "destructive",
+        });
+        setCreating(false);
+        return;
+      }
+
+      const available = floorToPrecision(parseFloat(tokenInfo.amount), tokenPrecision);
+      if (requested > available) {
+        toast({
+          title: "Not enough balance",
+          description: `You only have ${available.toFixed(tokenPrecision)} ${tokenInfo.symbol}.`,
+          variant: "destructive",
+        });
+        setCreating(false);
+        return;
+      }
+
+      const formattedAmount = formatAssetAmount(requested, tokenPrecision, tokenInfo.symbol);
       const unlockTimestamp = Math.floor(unlockDateTime.getTime() / 1000);
 
       await session.transact({
