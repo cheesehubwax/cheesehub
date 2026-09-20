@@ -611,6 +611,10 @@ function finaliseProviders(byAccount: Map<string, LpProviderRow>): LpProviderRow
  * from each position's current `totalValue`, falling back to `depositedUSDTotal`
  * only when the API omits it. Positions with no liquidity, closed positions and
  * ownerless rows are dropped.
+ *
+ * The in-range count is worked out from the pool's tick against each position's
+ * own tick range, cross-checked against its token balances; Alcor's `inRange`
+ * flag is only a last resort and disagreements are counted in `rangeMismatch`.
  */
 export function buildPoolSnapshot(
   target: VenuePair,
