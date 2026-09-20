@@ -217,6 +217,10 @@ export interface LpPoolSnapshot {
   volumeUsd24?: number;
   /** Rolling 24h trading volume of the CHEESE leg (Alcor only). */
   volumeCheese24?: number;
+  /** Current tick of the deepest pool at snapshot time (Alcor only). */
+  tick?: number;
+  /** How many positions had Alcor's own in-range flag contradicting the recorded data. */
+  rangeMismatch?: number;
   providers: LpProviderRow[];
 }
 
