@@ -335,6 +335,12 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
         <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-2">
           Providers {current?.date ? `· ${tooltipDate(current.date)}` : ''}
         </div>
+        {(pool.rangeMismatch ?? 0) > 0 && (
+          <p className="text-[10px] text-muted-foreground mb-2">
+            {pool.rangeMismatch} position{pool.rangeMismatch === 1 ? '' : 's'} here had the exchange reporting a
+            different in-range state than the recorded price range shows. The price range is used.
+          </p>
+        )}
         <div className="overflow-x-auto max-h-80 overflow-y-auto">
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-card">
