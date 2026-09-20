@@ -706,6 +706,8 @@ export function buildPoolSnapshot(
     positions,
     ...(priceInPaired !== undefined ? { priceInPaired } : {}),
     ...(priceUsd !== undefined ? { priceUsd } : {}),
+    ...(Number.isFinite(Number(deepest?.tick)) ? { tick: Number(deepest?.tick) } : {}),
+    ...(mismatches > 0 ? { rangeMismatch: mismatches } : {}),
     providers,
   };
 }
