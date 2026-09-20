@@ -123,6 +123,8 @@ export interface RawPool {
   id: number;
   fee?: number;
   active?: number | boolean;
+  /** Current tick of the pool — the price, in tick space. */
+  tick?: number;
   tokenA?: RawPoolToken;
   tokenB?: RawPoolToken;
   tvlUSD?: number;
