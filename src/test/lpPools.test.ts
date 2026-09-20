@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   TRACKED_LP_PAIRS,
+  departedProviders,
   venuePair,
   assetAmount,
   assetSymbol,
@@ -423,5 +424,80 @@ describe('HOLE as the base token', () => {
     expect(lpTokenConfig('cheese').dataPath).toBe('');
     expect(lpTokenConfig('hole').dataPath).toBe('hole');
     expect(lpTokenConfig('hole').contract).toBe('hole.cheese');
+  });
+});
+
+describe('departedProviders (tombstone)', () => {
+  const pool = (key: string, venue: 'alcor' | 'taco', providers: { a: string; usd: number }[]) => ({
+    key,
+    venue,
+    pairKey: key.split(':')[1],
+    symbol: 'WAX',
+    contract: 'eosio.token',
+    label: 'CHEESE / WAX',
+    poolIds: [1],
+    usd: providers.reduce((s, p) => s + p.usd, 0),
+    cheese: 0,
+    paired: 0,
+    accounts: providers.length,
+    positions: providers.length,
+    providers: providers.map((p) => ({ a: p.a, usd: p.usd, cheese: 0, paired: 0, pos: 1, inRange: 1 })),
+  });
+
+  const snapshots = [
+    {
+      date: '2026-09-01T00',
+      t: 1,
+      pools: [
+        pool('alcor:wax-eosio.token', 'alcor', [
+          { a: 'leaver', usd: 500 },
+          { a: 'tiny', usd: 4 },
+          { a: 'stayer', usd: 300 },
+          { a: 'dusty', usd: 80 },
+        ]),
+        pool('taco:wax-eosio.token', 'taco', [{ a: 'tacoleaver', usd: 60 }]),
+      ],
+    },
+    {
+      date: '2026-09-02T00',
+      t: 2,
+      pools: [
+        pool('alcor:wax-eosio.token', 'alcor', [
+          { a: 'stayer', usd: 310 },
+          { a: 'dusty', usd: 0.4 },
+          { a: 'tiny', usd: 2 },
+        ]),
+        pool('taco:wax-eosio.token', 'taco', []),
+      ],
+    },
+  ];
+
+  it('lists an account that pulled its liquidity, with peak and last-seen dates', () => {
+    const rows = departedProviders(snapshots);
+    const leaver = rows.find((r) => r.account === 'leaver');
+    expect(leaver).toBeDefined();
+    expect(leaver?.peakUsd).toBeCloseTo(500, 4);
+    expect(leaver?.peakDate).toBe('2026-09-01T00');
+    expect(leaver?.lastActiveDate).toBe('2026-09-01T00');
+    expect(leaver?.currentUsd).toBe(0);
+    expect(leaver?.pools.map((p) => p.key)).toEqual(['alcor:wax-eosio.token']);
+  });
+
+  it('excludes accounts that never passed $10 and accounts still holding value', () => {
+    const accounts = departedProviders(snapshots).map((r) => r.account);
+    expect(accounts).not.toContain('tiny');
+    expect(accounts).not.toContain('stayer');
+  });
+
+  it('includes dust-only leftovers and sorts by peak value', () => {
+    const rows = departedProviders(snapshots);
+    const dusty = rows.find((r) => r.account === 'dusty');
+    expect(dusty?.currentUsd).toBeCloseTo(0.4, 4);
+    expect(rows.map((r) => r.account)).toEqual(['leaver', 'dusty', 'tacoleaver']);
+  });
+
+  it('narrows peaks and current values to one venue', () => {
+    expect(departedProviders(snapshots, 'taco').map((r) => r.account)).toEqual(['tacoleaver']);
+    expect(departedProviders(snapshots, 'alcor').map((r) => r.account)).toEqual(['leaver', 'dusty']);
   });
 });

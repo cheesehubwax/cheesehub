@@ -879,3 +879,107 @@ export function mergeIndexDay(days: LpIndexDay[], day: LpIndexDay, maxDays = 160
   const kept = days.filter((d) => d && d.date && d.date !== day.date);
   return [...kept, day].sort((x, y) => x.date.localeCompare(y.date)).slice(-maxDays);
 }
+
+/* --------------------------------------------------------------- tombstone */
+
+/** A provider once worth more than this counts towards the tombstone. */
+export const TOMBSTONE_PEAK_USD = 10;
+/** Anything at or below this now counts as gone. */
+export const TOMBSTONE_DUST_USD = 1;
+
+/** One account that has left the tracked pools. */
+export interface LpDepartedProvider {
+  account: string;
+  /** Highest total value ever recorded for this account. */
+  peakUsd: number;
+  /** Snapshot key of that peak. */
+  peakDate: string;
+  /** Newest snapshot where they still held more than dust. */
+  lastActiveDate: string;
+  /** Their total in the newest recorded snapshot (0 when absent). */
+  currentUsd: number;
+  /** Pools they ever held liquidity in, biggest peak first. */
+  pools: { key: string; venue: LpVenue; label: string; symbol: string; contract: string }[];
+}
+
+/**
+ * Accounts whose recorded liquidity peaked above `TOMBSTONE_PEAK_USD` and has
+ * since fallen to dust or disappeared entirely. Built purely from recorded
+ * snapshots, oldest first; `venue` narrows both the peak and the current value.
+ */
+export function departedProviders(
+  snapshots: LpDayFile[],
+  venue: LpVenue | 'all' = 'all',
+  peakUsd = TOMBSTONE_PEAK_USD,
+  dustUsd = TOMBSTONE_DUST_USD,
+): LpDepartedProvider[] {
+  const ordered = [...snapshots]
+    .filter((s) => s && typeof s.date === 'string' && Array.isArray(s.pools))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (!ordered.length) return [];
+
+  interface Acc {
+    peakUsd: number;
+    peakDate: string;
+    lastActiveDate: string;
+    currentUsd: number;
+    pools: Map<string, { key: string; venue: LpVenue; label: string; symbol: string; contract: string; usd: number }>;
+  }
+  const accounts = new Map<string, Acc>();
+  const latestDate = ordered[ordered.length - 1].date;
+
+  for (const snapshot of ordered) {
+    const pools = poolsForVenue(snapshot.pools, venue);
+    const totals = new Map<string, number>();
+
+    for (const pool of pools) {
+      for (const row of pool.providers ?? []) {
+        if (!row?.a) continue;
+        const acc =
+          accounts.get(row.a) ??
+          ({ peakUsd: 0, peakDate: snapshot.date, lastActiveDate: snapshot.date, currentUsd: 0, pools: new Map() } as Acc);
+        accounts.set(row.a, acc);
+
+        const usd = Number.isFinite(row.usd) ? row.usd : 0;
+        totals.set(row.a, (totals.get(row.a) ?? 0) + usd);
+
+        const seen = acc.pools.get(pool.key);
+        if (!seen || usd > seen.usd) {
+          acc.pools.set(pool.key, {
+            key: pool.key,
+            venue: pool.venue,
+            label: pool.label,
+            symbol: pool.symbol,
+            contract: pool.contract,
+            usd: Math.max(usd, seen?.usd ?? 0),
+          });
+        }
+      }
+    }
+
+    for (const [account, total] of totals) {
+      const acc = accounts.get(account);
+      if (!acc) continue;
+      if (total > acc.peakUsd) {
+        acc.peakUsd = total;
+        acc.peakDate = snapshot.date;
+      }
+      if (total > dustUsd) acc.lastActiveDate = snapshot.date;
+      if (snapshot.date === latestDate) acc.currentUsd = total;
+    }
+  }
+
+  return [...accounts.entries()]
+    .filter(([, acc]) => acc.peakUsd > peakUsd && acc.currentUsd <= dustUsd)
+    .map(([account, acc]) => ({
+      account,
+      peakUsd: acc.peakUsd,
+      peakDate: acc.peakDate,
+      lastActiveDate: acc.lastActiveDate,
+      currentUsd: acc.currentUsd,
+      pools: [...acc.pools.values()]
+        .sort((a, b) => b.usd - a.usd)
+        .map(({ key, venue: v, label, symbol, contract }) => ({ key, venue: v, label, symbol, contract })),
+    }))
+    .sort((a, b) => b.peakUsd - a.peakUsd);
+}

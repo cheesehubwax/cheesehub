@@ -8,6 +8,7 @@ import { AnalAccountPanel } from '@/components/anal/AnalAccountPanel';
 import { AnalOverview } from '@/components/anal/AnalOverview';
 import { AnalPoolDetail } from '@/components/anal/AnalPoolDetail';
 import { AnalPoolTable } from '@/components/anal/AnalPoolTable';
+import { AnalTombstone } from '@/components/anal/AnalTombstone';
 import { AllVenueLogos, VenueLogo } from '@/components/anal/VenueLogo';
 import { HistoricalNote } from '@/components/anal/HistoricalNote';
 import { CheeseLogo } from '@/components/anal/PairLogos';
@@ -18,6 +19,7 @@ import {
   filterSnapshotByVenue,
   sliceDays,
   useLpDay,
+  useLpDeparted,
   useLpHistoryIndex,
   type LpRange,
 } from '@/hooks/useLpHistory';
@@ -85,6 +87,14 @@ const CheeseAnal = () => {
     for (const v of LP_VENUES) counts.set(v, (snapshot?.pools ?? []).filter((p) => p.venue === v).length);
     return counts;
   }, [snapshot]);
+
+  // The tombstone reads every recorded snapshot, not just the selected range.
+  const allDates = useMemo(() => days.map((d) => d.date), [days]);
+  const {
+    rows: departed,
+    isLoading: departedLoading,
+    isError: departedError,
+  } = useLpDeparted(allDates, tokenKey, venue);
 
   return (
     <Layout>
@@ -249,6 +259,16 @@ const CheeseAnal = () => {
           current={current}
           token={token}
         />
+
+        <AnalTombstone
+          rows={departed}
+          isLoading={departedLoading}
+          isError={departedError}
+          token={token}
+          onSelectAccount={setAccount}
+        />
+
+
 
 
         <p className="text-[10px] text-muted-foreground text-center max-w-2xl">

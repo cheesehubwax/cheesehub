@@ -1,6 +1,8 @@
 // CHEESEAnal — readers for workflow-recorded LP history snapshots.
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
+  departedProviders,
   lpTokenConfig,
   poolsForVenue,
   type LpDayFile,
@@ -118,6 +120,44 @@ export function useLpDay(date: string | null, token: LpTokenKey = 'cheese') {
     retry: 1,
   });
   return { day: query.data ?? null, isLoading: query.isLoading, isError: query.isError, refetch: query.refetch };
+}
+
+/** Fetch many recorded snapshots, skipping any that cannot be read. */
+async function fetchDays(dates: string[], token: LpTokenKey): Promise<LpDayFile[]> {
+  const out: LpDayFile[] = [];
+  for (let i = 0; i < dates.length; i += DAY_FETCH_CONCURRENCY) {
+    const chunk = dates.slice(i, i + DAY_FETCH_CONCURRENCY);
+    const results = await Promise.all(
+      chunk.map((date) =>
+        fetchJson<LpDayFile>(tokenPath(token, `days/${date}.json`)).catch(() => null),
+      ),
+    );
+    for (const day of results) if (day && Array.isArray(day.pools)) out.push(day);
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Providers who once held more than $10 and have since gone (the tombstone).
+ * Reads every recorded snapshot of the token, not just the selected range.
+ */
+export function useLpDeparted(dates: string[], token: LpTokenKey = 'cheese', venue: LpVenue | 'all' = 'all') {
+  const key = dates.join(',');
+  const query = useQuery({
+    queryKey: ['cheeseAnal', token, 'departed', key],
+    queryFn: () => fetchDays(dates, token),
+    enabled: dates.length > 0,
+    staleTime: 60 * 60_000,
+    gcTime: 2 * 60 * 60_000,
+    retry: 1,
+  });
+
+  const rows = useMemo(
+    () => departedProviders(query.data ?? [], venue),
+    [query.data, venue],
+  );
+
+  return { rows, isLoading: query.isLoading, isError: query.isError, refetch: query.refetch };
 }
 
 /** One account's liquidity in one pool on one recorded day. */
