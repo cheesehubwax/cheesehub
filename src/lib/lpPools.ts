@@ -662,7 +662,17 @@ export function buildPoolSnapshot(
       entry.cheese += Math.max(0, cheese);
       entry.paired += Math.max(0, paired);
       entry.pos += 1;
-      if (row.inRange === true) entry.inRange += 1;
+      const verdict = resolveInRange({
+        poolTick: pool.tick,
+        tickLower: row.tickLower,
+        tickUpper: row.tickUpper,
+        cheese,
+        paired,
+        flag: row.inRange,
+      });
+      if (verdict.inRange) entry.inRange += 1;
+      if (verdict.mismatch) mismatches += 1;
+      (entry.ranges ??= []).push(positionRange(pool, cheeseSideIsA, row, verdict.inRange));
       byAccount.set(account, entry);
     }
   }
