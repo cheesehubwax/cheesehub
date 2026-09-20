@@ -39,12 +39,28 @@ export function CreateLock() {
   const [amount, setAmount] = useState("");
   const [unlockDate, setUnlockDate] = useState("");
   const [unlockTime, setUnlockTime] = useState("00:00");
+  const [precision, setPrecision] = useState<number | null>(null);
 
   useEffect(() => {
     if (accountName) {
       loadTokens();
     }
   }, [accountName]);
+
+  // Resolve the selected token's real precision from the chain
+  useEffect(() => {
+    let cancelled = false;
+    setPrecision(null);
+    if (!selectedToken) return;
+    const [contract, symbol] = selectedToken.split(":");
+    const balance = tokens.find((t) => t.contract === contract && t.symbol === symbol)?.amount;
+    getTokenPrecision(contract, symbol, balance).then((p) => {
+      if (!cancelled) setPrecision(p);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedToken, tokens]);
 
   const loadTokens = async () => {
     if (!accountName) return;
