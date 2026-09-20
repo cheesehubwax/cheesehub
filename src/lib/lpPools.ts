@@ -145,7 +145,12 @@ export interface RawPosition {
   owner?: string;
   liquidity?: string | number;
   closed?: boolean;
+  /** Alcor's own claim about the position being in range — only a last resort. */
   inRange?: boolean;
+  /** Lower tick of the position's range. */
+  tickLower?: number;
+  /** Upper tick of the position's range. */
+  tickUpper?: number;
   /** Current USD value of the position — what Alcor's own UI shows. */
   totalValue?: number;
   /** USD value at deposit time; only a fallback, it drifts. */
