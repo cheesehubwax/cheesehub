@@ -105,12 +105,14 @@ export const COMPOUND_SLIPPAGE_TOLERANCE = 0.03;
 export const COMPOUND_FEE_MEMO = 'compound fee';
 
 /**
- * Smallest deposit, in raw units of a token's own precision, that can survive
- * the pool's integer rounding. The pool can come up to a couple of raw units
- * short on either side; below this threshold that shortfall exceeds the
- * slippage buffer and the pool rejects the whole transaction.
+ * Smallest deposit, in raw units of a token's own precision, that the pool can
+ * accept. One unit is the real floor: the minimum we send with the deposit is
+ * relaxed by a fixed couple of raw units (see `buildIncreaseLiquidityAction`),
+ * so the pool's integer rounding cannot reject tiny-but-valid amounts. Alcor
+ * itself accepts deposits this small.
  */
-export const MIN_DEPOSIT_RAW_UNITS = Math.ceil(2 / COMPOUND_SLIPPAGE_TOLERANCE);
+export const MIN_DEPOSIT_RAW_UNITS = 1;
+
 
 
 export function balanceKey(contract: string, symbol: string): string {
@@ -444,10 +446,10 @@ export function planCompound(
       continue;
     }
 
-    // The pool recomputes both amounts with integer maths and can end up a
-    // single unit of precision short on either side. On a deposit of only a few
-    // units that single unit is a larger share than the slippage buffer allows,
-    // so the pool would reject the whole transaction. Skip those instead.
+    // A side that rounds away to nothing at its own precision cannot be
+    // deposited at all. Everything above one raw unit is compounded — the
+    // deposit minimum carries a fixed raw-unit allowance for the pool's
+    // integer rounding, so small amounts no longer need to be skipped.
     const rawUnitsA = Math.round(depositA * 10 ** balA.precision);
     const rawUnitsB = Math.round(depositB * 10 ** balB.precision);
     if (rawUnitsA < MIN_DEPOSIT_RAW_UNITS || rawUnitsB < MIN_DEPOSIT_RAW_UNITS) {
@@ -456,10 +458,11 @@ export function planCompound(
         positionId: candidate.positionId,
         pair,
         reason: 'deposit-too-small',
-        detail: `Only ${smallSymbol} dust was claimed for this pair — too small for the pool to accept, so it was left in your wallet.`,
+        detail: `The claimed ${smallSymbol} rounds away to nothing at this pool's ratio, so it was left in your wallet.`,
       });
       continue;
     }
+
 
 
     balA.balance = floorTo(balA.balance - grossA, balA.precision);

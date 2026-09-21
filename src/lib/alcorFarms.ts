@@ -986,22 +986,22 @@ export function buildIncreaseLiquidityAction(
   const tolerance = Number.isFinite(slippageTolerance)
     ? Math.min(Math.max(slippageTolerance, 0), 0.5)
     : DEFAULT_DEPOSIT_SLIPPAGE;
-  const slippageMultiplier = 1 - tolerance;
 
-  // Floor the minimums at token precision — rounding up would push the minimum
-  // above what the pool can actually use and trip the slippage assertion. The
-  // minimum is also never stricter than "one unit of precision short", so the
-  // pool's own integer rounding alone can never breach it.
+  // Work the minimum out in raw units of the token's own precision. The
+  // allowance is the slippage share OR two raw units, whichever is larger: on
+  // large deposits that is effectively the percentage, and on tiny deposits it
+  // leaves room for the pool's integer rounding, which a percentage of a few
+  // raw units cannot. Never rounds up above what the pool can actually use.
   const minQuantity = (quantity: string): string => {
     const [rawAmount, symbol] = quantity.split(' ');
     const decimals = rawAmount.split('.')[1]?.length || 0;
     const factor = 10 ** decimals;
-    const desired = parseFloat(rawAmount);
-    const buffered = Math.floor(desired * slippageMultiplier * factor) / factor;
-    const oneUnitShort = Math.floor(desired * factor - 1) / factor;
-    const floored = Math.min(buffered, oneUnitShort);
-    return `${Math.max(floored, 0).toFixed(decimals)} ${symbol}`;
+    const desiredRaw = Math.round(parseFloat(rawAmount) * factor);
+    const allowance = Math.max(Math.ceil(desiredRaw * tolerance), 2);
+    const minRaw = Math.max(desiredRaw - allowance, 0);
+    return `${(minRaw / factor).toFixed(decimals)} ${symbol}`;
   };
+
 
 
   const minTokenA = minQuantity(tokenAQuantity);
