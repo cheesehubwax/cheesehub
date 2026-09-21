@@ -140,18 +140,44 @@ export function CompoundAllDialog({
   // re-check that produces the same plan keeps their choices.
   const [deselectedIds, setDeselectedIds] = useState<Set<number>>(new Set());
 
+  // Balances read after the claim — kept so the plan can be rebuilt against
+  // fresh pool prices immediately before signing.
+  const [afterBalances, setAfterBalances] = useState<Map<string, AvailableBalance>>(new Map());
+  // True once rewards have been claimed in this flow, so the claim can never run
+  // a second time (a repeat claim only pays dust and costs another signature).
+  const [claimed, setClaimed] = useState(false);
+  const [reusedClaim, setReusedClaim] = useState(false);
+
   useEffect(() => {
-    if (open) {
-      setStage('confirm');
-      setTermsAccepted(false);
+    if (!open) return;
+    setTermsAccepted(false);
+    setError(null);
+    setRechecking(false);
+    setDeselectedIds(new Set());
+    setAfterBalances(new Map());
+
+    // A claim that already happened moments ago (dialog closed and reopened)
+    // must not be repeated — reuse its baseline and go straight to planning.
+    const recent = accountName ? recentClaimFor(accountName) : null;
+    if (recent) {
+      setStage('waiting');
       setPlan(null);
-      setError(null);
-      setClaimTxId(null);
-      setRechecking(false);
-      setBeforeBalances(new Map());
-      setDeselectedIds(new Set());
+      setClaimTxId(recent.txId);
+      setClaimed(true);
+      setReusedClaim(true);
+      setBeforeBalances(recent.before);
+      return;
     }
-  }, [open]);
+
+    setStage('confirm');
+    setPlan(null);
+    setClaimTxId(null);
+    setClaimed(false);
+    setReusedClaim(false);
+    setBeforeBalances(new Map());
+  }, [open, accountName]);
+
+
 
   const candidates = useMemo<CompoundCandidate[]>(
     () =>
