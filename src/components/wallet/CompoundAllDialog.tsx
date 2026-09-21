@@ -351,6 +351,22 @@ export function CompoundAllDialog({
     }
   }, [accountName, tokensToRead, withSlots, beforeBalances]);
 
+  // Reopened with rewards claimed moments ago: plan against that claim instead of
+  // claiming again.
+  useEffect(() => {
+    if (!open || !reusedClaim || stage !== 'waiting' || plan) return;
+    let cancelled = false;
+    (async () => {
+      await recheckBalances();
+      if (!cancelled) setStage('preview');
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, reusedClaim, stage, plan, recheckBalances]);
+
+
+
 
 
   const selectedEntries = useMemo(
