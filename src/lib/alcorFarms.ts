@@ -986,7 +986,6 @@ export function buildIncreaseLiquidityAction(
   const tolerance = Number.isFinite(slippageTolerance)
     ? Math.min(Math.max(slippageTolerance, 0), 0.5)
     : DEFAULT_DEPOSIT_SLIPPAGE;
-  const slippageMultiplier = 1 - tolerance;
 
   // Work the minimum out in raw units of the token's own precision. The
   // allowance is the slippage share OR two raw units, whichever is larger: on
