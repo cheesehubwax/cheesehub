@@ -577,4 +577,63 @@ describe('deposit minimums', () => {
     // 0.03 * 0.995 = 0.02985 → floors to 0.02, never 0.03.
     expect(add.data.tokenAMin).toBe('0.02 CHEESE');
   });
+
+  it('never demands more than one unit of precision short, so pool rounding alone cannot reject it', () => {
+    const actions = buildIncreaseLiquidityAction(
+      'alice',
+      1,
+      10,
+      -100,
+      100,
+      CHEESE.contract,
+      '1000.00000000 CHEESE',
+      USDC.contract,
+      '100.000000 WAXUSDC',
+      0, // zero tolerance would otherwise demand the exact amount
+    );
+    const add: any = actions[actions.length - 1];
+    expect(add.data.tokenAMin).toBe('999.99999999 CHEESE');
+    expect(add.data.tokenBMin).toBe('99.999999 WAXUSDC');
+  });
 });
+
+describe('minimum viable deposit', () => {
+  it('skips a pair whose smaller side is only a few raw units', () => {
+    // 22 raw units of an 8-decimal token — the size that Alcor rejected on chain.
+    const c = candidate({
+      positionId: 120690,
+      tokenA: { ...CHEESE, amount: 2889.1986 },
+      tokenB: { ...USDC, amount: 0.00029059 },
+      slot: slotForRatio(0.0000001, -100, 100, 8, 8),
+    });
+    const plan = planCompound(
+      [c],
+      balances([
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 2.2874, precision: 8, known: true }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 0.00000023, precision: 8, known: true }],
+      ]),
+    );
+    expect(plan.compoundable).toHaveLength(0);
+    expect(plan.skipped[0].reason).toBe('deposit-too-small');
+    expect(plan.skipped[0].positionId).toBe(120690);
+  });
+
+  it('keeps token A exactly on the pool ratio of the rounded token B amount', () => {
+    const ratio = 0.1;
+    const c = candidate({ slot: slotForRatio(ratio, -100, 100, 8, 6) });
+    const plan = planCompound(
+      [c],
+      balances([
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 12.34567891, precision: 8, known: true }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 5, precision: 6, known: true }],
+      ]),
+    );
+    expect(plan.compoundable).toHaveLength(1);
+    const entry = plan.compoundable[0];
+    const a = parseFloat(entry.tokenA.quantity);
+    const b = parseFloat(entry.tokenB.quantity);
+    // B is the rounded figure; A must not exceed what that rounded B pairs with.
+    expect(a).toBeLessThanOrEqual(b / ratio + 1e-8);
+  });
+});
+
