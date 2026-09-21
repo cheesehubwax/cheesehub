@@ -404,7 +404,6 @@ export function CompoundAllDialog({
       }
       setPlan(fresh);
       const feeActions = buildCompoundFeeTotals(entries).map(fee => ({
-
         account: fee.contract,
         name: 'transfer',
         authorization: [{ actor: accountName, permission: 'active' }],
@@ -415,7 +414,7 @@ export function CompoundAllDialog({
           memo: COMPOUND_FEE_MEMO,
         },
       }));
-      const depositActions = selectedEntries.flatMap(entry =>
+      const depositActions = entries.flatMap(entry =>
         buildIncreaseLiquidityAction(
           accountName,
           entry.positionId,
@@ -434,9 +433,10 @@ export function CompoundAllDialog({
       const txId = result.resolved?.transaction.id?.toString() || null;
       onTransactionSuccess?.(
         'Rewards Compounded!',
-        `Added rewards back into ${selectedEntries.length} position${selectedEntries.length !== 1 ? 's' : ''}`,
+        `Added rewards back into ${entries.length} position${entries.length !== 1 ? 's' : ''}`,
         txId,
       );
+      clearRecentClaim();
       setStage('done');
       onTransactionComplete?.();
       onOpenChange(false);
@@ -444,16 +444,28 @@ export function CompoundAllDialog({
       setStage('preview');
       const raw = err?.message || 'Failed to add liquidity';
       const slippage = /slippage/i.test(raw);
+      const names = selectedEntries.map(e => `${e.pair} #${e.positionId}`).join(', ');
       setError(
         slippage
-          ? 'The pool price moved while you were signing, so the deposit was rejected. Your rewards are safe in your wallet — press "Re-check balances" and try again.'
+          ? `The pool price moved while you were signing, so the deposit was rejected (${names}). Your rewards are safe in your wallet — press "Re-check balances" and try again. If one pair keeps failing, untick it and compound the rest.`
           : `${raw} — your rewards were already claimed and are safe in your wallet. You can retry the compound step.`,
       );
     } finally {
       closeWharfkitModals();
       setTimeout(() => closeWharfkitModals(), 300);
     }
-  }, [session, accountName, selectedEntries, onTransactionSuccess, onTransactionComplete, onOpenChange]);
+  }, [
+    session,
+    accountName,
+    selectedEntries,
+    withSlots,
+    beforeBalances,
+    afterBalances,
+    onTransactionSuccess,
+    onTransactionComplete,
+    onOpenChange,
+  ]);
+
 
   const busy = stage === 'claiming' || stage === 'waiting' || stage === 'compounding';
 
