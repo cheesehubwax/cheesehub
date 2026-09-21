@@ -545,6 +545,15 @@ export function CompoundAllDialog({
 
         {(stage === 'preview' || stage === 'compounding') && plan && (
           <div className="space-y-4">
+            {reusedClaim && (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  Using the rewards you claimed a few minutes ago — nothing was claimed again.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {plan.compoundable.length > 0 ? (
               <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                 <div className="flex items-center gap-2 px-1">
