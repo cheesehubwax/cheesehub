@@ -257,7 +257,10 @@ export function CompoundAllDialog({
 
   const runClaimAndPlan = useCallback(async () => {
     if (!session || !accountName) return;
+    // Never claim twice in one flow.
+    if (claimed) return;
     setError(null);
+
 
     // Balances before the claim: everything here belongs to the user already and
     // must never be compounded.
