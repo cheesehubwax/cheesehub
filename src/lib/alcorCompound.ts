@@ -104,6 +104,15 @@ export const COMPOUND_FEE_ACCOUNT = 'hole.cheese';
 export const COMPOUND_SLIPPAGE_TOLERANCE = 0.03;
 export const COMPOUND_FEE_MEMO = 'compound fee';
 
+/**
+ * Smallest deposit, in raw units of a token's own precision, that can survive
+ * the pool's integer rounding. The pool can come up to a couple of raw units
+ * short on either side; below this threshold that shortfall exceeds the
+ * slippage buffer and the pool rejects the whole transaction.
+ */
+export const MIN_DEPOSIT_RAW_UNITS = Math.ceil(2 / COMPOUND_SLIPPAGE_TOLERANCE);
+
+
 export function balanceKey(contract: string, symbol: string): string {
   return `${contract}:${symbol}`;
 }
