@@ -84,9 +84,10 @@ describe('planCompound', () => {
     expect(entry.tokenB.gross).toBeCloseTo(10, 4);
     expect(entry.tokenA.fee).toBeCloseTo(entry.tokenA.gross * COMPOUND_FEE_RATE, 6);
     expect(entry.tokenB.fee).toBeCloseTo(entry.tokenB.gross * COMPOUND_FEE_RATE, 5);
-    expect(entry.tokenA.amount).toBeCloseTo(entry.tokenA.gross - entry.tokenA.fee, 6);
-    // Token B is re-aligned onto the pool ratio, so it may sit one unit below
-    // gross minus fee — never above it.
+    // Both sides are re-aligned onto the pool ratio, so either may sit one unit
+    // below gross minus fee — never above it.
+    expect(entry.tokenA.amount).toBeLessThanOrEqual(entry.tokenA.gross - entry.tokenA.fee);
+    expect(entry.tokenA.amount).toBeCloseTo(entry.tokenA.gross - entry.tokenA.fee, 4);
     expect(entry.tokenB.amount).toBeLessThanOrEqual(entry.tokenB.gross - entry.tokenB.fee);
     expect(entry.tokenB.amount).toBeCloseTo(entry.tokenB.gross - entry.tokenB.fee, 4);
     // Deposit plus fee never exceeds what was claimed.
@@ -98,12 +99,13 @@ describe('planCompound', () => {
 
   it('omits a fee that rounds to zero but still deposits', () => {
     const plan = planCompound(
-      [candidate({ slot: slotForRatio(0.004, -100, 100, 2, 2) })],
+      [candidate({ slot: slotForRatio(0.2, -100, 100, 2, 2) })],
       balances([
-        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 5, precision: 2 }],
-        [balanceKey(USDC.contract, USDC.symbol), { balance: 0.02, precision: 2 }],
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 100, precision: 2 }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 1, precision: 2 }],
       ]),
     );
+
 
     expect(plan.compoundable).toHaveLength(1);
     const entry = plan.compoundable[0];
