@@ -71,10 +71,12 @@ export type CompoundSkipReason =
   | 'balance-unknown'
   | 'no-balance'
   | 'dust'
+  | 'deposit-too-small'
   | 'missing-ticks'
   | 'out-of-range'
   | 'pool-price-unknown'
   | 'position-cap';
+
 
 export interface CompoundSkip {
   positionId: number;
@@ -101,6 +103,15 @@ export const COMPOUND_FEE_ACCOUNT = 'hole.cheese';
  */
 export const COMPOUND_SLIPPAGE_TOLERANCE = 0.03;
 export const COMPOUND_FEE_MEMO = 'compound fee';
+
+/**
+ * Smallest deposit, in raw units of a token's own precision, that can survive
+ * the pool's integer rounding. The pool can come up to a couple of raw units
+ * short on either side; below this threshold that shortfall exceeds the
+ * slippage buffer and the pool rejects the whole transaction.
+ */
+export const MIN_DEPOSIT_RAW_UNITS = Math.ceil(2 / COMPOUND_SLIPPAGE_TOLERANCE);
+
 
 export function balanceKey(contract: string, symbol: string): string {
   return `${contract}:${symbol}`;
@@ -414,13 +425,14 @@ export function planCompound(
 
     const feeA = floorTo(grossA * COMPOUND_FEE_RATE, balA.precision);
     const feeB = floorTo(grossB * COMPOUND_FEE_RATE, balB.precision);
-    let depositA = floorTo(grossA - feeA, balA.precision);
+    const maxDepositA = floorTo(grossA - feeA, balA.precision);
     const maxDepositB = floorTo(grossB - feeB, balB.precision);
-    // Keep the deposit on the pool's ratio, never spending more than allocated.
-    const depositB = Math.min(floorTo(depositA * ratio, balB.precision), maxDepositB);
-    if (depositB < floorTo(depositA * ratio, balB.precision)) {
-      depositA = Math.min(depositA, floorTo(depositB / ratio, balA.precision));
-    }
+    const depositB = Math.min(floorTo(maxDepositA * ratio, balB.precision), maxDepositB);
+    // Re-derive token A from the ROUNDED token B. Flooring B to its own
+    // precision can cut it by a whole unit, and leaving A sized for the
+    // unrounded figure leaves the pair off the pool's ratio — which is exactly
+    // what trips Alcor's "Price slippage check" on small deposits.
+    const depositA = Math.min(maxDepositA, floorTo(depositB / ratio, balA.precision));
 
     if (depositA <= 0 || depositB <= 0) {
       skipped.push({
@@ -431,6 +443,24 @@ export function planCompound(
       });
       continue;
     }
+
+    // The pool recomputes both amounts with integer maths and can end up a
+    // single unit of precision short on either side. On a deposit of only a few
+    // units that single unit is a larger share than the slippage buffer allows,
+    // so the pool would reject the whole transaction. Skip those instead.
+    const rawUnitsA = Math.round(depositA * 10 ** balA.precision);
+    const rawUnitsB = Math.round(depositB * 10 ** balB.precision);
+    if (rawUnitsA < MIN_DEPOSIT_RAW_UNITS || rawUnitsB < MIN_DEPOSIT_RAW_UNITS) {
+      const smallSymbol = rawUnitsA < MIN_DEPOSIT_RAW_UNITS ? candidate.tokenA.symbol : candidate.tokenB.symbol;
+      skipped.push({
+        positionId: candidate.positionId,
+        pair,
+        reason: 'deposit-too-small',
+        detail: `Only ${smallSymbol} dust was claimed for this pair — too small for the pool to accept, so it was left in your wallet.`,
+      });
+      continue;
+    }
+
 
     balA.balance = floorTo(balA.balance - grossA, balA.precision);
     balB.balance = floorTo(balB.balance - grossB, balB.precision);

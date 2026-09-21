@@ -51,6 +51,37 @@ type Stage = 'confirm' | 'claiming' | 'waiting' | 'preview' | 'compounding' | 'd
 
 const POLL_ATTEMPTS = 12;
 const POLL_DELAY_MS = 2000;
+/**
+ * How long a successful claim stays usable. Reopening the dialog inside this
+ * window reuses that claim instead of claiming again — a repeat claim only pays
+ * a few seconds' worth of dust and costs another signature.
+ */
+const CLAIM_REUSE_WINDOW_MS = 15 * 60 * 1000;
+
+interface RecentClaim {
+  account: string;
+  txId: string | null;
+  at: number;
+  before: Map<string, AvailableBalance>;
+}
+
+let recentClaim: RecentClaim | null = null;
+
+function recordClaim(account: string, txId: string | null, before: Map<string, AvailableBalance>) {
+  recentClaim = { account, txId, at: Date.now(), before };
+}
+
+function recentClaimFor(account: string): RecentClaim | null {
+  if (!recentClaim || recentClaim.account !== account) return null;
+  if (Date.now() - recentClaim.at > CLAIM_REUSE_WINDOW_MS) return null;
+  return recentClaim;
+}
+
+/** Forget the stored claim once its rewards have been compounded. */
+function clearRecentClaim() {
+  recentClaim = null;
+}
+
 
 function parseBalance(raw: string | undefined): AvailableBalance {
   if (!raw) return { balance: 0, precision: 8, known: true };
@@ -140,18 +171,44 @@ export function CompoundAllDialog({
   // re-check that produces the same plan keeps their choices.
   const [deselectedIds, setDeselectedIds] = useState<Set<number>>(new Set());
 
+  // Balances read after the claim — kept so the plan can be rebuilt against
+  // fresh pool prices immediately before signing.
+  const [afterBalances, setAfterBalances] = useState<Map<string, AvailableBalance>>(new Map());
+  // True once rewards have been claimed in this flow, so the claim can never run
+  // a second time (a repeat claim only pays dust and costs another signature).
+  const [claimed, setClaimed] = useState(false);
+  const [reusedClaim, setReusedClaim] = useState(false);
+
   useEffect(() => {
-    if (open) {
-      setStage('confirm');
-      setTermsAccepted(false);
+    if (!open) return;
+    setTermsAccepted(false);
+    setError(null);
+    setRechecking(false);
+    setDeselectedIds(new Set());
+    setAfterBalances(new Map());
+
+    // A claim that already happened moments ago (dialog closed and reopened)
+    // must not be repeated — reuse its baseline and go straight to planning.
+    const recent = accountName ? recentClaimFor(accountName) : null;
+    if (recent) {
+      setStage('waiting');
       setPlan(null);
-      setError(null);
-      setClaimTxId(null);
-      setRechecking(false);
-      setBeforeBalances(new Map());
-      setDeselectedIds(new Set());
+      setClaimTxId(recent.txId);
+      setClaimed(true);
+      setReusedClaim(true);
+      setBeforeBalances(recent.before);
+      return;
     }
-  }, [open]);
+
+    setStage('confirm');
+    setPlan(null);
+    setClaimTxId(null);
+    setClaimed(false);
+    setReusedClaim(false);
+    setBeforeBalances(new Map());
+  }, [open, accountName]);
+
+
 
   const candidates = useMemo<CompoundCandidate[]>(
     () =>
@@ -200,7 +257,10 @@ export function CompoundAllDialog({
 
   const runClaimAndPlan = useCallback(async () => {
     if (!session || !accountName) return;
+    // Never claim twice in one flow.
+    if (claimed) return;
     setError(null);
+
 
     // Balances before the claim: everything here belongs to the user already and
     // must never be compounded.
@@ -221,6 +281,9 @@ export function CompoundAllDialog({
       );
       txId = result.resolved?.transaction.id?.toString() || null;
       setClaimTxId(txId);
+      setClaimed(true);
+      recordClaim(accountName, txId, before);
+
     } catch (err: any) {
       setStage('confirm');
       setError(err?.message || 'Failed to claim rewards. Nothing was compounded.');
@@ -242,13 +305,15 @@ export function CompoundAllDialog({
     }
 
     // Only the claim delta is available to compound, sized at the live pool ratio.
+    setAfterBalances(after);
     const built = planCompound(await withSlots(), buildClaimedBalances(before, after), MAX_COMPOUND_POSITIONS);
     setPlan(built);
     // Fresh claim — everything compoundable starts selected.
     setDeselectedIds(new Set());
     setStage('preview');
     onTransactionComplete?.();
-  }, [session, accountName, tokensToRead, claims, withSlots, onTransactionComplete]);
+  }, [session, accountName, claimed, tokensToRead, claims, withSlots, onTransactionComplete]);
+
 
   // Re-read balances and rebuild the plan without claiming again — recovery for
   // a balance read that failed the first time round. Still measured against the
@@ -262,12 +327,14 @@ export function CompoundAllDialog({
         readBalances(accountName, tokensToRead),
         withSlots(),
       ]);
+      setAfterBalances(after);
       const built = planCompound(
         candidatesWithSlots,
         buildClaimedBalances(beforeBalances, after),
         MAX_COMPOUND_POSITIONS,
       );
       setPlan(built);
+
       // Keep the user's unticked positions, but drop any no longer in the plan.
       const stillCompoundable = new Set(built.compoundable.map(e => e.positionId));
       setDeselectedIds(prev => new Set([...prev].filter(id => stillCompoundable.has(id))));
@@ -284,6 +351,22 @@ export function CompoundAllDialog({
     }
   }, [accountName, tokensToRead, withSlots, beforeBalances]);
 
+  // Reopened with rewards claimed moments ago: plan against that claim instead of
+  // claiming again.
+  useEffect(() => {
+    if (!open || !reusedClaim || stage !== 'waiting' || plan) return;
+    let cancelled = false;
+    (async () => {
+      await recheckBalances();
+      if (!cancelled) setStage('preview');
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, reusedClaim, stage, plan, recheckBalances]);
+
+
+
 
 
   const selectedEntries = useMemo(
@@ -296,7 +379,31 @@ export function CompoundAllDialog({
     setError(null);
     setStage('compounding');
     try {
-      const feeActions = buildCompoundFeeTotals(selectedEntries).map(fee => ({
+      // Re-size the deposits against the pool prices as they are right now. The
+      // price moves with every trade, and a plan built even a minute ago can be
+      // off the pool's current ratio, which is what the pool rejects.
+      const fresh = planCompound(
+        await withSlots(),
+        buildClaimedBalances(beforeBalances, afterBalances),
+        MAX_COMPOUND_POSITIONS,
+      );
+      const selectedIds = new Set(selectedEntries.map(e => e.positionId));
+      const entries = fresh.compoundable.filter(e => selectedIds.has(e.positionId));
+      if (entries.length === 0) {
+        setStage('preview');
+        setPlan(fresh);
+        const reasons = fresh.skipped
+          .filter(s => selectedIds.has(s.positionId))
+          .map(s => `${s.pair} #${s.positionId} — ${s.detail}`);
+        setError(
+          reasons.length > 0
+            ? `The pool prices moved, so these deposits can no longer be made: ${reasons.join('; ')}. Your rewards are safe in your wallet.`
+            : 'The pool prices moved and nothing could be deposited. Your rewards are safe in your wallet — press "Re-check balances" and try again.',
+        );
+        return;
+      }
+      setPlan(fresh);
+      const feeActions = buildCompoundFeeTotals(entries).map(fee => ({
         account: fee.contract,
         name: 'transfer',
         authorization: [{ actor: accountName, permission: 'active' }],
@@ -307,7 +414,7 @@ export function CompoundAllDialog({
           memo: COMPOUND_FEE_MEMO,
         },
       }));
-      const depositActions = selectedEntries.flatMap(entry =>
+      const depositActions = entries.flatMap(entry =>
         buildIncreaseLiquidityAction(
           accountName,
           entry.positionId,
@@ -326,9 +433,10 @@ export function CompoundAllDialog({
       const txId = result.resolved?.transaction.id?.toString() || null;
       onTransactionSuccess?.(
         'Rewards Compounded!',
-        `Added rewards back into ${selectedEntries.length} position${selectedEntries.length !== 1 ? 's' : ''}`,
+        `Added rewards back into ${entries.length} position${entries.length !== 1 ? 's' : ''}`,
         txId,
       );
+      clearRecentClaim();
       setStage('done');
       onTransactionComplete?.();
       onOpenChange(false);
@@ -336,16 +444,31 @@ export function CompoundAllDialog({
       setStage('preview');
       const raw = err?.message || 'Failed to add liquidity';
       const slippage = /slippage/i.test(raw);
+      const names = selectedEntries
+        .map(e => `${e.tokenA.symbol}/${e.tokenB.symbol} #${e.positionId}`)
+        .join(', ');
+
       setError(
         slippage
-          ? 'The pool price moved while you were signing, so the deposit was rejected. Your rewards are safe in your wallet — press "Re-check balances" and try again.'
+          ? `The pool price moved while you were signing, so the deposit was rejected (${names}). Your rewards are safe in your wallet — press "Re-check balances" and try again. If one pair keeps failing, untick it and compound the rest.`
           : `${raw} — your rewards were already claimed and are safe in your wallet. You can retry the compound step.`,
       );
     } finally {
       closeWharfkitModals();
       setTimeout(() => closeWharfkitModals(), 300);
     }
-  }, [session, accountName, selectedEntries, onTransactionSuccess, onTransactionComplete, onOpenChange]);
+  }, [
+    session,
+    accountName,
+    selectedEntries,
+    withSlots,
+    beforeBalances,
+    afterBalances,
+    onTransactionSuccess,
+    onTransactionComplete,
+    onOpenChange,
+  ]);
+
 
   const busy = stage === 'claiming' || stage === 'waiting' || stage === 'compounding';
 
@@ -422,6 +545,15 @@ export function CompoundAllDialog({
 
         {(stage === 'preview' || stage === 'compounding') && plan && (
           <div className="space-y-4">
+            {reusedClaim && (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  Using the rewards you claimed a few minutes ago — nothing was claimed again.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {plan.compoundable.length > 0 ? (
               <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                 <div className="flex items-center gap-2 px-1">

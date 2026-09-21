@@ -989,14 +989,20 @@ export function buildIncreaseLiquidityAction(
   const slippageMultiplier = 1 - tolerance;
 
   // Floor the minimums at token precision — rounding up would push the minimum
-  // above what the pool can actually use and trip the slippage assertion.
+  // above what the pool can actually use and trip the slippage assertion. The
+  // minimum is also never stricter than "one unit of precision short", so the
+  // pool's own integer rounding alone can never breach it.
   const minQuantity = (quantity: string): string => {
     const [rawAmount, symbol] = quantity.split(' ');
     const decimals = rawAmount.split('.')[1]?.length || 0;
     const factor = 10 ** decimals;
-    const floored = Math.floor(parseFloat(rawAmount) * slippageMultiplier * factor) / factor;
+    const desired = parseFloat(rawAmount);
+    const buffered = Math.floor(desired * slippageMultiplier * factor) / factor;
+    const oneUnitShort = Math.floor(desired * factor - 1) / factor;
+    const floored = Math.min(buffered, oneUnitShort);
     return `${Math.max(floored, 0).toFixed(decimals)} ${symbol}`;
   };
+
 
   const minTokenA = minQuantity(tokenAQuantity);
   const minTokenB = minQuantity(tokenBQuantity);
