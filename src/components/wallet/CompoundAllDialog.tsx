@@ -379,7 +379,32 @@ export function CompoundAllDialog({
     setError(null);
     setStage('compounding');
     try {
-      const feeActions = buildCompoundFeeTotals(selectedEntries).map(fee => ({
+      // Re-size the deposits against the pool prices as they are right now. The
+      // price moves with every trade, and a plan built even a minute ago can be
+      // off the pool's current ratio, which is what the pool rejects.
+      const fresh = planCompound(
+        await withSlots(),
+        buildClaimedBalances(beforeBalances, afterBalances),
+        MAX_COMPOUND_POSITIONS,
+      );
+      const selectedIds = new Set(selectedEntries.map(e => e.positionId));
+      const entries = fresh.compoundable.filter(e => selectedIds.has(e.positionId));
+      if (entries.length === 0) {
+        setStage('preview');
+        setPlan(fresh);
+        const reasons = fresh.skipped
+          .filter(s => selectedIds.has(s.positionId))
+          .map(s => `${s.pair} #${s.positionId} — ${s.detail}`);
+        setError(
+          reasons.length > 0
+            ? `The pool prices moved, so these deposits can no longer be made: ${reasons.join('; ')}. Your rewards are safe in your wallet.`
+            : 'The pool prices moved and nothing could be deposited. Your rewards are safe in your wallet — press "Re-check balances" and try again.',
+        );
+        return;
+      }
+      setPlan(fresh);
+      const feeActions = buildCompoundFeeTotals(entries).map(fee => ({
+
         account: fee.contract,
         name: 'transfer',
         authorization: [{ actor: accountName, permission: 'active' }],
