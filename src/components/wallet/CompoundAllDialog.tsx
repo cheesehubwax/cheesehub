@@ -51,6 +51,37 @@ type Stage = 'confirm' | 'claiming' | 'waiting' | 'preview' | 'compounding' | 'd
 
 const POLL_ATTEMPTS = 12;
 const POLL_DELAY_MS = 2000;
+/**
+ * How long a successful claim stays usable. Reopening the dialog inside this
+ * window reuses that claim instead of claiming again — a repeat claim only pays
+ * a few seconds' worth of dust and costs another signature.
+ */
+const CLAIM_REUSE_WINDOW_MS = 15 * 60 * 1000;
+
+interface RecentClaim {
+  account: string;
+  txId: string | null;
+  at: number;
+  before: Map<string, AvailableBalance>;
+}
+
+let recentClaim: RecentClaim | null = null;
+
+function recordClaim(account: string, txId: string | null, before: Map<string, AvailableBalance>) {
+  recentClaim = { account, txId, at: Date.now(), before };
+}
+
+function recentClaimFor(account: string): RecentClaim | null {
+  if (!recentClaim || recentClaim.account !== account) return null;
+  if (Date.now() - recentClaim.at > CLAIM_REUSE_WINDOW_MS) return null;
+  return recentClaim;
+}
+
+/** Forget the stored claim once its rewards have been compounded. */
+function clearRecentClaim() {
+  recentClaim = null;
+}
+
 
 function parseBalance(raw: string | undefined): AvailableBalance {
   if (!raw) return { balance: 0, precision: 8, known: true };
