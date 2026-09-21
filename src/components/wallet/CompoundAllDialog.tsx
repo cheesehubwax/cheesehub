@@ -305,13 +305,15 @@ export function CompoundAllDialog({
     }
 
     // Only the claim delta is available to compound, sized at the live pool ratio.
+    setAfterBalances(after);
     const built = planCompound(await withSlots(), buildClaimedBalances(before, after), MAX_COMPOUND_POSITIONS);
     setPlan(built);
     // Fresh claim — everything compoundable starts selected.
     setDeselectedIds(new Set());
     setStage('preview');
     onTransactionComplete?.();
-  }, [session, accountName, tokensToRead, claims, withSlots, onTransactionComplete]);
+  }, [session, accountName, claimed, tokensToRead, claims, withSlots, onTransactionComplete]);
+
 
   // Re-read balances and rebuild the plan without claiming again — recovery for
   // a balance read that failed the first time round. Still measured against the
