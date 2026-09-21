@@ -71,10 +71,12 @@ export type CompoundSkipReason =
   | 'balance-unknown'
   | 'no-balance'
   | 'dust'
+  | 'deposit-too-small'
   | 'missing-ticks'
   | 'out-of-range'
   | 'pool-price-unknown'
   | 'position-cap';
+
 
 export interface CompoundSkip {
   positionId: number;
