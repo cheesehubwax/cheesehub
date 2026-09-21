@@ -281,6 +281,9 @@ export function CompoundAllDialog({
       );
       txId = result.resolved?.transaction.id?.toString() || null;
       setClaimTxId(txId);
+      setClaimed(true);
+      recordClaim(accountName, txId, before);
+
     } catch (err: any) {
       setStage('confirm');
       setError(err?.message || 'Failed to claim rewards. Nothing was compounded.');
