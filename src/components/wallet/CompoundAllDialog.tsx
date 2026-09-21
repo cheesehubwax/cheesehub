@@ -327,12 +327,14 @@ export function CompoundAllDialog({
         readBalances(accountName, tokensToRead),
         withSlots(),
       ]);
+      setAfterBalances(after);
       const built = planCompound(
         candidatesWithSlots,
         buildClaimedBalances(beforeBalances, after),
         MAX_COMPOUND_POSITIONS,
       );
       setPlan(built);
+
       // Keep the user's unticked positions, but drop any no longer in the plan.
       const stillCompoundable = new Set(built.compoundable.map(e => e.positionId));
       setDeselectedIds(prev => new Set([...prev].filter(id => stillCompoundable.has(id))));
