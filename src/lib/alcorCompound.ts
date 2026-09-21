@@ -105,12 +105,14 @@ export const COMPOUND_SLIPPAGE_TOLERANCE = 0.03;
 export const COMPOUND_FEE_MEMO = 'compound fee';
 
 /**
- * Smallest deposit, in raw units of a token's own precision, that can survive
- * the pool's integer rounding. The pool can come up to a couple of raw units
- * short on either side; below this threshold that shortfall exceeds the
- * slippage buffer and the pool rejects the whole transaction.
+ * Smallest deposit, in raw units of a token's own precision, that the pool can
+ * accept. One unit is the real floor: the minimum we send with the deposit is
+ * relaxed by a fixed couple of raw units (see `buildIncreaseLiquidityAction`),
+ * so the pool's integer rounding cannot reject tiny-but-valid amounts. Alcor
+ * itself accepts deposits this small.
  */
-export const MIN_DEPOSIT_RAW_UNITS = Math.ceil(2 / COMPOUND_SLIPPAGE_TOLERANCE);
+export const MIN_DEPOSIT_RAW_UNITS = 1;
+
 
 
 export function balanceKey(contract: string, symbol: string): string {
