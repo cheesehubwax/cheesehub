@@ -446,10 +446,10 @@ export function planCompound(
       continue;
     }
 
-    // The pool recomputes both amounts with integer maths and can end up a
-    // single unit of precision short on either side. On a deposit of only a few
-    // units that single unit is a larger share than the slippage buffer allows,
-    // so the pool would reject the whole transaction. Skip those instead.
+    // A side that rounds away to nothing at its own precision cannot be
+    // deposited at all. Everything above one raw unit is compounded — the
+    // deposit minimum carries a fixed raw-unit allowance for the pool's
+    // integer rounding, so small amounts no longer need to be skipped.
     const rawUnitsA = Math.round(depositA * 10 ** balA.precision);
     const rawUnitsB = Math.round(depositB * 10 ** balB.precision);
     if (rawUnitsA < MIN_DEPOSIT_RAW_UNITS || rawUnitsB < MIN_DEPOSIT_RAW_UNITS) {
@@ -458,10 +458,11 @@ export function planCompound(
         positionId: candidate.positionId,
         pair,
         reason: 'deposit-too-small',
-        detail: `Only ${smallSymbol} dust was claimed for this pair — too small for the pool to accept, so it was left in your wallet.`,
+        detail: `The claimed ${smallSymbol} rounds away to nothing at this pool's ratio, so it was left in your wallet.`,
       });
       continue;
     }
+
 
 
     balA.balance = floorTo(balA.balance - grossA, balA.precision);
