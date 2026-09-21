@@ -444,7 +444,10 @@ export function CompoundAllDialog({
       setStage('preview');
       const raw = err?.message || 'Failed to add liquidity';
       const slippage = /slippage/i.test(raw);
-      const names = selectedEntries.map(e => `${e.pair} #${e.positionId}`).join(', ');
+      const names = selectedEntries
+        .map(e => `${e.tokenA.symbol}/${e.tokenB.symbol} #${e.positionId}`)
+        .join(', ');
+
       setError(
         slippage
           ? `The pool price moved while you were signing, so the deposit was rejected (${names}). Your rewards are safe in your wallet — press "Re-check balances" and try again. If one pair keeps failing, untick it and compound the rest.`
