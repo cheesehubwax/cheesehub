@@ -576,11 +576,11 @@ describe('deposit minimums', () => {
       0.005,
     );
     const add: any = actions[actions.length - 1];
-    // 0.03 * 0.995 = 0.02985 → floors to 0.02, never 0.03.
-    expect(add.data.tokenAMin).toBe('0.02 CHEESE');
+    // 3 raw units, allowance 2 raw units → 1 raw unit, never above 0.03.
+    expect(add.data.tokenAMin).toBe('0.01 CHEESE');
   });
 
-  it('never demands more than one unit of precision short, so pool rounding alone cannot reject it', () => {
+  it('never demands more than two raw units short, so pool rounding alone cannot reject it', () => {
     const actions = buildIncreaseLiquidityAction(
       'alice',
       1,
@@ -594,14 +594,32 @@ describe('deposit minimums', () => {
       0, // zero tolerance would otherwise demand the exact amount
     );
     const add: any = actions[actions.length - 1];
-    expect(add.data.tokenAMin).toBe('999.99999999 CHEESE');
-    expect(add.data.tokenBMin).toBe('99.999999 WAXUSDC');
+    expect(add.data.tokenAMin).toBe('999.99999998 CHEESE');
+    expect(add.data.tokenBMin).toBe('99.999998 WAXUSDC');
+  });
+
+  it('lets a 68-raw-unit deposit through with room for pool rounding', () => {
+    const actions = buildIncreaseLiquidityAction(
+      'alice',
+      1,
+      10,
+      -100,
+      100,
+      CHEESE.contract,
+      '0.00000068 WAXWBTC',
+      USDC.contract,
+      '2.28740000 CHEESE',
+      COMPOUND_SLIPPAGE_TOLERANCE,
+    );
+    const add: any = actions[actions.length - 1];
+    // 68 raw units, 3% = 3 raw units → 65 raw units.
+    expect(add.data.tokenAMin).toBe('0.00000065 WAXWBTC');
   });
 });
 
 describe('minimum viable deposit', () => {
-  it('skips a pair whose smaller side is only a few raw units', () => {
-    // 22 raw units of an 8-decimal token — the size that Alcor rejected on chain.
+  it('compounds a pair whose smaller side is only a few raw units', () => {
+    // 22-ish raw units of an 8-decimal token — Alcor accepts deposits this small.
     const c = candidate({
       positionId: 120690,
       tokenA: { ...CHEESE, amount: 2889.1986 },
@@ -615,10 +633,48 @@ describe('minimum viable deposit', () => {
         [balanceKey(USDC.contract, USDC.symbol), { balance: 0.00000023, precision: 8, known: true }],
       ]),
     );
-    expect(plan.compoundable).toHaveLength(0);
-    expect(plan.skipped[0].reason).toBe('deposit-too-small');
-    expect(plan.skipped[0].positionId).toBe(120690);
+    expect(plan.skipped).toHaveLength(0);
+    expect(plan.compoundable).toHaveLength(1);
+    expect(plan.compoundable[0].tokenB.amount).toBeGreaterThan(0);
   });
+
+  it('compounds a 0.00000068 claim of an 8-decimal token', () => {
+    const c = candidate({
+      positionId: 120690,
+      tokenA: { ...CHEESE, amount: 2889.1986 },
+      tokenB: { ...USDC, amount: 0.00029059 },
+      slot: slotForRatio(0.0000001, -100, 100, 8, 8),
+    });
+    const plan = planCompound(
+      [c],
+      balances([
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 100, precision: 8, known: true }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 0.00000068, precision: 8, known: true }],
+      ]),
+    );
+    expect(plan.skipped).toHaveLength(0);
+    expect(plan.compoundable).toHaveLength(1);
+    const raw = Math.round(plan.compoundable[0].tokenB.amount * 1e8);
+    expect(raw).toBeGreaterThanOrEqual(1);
+    expect(raw).toBeLessThanOrEqual(68);
+  });
+
+  it('skips only when a side rounds away to nothing', () => {
+    const c = candidate({
+      positionId: 7,
+      slot: slotForRatio(0.1, -100, 100, 8, 6),
+    });
+    const plan = planCompound(
+      [c],
+      balances([
+        [balanceKey(CHEESE.contract, CHEESE.symbol), { balance: 0.00000005, precision: 8, known: true }],
+        [balanceKey(USDC.contract, USDC.symbol), { balance: 5, precision: 6, known: true }],
+      ]),
+    );
+    expect(plan.compoundable).toHaveLength(0);
+    expect(plan.skipped[0].reason).toBe('dust');
+  });
+
 
   it('keeps token A exactly on the pool ratio of the rounded token B amount', () => {
     const ratio = 0.1;
