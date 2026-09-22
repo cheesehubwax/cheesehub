@@ -29,6 +29,12 @@ export interface NullBreakdownEntry {
   percent7d: number;
   amount30d: number;
   percent30d: number;
+  /** Amount per day over the span actually tracked inside the 24h window. */
+  avg24h: number;
+  /** Amount per week over the span actually tracked inside the 7d window. */
+  avg7d: number;
+  /** Amount per month over the span actually tracked inside the 30d window. */
+  avg30d: number;
 }
 
 export interface NullBreakdownResult {
@@ -119,13 +125,26 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
   const powerActions = powerHistoryResult?.actions ?? [];
 
   const now = Date.now();
+  const DAY_MS = 24 * 60 * 60 * 1000;
   const cutoffs = {
-    day: now - 24 * 60 * 60 * 1000,
-    week: now - 7 * 24 * 60 * 60 * 1000,
-    month: now - 30 * 24 * 60 * 60 * 1000,
+    day: now - DAY_MS,
+    week: now - 7 * DAY_MS,
+    month: now - 30 * DAY_MS,
   };
-  const totals = new Map<string, { all: number; day: number; week: number; month: number }>();
-  for (const account of contractAccounts) totals.set(account, { all: 0, day: 0, week: 0, month: 0 });
+  interface ContractTotals {
+    all: number;
+    day: number;
+    week: number;
+    month: number;
+    /** Oldest record seen inside each window; Infinity when none yet. */
+    firstDay: number;
+    firstWeek: number;
+    firstMonth: number;
+  }
+  const totals = new Map<string, ContractTotals>();
+  for (const account of contractAccounts) {
+    totals.set(account, { all: 0, day: 0, week: 0, month: 0, firstDay: Infinity, firstWeek: Infinity, firstMonth: Infinity });
+  }
 
   const addActions = (actions: typeof nullActions, accountFor: (data: Record<string, unknown>) => string | null) => {
     for (const action of actions) {
@@ -138,9 +157,18 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
       if (!row) continue;
       row.all += quantity;
       const time = timestampMs(action);
-      if (time >= cutoffs.month) row.month += quantity;
-      if (time >= cutoffs.week) row.week += quantity;
-      if (time >= cutoffs.day) row.day += quantity;
+      if (time >= cutoffs.month) {
+        row.month += quantity;
+        if (time < row.firstMonth) row.firstMonth = time;
+      }
+      if (time >= cutoffs.week) {
+        row.week += quantity;
+        if (time < row.firstWeek) row.firstWeek = time;
+      }
+      if (time >= cutoffs.day) {
+        row.day += quantity;
+        if (time < row.firstDay) row.firstDay = time;
+      }
     }
   };
 
@@ -156,8 +184,22 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
   const burnerAuthoritative = burnerStats?.total_cheese_burned
     ? parseAssetAmount(burnerStats.total_cheese_burned)
     : null;
+  // Average per period unit over the span actually tracked: a contract whose
+  // records only reach back part of a window is divided by its real span, not
+  // the full window. Caps keep a brand-new contract from being divided by a
+  // fraction smaller than its first moments — we never go below one hour of
+  // span, and never above the window itself.
+  const MIN_SPAN_MS = 60 * 60 * 1000;
+  const trackedSpan = (first: number, cutoff: number, windowMs: number): number => {
+    if (!Number.isFinite(first) || first === 0) return windowMs;
+    return Math.min(windowMs, Math.max(now - Math.max(cutoff, first), MIN_SPAN_MS));
+  };
+
   const results = NULL_CONTRACTS.map(({ account, displayName }) => {
-    const values = totals.get(account) ?? { all: 0, day: 0, week: 0, month: 0 };
+    const values = totals.get(account) ?? { all: 0, day: 0, week: 0, month: 0, firstDay: Infinity, firstWeek: Infinity, firstMonth: Infinity };
+    const avg24h = values.day > 0 ? values.day / (trackedSpan(values.firstDay, cutoffs.day, DAY_MS) / DAY_MS) : 0;
+    const avg7d = values.week > 0 ? values.week / (trackedSpan(values.firstWeek, cutoffs.week, 7 * DAY_MS) / (7 * DAY_MS)) : 0;
+    const avg30d = values.month > 0 ? values.month / (trackedSpan(values.firstMonth, cutoffs.month, 30 * DAY_MS) / (30 * DAY_MS)) : 0;
     const amount = account === 'cheeseburner' && burnerAuthoritative !== null
       ? burnerAuthoritative
       : account === 'cheesepowerz'
@@ -170,6 +212,9 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
       amount24h: values.day,
       amount7d: values.week,
       amount30d: values.month,
+      avg24h,
+      avg7d,
+      avg30d,
     };
   });
 
