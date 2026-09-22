@@ -255,7 +255,7 @@ export function TokenStatsBanner() {
                             {entry.percent24h.toFixed(1)}%
                           </TableCell>
                           <TableCell className="py-2 text-xs text-right text-muted-foreground whitespace-nowrap">
-                            {formatFullNumber(entry.avg24h)} <span className="text-cheese">CHEESE</span>
+                            {entry.avg24h !== null ? (<>{formatFullNumber(entry.avg24h)} <span className="text-cheese">CHEESE</span></>) : '—'}
                           </TableCell>
                           <TableCell className="py-2 text-xs text-right whitespace-nowrap">
                             {formatFullNumber(entry.amount7d)} <span className="text-cheese">CHEESE</span>
@@ -264,7 +264,7 @@ export function TokenStatsBanner() {
                             {entry.percent7d.toFixed(1)}%
                           </TableCell>
                           <TableCell className="py-2 text-xs text-right text-muted-foreground whitespace-nowrap">
-                            {formatFullNumber(entry.avg7d)} <span className="text-cheese">CHEESE</span>
+                            {entry.avg7d !== null ? (<>{formatFullNumber(entry.avg7d)} <span className="text-cheese">CHEESE</span></>) : '—'}
                           </TableCell>
                           <TableCell className="py-2 text-xs text-right whitespace-nowrap">
                             {formatFullNumber(entry.amount30d)} <span className="text-cheese">CHEESE</span>
@@ -273,7 +273,7 @@ export function TokenStatsBanner() {
                             {entry.percent30d.toFixed(1)}%
                           </TableCell>
                           <TableCell className="py-2 text-xs text-right text-muted-foreground whitespace-nowrap">
-                            {formatFullNumber(entry.avg30d)} <span className="text-cheese">CHEESE</span>
+                            {entry.avg30d !== null ? (<>{formatFullNumber(entry.avg30d)} <span className="text-cheese">CHEESE</span></>) : '—'}
                           </TableCell>
                           <TableCell className="py-2 text-xs text-right whitespace-nowrap">
                             {formatFullNumber(entry.amount)} <span className="text-cheese">CHEESE</span>
