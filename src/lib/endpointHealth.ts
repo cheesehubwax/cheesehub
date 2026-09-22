@@ -23,32 +23,41 @@ export type EndpointFeature =
 /** Hosts confirmed dead — never queued, no matter which list names them. */
 export const DEAD_ENDPOINTS = ['https://wax.pink.gg', 'https://wax.blokcrafters.io'];
 
-/** Built-in fallback order, used until (or instead of) a health read. */
+/**
+ * Built-in fallback order, used until (or instead of) a health read.
+ *
+ * PROVEN HOSTS FIRST. Live health decides the order WITHIN this list and drops
+ * hosts reported down, but it must never promote a host we have not served real
+ * browser traffic from: wax.hivebp.io is ranked healthiest by the monitor and
+ * still answers "Failed to fetch" in some visitors' browsers, and leading with
+ * it blanked every stat on the site (2026-09-22). Newly discovered hosts sit at
+ * the back of each list as extra cover only.
+ */
 export const STATIC_ENDPOINTS: Record<EndpointFeature, string[]> = {
   'chain-api': [
-    'https://wax.hivebp.io',
-    'https://api.wax.alohaeos.com',
-    'https://wax.api.eosnation.io',
-    'https://wax.greymass.com',
     'https://wax.eosusa.io',
     'https://api.waxsweden.org',
+    'https://wax.greymass.com',
+    'https://wax.cryptolions.io',
+    'https://wax.eosdac.io',
+    'https://api.wax.alohaeos.com',
     'https://wax.eosphere.io',
+    'https://wax.hivebp.io',
   ],
   'hyperion-v2': [
-    'https://wax.hivebp.io',
-    'https://hyperion7.sentnl.io',
-    'https://wax.cryptolions.io',
-    'https://wax.eosphere.io',
-    'https://api.waxsweden.org',
-    'https://wax.eosdac.io',
     'https://wax.eosusa.io',
+    'https://wax.cryptolions.io',
+    'https://api.waxsweden.org',
+    'https://wax.eosphere.io',
+    'https://wax.eosdac.io',
+    'https://wax.hivebp.io',
   ],
   'history-v1': [
-    'https://wax.hivebp.io',
     'https://api.waxsweden.org',
-    'https://wax.eosphere.io',
-    'https://wax.cryptolions.io',
     'https://wax.eosusa.io',
+    'https://wax.cryptolions.io',
+    'https://wax.eosphere.io',
+    'https://wax.hivebp.io',
   ],
   'atomic-assets-api': [
     'https://wax.api.atomicassets.io',
