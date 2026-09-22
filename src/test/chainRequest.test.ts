@@ -99,7 +99,7 @@ describe('hedgedJson', () => {
   it('sends no body or content type on a GET', async () => {
     const { impl } = stubFetch({});
     await hedgedJson('/v2/state/get_tokens?account=bob', { fallback: HOSTS, method: 'GET' });
-    const init = impl.mock.calls[0][1] as RequestInit;
+    const init = chainCall(impl)[1] as RequestInit;
     expect(init.body).toBeUndefined();
     expect(init.headers).toBeUndefined();
   });
