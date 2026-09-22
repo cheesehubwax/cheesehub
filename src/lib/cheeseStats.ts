@@ -1,12 +1,9 @@
 // CHEESE Token Stats Fetching Utilities
 import { CHEESE_CONFIG, WAX_CHAIN } from './waxConfig';
-import { resolveEndpoints } from './endpointHealth';
+import { chainPost } from './chainRequest';
 
 // Use centralized WAX API endpoints for fallback
 const WAX_API_FALLBACK = WAX_CHAIN.rpcUrls;
-
-/** Health-ordered chain hosts, falling back to the static list. */
-const waxEndpoints = () => resolveEndpoints('chain-api', WAX_API_FALLBACK);
 
 // WaxDAO locker contract
 const WAXDAO_LOCKER = 'waxdaolocker';
