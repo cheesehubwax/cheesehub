@@ -1,20 +1,26 @@
 // WAX RPC API fallback utility for reliability
-// Automatically retries requests across multiple endpoints
+// Automatically retries requests across multiple endpoints.
+//
+// The order is decided at read time by src/lib/endpointHealth.ts (HerdCheck),
+// so a node that is currently down is never queued ahead of a healthy one.
+// The lists below are the offline fallback order.
+
+import { resolveEndpoints } from "./endpointHealth";
 
 // Hyperion endpoints for get_tokens (faster for balance queries)
 const HYPERION_ENDPOINTS = [
-  "https://wax.eosusa.io",
+  "https://wax.hivebp.io",
   "https://api.wax.alohaeos.com",
   "https://wax.eosphere.io",
-  "https://wax.pink.gg",
+  "https://wax.eosusa.io",
 ];
 
 export const WAX_RPC_ENDPOINTS = [
-  "https://wax.eosusa.io",
+  "https://wax.hivebp.io",
   "https://api.wax.alohaeos.com",
-  "https://wax.eosphere.io",
-  "https://wax.pink.gg",
+  "https://wax.eosusa.io",
   "https://api.waxsweden.org",
+  "https://wax.eosphere.io",
   "https://wax.greymass.com",
 ];
 
