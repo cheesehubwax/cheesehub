@@ -212,6 +212,9 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
       amount24h: values.day,
       amount7d: values.week,
       amount30d: values.month,
+      avg24h,
+      avg7d,
+      avg30d,
     };
   });
 
