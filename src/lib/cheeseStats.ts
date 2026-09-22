@@ -43,33 +43,28 @@ export interface CheeseStats {
   nextUnlock: NextUnlock | null;
 }
 
+/** One hedged table read against the health-ordered chain hosts. */
+const readRows = <T>(body: Record<string, unknown>) =>
+  chainPost<{ rows: T[]; more?: boolean }>('/v1/chain/get_table_rows', body, {
+    feature: 'chain-api',
+    fallback: WAX_API_FALLBACK,
+  });
+
 // Fetch token stats from the stat table
 async function fetchTokenStats(): Promise<TokenStat | null> {
-  for (const endpoint of await waxEndpoints()) {
-    try {
-      const response = await fetch(`${endpoint}/v1/chain/get_table_rows`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code: CHEESE_CONFIG.tokenContract,
-          scope: CHEESE_CONFIG.tokenSymbol,
-          table: 'stat',
-          json: true,
-          limit: 1,
-        }),
-      });
-
-      if (!response.ok) continue;
-
-      const data = await response.json();
-      if (data.rows && data.rows.length > 0) {
-        return data.rows[0] as TokenStat;
-      }
-    } catch (error) {
-      console.warn(`Failed to fetch token stats from ${endpoint}:`, error);
-    }
+  try {
+    const data = await readRows<TokenStat>({
+      code: CHEESE_CONFIG.tokenContract,
+      scope: CHEESE_CONFIG.tokenSymbol,
+      table: 'stat',
+      json: true,
+      limit: 1,
+    });
+    return data.rows?.[0] ?? null;
+  } catch (error) {
+    console.warn('Failed to fetch token stats:', error);
+    return null;
   }
-  return null;
 }
 
 // Parse token amount string (e.g., "888888888888.0000 CHEESE") to number
