@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { resolveEndpoints } from "@/lib/endpointHealth";
 
 export interface PowerupStats {
   totalPowerups: number;
@@ -13,10 +14,12 @@ interface UsePowerupStatsResult {
   refetch: () => void;
 }
 
-const WAX_ENDPOINTS = [
-  "https://wax.eosusa.io/v1/chain/get_table_rows",
-  "https://api.waxsweden.org/v1/chain/get_table_rows",
-  "https://wax.greymass.com/v1/chain/get_table_rows",
+const WAX_FALLBACK = [
+  "https://wax.hivebp.io",
+  "https://api.wax.alohaeos.com",
+  "https://wax.eosusa.io",
+  "https://api.waxsweden.org",
+  "https://wax.greymass.com",
 ];
 
 const parseAsset = (assetStr: string): number => {
@@ -34,9 +37,9 @@ export const usePowerupStats = (): UsePowerupStatsResult => {
     setIsLoading(true);
     setError(null);
 
-    for (const endpoint of WAX_ENDPOINTS) {
+    for (const base of await resolveEndpoints("chain-api", WAX_FALLBACK)) {
       try {
-        const response = await fetch(endpoint, {
+        const response = await fetch(`${base}/v1/chain/get_table_rows`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -67,7 +70,7 @@ export const usePowerupStats = (): UsePowerupStatsResult => {
           return;
         }
       } catch (err) {
-        console.error(`Failed to fetch from ${endpoint}:`, err);
+        console.error(`Failed to fetch from ${base}:`, err);
         continue;
       }
     }

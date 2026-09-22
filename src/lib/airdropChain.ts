@@ -6,6 +6,7 @@
 
 import { CHEESE_CONTRACT, CHEESE_RAM_CONTRACT, CHEESE_SYMBOL } from "./airdropCheese";
 import type { ResourcePricing } from "./airdropResources";
+import { resolveEndpoints } from "./endpointHealth";
 
 /**
  * Chain RPC endpoints. Every host here answers browser CORS preflights —
@@ -60,11 +61,11 @@ async function fetchJson(
 
 /** Try each endpoint in order until one succeeds. Returns [result, endpointUsed]. */
 async function withFailover<T>(
-  endpoints: string[],
+  endpoints: string[] | Promise<string[]>,
   fn: (base: string) => Promise<T>,
 ): Promise<[T, string]> {
   let lastError: unknown = new Error("No endpoints configured");
-  for (const base of endpoints) {
+  for (const base of await endpoints) {
     try {
       return [await fn(base), base];
     } catch (err) {
@@ -75,7 +76,7 @@ async function withFailover<T>(
 }
 
 async function chainPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
-  const [result] = await withFailover(CHAIN_ENDPOINTS, (base) =>
+  const [result] = await withFailover(resolveEndpoints("chain-api", CHAIN_ENDPOINTS), (base) =>
     fetchJson(`${base}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -276,7 +277,7 @@ export async function getNftHolders(
   schema?: string,
   templateId?: number,
 ): Promise<HolderSnapshot> {
-  const [holders] = await withFailover(ATOMIC_ENDPOINTS, async (base) => {
+  const [holders] = await withFailover(resolveEndpoints("atomic-assets-api", ATOMIC_ENDPOINTS), async (base) => {
     const out: Holder[] = [];
     for (let page = 1; ; page++) {
       const params = new URLSearchParams({
@@ -360,7 +361,7 @@ interface AaAssetsResponse {
 
 /** Collections the account owns NFTs from, most assets first. */
 export async function getInventoryCollections(account: string): Promise<InventoryCollection[]> {
-  const [collections] = await withFailover(ATOMIC_ENDPOINTS, async (base) => {
+  const [collections] = await withFailover(resolveEndpoints("atomic-assets-api", ATOMIC_ENDPOINTS), async (base) => {
     const data = (await fetchJson(
       `${base}/atomicassets/v1/accounts/${account}`,
       undefined,
@@ -384,7 +385,7 @@ export async function getInventoryTemplates(
   account: string,
   collection: string,
 ): Promise<InventoryTemplate[]> {
-  const [templates] = await withFailover(ATOMIC_ENDPOINTS, async (base) => {
+  const [templates] = await withFailover(resolveEndpoints("atomic-assets-api", ATOMIC_ENDPOINTS), async (base) => {
     const detail = (await fetchJson(
       `${base}/atomicassets/v1/accounts/${account}/${collection}`,
       undefined,
@@ -459,7 +460,7 @@ export async function getInventoryAssets(
   collection: string,
   templateId: number,
 ): Promise<{ assetIds: string[]; truncated: boolean }> {
-  const [assetIds] = await withFailover(ATOMIC_ENDPOINTS, async (base) => {
+  const [assetIds] = await withFailover(resolveEndpoints("atomic-assets-api", ATOMIC_ENDPOINTS), async (base) => {
     const out: string[] = [];
     for (let page = 1; ; page++) {
       const params = new URLSearchParams({
@@ -546,7 +547,7 @@ interface HyperionTokensResponse {
 
 export async function getWalletTokens(account: string): Promise<WalletToken[]> {
   try {
-    const [tokens] = await withFailover(HYPERION_ENDPOINTS, async (base) => {
+    const [tokens] = await withFailover(resolveEndpoints("hyperion-v2", HYPERION_ENDPOINTS), async (base) => {
       const data = (await fetchJson(
         `${base}/v2/state/get_tokens?account=${encodeURIComponent(account)}&limit=500`,
       )) as HyperionTokensResponse;

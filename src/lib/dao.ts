@@ -4,6 +4,7 @@
 import { getTokenConfig } from "@/lib/tokenRegistry";
 import { fetchWithFallback } from "@/lib/fetchWithFallback";
 import { fetchActionsUnion } from "@/lib/hyperionHistory";
+import { resolveEndpoints } from './endpointHealth';
 
 export const DAO_CONTRACT = "dao.waxdao";
 
@@ -1218,7 +1219,7 @@ const ATOMIC_API_ENDPOINTS = [
 
 async function fetchFromAtomicAPI(path: string): Promise<Response> {
   let lastError: Error | null = null;
-  for (const baseUrl of ATOMIC_API_ENDPOINTS) {
+  for (const baseUrl of await resolveEndpoints('atomic-assets-api', ATOMIC_API_ENDPOINTS)) {
     try {
       const response = await fetch(`${baseUrl}${path}`);
       if (response.ok) return response;

@@ -1,8 +1,12 @@
 // CHEESE Token Stats Fetching Utilities
 import { CHEESE_CONFIG, WAX_CHAIN } from './waxConfig';
+import { resolveEndpoints } from './endpointHealth';
 
 // Use centralized WAX API endpoints for fallback
-const WAX_API_ENDPOINTS = WAX_CHAIN.rpcUrls;
+const WAX_API_FALLBACK = WAX_CHAIN.rpcUrls;
+
+/** Health-ordered chain hosts, falling back to the static list. */
+const waxEndpoints = () => resolveEndpoints('chain-api', WAX_API_FALLBACK);
 
 // WaxDAO locker contract
 const WAXDAO_LOCKER = 'waxdaolocker';
@@ -44,7 +48,7 @@ export interface CheeseStats {
 
 // Fetch token stats from the stat table
 async function fetchTokenStats(): Promise<TokenStat | null> {
-  for (const endpoint of WAX_API_ENDPOINTS) {
+  for (const endpoint of await waxEndpoints()) {
     try {
       const response = await fetch(`${endpoint}/v1/chain/get_table_rows`, {
         method: 'POST',
@@ -82,7 +86,7 @@ function parseTokenAmount(amountStr: string): number {
 async function fetchLockedCheese(): Promise<{ lockedAmount: number; nextUnlock: NextUnlock | null }> {
   const now = Math.floor(Date.now() / 1000);
 
-  for (const endpoint of WAX_API_ENDPOINTS) {
+  for (const endpoint of await waxEndpoints()) {
     try {
       let lockedAmount = 0;
       let nextUnlock: NextUnlock | null = null;
@@ -149,7 +153,7 @@ async function fetchLockedCheese(): Promise<{ lockedAmount: number; nextUnlock: 
 
 // Fetch CHEESE balance of eosio.null account
 async function fetchNulledBalance(): Promise<number> {
-  for (const endpoint of WAX_API_ENDPOINTS) {
+  for (const endpoint of await waxEndpoints()) {
     try {
       const response = await fetch(`${endpoint}/v1/chain/get_currency_balance`, {
         method: 'POST',

@@ -7,10 +7,14 @@
 // of several providers, de-duplicated by on-chain action identity: a thin
 // provider can then only ever add rows, never remove them.
 
+import { resolveEndpoints } from './endpointHealth';
+
+/** Offline fallback order; live ordering comes from the health resolver. */
 export const DEFAULT_HYPERION_ENDPOINTS = [
-  'https://wax.cryptolions.io',
   'https://wax.hivebp.io',
+  'https://wax.cryptolions.io',
   'https://wax.eosphere.io',
+  'https://api.waxsweden.org',
 ];
 
 export interface HyperionActionRecord {
@@ -118,7 +122,7 @@ export async function fetchActionsUnion(
   options: ActionsUnionOptions = {},
 ): Promise<ActionsUnion> {
   const {
-    endpoints = DEFAULT_HYPERION_ENDPOINTS,
+    endpoints = await resolveEndpoints('hyperion-v2', DEFAULT_HYPERION_ENDPOINTS),
     batchSize = 1000,
     maxActions = 50000,
     timeoutMs = 20000,

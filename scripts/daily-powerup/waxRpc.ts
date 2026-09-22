@@ -1,6 +1,10 @@
 // Multi-endpoint WAX RPC helpers. Mirrors src/lib/wax.ts.
 
+import { applyHealthOrder } from "../shared/herdcheck";
+
+/** Offline fallback order; reordered in place by HerdCheck at start-up. */
 export const ENDPOINTS = [
+  "https://wax.hivebp.io",
   "https://api.wax.alohaeos.com",
   "https://wax.greymass.com",
   "https://wax.eosphere.io",
@@ -9,11 +13,19 @@ export const ENDPOINTS = [
 
 /** Hyperion v2 endpoints, used for transfer-history lookups. */
 export const HYPERION_ENDPOINTS = [
+  "https://wax.hivebp.io",
   "https://wax.eosphere.io",
-  "https://wax.greymass.com",
   "https://api.waxsweden.org",
   "https://wax.cryptolions.io",
 ];
+
+/** Put the currently healthy hosts first. Safe to call more than once. */
+export async function primeEndpointOrder(): Promise<void> {
+  await Promise.all([
+    applyHealthOrder(ENDPOINTS, "chain-api"),
+    applyHealthOrder(HYPERION_ENDPOINTS, "hyperion-v2"),
+  ]);
+}
 
 const TIMEOUT_MS = 8000;
 

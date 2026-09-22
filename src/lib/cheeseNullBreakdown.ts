@@ -10,14 +10,17 @@
 
 import { fetchContractStats, parseAssetAmount } from './cheeseNullApi';
 import { fetchActionsUnion, sumAssetField } from './hyperionHistory';
+import { resolveEndpoints } from './endpointHealth';
 
 const BATCH_SIZE = 1000;
 const MAX_ACTIONS = 50000;
 
-const WAX_RPC_ENDPOINTS = [
-  'https://wax.eosusa.io/v1/chain/get_table_rows',
-  'https://api.waxsweden.org/v1/chain/get_table_rows',
-  'https://wax.greymass.com/v1/chain/get_table_rows',
+const WAX_RPC_FALLBACK = [
+  'https://wax.hivebp.io',
+  'https://api.wax.alohaeos.com',
+  'https://wax.eosusa.io',
+  'https://api.waxsweden.org',
+  'https://wax.greymass.com',
 ];
 
 export interface NullBreakdownEntry {
@@ -52,9 +55,9 @@ interface CoverageTracker {
 
 // cheesepowerz stores its own stats on-chain (authoritative)
 async function fetchCheesepowerzNulled(): Promise<number | null> {
-  for (const endpoint of WAX_RPC_ENDPOINTS) {
+  for (const base of await resolveEndpoints('chain-api', WAX_RPC_FALLBACK)) {
     try {
-      const response = await fetch(endpoint, {
+      const response = await fetch(`${base}/v1/chain/get_table_rows`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

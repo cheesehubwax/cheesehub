@@ -2,12 +2,13 @@
 export const WAX_CHAIN = {
   id: '1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4',
   url: 'https://wax.greymass.com',
-  // Multiple RPC endpoints for fallback - alohaeos first as greymass is often rate-limited
+  // Fallback RPC order. Live ordering comes from src/lib/endpointHealth.ts;
+  // this list is only used before/without a health read.
   rpcUrls: [
+    'https://wax.hivebp.io',
     'https://api.wax.alohaeos.com',
     'https://wax.eosphere.io',
     'https://wax.greymass.com',
-    'https://wax.pink.gg',
   ],
 };
 

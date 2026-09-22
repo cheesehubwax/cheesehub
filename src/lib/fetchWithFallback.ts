@@ -1,14 +1,31 @@
-// Fallback fetch utility for AtomicAssets API reliability
+// Fallback fetch utility for chain / AtomicAssets API reliability.
+//
+// The endpoint order is decided at read time by src/lib/endpointHealth.ts
+// (HerdCheck's live node health), with the caller's own list kept as the
+// offline fallback, so a dead node is never queued ahead of a healthy one.
+
+import { resolveEndpoints, type EndpointFeature } from './endpointHealth';
+
+/** Guess which HerdCheck feature a request path belongs to. */
+export function featureForPath(path: string): EndpointFeature {
+  if (path.startsWith('/v2/history') || path.startsWith('/v2/state')) return 'hyperion-v2';
+  if (path.startsWith('/atomicassets') || path.startsWith('/atomicmarket')) {
+    return 'atomic-assets-api';
+  }
+  return 'chain-api';
+}
 
 export async function fetchWithFallback(
   endpoints: string[],
   path: string,
   options?: RequestInit,
-  timeout: number = 8000
+  timeout: number = 8000,
+  feature: EndpointFeature = featureForPath(path)
 ): Promise<Response> {
   let lastError: Error | null = null;
+  const ordered = await resolveEndpoints(feature, endpoints);
 
-  for (const baseUrl of endpoints) {
+  for (const baseUrl of ordered) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);

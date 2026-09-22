@@ -23,6 +23,7 @@ import {
   type LpVenue,
   type TrackedPair,
 } from './lpPools';
+import { resolveEndpoints } from './endpointHealth';
 
 /** Chain RPC hosts that answer browser CORS preflights for POST /v1/chain/*. */
 const CHAIN_ENDPOINTS = [
@@ -64,9 +65,12 @@ async function fetchJson<T>(url: string, init?: RequestInit, timeoutMs = TIMEOUT
   }
 }
 
-async function withFailover<T>(endpoints: string[], fn: (base: string) => Promise<T>): Promise<T> {
+async function withFailover<T>(
+  endpoints: string[] | Promise<string[]>,
+  fn: (base: string) => Promise<T>,
+): Promise<T> {
   let lastError: unknown = new Error('No endpoints configured');
-  for (const base of endpoints) {
+  for (const base of await endpoints) {
     try {
       return await fn(base);
     } catch (error) {
@@ -83,7 +87,7 @@ interface TableRowsResponse<T> {
 }
 
 async function chainPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
-  return withFailover(CHAIN_ENDPOINTS, (base) =>
+  return withFailover(resolveEndpoints('chain-api', CHAIN_ENDPOINTS), (base) =>
     fetchJson<T>(`${base}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -507,7 +511,7 @@ export async function fetchTacoPairVolume(
     const query =
       `?account=${TACO_CONTRACT}&act.name=exchangelog&sort=desc&limit=${TACO_VOLUME_PAGE}` +
       `&after=${since}${before ? `&before=${before}` : ''}`;
-    const data = await withFailover(HYPERION_ENDPOINTS, (base) =>
+    const data = await withFailover(resolveEndpoints('hyperion-v2', HYPERION_ENDPOINTS), (base) =>
       fetchJson<{ actions?: TacoExchangeLog[] }>(
         `${base.replace(/\/$/, '')}/v2/history/get_actions${query}`,
         undefined,

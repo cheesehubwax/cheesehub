@@ -1,5 +1,6 @@
 import { ATOMIC_API, CHEESE_CONFIG, NFTHIVE_CONFIG } from '@/lib/waxConfig';
 import { fetchWithFallback } from '@/lib/fetchWithFallback';
+import { resolveEndpoints } from '@/lib/endpointHealth';
 import { fetchActionsUnion, sumAssetField } from '@/lib/hyperionHistory';
 import { fetchTableRows } from '@/lib/waxRpcFallback';
 import type { NFTDrop, AtomicSale, AtomicTemplate, AtomicDrop, NFTHiveDrop, DropPrice } from '@/types/drop';
@@ -1004,11 +1005,11 @@ export async function fetchUserNFTsBySchema(
     if (!collection || !schema) continue;
 
     let fetched = false;
-    const endpoints = [
+    const endpoints = await resolveEndpoints('atomic-assets-api', [
       'https://aa.wax.blacklusion.io',
       'https://wax-aa.eu.eosamsterdam.net',
       'https://wax.api.atomicassets.io',
-    ];
+    ]);
     for (const baseUrl of endpoints) {
       if (fetched) break;
       try {

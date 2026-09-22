@@ -3,7 +3,7 @@
 // failure email) if no inbound CHEESE transfers from the signer to
 // cheesepowerz are found since 00:00 UTC today.
 
-import { getRecentInboundTransfers } from "./waxRpc";
+import { getRecentInboundTransfers, primeEndpointOrder } from "./waxRpc";
 
 const SIGNER = process.env.WAX_SIGNER_ACCOUNT ?? "power.chz";
 const POWERUP_TARGET = "cheesepowerz";
@@ -14,6 +14,7 @@ const MIN_EXPECTED = Number(process.env.WATCHDOG_MIN_TRANSFERS ?? "10");
 const log = (...args: unknown[]) => console.log("[watchdog]", ...args);
 
 async function main() {
+  await primeEndpointOrder();
   const startOfUtcDay = new Date();
   startOfUtcDay.setUTCHours(0, 0, 0, 0);
   const fromIso = startOfUtcDay.toISOString();

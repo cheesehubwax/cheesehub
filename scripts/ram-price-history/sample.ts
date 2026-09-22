@@ -10,12 +10,17 @@
  *   FORCE=1           append even if the last sample is very recent
  */
 
+/** Offline fallback order; reordered by HerdCheck health at start-up. */
 const ENDPOINTS = [
+  "https://wax.hivebp.io",
+  "https://api.wax.alohaeos.com",
   "https://wax.greymass.com",
   "https://wax.eosusa.io",
   "https://api.waxsweden.org",
   "https://wax.eosphere.io",
 ];
+
+import { applyHealthOrder } from "../shared/herdcheck";
 
 const ALCOR_TOKENS_URL = "https://wax.alcor.exchange/api/v2/tokens";
 
@@ -148,6 +153,7 @@ const round = (value: number, decimals: number) =>
   Number.isFinite(value) ? Number(value.toFixed(decimals)) : 0;
 
 async function main() {
+  await applyHealthOrder(ENDPOINTS, "chain-api");
   const file = process.env.RAM_HISTORY_FILE;
   if (!file) throw new Error("RAM_HISTORY_FILE is required");
   const force = process.env.FORCE === "1";

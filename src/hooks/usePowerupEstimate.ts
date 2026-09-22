@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useDebounce } from "@/hooks/useDebounce";
+import { resolveEndpoints } from "@/lib/endpointHealth";
 
 export interface PowerUpEstimate {
   cheesePriceInWax: number;
@@ -59,7 +60,9 @@ interface PowerUpStateRow {
   min_powerup_fee: string;
 }
 
-const WAX_ENDPOINTS = [
+const WAX_FALLBACK = [
+  "https://wax.hivebp.io",
+  "https://api.wax.alohaeos.com",
   "https://wax.eosusa.io",
   "https://api.waxsweden.org",
   "https://wax.greymass.com",
@@ -76,7 +79,7 @@ export const parsePriceWax = (priceStr: string): number => {
 };
 
 export async function fetchPowerupState(): Promise<PowerUpStateRow | null> {
-  for (const baseUrl of WAX_ENDPOINTS) {
+  for (const baseUrl of await resolveEndpoints("chain-api", WAX_FALLBACK)) {
     try {
       const response = await fetch(`${baseUrl}/v1/chain/get_table_rows`, {
         method: "POST",

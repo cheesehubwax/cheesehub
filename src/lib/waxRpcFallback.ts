@@ -1,20 +1,26 @@
 // WAX RPC API fallback utility for reliability
-// Automatically retries requests across multiple endpoints
+// Automatically retries requests across multiple endpoints.
+//
+// The order is decided at read time by src/lib/endpointHealth.ts (HerdCheck),
+// so a node that is currently down is never queued ahead of a healthy one.
+// The lists below are the offline fallback order.
+
+import { resolveEndpoints } from "./endpointHealth";
 
 // Hyperion endpoints for get_tokens (faster for balance queries)
 const HYPERION_ENDPOINTS = [
-  "https://wax.eosusa.io",
+  "https://wax.hivebp.io",
   "https://api.wax.alohaeos.com",
   "https://wax.eosphere.io",
-  "https://wax.pink.gg",
+  "https://wax.eosusa.io",
 ];
 
 export const WAX_RPC_ENDPOINTS = [
-  "https://wax.eosusa.io",
+  "https://wax.hivebp.io",
   "https://api.wax.alohaeos.com",
-  "https://wax.eosphere.io",
-  "https://wax.pink.gg",
+  "https://wax.eosusa.io",
   "https://api.waxsweden.org",
+  "https://wax.eosphere.io",
   "https://wax.greymass.com",
 ];
 
@@ -45,8 +51,9 @@ export async function fetchTableRows<T = Record<string, unknown>>(
   timeout: number = 8000
 ): Promise<TableRowsResponse<T>> {
   let lastError: Error | null = null;
+  const endpoints = await resolveEndpoints("chain-api", WAX_RPC_ENDPOINTS);
 
-  for (const baseUrl of WAX_RPC_ENDPOINTS) {
+  for (const baseUrl of endpoints) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -88,8 +95,9 @@ export async function waxRpcCall<T = unknown>(
   timeout: number = 8000
 ): Promise<T> {
   let lastError: Error | null = null;
+  const endpoints = await resolveEndpoints("chain-api", WAX_RPC_ENDPOINTS);
 
-  for (const baseUrl of WAX_RPC_ENDPOINTS) {
+  for (const baseUrl of endpoints) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -157,8 +165,9 @@ export async function fetchAllTokenBalances(
   timeout: number = 8000
 ): Promise<HyperionResult> {
   let lastError: Error | null = null;
+  const endpoints = await resolveEndpoints("hyperion-v2", HYPERION_ENDPOINTS);
 
-  for (const baseUrl of HYPERION_ENDPOINTS) {
+  for (const baseUrl of endpoints) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);

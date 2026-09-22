@@ -5,6 +5,7 @@ import { useFailedTransactions } from '@/hooks/useFailedTransactions';
 import { ContractStatusCard } from '@/components/admin/ContractStatusCard';
 import { PriceDeviationGauge } from '@/components/admin/PriceDeviationGauge';
 import { FailedTransactionLog } from '@/components/admin/FailedTransactionLog';
+import { NodeHealthPanel } from '@/components/admin/NodeHealthPanel';
 import { AddBannerSlotsCard } from '@/components/admin/AddBannerSlotsCard';
 import { parseAssetAmount, getDeviationSeverity } from '@/lib/adminData';
 import { DropPurchaseLog } from '@/components/admin/DropPurchaseLog';
@@ -290,6 +291,9 @@ export default function Admin() {
 
             {/* Failed Transactions */}
             <FailedTransactionLog transactions={failedTxs ?? []} isLoading={txsLoading} />
+
+            {/* Node health (read-only) */}
+            <NodeHealthPanel />
           </>
         ) : null}
       </div>
