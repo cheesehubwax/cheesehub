@@ -8,6 +8,20 @@ For each contract, find its earliest recorded nulling action. Count the days fro
 - **7d avg/wk** = 7d total ÷ tracked weeks (tracked days ÷ 7)
 - **30d avg/mo** = 30d total ÷ tracked months (tracked days ÷ 30)
 
+In one equation, with D = tracked days (D never below 1):
+
+```text
+avg24h = 24h total ÷ D
+avg7d  =  7d total ÷ (D / 7)
+avg30d = 30d total ÷ (D / 30)
+```
+
+Worked example — a contract first recorded 60 days ago (D = 60):
+
+- 24h avg = 24h total ÷ 60
+- 7d avg = 7d total ÷ (60/7) ≈ 7d total ÷ 8.57 weeks
+- 30d avg = 30d total ÷ (60/30) = 30d total ÷ 2 months
+
 So a contract whose first record is 2 days ago shows its 24h total ÷ 2, its 7d total ÷ (2/7), and its 30d total ÷ (2/30). A contract tracked for years divides by the full span.
 
 Guards: a contract with no records yet shows averages of 0; the divisor never goes below 1 day (same-day first record → ÷ 1).
