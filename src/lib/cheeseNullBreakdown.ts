@@ -29,11 +29,11 @@ export interface NullBreakdownEntry {
   percent7d: number;
   amount30d: number;
   percent30d: number;
-  /** Amount per day over the span actually tracked inside the 24h window. */
+  /** Amount per full day (the 24h amount divided by 1 day). */
   avg24h: number;
-  /** Amount per week over the span actually tracked inside the 7d window. */
+  /** Amount per full week (the 7d amount divided by 1 week). */
   avg7d: number;
-  /** Amount per month over the span actually tracked inside the 30d window. */
+  /** Amount per full month (the 30d amount divided by 1 month). */
   avg30d: number;
 }
 
@@ -136,14 +136,10 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
     day: number;
     week: number;
     month: number;
-    /** Oldest record seen inside each window; Infinity when none yet. */
-    firstDay: number;
-    firstWeek: number;
-    firstMonth: number;
   }
   const totals = new Map<string, ContractTotals>();
   for (const account of contractAccounts) {
-    totals.set(account, { all: 0, day: 0, week: 0, month: 0, firstDay: Infinity, firstWeek: Infinity, firstMonth: Infinity });
+    totals.set(account, { all: 0, day: 0, week: 0, month: 0 });
   }
 
   const addActions = (actions: typeof nullActions, accountFor: (data: Record<string, unknown>) => string | null) => {
@@ -157,18 +153,9 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
       if (!row) continue;
       row.all += quantity;
       const time = timestampMs(action);
-      if (time >= cutoffs.month) {
-        row.month += quantity;
-        if (time < row.firstMonth) row.firstMonth = time;
-      }
-      if (time >= cutoffs.week) {
-        row.week += quantity;
-        if (time < row.firstWeek) row.firstWeek = time;
-      }
-      if (time >= cutoffs.day) {
-        row.day += quantity;
-        if (time < row.firstDay) row.firstDay = time;
-      }
+      if (time >= cutoffs.month) row.month += quantity;
+      if (time >= cutoffs.week) row.week += quantity;
+      if (time >= cutoffs.day) row.day += quantity;
     }
   };
 
@@ -184,22 +171,14 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
   const burnerAuthoritative = burnerStats?.total_cheese_burned
     ? parseAssetAmount(burnerStats.total_cheese_burned)
     : null;
-  // Average per period unit over the span actually tracked: a contract whose
-  // records only reach back part of a window is divided by its real span, not
-  // the full window. Caps keep a brand-new contract from being divided by a
-  // fraction smaller than its first moments — we never go below one hour of
-  // span, and never above the window itself.
-  const MIN_SPAN_MS = 60 * 60 * 1000;
-  const trackedSpan = (first: number, cutoff: number, windowMs: number): number => {
-    if (!Number.isFinite(first) || first === 0) return windowMs;
-    return Math.min(windowMs, Math.max(now - Math.max(cutoff, first), MIN_SPAN_MS));
-  };
-
+  // Averages always divide by the FULL period: the 24h amount per day, the 7d
+  // amount per week, the 30d amount per month — regardless of how far back a
+  // contract's recorded history reaches.
   const results = NULL_CONTRACTS.map(({ account, displayName }) => {
-    const values = totals.get(account) ?? { all: 0, day: 0, week: 0, month: 0, firstDay: Infinity, firstWeek: Infinity, firstMonth: Infinity };
-    const avg24h = values.day > 0 ? values.day / (trackedSpan(values.firstDay, cutoffs.day, DAY_MS) / DAY_MS) : 0;
-    const avg7d = values.week > 0 ? values.week / (trackedSpan(values.firstWeek, cutoffs.week, 7 * DAY_MS) / (7 * DAY_MS)) : 0;
-    const avg30d = values.month > 0 ? values.month / (trackedSpan(values.firstMonth, cutoffs.month, 30 * DAY_MS) / (30 * DAY_MS)) : 0;
+    const values = totals.get(account) ?? { all: 0, day: 0, week: 0, month: 0 };
+    const avg24h = values.day / 1;
+    const avg7d = values.week / 1;
+    const avg30d = values.month / 1;
     const amount = account === 'cheeseburner' && burnerAuthoritative !== null
       ? burnerAuthoritative
       : account === 'cheesepowerz'
