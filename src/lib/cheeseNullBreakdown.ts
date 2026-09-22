@@ -10,18 +10,13 @@
 
 import { fetchContractStats, parseAssetAmount } from './cheeseNullApi';
 import { fetchActionsUnion, sumAssetField } from './hyperionHistory';
-import { resolveEndpoints } from './endpointHealth';
+import { STATIC_ENDPOINTS } from './endpointHealth';
+import { chainPost } from './chainRequest';
 
 const BATCH_SIZE = 1000;
 const MAX_ACTIONS = 50000;
 
-const WAX_RPC_FALLBACK = [
-  'https://wax.hivebp.io',
-  'https://api.wax.alohaeos.com',
-  'https://wax.eosusa.io',
-  'https://api.waxsweden.org',
-  'https://wax.greymass.com',
-];
+const WAX_RPC_FALLBACK = STATIC_ENDPOINTS['chain-api'];
 
 export interface NullBreakdownEntry {
   contract: string;
