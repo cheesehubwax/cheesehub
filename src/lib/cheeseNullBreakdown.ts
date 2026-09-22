@@ -176,25 +176,33 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
   addActions(nullActions, (data) => data.to === 'eosio.null' && typeof data.from === 'string' ? data.from : null);
 
   // Incoming cheesepowerz transfers are kept as a lifetime-only fallback for
-  // when the contract's authoritative counter is unavailable.
+  // when the contract's authoritative counter is unavailable. They also mark
+  // the earliest activity we can see for cheesepowerz, whose nulls go through
+  // the contract itself and may not appear in the eosio.null sweep.
   const powerInflowLifetime = sumAssetField(powerActions, 'quantity', (data) => data.to === 'cheesepowerz');
+  for (const action of powerActions) {
+    const data = action.act?.data;
+    if (data && data.to === 'cheesepowerz') noteSeen('cheesepowerz', timestampMs(action));
+  }
 
   const burnerAuthoritative = burnerStats?.total_cheese_burned
     ? parseAssetAmount(burnerStats.total_cheese_burned)
     : null;
-  // Averages always divide by the FULL period: the 24h amount per day, the 7d
-  // amount per week, the 30d amount per month — regardless of how far back a
-  // contract's recorded history reaches.
+  // Averages divide the contract's LIFETIME total by how long it has been
+  // tracked: days since its earliest recorded null for the daily average,
+  // those days / 7 for the weekly average, / 30 for the monthly average.
   const results = NULL_CONTRACTS.map(({ account, displayName }) => {
     const values = totals.get(account) ?? { all: 0, day: 0, week: 0, month: 0 };
-    const avg24h = values.day / 1;
-    const avg7d = values.week / 1;
-    const avg30d = values.month / 1;
     const amount = account === 'cheeseburner' && burnerAuthoritative !== null
       ? burnerAuthoritative
       : account === 'cheesepowerz'
         ? (powerTotal !== null ? powerTotal : Math.max(values.all, powerInflowLifetime))
         : values.all;
+    const first = firstSeen.get(account);
+    const trackedDays = first !== undefined ? Math.max(1, (now - first) / DAY_MS) : null;
+    const avg24h = trackedDays !== null ? amount / trackedDays : null;
+    const avg7d = trackedDays !== null ? amount / (trackedDays / 7) : null;
+    const avg30d = trackedDays !== null ? amount / (trackedDays / 30) : null;
     return {
       contract: account,
       displayName,
@@ -202,6 +210,7 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
       amount24h: values.day,
       amount7d: values.week,
       amount30d: values.month,
+      trackedDays,
       avg24h,
       avg7d,
       avg30d,
