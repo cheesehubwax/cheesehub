@@ -125,13 +125,26 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
   const powerActions = powerHistoryResult?.actions ?? [];
 
   const now = Date.now();
+  const DAY_MS = 24 * 60 * 60 * 1000;
   const cutoffs = {
-    day: now - 24 * 60 * 60 * 1000,
-    week: now - 7 * 24 * 60 * 60 * 1000,
-    month: now - 30 * 24 * 60 * 60 * 1000,
+    day: now - DAY_MS,
+    week: now - 7 * DAY_MS,
+    month: now - 30 * DAY_MS,
   };
-  const totals = new Map<string, { all: number; day: number; week: number; month: number }>();
-  for (const account of contractAccounts) totals.set(account, { all: 0, day: 0, week: 0, month: 0 });
+  interface ContractTotals {
+    all: number;
+    day: number;
+    week: number;
+    month: number;
+    /** Oldest record seen inside each window; Infinity when none yet. */
+    firstDay: number;
+    firstWeek: number;
+    firstMonth: number;
+  }
+  const totals = new Map<string, ContractTotals>();
+  for (const account of contractAccounts) {
+    totals.set(account, { all: 0, day: 0, week: 0, month: 0, firstDay: Infinity, firstWeek: Infinity, firstMonth: Infinity });
+  }
 
   const addActions = (actions: typeof nullActions, accountFor: (data: Record<string, unknown>) => string | null) => {
     for (const action of actions) {
@@ -144,9 +157,18 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
       if (!row) continue;
       row.all += quantity;
       const time = timestampMs(action);
-      if (time >= cutoffs.month) row.month += quantity;
-      if (time >= cutoffs.week) row.week += quantity;
-      if (time >= cutoffs.day) row.day += quantity;
+      if (time >= cutoffs.month) {
+        row.month += quantity;
+        if (time < row.firstMonth) row.firstMonth = time;
+      }
+      if (time >= cutoffs.week) {
+        row.week += quantity;
+        if (time < row.firstWeek) row.firstWeek = time;
+      }
+      if (time >= cutoffs.day) {
+        row.day += quantity;
+        if (time < row.firstDay) row.firstDay = time;
+      }
     }
   };
 
