@@ -1,5 +1,6 @@
 import { ATOMIC_API, CHEESE_CONFIG, NFTHIVE_CONFIG } from '@/lib/waxConfig';
 import { fetchWithFallback } from '@/lib/fetchWithFallback';
+import { resolveEndpoints } from '@/lib/endpointHealth';
 import { fetchActionsUnion, sumAssetField } from '@/lib/hyperionHistory';
 import { fetchTableRows } from '@/lib/waxRpcFallback';
 import type { NFTDrop, AtomicSale, AtomicTemplate, AtomicDrop, NFTHiveDrop, DropPrice } from '@/types/drop';
@@ -54,7 +55,6 @@ export function waitForPreload(url: string): Promise<boolean> {
 }
 
 import { IPFS_GATEWAYS, getIpfsUrl, extractIpfsHash, atomicHubImageUrl } from '@/lib/ipfsGateways';
-import { resolveEndpoints } from '@/lib/endpointHealth';
 
 // Warm the AtomicHub image cache alongside the primary gateway URL: for content
 // that is no longer retrievable from public IPFS gateways, the cache is the only

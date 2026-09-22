@@ -70,7 +70,7 @@ export const usePowerupStats = (): UsePowerupStatsResult => {
           return;
         }
       } catch (err) {
-        console.error(`Failed to fetch from ${endpoint}:`, err);
+        console.error(`Failed to fetch from ${base}:`, err);
         continue;
       }
     }
