@@ -1,15 +1,14 @@
 /**
  * HerdCheck endpoint health for the scheduled Bun scripts.
  *
- * The scripts keep their own static endpoint lists as the offline fallback.
- * Calling `applyHealthOrder` once at start-up reorders a list in place so the
- * hosts that HerdCheck currently reports as up are tried first, and hosts that
- * are down are dropped. Any failure leaves the static list untouched.
+ * The scripts keep their own vetted endpoint lists. Calling `applyHealthOrder`
+ * once at start-up reorders a list in place so the hosts HerdCheck currently
+ * reports as healthy come first and hosts reported as down are dropped. Any
+ * failure leaves the static list untouched.
  */
 
 const HERDCHECK_URL = "https://herdcheck.blocdraig.com/api/v1/wax/endpoints";
 const TIMEOUT_MS = 5_000;
-const MAX_ENDPOINTS = 8;
 
 export type EndpointFeature = "chain-api" | "hyperion-v2" | "history-v1" | "atomic-assets-api";
 
@@ -21,58 +20,66 @@ interface HerdCheckEntry {
   uptimePercent?: number;
 }
 
-/** Hosts HerdCheck currently reports as up for a feature, best first. */
-export async function healthyEndpoints(feature: EndpointFeature): Promise<string[]> {
+export interface HealthEntry {
+  url: string;
+  status: string;
+  uptimePercent: number;
+}
+
+/** Current health per host for a feature. */
+export async function fetchHealth(feature: EndpointFeature): Promise<HealthEntry[]> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(`${HERDCHECK_URL}?feature=${feature}&status=up`, {
-      signal: controller.signal,
-    });
+    const res = await fetch(`${HERDCHECK_URL}?feature=${feature}`, { signal: controller.signal });
     if (!res.ok) throw new Error(`HerdCheck returned ${res.status}`);
     const data = (await res.json()) as { endpoints?: HerdCheckEntry[] };
     return (data.endpoints ?? [])
-      .filter((e) => typeof e.url === "string" && (e.status === "healthy" || e.status === "degraded"))
-      .map((e) => normalize(e.url as string));
+      .filter((e): e is HerdCheckEntry & { url: string } => typeof e.url === "string")
+      .map((e) => ({
+        url: normalize(e.url),
+        status: e.status ?? "healthy",
+        uptimePercent: Number(e.uptimePercent) || 0,
+      }));
   } finally {
     clearTimeout(timer);
   }
 }
 
+const RANK: Record<string, number> = { healthy: 0, degraded: 1 };
+
 /**
- * Reorder `list` in place: healthy hosts first (HerdCheck order), then the
- * script's own hosts that HerdCheck does not list. Never throws.
+ * Reorder `list` in place: our own hosts sorted by live health (healthy first,
+ * best uptime first), hosts HerdCheck reports as down removed. Never throws.
  */
 export async function applyHealthOrder(
   list: string[],
   feature: EndpointFeature,
-  limit = MAX_ENDPOINTS,
 ): Promise<string[]> {
   try {
-    const healthy = await healthyEndpoints(feature);
-    if (healthy.length === 0) return list;
+    const health = await fetchHealth(feature);
+    if (health.length === 0) return list;
+    const byUrl = new Map(health.map((h) => [h.url, h]));
 
-    const healthySet = new Set(healthy);
-    const original = list.map(normalize);
-    const ordered: string[] = [];
-    const seen = new Set<string>();
+    const rank = (status?: string) =>
+      status === undefined ? 2 : (RANK[status] ?? 3);
 
-    for (const url of healthy) {
-      if (seen.has(url)) continue;
-      seen.add(url);
-      ordered.push(url);
-    }
-    // Keep our own remaining hosts as a last resort (tried only after the
-    // healthy ones): some are not monitored by HerdCheck at all.
-    for (const url of original) {
-      if (seen.has(url) || healthySet.has(url)) continue;
-      seen.add(url);
-      ordered.push(url);
-    }
+    const next = list
+      .map((url, index) => ({ url: normalize(url), entry: byUrl.get(normalize(url)), index }))
+      .filter(({ entry }) => rank(entry?.status) < 3)
+      .sort((a, b) => {
+        const byStatus = rank(a.entry?.status) - rank(b.entry?.status);
+        if (byStatus !== 0) return byStatus;
+        if (a.entry && b.entry && a.entry.uptimePercent !== b.entry.uptimePercent) {
+          return b.entry.uptimePercent - a.entry.uptimePercent;
+        }
+        return a.index - b.index;
+      })
+      .map(({ url }) => url);
 
-    const next = ordered.slice(0, limit);
+    if (next.length === 0) return list;
     list.splice(0, list.length, ...next);
-    console.log(`[herdcheck] ${feature}: using ${next.length} hosts, ${next[0]} first.`);
+    console.log(`[herdcheck] ${feature}: ${next.length} hosts, ${next[0]} first.`);
     return list;
   } catch (error) {
     console.warn(`[herdcheck] ${feature} health read failed:`, (error as Error).message);
