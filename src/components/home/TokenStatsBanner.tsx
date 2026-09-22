@@ -207,7 +207,7 @@ export function TokenStatsBanner() {
                   </div>
                 </div>
               </PopoverTrigger>
-              <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[860px] max-w-[860px] p-0" align="end">
+              <PopoverContent className="w-[calc(100vw-2rem)] sm:w-auto sm:min-w-[860px] max-w-[calc(100vw-2rem)] p-0" align="end">
                 <div className="p-3 border-b border-border">
                   <p className="text-sm font-semibold text-foreground">Null Breakdown by Contract</p>
                   {breakdownPartial && (
@@ -248,37 +248,37 @@ export function TokenStatsBanner() {
                       {breakdown.map((entry) => (
                         <TableRow key={entry.contract}>
                           <TableCell className="py-2 text-xs font-mono whitespace-nowrap">{entry.displayName ?? entry.contract}</TableCell>
-                          <TableCell className="py-2 text-xs text-right">
+                          <TableCell className="py-2 text-xs text-right whitespace-nowrap">
                             {formatFullNumber(entry.amount24h)} <span className="text-cheese">CHEESE</span>
                           </TableCell>
-                          <TableCell className="py-2 text-xs text-right font-semibold">
+                          <TableCell className="py-2 text-xs text-right font-semibold whitespace-nowrap">
                             {entry.percent24h.toFixed(1)}%
                           </TableCell>
-                          <TableCell className="py-2 text-xs text-right text-muted-foreground">
+                          <TableCell className="py-2 text-xs text-right text-muted-foreground whitespace-nowrap">
                             {formatFullNumber(entry.avg24h)} <span className="text-cheese">CHEESE</span>
                           </TableCell>
-                          <TableCell className="py-2 text-xs text-right">
+                          <TableCell className="py-2 text-xs text-right whitespace-nowrap">
                             {formatFullNumber(entry.amount7d)} <span className="text-cheese">CHEESE</span>
                           </TableCell>
-                          <TableCell className="py-2 text-xs text-right font-semibold">
+                          <TableCell className="py-2 text-xs text-right font-semibold whitespace-nowrap">
                             {entry.percent7d.toFixed(1)}%
                           </TableCell>
-                          <TableCell className="py-2 text-xs text-right text-muted-foreground">
+                          <TableCell className="py-2 text-xs text-right text-muted-foreground whitespace-nowrap">
                             {formatFullNumber(entry.avg7d)} <span className="text-cheese">CHEESE</span>
                           </TableCell>
-                          <TableCell className="py-2 text-xs text-right">
+                          <TableCell className="py-2 text-xs text-right whitespace-nowrap">
                             {formatFullNumber(entry.amount30d)} <span className="text-cheese">CHEESE</span>
                           </TableCell>
-                          <TableCell className="py-2 text-xs text-right font-semibold">
+                          <TableCell className="py-2 text-xs text-right font-semibold whitespace-nowrap">
                             {entry.percent30d.toFixed(1)}%
                           </TableCell>
-                          <TableCell className="py-2 text-xs text-right text-muted-foreground">
+                          <TableCell className="py-2 text-xs text-right text-muted-foreground whitespace-nowrap">
                             {formatFullNumber(entry.avg30d)} <span className="text-cheese">CHEESE</span>
                           </TableCell>
-                          <TableCell className="py-2 text-xs text-right">
+                          <TableCell className="py-2 text-xs text-right whitespace-nowrap">
                             {formatFullNumber(entry.amount)} <span className="text-cheese">CHEESE</span>
                           </TableCell>
-                          <TableCell className="py-2 text-xs text-right font-semibold">
+                          <TableCell className="py-2 text-xs text-right font-semibold whitespace-nowrap">
                             {entry.percent.toFixed(1)}%
                           </TableCell>
                         </TableRow>
