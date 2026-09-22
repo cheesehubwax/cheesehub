@@ -29,12 +29,14 @@ export interface NullBreakdownEntry {
   percent7d: number;
   amount30d: number;
   percent30d: number;
-  /** Amount per full day (the 24h amount divided by 1 day). */
-  avg24h: number;
-  /** Amount per full week (the 7d amount divided by 1 week). */
-  avg7d: number;
-  /** Amount per full month (the 30d amount divided by 1 month). */
-  avg30d: number;
+  /** Days between the contract's earliest recorded null and now (min 1). Null when no history was observed. */
+  trackedDays: number | null;
+  /** Lifetime total ÷ tracked days. Null when no history was observed. */
+  avg24h: number | null;
+  /** Lifetime total ÷ tracked weeks (trackedDays / 7). */
+  avg7d: number | null;
+  /** Lifetime total ÷ tracked months (trackedDays / 30). */
+  avg30d: number | null;
 }
 
 export interface NullBreakdownResult {
@@ -141,6 +143,14 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
   for (const account of contractAccounts) {
     totals.set(account, { all: 0, day: 0, week: 0, month: 0 });
   }
+  // Earliest transfer timestamp observed per contract — the start of its
+  // tracked span. Averages divide the lifetime total by this span.
+  const firstSeen = new Map<string, number>();
+  const noteSeen = (account: string, time: number) => {
+    if (!time) return;
+    const prev = firstSeen.get(account);
+    if (prev === undefined || time < prev) firstSeen.set(account, time);
+  };
 
   const addActions = (actions: typeof nullActions, accountFor: (data: Record<string, unknown>) => string | null) => {
     for (const action of actions) {
@@ -153,6 +163,7 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
       if (!row) continue;
       row.all += quantity;
       const time = timestampMs(action);
+      noteSeen(account, time);
       if (time >= cutoffs.month) row.month += quantity;
       if (time >= cutoffs.week) row.week += quantity;
       if (time >= cutoffs.day) row.day += quantity;
