@@ -27,13 +27,20 @@ interface FeatureHealth {
   order: string[];
 }
 
-async function loadHealth(): Promise<FeatureHealth[]> {
-  return Promise.all(
+interface HealthReport {
+  groups: FeatureHealth[];
+  /** Hosts this browser could not reach just now, and when they come back. */
+  benched: { url: string; until: number }[];
+}
+
+async function loadHealth(): Promise<HealthReport> {
+  const groups = await Promise.all(
     FEATURES.map(async ({ key, label }) => {
       const entries = await fetchEndpointHealth(key).catch(() => [] as HealthEntry[]);
       return { feature: key, label, entries, order: mergeEndpoints(entries, STATIC_ENDPOINTS[key]) };
     }),
   );
+  return { groups, benched: benchedEndpoints() };
 }
 
 const host = (url: string) => normalizeEndpoint(url).replace(/^https?:\/\//, '');
