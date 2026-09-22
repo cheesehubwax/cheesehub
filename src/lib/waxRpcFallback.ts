@@ -5,24 +5,13 @@
 // so a node that is currently down is never queued ahead of a healthy one.
 // The lists below are the offline fallback order.
 
-import { resolveEndpoints } from "./endpointHealth";
+import { STATIC_ENDPOINTS } from "./endpointHealth";
+import { hedgedJson } from "./chainRequest";
 
 // Hyperion endpoints for get_tokens (faster for balance queries)
-const HYPERION_ENDPOINTS = [
-  "https://wax.hivebp.io",
-  "https://api.wax.alohaeos.com",
-  "https://wax.eosphere.io",
-  "https://wax.eosusa.io",
-];
+const HYPERION_ENDPOINTS = STATIC_ENDPOINTS["hyperion-v2"];
 
-export const WAX_RPC_ENDPOINTS = [
-  "https://wax.hivebp.io",
-  "https://api.wax.alohaeos.com",
-  "https://wax.eosusa.io",
-  "https://api.waxsweden.org",
-  "https://wax.eosphere.io",
-  "https://wax.greymass.com",
-];
+export const WAX_RPC_ENDPOINTS = STATIC_ENDPOINTS["chain-api"];
 
 interface TableRowsParams {
   json?: boolean;
