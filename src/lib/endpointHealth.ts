@@ -99,7 +99,7 @@ async function requestHealth(feature: EndpointFeature): Promise<HealthEntry[]> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(`${HERDCHECK_URL}?feature=${feature}&status=up`, {
+    const res = await fetch(`${HERDCHECK_URL}?feature=${feature}`, {
       signal: controller.signal,
     });
     if (!res.ok) throw new Error(`HerdCheck returned ${res.status}`);
@@ -152,17 +152,42 @@ export async function fetchEndpointHealth(feature: EndpointFeature): Promise<Hea
 }
 
 /**
- * Healthy hosts first (best uptime), then any fallback host not already named,
- * so a specialised endpoint of ours stays reachable as a last resort.
+ * Order our OWN vetted hosts by live health, then append any other currently
+ * healthy host as a last resort.
+ *
+ * Vetted-first matters: the published list contains hosts that answer a plain
+ * GET but reject a browser CORS preflight for POST /v1/chain/*, so leading with
+ * an unknown host would slow every read down. Health decides the ORDER of hosts
+ * we already trust; unknown healthy hosts only ever act as a safety net.
  */
 export function mergeEndpoints(
   healthy: HealthEntry[],
   fallback: string[],
   limit = MAX_ENDPOINTS,
 ): string[] {
+  const byUrl = new Map<string, HealthEntry>();
+  for (const entry of healthy) byUrl.set(normalizeEndpoint(entry.url), entry);
+
+  const rank = (status?: EndpointStatus) =>
+    status === 'healthy' ? 0 : status === 'degraded' ? 1 : status === undefined ? 2 : 3;
+
+  const vetted = fallback
+    .map(normalizeEndpoint)
+    .filter((url, i, all) => url && !isDead(url) && all.indexOf(url) === i)
+    .map((url, index) => ({ url, entry: byUrl.get(url), index }))
+    // Down hosts are dropped outright; unmonitored ones keep their own order.
+    .filter(({ entry }) => rank(entry?.status) < 3)
+    .sort((a, b) => {
+      const byStatus = rank(a.entry?.status) - rank(b.entry?.status);
+      if (byStatus !== 0) return byStatus;
+      const byUptime = (b.entry?.uptimePercent ?? 0) - (a.entry?.uptimePercent ?? 0);
+      if (byUptime !== 0 && a.entry && b.entry) return byUptime;
+      return a.index - b.index;
+    })
+    .map(({ url }) => url);
+
   const out: string[] = [];
   const seen = new Set<string>();
-
   const push = (url: string) => {
     const clean = normalizeEndpoint(url);
     if (!clean || isDead(clean) || seen.has(clean)) return;
@@ -170,10 +195,8 @@ export function mergeEndpoints(
     out.push(clean);
   };
 
-  for (const entry of healthy) {
-    if (entry.status === 'healthy' || entry.status === 'degraded') push(entry.url);
-  }
-  for (const url of fallback) push(url);
+  for (const url of vetted) push(url);
+  for (const entry of healthy) if (entry.status === 'healthy') push(entry.url);
 
   return out.slice(0, limit);
 }
