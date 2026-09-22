@@ -184,8 +184,22 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
   const burnerAuthoritative = burnerStats?.total_cheese_burned
     ? parseAssetAmount(burnerStats.total_cheese_burned)
     : null;
+  // Average per period unit over the span actually tracked: a contract whose
+  // records only reach back part of a window is divided by its real span, not
+  // the full window. Caps keep a brand-new contract from being divided by a
+  // fraction smaller than its first moments — we never go below one hour of
+  // span, and never above the window itself.
+  const MIN_SPAN_MS = 60 * 60 * 1000;
+  const trackedSpan = (first: number, cutoff: number, windowMs: number): number => {
+    if (!Number.isFinite(first) || first === 0) return windowMs;
+    return Math.min(windowMs, Math.max(now - Math.max(cutoff, first), MIN_SPAN_MS));
+  };
+
   const results = NULL_CONTRACTS.map(({ account, displayName }) => {
-    const values = totals.get(account) ?? { all: 0, day: 0, week: 0, month: 0 };
+    const values = totals.get(account) ?? { all: 0, day: 0, week: 0, month: 0, firstDay: Infinity, firstWeek: Infinity, firstMonth: Infinity };
+    const avg24h = values.day > 0 ? values.day / (trackedSpan(values.firstDay, cutoffs.day, DAY_MS) / DAY_MS) : 0;
+    const avg7d = values.week > 0 ? values.week / (trackedSpan(values.firstWeek, cutoffs.week, 7 * DAY_MS) / (7 * DAY_MS)) : 0;
+    const avg30d = values.month > 0 ? values.month / (trackedSpan(values.firstMonth, cutoffs.month, 30 * DAY_MS) / (30 * DAY_MS)) : 0;
     const amount = account === 'cheeseburner' && burnerAuthoritative !== null
       ? burnerAuthoritative
       : account === 'cheesepowerz'
