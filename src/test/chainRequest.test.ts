@@ -89,7 +89,7 @@ describe('hedgedJson', () => {
   it('sends chain reads as text/plain so no CORS preflight is triggered', async () => {
     const { impl } = stubFetch({});
     await chainPost('/v1/chain/get_table_rows', { table: 'stat' }, { fallback: HOSTS });
-    const init = impl.mock.calls[0][1] as RequestInit;
+    const init = chainCall(impl)[1] as RequestInit;
     expect((init.headers as Record<string, string>)['Content-Type']).toBe(
       'text/plain;charset=UTF-8',
     );
