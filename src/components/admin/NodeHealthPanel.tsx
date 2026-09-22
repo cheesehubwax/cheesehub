@@ -8,6 +8,7 @@ import {
   STATIC_ENDPOINTS,
   mergeEndpoints,
   normalizeEndpoint,
+  benchedEndpoints,
   type EndpointFeature,
   type HealthEntry,
 } from '@/lib/endpointHealth';
@@ -26,13 +27,20 @@ interface FeatureHealth {
   order: string[];
 }
 
-async function loadHealth(): Promise<FeatureHealth[]> {
-  return Promise.all(
+interface HealthReport {
+  groups: FeatureHealth[];
+  /** Hosts this browser could not reach just now, and when they come back. */
+  benched: { url: string; until: number }[];
+}
+
+async function loadHealth(): Promise<HealthReport> {
+  const groups = await Promise.all(
     FEATURES.map(async ({ key, label }) => {
       const entries = await fetchEndpointHealth(key).catch(() => [] as HealthEntry[]);
       return { feature: key, label, entries, order: mergeEndpoints(entries, STATIC_ENDPOINTS[key]) };
     }),
   );
+  return { groups, benched: benchedEndpoints() };
 }
 
 const host = (url: string) => normalizeEndpoint(url).replace(/^https?:\/\//, '');
@@ -74,7 +82,27 @@ export function NodeHealthPanel() {
           </p>
         )}
 
-        {data?.map((group) => (
+        {data && data.benched.length > 0 && (
+          <div className="rounded-md border border-yellow-400/40 bg-yellow-400/5 p-2">
+            <p className="font-semibold text-yellow-400">Not answering this browser</p>
+            <ul className="mt-1 space-y-1">
+              {data.benched.map(({ url, until }) => (
+                <li key={url} className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground">{host(url)}</span>
+                  <span className="text-xs text-muted-foreground">
+                    retried in {Math.max(0, Math.round((until - Date.now()) / 1000))}s
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1 text-xs text-muted-foreground">
+              A node can be healthy for the monitor and still be unreachable from a visitor's
+              connection. Those are tried last until they answer again.
+            </p>
+          </div>
+        )}
+
+        {data?.groups.map((group) => (
           <div key={group.feature} className="space-y-1">
             <div className="flex items-center justify-between">
               <span className="font-semibold text-foreground">{group.label}</span>

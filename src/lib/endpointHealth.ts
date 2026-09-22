@@ -23,32 +23,41 @@ export type EndpointFeature =
 /** Hosts confirmed dead — never queued, no matter which list names them. */
 export const DEAD_ENDPOINTS = ['https://wax.pink.gg', 'https://wax.blokcrafters.io'];
 
-/** Built-in fallback order, used until (or instead of) a health read. */
+/**
+ * Built-in fallback order, used until (or instead of) a health read.
+ *
+ * PROVEN HOSTS FIRST. Live health decides the order WITHIN this list and drops
+ * hosts reported down, but it must never promote a host we have not served real
+ * browser traffic from: wax.hivebp.io is ranked healthiest by the monitor and
+ * still answers "Failed to fetch" in some visitors' browsers, and leading with
+ * it blanked every stat on the site (2026-09-22). Newly discovered hosts sit at
+ * the back of each list as extra cover only.
+ */
 export const STATIC_ENDPOINTS: Record<EndpointFeature, string[]> = {
   'chain-api': [
-    'https://wax.hivebp.io',
-    'https://api.wax.alohaeos.com',
-    'https://wax.api.eosnation.io',
-    'https://wax.greymass.com',
     'https://wax.eosusa.io',
     'https://api.waxsweden.org',
+    'https://wax.greymass.com',
+    'https://wax.cryptolions.io',
+    'https://wax.eosdac.io',
+    'https://api.wax.alohaeos.com',
     'https://wax.eosphere.io',
+    'https://wax.hivebp.io',
   ],
   'hyperion-v2': [
-    'https://wax.hivebp.io',
-    'https://hyperion7.sentnl.io',
-    'https://wax.cryptolions.io',
-    'https://wax.eosphere.io',
-    'https://api.waxsweden.org',
-    'https://wax.eosdac.io',
     'https://wax.eosusa.io',
+    'https://wax.cryptolions.io',
+    'https://api.waxsweden.org',
+    'https://wax.eosphere.io',
+    'https://wax.eosdac.io',
+    'https://wax.hivebp.io',
   ],
   'history-v1': [
-    'https://wax.hivebp.io',
     'https://api.waxsweden.org',
-    'https://wax.eosphere.io',
-    'https://wax.cryptolions.io',
     'https://wax.eosusa.io',
+    'https://wax.cryptolions.io',
+    'https://wax.eosphere.io',
+    'https://wax.hivebp.io',
   ],
   'atomic-assets-api': [
     'https://wax.api.atomicassets.io',
@@ -87,6 +96,56 @@ const inFlight = new Map<EndpointFeature, Promise<HealthEntry[]>>();
 export const normalizeEndpoint = (url: string): string => url.replace(/\/+$/, '');
 
 const isDead = (url: string): boolean => DEAD_ENDPOINTS.includes(normalizeEndpoint(url));
+
+// ---------------------------------------------------------------------------
+// Bench: what actually failed in THIS browser.
+//
+// A monitor checks nodes from its own machines. wax.hivebp.io is ranked the
+// healthiest WAX node and still answers "Failed to fetch" for some visitors, so
+// reachability has to be learned locally: a host that fails is benched for a
+// while and tried last instead of first.
+// ---------------------------------------------------------------------------
+
+/** How long a host sits out, by the kind of failure it produced. */
+export const BENCH_MS = {
+  /** Timeout or outright network/CORS failure. */
+  network: 25_000,
+  /** Rate limited (420 / 429). */
+  rateLimited: 30_000,
+  /** Any other unsuccessful answer. */
+  error: 15_000,
+} as const;
+
+const benched = new Map<string, number>();
+
+/** Sit a host out for `ms`. */
+export function benchEndpoint(url: string, ms: number = BENCH_MS.error): void {
+  benched.set(normalizeEndpoint(url), Date.now() + ms);
+}
+
+/** True while a host is benched. */
+export function isBenched(url: string): boolean {
+  const until = benched.get(normalizeEndpoint(url));
+  if (!until) return false;
+  if (until <= Date.now()) {
+    benched.delete(normalizeEndpoint(url));
+    return false;
+  }
+  return true;
+}
+
+/** A host answered — it is trustworthy again straight away. */
+export function clearBench(url: string): void {
+  benched.delete(normalizeEndpoint(url));
+}
+
+/** Benched hosts and when each comes back, for the admin health card. */
+export function benchedEndpoints(): { url: string; until: number }[] {
+  const now = Date.now();
+  return [...benched.entries()]
+    .filter(([, until]) => until > now)
+    .map(([url, until]) => ({ url, until }));
+}
 
 interface HerdCheckEntry {
   url?: string;
@@ -198,7 +257,11 @@ export function mergeEndpoints(
   for (const url of vetted) push(url);
   for (const entry of healthy) if (entry.status === 'healthy') push(entry.url);
 
-  return out.slice(0, limit);
+  // Hosts that just failed in this browser go to the tail rather than being
+  // dropped: they are still better than having nothing left to try.
+  const ordered = [...out].sort((a, b) => Number(isBenched(a)) - Number(isBenched(b)));
+
+  return ordered.slice(0, limit);
 }
 
 /**
@@ -237,8 +300,9 @@ export function primeEndpointHealth(): void {
   }
 }
 
-/** Test-only: forget every cached health answer. */
+/** Test-only: forget every cached health answer and every bench. */
 export function resetEndpointHealthCache(): void {
   cache.clear();
   inFlight.clear();
+  benched.clear();
 }

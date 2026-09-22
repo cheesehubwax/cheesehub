@@ -1,12 +1,9 @@
 // CHEESE Token Stats Fetching Utilities
 import { CHEESE_CONFIG, WAX_CHAIN } from './waxConfig';
-import { resolveEndpoints } from './endpointHealth';
+import { chainPost } from './chainRequest';
 
 // Use centralized WAX API endpoints for fallback
 const WAX_API_FALLBACK = WAX_CHAIN.rpcUrls;
-
-/** Health-ordered chain hosts, falling back to the static list. */
-const waxEndpoints = () => resolveEndpoints('chain-api', WAX_API_FALLBACK);
 
 // WaxDAO locker contract
 const WAXDAO_LOCKER = 'waxdaolocker';
@@ -46,33 +43,28 @@ export interface CheeseStats {
   nextUnlock: NextUnlock | null;
 }
 
+/** One hedged table read against the health-ordered chain hosts. */
+const readRows = <T>(body: Record<string, unknown>) =>
+  chainPost<{ rows: T[]; more?: boolean }>('/v1/chain/get_table_rows', body, {
+    feature: 'chain-api',
+    fallback: WAX_API_FALLBACK,
+  });
+
 // Fetch token stats from the stat table
 async function fetchTokenStats(): Promise<TokenStat | null> {
-  for (const endpoint of await waxEndpoints()) {
-    try {
-      const response = await fetch(`${endpoint}/v1/chain/get_table_rows`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code: CHEESE_CONFIG.tokenContract,
-          scope: CHEESE_CONFIG.tokenSymbol,
-          table: 'stat',
-          json: true,
-          limit: 1,
-        }),
-      });
-
-      if (!response.ok) continue;
-
-      const data = await response.json();
-      if (data.rows && data.rows.length > 0) {
-        return data.rows[0] as TokenStat;
-      }
-    } catch (error) {
-      console.warn(`Failed to fetch token stats from ${endpoint}:`, error);
-    }
+  try {
+    const data = await readRows<TokenStat>({
+      code: CHEESE_CONFIG.tokenContract,
+      scope: CHEESE_CONFIG.tokenSymbol,
+      table: 'stat',
+      json: true,
+      limit: 1,
+    });
+    return data.rows?.[0] ?? null;
+  } catch (error) {
+    console.warn('Failed to fetch token stats:', error);
+    return null;
   }
-  return null;
 }
 
 // Parse token amount string (e.g., "888888888888.0000 CHEESE") to number
@@ -86,95 +78,77 @@ function parseTokenAmount(amountStr: string): number {
 async function fetchLockedCheese(): Promise<{ lockedAmount: number; nextUnlock: NextUnlock | null }> {
   const now = Math.floor(Date.now() / 1000);
 
-  for (const endpoint of await waxEndpoints()) {
-    try {
-      let lockedAmount = 0;
-      let nextUnlock: NextUnlock | null = null;
-      let more = true;
-      let lowerBound = '';
+  try {
+    let lockedAmount = 0;
+    let nextUnlock: NextUnlock | null = null;
+    let more = true;
+    let lowerBound = '';
 
-      // Paginate through all locks
-      while (more) {
-        const response = await fetch(`${endpoint}/v1/chain/get_table_rows`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            code: WAXDAO_LOCKER,
-            scope: WAXDAO_LOCKER,
-            table: 'locks',
-            json: true,
-            limit: 1000,
-            lower_bound: lowerBound,
-          }),
-        });
+    // Paginate through all locks. Each page is hedged across hosts, so a page
+    // landing on a slow node no longer abandons the whole total.
+    while (more) {
+      const data = await readRows<TokenLock>({
+        code: WAXDAO_LOCKER,
+        scope: WAXDAO_LOCKER,
+        table: 'locks',
+        json: true,
+        limit: 1000,
+        lower_bound: lowerBound,
+      });
+      const locks = data.rows ?? [];
 
-        if (!response.ok) break;
+      // Sum up CHEESE locks that are funded (status = 1)
+      for (const lock of locks) {
+        if (lock.token_contract === CHEESE_CONFIG.tokenContract && lock.status === 1) {
+          const amount = parseTokenAmount(lock.amount);
+          lockedAmount += amount;
 
-        const data = await response.json();
-        const locks = data.rows as TokenLock[];
-
-        // Sum up CHEESE locks that are funded (status = 1)
-        for (const lock of locks) {
-          if (lock.token_contract === CHEESE_CONFIG.tokenContract && lock.status === 1) {
-            const amount = parseTokenAmount(lock.amount);
-            lockedAmount += amount;
-
-            // Find the next unlock (unlock_time in the future, closest to now)
-            if (lock.unlock_time > now) {
-              if (!nextUnlock || lock.unlock_time < nextUnlock.year) {
-                // Store the timestamp temporarily in year field to compare
-                nextUnlock = { year: lock.unlock_time, amount };
-              } else if (lock.unlock_time === nextUnlock.year) {
-                // Same unlock time, accumulate amount
-                nextUnlock.amount += amount;
-              }
+          // Find the next unlock (unlock_time in the future, closest to now)
+          if (lock.unlock_time > now) {
+            if (!nextUnlock || lock.unlock_time < nextUnlock.year) {
+              // Store the timestamp temporarily in year field to compare
+              nextUnlock = { year: lock.unlock_time, amount };
+            } else if (lock.unlock_time === nextUnlock.year) {
+              // Same unlock time, accumulate amount
+              nextUnlock.amount += amount;
             }
           }
         }
-
-        more = data.more;
-        if (more && locks.length > 0) {
-          lowerBound = String(locks[locks.length - 1].ID + 1);
-        }
       }
 
-      // Convert timestamp to year
-      if (nextUnlock) {
-        nextUnlock.year = new Date(nextUnlock.year * 1000).getFullYear();
+      more = Boolean(data.more);
+      if (more && locks.length > 0) {
+        lowerBound = String(locks[locks.length - 1].ID + 1);
       }
-
-      return { lockedAmount, nextUnlock };
-    } catch (error) {
-      console.warn(`Failed to fetch locked CHEESE from ${endpoint}:`, error);
     }
+
+    // Convert timestamp to year
+    if (nextUnlock) {
+      nextUnlock.year = new Date(nextUnlock.year * 1000).getFullYear();
+    }
+
+    return { lockedAmount, nextUnlock };
+  } catch (error) {
+    console.warn('Failed to fetch locked CHEESE:', error);
+    return { lockedAmount: 0, nextUnlock: null };
   }
-  return { lockedAmount: 0, nextUnlock: null };
 }
 
 // Fetch CHEESE balance of eosio.null account
 async function fetchNulledBalance(): Promise<number> {
-  for (const endpoint of await waxEndpoints()) {
-    try {
-      const response = await fetch(`${endpoint}/v1/chain/get_currency_balance`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code: CHEESE_CONFIG.tokenContract,
-          account: 'eosio.null',
-          symbol: CHEESE_CONFIG.tokenSymbol,
-        }),
-      });
-
-      if (!response.ok) continue;
-
-      const data = await response.json();
-      if (Array.isArray(data) && data.length > 0) {
-        return parseTokenAmount(data[0]);
-      }
-      return 0; // Account has no CHEESE balance
-    } catch (error) {
-      console.warn(`Failed to fetch nulled balance from ${endpoint}:`, error);
-    }
+  try {
+    const data = await chainPost<string[]>(
+      '/v1/chain/get_currency_balance',
+      {
+        code: CHEESE_CONFIG.tokenContract,
+        account: 'eosio.null',
+        symbol: CHEESE_CONFIG.tokenSymbol,
+      },
+      { feature: 'chain-api', fallback: WAX_API_FALLBACK },
+    );
+    if (Array.isArray(data) && data.length > 0) return parseTokenAmount(data[0]);
+  } catch (error) {
+    console.warn('Failed to fetch nulled balance:', error);
   }
   return 0;
 }

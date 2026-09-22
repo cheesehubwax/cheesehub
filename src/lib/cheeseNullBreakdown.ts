@@ -10,18 +10,13 @@
 
 import { fetchContractStats, parseAssetAmount } from './cheeseNullApi';
 import { fetchActionsUnion, sumAssetField } from './hyperionHistory';
-import { resolveEndpoints } from './endpointHealth';
+import { STATIC_ENDPOINTS } from './endpointHealth';
+import { chainPost } from './chainRequest';
 
 const BATCH_SIZE = 1000;
 const MAX_ACTIONS = 50000;
 
-const WAX_RPC_FALLBACK = [
-  'https://wax.hivebp.io',
-  'https://api.wax.alohaeos.com',
-  'https://wax.eosusa.io',
-  'https://api.waxsweden.org',
-  'https://wax.greymass.com',
-];
+const WAX_RPC_FALLBACK = STATIC_ENDPOINTS['chain-api'];
 
 export interface NullBreakdownEntry {
   contract: string;
@@ -55,30 +50,19 @@ interface CoverageTracker {
 
 // cheesepowerz stores its own stats on-chain (authoritative)
 async function fetchCheesepowerzNulled(): Promise<number | null> {
-  for (const base of await resolveEndpoints('chain-api', WAX_RPC_FALLBACK)) {
-    try {
-      const response = await fetch(`${base}/v1/chain/get_table_rows`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code: 'cheesepowerz',
-          scope: 'cheesepowerz',
-          table: 'stats',
-          json: true,
-          limit: 1,
-        }),
-      });
-      if (!response.ok) continue;
-      const data = await response.json();
-      if (data.rows && data.rows.length > 0) {
-        return parseAsset(data.rows[0].total_cheese_received);
-      }
-      return 0;
-    } catch {
-      continue;
+  try {
+    const data = await chainPost<{ rows: { total_cheese_received: string }[] }>(
+      '/v1/chain/get_table_rows',
+      { code: 'cheesepowerz', scope: 'cheesepowerz', table: 'stats', json: true, limit: 1 },
+      { feature: 'chain-api', fallback: WAX_RPC_FALLBACK },
+    );
+    if (data.rows && data.rows.length > 0) {
+      return parseAsset(data.rows[0].total_cheese_received);
     }
+    return 0;
+  } catch {
+    return null;
   }
-  return null;
 }
 
 // Hyperion returns timestamps like `2026-09-11T21:44:52.000` with no timezone
