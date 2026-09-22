@@ -17,6 +17,11 @@ import { readStatCache, writeStatCache, cached, clearStatCache } from '@/lib/sta
 
 const HOSTS = ['https://a.example', 'https://b.example', 'https://c.example'];
 
+/** First recorded call to a chain host, skipping the health-service probe. */
+function chainCall(impl: { mock: { calls: unknown[][] } }): unknown[] {
+  return impl.mock.calls.find((call) => HOSTS.some((h) => String(call[0]).startsWith(h)))!;
+}
+
 /** A fetch stub driven by per-host behaviour. */
 function stubFetch(
   behaviour: Record<string, { status?: number; delayMs?: number; throws?: boolean; body?: unknown }>,
