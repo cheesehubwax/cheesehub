@@ -8,6 +8,7 @@ import {
   STATIC_ENDPOINTS,
   mergeEndpoints,
   normalizeEndpoint,
+  benchedEndpoints,
   type EndpointFeature,
   type HealthEntry,
 } from '@/lib/endpointHealth';
