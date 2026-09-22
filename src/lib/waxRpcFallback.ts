@@ -33,91 +33,43 @@ interface TableRowsResponse<T = Record<string, unknown>> {
 }
 
 /**
- * Fetch table rows from WAX blockchain with automatic endpoint fallback
+ * Fetch table rows from WAX blockchain. Hedged across hosts, so a silent node
+ * costs a couple of seconds instead of the whole read.
  */
 export async function fetchTableRows<T = Record<string, unknown>>(
   params: TableRowsParams,
-  timeout: number = 8000
+  timeout: number = 9000
 ): Promise<TableRowsResponse<T>> {
-  let lastError: Error | null = null;
-  const endpoints = await resolveEndpoints("chain-api", WAX_RPC_ENDPOINTS);
-
-  for (const baseUrl of endpoints) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-      const response = await fetch(`${baseUrl}/v1/chain/get_table_rows`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          json: true,
-          ...params,
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        const data = await response.json();
-        return data as TableRowsResponse<T>;
-      }
-
-      console.warn(`WAX endpoint ${baseUrl} returned ${response.status}, trying next...`);
-    } catch (error) {
-      lastError = error as Error;
-      console.warn(`WAX endpoint ${baseUrl} failed:`, (error as Error).message);
-    }
-  }
-
-  throw lastError || new Error("All WAX RPC endpoints failed");
+  const { data } = await hedgedJson<TableRowsResponse<T>>("/v1/chain/get_table_rows", {
+    feature: "chain-api",
+    fallback: WAX_RPC_ENDPOINTS,
+    body: { json: true, ...params },
+    timeoutMs: timeout,
+  });
+  return data;
 }
 
 /**
- * Generic WAX RPC call with fallback
- * For get_currency_balance, a 400 error means the contract doesn't exist - return empty array
+ * Generic WAX RPC call.
+ * For get_currency_balance, a 400/500 means the contract doesn't exist — that is
+ * a valid "no balance" answer, not a reason to try another host.
  */
 export async function waxRpcCall<T = unknown>(
   path: string,
   body: Record<string, unknown>,
-  timeout: number = 8000
+  timeout: number = 9000
 ): Promise<T> {
-  let lastError: Error | null = null;
-  const endpoints = await resolveEndpoints("chain-api", WAX_RPC_ENDPOINTS);
-
-  for (const baseUrl of endpoints) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-      const response = await fetch(`${baseUrl}${path}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        return (await response.json()) as T;
-      }
-
-      // For get_currency_balance, 400/500 with account_query_exception means contract doesn't exist
-      // Return empty array instead of retrying - this is a valid response
-      if (path === '/v1/chain/get_currency_balance' && (response.status === 400 || response.status === 500)) {
-        return [] as T;
-      }
-
-      console.warn(`WAX endpoint ${baseUrl} returned ${response.status}, trying next...`);
-    } catch (error) {
-      lastError = error as Error;
-      console.warn(`WAX endpoint ${baseUrl} failed:`, (error as Error).message);
-    }
-  }
-
-  throw lastError || new Error("All WAX RPC endpoints failed");
+  const { data } = await hedgedJson<T>(path, {
+    feature: "chain-api",
+    fallback: WAX_RPC_ENDPOINTS,
+    body,
+    timeoutMs: timeout,
+    onStatus: (status) =>
+      path === "/v1/chain/get_currency_balance" && (status === 400 || status === 500)
+        ? { value: [] as unknown as T }
+        : undefined,
+  });
+  return data;
 }
 
 // Hyperion API types
