@@ -54,6 +54,7 @@ export function waitForPreload(url: string): Promise<boolean> {
 }
 
 import { IPFS_GATEWAYS, getIpfsUrl, extractIpfsHash, atomicHubImageUrl } from '@/lib/ipfsGateways';
+import { resolveEndpoints } from '@/lib/endpointHealth';
 
 // Warm the AtomicHub image cache alongside the primary gateway URL: for content
 // that is no longer retrievable from public IPFS gateways, the cache is the only
@@ -1004,11 +1005,11 @@ export async function fetchUserNFTsBySchema(
     if (!collection || !schema) continue;
 
     let fetched = false;
-    const endpoints = [
+    const endpoints = await resolveEndpoints('atomic-assets-api', [
       'https://aa.wax.blacklusion.io',
       'https://wax-aa.eu.eosamsterdam.net',
       'https://wax.api.atomicassets.io',
-    ];
+    ]);
     for (const baseUrl of endpoints) {
       if (fetched) break;
       try {
