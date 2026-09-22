@@ -1,29 +1,31 @@
 # Add average columns to Null by Contract
 
 ## Goal
-Show, for each contract in the Null Breakdown table, a daily average for each period already displayed: 24h, 7d and 30d.
+Add three average columns to the Null Breakdown table: one after each of the 24h, 7d and 30d periods, for every contract.
 
-## What the averages mean
-- 24h avg = the 24h amount divided by 1 day (the hourly-rate-free, plain per-day figure for the last day).
-- 7d avg = the 7d amount divided by 7.
-- 30d avg = the 30d amount divided by 30.
+## How each average is calculated
+We know how far back each contract has actually been tracked (the timestamp of its oldest history record). Each average divides the column's amount by the real tracked span inside that period, so a contract with only partial history is not unfairly diluted:
 
-All three are "CHEESE nulled per day" so the three numbers are directly comparable: a 24h average far above the 30d average means nulling has sped up.
+- **24h avg/day** = 24h amount ÷ tracked days (capped at 1 day).
+- **7d avg/week** = 7d amount ÷ tracked weeks (capped at 1 week).
+- **30d avg/month** = 30d amount ÷ tracked months (capped at 1 month).
+
+"Tracked" means: from the contract's oldest record within that period up to now, never longer than the period itself. A contract whose history covers the full period divides by the full 1 day / 1 week / 1 month; a contract that only started nulling halfway through divides by half, giving its true average rate over the time it has actually been active. If a contract has no records in a period, the average is zero.
 
 ## Changes
 1. **Breakdown data** (`src/lib/cheeseNullBreakdown.ts`)
-   - Add `avg24h`, `avg7d`, `avg30d` to `NullBreakdownEntry`, computed from the existing period amounts divided by 1, 7 and 30 days respectively.
-   - No new chain reads: the period amounts are already collected, so opening the table stays as fast as it is now.
+   - While grouping history, record each contract's earliest timestamp (overall and within the 7d/30d windows).
+   - Add `avg24h`, `avg7d`, `avg30d` to `NullBreakdownEntry`, computed as above.
+   - No new chain reads — everything derives from the history already fetched.
 
 2. **Table** (`src/components/home/TokenStatsBanner.tsx`)
-   - Add three columns, each immediately after its period's `%` column: `24h avg/day`, `7d avg/day`, `30d avg/day`.
-   - Format with the same `formatFullNumber` + yellow CHEESE label used by the amount cells, right-aligned, muted so the totals stay the visual focus.
-   - Column order becomes: Contract, 24h, 24h %, 24h avg/day, 7d, 7d %, 7d avg/day, 30d, 30d %, 30d avg/day, Total, %.
-   - Popover already scrolls horizontally on narrow widths; keep headers `whitespace-nowrap` so nothing wraps.
+   - New columns right after each period's `%` column: `24h avg/day`, `7d avg/wk`, `30d avg/mo`.
+   - Final order: Contract, 24h, 24h %, 24h avg/day, 7d, 7d %, 7d avg/wk, 30d, 30d %, 30d avg/mo, Total, %.
+   - Same `formatFullNumber` + yellow CHEESE styling as the amount cells, right-aligned; popover already handles the extra width with horizontal scroll on small screens.
 
 3. **Verify**
    - Typecheck and build.
-   - Open the homepage popover in the running preview, confirm the three new columns render with sensible values (24h avg equals the 24h amount, 7d avg equals roughly a seventh of the 7d amount) and the partial-coverage notice still behaves.
+   - Open the homepage popover in the running preview: confirm the three columns render, a fully-tracked contract's 24h avg equals its 24h amount, and a recently-started contract shows a higher average than naive division would give.
 
 ## Technical details
-Averages are pure presentation math derived from the already-computed `amount24h`/`amount7d`/`amount30d`, so no history reader, caching or provider behaviour changes. Where a period amount is zero the average renders as zero rather than blank, matching the existing amount cells.
+Pure read-side math on records already retrieved — no new provider calls, caching or transaction behaviour changes. Earliest-timestamp tracking piggybacks on the existing `addActions` loop; contracts relying on authoritative on-chain counters (cheeseburner, cheesepowerz) still use history-derived earliest timestamps for their spans, with the full window as fallback when no history rows exist.
