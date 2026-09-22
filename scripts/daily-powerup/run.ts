@@ -1,6 +1,6 @@
 // Daily CHEESE powerup runner.
 
-import { fetchTableAll, accountExists, getRecentInboundTransfers } from "./waxRpc";
+import { fetchTableAll, accountExists, getRecentInboundTransfers, primeEndpointOrder } from "./waxRpc";
 import { filterEligible, type StakeRow } from "./filterStakers";
 import { createSession, buildTransferAction, submitActions } from "./waxSign";
 
@@ -179,6 +179,7 @@ async function sendBatchWithBisect(
 }
 
 async function main() {
+  await primeEndpointOrder();
   log(`signer=${SIGNER}@${PERMISSION} dry_run=${DRY_RUN} allowlist=${ALLOWLIST.length}`);
   log(`config: min_staked=${MIN_STAKED} CHEESE, per_account=${TRANSFER_AMOUNT}`);
 
