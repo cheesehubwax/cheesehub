@@ -51,8 +51,9 @@ export async function fetchTableRows<T = Record<string, unknown>>(
   timeout: number = 8000
 ): Promise<TableRowsResponse<T>> {
   let lastError: Error | null = null;
+  const endpoints = await resolveEndpoints("chain-api", WAX_RPC_ENDPOINTS);
 
-  for (const baseUrl of WAX_RPC_ENDPOINTS) {
+  for (const baseUrl of endpoints) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -94,8 +95,9 @@ export async function waxRpcCall<T = unknown>(
   timeout: number = 8000
 ): Promise<T> {
   let lastError: Error | null = null;
+  const endpoints = await resolveEndpoints("chain-api", WAX_RPC_ENDPOINTS);
 
-  for (const baseUrl of WAX_RPC_ENDPOINTS) {
+  for (const baseUrl of endpoints) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -163,8 +165,9 @@ export async function fetchAllTokenBalances(
   timeout: number = 8000
 ): Promise<HyperionResult> {
   let lastError: Error | null = null;
+  const endpoints = await resolveEndpoints("hyperion-v2", HYPERION_ENDPOINTS);
 
-  for (const baseUrl of HYPERION_ENDPOINTS) {
+  for (const baseUrl of endpoints) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
