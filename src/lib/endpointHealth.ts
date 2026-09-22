@@ -257,7 +257,11 @@ export function mergeEndpoints(
   for (const url of vetted) push(url);
   for (const entry of healthy) if (entry.status === 'healthy') push(entry.url);
 
-  return out.slice(0, limit);
+  // Hosts that just failed in this browser go to the tail rather than being
+  // dropped: they are still better than having nothing left to try.
+  const ordered = [...out].sort((a, b) => Number(isBenched(a)) - Number(isBenched(b)));
+
+  return ordered.slice(0, limit);
 }
 
 /**
@@ -296,8 +300,9 @@ export function primeEndpointHealth(): void {
   }
 }
 
-/** Test-only: forget every cached health answer. */
+/** Test-only: forget every cached health answer and every bench. */
 export function resetEndpointHealthCache(): void {
   cache.clear();
   inFlight.clear();
+  benched.clear();
 }
