@@ -122,7 +122,7 @@ export async function fetchActionsUnion(
   options: ActionsUnionOptions = {},
 ): Promise<ActionsUnion> {
   const {
-    endpoints = DEFAULT_HYPERION_ENDPOINTS,
+    endpoints = await resolveEndpoints('hyperion-v2', DEFAULT_HYPERION_ENDPOINTS),
     batchSize = 1000,
     maxActions = 50000,
     timeoutMs = 20000,
