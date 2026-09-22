@@ -29,6 +29,12 @@ export interface NullBreakdownEntry {
   percent7d: number;
   amount30d: number;
   percent30d: number;
+  /** Amount per day over the span actually tracked inside the 24h window. */
+  avg24h: number;
+  /** Amount per week over the span actually tracked inside the 7d window. */
+  avg7d: number;
+  /** Amount per month over the span actually tracked inside the 30d window. */
+  avg30d: number;
 }
 
 export interface NullBreakdownResult {
