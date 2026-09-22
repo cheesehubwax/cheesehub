@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
+import { resolveEndpoints } from '@/lib/endpointHealth';
 
-const HYPERION_ENDPOINTS = [
+const HYPERION_FALLBACK = [
+  'https://wax.hivebp.io',
   'https://wax.eosphere.io',
-  'https://api.wax.alohaeos.com',
-  'https://wax.greymass.com',
+  'https://wax.cryptolions.io',
 ];
 
 const CONTRACTS = ['cheeseburner', 'cheesefeefee', 'cheesebannad', 'cheesepowerz'];
@@ -19,7 +20,7 @@ export interface FailedTransaction {
 async function fetchFailedForContract(contract: string): Promise<FailedTransaction[]> {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-  for (const endpoint of HYPERION_ENDPOINTS) {
+  for (const endpoint of await resolveEndpoints('hyperion-v2', HYPERION_FALLBACK)) {
     try {
       const url = `${endpoint}/v2/history/get_actions?account=${contract}&after=${since}&sort=desc&limit=100`;
       const controller = new AbortController();

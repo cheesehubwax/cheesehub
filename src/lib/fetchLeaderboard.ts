@@ -1,3 +1,4 @@
+import { resolveEndpoints } from './endpointHealth';
 // Nullers Leaderboard - fetches logburn actions from Hyperion and aggregates stats.
 //
 // Coverage note: individual Hyperion providers can silently lose or partially
@@ -6,12 +7,13 @@
 // looks "suddenly wrong". We query several providers, merge their results by
 // unique action identity and keep the most complete union.
 
-const HYPERION_ENDPOINTS = [
+/** Offline fallback order; live ordering comes from the health resolver. */
+const HYPERION_FALLBACK = [
+  'https://wax.hivebp.io',
   'https://wax.cryptolions.io',
   'https://api.waxsweden.org',
   'https://wax.eosusa.io',
   'https://wax.eosphere.io',
-  'https://wax.blokcrafters.io',
 ];
 const BATCH_SIZE = 1000;
 const MAX_ACTIONS = 10000; // safety cap
@@ -122,13 +124,14 @@ export async function fetchLogburnActionsDetailed(): Promise<LogburnFetchResult>
   let endpointsSucceeded = 0;
   let bestEndpointCount = 0;
 
+  const endpoints = await resolveEndpoints('hyperion-v2', HYPERION_FALLBACK);
   const results = await Promise.allSettled(
-    HYPERION_ENDPOINTS.map((base) => fetchFromEndpoint(base)),
+    endpoints.map((base) => fetchFromEndpoint(base)),
   );
 
   results.forEach((result, i) => {
     if (result.status !== 'fulfilled') {
-      console.warn(`Nuller leaderboard fetch failed for ${HYPERION_ENDPOINTS[i]}:`, result.reason);
+      console.warn(`Nuller leaderboard fetch failed for ${endpoints[i]}:`, result.reason);
       return;
     }
     endpointsSucceeded += 1;

@@ -1,12 +1,15 @@
+import { resolveEndpoints } from './endpointHealth';
 // Coverage note: single Hyperion providers can return a partially indexed
 // history, which silently shrinks the leaderboard. Query several and merge.
-const HYPERION_ENDPOINTS = [
-  'https://wax.cryptolions.io/v2/history/get_actions',
-  'https://api.waxsweden.org/v2/history/get_actions',
-  'https://wax.eosphere.io/v2/history/get_actions',
-  'https://wax.eosusa.io/v2/history/get_actions',
-  'https://wax.blokcrafters.io/v2/history/get_actions',
+/** Offline fallback order; live ordering comes from the health resolver. */
+const HYPERION_FALLBACK = [
+  'https://wax.hivebp.io',
+  'https://wax.cryptolions.io',
+  'https://api.waxsweden.org',
+  'https://wax.eosphere.io',
+  'https://wax.eosusa.io',
 ];
+const ACTIONS_PATH = '/v2/history/get_actions';
 const BATCH_SIZE = 1000;
 const MAX_ACTIONS = 10000;
 const ENDPOINT_TIMEOUT_MS = 20000;
@@ -69,7 +72,7 @@ async function fetchFromEndpoint(endpoint: string): Promise<Map<string, PowerupT
   let skip = 0;
 
   while (skip < MAX_ACTIONS) {
-    const url = `${endpoint}?act.account=cheeseburger&act.name=transfer&transfer.to=cheesepowerz&limit=${BATCH_SIZE}&skip=${skip}`;
+    const url = `${endpoint}${ACTIONS_PATH}?act.account=cheeseburger&act.name=transfer&transfer.to=cheesepowerz&limit=${BATCH_SIZE}&skip=${skip}`;
     const data = await fetchJson(url);
     const actions = data.actions;
 
@@ -95,13 +98,14 @@ export async function fetchPowerupTransfers(): Promise<PowerupTransferAction[]> 
   const merged = new Map<string, PowerupTransferAction>();
   let succeeded = 0;
 
+  const endpoints = await resolveEndpoints('hyperion-v2', HYPERION_FALLBACK);
   const results = await Promise.allSettled(
-    HYPERION_ENDPOINTS.map((endpoint) => fetchFromEndpoint(endpoint)),
+    endpoints.map((endpoint) => fetchFromEndpoint(endpoint)),
   );
 
   results.forEach((result, i) => {
     if (result.status !== 'fulfilled') {
-      console.error(`Powerup leaderboard fetch failed for ${HYPERION_ENDPOINTS[i]}:`, result.reason);
+      console.error(`Powerup leaderboard fetch failed for ${endpoints[i]}:`, result.reason);
       return;
     }
     succeeded += 1;

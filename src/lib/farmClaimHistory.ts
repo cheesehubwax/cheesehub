@@ -10,6 +10,7 @@
 
 import { FARM_CONTRACT } from "./farm";
 import { fetchActionsUnion } from "./hyperionHistory";
+import { resolveEndpoints } from "./endpointHealth";
 
 export interface ClaimedToken {
   contract: string;
@@ -30,11 +31,14 @@ export interface ClaimSnapshot {
 const STORAGE_PREFIX = "cheesehub:farmClaims:v1:";
 const SCHEMA_VERSION = 1 as const;
 
-const HYPERION_ENDPOINTS = [
-  "https://wax.cryptolions.io",
+const HYPERION_FALLBACK = [
   "https://wax.hivebp.io",
+  "https://wax.cryptolions.io",
   "https://wax.eosphere.io",
 ];
+
+/** Health-ordered Hyperion mirrors for this module's reads. */
+const hyperionEndpoints = () => resolveEndpoints("hyperion-v2", HYPERION_FALLBACK);
 
 // ── Storage ────────────────────────────────────────────────────────────────
 
@@ -136,7 +140,7 @@ async function withHyperionFallback<T>(
   signal?: AbortSignal,
 ): Promise<T> {
   let lastErr: unknown = null;
-  for (const base of HYPERION_ENDPOINTS) {
+  for (const base of await hyperionEndpoints()) {
     try {
       return await fetchJson<T>(build(base), signal);
     } catch (e) {
@@ -165,7 +169,7 @@ export async function fetchBaselineFromHyperion(
       `&filter=${encodeURIComponent(`${FARM_CONTRACT}:claim`)}` +
       `&sort=desc`,
     {
-      endpoints: HYPERION_ENDPOINTS,
+      endpoints: await hyperionEndpoints(),
       batchSize: PAGE_SIZE,
       maxActions: PAGE_SIZE * MAX_PAGES,
       timeoutMs: 10000,

@@ -3,12 +3,14 @@ import { fetchTableRows } from '@/lib/waxRpcFallback';
 import { NFTHIVE_CONFIG, CHEESE_CONFIG, ATOMIC_API } from '@/lib/waxConfig';
 import { getIpfsUrl, extractIpfsHash } from '@/lib/ipfsGateways';
 import { fetchActionsUnion } from '@/lib/hyperionHistory';
+import { resolveEndpoints } from '@/lib/endpointHealth';
 
-const HYPERION_ENDPOINTS = [
-  'https://wax.cryptolions.io',
+const HYPERION_FALLBACK = [
   'https://wax.hivebp.io',
+  'https://wax.cryptolions.io',
   'https://wax.eosphere.io',
 ];
+const hyperionEndpoints = () => resolveEndpoints('hyperion-v2', HYPERION_FALLBACK);
 
 export interface DropPurchase {
   timestamp: string;
@@ -94,7 +96,7 @@ async function fetchTemplateImages(templateIds: number[]): Promise<Map<number, s
 async function fetchDropPurchases(): Promise<DropPurchase[]> {
   const { actions } = await fetchActionsUnion(
     'account=nfthivedrops&act.name=claimdrop&sort=desc',
-    { endpoints: HYPERION_ENDPOINTS, batchSize: 200, paginate: false, timeoutMs: 10000 },
+    { endpoints: await hyperionEndpoints(), batchSize: 200, paginate: false, timeoutMs: 10000 },
   );
 
   const purchases: DropPurchase[] = [];
@@ -136,7 +138,7 @@ async function fetchDropTransfers(): Promise<Map<string, { quantity: string; cur
 
   const { actions } = await fetchActionsUnion(
     'account=nfthivedrops&act.name=transfer&filter=*:transfer&transfer.to=nfthivedrops&sort=desc',
-    { endpoints: HYPERION_ENDPOINTS, batchSize: 200, paginate: false, timeoutMs: 10000 },
+    { endpoints: await hyperionEndpoints(), batchSize: 200, paginate: false, timeoutMs: 10000 },
   );
 
   for (const action of actions) {
