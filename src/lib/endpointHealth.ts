@@ -97,6 +97,56 @@ export const normalizeEndpoint = (url: string): string => url.replace(/\/+$/, ''
 
 const isDead = (url: string): boolean => DEAD_ENDPOINTS.includes(normalizeEndpoint(url));
 
+// ---------------------------------------------------------------------------
+// Bench: what actually failed in THIS browser.
+//
+// A monitor checks nodes from its own machines. wax.hivebp.io is ranked the
+// healthiest WAX node and still answers "Failed to fetch" for some visitors, so
+// reachability has to be learned locally: a host that fails is benched for a
+// while and tried last instead of first.
+// ---------------------------------------------------------------------------
+
+/** How long a host sits out, by the kind of failure it produced. */
+export const BENCH_MS = {
+  /** Timeout or outright network/CORS failure. */
+  network: 25_000,
+  /** Rate limited (420 / 429). */
+  rateLimited: 30_000,
+  /** Any other unsuccessful answer. */
+  error: 15_000,
+} as const;
+
+const benched = new Map<string, number>();
+
+/** Sit a host out for `ms`. */
+export function benchEndpoint(url: string, ms: number = BENCH_MS.error): void {
+  benched.set(normalizeEndpoint(url), Date.now() + ms);
+}
+
+/** True while a host is benched. */
+export function isBenched(url: string): boolean {
+  const until = benched.get(normalizeEndpoint(url));
+  if (!until) return false;
+  if (until <= Date.now()) {
+    benched.delete(normalizeEndpoint(url));
+    return false;
+  }
+  return true;
+}
+
+/** A host answered — it is trustworthy again straight away. */
+export function clearBench(url: string): void {
+  benched.delete(normalizeEndpoint(url));
+}
+
+/** Benched hosts and when each comes back, for the admin health card. */
+export function benchedEndpoints(): { url: string; until: number }[] {
+  const now = Date.now();
+  return [...benched.entries()]
+    .filter(([, until]) => until > now)
+    .map(([url, until]) => ({ url, until }));
+}
+
 interface HerdCheckEntry {
   url?: string;
   status?: string;
