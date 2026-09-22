@@ -62,7 +62,8 @@ export async function applyHealthOrder(
       seen.add(url);
       ordered.push(url);
     }
-    // Keep our own hosts that HerdCheck does not monitor as a last resort.
+    // Keep our own remaining hosts as a last resort (tried only after the
+    // healthy ones): some are not monitored by HerdCheck at all.
     for (const url of original) {
       if (seen.has(url) || healthySet.has(url)) continue;
       seen.add(url);
