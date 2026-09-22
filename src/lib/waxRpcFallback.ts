@@ -103,57 +103,35 @@ const STALE_THRESHOLD_MS = 60 * 60 * 1000;
  */
 export async function fetchAllTokenBalances(
   account: string,
-  timeout: number = 8000
+  timeout: number = 9000
 ): Promise<HyperionResult> {
-  let lastError: Error | null = null;
-  const endpoints = await resolveEndpoints("hyperion-v2", HYPERION_ENDPOINTS);
-
-  for (const baseUrl of endpoints) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-      const response = await fetch(
-        `${baseUrl}/v2/state/get_tokens?account=${account}`,
-        {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-          signal: controller.signal,
-        }
-      );
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        const data = (await response.json()) as HyperionTokensResponse;
-        const tokens = data.tokens || [];
-
-        // Parse last indexed time and check staleness
-        const lastIndexedTime = data.last_indexed_block_time
-          ? new Date(data.last_indexed_block_time)
-          : null;
-
-        const isStale = lastIndexedTime
-          ? (Date.now() - lastIndexedTime.getTime()) > STALE_THRESHOLD_MS
-          : false;
-
-        const ageMinutes = lastIndexedTime
-          ? Math.round((Date.now() - lastIndexedTime.getTime()) / 60000)
-          : 'unknown';
-
-        console.log(`[Hyperion] Got ${tokens.length} tokens from ${baseUrl} (indexed ${ageMinutes} min ago, stale: ${isStale})`);
-
-        return { tokens, lastIndexedTime, isStale };
-      }
-
-      console.warn(`Hyperion endpoint ${baseUrl} returned ${response.status}, trying next...`);
-    } catch (error) {
-      lastError = error as Error;
-      console.warn(`Hyperion endpoint ${baseUrl} failed:`, (error as Error).message);
+  const { data, host } = await hedgedJson<HyperionTokensResponse>(
+    `/v2/state/get_tokens?account=${account}`,
+    {
+      feature: "hyperion-v2",
+      fallback: HYPERION_ENDPOINTS,
+      method: "GET",
+      timeoutMs: timeout,
     }
-  }
+  );
 
-  throw lastError || new Error("All Hyperion endpoints failed");
+  const tokens = data.tokens || [];
+
+  const lastIndexedTime = data.last_indexed_block_time
+    ? new Date(data.last_indexed_block_time)
+    : null;
+
+  const isStale = lastIndexedTime
+    ? (Date.now() - lastIndexedTime.getTime()) > STALE_THRESHOLD_MS
+    : false;
+
+  const ageMinutes = lastIndexedTime
+    ? Math.round((Date.now() - lastIndexedTime.getTime()) / 60000)
+    : 'unknown';
+
+  console.log(`[Hyperion] Got ${tokens.length} tokens from ${host} (indexed ${ageMinutes} min ago, stale: ${isStale})`);
+
+  return { tokens, lastIndexedTime, isStale };
 }
 
 /**
