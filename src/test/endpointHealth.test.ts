@@ -30,12 +30,33 @@ const healthResponse = (urls: { url: string; status?: string; uptimePercent?: nu
 });
 
 describe('mergeEndpoints', () => {
-  it('puts healthy hosts first and keeps unlisted fallbacks last', () => {
+  it('orders our own hosts by health and keeps unmonitored ones in the middle', () => {
     const merged = mergeEndpoints(
-      [entry('https://healthy-a.io'), entry('https://healthy-b.io', 'degraded', 80)],
-      ['https://mine.io', 'https://healthy-a.io'],
+      [entry('https://ours-b.io', 'degraded', 80), entry('https://ours-a.io')],
+      ['https://ours-b.io', 'https://mine.io', 'https://ours-a.io'],
     );
-    expect(merged).toEqual(['https://healthy-a.io', 'https://healthy-b.io', 'https://mine.io']);
+    expect(merged).toEqual(['https://ours-a.io', 'https://ours-b.io', 'https://mine.io']);
+  });
+
+  it('appends healthy hosts we do not list, as a last resort only', () => {
+    const merged = mergeEndpoints([entry('https://extra.io')], ['https://mine.io']);
+    expect(merged).toEqual(['https://mine.io', 'https://extra.io']);
+  });
+
+  it('drops one of our hosts when health reports it down', () => {
+    const merged = mergeEndpoints(
+      [entry('https://ours-down.io', 'down', 0), entry('https://ours-up.io')],
+      ['https://ours-down.io', 'https://ours-up.io'],
+    );
+    expect(merged).toEqual(['https://ours-up.io']);
+  });
+
+  it('prefers the better uptime among healthy hosts', () => {
+    const merged = mergeEndpoints(
+      [entry('https://ours-a.io', 'healthy', 41), entry('https://ours-b.io', 'healthy', 100)],
+      ['https://ours-a.io', 'https://ours-b.io'],
+    );
+    expect(merged).toEqual(['https://ours-b.io', 'https://ours-a.io']);
   });
 
   it('never queues a known-dead host, from either list', () => {
@@ -44,11 +65,8 @@ describe('mergeEndpoints', () => {
     expect(merged).toEqual(['https://alive.io']);
   });
 
-  it('drops hosts reported as down and normalises trailing slashes', () => {
-    const merged = mergeEndpoints(
-      [entry('https://down.io', 'down', 0), entry('https://up.io/')],
-      [],
-    );
+  it('normalises trailing slashes', () => {
+    const merged = mergeEndpoints([entry('https://up.io/')], ['https://up.io']);
     expect(merged).toEqual(['https://up.io']);
   });
 
@@ -70,11 +88,15 @@ describe('resolveEndpoints', () => {
   it('orders reads by live health', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => healthResponse([{ url: 'https://fast.io' }, { url: 'https://ok.io' }])),
+      vi.fn(async () =>
+        healthResponse([
+          { url: 'https://fast.io', uptimePercent: 100 },
+          { url: 'https://slow.io', status: 'degraded', uptimePercent: 60 },
+        ]),
+      ),
     );
-    const order = await resolveEndpoints('chain-api', ['https://mine.io']);
-    expect(order[0]).toBe('https://fast.io');
-    expect(order).toContain('https://mine.io');
+    const order = await resolveEndpoints('chain-api', ['https://slow.io', 'https://fast.io']);
+    expect(order.slice(0, 2)).toEqual(['https://fast.io', 'https://slow.io']);
   });
 
   it('falls back to the static list when the health read fails', async () => {
