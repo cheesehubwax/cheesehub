@@ -133,9 +133,20 @@ export async function fetchActionsUnion(
   let endpointsSucceeded = 0;
   let bestEndpointCount = 0;
 
-  const results = await Promise.allSettled(
-    endpoints.map((base) => fetchFromEndpoint(base, query, batchSize, maxActions, timeoutMs, paginate)),
-  );
+  // Bounded parallelism: a union read across many providers must not open one
+  // socket per host at once, which is what starves the rest of the page.
+  const results = await mapLimit(endpoints, MAX_CONCURRENT, async (base) => {
+    try {
+      const value = await fetchFromEndpoint(base, query, batchSize, maxActions, timeoutMs, paginate);
+      clearBench(base);
+      return { status: 'fulfilled' as const, value };
+    } catch (error) {
+      // A provider that just failed is sidelined for a short while so the next
+      // read leads with hosts that are actually answering this browser.
+      benchEndpoint(base, BENCH_MS.error);
+      return { status: 'rejected' as const, reason: error };
+    }
+  });
 
   results.forEach((result, i) => {
     if (result.status !== 'fulfilled') {
