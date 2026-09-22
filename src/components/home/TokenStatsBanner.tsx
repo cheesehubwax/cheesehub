@@ -254,7 +254,7 @@ export function TokenStatsBanner() {
                           <TableCell className="py-2 text-xs text-right font-semibold whitespace-nowrap">
                             {entry.percent24h.toFixed(1)}%
                           </TableCell>
-                          <TableCell className="py-2 text-xs text-right text-muted-foreground whitespace-nowrap">
+                          <TableCell className="py-2 text-xs text-right whitespace-nowrap">
                             {entry.avg24h !== null ? (<>{formatFullNumber(entry.avg24h)} <span className="text-cheese">CHEESE</span></>) : '—'}
                           </TableCell>
                           <TableCell className="py-2 text-xs text-right whitespace-nowrap">
@@ -263,7 +263,7 @@ export function TokenStatsBanner() {
                           <TableCell className="py-2 text-xs text-right font-semibold whitespace-nowrap">
                             {entry.percent7d.toFixed(1)}%
                           </TableCell>
-                          <TableCell className="py-2 text-xs text-right text-muted-foreground whitespace-nowrap">
+                          <TableCell className="py-2 text-xs text-right whitespace-nowrap">
                             {entry.avg7d !== null ? (<>{formatFullNumber(entry.avg7d)} <span className="text-cheese">CHEESE</span></>) : '—'}
                           </TableCell>
                           <TableCell className="py-2 text-xs text-right whitespace-nowrap">
@@ -272,7 +272,7 @@ export function TokenStatsBanner() {
                           <TableCell className="py-2 text-xs text-right font-semibold whitespace-nowrap">
                             {entry.percent30d.toFixed(1)}%
                           </TableCell>
-                          <TableCell className="py-2 text-xs text-right text-muted-foreground whitespace-nowrap">
+                          <TableCell className="py-2 text-xs text-right whitespace-nowrap">
                             {entry.avg30d !== null ? (<>{formatFullNumber(entry.avg30d)} <span className="text-cheese">CHEESE</span></>) : '—'}
                           </TableCell>
                           <TableCell className="py-2 text-xs text-right whitespace-nowrap">
