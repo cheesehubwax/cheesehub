@@ -14,7 +14,7 @@ As recorded history grows, the small graphs squeeze more points into the same wi
 
 ## Technical details
 
-- New shared `AnalChartDialog.tsx` in `src/components/anal/`: a shadcn `Dialog` (component already exists in `src/components/ui/dialog.tsx`) rendering a full-size recharts chart with `Brush` (recharts, already in use) for range zoom, reusing `MiniChartTooltip` and the existing `extras` builders unchanged.
+- New shared `AnalChartDialog.tsx` in `src/components/anal/`: a shadcn `Dialog` (component already exists in `src/components/ui/dialog.tsx`) rendering the chart at the overview's `h-96` height with the same axis/grid/dot styling, plus `Brush` (recharts, already in use) for range zoom, reusing `MiniChartTooltip` and the existing `extras` builders unchanged.
 - In `AnalPoolDetail.tsx` and `AnalAccountPanel.tsx`, wrap each `h-36` chart container in a button/click target that opens the dialog with that chart's series, dataKey, formatter, colour, chart type (Line vs Area) and tooltip extras. The dialog owns its own hover state so account-attribution lookups (`useLpDay`) keep working inside the popup via the existing query cache.
 - The dialog chart reuses the same memoised series data — no extra network requests beyond the already-cached hover lookups.
 - Overview chart in `AnalOverview.tsx` is already large (full-width, h-96) and out of scope; only the eight mini graphs get the popup.
