@@ -28,7 +28,7 @@ interface AnalPoolDetailProps {
   token: LpTokenConfig;
 }
 
-const axisTick = { fontSize: 10, fill: '#FFFFFF' } as const;
+const MAX_NAMES = 4;
 const MAX_NAMES = 4;
 
 function nameList(names: string[]): string {
