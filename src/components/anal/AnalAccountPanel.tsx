@@ -25,7 +25,6 @@ interface AnalAccountPanelProps {
   token: LpTokenConfig;
 }
 
-const axisTick = { fontSize: 10, fill: '#FFFFFF' } as const;
 
 export function AnalAccountPanel({ account, onAccountChange, days, current, token }: AnalAccountPanelProps) {
   const [query, setQuery] = useState('');
