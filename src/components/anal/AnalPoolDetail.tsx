@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/u
 import { useLpDay } from '@/hooks/useLpHistory';
 import { downloadPoolHistoryCsv } from '@/lib/lpCsv';
 import { type LpDayFile, type LpIndexDay, type LpPoolSnapshot, type LpTokenConfig } from '@/lib/lpPools';
-import { amount, change, shortDate, tokenPrice, tooltipDate, usd } from './format';
+import { amount, change, tokenPrice, tooltipDate, usd } from './format';
 
 interface AnalPoolDetailProps {
   pool: LpPoolSnapshot | null;
