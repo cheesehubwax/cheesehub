@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { useLpAccountHistory } from '@/hooks/useLpHistory';
 import { downloadAccountHistoryCsv } from '@/lib/lpCsv';
 import { type LpDayFile, type LpIndexDay, type LpTokenConfig } from '@/lib/lpPools';
-import { amount, change, shortDate, usd } from './format';
+import { amount, change, usd } from './format';
 
 interface AnalAccountPanelProps {
   account: string | null;
