@@ -182,149 +182,143 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
 
       {hasSeries ? (
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-1">
-            <div className="w-fit mx-auto px-2 py-1 rounded-md bg-background/60 border border-border/40 text-center">
-              <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+          <AnalChartCard
+            title={`${token.symbol} price in ${pool.symbol}`}
+            label={
+              <>
                 <TokenLogo contract={pool.contract ?? ''} symbol={pool.symbol} size="sm" />
                 {token.symbol} price in {pool.symbol}
-              </div>
-              <div className="text-sm font-mono font-semibold text-foreground leading-tight">
-                {pool.priceInPaired ? tokenPrice(pool.priceInPaired, pool.symbol) : '—'}
-              </div>
-            </div>
-            <div className="h-36">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} {...chartHover}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
-                  <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
-                  <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => tokenPrice(v)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
-                  <Tooltip content={(props) => <MiniChartTooltip {...props} format={(v) => tokenPrice(v, pool.symbol)} valueClass="text-cheese" extras={extras('price')} />} />
-                  <Line type="monotone" dataKey="price" stroke="#FACC15" strokeWidth={2} dot={{ r: 3, fill: '#FACC15', strokeWidth: 0 }} activeDot={{ r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+              </>
+            }
+            value={pool.priceInPaired ? tokenPrice(pool.priceInPaired, pool.symbol) : '—'}
+            data={series}
+            dataKey="price"
+            type="line"
+            color="#FACC15"
+            format={(v) => tokenPrice(v, pool.symbol)}
+            yFormat={(v) => tokenPrice(v)}
+            valueClass="text-cheese"
+            extras={extras('price')}
+            onHover={setHovered}
+          />
 
-          <div className="space-y-1">
-            <div className="w-fit mx-auto px-2 py-1 rounded-md bg-background/60 border border-border/40 text-center">
-              <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+          <AnalChartCard
+            title="Pool value (USD)"
+            label={
+              <>
                 <UsdLogo />
                 Pool value (USD)
-              </div>
-              <div className="text-sm font-mono font-semibold text-foreground leading-tight">{usd(pool.usd)}</div>
-            </div>
-            <div className="h-36">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} {...chartHover}>
-                  <defs>
-                    <linearGradient id="analPoolUsd" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
-                  <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
-                  <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => usd(v)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
-                  <Tooltip content={(props) => <MiniChartTooltip {...props} format={usd} valueClass="text-cheese" extras={extras('usd')} />} />
-                  <Area type="monotone" dataKey="usd" stroke="#3B82F6" strokeWidth={2} fill="url(#analPoolUsd)" dot={{ r: 3, fill: '#3B82F6', strokeWidth: 0 }} activeDot={{ r: 4 }} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+              </>
+            }
+            value={usd(pool.usd)}
+            data={series}
+            dataKey="usd"
+            type="area"
+            gradientId="analPoolUsd"
+            color="#3B82F6"
+            format={usd}
+            yFormat={(v) => usd(v)}
+            valueClass="text-cheese"
+            extras={extras('usd')}
+            onHover={setHovered}
+          />
 
-          <div className="space-y-1">
-            <div className="w-fit mx-auto px-2 py-1 rounded-md bg-background/60 border border-border/40 text-center">
-              <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+          <AnalChartCard
+            title={`${token.symbol} in pool`}
+            label={
+              <>
                 <CheeseLogo base={token} />
                 {token.symbol} in pool
-              </div>
-              <div className="text-sm font-mono font-semibold text-foreground leading-tight">{amount(pool.cheese, 0)}</div>
-            </div>
-            <div className="h-36">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} {...chartHover}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
-                  <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
-                  <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => amount(v, 0)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
-                  <Tooltip content={(props) => <MiniChartTooltip {...props} format={(v) => `${amount(v, 4)} ${token.symbol}`} valueClass="text-cheese" extras={extras('cheese')} />} />
-                  <Line type="monotone" dataKey="cheese" stroke="#22C55E" strokeWidth={2} dot={{ r: 3, fill: '#22C55E', strokeWidth: 0 }} activeDot={{ r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+              </>
+            }
+            value={amount(pool.cheese, 0)}
+            data={series}
+            dataKey="cheese"
+            type="line"
+            color="#22C55E"
+            format={(v) => `${amount(v, 4)} ${token.symbol}`}
+            yFormat={(v) => amount(v, 0)}
+            valueClass="text-cheese"
+            extras={extras('cheese')}
+            onHover={setHovered}
+          />
 
-          <div className="space-y-1">
-            <div className="w-fit mx-auto px-2 py-1 rounded-md bg-background/60 border border-border/40 text-center">
-              <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+          <AnalChartCard
+            title={`${pool.symbol} in pool`}
+            label={
+              <>
                 <TokenLogo contract={pool.contract ?? ''} symbol={pool.symbol} size="sm" />
                 {pool.symbol} in pool
-              </div>
-              <div className="text-sm font-mono font-semibold text-foreground leading-tight">{amount(pool.paired, 4)}</div>
-            </div>
-            <div className="h-36">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} {...chartHover}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
-                  <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
-                  <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => amount(v, 2)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
-                  <Tooltip content={(props) => <MiniChartTooltip {...props} format={(v) => `${amount(v, 6)} ${pool.symbol}`} valueClass="text-foreground" extras={extras('paired')} />} />
-                  <Line type="monotone" dataKey="paired" stroke="#EC4899" strokeWidth={2} dot={{ r: 3, fill: '#EC4899', strokeWidth: 0 }} activeDot={{ r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+              </>
+            }
+            value={amount(pool.paired, 4)}
+            data={series}
+            dataKey="paired"
+            type="line"
+            color="#EC4899"
+            format={(v) => `${amount(v, 6)} ${pool.symbol}`}
+            yFormat={(v) => amount(v, 2)}
+            valueClass="text-foreground"
+            extras={extras('paired')}
+            onHover={setHovered}
+          />
 
-          <div className="space-y-1">
-            <div className="w-fit mx-auto px-2 py-1 rounded-md bg-background/60 border border-border/40 text-center">
-              <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                Provider accounts
-              </div>
-              <div className="text-sm font-mono font-semibold text-foreground leading-tight">{`${pool.accounts} (${pool.positions} pos)`}</div>
-            </div>
-            <div className="h-36">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} {...chartHover}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
-                  <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
-                  <YAxis domain={['auto', 'auto']} allowDecimals={false} tick={axisTick} width={70} stroke="hsl(var(--border))" />
-                  <Tooltip content={(props) => <MiniChartTooltip {...props} format={(v) => `${Math.round(v)} accounts`} valueClass="text-foreground" extras={extras('accounts')} />} />
-                  <Line type="monotone" dataKey="accounts" stroke="#FFFFFF" strokeWidth={2} dot={{ r: 3, fill: '#FFFFFF', strokeWidth: 0 }} activeDot={{ r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+          <AnalChartCard
+            title="Provider accounts"
+            label="Provider accounts"
+            value={`${pool.accounts} (${pool.positions} pos)`}
+            data={series}
+            dataKey="accounts"
+            type="line"
+            color="#FFFFFF"
+            format={(v) => `${Math.round(v)} accounts`}
+            valueClass="text-foreground"
+            allowDecimals={false}
+            extras={extras('accounts')}
+            onHover={setHovered}
+          />
 
-          <div className="space-y-1">
-            <div className="w-fit mx-auto px-2 py-1 rounded-md bg-background/60 border border-border/40 text-center">
-              <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                <UsdLogo />
-                Volume (24h)
-              </div>
-              <div className="text-sm font-mono font-semibold text-foreground leading-tight">
-                {latestVolume?.volumeUsd !== null && latestVolume?.volumeUsd !== undefined
+          {volumeSeries.length > 0 ? (
+            <AnalChartCard
+              title="Volume (24h)"
+              label={
+                <>
+                  <UsdLogo />
+                  Volume (24h)
+                </>
+              }
+              value={
+                latestVolume?.volumeUsd !== null && latestVolume?.volumeUsd !== undefined
                   ? usd(latestVolume.volumeUsd)
-                  : '—'}
+                  : '—'
+              }
+              data={volumeSeries}
+              dataKey="volumeUsd"
+              type="line"
+              color="#38BDF8"
+              format={usd}
+              yFormat={(v) => usd(v)}
+              valueClass="text-cheese"
+              connectNulls={false}
+              extras={extras('volumeUsd')}
+              onHover={setHovered}
+            />
+          ) : (
+            <div className="space-y-1">
+              <div className="w-fit mx-auto px-2 py-1 rounded-md bg-background/60 border border-border/40 text-center">
+                <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <UsdLogo />
+                  Volume (24h)
+                </div>
+                <div className="text-sm font-mono font-semibold text-foreground leading-tight">—</div>
               </div>
-            </div>
-            {volumeSeries.length > 0 ? (
-              <div className="h-36">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={volumeSeries} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} {...chartHover}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
-                    <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
-                    <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => usd(v)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
-                    <Tooltip content={(props) => <MiniChartTooltip {...props} format={usd} valueClass="text-cheese" extras={extras('volumeUsd')} />} />
-                    <Line type="monotone" dataKey="volumeUsd" stroke="#38BDF8" strokeWidth={2} connectNulls={false} dot={{ r: 3, fill: '#38BDF8', strokeWidth: 0 }} activeDot={{ r: 4 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
               <div className="h-36 flex items-center justify-center text-center text-[11px] text-muted-foreground px-4">
                 Volume history starts with the next daily snapshot.
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
+
       ) : (
         <p className="text-xs text-muted-foreground text-center py-4">
           Charts appear once a snapshot has been recorded.
