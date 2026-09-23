@@ -158,19 +158,17 @@ export function AnalChartCard(props: AnalChartCardProps) {
         </div>
         <div className="text-sm font-mono font-semibold text-foreground leading-tight">{value}</div>
       </div>
-      <div className="group relative">
-        <div className="h-36">
-          <ChartBody {...props} large={false} brushKey={brushKey} />
-        </div>
+      <div className="h-36">
+        <ChartBody {...props} large={false} brushKey={brushKey} />
+      </div>
+      <div className="flex justify-center">
         <button
           type="button"
           onClick={() => setOpen(true)}
           aria-label={`Enlarge ${title}`}
-          className="absolute inset-0 cursor-zoom-in rounded-md"
+          className="rounded bg-background/80 border border-border/60 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-muted-foreground hover:text-foreground hover:border-border transition-colors"
         >
-          <span className="absolute top-1 right-1 rounded bg-background/80 border border-border/60 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
-            Click to enlarge
-          </span>
+          🔍 Click to enlarge
         </button>
       </div>
 
