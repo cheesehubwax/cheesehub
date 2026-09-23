@@ -29,7 +29,6 @@ interface AnalPoolDetailProps {
 }
 
 const MAX_NAMES = 4;
-const MAX_NAMES = 4;
 
 function nameList(names: string[]): string {
   if (names.length <= MAX_NAMES) return names.join(', ');
