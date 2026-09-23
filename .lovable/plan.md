@@ -5,7 +5,8 @@ As recorded history grows, the small graphs squeeze more points into the same wi
 ## What you will see
 
 - Every mini graph on the pool history panel (all six: price in pair, pool value, CHEESE in pool, paired token, provider accounts, 24h volume) and the account detail panel (position value, CHEESE in positions) becomes clickable, with a subtle hover hint (cursor plus a faint "click to enlarge" affordance on hover).
-- Clicking opens a centred popup showing that same graph much larger (nearly full screen on desktop, full width on mobile), titled with the same heading as the mini graph.
+- Clicking opens a centred popup showing that same graph at the same size as the big overview graph at the top of the page (same height, full container width), titled with the same heading as the mini graph.
+
 - The large graph keeps the same colours, dots and the same rich tooltip as the mini version — hovering still shows the value, the change since the previous snapshot, WAX equivalents, provider joins/leaves and per-pool changes exactly as today.
 - A drag-to-zoom strip along the bottom of the large graph lets you pull a window over any span of dates and drag it, so dense later history can be examined day by day; a reset button restores the full range.
 - The popup closes with the X, the Escape key, or clicking the dimmed backdrop.
