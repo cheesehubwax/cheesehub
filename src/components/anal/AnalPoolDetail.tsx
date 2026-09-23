@@ -1,6 +1,6 @@
 // CHEESEAnal — history charts and provider list for one selected pool.
 import { useMemo, useState } from 'react';
-import { Area, AreaChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { AnalChartCard } from '@/components/anal/AnalChartCard';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { CheeseLogo, PairLabel, PairLogos, UsdLogo } from '@/components/anal/PairLogos';
 import { HistoricalNote } from '@/components/anal/HistoricalNote';
