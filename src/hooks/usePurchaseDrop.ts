@@ -122,6 +122,7 @@ export function usePurchaseDrop() {
       }
 
       refreshBalance?.();
+      refreshDropData();
       const success = { success: true, transactionId };
       setResult(success);
       return success;
