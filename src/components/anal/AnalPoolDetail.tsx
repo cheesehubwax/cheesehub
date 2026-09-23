@@ -128,11 +128,6 @@ export function AnalPoolDetail({ pool, pools, days, current, onSelectAccount, on
       return lines;
     };
 
-  const chartHover = {
-    onMouseMove: (state: { activeLabel?: string | number }) =>
-      setHovered(state?.activeLabel != null ? String(state.activeLabel) : null),
-    onMouseLeave: () => setHovered(null),
-  };
 
   if (!pool) {
     return (
