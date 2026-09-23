@@ -1,7 +1,15 @@
 import { useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useWax } from '@/context/WaxContext';
 import { getTransactPlugins, closeWharfkitModals } from '@/lib/wharfKit';
+import { clearDropsCache } from '@/hooks/useDropsLoader';
 import type { NFTDrop, SelectedPrice } from '@/types/drop';
+
+/** Broadcast so any open drop view re-reads its own on-chain numbers. */
+export const DROP_PURCHASED_EVENT = 'cheesedrop:purchased';
+
+/** Chain state needs a block or two before the claimed counters move. */
+const REFRESH_DELAYS_MS = [0, 2500, 6000];
 
 export interface PurchaseResult {
   success: boolean;
