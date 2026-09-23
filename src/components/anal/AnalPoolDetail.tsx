@@ -5,7 +5,6 @@ import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { CheeseLogo, PairLabel, PairLogos, UsdLogo } from '@/components/anal/PairLogos';
 import { HistoricalNote } from '@/components/anal/HistoricalNote';
 import { InRangeCell } from '@/components/anal/InRangeCell';
-import { MiniChartTooltip } from '@/components/anal/MiniChartTooltip';
 import { diffPoolSnapshots, waxUsdFromPools } from '@/components/anal/snapshotDiff';
 import { TokenLogo } from '@/components/TokenLogo';
 import { VenueLabel } from '@/components/anal/VenueLogo';
