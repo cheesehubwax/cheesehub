@@ -13,6 +13,7 @@ import { fetchDropById } from "@/services/atomicApi";
 import { useWax } from "@/context/WaxContext";
 import { useCart } from "@/context/CartContext";
 import { useDropEligibility } from "@/hooks/useDropEligibility";
+import { DROP_PURCHASED_EVENT } from "@/hooks/usePurchaseDrop";
 import { getTokenConfig } from "@/lib/tokenRegistry";
 import { getTokenContract } from "@/lib/tokenLogos";
 import type { NFTDrop, SelectedPrice } from "@/types/drop";
