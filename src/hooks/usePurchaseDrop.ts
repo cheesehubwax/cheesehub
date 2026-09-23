@@ -19,8 +19,24 @@ export interface PurchaseResult {
 
 export function usePurchaseDrop() {
   const { session, accountName, refreshBalance } = useWax();
+  const queryClient = useQueryClient();
   const [purchasing, setPurchasing] = useState(false);
   const [result, setResult] = useState<PurchaseResult | null>(null);
+
+  /** Re-read drop supply/claim counters after a purchase, allowing for block time. */
+  const refreshDropData = useCallback(() => {
+    clearDropsCache();
+    for (const delay of REFRESH_DELAYS_MS) {
+      setTimeout(() => {
+        clearDropsCache();
+        queryClient.invalidateQueries({ queryKey: ['drops-raw'] });
+        queryClient.invalidateQueries({ queryKey: ['cheese-drop-stats'] });
+        queryClient.invalidateQueries({ queryKey: ['admin-drop-purchases'] });
+        window.dispatchEvent(new CustomEvent(DROP_PURCHASED_EVENT));
+      }, delay);
+    }
+  }, [queryClient]);
+
 
   const purchaseDrop = useCallback(async (
     drop: NFTDrop,
