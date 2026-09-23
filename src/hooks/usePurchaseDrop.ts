@@ -138,7 +138,7 @@ export function usePurchaseDrop() {
       setPurchasing(false);
       closeWharfkitModals();
     }
-  }, [session, accountName, refreshBalance]);
+  }, [session, accountName, refreshBalance, refreshDropData]);
 
   const clearResult = useCallback(() => {
     setResult(null);
