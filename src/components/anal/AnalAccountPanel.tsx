@@ -305,58 +305,46 @@ export function AnalAccountPanel({ account, onAccountChange, days, current, toke
                 )}
               </div>
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-1">
-                <div className="w-fit mx-auto px-2 py-1 rounded-md bg-background/60 border border-border/40 text-center">
-                  <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+              <AnalChartCard
+                title={`Position value (USD)${selectedPoolLabel ? ` — ${selectedPoolLabel}` : ''}`}
+                label={
+                  <>
                     <UsdLogo />
                     Position value (USD){selectedPoolLabel ? ` — ${selectedPoolLabel}` : ''}
-                  </div>
-                  <div className="text-sm font-mono font-semibold text-foreground leading-tight">
-                    {usd(selectedPoolRow?.usd ?? totalNow)}
-                  </div>
-                </div>
-                <div className="h-36">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="analAccountUsd" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.35} />
-                          <stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
-                      <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
-                      <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => usd(v)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
-                      <Tooltip content={(props) => <MiniChartTooltip {...props} format={usd} valueClass="text-cheese" extras={tooltipExtras('usd')} />} />
-                      <Area type="monotone" dataKey="usd" stroke="#3B82F6" strokeWidth={2} fill="url(#analAccountUsd)" dot={{ r: 3, fill: '#3B82F6', strokeWidth: 0 }} activeDot={{ r: 4 }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
+                  </>
+                }
+                value={usd(selectedPoolRow?.usd ?? totalNow)}
+                data={series}
+                dataKey="usd"
+                type="area"
+                gradientId="analAccountUsd"
+                color="#3B82F6"
+                format={usd}
+                yFormat={(v) => usd(v)}
+                valueClass="text-cheese"
+                extras={tooltipExtras('usd')}
+              />
 
-              <div className="space-y-1">
-                <div className="w-fit mx-auto px-2 py-1 rounded-md bg-background/60 border border-border/40 text-center">
-                  <div className="flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+              <AnalChartCard
+                title={`${token.symbol} in positions${selectedPoolLabel ? ` — ${selectedPoolLabel}` : ''}`}
+                label={
+                  <>
                     <CheeseLogo base={token} />
                     {token.symbol} in positions{selectedPoolLabel ? ` — ${selectedPoolLabel}` : ''}
-                  </div>
-                  <div className="text-sm font-mono font-semibold text-foreground leading-tight">
-                    {amount(selectedPoolRow?.cheese ?? cheeseNow, 0)}
-                  </div>
-                </div>
-                <div className="h-36">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} vertical={false} />
-                      <XAxis dataKey="date" tickFormatter={shortDate} tick={axisTick} stroke="hsl(var(--border))" />
-                      <YAxis domain={['auto', 'auto']} tickFormatter={(v: number) => amount(v, 0)} tick={axisTick} width={70} stroke="hsl(var(--border))" />
-                      <Tooltip content={(props) => <MiniChartTooltip {...props} format={(v) => `${amount(v, 4)} ${token.symbol}`} valueClass="text-cheese" extras={tooltipExtras('cheese')} />} />
-                      <Line type="monotone" dataKey="cheese" stroke="#22C55E" strokeWidth={2} dot={{ r: 3, fill: '#22C55E', strokeWidth: 0 }} activeDot={{ r: 4 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
+                  </>
+                }
+                value={amount(selectedPoolRow?.cheese ?? cheeseNow, 0)}
+                data={series}
+                dataKey="cheese"
+                type="line"
+                color="#22C55E"
+                format={(v) => `${amount(v, 4)} ${token.symbol}`}
+                yFormat={(v) => amount(v, 0)}
+                valueClass="text-cheese"
+                extras={tooltipExtras('cheese')}
+              />
             </div>
+
           </div>
         ) : (
             <p className="text-xs text-muted-foreground text-center py-2">
