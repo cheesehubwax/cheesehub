@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { fetchDropById } from "@/services/atomicApi";
 import { useWax } from "@/context/WaxContext";
 import { useCart } from "@/context/CartContext";
 import { useDropEligibility } from "@/hooks/useDropEligibility";
+import { DROP_PURCHASED_EVENT } from "@/hooks/usePurchaseDrop";
 import { getTokenConfig } from "@/lib/tokenRegistry";
 import { getTokenContract } from "@/lib/tokenLogos";
 import type { NFTDrop, SelectedPrice } from "@/types/drop";
@@ -27,14 +28,24 @@ const DropDetail = () => {
   const [quantity, setQuantity] = useState(1);
   const { eligibility } = useDropEligibility(drop, accountName || undefined);
 
-  useEffect(() => {
+  const loadDrop = useCallback(async (showSpinner: boolean) => {
     if (!id) return;
-    setLoading(true);
-    fetchDropById(id).then(data => {
-      setDrop(data);
-      setLoading(false);
-    });
+    if (showSpinner) setLoading(true);
+    const data = await fetchDropById(id);
+    setDrop(data);
+    setLoading(false);
   }, [id]);
+
+  useEffect(() => {
+    loadDrop(true);
+  }, [loadDrop]);
+
+  // Re-read the drop after a purchase so the minted count updates without a refresh.
+  useEffect(() => {
+    const onPurchased = () => { loadDrop(false); };
+    window.addEventListener(DROP_PURCHASED_EVENT, onPurchased);
+    return () => window.removeEventListener(DROP_PURCHASED_EVENT, onPurchased);
+  }, [loadDrop]);
 
   // Auto-select if only one price option
   useEffect(() => {

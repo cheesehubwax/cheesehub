@@ -1,7 +1,15 @@
 import { useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useWax } from '@/context/WaxContext';
 import { getTransactPlugins, closeWharfkitModals } from '@/lib/wharfKit';
+import { clearDropsCache } from '@/hooks/useDropsLoader';
 import type { NFTDrop, SelectedPrice } from '@/types/drop';
+
+/** Broadcast so any open drop view re-reads its own on-chain numbers. */
+export const DROP_PURCHASED_EVENT = 'cheesedrop:purchased';
+
+/** Chain state needs a block or two before the claimed counters move. */
+const REFRESH_DELAYS_MS = [0, 2500, 6000];
 
 export interface PurchaseResult {
   success: boolean;
@@ -11,8 +19,24 @@ export interface PurchaseResult {
 
 export function usePurchaseDrop() {
   const { session, accountName, refreshBalance } = useWax();
+  const queryClient = useQueryClient();
   const [purchasing, setPurchasing] = useState(false);
   const [result, setResult] = useState<PurchaseResult | null>(null);
+
+  /** Re-read drop supply/claim counters after a purchase, allowing for block time. */
+  const refreshDropData = useCallback(() => {
+    clearDropsCache();
+    for (const delay of REFRESH_DELAYS_MS) {
+      setTimeout(() => {
+        clearDropsCache();
+        queryClient.invalidateQueries({ queryKey: ['drops-raw'] });
+        queryClient.invalidateQueries({ queryKey: ['cheese-drop-stats'] });
+        queryClient.invalidateQueries({ queryKey: ['admin-drop-purchases'] });
+        window.dispatchEvent(new CustomEvent(DROP_PURCHASED_EVENT));
+      }, delay);
+    }
+  }, [queryClient]);
+
 
   const purchaseDrop = useCallback(async (
     drop: NFTDrop,
@@ -98,6 +122,7 @@ export function usePurchaseDrop() {
       }
 
       refreshBalance?.();
+      refreshDropData();
       const success = { success: true, transactionId };
       setResult(success);
       return success;
@@ -113,7 +138,7 @@ export function usePurchaseDrop() {
       setPurchasing(false);
       closeWharfkitModals();
     }
-  }, [session, accountName, refreshBalance]);
+  }, [session, accountName, refreshBalance, refreshDropData]);
 
   const clearResult = useCallback(() => {
     setResult(null);
