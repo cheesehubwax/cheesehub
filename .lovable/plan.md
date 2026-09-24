@@ -2,13 +2,21 @@
 
 ## What changes
 
-The yellow CHEESEFarm placeholder banner (the one shown when a shared slot's
-second half is unrented) is replaced with the uploaded WaxEDGE banner
-(580x150, exact slot size). Paid banners and the rest of the banner system
-are untouched.
+The yellow CHEESEFarm placeholder banner is kept, but demoted to a second
+placeholder. The uploaded WaxEDGE banner (580x150, exact slot size) becomes
+the first placeholder:
 
-- Clicking the new banner opens **https://waxedge.app** and goes through the
-  same external-link warning dialog paid external banners use.
+- When one shared slot's second half is unrented → the WaxEDGE banner fills it.
+- When two shared slots are open side by side at the same time (position 1 and
+  position 2 both have empty shared halves) → WaxEDGE fills the first empty
+  slot, the old yellow CHEESEFarm banner fills the second, so the two empty
+  slots never show the same image.
+
+Paid banners and the rest of the banner system are untouched.
+
+- Clicking the WaxEDGE banner opens **https://waxedge.app** and goes through
+  the same external-link warning dialog paid external banners use. The yellow
+  banner keeps its existing internal link to `/farm`.
 - The empty-slot dashed state ("Slot N — Available") is unchanged.
 
 ## Implementation
