@@ -1,6 +1,5 @@
 import { fetchTableRows } from './waxRpcFallback';
-import { chainPost, mapLimit } from './chainRequest';
-import { readStatCache, writeStatCache } from './statCache';
+import { chainPost } from './chainRequest';
 
 const CHEESE_CONTRACT = 'cheeseburger';
 const CHEESE_SYMBOL = 'CHEESE';
@@ -59,21 +58,6 @@ function parseQuantity(quantity: string): { amount: number; symbol: string } {
 
 const ALCOR_API = 'https://wax.alcor.exchange/api/v2';
 const SOURCE_TIMEOUT_MS = 8_000;
-const POOL_IDS_KEY = 'cheese-pool-ids';
-
-/** fetch with a hard time limit so one slow source can't hold up the rest. */
-async function fetchWithTimeout<T>(url: string, init?: RequestInit): Promise<T> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), SOURCE_TIMEOUT_MS);
-  try {
-    const res = await fetch(url, { ...init, signal: controller.signal });
-    if (!res.ok) throw new Error(`${url} failed (${res.status})`);
-    return (await res.json()) as T;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 function isCheesePool(pool: AlcorPool): boolean {
   return (
     (pool.tokenA.contract === CHEESE_CONTRACT && pool.tokenA.symbol.includes(CHEESE_SYMBOL)) ||
@@ -81,30 +65,20 @@ function isCheesePool(pool: AlcorPool): boolean {
   );
 }
 
-/**
- * CHEESE pool ids, discovered from the full (~11 MB) pool list at most once
- * per day and remembered in the browser. Returns the full-list pools too when
- * a scan was needed, so that run doesn't fetch each pool again.
- */
-async function cheesePoolIds(): Promise<{ ids: number[]; scanned?: AlcorPool[] }> {
-  const known = readStatCache<number[]>(POOL_IDS_KEY);
-  if (known && known.length > 0) return { ids: known };
-  const pools = await fetchWithTimeout<AlcorPool[]>(`${ALCOR_API}/swap/pools`);
-  const cheese = pools.filter(isCheesePool);
-  const ids = cheese.map((p) => p.id);
-  if (ids.length > 0) writeStatCache(POOL_IDS_KEY, ids);
-  return { ids, scanned: cheese };
-}
-
 export async function fetchAlcorSwapCheeseTVL(): Promise<number> {
   try {
-    const { ids, scanned } = await cheesePoolIds();
-    if (scanned) return scanned.reduce((sum, pool) => sum + (pool.tvlUSD || 0), 0);
-    const pools = await mapLimit(ids, 8, (id) =>
-      fetchWithTimeout<AlcorPool>(`${ALCOR_API}/swap/pools/${id}`).catch(() => null),
-    );
-    if (pools.every((p) => p === null)) throw new Error('No CHEESE pool answered');
-    return pools.reduce((sum, pool) => sum + (pool?.tvlUSD || 0), 0);
+    // Alcor filters server-side by either side of the pair: ~60 KB in two
+    // requests instead of the ~11 MB full pool list. Both must answer, so a
+    // half-read never shows up as a lower TVL.
+    const [asA, asB] = await Promise.all([
+      fetchWithTimeout<AlcorPool[]>(`${ALCOR_API}/swap/pools?tokenA=cheese-cheeseburger`),
+      fetchWithTimeout<AlcorPool[]>(`${ALCOR_API}/swap/pools?tokenB=cheese-cheeseburger`),
+    ]);
+    const byId = new Map<number, AlcorPool>();
+    for (const pool of [...asA, ...asB]) if (isCheesePool(pool)) byId.set(pool.id, pool);
+    let total = 0;
+    for (const pool of byId.values()) total += pool.tvlUSD || 0;
+    return total;
   } catch (error) {
     console.warn('Failed to fetch Alcor Swap CHEESE TVL:', error);
     return 0;
