@@ -6,6 +6,11 @@ import { componentTagger } from "lovable-tagger";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   base: mode === "production" ? "/cheesehub/" : "/",
+  // ES module workers: the Alcor route worker imports a shared polyfill module,
+  // which code-splits and cannot ship as the default IIFE worker bundle.
+  worker: {
+    format: "es",
+  },
   server: {
     host: "::",
     port: 8080,

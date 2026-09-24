@@ -8,6 +8,7 @@ import { isDomainBlocked } from "@/lib/bannerBlocklist";
 import { logger } from "@/lib/logger";
 import { ExternalLinkWarning } from "./ExternalLinkWarning";
 import cheeseBanner4 from "@/assets/cheese_banner4.png";
+import waxedgeBanner from "@/assets/waxedge-banner.jpg";
 
 interface ActiveBanner {
   ipfsHash?: string;
@@ -16,9 +17,23 @@ interface ActiveBanner {
   user: string;
   isPlaceholder?: boolean;
   isShared?: boolean;
+  alt?: string;
 }
 
-function extractBannersForSlot(slot: BannerSlot): ActiveBanner[] {
+// First placeholder = WaxEDGE promo; the legacy yellow banner is the second
+// placeholder so two open shared slots side by side never show the same image.
+function placeholderBanner(placeholderNumber: number): ActiveBanner {
+  const isFirst = placeholderNumber === 1;
+  return {
+    localSrc: isFirst ? waxedgeBanner : cheeseBanner4,
+    websiteUrl: isFirst ? "https://waxedge.app" : "/farm",
+    user: isFirst ? "placeholder-waxedge" : "placeholder",
+    isPlaceholder: true,
+    alt: isFirst ? "WaxEDGE Banner" : "CHEESEFarm Banner",
+  };
+}
+
+function extractBannersForSlot(slot: BannerSlot, placeholderNumber: number): ActiveBanner[] {
   const banners: ActiveBanner[] = [];
   if (slot.suspended) return banners;
 
@@ -48,12 +63,7 @@ function extractBannersForSlot(slot: BannerSlot): ActiveBanner[] {
 
   // Placeholder for unrented shared half
   if (slot.rentalType === "shared" && slot.user !== "cheesebannad" && !slot.sharedUser) {
-    banners.push({
-      localSrc: cheeseBanner4,
-      websiteUrl: "/farm",
-      user: "placeholder",
-      isPlaceholder: true,
-    });
+    banners.push(placeholderBanner(placeholderNumber));
   }
 
   return banners;
@@ -77,17 +87,19 @@ function BannerLayer({
 
   if (banner.localSrc) {
     return (
-      <Link
-        to={banner.websiteUrl}
-        className={`absolute inset-0 transition-opacity duration-500 ${visibilityClass}`}
+      <div
+        onClick={() => isActive && onAdClick(banner.websiteUrl)}
+        className={`absolute inset-0 cursor-pointer transition-opacity duration-500 ${visibilityClass}`}
+        role="link"
         tabIndex={isActive ? 0 : -1}
+        onKeyDown={(e) => { if (isActive && e.key === "Enter") onAdClick(banner.websiteUrl); }}
       >
         <img
           src={banner.localSrc}
-          alt="CHEESEFarm Banner"
+          alt={banner.alt ?? "Banner"}
           className="w-full h-full object-contain rounded-lg"
         />
-      </Link>
+      </div>
     );
   }
 
@@ -216,8 +228,11 @@ export function BannerDisplay() {
 
     if (!currentGroup) return result;
 
-    for (const slot of currentGroup.slots) {
-      const banners = extractBannersForSlot(slot);
+    // Position order so the first empty slot always gets the WaxEDGE placeholder
+    let placeholderCount = 0;
+    for (const slot of [...currentGroup.slots].sort((a, b) => a.position - b.position)) {
+      const banners = extractBannersForSlot(slot, placeholderCount + 1);
+      if (banners.some((b) => b.isPlaceholder)) placeholderCount++;
       if (slot.position === 1) {
         result.pos1Banners.push(...banners);
       } else if (slot.position === 2) {
