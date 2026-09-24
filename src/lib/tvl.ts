@@ -1,4 +1,6 @@
 import { fetchTableRows } from './waxRpcFallback';
+import { chainPost, mapLimit } from './chainRequest';
+import { readStatCache, writeStatCache } from './statCache';
 
 const CHEESE_CONTRACT = 'cheeseburger';
 const CHEESE_SYMBOL = 'CHEESE';
@@ -55,21 +57,54 @@ function parseQuantity(quantity: string): { amount: number; symbol: string } {
   };
 }
 
+const ALCOR_API = 'https://wax.alcor.exchange/api/v2';
+const SOURCE_TIMEOUT_MS = 8_000;
+const POOL_IDS_KEY = 'cheese-pool-ids';
+
+/** fetch with a hard time limit so one slow source can't hold up the rest. */
+async function fetchWithTimeout<T>(url: string, init?: RequestInit): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SOURCE_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { ...init, signal: controller.signal });
+    if (!res.ok) throw new Error(`${url} failed (${res.status})`);
+    return (await res.json()) as T;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function isCheesePool(pool: AlcorPool): boolean {
+  return (
+    (pool.tokenA.contract === CHEESE_CONTRACT && pool.tokenA.symbol.includes(CHEESE_SYMBOL)) ||
+    (pool.tokenB.contract === CHEESE_CONTRACT && pool.tokenB.symbol.includes(CHEESE_SYMBOL))
+  );
+}
+
+/**
+ * CHEESE pool ids, discovered from the full (~11 MB) pool list at most once
+ * per day and remembered in the browser. Returns the full-list pools too when
+ * a scan was needed, so that run doesn't fetch each pool again.
+ */
+async function cheesePoolIds(): Promise<{ ids: number[]; scanned?: AlcorPool[] }> {
+  const known = readStatCache<number[]>(POOL_IDS_KEY);
+  if (known && known.length > 0) return { ids: known };
+  const pools = await fetchWithTimeout<AlcorPool[]>(`${ALCOR_API}/swap/pools`);
+  const cheese = pools.filter(isCheesePool);
+  const ids = cheese.map((p) => p.id);
+  if (ids.length > 0) writeStatCache(POOL_IDS_KEY, ids);
+  return { ids, scanned: cheese };
+}
+
 export async function fetchAlcorSwapCheeseTVL(): Promise<number> {
   try {
-    const response = await fetch('https://wax.alcor.exchange/api/v2/swap/pools');
-    if (!response.ok) throw new Error('Failed to fetch Alcor pools');
-
-    const pools: AlcorPool[] = await response.json();
-
-    // Filter for CHEESE pools (tokenA or tokenB is CHEESE)
-    const cheesePools = pools.filter(pool =>
-      (pool.tokenA.contract === CHEESE_CONTRACT && pool.tokenA.symbol.includes(CHEESE_SYMBOL)) ||
-      (pool.tokenB.contract === CHEESE_CONTRACT && pool.tokenB.symbol.includes(CHEESE_SYMBOL))
+    const { ids, scanned } = await cheesePoolIds();
+    if (scanned) return scanned.reduce((sum, pool) => sum + (pool.tvlUSD || 0), 0);
+    const pools = await mapLimit(ids, 8, (id) =>
+      fetchWithTimeout<AlcorPool>(`${ALCOR_API}/swap/pools/${id}`).catch(() => null),
     );
-
-    // Sum up TVL from all CHEESE pools
-    return cheesePools.reduce((sum, pool) => sum + (pool.tvlUSD || 0), 0);
+    if (pools.every((p) => p === null)) throw new Error('No CHEESE pool answered');
+    return pools.reduce((sum, pool) => sum + (pool?.tvlUSD || 0), 0);
   } catch (error) {
     console.warn('Failed to fetch Alcor Swap CHEESE TVL:', error);
     return 0;
@@ -78,29 +113,11 @@ export async function fetchAlcorSwapCheeseTVL(): Promise<number> {
 
 export async function fetchAlcorSpotCheeseTVL(waxUsdPrice: number): Promise<number> {
   try {
-    // Fetch CHEESE spot orderbook markets
-    const response = await fetch('https://wax.alcor.exchange/api/v2/tickers');
-    if (!response.ok) throw new Error('Failed to fetch Alcor tickers');
-
-    const tickers: AlcorTicker[] = await response.json();
-
-    // Filter for CHEESE markets
-    const cheeseMarkets = tickers.filter(ticker =>
-      ticker.base_currency === 'cheese-cheeseburger' ||
-      ticker.target_currency === 'cheese-cheeseburger'
+    // Only the CHEESE/WAX spot market is counted, so read just that one.
+    const market = await fetchWithTimeout<AlcorTicker>(
+      `${ALCOR_API}/tickers/cheese-cheeseburger_wax-eosio.token`,
     );
-
-    // Sum up the target volume (WAX side) from spot orderbooks
-    // The volume represents liquidity in open orders
-    let totalSpotTVL = 0;
-    for (const market of cheeseMarkets) {
-      // target_volume is typically in WAX, multiply by USD price
-      if (market.target_currency === 'wax-eosio.token') {
-        totalSpotTVL += (market.target_volume || 0) * waxUsdPrice;
-      }
-    }
-
-    return totalSpotTVL;
+    return (market?.target_volume || 0) * waxUsdPrice;
   } catch (error) {
     console.warn('Failed to fetch Alcor Spot CHEESE TVL:', error);
     return 0;
@@ -180,20 +197,12 @@ export async function fetchTacoCheeseTVL(waxUsdPrice: number): Promise<number> {
 
 export async function fetchNeftyCheeseTVL(cheeseUsdPrice: number): Promise<number> {
   try {
-    // Query CHEESE balance held by swap.nefty directly
-    const response = await fetch('https://api.wax.alohaeos.com/v1/chain/get_currency_balance', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        code: CHEESE_CONTRACT,
-        account: 'swap.nefty',
-        symbol: CHEESE_SYMBOL,
-      }),
+    // CHEESE balance held by swap.nefty, via the shared backup-node reader.
+    const balances = await chainPost<string[]>('/v1/chain/get_currency_balance', {
+      code: CHEESE_CONTRACT,
+      account: 'swap.nefty',
+      symbol: CHEESE_SYMBOL,
     });
-
-    if (!response.ok) throw new Error('Failed to fetch Nefty CHEESE balance');
-
-    const balances: string[] = await response.json();
     if (!balances || balances.length === 0) return 0;
 
     const { amount } = parseQuantity(balances[0]);
