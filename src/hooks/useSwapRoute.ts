@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useRef } from "react";
 import { fetchSwapRoute, type SwapToken, type SwapRoute } from "@/lib/swapApi";
 import { computeAlcorTrade } from "@/lib/alcorRouter";
@@ -57,22 +57,38 @@ export function useSwapRoute(
   const enabled =
     !!tokenIn && !!tokenOut && !tokensIdentical && !!debouncedAmount && parseFloat(debouncedAmount) > 0 && !!receiver && receiver !== "placeholder111";
 
+  const queryClient = useQueryClient();
+  const keyParts = [tokenIn?.ticker, tokenIn?.contract, tokenOut?.ticker, tokenOut?.contract, debouncedAmount, slippage, receiver, debouncedTradeType] as const;
+  const httpKey = ["swap-route-http", ...keyParts];
+
+  // Alcor's own quick quote, shown straight away while the split search runs.
+  // It is marked incomplete so the Swap button stays locked until the full
+  // search has confirmed (or beaten) it.
+  const httpQuery = useQuery<SwapRoute | null>({
+    queryKey: httpKey,
+    queryFn: ({ signal }) =>
+      fetchSwapRoute(tokenIn!, tokenOut!, debouncedAmount, slippage, receiver, signal, debouncedTradeType),
+    enabled,
+    staleTime: 15_000,
+    gcTime: 30_000,
+    retry: 1,
+  });
+
   const { data: route, isLoading, error, isFetching, failureCount, refetch } = useQuery<SwapRoute | null>({
-    queryKey: ["swap-route", tokenIn?.ticker, tokenIn?.contract, tokenOut?.ticker, tokenOut?.contract, debouncedAmount, slippage, receiver, debouncedTradeType],
+    queryKey: ["swap-route", ...keyParts],
     queryFn: async ({ signal }) => {
       // Run both quote engines and do not let the cheap HTTP route look final
       // until the SDK split router has completed. If the SDK is temporarily
       // blocked by rate limits/missing pool data, retry instead of exposing a
       // worse 100% route as the best available price.
-      const httpPromise = fetchSwapRoute(
-        tokenIn!,
-        tokenOut!,
-        debouncedAmount,
-        slippage,
-        receiver,
-        signal,
-        debouncedTradeType,
-      );
+      // Shares the quick-quote request above instead of sending it twice.
+      const httpPromise = queryClient.fetchQuery({
+        queryKey: httpKey,
+        queryFn: ({ signal: s }) =>
+          fetchSwapRoute(tokenIn!, tokenOut!, debouncedAmount, slippage, receiver, s ?? signal, debouncedTradeType),
+        staleTime: 15_000,
+        retry: 1,
+      });
 
       // Match Alcor's UI behavior: always evaluate 1% allocation buckets.
       // Small WAX→WAXWBTC quotes need this granularity to find the visible
@@ -201,8 +217,16 @@ export function useSwapRoute(
     };
   }, [exhaustedTransient, enabled, refetch]);
 
+  const provisional =
+    !route && enabled && isValidHttpRoute(httpQuery.data) && !finalError
+      ? { ...httpQuery.data!, quoteComplete: false }
+      : undefined;
+  const shownRoute = route ?? provisional;
+
   return {
-    route: route ?? undefined,
+    route: shownRoute,
+    /** True while the shown route is Alcor's quick quote and the split search is still running. */
+    isProvisional: !!provisional,
     isLoading: isLoading && enabled,
     isFetching,
     error: finalError,

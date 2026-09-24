@@ -16,7 +16,19 @@ import {
   TradeType,
   Percent,
 } from "@alcorexchange/alcor-swap-sdk";
-import type { SwapToken, SwapRoute, SwapSplit } from "./swapApi";
+import type { SwapToken, SwapRoute } from "./swapApi";
+import {
+  type RawAlcorPool,
+  type RawAlcorTick,
+  tokenKey,
+  buildPool,
+  runBestTradeWithSplit,
+  toRawAmount,
+  formatSdkDiagnostics,
+} from "./alcorQuoteCore";
+import { runQuote } from "./alcorQuoteRunner";
+import { fetchTableRows } from "./waxRpcFallback";
+import { readStatCache, writeStatCache } from "./statCache";
 import { logger } from "./logger";
 
 const ALCOR_API = "https://wax.alcor.exchange/api/v2";
@@ -35,51 +47,7 @@ export function isAlcorCoolingDown(): boolean {
   return Date.now() < alcorCooldownUntil;
 }
 
-// ----- Per-split slippage widening -----
-// On-chain, swap.alcor enforces `minTokenOut` per transfer. When the router
-// splits a trade across multiple pools, one leg can drift more than the user's
-// aggregate slippage even when the aggregate output is still inside slippage —
-// aborting the whole tx. We widen only the per-split memo min; the aggregate
-// `minReceived` shown to the user is unchanged.
-const SPLIT_SLIPPAGE_MULTIPLIER = 3;
-const SPLIT_SLIPPAGE_FLOOR_BPS = 50; // 0.5%
-const SPLIT_SLIPPAGE_MAX_BPS = 1000; // 10%
-function splitSlipBps(userBps: number, splitCount: number): number {
-  if (splitCount <= 1) return userBps;
-  const widened = Math.max(
-    userBps * SPLIT_SLIPPAGE_MULTIPLIER,
-    userBps + SPLIT_SLIPPAGE_FLOOR_BPS,
-  );
-  return Math.min(widened, SPLIT_SLIPPAGE_MAX_BPS);
-}
 
-// ----- Raw API shapes -----
-
-interface RawAlcorPool {
-  id: number;
-  active: boolean;
-  fee: number;
-  tickSpacing: number;
-  sqrtPriceX64: string;
-  liquidity: string;
-  tick: number;
-  feeGrowthGlobalAX64: string;
-  feeGrowthGlobalBX64: string;
-  tokenA: { contract: string; decimals: number; symbol: string; id: string };
-  tokenB: { contract: string; decimals: number; symbol: string; id: string };
-}
-
-interface RawAlcorTick {
-  id: number;
-  liquidityGross: string | number;
-  liquidityNet: string | number;
-  feeGrowthOutsideAX64: string;
-  feeGrowthOutsideBX64: string;
-  tickCumulativeOutside: number | string;
-  secondsPerLiquidityOutsideX64: string;
-  secondsOutside: number | string;
-  initialized?: number | boolean;
-}
 
 // ----- Cached fetchers -----
 
@@ -101,6 +69,7 @@ export async function fetchAllAlcorPools(signal?: AbortSignal): Promise<RawAlcor
     }
     const data = (await res.json()) as RawAlcorPool[];
     poolsCache = { at: Date.now(), data };
+    savePoolIndex(data);
     return data;
   })();
   try {
@@ -108,6 +77,89 @@ export async function fetchAllAlcorPools(signal?: AbortSignal): Promise<RawAlcor
   } finally {
     poolsInflight = null;
   }
+}
+
+// ----- Saved pool index -----
+// A slim copy of the pool list (which pools exist, their tokens, fee and
+// liquidity) kept in the browser so a returning visitor can start fetching
+// ticks before the ~2 MB live list arrives. Never used for prices.
+const POOL_INDEX_KEY = "alcor-pools-index";
+const POOL_INDEX_SAVE_EVERY_MS = 10 * 60_000;
+let poolIndexSavedAt = 0;
+
+function savePoolIndex(data: RawAlcorPool[]): void {
+  if (Date.now() - poolIndexSavedAt < POOL_INDEX_SAVE_EVERY_MS) return;
+  poolIndexSavedAt = Date.now();
+  const tok = (t: RawAlcorPool["tokenA"]) => ({
+    contract: t.contract,
+    decimals: t.decimals,
+    symbol: t.symbol,
+    id: t.id,
+  });
+  writeStatCache(
+    POOL_INDEX_KEY,
+    data
+      .filter((p) => p.active)
+      .map((p) => ({
+        id: p.id,
+        active: p.active,
+        fee: p.fee,
+        liquidity: p.liquidity,
+        tokenA: tok(p.tokenA),
+        tokenB: tok(p.tokenB),
+      })),
+  );
+}
+
+function readSavedPoolIndex(): RawAlcorPool[] | null {
+  const saved = readStatCache<RawAlcorPool[]>(POOL_INDEX_KEY);
+  return Array.isArray(saved) && saved.length > 0 ? saved : null;
+}
+
+/**
+ * Warm the tick cache for a token pair before an amount is typed, so the
+ * first quote only has to run the search. Best-effort and silent.
+ */
+export async function prefetchPairPools(tokenIn: SwapToken, tokenOut: SwapToken): Promise<void> {
+  try {
+    const list = poolsCache?.data ?? readSavedPoolIndex() ?? (await fetchAllAlcorPools());
+    const relevant = selectRelevantPools(
+      list,
+      tokenKey(tokenIn.contract, tokenIn.ticker),
+      tokenKey(tokenOut.contract, tokenOut.ticker),
+      3,
+    );
+    await mapWithConcurrency(relevant, TICK_CONCURRENCY, (p) =>
+      fetchPoolTicksWithRetry(p.id).catch(() => null),
+    );
+  } catch {
+    // Prefetch is a nicety only.
+  }
+}
+
+// ----- Ticks straight from the chain -----
+// The swap.alcor `ticks` table (scoped by pool id) holds exactly the rows the
+// Alcor API serves. Used when the API refuses us (429) so a busy Alcor never
+// removes a pool from the route search.
+const CHAIN_TICKS_PAGE = 1000;
+const CHAIN_TICKS_MAX_PAGES = 20;
+
+export async function fetchPoolTicksFromChain(poolId: number): Promise<RawAlcorTick[]> {
+  const rows: RawAlcorTick[] = [];
+  let lower: string | undefined;
+  for (let page = 0; page < CHAIN_TICKS_MAX_PAGES; page++) {
+    const res = await fetchTableRows<RawAlcorTick>({
+      code: "swap.alcor",
+      scope: String(poolId),
+      table: "ticks",
+      limit: CHAIN_TICKS_PAGE,
+      ...(lower ? { lower_bound: lower } : {}),
+    });
+    rows.push(...res.rows);
+    if (!res.more || !res.next_key) return rows;
+    lower = res.next_key;
+  }
+  throw new Error(`Too many tick pages for pool ${poolId}`);
 }
 
 const ticksCache = new Map<number, { at: number; data: RawAlcorTick[] }>();
@@ -166,21 +218,36 @@ export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Prom
 export async function fetchPoolTicksWithRetry(
   poolId: number,
   signal?: AbortSignal,
+  preferChain = false,
 ): Promise<RawAlcorTick[]> {
-  try {
-    return await fetchPoolTicks(poolId, signal);
-  } catch (e) {
-    if ((e as any)?.name === "AbortError") throw e;
-    // Bust the 8s negative cache so the retry actually hits the network.
-    ticksFailCache.delete(poolId);
-    // Jittered backoff to avoid re-entering the same 429 window.
-    await new Promise((r) => setTimeout(r, 300 + Math.random() * 400));
+  const cached = ticksCache.get(poolId);
+  if (cached && Date.now() - cached.at < TICKS_TTL_MS) return cached.data;
+  const fromChain = async () => {
     if (signal?.aborted) {
       const err = new Error("aborted");
       (err as any).name = "AbortError";
       throw err;
     }
+    const data = await fetchPoolTicksFromChain(poolId);
+    ticksCache.set(poolId, { at: Date.now(), data });
+    ticksFailCache.delete(poolId);
+    return data;
+  };
+  // While Alcor is rate-limiting us, go straight to the chain.
+  if (isAlcorCoolingDown()) return fromChain();
+  if (preferChain) {
+    try {
+      return await fromChain();
+    } catch (e) {
+      if ((e as any)?.name === "AbortError") throw e;
+      // fall through to Alcor
+    }
+  }
+  try {
     return await fetchPoolTicks(poolId, signal);
+  } catch (e) {
+    if ((e as any)?.name === "AbortError") throw e;
+    return fromChain();
   }
 }
 
@@ -209,9 +276,6 @@ async function mapWithConcurrency<T, R>(
 
 // ----- Route graph filtering -----
 
-function tokenKey(contract: string, symbol: string): string {
-  return `${symbol.toLowerCase()}-${contract}`;
-}
 
 // Hub tokens that make good intermediate hops on WAX (matches Alcor's routing
 // heuristics: only route through liquid, well-known assets).
@@ -474,78 +538,9 @@ function selectRelevantPools(
   return selected;
 }
 
-function formatSdkDiagnostics(diag?: SwapRoute["quoteDiagnostics"]): string {
-  if (!diag) return "";
-  return ` (${diag.routesConsidered ?? "?"} routes, ${diag.poolsBuilt ?? "?"}/${diag.relevantPools ?? "?"} pools, tickFailures=${diag.tickFailures ?? 0}, rateLimited=${diag.rateLimitedTickFailures ?? 0}, ${diag.tookMs ?? "?"}ms)`;
-}
 
 // ----- Pool construction -----
 
-// ----- Router entry: prefer WASM (matches Alcor's UI) then fall back to JS -----
-
-async function runBestTradeWithSplit(
-  routes: any[],
-  currencyAmount: any,
-  percents: number[],
-  sdkTradeType: any,
-  sdkPools: Pool[],
-  swapConfig: { minSplits: number; maxSplits: number }
-): Promise<any> {
-  const T = Trade as any;
-  // The SDK's WASM router ships as a Node-only build (uses `require('util')`
-  // and CJS `module.exports`), so it cannot load in the browser and always
-  // throws "require is not defined". Skip it entirely in browser contexts to
-  // avoid the noisy console error and wasted dynamic import on every quote.
-  const isBrowser = typeof window !== "undefined";
-  if (!isBrowser && typeof T.bestTradeWithSplitWASM === "function") {
-    try {
-      const wasmTrade = await T.bestTradeWithSplitWASM(
-        routes,
-        currencyAmount,
-        percents,
-        sdkTradeType,
-        sdkPools,
-        swapConfig
-      );
-      if (wasmTrade) return wasmTrade;
-      logger.warn("[alcor-router] WASM router returned null — falling back to JS");
-    } catch (e) {
-      logger.warn("[alcor-router] WASM router threw — falling back to JS", e);
-    }
-  }
-  return T.bestTradeWithSplit(routes, currencyAmount, percents, sdkTradeType, swapConfig);
-}
-
-function buildPool(raw: RawAlcorPool, ticks: RawAlcorTick[]): Pool {
-  // Match the exact JSON shape Pool.fromJSON expects. The tick shape from
-  // /pools/:id/ticks already matches Tick.fromJSON.
-  const json = {
-    id: raw.id,
-    active: raw.active,
-    fee: raw.fee,
-    tokenA: { contract: raw.tokenA.contract, decimals: raw.tokenA.decimals, symbol: raw.tokenA.symbol },
-    tokenB: { contract: raw.tokenB.contract, decimals: raw.tokenB.decimals, symbol: raw.tokenB.symbol },
-    sqrtPriceX64: raw.sqrtPriceX64,
-    liquidity: raw.liquidity,
-    tickCurrent: raw.tick,
-    feeGrowthGlobalAX64: raw.feeGrowthGlobalAX64,
-    feeGrowthGlobalBX64: raw.feeGrowthGlobalBX64,
-    tickDataProvider: ticks
-      .slice()
-      .sort((a, b) => a.id - b.id)
-      .map((t) => ({
-        id: t.id,
-        liquidityGross: String(t.liquidityGross),
-        liquidityNet: String(t.liquidityNet),
-        feeGrowthOutsideAX64: t.feeGrowthOutsideAX64,
-        feeGrowthOutsideBX64: t.feeGrowthOutsideBX64,
-        tickCumulativeOutside: String(t.tickCumulativeOutside),
-        secondsPerLiquidityOutsideX64: t.secondsPerLiquidityOutsideX64,
-        secondsOutside: String(t.secondsOutside),
-      })),
-  };
-  return Pool.fromJSON(json);
-}
 
 // ----- Public entry -----
 
@@ -666,14 +661,6 @@ export async function computeShadowQuote(args: ShadowQuoteArgs): Promise<ShadowQ
   };
 }
 
-function toRawAmount(human: string, decimals: number): string {
-  // Convert "1.23" @ decimals=8 → "123000000". Avoids float precision.
-  const [whole, frac = ""] = human.split(".");
-  const fracPadded = (frac + "0".repeat(decimals)).slice(0, decimals);
-  const raw = (whole || "0") + fracPadded;
-  const trimmed = raw.replace(/^0+(?=\d)/, "");
-  return trimmed || "0";
-}
 
 // ----- Split-trade -> SwapRoute adapter -----
 
@@ -713,173 +700,66 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   const inKey = tokenKey(tokenIn.contract, tokenIn.ticker);
   const outKey = tokenKey(tokenOut.contract, tokenOut.ticker);
 
-  const allPools = await fetchAllAlcorPools(signal);
-  const relevant = selectRelevantPools(allPools, inKey, outKey, maxHops);
-  if (relevant.length === 0) return null;
+  // Start fetching ticks straight away from the pool list we already have
+  // (in memory, or saved in the browser from an earlier visit), while the
+  // fresh pool list downloads in parallel. Live pool state (price, liquidity,
+  // current tick) always comes from the fresh list — the saved list is only
+  // used to decide which pools are worth fetching ticks for.
+  const freshPromise = fetchAllAlcorPools(signal);
+  const earlyList = poolsCache?.data ?? readSavedPoolIndex();
+  const earlyRelevant = earlyList ? selectRelevantPools(earlyList, inKey, outKey, maxHops) : [];
 
   let tickFailures = 0;
   let rateLimitedTickFailures = 0;
-  const tickResults = await mapWithConcurrency(relevant, TICK_CONCURRENCY, async (p) => {
-    try {
-      return { p, ticks: await fetchPoolTicksWithRetry(p.id, signal) };
-    } catch (e) {
-      if ((e as any)?.name === "AbortError") throw e;
-      tickFailures += 1;
-      if (isRateLimitError(e)) rateLimitedTickFailures += 1;
-      logger.warn(`alcorTrade: tick fetch failed for pool ${p.id}`, e);
-      return { p, ticks: [] as RawAlcorTick[] };
-    }
-  });
-
-  const sdkPools = tickResults
-    .filter((r) => r.ticks.length > 0)
-    .map((r) => {
-      try {
-        return buildPool(r.p, r.ticks);
-      } catch (e) {
-        logger.warn(`alcorTrade: pool build failed for pool ${r.p.id}`, e);
+  const tickById = new Map<number, Promise<RawAlcorTick[] | null>>();
+  // Spread the fan-out: every third pool is read from the chain first, so
+  // Alcor sees fewer requests at once and stops answering 429.
+  let fanout = 0;
+  const ticksFor = (id: number) => {
+    let pr = tickById.get(id);
+    if (!pr) {
+      const preferChain = fanout++ % 3 === 2;
+      pr = fetchPoolTicksWithRetry(id, signal, preferChain).catch((e) => {
+        if ((e as any)?.name === "AbortError") throw e;
+        tickFailures += 1;
+        if (isRateLimitError(e)) rateLimitedTickFailures += 1;
+        logger.warn(`alcorTrade: tick fetch failed for pool ${id}`, e);
         return null;
-      }
-    })
-    .filter((p): p is Pool => p !== null);
+      });
+      // Surface aborts only to whoever awaits; never as unhandled rejections.
+      pr.catch(() => {});
+      tickById.set(id, pr);
+    }
+    return pr;
+  };
+  // Bounded fan-out: same concurrency as before.
+  const earlyWarm = mapWithConcurrency(earlyRelevant, TICK_CONCURRENCY, (p) => ticksFor(p.id));
+  earlyWarm.catch(() => {});
 
-  // Diagnostic: log which pools were excluded from the SDK graph because they
-  // returned no ticks after retry. This is the mechanism that historically
-  // caused the WAX→WAXWBTC split to collapse to a single route when a WAXBTC
-  // endpoint pool was silently dropped.
-  const droppedForTicks = tickResults
-    .filter((r) => r.ticks.length === 0)
-    .map((r) => r.p.id);
-  if (droppedForTicks.length > 0) {
-    logger.warn(
-      `[alcor-router] Dropped ${droppedForTicks.length} pool(s) with 0 ticks after retry`,
-      droppedForTicks,
-    );
-  }
+  const allPools = await freshPromise;
+  const relevant = selectRelevantPools(allPools, inKey, outKey, maxHops);
+  if (relevant.length === 0) return null;
 
-  if (sdkPools.length === 0) {
-    return null;
-  }
+  const tickResults = await mapWithConcurrency(relevant, TICK_CONCURRENCY, async (p) => ({
+    p,
+    ticks: (await ticksFor(p.id)) ?? ([] as RawAlcorTick[]),
+  }));
 
-  const inTok = new Token(tokenIn.contract, tokenIn.precision, tokenIn.ticker);
-  const outTok = new Token(tokenOut.contract, tokenOut.precision, tokenOut.ticker);
-
-  const routes = computeAllRoutes(inTok, outTok, sdkPools, maxHops);
-  if (routes.length === 0) {
-    return null;
-  }
-
-  const percents: number[] = [];
-  for (let p = distributionPercent; p <= 100; p += distributionPercent) percents.push(p);
-
-  const rawAmount = toRawAmount(
+  return runQuote({
+    pools: tickResults,
+    tokenIn,
+    tokenOut,
     amount,
-    tradeType === "EXACT_INPUT" ? tokenIn.precision : tokenOut.precision
-  );
-  const currencyAmount = CurrencyAmount.fromRawAmount(
-    tradeType === "EXACT_INPUT" ? inTok : outTok,
-    rawAmount
-  );
-
-  const sdkTradeType = tradeType === "EXACT_INPUT" ? TradeType.EXACT_INPUT : TradeType.EXACT_OUTPUT;
-  const trade = await runBestTradeWithSplit(
-    routes,
-    currencyAmount,
-    percents,
-    sdkTradeType,
-    sdkPools,
-    { minSplits: 1, maxSplits: 6 }
-  );
-
-  const diagnostics: SwapRoute["quoteDiagnostics"] = {
-    relevantPools: relevant.length,
-    poolsBuilt: sdkPools.length,
-    routesConsidered: routes.length,
+    slippage,
+    receiver,
+    tradeType,
+    maxHops,
+    distributionPercent,
+    relevantCount: relevant.length,
     tickFailures,
     rateLimitedTickFailures,
-    poolsDroppedNoTicks: droppedForTicks.length,
-    tookMs: Math.round(performance.now() - started),
-  };
-
-  if (!trade) {
-    return null;
-  }
-
-  // Slippage as SDK Percent: e.g. 1% => Percent(100, 10_000).
-  const bps = Math.round(slippage * 100); // 1% -> 100bps
-  const slip = new Percent(bps, 10_000);
-
-  const exactIn = tradeType === "EXACT_INPUT";
-  const opWord = exactIn ? "swapexactin" : "swapexactout";
-
-  // Per-split shape mirrors Alcor's own parseTrade so the memo is byte-identical
-  // to what wax.alcor.exchange sends today.
-  const splitCount = trade.swaps.length;
-  const perSplitBps = splitSlipBps(bps, splitCount);
-  const splitSlip = new Percent(perSplitBps, 10_000);
-  const splits: SwapSplit[] = trade.swaps.map((s: any) => {
-    const poolIds: number[] = s.route.pools.map((p: Pool) => p.id);
-    const visualPath = s.route.tokenPath.map((t: Token) => ({
-      id: tokenKey(t.contract, t.symbol),
-      symbol: t.symbol,
-      contract: t.contract,
-      decimals: t.decimals,
-    }));
-    const visualFees = s.route.pools.map((p: Pool) => p.fee);
-    const maxSent = exactIn ? s.inputAmount : trade.maximumAmountIn(slip, s.inputAmount);
-    const minReceived = exactIn ? trade.minimumAmountOut(splitSlip, s.outputAmount) : s.outputAmount;
-    const memo = `${opWord}#${poolIds.join(",")}#${receiver}#${minReceived.toExtendedAsset()}#0`;
-    return {
-      percent: s.percent,
-      route: poolIds,
-      input: s.inputAmount.toFixed(),
-      output: s.outputAmount.toFixed(),
-      minReceived: minReceived.toFixed(),
-      maxSent: maxSent.toFixed(),
-      memo,
-      visualPath,
-      visualFees,
-    };
-  });
-
-  const aggMin = exactIn ? trade.minimumAmountOut(slip) : trade.outputAmount;
-  const aggRoute: number[] = trade.swaps[0].route.pools.map((p: Pool) => p.id);
-  const aggMemo = `${opWord}#${aggRoute.join(",")}#${receiver}#${aggMin.toExtendedAsset()}#0`;
-
-  // Defensive invariant: at positive slippage, minReceived must never exceed
-  // output. Clamp + warn if a future SDK version ever violates this.
-  const outputNum = parseFloat(trade.outputAmount.toFixed());
-  let minReceivedNum = parseFloat(aggMin.toFixed());
-  if (exactIn && minReceivedNum > outputNum) {
-    logger.warn("[alcor-router] minReceived > output; clamping", {
-      output: outputNum,
-      minReceived: minReceivedNum,
-    });
-    minReceivedNum = outputNum;
-  }
-
-  const result = {
-    output: outputNum,
-    minReceived: minReceivedNum,
-    priceImpact: parseFloat(trade.priceImpact.toFixed(4)),
-    memo: aggMemo,
-    route: aggRoute,
-    executionPrice: {
-      numerator: trade.executionPrice.numerator.toString(),
-      denominator: trade.executionPrice.denominator.toString(),
-    },
-    input: parseFloat(trade.inputAmount.toFixed()),
-    swaps: splits,
-    quoteSource: "sdk",
-    quoteComplete: tickFailures === 0,
-    quoteDiagnostics: diagnostics,
-  } as SwapRoute;
-
-  logger.info(
-    `[alcor-router] SDK quote produced ${splits.length} split(s) [grid=${distributionPercent}%, maxHops=${maxHops}, per-split slip=${perSplitBps / 100}%]${formatSdkDiagnostics(diagnostics)}`,
-  );
-
-  return result;
+    started,
+  }, signal);
 }
 
 // Warm the pool-list cache on module import so the first quote (or route
