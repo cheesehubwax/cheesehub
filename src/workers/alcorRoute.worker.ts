@@ -2,8 +2,9 @@
 import "./workerPolyfills";
 import { quoteFromData, type QuoteInput } from "@/lib/alcorQuoteCore";
 
-self.onmessage = async (ev: MessageEvent<{ id: number; input: QuoteInput }>) => {
-  const { id, input } = ev.data;
+self.onmessage = async (ev: MessageEvent<{ id: number; input: QuoteInput; elapsedMs: number }>) => {
+  const { id, input, elapsedMs } = ev.data;
+  input.started = performance.now() - (elapsedMs || 0);
   try {
     const route = await quoteFromData(input);
     (self as unknown as Worker).postMessage({ id, ok: true, route });

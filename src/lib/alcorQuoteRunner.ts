@@ -74,6 +74,7 @@ export function runQuote(input: QuoteInput, signal?: AbortSignal): Promise<SwapR
       },
       { once: true },
     );
-    w.postMessage({ id, input });
+    // performance.now() has a different origin inside a worker; send elapsed time.
+    w.postMessage({ id, input, elapsedMs: performance.now() - input.started });
   });
 }
