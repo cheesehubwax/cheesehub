@@ -21,10 +21,14 @@ Paid banners and the rest of the banner system are untouched.
 
 ## Implementation
 
-1. **Asset**: upload the uploaded image via `lovable-assets` from
-   `/mnt/user-uploads/waxedge.jpg` → `src/assets/waxedge-banner.jpg.asset.json`
-   (CDN pointer; no binary left in the repo). The existing
-   `src/assets/cheese_banner4.png` stays in the repo as the second placeholder.
+1. **Asset**: copy the upload into the repo as a regular bundled image,
+   `src/assets/waxedge-banner.jpg`, imported exactly like the existing
+   `cheese_banner4.png`. A Lovable CDN asset pointer (`/__l5e/assets-v1/...`)
+   cannot be used here: that URL is only served by Lovable hosting and the dev
+   proxy, so the banner would be blank on the GitHub Pages deployment at
+   `/cheesehub/`. A bundled import is rewritten by Vite to the correct
+   `/cheesehub/` path at build time, so it works in the preview, on Lovable
+   hosting, and on GitHub Pages.
 2. **`src/components/bannerads/BannerDisplay.tsx`**:
    - Add an import for the new `.asset.json` pointer; use its `.url` as the
      WaxEDGE placeholder's `localSrc`.
@@ -48,4 +52,7 @@ Paid banners and the rest of the banner system are untouched.
 - Browser check on the homepage: the WaxEDGE banner renders in the placeholder
   half at 580x150, click opens the external-link warning, paid banners render
   as before.
+- GitHub Pages check: build the production bundle (`base: /cheesehub/`) and
+  confirm the banner image URL in the output is correctly prefixed with
+  `/cheesehub/`, so it loads on the GitHub site, not just the preview.
 - Typecheck + build + test suite.
