@@ -63,12 +63,7 @@ function extractBannersForSlot(slot: BannerSlot, placeholderNumber: number): Act
 
   // Placeholder for unrented shared half
   if (slot.rentalType === "shared" && slot.user !== "cheesebannad" && !slot.sharedUser) {
-    banners.push({
-      localSrc: cheeseBanner4,
-      websiteUrl: "/farm",
-      user: "placeholder",
-      isPlaceholder: true,
-    });
+    banners.push(placeholderBanner(placeholderNumber));
   }
 
   return banners;
