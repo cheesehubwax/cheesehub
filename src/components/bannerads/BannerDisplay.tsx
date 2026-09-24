@@ -228,8 +228,11 @@ export function BannerDisplay() {
 
     if (!currentGroup) return result;
 
-    for (const slot of currentGroup.slots) {
-      const banners = extractBannersForSlot(slot);
+    // Position order so the first empty slot always gets the WaxEDGE placeholder
+    let placeholderCount = 0;
+    for (const slot of [...currentGroup.slots].sort((a, b) => a.position - b.position)) {
+      const banners = extractBannersForSlot(slot, placeholderCount + 1);
+      if (banners.some((b) => b.isPlaceholder)) placeholderCount++;
       if (slot.position === 1) {
         result.pos1Banners.push(...banners);
       } else if (slot.position === 2) {
