@@ -218,6 +218,7 @@ export async function fetchPoolTicks(poolId: number, signal?: AbortSignal): Prom
 export async function fetchPoolTicksWithRetry(
   poolId: number,
   signal?: AbortSignal,
+  preferChain = false,
 ): Promise<RawAlcorTick[]> {
   const cached = ticksCache.get(poolId);
   if (cached && Date.now() - cached.at < TICKS_TTL_MS) return cached.data;
@@ -234,6 +235,14 @@ export async function fetchPoolTicksWithRetry(
   };
   // While Alcor is rate-limiting us, go straight to the chain.
   if (isAlcorCoolingDown()) return fromChain();
+  if (preferChain) {
+    try {
+      return await fromChain();
+    } catch (e) {
+      if ((e as any)?.name === "AbortError") throw e;
+      // fall through to Alcor
+    }
+  }
   try {
     return await fetchPoolTicks(poolId, signal);
   } catch (e) {
@@ -703,10 +712,14 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   let tickFailures = 0;
   let rateLimitedTickFailures = 0;
   const tickById = new Map<number, Promise<RawAlcorTick[] | null>>();
+  // Spread the fan-out: every third pool is read from the chain first, so
+  // Alcor sees fewer requests at once and stops answering 429.
+  let fanout = 0;
   const ticksFor = (id: number) => {
     let pr = tickById.get(id);
     if (!pr) {
-      pr = fetchPoolTicksWithRetry(id, signal).catch((e) => {
+      const preferChain = fanout++ % 3 === 2;
+      pr = fetchPoolTicksWithRetry(id, signal, preferChain).catch((e) => {
         if ((e as any)?.name === "AbortError") throw e;
         tickFailures += 1;
         if (isRateLimitError(e)) rateLimitedTickFailures += 1;
