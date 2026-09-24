@@ -7,8 +7,8 @@ import { sanitizeUrl } from "@/lib/sanitizeUrl";
 import { isDomainBlocked } from "@/lib/bannerBlocklist";
 import { logger } from "@/lib/logger";
 import { ExternalLinkWarning } from "./ExternalLinkWarning";
-import cheeseBanner4 from "@/assets/cheese_banner4.png";
 import waxedgeBanner from "@/assets/waxedge-banner.jpg";
+import gpkCollectionManagerBanner from "@/assets/gpk-collection-manager-banner.png";
 
 interface ActiveBanner {
   ipfsHash?: string;
@@ -20,16 +20,16 @@ interface ActiveBanner {
   alt?: string;
 }
 
-// First placeholder = WaxEDGE promo; the legacy yellow banner is the second
+// First placeholder = WaxEDGE promo; GPK Collection Manager is the second
 // placeholder so two open shared slots side by side never show the same image.
 function placeholderBanner(placeholderNumber: number): ActiveBanner {
   const isFirst = placeholderNumber === 1;
   return {
-    localSrc: isFirst ? waxedgeBanner : cheeseBanner4,
-    websiteUrl: isFirst ? "https://waxedge.app" : "/farm",
-    user: isFirst ? "placeholder-waxedge" : "placeholder",
+    localSrc: isFirst ? waxedgeBanner : gpkCollectionManagerBanner,
+    websiteUrl: isFirst ? "https://waxedge.app" : "https://gpkonwax.github.io/collection-manager/",
+    user: isFirst ? "placeholder-waxedge" : "placeholder-gpk-collection-manager",
     isPlaceholder: true,
-    alt: isFirst ? "WaxEDGE Banner" : "CHEESEFarm Banner",
+    alt: isFirst ? "WaxEDGE Banner" : "Unofficial GPK Collection Manager Banner",
   };
 }
 
