@@ -619,7 +619,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   });
 
   return runQuote({
-    pools: tickResults.filter((r) => r.ticks.length > 0),
+    pools: tickResults,
     tokenIn,
     tokenOut,
     amount,
