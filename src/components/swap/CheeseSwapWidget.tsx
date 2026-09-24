@@ -74,7 +74,7 @@ export function CheeseSwapWidget({
   const tradeType: TradeType = activeField === "in" ? "EXACT_INPUT" : "EXACT_OUTPUT";
   const routeAmount = activeField === "in" ? amountIn : amountOut;
 
-  const { route, isFetching: routeLoading, error: routeError, noRoute, isRetrying, exhaustedTransient, refetch: refetchRoute } = useSwapRoute(
+  const { route, isProvisional, isFetching: routeLoading, error: routeError, noRoute, isRetrying, exhaustedTransient, refetch: refetchRoute } = useSwapRoute(
     tokenIn,
     tokenOut,
     routeAmount,
@@ -82,6 +82,14 @@ export function CheeseSwapWidget({
     accountName || "placeholder111",
     tradeType
   );
+
+  // Warm the pool data for the chosen pair before an amount is typed.
+  useEffect(() => {
+    if (!tokenIn || !tokenOut) return;
+    if (tokenIn.contract === tokenOut.contract && tokenIn.ticker === tokenOut.ticker) return;
+    const t = setTimeout(() => { void prefetchPairPools(tokenIn, tokenOut); }, 150);
+    return () => clearTimeout(t);
+  }, [tokenIn, tokenOut]);
 
   // Derive the non-active field from route. Guard against stale placeholderData
   // — when the active field is empty, force the derived field to empty too.
@@ -132,7 +140,7 @@ export function CheeseSwapWidget({
     : (route?.input ? formatTokenAmount(route.input, tokenIn?.precision ?? 8) : "");
 
   const handleSwap = async () => {
-    if (!route || !session || !accountName || !tokenIn) return;
+    if (!route || route.quoteComplete === false || !session || !accountName || !tokenIn) return;
     setIsSwapping(true);
     try {
       const actions = normalizeRouteActions(route, accountName, tokenIn.contract, swapAmountIn, tokenIn);
@@ -202,7 +210,7 @@ export function CheeseSwapWidget({
   };
 
   const hasAmount = parseFloat(routeAmount) > 0;
-  const canSwap = !!route && !!route.memo && !!accountName && hasAmount && !routeLoading;
+  const canSwap = !!route && !!route.memo && route.quoteComplete !== false && !!accountName && hasAmount && !routeLoading;
 
   const handleTokenSelect = useCallback((token: SwapToken) => {
     const prev = selectorSide === "in" ? tokenIn : tokenOut;
@@ -219,7 +227,7 @@ export function CheeseSwapWidget({
     }
   }, [selectorSide, tokenIn, tokenOut]);
 
-  const isLoading = routeLoading && hasAmount;
+  const isLoading = routeLoading && hasAmount && !isProvisional;
 
   return (
     <div className="space-y-3">
@@ -397,6 +405,8 @@ export function CheeseSwapWidget({
           "Select tokens"
         ) : !hasAmount ? (
           "Enter amount"
+        ) : isProvisional ? (
+          "Finding a better split..."
         ) : routeLoading || isRetrying ? (
           "Finding best route..."
         ) : noRoute ? (
