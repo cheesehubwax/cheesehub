@@ -28,6 +28,7 @@ import {
 } from "./alcorQuoteCore";
 import { runQuote } from "./alcorQuoteRunner";
 import { fetchTableRows } from "./waxRpcFallback";
+import { readStatCache, writeStatCache } from "./statCache";
 import { logger } from "./logger";
 
 const ALCOR_API = "https://wax.alcor.exchange/api/v2";
@@ -68,6 +69,7 @@ export async function fetchAllAlcorPools(signal?: AbortSignal): Promise<RawAlcor
     }
     const data = (await res.json()) as RawAlcorPool[];
     poolsCache = { at: Date.now(), data };
+    savePoolIndex(data);
     return data;
   })();
   try {
@@ -75,6 +77,89 @@ export async function fetchAllAlcorPools(signal?: AbortSignal): Promise<RawAlcor
   } finally {
     poolsInflight = null;
   }
+}
+
+// ----- Saved pool index -----
+// A slim copy of the pool list (which pools exist, their tokens, fee and
+// liquidity) kept in the browser so a returning visitor can start fetching
+// ticks before the ~2 MB live list arrives. Never used for prices.
+const POOL_INDEX_KEY = "alcor-pools-index";
+const POOL_INDEX_SAVE_EVERY_MS = 10 * 60_000;
+let poolIndexSavedAt = 0;
+
+function savePoolIndex(data: RawAlcorPool[]): void {
+  if (Date.now() - poolIndexSavedAt < POOL_INDEX_SAVE_EVERY_MS) return;
+  poolIndexSavedAt = Date.now();
+  const tok = (t: RawAlcorPool["tokenA"]) => ({
+    contract: t.contract,
+    decimals: t.decimals,
+    symbol: t.symbol,
+    id: t.id,
+  });
+  writeStatCache(
+    POOL_INDEX_KEY,
+    data
+      .filter((p) => p.active)
+      .map((p) => ({
+        id: p.id,
+        active: p.active,
+        fee: p.fee,
+        liquidity: p.liquidity,
+        tokenA: tok(p.tokenA),
+        tokenB: tok(p.tokenB),
+      })),
+  );
+}
+
+function readSavedPoolIndex(): RawAlcorPool[] | null {
+  const saved = readStatCache<RawAlcorPool[]>(POOL_INDEX_KEY);
+  return Array.isArray(saved) && saved.length > 0 ? saved : null;
+}
+
+/**
+ * Warm the tick cache for a token pair before an amount is typed, so the
+ * first quote only has to run the search. Best-effort and silent.
+ */
+export async function prefetchPairPools(tokenIn: SwapToken, tokenOut: SwapToken): Promise<void> {
+  try {
+    const list = poolsCache?.data ?? readSavedPoolIndex() ?? (await fetchAllAlcorPools());
+    const relevant = selectRelevantPools(
+      list,
+      tokenKey(tokenIn.contract, tokenIn.ticker),
+      tokenKey(tokenOut.contract, tokenOut.ticker),
+      3,
+    );
+    await mapWithConcurrency(relevant, TICK_CONCURRENCY, (p) =>
+      fetchPoolTicksWithRetry(p.id).catch(() => null),
+    );
+  } catch {
+    // Prefetch is a nicety only.
+  }
+}
+
+// ----- Ticks straight from the chain -----
+// The swap.alcor `ticks` table (scoped by pool id) holds exactly the rows the
+// Alcor API serves. Used when the API refuses us (429) so a busy Alcor never
+// removes a pool from the route search.
+const CHAIN_TICKS_PAGE = 1000;
+const CHAIN_TICKS_MAX_PAGES = 20;
+
+export async function fetchPoolTicksFromChain(poolId: number): Promise<RawAlcorTick[]> {
+  const rows: RawAlcorTick[] = [];
+  let lower: string | undefined;
+  for (let page = 0; page < CHAIN_TICKS_MAX_PAGES; page++) {
+    const res = await fetchTableRows<RawAlcorTick>({
+      code: "swap.alcor",
+      scope: String(poolId),
+      table: "ticks",
+      limit: CHAIN_TICKS_PAGE,
+      ...(lower ? { lower_bound: lower } : {}),
+    });
+    rows.push(...res.rows);
+    if (!res.more || !res.next_key) return rows;
+    lower = res.next_key;
+  }
+  throw new Error(`Too many tick pages for pool ${poolId}`);
 }
 
 const ticksCache = new Map<number, { at: number; data: RawAlcorTick[] }>();
@@ -134,20 +219,26 @@ export async function fetchPoolTicksWithRetry(
   poolId: number,
   signal?: AbortSignal,
 ): Promise<RawAlcorTick[]> {
-  try {
-    return await fetchPoolTicks(poolId, signal);
-  } catch (e) {
-    if ((e as any)?.name === "AbortError") throw e;
-    // Bust the 8s negative cache so the retry actually hits the network.
-    ticksFailCache.delete(poolId);
-    // Jittered backoff to avoid re-entering the same 429 window.
-    await new Promise((r) => setTimeout(r, 300 + Math.random() * 400));
+  const cached = ticksCache.get(poolId);
+  if (cached && Date.now() - cached.at < TICKS_TTL_MS) return cached.data;
+  const fromChain = async () => {
     if (signal?.aborted) {
       const err = new Error("aborted");
       (err as any).name = "AbortError";
       throw err;
     }
+    const data = await fetchPoolTicksFromChain(poolId);
+    ticksCache.set(poolId, { at: Date.now(), data });
+    ticksFailCache.delete(poolId);
+    return data;
+  };
+  // While Alcor is rate-limiting us, go straight to the chain.
+  if (isAlcorCoolingDown()) return fromChain();
+  try {
     return await fetchPoolTicks(poolId, signal);
+  } catch (e) {
+    if ((e as any)?.name === "AbortError") throw e;
+    return fromChain();
   }
 }
 
@@ -600,23 +691,46 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   const inKey = tokenKey(tokenIn.contract, tokenIn.ticker);
   const outKey = tokenKey(tokenOut.contract, tokenOut.ticker);
 
-  const allPools = await fetchAllAlcorPools(signal);
-  const relevant = selectRelevantPools(allPools, inKey, outKey, maxHops);
-  if (relevant.length === 0) return null;
+  // Start fetching ticks straight away from the pool list we already have
+  // (in memory, or saved in the browser from an earlier visit), while the
+  // fresh pool list downloads in parallel. Live pool state (price, liquidity,
+  // current tick) always comes from the fresh list — the saved list is only
+  // used to decide which pools are worth fetching ticks for.
+  const freshPromise = fetchAllAlcorPools(signal);
+  const earlyList = poolsCache?.data ?? readSavedPoolIndex();
+  const earlyRelevant = earlyList ? selectRelevantPools(earlyList, inKey, outKey, maxHops) : [];
 
   let tickFailures = 0;
   let rateLimitedTickFailures = 0;
-  const tickResults = await mapWithConcurrency(relevant, TICK_CONCURRENCY, async (p) => {
-    try {
-      return { p, ticks: await fetchPoolTicksWithRetry(p.id, signal) };
-    } catch (e) {
-      if ((e as any)?.name === "AbortError") throw e;
-      tickFailures += 1;
-      if (isRateLimitError(e)) rateLimitedTickFailures += 1;
-      logger.warn(`alcorTrade: tick fetch failed for pool ${p.id}`, e);
-      return { p, ticks: [] as RawAlcorTick[] };
+  const tickById = new Map<number, Promise<RawAlcorTick[] | null>>();
+  const ticksFor = (id: number) => {
+    let pr = tickById.get(id);
+    if (!pr) {
+      pr = fetchPoolTicksWithRetry(id, signal).catch((e) => {
+        if ((e as any)?.name === "AbortError") throw e;
+        tickFailures += 1;
+        if (isRateLimitError(e)) rateLimitedTickFailures += 1;
+        logger.warn(`alcorTrade: tick fetch failed for pool ${id}`, e);
+        return null;
+      });
+      // Surface aborts only to whoever awaits; never as unhandled rejections.
+      pr.catch(() => {});
+      tickById.set(id, pr);
     }
-  });
+    return pr;
+  };
+  // Bounded fan-out: same concurrency as before.
+  const earlyWarm = mapWithConcurrency(earlyRelevant, TICK_CONCURRENCY, (p) => ticksFor(p.id));
+  earlyWarm.catch(() => {});
+
+  const allPools = await freshPromise;
+  const relevant = selectRelevantPools(allPools, inKey, outKey, maxHops);
+  if (relevant.length === 0) return null;
+
+  const tickResults = await mapWithConcurrency(relevant, TICK_CONCURRENCY, async (p) => ({
+    p,
+    ticks: (await ticksFor(p.id)) ?? ([] as RawAlcorTick[]),
+  }));
 
   return runQuote({
     pools: tickResults,
