@@ -58,6 +58,20 @@ function parseQuantity(quantity: string): { amount: number; symbol: string } {
 
 const ALCOR_API = 'https://wax.alcor.exchange/api/v2';
 const SOURCE_TIMEOUT_MS = 8_000;
+
+/** fetch with a hard time limit so one slow source can't hold up the rest. */
+async function fetchWithTimeout<T>(url: string, init?: RequestInit): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SOURCE_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { ...init, signal: controller.signal });
+    if (!res.ok) throw new Error(`${url} failed (${res.status})`);
+    return (await res.json()) as T;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function isCheesePool(pool: AlcorPool): boolean {
   return (
     (pool.tokenA.contract === CHEESE_CONTRACT && pool.tokenA.symbol.includes(CHEESE_SYMBOL)) ||
