@@ -12,6 +12,7 @@ import { useWax } from "@/context/WaxContext";
 import { type SwapToken, formatTokenAmount, normalizeRouteActions, PREFERRED_CONTRACTS } from "@/lib/swapApi";
 import { getTransactPlugins } from "@/lib/wharfKit";
 import { fetchSingleTokenBalance } from "@/lib/waxRpcFallback";
+import { prefetchPairPools } from "@/lib/alcorRouter";
 import type { TokenWithBalance } from "@/hooks/useAllTokenBalances";
 import { toast } from "sonner";
 
