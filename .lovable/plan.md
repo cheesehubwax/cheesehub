@@ -52,4 +52,7 @@ Paid banners and the rest of the banner system are untouched.
 - Browser check on the homepage: the WaxEDGE banner renders in the placeholder
   half at 580x150, click opens the external-link warning, paid banners render
   as before.
+- GitHub Pages check: build the production bundle (`base: /cheesehub/`) and
+  confirm the banner image URL in the output is correctly prefixed with
+  `/cheesehub/`, so it loads on the GitHub site, not just the preview.
 - Typecheck + build + test suite.
