@@ -7,3 +7,4 @@
 
 - [x] CHEESESwap: faster route finding (instant Alcor quote, background search, chain tick fallback, early prefetch)
 - [x] Banner ads: WaxEDGE placeholder first, legacy yellow banner as second placeholder when two shared slots are open; placeholder must also work on GitHub Pages (bundled asset)
+- [x] Banner ads: replace the legacy yellow second placeholder with GPK Collection Manager, linking through the external-site warning
