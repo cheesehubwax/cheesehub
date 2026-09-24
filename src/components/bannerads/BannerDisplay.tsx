@@ -8,6 +8,7 @@ import { isDomainBlocked } from "@/lib/bannerBlocklist";
 import { logger } from "@/lib/logger";
 import { ExternalLinkWarning } from "./ExternalLinkWarning";
 import cheeseBanner4 from "@/assets/cheese_banner4.png";
+import waxedgeBanner from "@/assets/waxedge-banner.jpg";
 
 interface ActiveBanner {
   ipfsHash?: string;
@@ -16,9 +17,23 @@ interface ActiveBanner {
   user: string;
   isPlaceholder?: boolean;
   isShared?: boolean;
+  alt?: string;
 }
 
-function extractBannersForSlot(slot: BannerSlot): ActiveBanner[] {
+// First placeholder = WaxEDGE promo; the legacy yellow banner is the second
+// placeholder so two open shared slots side by side never show the same image.
+function placeholderBanner(placeholderNumber: number): ActiveBanner {
+  const isFirst = placeholderNumber === 1;
+  return {
+    localSrc: isFirst ? waxedgeBanner : cheeseBanner4,
+    websiteUrl: isFirst ? "https://waxedge.app" : "/farm",
+    user: isFirst ? "placeholder-waxedge" : "placeholder",
+    isPlaceholder: true,
+    alt: isFirst ? "WaxEDGE Banner" : "CHEESEFarm Banner",
+  };
+}
+
+function extractBannersForSlot(slot: BannerSlot, placeholderNumber: number): ActiveBanner[] {
   const banners: ActiveBanner[] = [];
   if (slot.suspended) return banners;
 
