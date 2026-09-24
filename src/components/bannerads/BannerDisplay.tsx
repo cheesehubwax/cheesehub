@@ -87,17 +87,19 @@ function BannerLayer({
 
   if (banner.localSrc) {
     return (
-      <Link
-        to={banner.websiteUrl}
-        className={`absolute inset-0 transition-opacity duration-500 ${visibilityClass}`}
+      <div
+        onClick={() => isActive && onAdClick(banner.websiteUrl)}
+        className={`absolute inset-0 cursor-pointer transition-opacity duration-500 ${visibilityClass}`}
+        role="link"
         tabIndex={isActive ? 0 : -1}
+        onKeyDown={(e) => { if (isActive && e.key === "Enter") onAdClick(banner.websiteUrl); }}
       >
         <img
           src={banner.localSrc}
-          alt="CHEESEFarm Banner"
+          alt={banner.alt ?? "Banner"}
           className="w-full h-full object-contain rounded-lg"
         />
-      </Link>
+      </div>
     );
   }
 
