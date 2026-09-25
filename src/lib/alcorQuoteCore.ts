@@ -328,9 +328,6 @@ async function searchSplits(
   const singles = await runBestTradeWithSplit(routes, amount, [100], tradeType, pools, { minSplits: 1, maxSplits: 1 })
     .catch(() => null);
   if (singles) for (const s of singles.swaps) keep.add(routeKey(s.route));
-  const ranked = routes
-    .map((r) => { try { return { r, q: exactIn ? r.midPrice?.quote?.(amount) : null }; } catch { return { r, q: null }; } });
-  void ranked;
   const subset = routes.filter((r) => keep.has(routeKey(r)));
   const fine = await runBestTradeWithSplit(subset, amount, percents, tradeType, pools, cfg);
   return betterTrade(coarse, fine, exactIn);
