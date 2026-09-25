@@ -163,6 +163,15 @@ async function poolsForVenue(venue: AmmVenue, tokenIn: SwapToken, tokenOut: Swap
   return fresh.filter((p): p is AmmPoolState => !!p);
 }
 
+/** True when both pool lists are already in memory, so a quote only needs two tiny live reads. */
+export function ammIndexesReady(): boolean {
+  const ok = (v: AmmVenue) => {
+    const m = memIndex.get(v);
+    return !!m && Date.now() - m.at < INDEX_TTL_MS;
+  };
+  return ok("defibox") && ok("taco");
+}
+
 /** Warm the pool lists as soon as both tokens are picked. */
 export function prefetchAmmIndexes(): void {
   void loadIndex("defibox").catch(() => {});
