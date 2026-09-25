@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { ammAmountOut, allocateAcrossAmm, ammMemo, rawToFixed, type AmmPoolState } from "@/lib/ammQuote";
 import { normalizeRouteActions, type SwapRoute } from "@/lib/swapApi";
 import { parseAsset } from "@/lib/ammSwapPools";
-import { parseManualAllocations, redistributeAllocations, splitRawByBps } from "@/lib/manualSwap";
+import { parseManualAllocations, redistributeAllocations, splitRawByBps, stepAllocation } from "@/lib/manualSwap";
 
 const WAX = { symbol: "WAX", contract: "eosio.token", decimals: 8 };
 const CHEESE = { symbol: "CHEESE", contract: "cheeseburger", decimals: 4 };
@@ -123,5 +123,20 @@ describe("manual route allocations", () => {
     ]);
     expect([...parts.values()].reduce((sum, value) => sum + value, 0n)).toBe(100_000_001n);
     expect(parts.get("c")).toBe(33_340_001n);
+  });
+
+  it("moves plus and minus controls by exactly 1% and preserves the total", () => {
+    const allocations = [{ key: "a", bps: 6000 }, { key: "b", bps: 4000 }];
+    const increased = stepAllocation(allocations, "a", 1);
+    expect(increased).toEqual([{ key: "a", bps: 6100 }, { key: "b", bps: 3900 }]);
+    expect(stepAllocation(increased, "a", -1)).toEqual(allocations);
+    expect(increased.reduce((sum, item) => sum + item.bps, 0)).toBe(10_000);
+  });
+
+  it("clamps one-percent controls at allocation boundaries", () => {
+    const allocations = [{ key: "a", bps: 9900 }, { key: "b", bps: 100 }];
+    expect(stepAllocation(allocations, "a", 1)).toEqual([{ key: "a", bps: 10_000 }, { key: "b", bps: 0 }]);
+    expect(stepAllocation(allocations, "b", -1)).toEqual([{ key: "a", bps: 10_000 }, { key: "b", bps: 0 }]);
+    expect(stepAllocation([{ key: "a", bps: 10_000 }], "a", -1)).toEqual([{ key: "a", bps: 10_000 }]);
   });
 });
