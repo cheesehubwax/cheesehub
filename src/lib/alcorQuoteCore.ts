@@ -347,14 +347,10 @@ export async function quoteFromData(input: QuoteInput): Promise<SwapRoute | null
   );
 
   const sdkTradeType = tradeType === "EXACT_INPUT" ? TradeType.EXACT_INPUT : TradeType.EXACT_OUTPUT;
-  const trade = await runBestTradeWithSplit(
-    routes,
-    currencyAmount,
-    percents,
-    sdkTradeType,
-    sdkPools,
-    { minSplits: 1, maxSplits: 6 }
-  );
+  const cfg = { minSplits: 1, maxSplits: 6 };
+  const searchStarted = performance.now();
+  const trade = await searchSplits(routes, currencyAmount, percents, sdkTradeType, sdkPools, cfg, distributionPercent);
+  searchTimings.lastMs = Math.round(performance.now() - searchStarted);
 
   if (!trade) {
     return null;
