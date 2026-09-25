@@ -103,7 +103,8 @@ describe("MultiRoutePanel add-route popup", () => {
     await waitFor(() => {
       expect(screen.getAllByRole("option").length).toBeGreaterThan(0);
     });
-    const option = screen.getAllByRole("option")[1]; // the Defibox candidate (not yet allocated)
+    const options = screen.getAllByRole("option");
+    const option = options.find((o) => o.textContent?.includes("USDT")) ?? options[options.length - 1];
     const images = option.querySelectorAll("img");
     // venue logo + overlapped token pair (CHEESE and WAX)
     expect(images.length).toBeGreaterThanOrEqual(3);
