@@ -322,12 +322,25 @@ async function searchSplits(
   if (!coarse) return runBestTradeWithSplit(routes, amount, percents, tradeType, pools, cfg);
 
   const keep = new Set<string>(coarse.swaps.map((s: any) => routeKey(s.route)));
-  // Also keep the best single routes at 100% so a route the coarse grid
-  // under-valued can still enter the fine pass.
+  // Also keep the routes that price best for a typical split leg (a fifth of
+  // the trade), so a route the coarse grid under-valued still enters the
+  // fine pass.
   const exactIn = tradeType === TradeType.EXACT_INPUT;
-  const singles = await runBestTradeWithSplit(routes, amount, [100], tradeType, pools, { minSplits: 1, maxSplits: 1 })
-    .catch(() => null);
-  if (singles) for (const s of singles.swaps) keep.add(routeKey(s.route));
+  const legRaw = BigInt(amount.quotient.toString()) / 5n;
+  if (legRaw > 0n) {
+    const leg = CurrencyAmount.fromRawAmount(amount.currency, legRaw.toString());
+    const scored: { k: string; v: bigint }[] = [];
+    for (const r of routes) {
+      try {
+        const t = await runBestTradeWithSplit([r], leg, [100], tradeType, pools, { minSplits: 1, maxSplits: 1 });
+        if (!t) continue;
+        const v = BigInt((exactIn ? t.outputAmount : t.inputAmount).quotient.toString());
+        scored.push({ k: routeKey(r), v: exactIn ? v : -v });
+      } catch { /* route cannot fill this leg */ }
+    }
+    scored.sort((x, y) => (y.v > x.v ? 1 : y.v < x.v ? -1 : 0));
+    for (const s of scored.slice(0, 8)) keep.add(s.k);
+  }
   const subset = routes.filter((r) => keep.has(routeKey(r)));
   const fine = await runBestTradeWithSplit(subset, amount, percents, tradeType, pools, cfg);
   return betterTrade(coarse, fine, exactIn);
