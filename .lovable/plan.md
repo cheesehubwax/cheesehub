@@ -13,7 +13,7 @@ Keep CHEESESwap’s automatic best-price route as the default, while adding a Ma
 - Adjusting one route keeps its chosen value and proportionally redistributes the remainder across the other selected routes. Percentages use 1% steps and always total exactly 100%.
 - Setting a route to 0% removes it from the transaction. A route that rounds below one smallest token unit is marked too small and cannot be submitted.
 - **Reset to best route** returns to the current automatic result immediately.
-- In spend mode, sliders divide the amount being spent. In receive mode, sliders divide the requested output; CHEESESwap calculates and displays the total input required.
+- Manual mode is available only when the user enters the amount to spend. If the user switches to entering a desired receive amount, CHEESESwap returns to Auto and hides the manual controls.
 - While a manual quote is recalculating, keep the chosen percentages visible but disable Swap so an old quote cannot be signed.
 - Clearly label manual mode as user-selected routing and show price impact warnings without preventing an intentional, valid route.
 
@@ -29,9 +29,9 @@ Keep CHEESESwap’s automatic best-price route as the default, while adding a Ma
 
 ## Quote and transaction rules
 - Represent allocations internally as integer basis points, normalize them to exactly 10,000, and derive raw token amounts with integer arithmetic.
-- In spend mode, assign each route its exact raw input and put the final rounding unit into the largest selected leg.
-- In receive mode, assign each route its exact raw output target, quote the required input for that route, and sum the route inputs/maxima correctly.
-- Requote fixed Alcor paths directly rather than rerunning the optimizer; quote Defibox and TacoSwap pools with the existing contract-matched integer formulas. Add the inverse AMM calculation needed for receive mode and test its rounding against contract behavior.
+- Validate manual percentages as bounded integers before quoting or building actions; reject malformed, non-finite, negative, over-100%, or non-totaling allocations.
+- Assign each route its exact raw input and put the final rounding unit into the largest selected leg.
+- Requote fixed Alcor paths directly rather than rerunning the optimizer; quote Defibox and TacoSwap pools with the existing contract-matched integer formulas.
 - Rebuild every leg’s input, output, minimum received or maximum sent, memo, price impact, and aggregate totals whenever an allocation changes.
 - Preserve the user’s aggregate slippage setting and the existing widened per-leg protection. Never reuse memos or amounts from the previous allocation.
 - Keep one wallet signature and one atomic transaction containing one transfer per selected leg. If any leg fails, the entire swap transaction reverts.
@@ -39,16 +39,15 @@ Keep CHEESESwap’s automatic best-price route as the default, while adding a Ma
 
 ## Implementation areas
 - Add manual route/allocation request types and stable route identifiers to the swap data model.
-- Extend the Alcor quote worker/core with fixed-route exact-input and exact-output quoting, while leaving automatic optimization untouched.
-- Extend Defibox/TacoSwap maths with exact-output quoting and contract-accurate upward rounding.
+- Extend the Alcor quote worker/core with fixed-route exact-input quoting, while leaving automatic optimization and exact-output quoting untouched.
 - Pass manual mode and normalized allocations through the swap query key; skip Alcor’s HTTP auto quote while Manual mode is active because it cannot represent chosen splits.
 - Add the Auto/Manual controls, route picker, sliders, numeric fields, reset action, unavailable-route state, and warnings to the swap panel.
-- Audit the transaction builder for exact-output multi-leg transfers so each route receives its own correctly protected maximum input and the total shown matches what can be sent.
+- Audit the transaction builder so fixed-input legs use the selected raw amounts, sum exactly to the amount entered, and carry fresh per-leg minimum outputs.
 
 ## Verification
 - Unit-test allocation normalization at 0/100, 1/99, equal three-way splits, slider redistribution, route removal, tiny amounts, and token-precision rounding.
-- Test fixed-route quotes for direct and multi-hop Alcor routes plus direct Defibox and TacoSwap routes in both spend and receive modes.
+- Test fixed-route quotes for direct and multi-hop Alcor routes plus direct Defibox and TacoSwap routes in spend mode.
 - Confirm all raw leg amounts sum to the displayed aggregate and every memo contains the matching per-leg protection amount.
 - Compare 100% manual routes against the same pool’s standalone quote, and compare the untouched Auto mode against today’s results.
-- Browser-test adding routes, changing sliders, switching input direction, reset-to-best, stale/unavailable pools, mobile layout, and the final wallet transaction preview.
+- Browser-test adding routes, changing sliders, switching to receive mode (which must return to Auto), reset-to-best, stale/unavailable pools, mobile layout, and the final wallet transaction preview.
 - Perform a small user-signed real swap for each venue before treating manual routing as fully proven on-chain.
