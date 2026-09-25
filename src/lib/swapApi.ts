@@ -39,6 +39,20 @@ export interface SwapSplit {
   contract?: string;
   /** Defibox pair id or Taco pair name, for display. */
   venuePoolId?: string;
+  /** Stable identifier used by manual route allocation. */
+  routeKey?: string;
+}
+
+export interface SwapRouteCandidate {
+  key: string;
+  venue: "alcor" | "defibox" | "taco";
+  route: number[];
+  venuePoolId?: string;
+  contract: string;
+  visualPath: AlcorPoolToken[];
+  visualFees: number[];
+  quotedInput: string;
+  quotedOutput: string;
 }
 
 export interface SwapRoute {
@@ -52,6 +66,8 @@ export interface SwapRoute {
   swaps: SwapSplit[];
   quoteSource?: "http" | "sdk";
   quoteComplete?: boolean;
+  availableRoutes?: SwapRouteCandidate[];
+  manual?: boolean;
   quoteDiagnostics?: {
     relevantPools?: number;
     poolsBuilt?: number;

@@ -11,7 +11,8 @@ import {
   TradeType,
   Percent,
 } from "@alcorexchange/alcor-swap-sdk";
-import type { SwapToken, SwapRoute, SwapSplit } from "./swapApi";
+import type { SwapToken, SwapRoute, SwapSplit, SwapRouteCandidate } from "./swapApi";
+import { parseManualAllocations, splitRawByBps, type ManualAllocation } from "./manualSwap";
 import { logger } from "./logger";
 import {
   type AmmPoolState,
@@ -173,6 +174,8 @@ export interface QuoteInput {
   started: number;
   /** Live Defibox / TacoSwap pools pairing tokenIn and tokenOut directly. */
   ammPools?: AmmPoolState[];
+  /** Fixed user-selected route percentages. Exact-input only. */
+  manualAllocations?: ManualAllocation[];
 }
 
 // ----- Cross-venue blend (Alcor + Defibox + TacoSwap), EXACT_INPUT only -----
