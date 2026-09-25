@@ -137,6 +137,11 @@ export function MultiRoutePanel({
     onAllocationsChange(remaining.map((item) => item.key === largest.key ? { ...item, bps: item.bps + removed } : item));
   };
 
+  const changeRoute = (key: string, percent: number) => {
+    const next = redistributeAllocations(manualAllocations, key, percent * 100);
+    onAllocationsChange(next.length > 1 ? next.filter((item) => item.bps > 0) : next);
+  };
+
   // SDK quotes include display-ready token/fee metadata, so they can render on
   // the first quote without waiting for a second pool-detail lookup. HTTP routes
   // still fall back to the shared pool lookup and keep the skeleton until ready.
@@ -178,7 +183,7 @@ export function MultiRoutePanel({
                     max={100}
                     step={1}
                     value={allocation.bps / 100}
-                    onChange={(event) => onAllocationsChange(redistributeAllocations(manualAllocations, allocation.key, Number(event.target.value) * 100))}
+                    onChange={(event) => changeRoute(allocation.key, Number(event.target.value))}
                     className="h-7 w-16 rounded-md border border-input bg-background px-2 text-right text-xs text-foreground"
                   />
                   <span className="text-muted-foreground">%</span>
@@ -192,7 +197,7 @@ export function MultiRoutePanel({
                   max={100}
                   step={1}
                   value={[allocation.bps / 100]}
-                  onValueChange={([value]) => onAllocationsChange(redistributeAllocations(manualAllocations, allocation.key, value * 100))}
+                  onValueChange={([value]) => changeRoute(allocation.key, value)}
                 />
               </div>
             );

@@ -630,7 +630,7 @@ export async function quoteFromData(input: QuoteInput): Promise<SwapRoute | null
     input: blend || manual ? parseFloat(rawToFixed(totalRawIn, tokenIn.precision)) : parseFloat(trade.inputAmount.toFixed()),
     swaps: splits,
     quoteSource: "sdk",
-    quoteComplete: tickFailures === 0,
+    quoteComplete: manual ? true : tickFailures === 0,
     availableRoutes: candidates,
     manual: !!manual,
     quoteDiagnostics: diagnostics,
