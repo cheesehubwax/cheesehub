@@ -271,7 +271,6 @@ export function normalizeRouteActions(
       const [whole, fraction = ""] = value.trim().split(".");
       return BigInt(`${whole}${(fraction + "0".repeat(precision)).slice(0, precision)}`);
     };
-    const scale = 10n ** BigInt(precision);
     const totalRaw = toRaw(amount);
     const rawParts = splits.map((s) => toRaw(s.input));
     const sumFirst = rawParts.slice(0, -1).reduce((a, b) => a + b, 0n);

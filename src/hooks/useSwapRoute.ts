@@ -192,6 +192,7 @@ export function useSwapRoute(
     enabled,
     staleTime: 15_000,
     gcTime: 30_000,
+    placeholderData: (previous) => previous,
     retryOnMount: true,
     retry: (count, err) => {
       if (isTransientError(err)) return count < MAX_TRANSIENT_RETRIES;
