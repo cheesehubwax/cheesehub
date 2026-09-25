@@ -120,7 +120,7 @@ const Index = () => {
               </div>
               <h2 className="text-2xl font-bold mb-4 flex items-center justify-center gap-2"><span><span className="text-cheese">CHEESE</span><span className="text-foreground">Air</span></span><span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span></h2>
               <p className="text-muted-foreground max-w-sm mx-auto mb-6">
-                Powered by the cheeseburger and atomicassets smart contracts CHEESEAir allows anyone to airdrop tokens, NFTs or RAM to token holders, NFT collectors or liquidity providers
+                Partially powered by the ram.chz smart contract CHEESEAir allows anyone to airdrop tokens, NFTs or RAM to token holders, NFT collectors or liquidity providers
               </p>
               <Button asChild size="lg" className="bg-cheese hover:bg-cheese-dark text-primary-foreground font-semibold">
                 <Link to="/air">
