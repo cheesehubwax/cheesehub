@@ -751,7 +751,12 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     ticks: (await ticksFor(p.id)) ?? ([] as RawAlcorTick[]),
   }));
 
-  const ammPools = await ammPromise;
+  // Never hold the Alcor quote for Defibox/Taco: use their pools only if they
+  // have already arrived (they load alongside the tick reads above).
+  const ammPools = await Promise.race([
+    ammPromise,
+    new Promise<[]>((resolve) => setTimeout(() => resolve([]), 0)),
+  ]);
 
   return runQuote({
     pools: tickResults,

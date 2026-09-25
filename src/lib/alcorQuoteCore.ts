@@ -214,83 +214,78 @@ async function blendWithAmm(args: {
   const outDec = tokenOut.precision;
   const toRaw = (t: any): bigint => BigInt(toRawAmount(t.outputAmount.toFixed(), outDec));
   const baseOut = toRaw(trade);
-  const coarsePercents: number[] = [];
-  for (let p = 5; p <= 100; p += 5) coarsePercents.push(p);
-  const cfg = { minSplits: 1, maxSplits: 6 };
 
-  const alcorQuote = async (raw: bigint, percents: number[]): Promise<any | null> => {
-    if (raw <= 0n) return null;
+  // Alcor's side is priced by shrinking every leg of the Alcor split it already
+  // found, each re-simulated on its own route. That is a real, executable trade
+  // (exactly what gets sent on-chain), and costs a few milliseconds instead of a
+  // whole new split search — so every 1% share can be checked.
+  const legs = (trade.swaps as any[]).map((sw) => ({
+    route: sw.route,
+    raw: BigInt(toRawAmount(sw.inputAmount.toFixed(), tokenIn.precision)),
+  }));
+  const legsRawTotal = legs.reduce((acc, l) => acc + l.raw, 0n);
+  if (legsRawTotal <= 0n) return null;
+
+  const alcorScaled = (share: number): { trade: any | null; out: bigint } | null => {
+    if (share >= 100) return { trade: null, out: 0n };
+    const parts = legs
+      .map((l) => ({ route: l.route, raw: (l.raw * BigInt(100 - share)) / 100n }))
+      .filter((l) => l.raw > 0n);
+    if (parts.length === 0) return { trade: null, out: 0n };
     try {
-      return await runBestTradeWithSplit(
-        routes,
-        CurrencyAmount.fromRawAmount(inTok, raw.toString()),
-        percents,
+      const t = (Trade as any).fromRoutes(
+        parts.map((l) => ({
+          route: l.route,
+          amount: CurrencyAmount.fromRawAmount(inTok, l.raw.toString()),
+          percent: 0,
+        })),
         sdkTradeType,
-        sdkPools,
-        cfg,
       );
+      // Percent per leg, relative to Alcor's part (display only).
+      const alcorTotal = parts.reduce((acc, l) => acc + l.raw, 0n);
+      t.swaps.forEach((sw: any, i: number) => {
+        sw.percent = Number((parts[i].raw * 10_000n) / alcorTotal) / 100;
+      });
+      return { trade: t, out: toRaw(t) };
     } catch {
       return null;
     }
   };
 
-  const scores = new Map<number, bigint>();
-  const evalShare = async (share: number): Promise<bigint> => {
-    const cached = scores.get(share);
-    if (cached !== undefined) return cached;
-    const ammIn = (totalRaw * BigInt(share)) / 100n;
+  type Eval = { total: bigint; trade: any | null; amm: ReturnType<typeof allocateAcrossAmm> };
+  const cache = new Map<number, Eval | null>();
+  const evalShare = (share: number): Eval | null => {
+    if (cache.has(share)) return cache.get(share)!;
+    const ammIn = (legsRawTotal * BigInt(share)) / 100n;
     const amm = allocateAcrossAmm(cands, ammIn);
-    let total = -1n;
-    if (ammIn === 0n || amm.legs.length > 0) {
-      const alcorIn = totalRaw - ammIn;
-      if (alcorIn === 0n) total = amm.out;
-      else {
-        const t = await alcorQuote(alcorIn, coarsePercents);
-        if (t) total = amm.out + toRaw(t);
-      }
+    let res: Eval | null = null;
+    if (amm.legs.length > 0) {
+      const al = alcorScaled(share);
+      if (al) res = { total: amm.out + al.out, trade: al.trade, amm };
     }
-    scores.set(share, total);
-    return total;
+    cache.set(share, res);
+    return res;
   };
 
-  // Coarse sweep, then home in on the best share to 1%.
+  // Output is concave in the share: walk up from 1% while it keeps improving.
   let best = 0;
+  let bestEval: Eval | null = null;
   let bestScore = baseOut;
-  for (const s of [2, 5, 10, 20, 35, 50, 75, 100]) {
-    const v = await evalShare(s);
-    if (v > bestScore) {
-      bestScore = v;
-      best = s;
+  let worseInARow = 0;
+  for (let sh = 1; sh <= 100; sh++) {
+    const e = evalShare(sh);
+    if (e && e.total > bestScore) {
+      bestScore = e.total;
+      best = sh;
+      bestEval = e;
+      worseInARow = 0;
+    } else if (++worseInARow >= 3) {
+      break;
     }
   }
-  if (best === 0) return null;
-  for (const gap of [8, 4, 2, 1]) {
-    for (const s of [best - gap, best + gap]) {
-      if (s < 1 || s > 100) continue;
-      const v = await evalShare(s);
-      if (v > bestScore) {
-        bestScore = v;
-        best = s;
-      }
-    }
-  }
-
-  // Final: full 1% search for Alcor's share at the chosen split.
-  const ammIn = (totalRaw * BigInt(best)) / 100n;
-  const amm = allocateAcrossAmm(cands, ammIn);
-  if (amm.legs.length === 0) return null;
-  const alcorIn = totalRaw - ammIn;
-  let alcorTrade: any | null = null;
-  let alcorOut = 0n;
-  if (alcorIn > 0n) {
-    alcorTrade = await alcorQuote(alcorIn, finePercents);
-    if (!alcorTrade) return null;
-    alcorOut = toRaw(alcorTrade);
-  }
-  const outRaw = amm.out + alcorOut;
   // Only use other venues when the result is strictly better than Alcor alone.
-  if (outRaw <= baseOut) return null;
-  return { trade: alcorTrade, legs: amm.legs, share: best, outRaw };
+  if (!bestEval || best === 0 || bestEval.total <= baseOut) return null;
+  return { trade: bestEval.trade, legs: bestEval.amm.legs, share: best, outRaw: bestEval.total };
 }
 
 /** Everything after the network: build pools, search splits, emit memos. */
@@ -375,6 +370,7 @@ export async function quoteFromData(input: QuoteInput): Promise<SwapRoute | null
   // Try sending part of the trade through Defibox / TacoSwap. Only kept when
   // it strictly beats Alcor alone; any failure keeps the Alcor-only quote.
   let blend: BlendResult | null = null;
+  const blendStarted = performance.now();
   if (exactIn && input.ammPools && input.ammPools.length > 0) {
     try {
       blend = await blendWithAmm({
@@ -397,6 +393,7 @@ export async function quoteFromData(input: QuoteInput): Promise<SwapRoute | null
   const alcorTrade: any | null = blend ? blend.trade : trade;
   const ammLegs = blend?.legs ?? [];
   const alcorScale = blend ? (100 - blend.share) / 100 : 1;
+  const blendMs = Math.round(performance.now() - blendStarted);
 
   // Per-split shape mirrors Alcor's own parseTrade so the memo is byte-identical
   // to what wax.alcor.exchange sends today.
@@ -510,6 +507,8 @@ export async function quoteFromData(input: QuoteInput): Promise<SwapRoute | null
     rateLimitedTickFailures,
     poolsDroppedNoTicks: droppedForTicks.length,
     tookMs: Math.round(performance.now() - started),
+    ammPools: input.ammPools?.length ?? 0,
+    blendMs,
   };
 
   // Defensive invariant: at positive slippage, minReceived must never exceed
