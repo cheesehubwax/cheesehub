@@ -252,7 +252,43 @@ export function MultiRoutePanelBisect({
           const percent = allocation ? allocation.bps / 100 : row.split.percent;
           return (
           <div key={routeKey ?? i} className="space-y-1 rounded-md border border-border/40 px-2 py-1.5">
-          <div className="text-[11px]">ROW-HEADER</div>
+          <div className="flex min-w-0 items-center gap-1.5 text-[11px]">
+            <span className="text-foreground font-medium">
+              {Math.round(percent)}%
+            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="cursor-help">
+              <VenueLogo venue={row.split.venue ?? "alcor"} className="h-3.5 w-3.5" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                {VENUE_NAMES[row.split.venue ?? "alcor"]}
+              </TooltipContent>
+            </Tooltip>
+            {/* Start-token chip */}
+            <div className="ring-1 ring-border/50 rounded-full">
+              <TokenLogo contract={tokenIn.contract} symbol={tokenIn.ticker} size="sm" />
+            </div>
+            <span
+              aria-hidden
+              className="flex-1 min-w-[12px] border-t border-dashed border-foreground/60"
+            />
+            {row.hopFees.map((fee, idx) => { return null; })}
+            {/* End-token chip */}
+            <span
+              aria-hidden
+              className="flex-1 min-w-[12px] border-t border-dashed border-foreground/60"
+            />
+            <div className="ring-1 ring-border/50 rounded-full">
+               <TokenLogo contract={tokenOut.contract} symbol={tokenOut.ticker} size="sm" />
+            </div>
+            {manualMode && routeKey && candidate && (
+               <Button type="button" variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => removeRoute(routeKey)} disabled={onlyRoute} aria-label={`Remove ${candidateLabel(candidate)}`}>
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
           {manualMode && routeKey && allocation && candidate && (
              <div className="flex items-center gap-1.5">
                <Button type="button" variant="outline" size="icon" className="h-7 w-7 shrink-0" onClick={() => stepRoute(routeKey, -1)} disabled={onlyRoute || allocation.bps <= 0} aria-label={`Decrease ${candidateLabel(candidate)} by 1%`}>
