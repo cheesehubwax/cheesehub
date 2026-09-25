@@ -73,9 +73,8 @@ describe("MultiRoutePanel add-route popup", () => {
   it("renders token logo pairs inside the add-a-pool-route options", async () => {
     renderPanel();
     const trigger = screen.getByRole("combobox");
-    fireEvent.pointerDown(trigger);
-    fireEvent.pointerUp(trigger);
-    fireEvent.click(trigger);
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: "Enter", code: "Enter" });
     await waitFor(() => {
       expect(screen.getAllByRole("option").length).toBeGreaterThan(0);
     });
