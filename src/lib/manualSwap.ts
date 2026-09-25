@@ -53,6 +53,18 @@ export function redistributeAllocations(
   );
 }
 
+/** Move one route by a whole percentage step while preserving the 100% total. */
+export function stepAllocation(
+  items: ManualAllocation[],
+  key: string,
+  deltaPercent: number,
+): ManualAllocation[] {
+  const current = items.find((item) => item.key === key);
+  if (!current) return items;
+  const nextBps = current.bps + Math.round(deltaPercent * 100);
+  return redistributeAllocations(items, key, nextBps);
+}
+
 export function splitRawByBps(total: bigint, items: ManualAllocation[]): Map<string, bigint> {
   const parsed = parseManualAllocations(items);
   const parts = new Map(parsed.map((item) => [item.key, (total * BigInt(item.bps)) / 10_000n]));

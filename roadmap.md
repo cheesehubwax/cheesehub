@@ -10,3 +10,4 @@
 - [x] Banner ads: replace the legacy yellow second placeholder with GPK Collection Manager, linking through the external-site warning
 
 - [x] CHEESESwap: manual spend-only per-pool route sliders with exact 100% allocation
+- [x] CHEESESwap: place manual sliders beneath their pool rows with easier dragging and 1% controls
