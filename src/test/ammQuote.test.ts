@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { ammAmountOut, allocateAcrossAmm, ammMemo, rawToFixed, type AmmPoolState } from "@/lib/ammQuote";
 import { normalizeRouteActions, type SwapRoute } from "@/lib/swapApi";
 import { parseAsset } from "@/lib/ammSwapPools";
+import { parseManualAllocations, redistributeAllocations, splitRawByBps } from "@/lib/manualSwap";
 
 const WAX = { symbol: "WAX", contract: "eosio.token", decimals: 8 };
 const CHEESE = { symbol: "CHEESE", contract: "cheeseburger", decimals: 4 };
@@ -90,5 +91,37 @@ describe("allocation and memos", () => {
     const acts = normalizeRouteActions(route, "me", "eosio.token", "10", { contract: "eosio.token", ticker: "WAX", precision: 8 });
     expect(acts).toHaveLength(1);
     expect(acts[0].data).toMatchObject({ to: "swap.box", memo: "swap,1,382", quantity: "10.00000000 WAX" });
+  });
+});
+
+describe("manual route allocations", () => {
+  it("redistributes every slider change to exactly 100%", () => {
+    const next = redistributeAllocations(
+      [{ key: "a", bps: 5000 }, { key: "b", bps: 3000 }, { key: "c", bps: 2000 }],
+      "a",
+      7300,
+    );
+    expect(next).toEqual([
+      { key: "a", bps: 7300 },
+      { key: "b", bps: 1620 },
+      { key: "c", bps: 1080 },
+    ]);
+    expect(next.reduce((sum, item) => sum + item.bps, 0)).toBe(10_000);
+  });
+
+  it("rejects malformed, duplicate, and non-totaling allocations", () => {
+    expect(() => parseManualAllocations([{ key: "a", bps: -1 }, { key: "b", bps: 10_001 }])).toThrow();
+    expect(() => parseManualAllocations([{ key: "a", bps: 5000 }, { key: "a", bps: 5000 }])).toThrow();
+    expect(() => parseManualAllocations([{ key: "a", bps: 9999 }])).toThrow();
+  });
+
+  it("preserves every smallest unit when percentages round", () => {
+    const parts = splitRawByBps(100_000_001n, [
+      { key: "a", bps: 3333 },
+      { key: "b", bps: 3333 },
+      { key: "c", bps: 3334 },
+    ]);
+    expect([...parts.values()].reduce((sum, value) => sum + value, 0n)).toBe(100_000_001n);
+    expect(parts.get("c")).toBe(33_340_001n);
   });
 });

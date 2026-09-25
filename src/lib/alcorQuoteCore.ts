@@ -11,12 +11,14 @@ import {
   TradeType,
   Percent,
 } from "@alcorexchange/alcor-swap-sdk";
-import type { SwapToken, SwapRoute, SwapSplit } from "./swapApi";
+import type { SwapToken, SwapRoute, SwapSplit, SwapRouteCandidate } from "./swapApi";
+import { parseManualAllocations, splitRawByBps, type ManualAllocation } from "./manualSwap";
 import { logger } from "./logger";
 import {
   type AmmPoolState,
   type AmmAllocation,
   allocateAcrossAmm,
+  ammAmountOut,
   ammMemo,
   rawToFixed,
   sameToken,
@@ -173,6 +175,55 @@ export interface QuoteInput {
   started: number;
   /** Live Defibox / TacoSwap pools pairing tokenIn and tokenOut directly. */
   ammPools?: AmmPoolState[];
+  /** Fixed user-selected route percentages. Exact-input only. */
+  manualAllocations?: ManualAllocation[];
+}
+
+function alcorRouteKey(route: any): string {
+  return `alcor:${route.pools.map((pool: Pool) => pool.id).join(",")}`;
+}
+
+function ammRouteKey(pool: AmmPoolState): string {
+  return `${pool.venue}:${pool.id}`;
+}
+
+function routeCandidates(routes: any[], ammPools: AmmPoolState[], tokenIn: SwapToken): SwapRouteCandidate[] {
+  const alcor = routes.map((route) => ({
+    key: alcorRouteKey(route),
+    venue: "alcor" as const,
+    route: route.pools.map((pool: Pool) => pool.id),
+    contract: "swap.alcor",
+    visualPath: route.tokenPath.map((token: Token) => ({
+      id: tokenKey(token.contract, token.symbol),
+      symbol: token.symbol,
+      contract: token.contract,
+      decimals: token.decimals,
+    })),
+    visualFees: route.pools.map((pool: Pool) => pool.fee),
+    quotedInput: "",
+    quotedOutput: "",
+  }));
+  const amm = ammPools.map((pool) => ({
+    key: ammRouteKey(pool),
+    venue: pool.venue,
+    route: [],
+    venuePoolId: pool.id,
+    contract: pool.contract,
+    visualPath: (sameToken(pool.tokenA, tokenIn.ticker, tokenIn.contract)
+      ? [pool.tokenA, pool.tokenB]
+      : [pool.tokenB, pool.tokenA]).map((token) => ({
+      id: tokenKey(token.contract, token.symbol),
+      symbol: token.symbol,
+      contract: token.contract,
+      decimals: token.decimals,
+    })),
+    visualFees: [AMM_DISPLAY_FEE],
+    quotedInput: "",
+    quotedOutput: "",
+  }));
+  return [...alcor, ...amm].filter(
+    (candidate, index, all) => all.findIndex((other) => other.key === candidate.key) === index,
+  );
 }
 
 // ----- Cross-venue blend (Alcor + Defibox + TacoSwap), EXACT_INPUT only -----
@@ -347,17 +398,57 @@ export async function quoteFromData(input: QuoteInput): Promise<SwapRoute | null
   );
 
   const sdkTradeType = tradeType === "EXACT_INPUT" ? TradeType.EXACT_INPUT : TradeType.EXACT_OUTPUT;
-  const trade = await runBestTradeWithSplit(
-    routes,
-    currencyAmount,
-    percents,
-    sdkTradeType,
-    sdkPools,
-    { minSplits: 1, maxSplits: 6 }
-  );
+  const candidates = routeCandidates(routes, input.ammPools ?? [], tokenIn);
+  const manual = input.manualAllocations ? parseManualAllocations(input.manualAllocations) : null;
+  if (manual && !exactInput(tradeType)) throw new Error("Manual routing is only available for spend amounts");
 
-  if (!trade) {
-    return null;
+  let manualAmmLegs: AmmAllocation[] = [];
+  let manualAlcorBps = new Map<string, number>();
+  let trade: any | null = null;
+  if (manual) {
+    const known = new Set(candidates.map((candidate) => candidate.key));
+    if (manual.some((allocation) => !known.has(allocation.key))) {
+      throw new Error("A selected pool is no longer available");
+    }
+    const rawParts = splitRawByBps(BigInt(rawAmount), manual);
+    const alcorParts: Array<{ route: any; amount: any; percent: number }> = [];
+    for (const allocation of manual) {
+      const amountRaw = rawParts.get(allocation.key) ?? 0n;
+      if (amountRaw <= 0n) throw new Error("One selected route is too small for this token amount");
+      if (allocation.key.startsWith("alcor:")) {
+        const route = routes.find((candidate) => alcorRouteKey(candidate) === allocation.key);
+        if (!route) throw new Error("A selected Alcor route is no longer available");
+        alcorParts.push({
+          route,
+          amount: CurrencyAmount.fromRawAmount(inTok, amountRaw.toString()),
+          percent: 0,
+        });
+        manualAlcorBps.set(allocation.key, allocation.bps);
+      } else {
+        const pool = (input.ammPools ?? []).find((candidate) => ammRouteKey(candidate) === allocation.key);
+        if (!pool) throw new Error("A selected exchange pool is no longer available");
+        const inIsA = sameToken(pool.tokenA, tokenIn.ticker, tokenIn.contract);
+        const amountOut = ammAmountOut(pool, inIsA, amountRaw);
+        if (amountOut <= 0n) throw new Error("One selected route is too small for this token amount");
+        manualAmmLegs.push({ pool, inIsA, amountIn: amountRaw, amountOut });
+      }
+    }
+    if (alcorParts.length > 0) {
+      trade = (Trade as any).fromRoutes(alcorParts, TradeType.EXACT_INPUT);
+      trade.swaps.forEach((swap: any) => {
+        swap.percent = (manualAlcorBps.get(alcorRouteKey(swap.route)) ?? 0) / 100;
+      });
+    }
+  } else {
+    trade = await runBestTradeWithSplit(
+      routes,
+      currencyAmount,
+      percents,
+      sdkTradeType,
+      sdkPools,
+      { minSplits: 1, maxSplits: 6 }
+    );
+    if (!trade) return null;
   }
 
   // Slippage as SDK Percent: e.g. 1% => Percent(100, 10_000).
@@ -371,7 +462,7 @@ export async function quoteFromData(input: QuoteInput): Promise<SwapRoute | null
   // it strictly beats Alcor alone; any failure keeps the Alcor-only quote.
   let blend: BlendResult | null = null;
   const blendStarted = performance.now();
-  if (exactIn && input.ammPools && input.ammPools.length > 0) {
+  if (!manual && exactIn && input.ammPools && input.ammPools.length > 0 && trade) {
     try {
       blend = await blendWithAmm({
         trade,
@@ -391,7 +482,7 @@ export async function quoteFromData(input: QuoteInput): Promise<SwapRoute | null
     }
   }
   const alcorTrade: any | null = blend ? blend.trade : trade;
-  const ammLegs = blend?.legs ?? [];
+  const ammLegs = manual ? manualAmmLegs : (blend?.legs ?? []);
   const alcorScale = blend ? (100 - blend.share) / 100 : 1;
   const blendMs = Math.round(performance.now() - blendStarted);
 
@@ -413,7 +504,7 @@ export async function quoteFromData(input: QuoteInput): Promise<SwapRoute | null
     const minReceived = exactIn ? alcorTrade.minimumAmountOut(splitSlip, s.outputAmount) : s.outputAmount;
     const memo = `${opWord}#${poolIds.join(",")}#${receiver}#${minReceived.toExtendedAsset()}#0`;
     return {
-      percent: s.percent * alcorScale,
+      percent: manual ? (manualAlcorBps.get(alcorRouteKey(s.route)) ?? 0) / 100 : s.percent * alcorScale,
       route: poolIds,
       input: s.inputAmount.toFixed(),
       output: s.outputAmount.toFixed(),
@@ -424,6 +515,7 @@ export async function quoteFromData(input: QuoteInput): Promise<SwapRoute | null
       visualFees,
       venue: "alcor",
       contract: "swap.alcor",
+      routeKey: alcorRouteKey(s.route),
     };
   });
 
@@ -457,6 +549,7 @@ export async function quoteFromData(input: QuoteInput): Promise<SwapRoute | null
       venue: leg.pool.venue,
       contract: leg.pool.contract,
       venuePoolId: leg.pool.id,
+      routeKey: ammRouteKey(leg.pool),
     };
   });
   // Defibox / Taco legs go first so the last (Alcor) transfer absorbs any
@@ -469,9 +562,13 @@ export async function quoteFromData(input: QuoteInput): Promise<SwapRoute | null
   let aggMemo: string;
   let priceImpact: number;
   let executionPrice: { numerator: string; denominator: string };
-  if (blend) {
-    const minAgg = (blend.outRaw * BigInt(10_000 - bps)) / 10_000n;
-    outputNum = parseFloat(rawToFixed(blend.outRaw, tokenOut.precision));
+  if (blend || manual) {
+    const alcorOutRaw = alcorTrade
+      ? BigInt(toRawAmount(alcorTrade.outputAmount.toFixed(), tokenOut.precision))
+      : 0n;
+    const combinedOutRaw = blend?.outRaw ?? (alcorOutRaw + ammLegs.reduce((sum, leg) => sum + leg.amountOut, 0n));
+    const minAgg = (combinedOutRaw * BigInt(10_000 - bps)) / 10_000n;
+    outputNum = parseFloat(rawToFixed(combinedOutRaw, tokenOut.precision));
     minReceivedNum = parseFloat(rawToFixed(minAgg, tokenOut.precision));
     aggMemo = alcorSplits[0]?.memo ?? ammSplits[0].memo!;
     // Worst leg's price impact (Alcor's from the SDK, Defibox/Taco from spot).
@@ -483,10 +580,12 @@ export async function quoteFromData(input: QuoteInput): Promise<SwapRoute | null
     });
     const alcorImpact = alcorTrade ? parseFloat(alcorTrade.priceImpact.toFixed(4)) : 0;
     priceImpact = parseFloat(Math.max(alcorImpact, ...ammImpacts).toFixed(4));
-    executionPrice = { numerator: blend.outRaw.toString(), denominator: totalRawIn.toString() };
-    logger.info(
-      `[amm-router] blended ${blend.share}% via ${ammLegs.map((l) => `${l.pool.venue}#${l.pool.id}`).join("+")}`,
-    );
+    executionPrice = { numerator: combinedOutRaw.toString(), denominator: totalRawIn.toString() };
+    if (blend) {
+      logger.info(
+        `[amm-router] blended ${blend.share}% via ${ammLegs.map((l) => `${l.pool.venue}#${l.pool.id}`).join("+")}`,
+      );
+    }
   } else {
     const aggMin = exactIn ? trade.minimumAmountOut(slip) : trade.outputAmount;
     aggMemo = `${opWord}#${aggRoute.join(",")}#${receiver}#${aggMin.toExtendedAsset()}#0`;
@@ -528,10 +627,12 @@ export async function quoteFromData(input: QuoteInput): Promise<SwapRoute | null
     memo: aggMemo,
     route: aggRoute,
     executionPrice,
-    input: blend ? parseFloat(rawToFixed(totalRawIn, tokenIn.precision)) : parseFloat(trade.inputAmount.toFixed()),
+    input: blend || manual ? parseFloat(rawToFixed(totalRawIn, tokenIn.precision)) : parseFloat(trade.inputAmount.toFixed()),
     swaps: splits,
     quoteSource: "sdk",
-    quoteComplete: tickFailures === 0,
+    quoteComplete: manual ? true : tickFailures === 0,
+    availableRoutes: candidates,
+    manual: !!manual,
     quoteDiagnostics: diagnostics,
   } as SwapRoute;
 
@@ -540,4 +641,8 @@ export async function quoteFromData(input: QuoteInput): Promise<SwapRoute | null
   );
 
   return result;
+}
+
+function exactInput(tradeType: QuoteInput["tradeType"]): boolean {
+  return tradeType === "EXACT_INPUT";
 }

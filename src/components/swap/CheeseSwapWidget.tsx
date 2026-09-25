@@ -9,7 +9,8 @@ import { useSwapTokens } from "@/hooks/useSwapTokens";
 import { useSwapRoute, type TradeType } from "@/hooks/useSwapRoute";
 import { useSwapTokenBalance } from "@/hooks/useSwapTokenBalance";
 import { useWax } from "@/context/WaxContext";
-import { type SwapToken, formatTokenAmount, normalizeRouteActions, PREFERRED_CONTRACTS } from "@/lib/swapApi";
+import { type SwapToken, type SwapRouteCandidate, formatTokenAmount, normalizeRouteActions, PREFERRED_CONTRACTS } from "@/lib/swapApi";
+import { type ManualAllocation } from "@/lib/manualSwap";
 import { getTransactPlugins } from "@/lib/wharfKit";
 import { fetchSingleTokenBalance } from "@/lib/waxRpcFallback";
 import { prefetchPairPools } from "@/lib/alcorRouter";
@@ -46,6 +47,9 @@ export function CheeseSwapWidget({
   const [selectorSide, setSelectorSide] = useState<"in" | "out" | null>(null);
   const [showRouteDetails, setShowRouteDetails] = useState(true);
   const [isSwapping, setIsSwapping] = useState(false);
+  const [manualMode, setManualMode] = useState(false);
+  const [manualAllocations, setManualAllocations] = useState<ManualAllocation[] | undefined>();
+  const [manualCandidates, setManualCandidates] = useState<SwapRouteCandidate[]>([]);
 
   // Set defaults when tokens load
   useEffect(() => {
@@ -82,8 +86,46 @@ export function CheeseSwapWidget({
     routeAmount,
     slippage,
     accountName || "placeholder111",
-    tradeType
+    tradeType,
+    manualMode ? manualAllocations : undefined,
   );
+
+  useEffect(() => {
+    if (route?.availableRoutes?.length) setManualCandidates(route.availableRoutes);
+  }, [route?.availableRoutes]);
+
+  useEffect(() => {
+    if (activeField === "out") {
+      setManualMode(false);
+      setManualAllocations(undefined);
+    }
+  }, [activeField]);
+
+  const enableManual = useCallback(() => {
+    let routeAllocations = (route?.swaps ?? [])
+      .filter((split) => split.routeKey)
+      .map((split) => ({ key: split.routeKey as string, bps: Math.max(0, Math.round(split.percent * 100)) }));
+    const candidates = route?.availableRoutes ?? manualCandidates;
+    if (routeAllocations.length === 0 && route?.route?.length) {
+      const key = `alcor:${route.route.join(",")}`;
+      if (candidates.some((candidate) => candidate.key === key)) routeAllocations = [{ key, bps: 10_000 }];
+    }
+    const seed = routeAllocations.length > 0
+      ? routeAllocations
+      : candidates[0]
+        ? [{ key: candidates[0].key, bps: 10_000 }]
+        : [];
+    if (seed.length === 0) return;
+    const total = seed.reduce((sum, item) => sum + item.bps, 0);
+    seed[seed.length - 1].bps += 10_000 - total;
+    setManualAllocations(seed);
+    setManualMode(true);
+  }, [route?.swaps, route?.availableRoutes, manualCandidates]);
+
+  const resetAuto = useCallback(() => {
+    setManualMode(false);
+    setManualAllocations(undefined);
+  }, []);
 
   // Defibox / TacoSwap pool lists load as soon as the swap window opens.
   useEffect(() => {
@@ -126,7 +168,8 @@ export function CheeseSwapWidget({
     setAmountIn("");
     setAmountOut("");
     setActiveField("in");
-  }, [tokenIn, tokenOut]);
+    resetAuto();
+  }, [tokenIn, tokenOut, resetAuto]);
 
   const handleSlippageChange = (val: number) => {
     setSlippage(val);
@@ -231,8 +274,9 @@ export function CheeseSwapWidget({
       setAmountIn("");
       setAmountOut("");
       setActiveField("in");
+      resetAuto();
     }
-  }, [selectorSide, tokenIn, tokenOut]);
+  }, [selectorSide, tokenIn, tokenOut, resetAuto]);
 
   const isLoading = routeLoading && hasAmount && !isProvisional;
 
@@ -372,7 +416,18 @@ export function CheeseSwapWidget({
                 </span>
               </div>
               {tokenIn && tokenOut && route.swaps && route.swaps.length > 0 && (
-                <MultiRoutePanel route={route} tokenIn={tokenIn} tokenOut={tokenOut} />
+                <MultiRoutePanel
+                  route={route}
+                  tokenIn={tokenIn}
+                  tokenOut={tokenOut}
+                  manualMode={manualMode}
+                  manualAllocations={manualAllocations}
+                  candidates={manualCandidates}
+                  onEnableManual={enableManual}
+                  onResetAuto={resetAuto}
+                  onAllocationsChange={setManualAllocations}
+                  canUseManual={activeField === "in" && manualCandidates.length > 0 && !isProvisional}
+                />
               )}
             </div>
           )}

@@ -39,6 +39,20 @@ export interface SwapSplit {
   contract?: string;
   /** Defibox pair id or Taco pair name, for display. */
   venuePoolId?: string;
+  /** Stable identifier used by manual route allocation. */
+  routeKey?: string;
+}
+
+export interface SwapRouteCandidate {
+  key: string;
+  venue: "alcor" | "defibox" | "taco";
+  route: number[];
+  venuePoolId?: string;
+  contract: string;
+  visualPath: AlcorPoolToken[];
+  visualFees: number[];
+  quotedInput: string;
+  quotedOutput: string;
 }
 
 export interface SwapRoute {
@@ -52,6 +66,8 @@ export interface SwapRoute {
   swaps: SwapSplit[];
   quoteSource?: "http" | "sdk";
   quoteComplete?: boolean;
+  availableRoutes?: SwapRouteCandidate[];
+  manual?: boolean;
   quoteDiagnostics?: {
     relevantPools?: number;
     poolsBuilt?: number;
@@ -250,14 +266,20 @@ export function normalizeRouteActions(
     // route any rounding remainder into the last split so the on-chain total
     // equals the user's typed amount exactly.
     const precision = tokenIn.precision;
-    const scale = 10 ** precision;
-    const totalRaw = Math.round(parseFloat(amount) * scale);
-    const rawParts = splits.map((s) => Math.round(parseFloat(s.input) * scale));
-    const sumFirst = rawParts.slice(0, -1).reduce((a, b) => a + b, 0);
+    const toRaw = (value: string): bigint => {
+      if (!/^\d+(?:\.\d*)?$/.test(value.trim())) throw new Error("Invalid swap amount");
+      const [whole, fraction = ""] = value.trim().split(".");
+      return BigInt(`${whole}${(fraction + "0".repeat(precision)).slice(0, precision)}`);
+    };
+    const totalRaw = toRaw(amount);
+    const rawParts = splits.map((s) => toRaw(s.input));
+    const sumFirst = rawParts.slice(0, -1).reduce((a, b) => a + b, 0n);
     rawParts[rawParts.length - 1] = totalRaw - sumFirst;
+    if (rawParts.some((part) => part <= 0n)) throw new Error("One selected route is too small for this amount");
 
     return splits.map((split, i) => {
-      const human = (rawParts[i] / scale).toFixed(precision);
+      const raw = rawParts[i].toString().padStart(precision + 1, "0");
+      const human = precision > 0 ? `${raw.slice(0, -precision)}.${raw.slice(-precision)}` : raw;
       return {
         account: inputTokenContract,
         name: "transfer",
