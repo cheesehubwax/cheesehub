@@ -27,11 +27,11 @@ export function HoleInfoDialog() {
           type="button"
           variant="ghost"
           size="sm"
-          className="h-auto px-1 py-0.5 text-cheese hover:bg-cheese/10 hover:text-cheese"
+          className="h-auto gap-1.5 whitespace-nowrap px-2 py-1 text-cheese hover:bg-cheese/10 hover:text-cheese"
           title="About the HOLE token"
           aria-label="About the HOLE token"
         >
-          <OpenMojiIcon emoji="ℹ️" size={14} />
+          <OpenMojiIcon emoji="ℹ️" size={18} />
           <span className="hidden text-xs font-semibold uppercase sm:inline">About</span>
         </Button>
       </DialogTrigger>
