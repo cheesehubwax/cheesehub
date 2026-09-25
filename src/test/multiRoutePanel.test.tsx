@@ -22,7 +22,6 @@ class ResizeObserverStub {
   unobserve() {}
   disconnect() {}
 }
-// @ts-expect-error jsdom lacks ResizeObserver, which Radix Slider needs
 window.ResizeObserver = window.ResizeObserver ?? ResizeObserverStub;
 
 const tokenIn: SwapToken = { ticker: "CHEESE", contract: "cheeseburger", precision: 8 } as unknown as SwapToken;
