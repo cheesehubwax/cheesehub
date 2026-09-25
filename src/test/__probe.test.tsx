@@ -6,6 +6,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { MultiRoutePanelBisect } from "./__PanelBisect";
 import type { SwapRoute, SwapToken, SwapRouteCandidate } from "@/lib/swapApi";
 
+
+class RO { observe(){} unobserve(){} disconnect(){} }
+// @ts-ignore
+window.ResizeObserver = window.ResizeObserver || RO;
+// @ts-ignore
+globalThis.ResizeObserver = globalThis.ResizeObserver || RO;
+
 describe("bisect", () => {
   it("renders stubbed rows", async () => {
     const { MultiRoutePanelBisect: P } = await import("./__PanelBisect");
