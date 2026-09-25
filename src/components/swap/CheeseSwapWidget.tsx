@@ -9,7 +9,7 @@ import { useSwapTokens } from "@/hooks/useSwapTokens";
 import { useSwapRoute, type TradeType } from "@/hooks/useSwapRoute";
 import { useSwapTokenBalance } from "@/hooks/useSwapTokenBalance";
 import { useWax } from "@/context/WaxContext";
-import { type SwapToken, type SwapRouteCandidate, formatTokenAmount, normalizeRouteActions, PREFERRED_CONTRACTS } from "@/lib/swapApi";
+import { type SwapRoute, type SwapToken, type SwapRouteCandidate, formatTokenAmount, normalizeRouteActions, PREFERRED_CONTRACTS } from "@/lib/swapApi";
 import { type ManualAllocation } from "@/lib/manualSwap";
 import { getTransactPlugins } from "@/lib/wharfKit";
 import { fetchSingleTokenBalance } from "@/lib/waxRpcFallback";
@@ -50,6 +50,7 @@ export function CheeseSwapWidget({
   const [manualMode, setManualMode] = useState(false);
   const [manualAllocations, setManualAllocations] = useState<ManualAllocation[] | undefined>();
   const [manualCandidates, setManualCandidates] = useState<SwapRouteCandidate[]>([]);
+  const [autoComparison, setAutoComparison] = useState<{ key: string; route: SwapRoute } | null>(null);
 
   // Set defaults when tokens load
   useEffect(() => {
@@ -79,6 +80,21 @@ export function CheeseSwapWidget({
 
   const tradeType: TradeType = activeField === "in" ? "EXACT_INPUT" : "EXACT_OUTPUT";
   const routeAmount = activeField === "in" ? amountIn : amountOut;
+  const comparisonKey = [
+    tokenIn?.ticker,
+    tokenIn?.contract,
+    tokenOut?.ticker,
+    tokenOut?.contract,
+    routeAmount,
+    slippage,
+    tradeType,
+  ].join("|");
+
+  useEffect(() => {
+    if (autoComparison && autoComparison.key !== comparisonKey) {
+      setAutoComparison(null);
+    }
+  }, [autoComparison, comparisonKey]);
 
   const { route, isProvisional, isFetching: routeLoading, error: routeError, noRoute, isRetrying, exhaustedTransient, refetch: refetchRoute } = useSwapRoute(
     tokenIn,
@@ -118,9 +134,12 @@ export function CheeseSwapWidget({
     if (seed.length === 0) return;
     const total = seed.reduce((sum, item) => sum + item.bps, 0);
     seed[seed.length - 1].bps += 10_000 - total;
+    if (route && route.quoteComplete !== false) {
+      setAutoComparison({ key: comparisonKey, route });
+    }
     setManualAllocations(seed);
     setManualMode(true);
-  }, [route?.swaps, route?.availableRoutes, manualCandidates]);
+  }, [route, manualCandidates, comparisonKey]);
 
   const resetAuto = useCallback(() => {
     setManualMode(false);
@@ -149,6 +168,15 @@ export function CheeseSwapWidget({
   const displayAmountOut = activeField === "out"
     ? amountOut
     : (hasActiveAmount && route?.output ? formatTokenAmount(route.output, tokenOut?.precision ?? 8) : "");
+  const comparableAutoRoute = manualMode && autoComparison?.key === comparisonKey
+    ? autoComparison.route
+    : null;
+  const comparisonDelta = comparableAutoRoute && route
+    ? route.output - comparableAutoRoute.output
+    : null;
+  const comparisonDeltaPercent = comparisonDelta !== null && comparableAutoRoute && comparableAutoRoute.output > 0
+    ? (comparisonDelta / comparableAutoRoute.output) * 100
+    : null;
 
   const handleAmountInChange = (val: string) => {
     setAmountIn(val);
@@ -409,6 +437,24 @@ export function CheeseSwapWidget({
                   {formatTokenAmount(route.output, tokenOut?.precision ?? 8)} {tokenOut?.ticker}
                 </span>
               </div>
+              {comparableAutoRoute && (
+                <div className="rounded-md border border-border/50 bg-background/50 px-2 py-1.5 text-xs">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Auto result</span>
+                    <span className="font-medium text-foreground">
+                      {formatTokenAmount(comparableAutoRoute.output, tokenOut?.precision ?? 8)} {tokenOut?.ticker}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Manual vs Auto</span>
+                    <span className={comparisonDelta !== null && comparisonDelta >= 0 ? "text-green-500" : "text-destructive"}>
+                      {comparisonDelta !== null && comparisonDelta >= 0 ? "+" : ""}
+                      {comparisonDelta !== null ? formatTokenAmount(comparisonDelta, tokenOut?.precision ?? 8) : "—"} {tokenOut?.ticker}
+                      {comparisonDeltaPercent !== null && ` (${comparisonDeltaPercent >= 0 ? "+" : ""}${comparisonDeltaPercent.toFixed(2)}%)`}
+                    </span>
+                  </div>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Min. Received</span>
                 <span className="text-foreground">
