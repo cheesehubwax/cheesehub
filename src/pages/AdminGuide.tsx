@@ -222,6 +222,11 @@ const automation = [
     schedule: 'Twice daily (12h slots, retried within each slot)',
     detail: 'Samples the WAX and CHEESE price of RAM and appends one sample per 12-hour UTC slot to a separate data branch. This history feeds the CHEESERam price charts (24h / 7d / all).',
   },
+  {
+    name: 'CHEESEAnal LP snapshotter',
+    schedule: 'Twice daily (12h slots, eight ~3-hourly retries per slot)',
+    detail: 'Records one liquidity snapshot per half-day UTC slot to the lp-history-data branch, covering every CHEESE and HOLE pool over the minimum on Alcor, Defibox and TacoSwap: pool liquidity in USD and tokens, CHEESE price per pair, providers and their positions (with each position\'s price range and in-range state), and daily volumes (Defibox market data plus full 24h TacoSwap exchangelog sweeps, once per UTC day). This history feeds the entire CHEESEAnal page at /anal — overview graphs, pool and account details, mini graphs, and the departed-providers tombstone — which is strictly snapshot-only and never reads live chain data.',
+  },
 ];
 
 /* ── dApp sections ── */
