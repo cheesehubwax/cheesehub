@@ -33,6 +33,21 @@ const candidate: SwapRouteCandidate = {
   quotedOutput: "",
 } as unknown as SwapRouteCandidate;
 
+const candidate2: SwapRouteCandidate = {
+  key: "defibox:9",
+  venue: "defibox",
+  route: [9],
+  contract: "swap.defi",
+  visualPath: [
+    { id: "wax-eosio.token", symbol: "WAX", contract: "eosio.token", decimals: 8 },
+    { id: "usdt-eosio.token", symbol: "USDT", contract: "tethertether", decimals: 4 },
+    { id: "cheese-cheeseburger", symbol: "CHEESE", contract: "cheeseburger", decimals: 8 },
+  ],
+  visualFees: [30, 30],
+  quotedInput: "",
+  quotedOutput: "",
+} as unknown as SwapRouteCandidate;
+
 const route: SwapRoute = {
   swaps: [{
     route: [1],
@@ -58,7 +73,7 @@ function renderPanel() {
           tokenOut={tokenOut}
           manualMode
           manualAllocations={[{ key: "alcor:1", bps: 10_000 }]}
-          candidates={[candidate]}
+          candidates={[candidate, candidate2]}
           canUseManual
           onEnableManual={vi.fn()}
           onResetAuto={vi.fn()}
@@ -79,12 +94,12 @@ describe("MultiRoutePanel add-route popup", () => {
     await waitFor(() => {
       expect(screen.getAllByRole("option").length).toBeGreaterThan(0);
     });
-    const option = screen.getAllByRole("option")[0];
+    const option = screen.getAllByRole("option")[1]; // the Defibox candidate (not yet allocated)
     const images = option.querySelectorAll("img");
     // venue logo + overlapped token pair (CHEESE and WAX)
     expect(images.length).toBeGreaterThanOrEqual(3);
     const alts = Array.from(images).map((img) => img.getAttribute("alt") ?? "");
-    expect(alts.some((a) => a.toUpperCase().includes("CHEESE"))).toBe(true);
+    expect(alts.some((a) => a.toUpperCase().includes("USDT"))).toBe(true);
     expect(alts.some((a) => a.toUpperCase().includes("WAX"))).toBe(true);
     expect(option.textContent).toContain("0.3%");
   });
