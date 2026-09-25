@@ -18,7 +18,9 @@ export const manualAllocationsSchema = z
   .refine((items) => items.reduce((sum, item) => sum + item.bps, 0) === 10_000, "Allocations must total 100%");
 
 export function parseManualAllocations(value: unknown): ManualAllocation[] {
-  return manualAllocationsSchema.parse(value).filter((item) => item.bps > 0);
+  return manualAllocationsSchema.parse(value)
+    .filter((item) => item.bps > 0)
+    .map((item) => ({ key: item.key, bps: item.bps }));
 }
 
 export function allocationKey(items: ManualAllocation[] | undefined): string {
