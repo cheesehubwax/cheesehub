@@ -1,12 +1,22 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import MultiRoutePanel from "@/components/swap/MultiRoutePanel";
-import type { SwapRouteCandidate, SwapRoute, SwapToken } from "@/lib/swapApi";
+import type { SwapRoute, SwapRouteCandidate, SwapToken } from "@/lib/swapApi";
 import "@testing-library/jest-dom";
 
-const tokenIn: SwapToken = { ticker: "CHEESE", contract: "cheeseburger", precision: 8 } as SwapToken;
-const tokenOut: SwapToken = { ticker: "WAX", contract: "eosio.token", precision: 8 } as SwapToken;
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+// @ts-expect-error jsdom lacks ResizeObserver, which Radix Slider needs
+window.ResizeObserver = window.ResizeObserver ?? ResizeObserverStub;
+
+const tokenIn: SwapToken = { ticker: "CHEESE", contract: "cheeseburger", precision: 8 } as unknown as SwapToken;
+const tokenOut: SwapToken = { ticker: "WAX", contract: "eosio.token", precision: 8 } as unknown as SwapToken;
 
 const candidate: SwapRouteCandidate = {
   key: "alcor:1",
@@ -35,23 +45,28 @@ const route: SwapRoute = {
   availableRoutes: [],
 } as unknown as SwapRoute;
 
-function renderPanel(manual = true) {
+function renderPanel() {
   const onAllocationsChange = vi.fn();
-  const utils = render(
-    <MultiRoutePanel
-      route={route}
-      tokenIn={tokenIn}
-      tokenOut={tokenOut}
-      manualMode={manual}
-      manualAllocations={manual ? [{ key: "alcor:1", bps: 10_000 }] : []}
-      candidates={manual ? [candidate] : []}
-      canUseManual
-      onEnableManual={vi.fn()}
-      onResetAuto={vi.fn()}
-      onAllocationsChange={onAllocationsChange}
-    />,
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={qc}>
+      <TooltipProvider>
+        <MultiRoutePanel
+          route={route}
+          tokenIn={tokenIn}
+          tokenOut={tokenOut}
+          manualMode
+          manualAllocations={[{ key: "alcor:1", bps: 10_000 }]}
+          candidates={[candidate]}
+          canUseManual
+          onEnableManual={vi.fn()}
+          onResetAuto={vi.fn()}
+          onAllocationsChange={onAllocationsChange}
+        />
+      </TooltipProvider>
+    </QueryClientProvider>,
   );
-  return { ...utils, onAllocationsChange };
+  return { onAllocationsChange };
 }
 
 describe("MultiRoutePanel add-route popup", () => {
@@ -71,5 +86,6 @@ describe("MultiRoutePanel add-route popup", () => {
     const alts = Array.from(images).map((img) => img.getAttribute("alt") ?? "");
     expect(alts.some((a) => a.toUpperCase().includes("CHEESE"))).toBe(true);
     expect(alts.some((a) => a.toUpperCase().includes("WAX"))).toBe(true);
+    expect(option.textContent).toContain("0.3%");
   });
 });
