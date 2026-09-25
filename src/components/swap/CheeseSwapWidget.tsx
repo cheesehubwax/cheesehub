@@ -85,6 +85,11 @@ export function CheeseSwapWidget({
     tradeType
   );
 
+  // Defibox / TacoSwap pool lists load as soon as the swap window opens.
+  useEffect(() => {
+    prefetchAmmIndexes();
+  }, []);
+
   // Warm the pool data for the chosen pair before an amount is typed.
   useEffect(() => {
     if (!tokenIn || !tokenOut) return;
