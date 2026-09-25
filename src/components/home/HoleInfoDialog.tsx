@@ -1,7 +1,7 @@
 import { Info } from 'lucide-react';
 import { TokenLogo } from '@/components/TokenLogo';
 import { Button } from '@/components/ui/button';
-import { getTokenLogoUrl } from '@/lib/tokenLogos';
+import holeSquare from '@/assets/hole-logo-square.png';
 import {
   Dialog,
   DialogContent,
