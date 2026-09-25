@@ -32,6 +32,7 @@ export function HoleInfoDialog() {
           aria-label="About the HOLE token"
         >
           <OpenMojiIcon emoji="ℹ️" size={14} />
+          <span className="hidden text-xs font-semibold uppercase sm:inline">About</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="isolate w-[calc(100%-2rem)] max-w-md overflow-hidden [&>button]:z-10">
