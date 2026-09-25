@@ -294,6 +294,25 @@ const Index = () => {
             </CardContent>
           </Card>
 
+          {/* CHEESEAnal */}
+          <Card className="bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border-cheese/20">
+            <CardContent className="py-12 text-center">
+              <div className="h-16 w-16 rounded-full bg-cheese/20 flex items-center justify-center mx-auto mb-6">
+                <OpenMojiIcon emoji="📈" size={32} className="text-4xl" />
+              </div>
+              <h2 className="text-2xl font-bold mb-4 flex items-center justify-center gap-2"><span><span className="text-cheese">CHEESE</span><span className="text-foreground">Anal</span></span><span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span></h2>
+              <p className="text-muted-foreground max-w-sm mx-auto mb-6">
+                Liquidity, price and volume analytics built from twice-daily snapshots of every CHEESE and HOLE pool on Alcor, Defibox and TacoSwap, with pool and account level history
+              </p>
+              <Button asChild size="lg" className="bg-cheese hover:bg-cheese-dark text-primary-foreground font-semibold">
+                <Link to="/anal">
+                  Go to CHEESEAnal
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
           {/* CHEESEAmp */}
           <Card className="bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border-cheese/20">
             <CardContent className="py-12 text-center">
