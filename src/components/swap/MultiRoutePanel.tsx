@@ -212,7 +212,7 @@ export function MultiRoutePanel({
           return (
           <div key={routeKey ?? i} className="space-y-2 rounded-md border border-border/40 p-2">
           <div className="flex items-center gap-2 flex-wrap text-xs">
-            <span className="text-white font-medium">
+            <span className="text-foreground font-medium">
               {Math.round(percent)}%
             </span>
             <Tooltip>
@@ -231,7 +231,7 @@ export function MultiRoutePanel({
             </div>
             <span
               aria-hidden
-              className="flex-1 min-w-[12px] border-t border-dashed border-white/60"
+              className="flex-1 min-w-[12px] border-t border-dashed border-foreground/60"
             />
             {row.hopFees.map((fee, idx) => {
               const a = row.chain[idx];
@@ -254,7 +254,7 @@ export function MultiRoutePanel({
                         {`${a.symbol} (${a.contract}) / ${b.symbol} (${b.contract})`}
                       </TooltipContent>
                     </Tooltip>
-                    <span className="text-white font-medium">
+                    <span className="text-foreground font-medium">
                       {!row.broken ? formatFee(fee) : ""}
                     </span>
                   </div>
@@ -262,7 +262,7 @@ export function MultiRoutePanel({
                   {!isLast && (
                     <span
                       aria-hidden
-                      className="flex-1 min-w-[16px] border-t border-dashed border-white"
+                      className="flex-1 min-w-[16px] border-t border-dashed border-foreground"
                     />
                   )}
                 </div>
@@ -271,7 +271,7 @@ export function MultiRoutePanel({
             {/* End-token chip */}
             <span
               aria-hidden
-              className="flex-1 min-w-[12px] border-t border-dashed border-white/60"
+              className="flex-1 min-w-[12px] border-t border-dashed border-foreground/60"
             />
             <div className="ring-1 ring-border/50 rounded-full">
               <TokenLogo contract={tokenOut.contract} symbol={tokenOut.ticker} size="md" />

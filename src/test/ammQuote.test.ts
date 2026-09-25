@@ -137,5 +137,6 @@ describe("manual route allocations", () => {
     const allocations = [{ key: "a", bps: 9900 }, { key: "b", bps: 100 }];
     expect(stepAllocation(allocations, "a", 1)).toEqual([{ key: "a", bps: 10_000 }, { key: "b", bps: 0 }]);
     expect(stepAllocation(allocations, "b", -1)).toEqual([{ key: "a", bps: 10_000 }, { key: "b", bps: 0 }]);
+    expect(stepAllocation([{ key: "a", bps: 10_000 }], "a", -1)).toEqual([{ key: "a", bps: 10_000 }]);
   });
 });
