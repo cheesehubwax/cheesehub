@@ -9,4 +9,4 @@
 - [x] Banner ads: WaxEDGE placeholder first, legacy yellow banner as second placeholder when two shared slots are open; placeholder must also work on GitHub Pages (bundled asset)
 - [x] Banner ads: replace the legacy yellow second placeholder with GPK Collection Manager, linking through the external-site warning
 
-- [ ] CHEESESwap: manual spend-only per-pool route sliders with exact 100% allocation
+- [x] CHEESESwap: manual spend-only per-pool route sliders with exact 100% allocation
