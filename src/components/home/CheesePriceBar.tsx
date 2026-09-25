@@ -184,7 +184,10 @@ export function CheesePriceBar() {
         <div className="flex items-center gap-2 bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border border-cheese/20 rounded-lg px-4 py-2">
           <TokenLogo contract="hole.cheese" symbol="HOLE" size="md" />
           <div className="flex flex-col items-start">
-            <span className="text-xs text-muted-foreground">HOLE/CHEESE</span>
+            <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+              HOLE/CHEESE
+              <HoleInfoDialog />
+            </span>
             {holeLoading ? (
               <Skeleton className="h-5 w-32" />
             ) : (
@@ -193,7 +196,6 @@ export function CheesePriceBar() {
               </span>
             )}
           </div>
-          <HoleInfoDialog />
         </div>
       </div>
 
