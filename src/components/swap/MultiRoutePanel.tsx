@@ -33,6 +33,47 @@ function candidateLabel(candidate: SwapRouteCandidate): string {
   return `${VENUE_NAMES[candidate.venue]} · ${path}`;
 }
 
+// Compact logo chain for the "Add a pool route" popup, mirroring the route
+// rows: start chip, dashed link, overlapped pair logos with fees per hop.
+function CandidateRoutePath({ path, hopFees }: { path: AlcorPoolToken[]; hopFees: number[] }) {
+  if (path.length < 2) return null;
+  const hops = Math.min(hopFees.length, path.length - 1);
+  return (
+    <>
+      <div className="ring-1 ring-border/50 rounded-full shrink-0">
+        <TokenLogo contract={path[0].contract} symbol={path[0].symbol} size="sm" />
+      </div>
+      {Array.from({ length: hops }, (_, idx) => {
+        const a = path[idx];
+        const b = path[idx + 1];
+        if (!a || !b) return null;
+        return (
+          <div key={idx} className="flex shrink-0 items-center gap-1">
+            <span aria-hidden className="w-2 border-t border-dashed border-foreground/60" />
+            <div className="flex items-center">
+              <TokenLogo contract={a.contract} symbol={a.symbol} size="sm" />
+              <div className="-ml-2 ring-2 ring-popover rounded-full">
+                <TokenLogo contract={b.contract} symbol={b.symbol} size="sm" />
+              </div>
+            </div>
+            {hopFees[idx] != null && (
+              <span className="text-[10px] text-muted-foreground">{formatFee(hopFees[idx])}</span>
+            )}
+          </div>
+        );
+      })}
+      {hops < path.length - 1 && (
+        <>
+          <span aria-hidden className="w-2 border-t border-dashed border-foreground/60" />
+          <div className="ring-1 ring-border/50 rounded-full shrink-0">
+            <TokenLogo contract={path[path.length - 1].contract} symbol={path[path.length - 1].symbol} size="sm" />
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
 function hasVisualRoute(split: SwapRoute["swaps"][number]): boolean {
   if (split.venue && split.venue !== "alcor") return true;
   return (
@@ -313,7 +354,18 @@ export function MultiRoutePanel({
             <Select onValueChange={addRoute} disabled={addable.length === 0 || manualAllocations.length >= 6}>
               <SelectTrigger className="h-8 flex-1 text-xs"><SelectValue placeholder="Add a pool route" /></SelectTrigger>
               <SelectContent>
-                {addable.map((candidate) => <SelectItem key={candidate.key} value={candidate.key}>{candidateLabel(candidate)}</SelectItem>)}
+                {addable.map((candidate) => (
+                  <SelectItem key={candidate.key} value={candidate.key} className="pr-2">
+                    <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-xs">
+                      <VenueLogo venue={candidate.venue} className="h-3.5 w-3.5 shrink-0" />
+                      {candidate.visualPath.length >= 2 ? (
+                        <CandidateRoutePath path={candidate.visualPath} hopFees={candidate.visualFees ?? []} />
+                      ) : (
+                        <span className="text-muted-foreground">{candidateLabel(candidate)}</span>
+                      )}
+                    </span>
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={onResetAuto}>
