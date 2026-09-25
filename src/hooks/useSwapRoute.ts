@@ -182,7 +182,7 @@ export function useSwapRoute(
         } else {
           logger.info("[alcor-router] HTTP won after SDK returned no valid split route");
         }
-        return { ...http!, quoteComplete: true };
+        return { ...http!, availableRoutes: sdk?.availableRoutes, quoteComplete: true };
       }
 
       // Neither valid — propagate errors if any, else null.
