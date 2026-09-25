@@ -2,6 +2,21 @@
 
 const ALCOR_LOGO_BASE = 'https://wax.alcor.exchange/api/v2/tokens';
 
+// Bundled logos for our own tokens — always available, never rate-limited,
+// and immune to transient remote failures being cached as "missing".
+import cheeseTokenLogo from '@/assets/cheese-token.png';
+
+const LOCAL_LOGOS: Record<string, string> = {
+  'cheeseburger:cheese': cheeseTokenLogo,
+};
+
+/**
+ * True when the URL is a bundled local asset rather than a remote logo.
+ */
+export function isLocalLogoUrl(url: string): boolean {
+  return !url.startsWith('http') && url !== '/placeholder.svg';
+}
+
 // Cache for token contracts fetched from Alcor API
 let tokenContractCache: Map<string, string> = new Map();
 let cacheInitialized = false;
@@ -86,6 +101,9 @@ export function getTokenLogoUrl(contractOrSymbol: string, symbol?: string): stri
   if (!tokenContract) {
     return '/placeholder.svg';
   }
+
+  const local = LOCAL_LOGOS[`${tokenContract}:${lowerSymbol}`];
+  if (local) return local;
 
   return `${ALCOR_LOGO_BASE}/${lowerSymbol}-${tokenContract}/logo`;
 }

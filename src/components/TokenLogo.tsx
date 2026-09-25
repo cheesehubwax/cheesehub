@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getTokenLogoUrl } from '@/lib/tokenLogos';
+import { getTokenLogoUrl, isLocalLogoUrl } from '@/lib/tokenLogos';
 import { hasMissingLogo, markMissingLogo } from '@/lib/tokenLogoMisses';
 import { cn } from '@/lib/utils';
 
@@ -23,8 +23,10 @@ const fontSizeClasses = {
 };
 
 export function TokenLogo({ contract, symbol, className, size = 'md' }: TokenLogoProps) {
-  const [hasError, setHasError] = useState(() => hasMissingLogo(contract, symbol));
   const logoUrl = getTokenLogoUrl(contract, symbol);
+  // Bundled local logos can never 404 — skip the miss-cache entirely.
+  const isLocal = isLocalLogoUrl(logoUrl);
+  const [hasError, setHasError] = useState(() => !isLocal && hasMissingLogo(contract, symbol));
 
   if (hasError) {
     return (
