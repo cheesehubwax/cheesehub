@@ -38,36 +38,33 @@ function candidateLabel(candidate: SwapRouteCandidate): string {
 function CandidateRoutePath({ path, hopFees }: { path: AlcorPoolToken[]; hopFees: number[] }) {
   if (path.length < 2) return null;
   const hops = Math.min(hopFees.length, path.length - 1);
+  const renderToken = (token: AlcorPoolToken, key: string) => (
+    <span key={key} className="flex shrink-0 items-center gap-1 font-medium">
+      {token.symbol}
+      <TokenLogo contract={token.contract} symbol={token.symbol} size="sm" />
+    </span>
+  );
   return (
     <>
-      <div className="ring-1 ring-border/50 rounded-full shrink-0">
-        <TokenLogo contract={path[0].contract} symbol={path[0].symbol} size="sm" />
-      </div>
+      {renderToken(path[0], "start")}
       {Array.from({ length: hops }, (_, idx) => {
         const a = path[idx];
         const b = path[idx + 1];
         if (!a || !b) return null;
         return (
-          <div key={idx} className="flex shrink-0 items-center gap-1">
-            <span aria-hidden className="w-2 border-t border-dashed border-foreground/60" />
-            <div className="flex items-center">
-              <TokenLogo contract={a.contract} symbol={a.symbol} size="sm" />
-              <div className="-ml-2 ring-2 ring-popover rounded-full">
-                <TokenLogo contract={b.contract} symbol={b.symbol} size="sm" />
-              </div>
-            </div>
+          <span key={idx} className="flex shrink-0 items-center gap-1">
+            <span aria-hidden className="text-muted-foreground">~</span>
+            {renderToken(b, `hop-${idx}`)}
             {hopFees[idx] != null && (
-              <span className="text-[10px] text-muted-foreground">{formatFee(hopFees[idx])}</span>
+              <span className="text-[10px] text-muted-foreground">({formatFee(hopFees[idx])})</span>
             )}
-          </div>
+          </span>
         );
       })}
       {hops < path.length - 1 && (
         <>
-          <span aria-hidden className="w-2 border-t border-dashed border-foreground/60" />
-          <div className="ring-1 ring-border/50 rounded-full shrink-0">
-            <TokenLogo contract={path[path.length - 1].contract} symbol={path[path.length - 1].symbol} size="sm" />
-          </div>
+          <span aria-hidden className="text-muted-foreground">~</span>
+          {renderToken(path[path.length - 1], "end")}
         </>
       )}
     </>
