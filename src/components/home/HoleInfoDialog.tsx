@@ -1,6 +1,7 @@
 import { Info } from 'lucide-react';
 import { TokenLogo } from '@/components/TokenLogo';
 import { Button } from '@/components/ui/button';
+import { getTokenLogoUrl } from '@/lib/tokenLogos';
 import {
   Dialog,
   DialogContent,
@@ -33,8 +34,15 @@ export function HoleInfoDialog() {
           <Info />
         </Button>
       </DialogTrigger>
-      <DialogContent className="w-[calc(100%-2rem)] max-w-md">
-        <DialogHeader className="pr-7">
+      <DialogContent className="isolate w-[calc(100%-2rem)] max-w-md overflow-hidden [&>button]:z-10">
+        <img
+          src={getTokenLogoUrl('hole.cheese', 'HOLE')}
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10 h-full w-full scale-110 object-cover opacity-20"
+        />
+
+        <DialogHeader className="relative pr-7">
           <DialogTitle className="flex items-center gap-3 text-left">
             <TokenLogo contract="hole.cheese" symbol="HOLE" size="lg" />
             HOLE Token
@@ -44,7 +52,7 @@ export function HoleInfoDialog() {
           </DialogDescription>
         </DialogHeader>
 
-        <dl className="divide-y divide-border rounded-lg border border-border bg-card px-4">
+        <dl className="relative divide-y divide-border rounded-lg border border-border bg-card/80 px-4 backdrop-blur-sm">
           {HOLE_FACTS.map(([label, value]) => (
             <div key={label} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-3 text-sm">
               <dt className="text-muted-foreground">{label}</dt>
@@ -53,7 +61,7 @@ export function HoleInfoDialog() {
           ))}
         </dl>
 
-        <p className="text-sm leading-relaxed text-foreground">
+        <p className="relative rounded-lg bg-background/75 p-3 text-sm leading-relaxed text-foreground backdrop-blur-sm">
           $HOLE is the 'Son Token' of $CHEESE. The first token contract born of the CHEESE account.
           100% of supply 100k was minted and immediately paired with 0 $CHEESE. $HOLE acts like a
           $CHEESE 'sink' or a hole hence its name.
