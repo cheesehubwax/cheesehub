@@ -33,6 +33,12 @@ function candidateLabel(candidate: SwapRouteCandidate): string {
   return `${VENUE_NAMES[candidate.venue]} · ${path}`;
 }
 
+// Path-only label for popup items that lack a visual route, since the venue
+// name is already rendered separately at the start of the item.
+function candidatePathLabel(candidate: SwapRouteCandidate): string {
+  return candidate.visualPath.map((token) => token.symbol).join(" → ") || VENUE_NAMES[candidate.venue];
+}
+
 // Compact logo chain for the "Add a pool route" popup, mirroring the route
 // rows: start chip, dashed link, overlapped pair logos with fees per hop.
 function CandidateRoutePath({ path, hopFees }: { path: AlcorPoolToken[]; hopFees: number[] }) {
