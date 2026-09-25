@@ -7,7 +7,7 @@ import MultiRoutePanel from "@/components/swap/MultiRoutePanel";
 import type { SwapRoute, SwapToken, SwapRouteCandidate } from "@/lib/swapApi";
 
 describe("probe6", () => {
-  it("finds undefined element via jsx hook", () => {
+  it("finds undefined element via jsx hook", async () => {
     const mod = jsx as any;
     for (const fn of ["jsx", "jsxs", "jsxDEV"]) {
       if (typeof mod[fn] !== "function") continue;
