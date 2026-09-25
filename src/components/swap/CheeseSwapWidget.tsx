@@ -90,6 +90,12 @@ export function CheeseSwapWidget({
     tradeType,
   ].join("|");
 
+  useEffect(() => {
+    if (autoComparison && autoComparison.key !== comparisonKey) {
+      setAutoComparison(null);
+    }
+  }, [autoComparison, comparisonKey]);
+
   const { route, isProvisional, isFetching: routeLoading, error: routeError, noRoute, isRetrying, exhaustedTransient, refetch: refetchRoute } = useSwapRoute(
     tokenIn,
     tokenOut,
