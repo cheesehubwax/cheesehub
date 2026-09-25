@@ -202,7 +202,7 @@ export function MultiRoutePanel({
           <Button type="button" size="sm" variant={manualMode ? "secondary" : "ghost"} className="h-7 px-2 text-xs" onClick={onEnableManual} disabled={!canUseManual}>Manual</Button>
         </div>
       </div>
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {rows.map((row, i) => {
           const routeKey = row.split.routeKey;
           const allocation = routeKey ? draftAllocations.find((item) => item.key === routeKey) : undefined;
@@ -210,15 +210,15 @@ export function MultiRoutePanel({
           const onlyRoute = draftAllocations.length === 1;
           const percent = allocation ? allocation.bps / 100 : row.split.percent;
           return (
-          <div key={routeKey ?? i} className="space-y-2 rounded-md border border-border/40 p-2">
-          <div className="flex items-center gap-2 flex-wrap text-xs">
+          <div key={routeKey ?? i} className="space-y-1 rounded-md border border-border/40 px-2 py-1.5">
+          <div className="flex min-w-0 items-center gap-1.5 text-[11px]">
             <span className="text-foreground font-medium">
               {Math.round(percent)}%
             </span>
             <Tooltip>
               <TooltipTrigger asChild>
                 <span className="cursor-help">
-                  <VenueLogo venue={row.split.venue ?? "alcor"} className="h-4 w-4" />
+              <VenueLogo venue={row.split.venue ?? "alcor"} className="h-3.5 w-3.5" />
                 </span>
               </TooltipTrigger>
               <TooltipContent side="top" className="text-xs">
@@ -227,7 +227,7 @@ export function MultiRoutePanel({
             </Tooltip>
             {/* Start-token chip */}
             <div className="ring-1 ring-border/50 rounded-full">
-              <TokenLogo contract={tokenIn.contract} symbol={tokenIn.ticker} size="md" />
+              <TokenLogo contract={tokenIn.contract} symbol={tokenIn.ticker} size="sm" />
             </div>
             <span
               aria-hidden
@@ -239,14 +239,14 @@ export function MultiRoutePanel({
               const isLast = idx === row.hopFees.length - 1;
               if (!a || !b) return null;
               return (
-                <div key={idx} className="flex items-center gap-2">
-                  <div className="flex items-center gap-1.5">
+                 <div key={idx} className="flex min-w-0 items-center gap-1.5">
+                   <div className="flex items-center gap-1">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div className="flex items-center cursor-help">
-                          <TokenLogo contract={a.contract} symbol={a.symbol} size="md" />
-                          <div className="-ml-3 ring-2 ring-background rounded-full">
-                            <TokenLogo contract={b.contract} symbol={b.symbol} size="md" />
+                           <TokenLogo contract={a.contract} symbol={a.symbol} size="sm" />
+                           <div className="-ml-2 ring-2 ring-background rounded-full">
+                             <TokenLogo contract={b.contract} symbol={b.symbol} size="sm" />
                           </div>
                         </div>
                       </TooltipTrigger>
@@ -274,18 +274,18 @@ export function MultiRoutePanel({
               className="flex-1 min-w-[12px] border-t border-dashed border-foreground/60"
             />
             <div className="ring-1 ring-border/50 rounded-full">
-              <TokenLogo contract={tokenOut.contract} symbol={tokenOut.ticker} size="md" />
+               <TokenLogo contract={tokenOut.contract} symbol={tokenOut.ticker} size="sm" />
             </div>
             {manualMode && routeKey && candidate && (
-              <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeRoute(routeKey)} disabled={onlyRoute} aria-label={`Remove ${candidateLabel(candidate)}`}>
+               <Button type="button" variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => removeRoute(routeKey)} disabled={onlyRoute} aria-label={`Remove ${candidateLabel(candidate)}`}>
                 <X className="h-3.5 w-3.5" />
               </Button>
             )}
           </div>
           {manualMode && routeKey && allocation && candidate && (
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => stepRoute(routeKey, -1)} disabled={onlyRoute || allocation.bps <= 0} aria-label={`Decrease ${candidateLabel(candidate)} by 1%`}>
-                <Minus className="h-4 w-4" />
+             <div className="flex items-center gap-1.5">
+               <Button type="button" variant="outline" size="icon" className="h-7 w-7 shrink-0" onClick={() => stepRoute(routeKey, -1)} disabled={onlyRoute || allocation.bps <= 0} aria-label={`Decrease ${candidateLabel(candidate)} by 1%`}>
+                 <Minus className="h-3.5 w-3.5" />
               </Button>
               <Slider
                 aria-label={`${candidateLabel(candidate)} allocation`}
@@ -296,10 +296,10 @@ export function MultiRoutePanel({
                 disabled={onlyRoute}
                 onValueChange={([value]) => previewRoute(routeKey, value)}
                 onValueCommit={([value]) => changeRoute(routeKey, value)}
-                className="h-8 flex-1 px-1 [&>span:first-child]:h-3 [&>span:last-child]:h-7 [&>span:last-child]:w-7"
+                 className="h-7 min-w-0 flex-1 px-1 [&>span:first-child]:h-2.5 [&>span:last-child]:h-6 [&>span:last-child]:w-6"
               />
-              <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => stepRoute(routeKey, 1)} disabled={onlyRoute || allocation.bps >= 10_000} aria-label={`Increase ${candidateLabel(candidate)} by 1%`}>
-                <Plus className="h-4 w-4" />
+               <Button type="button" variant="outline" size="icon" className="h-7 w-7 shrink-0" onClick={() => stepRoute(routeKey, 1)} disabled={onlyRoute || allocation.bps >= 10_000} aria-label={`Increase ${candidateLabel(candidate)} by 1%`}>
+                 <Plus className="h-3.5 w-3.5" />
               </Button>
             </div>
           )}
@@ -308,7 +308,7 @@ export function MultiRoutePanel({
         })}
       </div>
       {manualMode && (
-        <div className="mt-3 space-y-2 border-t border-border/50 pt-3">
+         <div className="mt-2 space-y-1.5 border-t border-border/50 pt-2">
           <div className="flex items-center gap-2">
             <Select onValueChange={addRoute} disabled={addable.length === 0 || manualAllocations.length >= 6}>
               <SelectTrigger className="h-8 flex-1 text-xs"><SelectValue placeholder="Add a pool route" /></SelectTrigger>
