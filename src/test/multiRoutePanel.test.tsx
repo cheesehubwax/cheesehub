@@ -8,6 +8,15 @@ import { MultiRoutePanel } from "@/components/swap/MultiRoutePanel";
 import type { SwapRoute, SwapRouteCandidate, SwapToken } from "@/lib/swapApi";
 import "@testing-library/jest-dom";
 
+// Radix Select relies on pointer capture APIs jsdom lacks
+if (!Element.prototype.hasPointerCapture) {
+  Element.prototype.hasPointerCapture = () => false;
+  Element.prototype.setPointerCapture = () => {};
+  Element.prototype.releasePointerCapture = () => {};
+}
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}
 class ResizeObserverStub {
   observe() {}
   unobserve() {}
