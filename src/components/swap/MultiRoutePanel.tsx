@@ -365,7 +365,7 @@ export function MultiRoutePanel({
                       {candidate.visualPath.length >= 2 ? (
                         <CandidateRoutePath path={candidate.visualPath} hopFees={candidate.visualFees ?? []} />
                       ) : (
-                        <span className="text-muted-foreground">{candidateLabel(candidate)}</span>
+                        <span className="text-muted-foreground">{candidatePathLabel(candidate)}</span>
                       )}
                     </span>
                   </SelectItem>
