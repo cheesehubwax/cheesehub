@@ -178,6 +178,51 @@ export interface QuoteInput {
   manualAllocations?: ManualAllocation[];
 }
 
+function alcorRouteKey(route: any): string {
+  return `alcor:${route.pools.map((pool: Pool) => pool.id).join(",")}`;
+}
+
+function ammRouteKey(pool: AmmPoolState): string {
+  return `${pool.venue}:${pool.id}`;
+}
+
+function routeCandidates(routes: any[], ammPools: AmmPoolState[]): SwapRouteCandidate[] {
+  const alcor = routes.map((route) => ({
+    key: alcorRouteKey(route),
+    venue: "alcor" as const,
+    route: route.pools.map((pool: Pool) => pool.id),
+    contract: "swap.alcor",
+    visualPath: route.tokenPath.map((token: Token) => ({
+      id: tokenKey(token.contract, token.symbol),
+      symbol: token.symbol,
+      contract: token.contract,
+      decimals: token.decimals,
+    })),
+    visualFees: route.pools.map((pool: Pool) => pool.fee),
+    quotedInput: "",
+    quotedOutput: "",
+  }));
+  const amm = ammPools.map((pool) => ({
+    key: ammRouteKey(pool),
+    venue: pool.venue,
+    route: [],
+    venuePoolId: pool.id,
+    contract: pool.contract,
+    visualPath: [pool.tokenA, pool.tokenB].map((token) => ({
+      id: tokenKey(token.contract, token.symbol),
+      symbol: token.symbol,
+      contract: token.contract,
+      decimals: token.decimals,
+    })),
+    visualFees: [AMM_DISPLAY_FEE],
+    quotedInput: "",
+    quotedOutput: "",
+  }));
+  return [...alcor, ...amm].filter(
+    (candidate, index, all) => all.findIndex((other) => other.key === candidate.key) === index,
+  );
+}
+
 // ----- Cross-venue blend (Alcor + Defibox + TacoSwap), EXACT_INPUT only -----
 
 interface BlendResult {

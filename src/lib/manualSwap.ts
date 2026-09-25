@@ -15,7 +15,7 @@ export const manualAllocationsSchema = z
   .max(6)
   .refine((items) => new Set(items.map((item) => item.key)).size === items.length, "Duplicate routes")
   .refine((items) => items.filter((item) => item.bps > 0).length > 0, "Select at least one route")
-  .refine((items) => items.reduce((sum, item) => sum + item.bps, 0) === 10_000, "Allocations must total 100%');
+  .refine((items) => items.reduce((sum, item) => sum + item.bps, 0) === 10_000, "Allocations must total 100%");
 
 export function parseManualAllocations(value: unknown): ManualAllocation[] {
   return manualAllocationsSchema.parse(value).filter((item) => item.bps > 0);
