@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import MultiRoutePanel from "@/components/swap/MultiRoutePanel";
+import { MultiRoutePanel } from "@/components/swap/MultiRoutePanel";
 import type { SwapRoute, SwapRouteCandidate, SwapToken } from "@/lib/swapApi";
 import "@testing-library/jest-dom";
 
