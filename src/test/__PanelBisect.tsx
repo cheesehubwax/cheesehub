@@ -244,7 +244,39 @@ export function MultiRoutePanelBisect({
         </div>
       </div>
       <div className="space-y-1.5">
-        {rows.map((row, i) => { return null; })}
+        {rows.map((row, i) => {
+          const routeKey = row.split.routeKey;
+          const allocation = routeKey ? draftAllocations.find((item) => item.key === routeKey) : undefined;
+          const candidate = routeKey ? candidates.find((item) => item.key === routeKey) : undefined;
+          const onlyRoute = draftAllocations.length === 1;
+          const percent = allocation ? allocation.bps / 100 : row.split.percent;
+          return (
+          <div key={routeKey ?? i} className="space-y-1 rounded-md border border-border/40 px-2 py-1.5">
+          <div className="text-[11px]">ROW-HEADER</div>
+          {manualMode && routeKey && allocation && candidate && (
+             <div className="flex items-center gap-1.5">
+               <Button type="button" variant="outline" size="icon" className="h-7 w-7 shrink-0" onClick={() => stepRoute(routeKey, -1)} disabled={onlyRoute || allocation.bps <= 0} aria-label={`Decrease ${candidateLabel(candidate)} by 1%`}>
+                 <Minus className="h-3.5 w-3.5" />
+              </Button>
+              <Slider
+                aria-label={`${candidateLabel(candidate)} allocation`}
+                min={0}
+                max={100}
+                step={1}
+                value={[percent]}
+                disabled={onlyRoute}
+                onValueChange={([value]) => previewRoute(routeKey, value)}
+                onValueCommit={([value]) => changeRoute(routeKey, value)}
+                 className="h-7 min-w-0 flex-1 px-1 [&>span:first-child]:h-2.5 [&>span:last-child]:h-6 [&>span:last-child]:w-6"
+              />
+               <Button type="button" variant="outline" size="icon" className="h-7 w-7 shrink-0" onClick={() => stepRoute(routeKey, 1)} disabled={onlyRoute || allocation.bps >= 10_000} aria-label={`Increase ${candidateLabel(candidate)} by 1%`}>
+                 <Plus className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          )}
+          </div>
+          );
+        })}
       </div>
       {manualMode && (
          <div className="mt-2 space-y-1.5 border-t border-border/50 pt-2">
