@@ -37,7 +37,7 @@ const candidate: SwapRouteCandidate = {
     { id: "cheese-cheeseburger", symbol: "CHEESE", contract: "cheeseburger", decimals: 8 },
     { id: "wax-eosio.token", symbol: "WAX", contract: "eosio.token", decimals: 8 },
   ],
-  visualFees: [30],
+  visualFees: [3000],
   quotedInput: "",
   quotedOutput: "",
 } as unknown as SwapRouteCandidate;
@@ -52,7 +52,7 @@ const candidate2: SwapRouteCandidate = {
     { id: "usdt-eosio.token", symbol: "USDT", contract: "tethertether", decimals: 4 },
     { id: "cheese-cheeseburger", symbol: "CHEESE", contract: "cheeseburger", decimals: 8 },
   ],
-  visualFees: [30, 30],
+  visualFees: [3000, 3000],
   quotedInput: "",
   quotedOutput: "",
 } as unknown as SwapRouteCandidate;
@@ -65,7 +65,7 @@ const route: SwapRoute = {
     minReceived: "",
     routeKey: "alcor:1",
     visualPath: candidate.visualPath,
-    visualFees: [30],
+    visualFees: [3000],
   }],
   availableRoutes: [],
 } as unknown as SwapRoute;
