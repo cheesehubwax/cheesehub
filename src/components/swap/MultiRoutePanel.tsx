@@ -33,6 +33,12 @@ function candidateLabel(candidate: SwapRouteCandidate): string {
   return `${VENUE_NAMES[candidate.venue]} · ${path}`;
 }
 
+// Path-only label for popup items that lack a visual route, since the venue
+// name is already rendered separately at the start of the item.
+function candidatePathLabel(candidate: SwapRouteCandidate): string {
+  return candidate.visualPath.map((token) => token.symbol).join(" → ") || VENUE_NAMES[candidate.venue];
+}
+
 // Compact logo chain for the "Add a pool route" popup, mirroring the route
 // rows: start chip, dashed link, overlapped pair logos with fees per hop.
 function CandidateRoutePath({ path, hopFees }: { path: AlcorPoolToken[]; hopFees: number[] }) {
@@ -355,9 +361,11 @@ export function MultiRoutePanel({
                   <SelectItem key={candidate.key} value={candidate.key} className="pr-2">
                     <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-xs">
                       <VenueLogo venue={candidate.venue} className="h-3.5 w-3.5 shrink-0" />
-                      <span className="shrink-0">{candidateLabel(candidate)}</span>
-                      {candidate.visualPath.length >= 2 && (
+                      <span className="shrink-0">{VENUE_NAMES[candidate.venue]}</span>
+                      {candidate.visualPath.length >= 2 ? (
                         <CandidateRoutePath path={candidate.visualPath} hopFees={candidate.visualFees ?? []} />
+                      ) : (
+                        <span className="text-muted-foreground">{candidatePathLabel(candidate)}</span>
                       )}
                     </span>
                   </SelectItem>
