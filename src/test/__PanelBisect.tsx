@@ -256,16 +256,7 @@ export function MultiRoutePanelBisect({
             <span className="text-foreground font-medium">
               {Math.round(percent)}%
             </span>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="cursor-help">
-              <VenueLogo venue={row.split.venue ?? "alcor"} className="h-3.5 w-3.5" />
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="text-xs">
-                {VENUE_NAMES[row.split.venue ?? "alcor"]}
-              </TooltipContent>
-            </Tooltip>
+            <span>VENUE</span>
             {/* Start-token chip */}
             <div className="ring-1 ring-border/50 rounded-full">
               <TokenLogo contract={tokenIn.contract} symbol={tokenIn.ticker} size="sm" />
@@ -282,7 +273,19 @@ export function MultiRoutePanelBisect({
               return (
                  <div key={idx} className="flex min-w-0 items-center gap-1.5">
                    <div className="flex items-center gap-1">
-                    <span>PAIR</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center cursor-help">
+                           <TokenLogo contract={a.contract} symbol={a.symbol} size="sm" />
+                           <div className="-ml-2 ring-2 ring-background rounded-full">
+                             <TokenLogo contract={b.contract} symbol={b.symbol} size="sm" />
+                          </div>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs">
+                        {`${a.symbol} (${a.contract}) / ${b.symbol} (${b.contract})`}
+                      </TooltipContent>
+                    </Tooltip>
                     <span className="text-foreground font-medium">
                       {!row.broken ? formatFee(fee) : ""}
                     </span>
