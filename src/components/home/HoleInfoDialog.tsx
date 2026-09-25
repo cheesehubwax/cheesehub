@@ -1,4 +1,4 @@
-import { Info } from 'lucide-react';
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { TokenLogo } from '@/components/TokenLogo';
 import { Button } from '@/components/ui/button';
 import holeSquare from '@/assets/hole-logo-square.png';
@@ -26,12 +26,12 @@ export function HoleInfoDialog() {
         <Button
           type="button"
           variant="ghost"
-          size="icon"
-          className="ml-1 h-7 w-7 text-muted-foreground hover:text-cheese"
+          size="sm"
+          className="h-auto px-1 py-0.5 text-cheese hover:bg-cheese/10 hover:text-cheese"
           title="About the HOLE token"
           aria-label="About the HOLE token"
         >
-          <Info />
+          <OpenMojiIcon emoji="ℹ️" size={14} />
         </Button>
       </DialogTrigger>
       <DialogContent className="isolate w-[calc(100%-2rem)] max-w-md overflow-hidden [&>button]:z-10">
