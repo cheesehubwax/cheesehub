@@ -59,7 +59,7 @@ function CandidateRoutePath({ path, hopFees }: { path: AlcorPoolToken[]; hopFees
         if (!a || !b) return null;
         return (
           <span key={idx} className="flex shrink-0 items-center gap-1">
-            <span aria-hidden className="text-muted-foreground">~</span>
+            <span aria-hidden className="text-muted-foreground">→</span>
             {renderToken(b, `hop-${idx}`)}
             {hopFees[idx] != null && (
               <span className="text-[10px] text-muted-foreground">({formatFee(hopFees[idx])})</span>
@@ -69,7 +69,7 @@ function CandidateRoutePath({ path, hopFees }: { path: AlcorPoolToken[]; hopFees
       })}
       {hops < path.length - 1 && (
         <>
-          <span aria-hidden className="text-muted-foreground">~</span>
+          <span aria-hidden className="text-muted-foreground">→</span>
           {renderToken(path[path.length - 1], "end")}
         </>
       )}
