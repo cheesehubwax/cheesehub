@@ -358,10 +358,9 @@ export function MultiRoutePanel({
                   <SelectItem key={candidate.key} value={candidate.key} className="pr-2">
                     <span className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-xs">
                       <VenueLogo venue={candidate.venue} className="h-3.5 w-3.5 shrink-0" />
-                      {candidate.visualPath.length >= 2 ? (
+                      <span className="shrink-0">{candidateLabel(candidate)}</span>
+                      {candidate.visualPath.length >= 2 && (
                         <CandidateRoutePath path={candidate.visualPath} hopFees={candidate.visualFees ?? []} />
-                      ) : (
-                        <span className="text-muted-foreground">{candidateLabel(candidate)}</span>
                       )}
                     </span>
                   </SelectItem>
