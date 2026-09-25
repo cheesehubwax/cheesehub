@@ -27,7 +27,10 @@ import {
   formatSdkDiagnostics,
 } from "./alcorQuoteCore";
 import { runQuote } from "./alcorQuoteRunner";
-import { fetchAmmPoolsFor, prefetchAmmIndexes } from "./ammSwapPools";
+import { fetchAmmPoolsFor, prefetchAmmIndexes, ammIndexesReady } from "./ammSwapPools";
+
+/** Longest the Alcor quote waits for already-indexed Defibox/Taco pools. */
+const AMM_GRACE_MS = 1_200;
 import { fetchTableRows } from "./waxRpcFallback";
 import { readStatCache, writeStatCache } from "./statCache";
 import { logger } from "./logger";
@@ -751,7 +754,14 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     ticks: (await ticksFor(p.id)) ?? ([] as RawAlcorTick[]),
   }));
 
-  const ammPools = await ammPromise;
+  // Never hold the Alcor quote long for Defibox/Taco. When their pool lists are
+  // already loaded, the live reserve reads take a few hundred ms, so allow a
+  // short grace; while the lists are still downloading, don't wait at all.
+  const graceMs = ammIndexesReady() ? AMM_GRACE_MS : 0;
+  const ammPools = await Promise.race([
+    ammPromise,
+    new Promise<[]>((resolve) => setTimeout(() => resolve([]), graceMs)),
+  ]);
 
   return runQuote({
     pools: tickResults,

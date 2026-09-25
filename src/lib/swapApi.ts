@@ -60,6 +60,10 @@ export interface SwapRoute {
     rateLimitedTickFailures?: number;
     poolsDroppedNoTicks?: number;
     tookMs?: number;
+    /** Defibox/Taco pools available to the blend step. */
+    ammPools?: number;
+    /** Time spent weighing Defibox/Taco legs. */
+    blendMs?: number;
   };
 }
 

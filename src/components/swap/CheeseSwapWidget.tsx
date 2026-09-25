@@ -13,6 +13,7 @@ import { type SwapToken, formatTokenAmount, normalizeRouteActions, PREFERRED_CON
 import { getTransactPlugins } from "@/lib/wharfKit";
 import { fetchSingleTokenBalance } from "@/lib/waxRpcFallback";
 import { prefetchPairPools } from "@/lib/alcorRouter";
+import { prefetchAmmIndexes } from "@/lib/ammSwapPools";
 import type { TokenWithBalance } from "@/hooks/useAllTokenBalances";
 import { toast } from "sonner";
 
@@ -83,6 +84,11 @@ export function CheeseSwapWidget({
     accountName || "placeholder111",
     tradeType
   );
+
+  // Defibox / TacoSwap pool lists load as soon as the swap window opens.
+  useEffect(() => {
+    prefetchAmmIndexes();
+  }, []);
 
   // Warm the pool data for the chosen pair before an amount is typed.
   useEffect(() => {
