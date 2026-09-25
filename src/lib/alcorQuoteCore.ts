@@ -18,6 +18,7 @@ import {
   type AmmPoolState,
   type AmmAllocation,
   allocateAcrossAmm,
+  ammAmountOut,
   ammMemo,
   rawToFixed,
   sameToken,

@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { fetchSwapRoute, type SwapToken, type SwapRoute } from "@/lib/swapApi";
 import { computeAlcorTrade } from "@/lib/alcorRouter";
 import { logger } from "@/lib/logger";
+import { allocationKey, type ManualAllocation } from "@/lib/manualSwap";
 
 export type TradeType = "EXACT_INPUT" | "EXACT_OUTPUT";
 
@@ -38,7 +39,8 @@ export function useSwapRoute(
   amount: string,
   slippage: number,
   receiver: string,
-  tradeType: TradeType = "EXACT_INPUT"
+  tradeType: TradeType = "EXACT_INPUT",
+  manualAllocations?: ManualAllocation[],
 ) {
   const [debouncedAmount, setDebouncedAmount] = useState(amount);
   const [debouncedTradeType, setDebouncedTradeType] = useState(tradeType);
@@ -58,7 +60,9 @@ export function useSwapRoute(
     !!tokenIn && !!tokenOut && !tokensIdentical && !!debouncedAmount && parseFloat(debouncedAmount) > 0 && !!receiver && receiver !== "placeholder111";
 
   const queryClient = useQueryClient();
-  const keyParts = [tokenIn?.ticker, tokenIn?.contract, tokenOut?.ticker, tokenOut?.contract, debouncedAmount, slippage, receiver, debouncedTradeType] as const;
+  const manualKey = allocationKey(manualAllocations);
+  const manualMode = manualKey !== "auto" && debouncedTradeType === "EXACT_INPUT";
+  const keyParts = [tokenIn?.ticker, tokenIn?.contract, tokenOut?.ticker, tokenOut?.contract, debouncedAmount, slippage, receiver, debouncedTradeType, manualKey] as const;
   const httpKey = ["swap-route-http", ...keyParts];
 
   // Alcor's own quick quote, shown straight away while the split search runs.
@@ -68,7 +72,7 @@ export function useSwapRoute(
     queryKey: httpKey,
     queryFn: ({ signal }) =>
       fetchSwapRoute(tokenIn!, tokenOut!, debouncedAmount, slippage, receiver, signal, debouncedTradeType),
-    enabled,
+    enabled: enabled && !manualMode,
     staleTime: 15_000,
     gcTime: 30_000,
     retry: 1,
@@ -104,7 +108,14 @@ export function useSwapRoute(
         tradeType: debouncedTradeType,
         distributionPercent,
         signal,
+        manualAllocations: manualMode ? manualAllocations : undefined,
       });
+
+      if (manualMode) {
+        const manualRoute = await sdkPromise;
+        if (!isValidSdkRoute(manualRoute)) return null;
+        return { ...manualRoute, quoteComplete: true };
+      }
 
       const [httpSettled, sdkSettled] = await Promise.allSettled([httpPromise, sdkPromise]);
 
@@ -218,7 +229,7 @@ export function useSwapRoute(
   }, [exhaustedTransient, enabled, refetch]);
 
   const provisional =
-    !route && enabled && isValidHttpRoute(httpQuery.data) && !finalError
+    !manualMode && !route && enabled && isValidHttpRoute(httpQuery.data) && !finalError
       ? { ...httpQuery.data!, quoteComplete: false }
       : undefined;
   const shownRoute = route ?? provisional;

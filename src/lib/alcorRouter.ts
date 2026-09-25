@@ -17,6 +17,7 @@ import {
   Percent,
 } from "@alcorexchange/alcor-swap-sdk";
 import type { SwapToken, SwapRoute } from "./swapApi";
+import type { ManualAllocation } from "./manualSwap";
 import {
   type RawAlcorPool,
   type RawAlcorTick,
@@ -679,6 +680,7 @@ export interface AlcorTradeArgs {
   maxHops?: number;
   distributionPercent?: number;
   signal?: AbortSignal;
+  manualAllocations?: ManualAllocation[];
 }
 
 /**
@@ -698,6 +700,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     maxHops = 3,
     distributionPercent = 1,
     signal,
+    manualAllocations,
   } = args;
 
   const started = performance.now();
@@ -778,6 +781,7 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     tickFailures,
     rateLimitedTickFailures,
     started,
+    manualAllocations,
   }, signal);
 }
 
