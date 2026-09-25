@@ -1,34 +1,25 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
-import * as L from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
-import { Select } from "@/components/ui/select";
-import { Tooltip, TooltipTrigger } from "@/components/ui/tooltip";
-import { TokenLogo } from "@/components/TokenLogo";
-import { VenueLogo } from "@/components/anal/VenueLogo";
+import MultiRoutePanel from "@/components/swap/MultiRoutePanel";
+import type { SwapRoute, SwapToken, SwapRouteCandidate } from "@/lib/swapApi";
 
 describe("probe", () => {
-  it("renders each piece", () => {
-    const cases: [string, React.ReactElement][] = [
-      ["Button", <Button key="b">x</Button>],
-      ["Slider", <Slider key="s" value={[1]} />],
-      ["Select", <Select key="c"><div/></Select>],
-      ["Tooltip", <Tooltip key="t"><TooltipTrigger/></Tooltip>],
-      ["TokenLogo", <TokenLogo key="l" contract="a" symbol="B" />],
-      ["VenueLogo", <VenueLogo key="v" venue="alcor" />],
-      ["Minus", <L.Minus key="m" className="h-3" />],
-    ];
-    const failed: string[] = [];
-    for (const [name, el] of cases) {
-      const orig = console.error;
-      console.error = () => {};
-      try { render(el); } catch (e) { failed.push(name + ": " + (e as Error).message.slice(0, 80)); }
-      console.error = orig;
-      document.body.innerHTML = "";
-    }
-    console.log("FAILED:", failed);
+  it("renders panel", () => {
+    const tokenIn = { ticker: "CHEESE", contract: "cheeseburger", precision: 8 } as unknown as SwapToken;
+    const tokenOut = { ticker: "WAX", contract: "eosio.token", precision: 8 } as unknown as SwapToken;
+    const cand = {
+      key: "alcor:1", venue: "alcor", route: [1], contract: "alcor.swap",
+      visualPath: [{ id: "a", symbol: "CHEESE", contract: "c", decimals: 8 }, { id: "b", symbol: "WAX", contract: "e", decimals: 8 }],
+      visualFees: [30], quotedInput: "", quotedOutput: "",
+    } as unknown as SwapRouteCandidate;
+    const route = { swaps: [{ route: [1], input: "", output: "", minReceived: "", routeKey: "alcor:1", visualPath: cand.visualPath, visualFees: [30] }], availableRoutes: [] } as unknown as SwapRoute;
+    const orig = console.error; console.error = () => {};
+    try {
+      render(<MultiRoutePanel route={route} tokenIn={tokenIn} tokenOut={tokenOut} manualMode manualAllocations={[{ key: "alcor:1", bps: 10000 }]} candidates={[cand]} canUseManual onEnableManual={() => {}} onResetAuto={() => {}} onAllocationsChange={() => {}} />);
+      console.log("PANEL RENDER OK");
+    } catch (e) { console.log("PANEL FAIL:", (e as Error).message); }
+    console.error = orig;
     expect(true).toBe(true);
   });
 });
