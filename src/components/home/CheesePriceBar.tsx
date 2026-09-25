@@ -11,6 +11,7 @@ import marketcapUrl from '@/assets/marketcap.png';
 import tvlUrl from '@/assets/tvl.png';
 import refreshIconUrl from '@/assets/refresh-icon.png';
 import { CheeseSwapDialog } from '@/components/swap/CheeseSwapDialog';
+import { HoleInfoDialog } from './HoleInfoDialog';
 
 function formatPrice(price: number, decimals: number = 8): string {
   return price.toFixed(decimals);
@@ -192,6 +193,7 @@ export function CheesePriceBar() {
               </span>
             )}
           </div>
+          <HoleInfoDialog />
         </div>
       </div>
 
