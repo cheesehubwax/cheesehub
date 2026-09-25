@@ -33,11 +33,11 @@ export function CheeseSwapDialog({ open, onOpenChange, inputToken = 'WAX' }: Che
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-[480px] p-0 overflow-hidden bg-background border-cheese/30"
+        className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-[480px] flex-col overflow-hidden border-cheese/30 bg-background p-0 sm:max-h-[calc(100dvh-2rem)]"
         onInteractOutside={(e) => e.preventDefault()}
         onPointerDownOutside={(e) => e.preventDefault()}
       >
-        <DialogHeader className="p-4 pb-0 pr-10">
+        <DialogHeader className="shrink-0 border-b border-border/50 bg-background p-3 pr-10 sm:p-4 sm:pb-3 sm:pr-10">
           <div className="flex items-center gap-3">
             <DialogTitle className="text-lg font-bold text-foreground">
               <span className="text-cheese">CHEESE</span>
@@ -51,7 +51,7 @@ export function CheeseSwapDialog({ open, onOpenChange, inputToken = 'WAX' }: Che
             Swap tokens using Alcor's smart contracts
           </DialogDescription>
         </DialogHeader>
-        <div className="p-4">
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3 sm:p-4">
           <CheeseSwapWidget
             defaultInputTicker={inputToken}
             defaultOutputTicker="CHEESE"

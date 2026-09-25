@@ -11,3 +11,4 @@
 
 - [x] CHEESESwap: manual spend-only per-pool route sliders with exact 100% allocation
 - [x] CHEESESwap: place manual sliders beneath their pool rows with easier dragging and 1% controls
+- [x] CHEESESwap: compact manual pool rows and add viewport-safe scrolling for zoomed and small screens
