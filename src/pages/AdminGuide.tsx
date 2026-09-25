@@ -356,6 +356,14 @@ const dapps: DApp[] = [
     feeNote: 'Swap fees set by Alcor DEX. No additional CHEESE fees.',
   },
   {
+    id: 'anal',
+    name: 'CHEESEAnal',
+    contracts: [],
+    owner: 'CHEESE team',
+    description: 'Liquidity analytics dashboard at /anal, public in the header (CHEESE and HOLE tabs). Reads twice-daily snapshots recorded by GitHub Actions into the lp-history-data branch: per Alcor pool and per account, it tracks liquidity (USD and CHEESE), CHEESE price, providers, positions and 24h volume for CHEESE pairs plus Defibox and TacoSwap venues. The page is snapshot-only — every table, graph, value box, CSV export and the departed-providers tombstone comes from recorded history, with no live chain reads. Coverage starts when snapshots began; ranges without recorded data are shown as unavailable rather than substituted.',
+    feeNote: 'No fees and no transactions — CHEESEAnal is read-only and records no on-chain state of its own.',
+  },
+  {
     id: 'wallet',
     name: 'CHEESEWallet',
     contracts: [],
