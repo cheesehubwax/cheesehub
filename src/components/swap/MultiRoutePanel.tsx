@@ -3,9 +3,12 @@ import { TokenLogo } from "@/components/TokenLogo";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useAlcorPools } from "@/hooks/useAlcorPools";
 import type { SwapRoute, SwapToken, AlcorPoolToken } from "@/lib/swapApi";
+import { VenueLogo } from "@/components/anal/VenueLogo";
 
 
 
+
+const VENUE_NAMES = { alcor: "Alcor", defibox: "Defibox", taco: "TacoSwap" } as const;
 
 interface MultiRoutePanelProps {
   route: SwapRoute;
@@ -14,6 +17,7 @@ interface MultiRoutePanelProps {
 }
 
 function hasVisualRoute(split: SwapRoute["swaps"][number]): boolean {
+  if (split.venue && split.venue !== "alcor") return true;
   return (
     Array.isArray(split.visualPath) &&
     Array.isArray(split.visualFees) &&
@@ -106,6 +110,16 @@ export function MultiRoutePanel({ route, tokenIn, tokenOut }: MultiRoutePanelPro
             <span className="text-white font-medium">
               {Math.round(row.split.percent)}%
             </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="cursor-help">
+                  <VenueLogo venue={row.split.venue ?? "alcor"} className="h-4 w-4" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                {VENUE_NAMES[row.split.venue ?? "alcor"]}
+              </TooltipContent>
+            </Tooltip>
             {/* Start-token chip */}
             <div className="ring-1 ring-border/50 rounded-full">
               <TokenLogo contract={tokenIn.contract} symbol={tokenIn.ticker} size="md" />
