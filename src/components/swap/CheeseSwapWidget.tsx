@@ -102,10 +102,14 @@ export function CheeseSwapWidget({
   }, [activeField]);
 
   const enableManual = useCallback(() => {
-    const routeAllocations = (route?.swaps ?? [])
+    let routeAllocations = (route?.swaps ?? [])
       .filter((split) => split.routeKey)
       .map((split) => ({ key: split.routeKey as string, bps: Math.max(0, Math.round(split.percent * 100)) }));
     const candidates = route?.availableRoutes ?? manualCandidates;
+    if (routeAllocations.length === 0 && route?.route?.length) {
+      const key = `alcor:${route.route.join(",")}`;
+      if (candidates.some((candidate) => candidate.key === key)) routeAllocations = [{ key, bps: 10_000 }];
+    }
     const seed = routeAllocations.length > 0
       ? routeAllocations
       : candidates[0]
