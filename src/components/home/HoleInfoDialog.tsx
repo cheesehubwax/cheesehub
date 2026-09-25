@@ -1,7 +1,7 @@
 import { Info } from 'lucide-react';
 import { TokenLogo } from '@/components/TokenLogo';
 import { Button } from '@/components/ui/button';
-import { getTokenLogoUrl } from '@/lib/tokenLogos';
+import holeSquare from '@/assets/hole-logo-square.png';
 import {
   Dialog,
   DialogContent,
@@ -36,10 +36,10 @@ export function HoleInfoDialog() {
       </DialogTrigger>
       <DialogContent className="isolate w-[calc(100%-2rem)] max-w-md overflow-hidden [&>button]:z-10">
         <img
-          src={getTokenLogoUrl('hole.cheese', 'HOLE')}
+          src={holeSquare}
           alt=""
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 -z-10 h-full w-full scale-110 object-cover opacity-60"
+          className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover opacity-60"
         />
 
         <DialogHeader className="relative pr-7">
