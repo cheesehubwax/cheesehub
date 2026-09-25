@@ -13,6 +13,7 @@ import { type SwapToken, formatTokenAmount, normalizeRouteActions, PREFERRED_CON
 import { getTransactPlugins } from "@/lib/wharfKit";
 import { fetchSingleTokenBalance } from "@/lib/waxRpcFallback";
 import { prefetchPairPools } from "@/lib/alcorRouter";
+import { prefetchAmmIndexes } from "@/lib/ammSwapPools";
 import type { TokenWithBalance } from "@/hooks/useAllTokenBalances";
 import { toast } from "sonner";
 

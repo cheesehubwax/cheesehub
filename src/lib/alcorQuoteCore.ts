@@ -198,7 +198,7 @@ async function blendWithAmm(args: {
   sdkTradeType: any;
   finePercents: number[];
 }): Promise<BlendResult | null> {
-  const { trade, tokenIn, tokenOut, inTok, totalRaw, routes, sdkPools, sdkTradeType, finePercents } = args;
+  const { trade, tokenIn, tokenOut, inTok, totalRaw, sdkTradeType } = args;
   const cands = args.ammPools
     .map((pool) => {
       const inIsA = sameToken(pool.tokenA, tokenIn.ticker, tokenIn.contract);
