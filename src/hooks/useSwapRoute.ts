@@ -86,7 +86,7 @@ export function useSwapRoute(
       // blocked by rate limits/missing pool data, retry instead of exposing a
       // worse 100% route as the best available price.
       // Shares the quick-quote request above instead of sending it twice.
-      const httpPromise = queryClient.fetchQuery({
+      const httpPromise = manualMode ? Promise.resolve(null) : queryClient.fetchQuery({
         queryKey: httpKey,
         queryFn: ({ signal: s }) =>
           fetchSwapRoute(tokenIn!, tokenOut!, debouncedAmount, slippage, receiver, s ?? signal, debouncedTradeType),

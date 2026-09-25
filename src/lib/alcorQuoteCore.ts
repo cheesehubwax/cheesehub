@@ -187,7 +187,7 @@ function ammRouteKey(pool: AmmPoolState): string {
   return `${pool.venue}:${pool.id}`;
 }
 
-function routeCandidates(routes: any[], ammPools: AmmPoolState[]): SwapRouteCandidate[] {
+function routeCandidates(routes: any[], ammPools: AmmPoolState[], tokenIn: SwapToken): SwapRouteCandidate[] {
   const alcor = routes.map((route) => ({
     key: alcorRouteKey(route),
     venue: "alcor" as const,
@@ -209,7 +209,9 @@ function routeCandidates(routes: any[], ammPools: AmmPoolState[]): SwapRouteCand
     route: [],
     venuePoolId: pool.id,
     contract: pool.contract,
-    visualPath: [pool.tokenA, pool.tokenB].map((token) => ({
+    visualPath: (sameToken(pool.tokenA, tokenIn.ticker, tokenIn.contract)
+      ? [pool.tokenA, pool.tokenB]
+      : [pool.tokenB, pool.tokenA]).map((token) => ({
       id: tokenKey(token.contract, token.symbol),
       symbol: token.symbol,
       contract: token.contract,
@@ -396,7 +398,7 @@ export async function quoteFromData(input: QuoteInput): Promise<SwapRoute | null
   );
 
   const sdkTradeType = tradeType === "EXACT_INPUT" ? TradeType.EXACT_INPUT : TradeType.EXACT_OUTPUT;
-  const candidates = routeCandidates(routes, input.ammPools ?? []);
+  const candidates = routeCandidates(routes, input.ammPools ?? [], tokenIn);
   const manual = input.manualAllocations ? parseManualAllocations(input.manualAllocations) : null;
   if (manual && !exactInput(tradeType)) throw new Error("Manual routing is only available for spend amounts");
 

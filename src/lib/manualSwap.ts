@@ -33,7 +33,7 @@ export function redistributeAllocations(
   nextBps: number,
 ): ManualAllocation[] {
   if (items.length === 0) return [];
-  const safe = Math.max(0, Math.min(10_000, Math.round(nextBps)));
+  const safe = Number.isFinite(nextBps) ? Math.max(0, Math.min(10_000, Math.round(nextBps))) : 0;
   const others = items.filter((item) => item.key !== changedKey);
   if (others.length === 0) return [{ key: changedKey, bps: 10_000 }];
   const remaining = 10_000 - safe;
