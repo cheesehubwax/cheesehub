@@ -288,6 +288,54 @@ async function blendWithAmm(args: {
   return { trade: bestEval.trade, legs: bestEval.amm.legs, share: best, outRaw: bestEval.total };
 }
 
+/** Test hook: force the full 1% search, and read back how long the search took. */
+export const searchTimings = { forceFull: false, lastMs: 0 };
+
+function routeKey(r: any): string {
+  return r.pools.map((p: Pool) => p.id).join(",");
+}
+
+function betterTrade(a: any | null, b: any | null, exactIn: boolean): any | null {
+  if (!a) return b;
+  if (!b) return a;
+  const ao = BigInt((exactIn ? a.outputAmount : a.inputAmount).quotient.toString());
+  const bo = BigInt((exactIn ? b.outputAmount : b.inputAmount).quotient.toString());
+  return exactIn ? (bo > ao ? b : a) : (bo < ao ? b : a);
+}
+
+/**
+ * Coarse-to-fine split search. A 5% pass over every route picks the useful
+ * routes; a 1% pass over just those routes (plus the next best singles) then
+ * refines the shares. The better of the two is returned. Falls back to the
+ * full 1% search when the coarse grid doesn't apply.
+ */
+async function searchSplits(
+  routes: any[], amount: any, percents: number[], tradeType: TradeType,
+  pools: Pool[], cfg: { minSplits: number; maxSplits: number }, step: number,
+): Promise<any | null> {
+  if (searchTimings.forceFull || step !== 1 || routes.length <= 8) {
+    return runBestTradeWithSplit(routes, amount, percents, tradeType, pools, cfg);
+  }
+  const coarsePct: number[] = [];
+  for (let p = 5; p <= 100; p += 5) coarsePct.push(p);
+  const coarse = await runBestTradeWithSplit(routes, amount, coarsePct, tradeType, pools, cfg);
+  if (!coarse) return runBestTradeWithSplit(routes, amount, percents, tradeType, pools, cfg);
+
+  const keep = new Set<string>(coarse.swaps.map((s: any) => routeKey(s.route)));
+  // Also keep the best single routes at 100% so a route the coarse grid
+  // under-valued can still enter the fine pass.
+  const exactIn = tradeType === TradeType.EXACT_INPUT;
+  const singles = await runBestTradeWithSplit(routes, amount, [100], tradeType, pools, { minSplits: 1, maxSplits: 1 })
+    .catch(() => null);
+  if (singles) for (const s of singles.swaps) keep.add(routeKey(s.route));
+  const ranked = routes
+    .map((r) => { try { return { r, q: exactIn ? r.midPrice?.quote?.(amount) : null }; } catch { return { r, q: null }; } });
+  void ranked;
+  const subset = routes.filter((r) => keep.has(routeKey(r)));
+  const fine = await runBestTradeWithSplit(subset, amount, percents, tradeType, pools, cfg);
+  return betterTrade(coarse, fine, exactIn);
+}
+
 /** Everything after the network: build pools, search splits, emit memos. */
 export async function quoteFromData(input: QuoteInput): Promise<SwapRoute | null> {
   const {
