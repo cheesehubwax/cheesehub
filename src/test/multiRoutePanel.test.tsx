@@ -73,8 +73,13 @@ describe("MultiRoutePanel add-route popup", () => {
   it("renders token logo pairs inside the add-a-pool-route options", async () => {
     renderPanel();
     const trigger = screen.getByRole("combobox");
-    trigger.focus();
-    fireEvent.keyDown(trigger, { key: "Enter", code: "Enter" });
+    // Radix Select needs a realistic pointer sequence to open in jsdom
+    const pd = new Event("pointerdown", { bubbles: true, cancelable: true });
+    Object.defineProperty(pd, "pointerId", { value: 1 });
+    Object.defineProperty(pd, "button", { value: 0 });
+    Object.defineProperty(pd, "ctrlKey", { value: false });
+    trigger.dispatchEvent(pd);
+    fireEvent.click(trigger);
     await waitFor(() => {
       expect(screen.getAllByRole("option").length).toBeGreaterThan(0);
     });
