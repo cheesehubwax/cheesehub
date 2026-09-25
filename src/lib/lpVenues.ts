@@ -86,7 +86,7 @@ interface TableRowsResponse<T> {
   next_key?: string;
 }
 
-async function chainPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
+export async function chainPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
   return withFailover(resolveEndpoints('chain-api', CHAIN_ENDPOINTS), (base) =>
     fetchJson<T>(`${base}${path}`, {
       method: 'POST',
@@ -97,7 +97,7 @@ async function chainPost<T>(path: string, body: Record<string, unknown>): Promis
 }
 
 /** Read a whole contract table, following `next_key` until exhausted. */
-async function readTable<T>(
+export async function readTable<T>(
   code: string,
   scope: string,
   table: string,

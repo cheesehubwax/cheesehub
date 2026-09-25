@@ -27,6 +27,7 @@ import {
   formatSdkDiagnostics,
 } from "./alcorQuoteCore";
 import { runQuote } from "./alcorQuoteRunner";
+import { fetchAmmPoolsFor, prefetchAmmIndexes } from "./ammSwapPools";
 import { fetchTableRows } from "./waxRpcFallback";
 import { readStatCache, writeStatCache } from "./statCache";
 import { logger } from "./logger";
@@ -121,6 +122,7 @@ function readSavedPoolIndex(): RawAlcorPool[] | null {
  * first quote only has to run the search. Best-effort and silent.
  */
 export async function prefetchPairPools(tokenIn: SwapToken, tokenOut: SwapToken): Promise<void> {
+  prefetchAmmIndexes();
   try {
     const list = poolsCache?.data ?? readSavedPoolIndex() ?? (await fetchAllAlcorPools());
     const relevant = selectRelevantPools(
@@ -706,6 +708,10 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
   // current tick) always comes from the fresh list — the saved list is only
   // used to decide which pools are worth fetching ticks for.
   const freshPromise = fetchAllAlcorPools(signal);
+  // Defibox / TacoSwap pools for the same pair, read alongside Alcor's. This
+  // never throws and is time-boxed, so it can't slow or break the Alcor quote.
+  const ammPromise =
+    tradeType === "EXACT_INPUT" ? fetchAmmPoolsFor(tokenIn, tokenOut) : Promise.resolve([]);
   const earlyList = poolsCache?.data ?? readSavedPoolIndex();
   const earlyRelevant = earlyList ? selectRelevantPools(earlyList, inKey, outKey, maxHops) : [];
 
@@ -745,8 +751,11 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     ticks: (await ticksFor(p.id)) ?? ([] as RawAlcorTick[]),
   }));
 
+  const ammPools = await ammPromise;
+
   return runQuote({
     pools: tickResults,
+    ammPools,
     tokenIn,
     tokenOut,
     amount,

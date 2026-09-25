@@ -13,6 +13,15 @@ import {
 } from "@alcorexchange/alcor-swap-sdk";
 import type { SwapToken, SwapRoute, SwapSplit } from "./swapApi";
 import { logger } from "./logger";
+import {
+  type AmmPoolState,
+  type AmmAllocation,
+  allocateAcrossAmm,
+  ammMemo,
+  rawToFixed,
+  sameToken,
+  AMM_DISPLAY_FEE,
+} from "./ammQuote";
 
 // ----- Per-split slippage widening -----
 // On-chain, swap.alcor enforces `minTokenOut` per transfer. When the router
@@ -162,6 +171,126 @@ export interface QuoteInput {
   rateLimitedTickFailures: number;
   /** performance.now() when the quote started, for diagnostics. */
   started: number;
+  /** Live Defibox / TacoSwap pools pairing tokenIn and tokenOut directly. */
+  ammPools?: AmmPoolState[];
+}
+
+// ----- Cross-venue blend (Alcor + Defibox + TacoSwap), EXACT_INPUT only -----
+
+interface BlendResult {
+  /** Alcor trade for the Alcor share, or null when 100% goes to Defibox/Taco. */
+  trade: any | null;
+  legs: AmmAllocation[];
+  /** Percent of the input sent to Defibox/Taco. */
+  share: number;
+  outRaw: bigint;
+}
+
+async function blendWithAmm(args: {
+  trade: any;
+  ammPools: AmmPoolState[];
+  tokenIn: SwapToken;
+  tokenOut: SwapToken;
+  inTok: Token;
+  totalRaw: bigint;
+  routes: any[];
+  sdkPools: Pool[];
+  sdkTradeType: any;
+  finePercents: number[];
+}): Promise<BlendResult | null> {
+  const { trade, tokenIn, tokenOut, inTok, totalRaw, routes, sdkPools, sdkTradeType, finePercents } = args;
+  const cands = args.ammPools
+    .map((pool) => {
+      const inIsA = sameToken(pool.tokenA, tokenIn.ticker, tokenIn.contract);
+      const outOk = inIsA
+        ? sameToken(pool.tokenB, tokenOut.ticker, tokenOut.contract)
+        : sameToken(pool.tokenA, tokenOut.ticker, tokenOut.contract) &&
+          sameToken(pool.tokenB, tokenIn.ticker, tokenIn.contract);
+      return outOk ? { pool, inIsA } : null;
+    })
+    .filter((c): c is { pool: AmmPoolState; inIsA: boolean } => !!c);
+  if (cands.length === 0 || totalRaw <= 0n) return null;
+
+  const outDec = tokenOut.precision;
+  const toRaw = (t: any): bigint => BigInt(toRawAmount(t.outputAmount.toFixed(), outDec));
+  const baseOut = toRaw(trade);
+  const coarsePercents: number[] = [];
+  for (let p = 5; p <= 100; p += 5) coarsePercents.push(p);
+  const cfg = { minSplits: 1, maxSplits: 6 };
+
+  const alcorQuote = async (raw: bigint, percents: number[]): Promise<any | null> => {
+    if (raw <= 0n) return null;
+    try {
+      return await runBestTradeWithSplit(
+        routes,
+        CurrencyAmount.fromRawAmount(inTok, raw.toString()),
+        percents,
+        sdkTradeType,
+        sdkPools,
+        cfg,
+      );
+    } catch {
+      return null;
+    }
+  };
+
+  const scores = new Map<number, bigint>();
+  const evalShare = async (share: number): Promise<bigint> => {
+    const cached = scores.get(share);
+    if (cached !== undefined) return cached;
+    const ammIn = (totalRaw * BigInt(share)) / 100n;
+    const amm = allocateAcrossAmm(cands, ammIn);
+    let total = -1n;
+    if (ammIn === 0n || amm.legs.length > 0) {
+      const alcorIn = totalRaw - ammIn;
+      if (alcorIn === 0n) total = amm.out;
+      else {
+        const t = await alcorQuote(alcorIn, coarsePercents);
+        if (t) total = amm.out + toRaw(t);
+      }
+    }
+    scores.set(share, total);
+    return total;
+  };
+
+  // Coarse sweep, then home in on the best share to 1%.
+  let best = 0;
+  let bestScore = baseOut;
+  for (const s of [2, 5, 10, 20, 35, 50, 75, 100]) {
+    const v = await evalShare(s);
+    if (v > bestScore) {
+      bestScore = v;
+      best = s;
+    }
+  }
+  if (best === 0) return null;
+  for (const gap of [8, 4, 2, 1]) {
+    for (const s of [best - gap, best + gap]) {
+      if (s < 1 || s > 100) continue;
+      const v = await evalShare(s);
+      if (v > bestScore) {
+        bestScore = v;
+        best = s;
+      }
+    }
+  }
+
+  // Final: full 1% search for Alcor's share at the chosen split.
+  const ammIn = (totalRaw * BigInt(best)) / 100n;
+  const amm = allocateAcrossAmm(cands, ammIn);
+  if (amm.legs.length === 0) return null;
+  const alcorIn = totalRaw - ammIn;
+  let alcorTrade: any | null = null;
+  let alcorOut = 0n;
+  if (alcorIn > 0n) {
+    alcorTrade = await alcorQuote(alcorIn, finePercents);
+    if (!alcorTrade) return null;
+    alcorOut = toRaw(alcorTrade);
+  }
+  const outRaw = amm.out + alcorOut;
+  // Only use other venues when the result is strictly better than Alcor alone.
+  if (outRaw <= baseOut) return null;
+  return { trade: alcorTrade, legs: amm.legs, share: best, outRaw };
 }
 
 /** Everything after the network: build pools, search splits, emit memos. */
@@ -232,16 +361,6 @@ export async function quoteFromData(input: QuoteInput): Promise<SwapRoute | null
     { minSplits: 1, maxSplits: 6 }
   );
 
-  const diagnostics: SwapRoute["quoteDiagnostics"] = {
-    relevantPools: relevant.length,
-    poolsBuilt: sdkPools.length,
-    routesConsidered: routes.length,
-    tickFailures,
-    rateLimitedTickFailures,
-    poolsDroppedNoTicks: droppedForTicks.length,
-    tookMs: Math.round(performance.now() - started),
-  };
-
   if (!trade) {
     return null;
   }
@@ -253,12 +372,38 @@ export async function quoteFromData(input: QuoteInput): Promise<SwapRoute | null
   const exactIn = tradeType === "EXACT_INPUT";
   const opWord = exactIn ? "swapexactin" : "swapexactout";
 
+  // Try sending part of the trade through Defibox / TacoSwap. Only kept when
+  // it strictly beats Alcor alone; any failure keeps the Alcor-only quote.
+  let blend: BlendResult | null = null;
+  if (exactIn && input.ammPools && input.ammPools.length > 0) {
+    try {
+      blend = await blendWithAmm({
+        trade,
+        ammPools: input.ammPools,
+        tokenIn,
+        tokenOut,
+        inTok,
+        totalRaw: BigInt(rawAmount),
+        routes,
+        sdkPools,
+        sdkTradeType,
+        finePercents: percents,
+      });
+    } catch (e) {
+      logger.warn("[amm-router] blend failed — Alcor only", e);
+      blend = null;
+    }
+  }
+  const alcorTrade: any | null = blend ? blend.trade : trade;
+  const ammLegs = blend?.legs ?? [];
+  const alcorScale = blend ? (100 - blend.share) / 100 : 1;
+
   // Per-split shape mirrors Alcor's own parseTrade so the memo is byte-identical
   // to what wax.alcor.exchange sends today.
-  const splitCount = trade.swaps.length;
+  const splitCount = (alcorTrade?.swaps.length ?? 0) + ammLegs.length;
   const perSplitBps = splitSlipBps(bps, splitCount);
   const splitSlip = new Percent(perSplitBps, 10_000);
-  const splits: SwapSplit[] = trade.swaps.map((s: any) => {
+  const alcorSplits: SwapSplit[] = (alcorTrade?.swaps ?? []).map((s: any) => {
     const poolIds: number[] = s.route.pools.map((p: Pool) => p.id);
     const visualPath = s.route.tokenPath.map((t: Token) => ({
       id: tokenKey(t.contract, t.symbol),
@@ -267,11 +412,11 @@ export async function quoteFromData(input: QuoteInput): Promise<SwapRoute | null
       decimals: t.decimals,
     }));
     const visualFees = s.route.pools.map((p: Pool) => p.fee);
-    const maxSent = exactIn ? s.inputAmount : trade.maximumAmountIn(slip, s.inputAmount);
-    const minReceived = exactIn ? trade.minimumAmountOut(splitSlip, s.outputAmount) : s.outputAmount;
+    const maxSent = exactIn ? s.inputAmount : alcorTrade.maximumAmountIn(slip, s.inputAmount);
+    const minReceived = exactIn ? alcorTrade.minimumAmountOut(splitSlip, s.outputAmount) : s.outputAmount;
     const memo = `${opWord}#${poolIds.join(",")}#${receiver}#${minReceived.toExtendedAsset()}#0`;
     return {
-      percent: s.percent,
+      percent: s.percent * alcorScale,
       route: poolIds,
       input: s.inputAmount.toFixed(),
       output: s.outputAmount.toFixed(),
@@ -280,17 +425,95 @@ export async function quoteFromData(input: QuoteInput): Promise<SwapRoute | null
       memo,
       visualPath,
       visualFees,
+      venue: "alcor",
+      contract: "swap.alcor",
     };
   });
 
-  const aggMin = exactIn ? trade.minimumAmountOut(slip) : trade.outputAmount;
-  const aggRoute: number[] = trade.swaps[0].route.pools.map((p: Pool) => p.id);
-  const aggMemo = `${opWord}#${aggRoute.join(",")}#${receiver}#${aggMin.toExtendedAsset()}#0`;
+  const totalRawIn = BigInt(rawAmount);
+  const outTokDesc = { symbol: tokenOut.ticker, contract: tokenOut.contract, decimals: tokenOut.precision };
+  const inPathTok = {
+    id: tokenKey(tokenIn.contract, tokenIn.ticker),
+    symbol: tokenIn.ticker,
+    contract: tokenIn.contract,
+    decimals: tokenIn.precision,
+  };
+  const outPathTok = {
+    id: tokenKey(tokenOut.contract, tokenOut.ticker),
+    symbol: tokenOut.ticker,
+    contract: tokenOut.contract,
+    decimals: tokenOut.precision,
+  };
+  const ammSplits: SwapSplit[] = ammLegs.map((leg) => {
+    const minOut = (leg.amountOut * BigInt(10_000 - perSplitBps)) / 10_000n;
+    const input = rawToFixed(leg.amountIn, tokenIn.precision);
+    return {
+      percent: Number((leg.amountIn * 10_000n) / totalRawIn) / 100,
+      route: [],
+      input,
+      output: rawToFixed(leg.amountOut, tokenOut.precision),
+      minReceived: rawToFixed(minOut, tokenOut.precision),
+      maxSent: input,
+      memo: ammMemo(leg.pool, outTokDesc, minOut),
+      visualPath: [inPathTok, outPathTok],
+      visualFees: [AMM_DISPLAY_FEE],
+      venue: leg.pool.venue,
+      contract: leg.pool.contract,
+      venuePoolId: leg.pool.id,
+    };
+  });
+  // Defibox / Taco legs go first so the last (Alcor) transfer absorbs any
+  // rounding remainder when the transaction is built.
+  const splits: SwapSplit[] = [...ammSplits, ...alcorSplits];
+
+  const aggRoute: number[] = alcorTrade ? alcorTrade.swaps[0].route.pools.map((p: Pool) => p.id) : [];
+  let outputNum: number;
+  let minReceivedNum: number;
+  let aggMemo: string;
+  let priceImpact: number;
+  let executionPrice: { numerator: string; denominator: string };
+  if (blend) {
+    const minAgg = (blend.outRaw * BigInt(10_000 - bps)) / 10_000n;
+    outputNum = parseFloat(rawToFixed(blend.outRaw, tokenOut.precision));
+    minReceivedNum = parseFloat(rawToFixed(minAgg, tokenOut.precision));
+    aggMemo = alcorSplits[0]?.memo ?? ammSplits[0].memo!;
+    // Worst leg's price impact (Alcor's from the SDK, Defibox/Taco from spot).
+    const ammImpacts = ammLegs.map((leg) => {
+      const rin = Number(leg.inIsA ? leg.pool.reserveA : leg.pool.reserveB);
+      const rout = Number(leg.inIsA ? leg.pool.reserveB : leg.pool.reserveA);
+      const ideal = (Number(leg.amountIn) * rout) / rin;
+      return ideal > 0 ? Math.max(0, (1 - Number(leg.amountOut) / ideal) * 100) : 0;
+    });
+    const alcorImpact = alcorTrade ? parseFloat(alcorTrade.priceImpact.toFixed(4)) : 0;
+    priceImpact = parseFloat(Math.max(alcorImpact, ...ammImpacts).toFixed(4));
+    executionPrice = { numerator: blend.outRaw.toString(), denominator: totalRawIn.toString() };
+    logger.info(
+      `[amm-router] blended ${blend.share}% via ${ammLegs.map((l) => `${l.pool.venue}#${l.pool.id}`).join("+")}`,
+    );
+  } else {
+    const aggMin = exactIn ? trade.minimumAmountOut(slip) : trade.outputAmount;
+    aggMemo = `${opWord}#${aggRoute.join(",")}#${receiver}#${aggMin.toExtendedAsset()}#0`;
+    outputNum = parseFloat(trade.outputAmount.toFixed());
+    minReceivedNum = parseFloat(aggMin.toFixed());
+    priceImpact = parseFloat(trade.priceImpact.toFixed(4));
+    executionPrice = {
+      numerator: trade.executionPrice.numerator.toString(),
+      denominator: trade.executionPrice.denominator.toString(),
+    };
+  }
+
+  const diagnostics: SwapRoute["quoteDiagnostics"] = {
+    relevantPools: relevant.length,
+    poolsBuilt: sdkPools.length,
+    routesConsidered: routes.length,
+    tickFailures,
+    rateLimitedTickFailures,
+    poolsDroppedNoTicks: droppedForTicks.length,
+    tookMs: Math.round(performance.now() - started),
+  };
 
   // Defensive invariant: at positive slippage, minReceived must never exceed
   // output. Clamp + warn if a future SDK version ever violates this.
-  const outputNum = parseFloat(trade.outputAmount.toFixed());
-  let minReceivedNum = parseFloat(aggMin.toFixed());
   if (exactIn && minReceivedNum > outputNum) {
     logger.warn("[alcor-router] minReceived > output; clamping", {
       output: outputNum,
@@ -302,14 +525,11 @@ export async function quoteFromData(input: QuoteInput): Promise<SwapRoute | null
   const result = {
     output: outputNum,
     minReceived: minReceivedNum,
-    priceImpact: parseFloat(trade.priceImpact.toFixed(4)),
+    priceImpact,
     memo: aggMemo,
     route: aggRoute,
-    executionPrice: {
-      numerator: trade.executionPrice.numerator.toString(),
-      denominator: trade.executionPrice.denominator.toString(),
-    },
-    input: parseFloat(trade.inputAmount.toFixed()),
+    executionPrice,
+    input: blend ? parseFloat(rawToFixed(totalRawIn, tokenIn.precision)) : parseFloat(trade.inputAmount.toFixed()),
     swaps: splits,
     quoteSource: "sdk",
     quoteComplete: tickFailures === 0,

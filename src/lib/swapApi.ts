@@ -33,6 +33,12 @@ export interface SwapSplit {
   visualPath?: AlcorPoolToken[];
   /** Optional display-only pool fees aligned with `route`. */
   visualFees?: number[];
+  /** Exchange this leg trades on. Missing means Alcor. */
+  venue?: "alcor" | "defibox" | "taco";
+  /** Contract the leg's transfer goes to (swap.alcor, swap.box or swap.taco). */
+  contract?: string;
+  /** Defibox pair id or Taco pair name, for display. */
+  venuePoolId?: string;
 }
 
 export interface SwapRoute {
@@ -231,7 +237,9 @@ export function normalizeRouteActions(
   // Only used when every split carries a memo (i.e. quote came from the SDK
   // split router). Falls through to the legacy single-transfer path otherwise.
   const splits = route.swaps ?? [];
-  const allHaveMemos = splits.length > 1 && splits.every((s) => !!s.memo && !!s.input);
+  const hasOtherVenue = splits.some((s) => !!s.venue && s.venue !== "alcor");
+  const allHaveMemos =
+    (splits.length > 1 || hasOtherVenue) && splits.every((s) => !!s.memo && !!s.input);
 
   if (allHaveMemos) {
     // Preserve raw-integer sum: format each split's `input` to precision, then
@@ -252,7 +260,7 @@ export function normalizeRouteActions(
         authorization: auth,
         data: {
           from: accountName,
-          to: "swap.alcor",
+          to: split.contract ?? "swap.alcor",
           quantity: `${human} ${tokenIn.ticker}`,
           memo: split.memo!,
         },
