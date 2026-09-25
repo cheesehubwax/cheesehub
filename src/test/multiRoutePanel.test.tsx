@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { MultiRoutePanel } from "@/components/swap/MultiRoutePanel";
@@ -74,12 +75,7 @@ describe("MultiRoutePanel add-route popup", () => {
     renderPanel();
     const trigger = screen.getByRole("combobox");
     // Radix Select needs a realistic pointer sequence to open in jsdom
-    const pd = new Event("pointerdown", { bubbles: true, cancelable: true });
-    Object.defineProperty(pd, "pointerId", { value: 1 });
-    Object.defineProperty(pd, "button", { value: 0 });
-    Object.defineProperty(pd, "ctrlKey", { value: false });
-    trigger.dispatchEvent(pd);
-    fireEvent.click(trigger);
+    await userEvent.click(trigger);
     await waitFor(() => {
       expect(screen.getAllByRole("option").length).toBeGreaterThan(0);
     });
