@@ -256,7 +256,16 @@ export function MultiRoutePanelBisect({
             <span className="text-foreground font-medium">
               {Math.round(percent)}%
             </span>
-            <span>VENUE</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="cursor-help">
+              <VenueLogo venue={row.split.venue ?? "alcor"} className="h-3.5 w-3.5" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                {VENUE_NAMES[row.split.venue ?? "alcor"]}
+              </TooltipContent>
+            </Tooltip>
             {/* Start-token chip */}
             <div className="ring-1 ring-border/50 rounded-full">
               <TokenLogo contract={tokenIn.contract} symbol={tokenIn.ticker} size="sm" />
