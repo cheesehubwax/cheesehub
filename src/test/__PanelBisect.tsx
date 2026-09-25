@@ -274,7 +274,29 @@ export function MultiRoutePanelBisect({
               aria-hidden
               className="flex-1 min-w-[12px] border-t border-dashed border-foreground/60"
             />
-            {row.hopFees.map((fee, idx) => { return null; })}
+            {row.hopFees.map((fee, idx) => {
+              const a = row.chain[idx];
+              const b = row.chain[idx + 1];
+              const isLast = idx === row.hopFees.length - 1;
+              if (!a || !b) return null;
+              return (
+                 <div key={idx} className="flex min-w-0 items-center gap-1.5">
+                   <div className="flex items-center gap-1">
+                    <span>PAIR</span>
+                    <span className="text-foreground font-medium">
+                      {!row.broken ? formatFee(fee) : ""}
+                    </span>
+                  </div>
+
+                  {!isLast && (
+                    <span
+                      aria-hidden
+                      className="flex-1 min-w-[16px] border-t border-dashed border-foreground"
+                    />
+                  )}
+                </div>
+              );
+            })}
             {/* End-token chip */}
             <span
               aria-hidden
