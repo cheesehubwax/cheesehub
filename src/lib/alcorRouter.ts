@@ -336,7 +336,7 @@ function routeCoverageHubKeys(inKey: string, outKey: string): Set<string> {
  *  ≤ maxHops. Considers every active pool (matching Alcor's own router), uses
  *  forward+reverse BFS over the full graph to keep only pools that plausibly
  *  lie on some ≤maxHops path, and caps the result to protect the ticks fan-out. */
-function selectRelevantPools(
+export function selectRelevantPools(
   pools: RawAlcorPool[],
   inKey: string,
   outKey: string,
@@ -766,7 +766,9 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     new Promise<[]>((resolve) => setTimeout(() => resolve([]), graceMs)),
   ]);
 
-  return runQuote({
+  const fetchMs = Math.round(performance.now() - started);
+  const searchStarted = performance.now();
+  const quoted = await runQuote({
     pools: tickResults,
     ammPools,
     tokenIn,
@@ -783,6 +785,11 @@ export async function computeAlcorTrade(args: AlcorTradeArgs): Promise<SwapRoute
     started,
     manualAllocations,
   }, signal);
+  if (quoted?.quoteDiagnostics) {
+    quoted.quoteDiagnostics.fetchMs = fetchMs;
+    quoted.quoteDiagnostics.searchMs = Math.round(performance.now() - searchStarted);
+  }
+  return quoted;
 }
 
 // Warm the pool-list cache on module import so the first quote (or route

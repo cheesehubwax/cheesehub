@@ -169,7 +169,7 @@ export function useSwapRoute(
           ? (sdk!.output - (http?.output ?? 0)) / Math.max(http?.output ?? 1, 1e-9)
           : ((http?.input ?? 0) - (sdk!.input ?? 0)) / Math.max(http?.input ?? 1, 1e-9);
         logger.info(
-          `[alcor-router] SDK won (${sdk!.swaps.length} splits, +${(delta * 100).toFixed(4)}%, ${sdk!.quoteDiagnostics?.routesConsidered ?? "?"} routes, ${sdk!.quoteDiagnostics?.poolsBuilt ?? "?"}/${sdk!.quoteDiagnostics?.relevantPools ?? "?"} pools, ${sdk!.quoteDiagnostics?.tookMs ?? "?"}ms)`,
+          `[alcor-router] SDK won (${sdk!.swaps.length} splits, +${(delta * 100).toFixed(4)}%, ${sdk!.quoteDiagnostics?.routesConsidered ?? "?"} routes, ${sdk!.quoteDiagnostics?.poolsBuilt ?? "?"}/${sdk!.quoteDiagnostics?.relevantPools ?? "?"} pools, ${sdk!.quoteDiagnostics?.tookMs ?? "?"}ms: fetch ${sdk!.quoteDiagnostics?.fetchMs ?? "?"}ms, search ${sdk!.quoteDiagnostics?.searchMs ?? "?"}ms)`,
         );
         return { ...sdk!, quoteComplete: true };
       }
@@ -200,7 +200,9 @@ export function useSwapRoute(
     },
     retryDelay: (attemptIndex, err) => {
       const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("Rate limited")) return Math.min(5000 * 2 ** attemptIndex, 30000);
+      // Price detail falls back to chain nodes while Alcor rate-limits us, so
+      // a short wait is enough — long waits made quotes take 20+ seconds.
+      if (msg.includes("Rate limited")) return Math.min(1500 * 2 ** attemptIndex, 8000);
       return Math.min(300 * 2 ** attemptIndex, 4000);
     },
   });
