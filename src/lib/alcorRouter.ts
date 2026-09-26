@@ -336,7 +336,7 @@ function routeCoverageHubKeys(inKey: string, outKey: string): Set<string> {
  *  ≤ maxHops. Considers every active pool (matching Alcor's own router), uses
  *  forward+reverse BFS over the full graph to keep only pools that plausibly
  *  lie on some ≤maxHops path, and caps the result to protect the ticks fan-out. */
-function selectRelevantPools(
+export function selectRelevantPools(
   pools: RawAlcorPool[],
   inKey: string,
   outKey: string,
