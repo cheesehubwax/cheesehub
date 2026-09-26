@@ -81,6 +81,10 @@ export interface SwapRoute {
     ammPools?: number;
     /** Time spent weighing Defibox/Taco legs. */
     blendMs?: number;
+    /** Time spent downloading pools and price detail. */
+    fetchMs?: number;
+    /** Time spent in the route search itself. */
+    searchMs?: number;
   };
 }
 
