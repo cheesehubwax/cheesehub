@@ -9,7 +9,7 @@ describe("token logo resolution", () => {
 
     expect(isLocalLogoUrl(wax)).toBe(true);
     expect(isLocalLogoUrl(cheese)).toBe(true);
-    expect(wax).toContain("wax-token");
+    expect(wax).toContain("wax-seal");
     expect(cheese).toContain("cheese-token-logo");
   });
 

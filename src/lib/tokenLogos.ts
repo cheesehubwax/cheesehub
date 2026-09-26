@@ -5,11 +5,11 @@ const ALCOR_LOGO_BASE = 'https://wax.alcor.exchange/api/v2/tokens';
 // Bundled logos for our own tokens — always available, never rate-limited,
 // and immune to transient remote failures being cached as "missing".
 import cheeseTokenLogo from '@/assets/cheese-token-logo.png';
-import waxTokenLogo from '@/assets/wax-token.png';
+import waxSealLogo from '@/assets/wax-seal.png';
 
 const LOCAL_LOGOS: Record<string, string> = {
   'cheeseburger:cheese': cheeseTokenLogo,
-  'eosio.token:wax': waxTokenLogo,
+  'eosio.token:wax': waxSealLogo,
 };
 
 /**
