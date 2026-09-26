@@ -13,6 +13,7 @@ import {
 } from "@alcorexchange/alcor-swap-sdk";
 import type { SwapToken, SwapRoute, SwapSplit, SwapRouteCandidate } from "./swapApi";
 import { parseManualAllocations, splitRawByBps, type ManualAllocation } from "./manualSwap";
+import { fastBestTradeWithSplit } from "./fastSplitSearch";
 import { logger } from "./logger";
 import {
   type AmmPoolState,
@@ -114,6 +115,14 @@ export async function runBestTradeWithSplit(
     } catch (e) {
       logger.warn("[alcor-router] WASM router threw — falling back to JS", e);
     }
+  }
+  // Same search as the SDK, just faster; falls back to the SDK if the inputs
+  // can't be handled exactly.
+  try {
+    const fast = fastBestTradeWithSplit(routes, currencyAmount, percents, sdkTradeType, swapConfig);
+    if (fast !== undefined) return fast;
+  } catch (e) {
+    logger.warn("[alcor-router] fast split search failed — using SDK search", e);
   }
   return T.bestTradeWithSplit(routes, currencyAmount, percents, sdkTradeType, swapConfig);
 }
