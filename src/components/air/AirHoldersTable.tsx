@@ -105,6 +105,8 @@ export function AirHoldersTable() {
                       ? 'NFTs'
                       : snapshotMode === 'lp'
                         ? 'LP value (USD)'
+                        : snapshotMode === 'suffix'
+                          ? 'Weight'
                         : 'Balance'}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">
@@ -142,7 +144,7 @@ export function AirHoldersTable() {
                       </td>
                       <td className="px-3 py-1.5 text-foreground">{h.account}</td>
                       <td className="px-3 py-1.5 text-right text-muted-foreground">
-                        {snapshotMode === 'nft' || snapshotMode === 'lp'
+                        {snapshotMode === 'nft' || snapshotMode === 'lp' || snapshotMode === 'suffix'
                           ? h.raw
                           : parseFloat(h.raw).toLocaleString(undefined, {
                               maximumFractionDigits: 4,

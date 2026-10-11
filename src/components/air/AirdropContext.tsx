@@ -44,6 +44,7 @@ import {
   type InventoryCollection,
   type InventoryTemplate,
 } from '@/lib/airdropChain';
+import { getSuffixHolders } from '@/lib/airdropSuffix';
 import { getVenueLpHolders, type VenueLpPair } from '@/lib/airdropVenueLp';
 import {
   CHEESE_CONTRACT,

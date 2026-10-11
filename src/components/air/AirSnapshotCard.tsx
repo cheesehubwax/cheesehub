@@ -22,6 +22,7 @@ import {
   venuePairLabel,
   type VenueLpPair,
 } from '@/lib/airdropVenueLp';
+import { normaliseSuffix } from '@/lib/airdropSuffix';
 import { getTokenLogoUrl } from '@/lib/tokenLogos';
 import { ACCOUNT_RE, useAirdrop, type SnapshotMode } from '@/components/air/AirdropContext';
 
@@ -81,6 +82,8 @@ export function AirSnapshotCard() {
     setSnapSymbol,
     snapCollection,
     setSnapCollection,
+    snapSuffix,
+    setSnapSuffix,
     snapSchema,
     setSnapSchema,
     snapTemplate,
@@ -110,7 +113,9 @@ export function AirSnapshotCard() {
       ? !ACCOUNT_RE.test(snapContract) || !snapSymbol
       : snapshotMode === 'nft'
         ? !snapCollection
-        : !lpPair);
+        : snapshotMode === 'suffix'
+          ? !normaliseSuffix(snapSuffix)
+          : !lpPair);
 
   return (
     <Card className="border-cheese/20 bg-card/80 backdrop-blur-sm">
@@ -121,10 +126,11 @@ export function AirSnapshotCard() {
         </h2>
 
         <Tabs value={snapshotMode} onValueChange={(v) => setSnapshotMode(v as SnapshotMode)}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="token">Token</TabsTrigger>
             <TabsTrigger value="nft">NFT collection</TabsTrigger>
             <TabsTrigger value="lp">LP</TabsTrigger>
+            <TabsTrigger value="suffix">Suffix</TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -143,6 +149,24 @@ export function AirSnapshotCard() {
               placeholder="symbol"
               className="font-mono"
             />
+          </div>
+        ) : snapshotMode === 'suffix' ? (
+          <div className="mt-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-muted-foreground">.</span>
+              <Input
+                value={snapSuffix}
+                onChange={(e) => setSnapSuffix(e.target.value.trim().toLowerCase())}
+                placeholder="suffix (e.g. gm)"
+                className="font-mono"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Lists every account ending in .{normaliseSuffix(snapSuffix) ?? 'suffix'}. Only the
+              suffix owner can create these names, so the list comes from the accounts it created.
+              Each account counts once, so use Equal or Fixed. Cloud Wallet (.wam) is not
+              supported — it has millions of accounts.
+            </p>
           </div>
         ) : snapshotMode === 'nft' ? (
           <div className="mt-3 space-y-2">
@@ -265,7 +289,7 @@ export function AirSnapshotCard() {
           <>
             <p className="mt-2 text-xs text-muted-foreground">
               {snapshot.holders.length.toLocaleString()}
-              {snapshotMode === 'lp' ? ' liquidity providers' : ' holders'}
+              {snapshotMode === 'lp' ? ' liquidity providers' : snapshotMode === 'suffix' ? ' accounts' : ' holders'}
               {snapshot.truncated && ' (truncated)'} · via {snapshot.source}
               {snapshotMode === 'lp' && lpPoolsScanned !== null && (
                 <>
@@ -283,7 +307,7 @@ export function AirSnapshotCard() {
         )}
 
 
-        {snapshot && !snapshot.hasBalances && (
+        {snapshot && !snapshot.hasBalances && snapshotMode !== 'suffix' && (
           <p className="mt-1 text-xs text-destructive">
             Fallback source has no balances — pro-rata distribution is unavailable.
           </p>
