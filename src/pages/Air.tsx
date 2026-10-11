@@ -71,7 +71,7 @@ const Air = () => (
           <div className="w-full max-w-lg">
             <AirSnapshotCard />
           </div>
-          <div className="w-full max-w-xl">
+          <div className="w-full min-w-0 flex justify-center">
             <AirHoldersTable />
           </div>
           <div className="w-full max-w-lg">

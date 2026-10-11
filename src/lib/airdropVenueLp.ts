@@ -246,6 +246,7 @@ async function getAmmLpHolders(pair: VenueLpPair): Promise<LpHolderSnapshot> {
   if (pools.length === 0) throw new Error(`No pools found for ${venuePairLabel(pair)}`);
 
   const weightByAccount = new Map<string, number>();
+  const tokensByAccount = new Map<string, { a: number; b: number }>();
   let poolsScanned = 0;
   let positions = 0;
   let priced = true;
@@ -268,6 +269,12 @@ async function getAmmLpHolders(pair: VenueLpPair): Promise<LpHolderSnapshot> {
       if (!(value > 0)) continue;
       positions += 1;
       weightByAccount.set(holder.account, (weightByAccount.get(holder.account) ?? 0) + value);
+      const share = holder.shares / pool.totalShares;
+      const flip = tokenId(pool.symbolA, pool.contractA) !== tokenId(pair.symbolA, pair.contractA);
+      const amounts = tokensByAccount.get(holder.account) ?? { a: 0, b: 0 };
+      amounts.a += share * (flip ? pool.reserveB : pool.reserveA);
+      amounts.b += share * (flip ? pool.reserveA : pool.reserveB);
+      tokensByAccount.set(holder.account, amounts);
     }
   }
 
@@ -284,6 +291,10 @@ async function getAmmLpHolders(pair: VenueLpPair): Promise<LpHolderSnapshot> {
       account,
       weight,
       raw: priced ? formatUsd(weight) : `${weight.toFixed(4)} ${pair.symbolA}`,
+      lpTokens: {
+        tokenA: { symbol: pair.symbolA, amount: tokensByAccount.get(account)?.a ?? null },
+        tokenB: { symbol: pair.symbolB, amount: tokensByAccount.get(account)?.b ?? null },
+      },
     }))
     .sort((a, b) => b.weight - a.weight);
 

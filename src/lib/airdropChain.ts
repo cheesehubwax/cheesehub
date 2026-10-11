@@ -96,6 +96,11 @@ export interface Holder {
   weight: number;
   /** Formatted balance as reported (e.g. "123.4567 TOKEN") or asset count as string. */
   raw: string;
+  /** Current underlying LP token quantities, not original deposits or rewards. */
+  lpTokens?: {
+    tokenA: { symbol: string; amount: number | null };
+    tokenB: { symbol: string; amount: number | null };
+  };
 }
 
 export interface HolderSnapshot {
