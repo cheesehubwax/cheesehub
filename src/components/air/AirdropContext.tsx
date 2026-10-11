@@ -331,7 +331,8 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
   const [lpPair, setLpPair] = useState<VenueLpPair | null>(null);
   const [lpPoolsScanned, setLpPoolsScanned] = useState<number | null>(null);
   const [lpPositions, setLpPositions] = useState<number | null>(null);
-  const lpPairsQuery = useAirAlcorPairs(snapshotMode === 'lp');
+  // Prefetched as soon as CHEESEAir opens so the LP picker is ready on arrival.
+  const lpPairsQuery = useAirAlcorPairs(true);
   const lpPairs = lpPairsQuery.data ?? [];
   const [snapContract, setSnapContract] = useState('');
   const [snapSymbol, setSnapSymbol] = useState('');
@@ -1410,7 +1411,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     snapshotMode,
     setSnapshotMode,
     lpPairs,
-    lpPairsLoading: lpPairsQuery.isFetching,
+    lpPairsLoading: lpPairsQuery.isFetching && !lpPairsQuery.data?.length,
     lpPair,
     setLpPair,
     lpPoolsScanned,

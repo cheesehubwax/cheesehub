@@ -10,7 +10,7 @@ import {
   getTokenStat,
   getWalletTokens,
 } from '@/lib/airdropChain';
-import { fetchVenueLpPairs } from '@/lib/airdropVenueLp';
+import { fetchVenueLpPairs, readStoredVenueLpPairs } from '@/lib/airdropVenueLp';
 
 const ACCOUNT_RE = /^[a-z1-5.]{1,12}$/;
 
@@ -113,6 +113,9 @@ export function useAirAlcorPairs(enabled: boolean) {
     queryKey: ['air-venue-lp-pairs'],
     queryFn: fetchVenueLpPairs,
     enabled,
+    // Show this browser's last list instantly; it is refreshed in the background.
+    initialData: () => readStoredVenueLpPairs()?.data,
+    initialDataUpdatedAt: () => readStoredVenueLpPairs()?.at,
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
