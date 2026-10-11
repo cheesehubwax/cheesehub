@@ -34,6 +34,8 @@ export interface VenueLpPair {
   symbolB: string;
   contractB: string;
   tvlUSD: number;
+  /** Number of pools behind this pair (kept when the list is stored). */
+  poolCount?: number;
   /** Alcor only — fee tiers of the pools behind this pair. */
   fees?: number[];
   /** Alcor only — the underlying pair record. */
@@ -140,7 +142,22 @@ export function readStoredVenueLpPairs(): { data: VenueLpPair[]; at: number } | 
 function storeVenueLpPairs(data: VenueLpPair[], at: number) {
   try {
     if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ data, at }));
+    // Display fields only, and only pairs holding value — the full list is
+    // several megabytes, past the browser's storage limit.
+    const slim: VenueLpPair[] = data
+      .filter((p) => p.tvlUSD > 0)
+      .map((p) => ({
+        venue: p.venue,
+        key: p.key,
+        symbolA: p.symbolA,
+        contractA: p.contractA,
+        symbolB: p.symbolB,
+        contractB: p.contractB,
+        tvlUSD: p.tvlUSD,
+        poolCount: p.alcor?.poolIds.length ?? p.pools?.length ?? p.poolCount,
+        ...(p.fees ? { fees: p.fees } : {}),
+      }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ data: slim, at }));
   } catch {
     // Quota or privacy mode — the in-memory cache still works.
   }

@@ -69,7 +69,7 @@ function PairLogos({ pair }: { pair: VenueLpPair }) {
 
 /** Pools behind a pair: fee tiers on Alcor, share pools on Taco / Defibox. */
 function poolCount(pair: VenueLpPair): number {
-  return pair.alcor?.poolIds.length ?? pair.pools?.length ?? 0;
+  return pair.alcor?.poolIds.length ?? pair.pools?.length ?? pair.poolCount ?? 0;
 }
 
 export function AirSnapshotCard() {
