@@ -1,6 +1,6 @@
 # CHEESEHub roadmap
 
-- [ ] CHEESEAir: show current Token A and Token B quantities in a widened LP holder table without changing payouts.
+- [x] CHEESEAir: show current Token A and Token B quantities in a widened LP holder table without changing payouts.
 
 - [x] Update CHEESEAir subheading: "and liquidity providers" → "or liquidity providers"
 - [x] CHEESEAir: equal-split and pro-rata distribution modes for NFT drops
