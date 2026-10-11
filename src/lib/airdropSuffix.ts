@@ -32,6 +32,9 @@ export function suffixAccountsFromActions(actions: HyperionActionRecord[], suffi
 export async function getSuffixHolders(input: string): Promise<HolderSnapshot> {
   const suffix = normaliseSuffix(input);
   if (!suffix) throw new Error('Enter a valid account suffix (e.g. gm)');
+  if (suffix === 'wam' || suffix.endsWith('.wam')) {
+    throw new Error('Cloud Wallet (.wam) accounts are not supported — there are millions of them');
+  }
   const { actions } = await fetchActionsUnion(
     `account=${suffix}&filter=eosio:newaccount&act.authorization.actor=${suffix}`,
     { timeoutMs: 30000 },
