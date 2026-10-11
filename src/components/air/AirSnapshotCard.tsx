@@ -164,7 +164,7 @@ export function AirSnapshotCard() {
             <p className="text-xs text-muted-foreground">
               Lists every account ending in .{normaliseSuffix(snapSuffix) ?? 'suffix'}. Only the
               suffix owner can create these names, so the list comes from the accounts it created.
-              Each account counts once, so use Equal or Fixed. Cloud Wallet (.wam) is not
+              Each account counts once, so use Equal or Fixed. Large suffixes can take up to a minute. Cloud Wallet (.wam) is not
               supported — it has millions of accounts.
             </p>
           </div>
