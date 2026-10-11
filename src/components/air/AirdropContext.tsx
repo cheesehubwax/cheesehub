@@ -44,6 +44,7 @@ import {
   type InventoryCollection,
   type InventoryTemplate,
 } from '@/lib/airdropChain';
+import { getSuffixHolders } from '@/lib/airdropSuffix';
 import { getVenueLpHolders, type VenueLpPair } from '@/lib/airdropVenueLp';
 import {
   CHEESE_CONTRACT,
@@ -92,7 +93,7 @@ import {
 import { venueLabel, venuePairLabel } from '@/lib/airdropVenueLp';
 
 /** Where the recipient list comes from. */
-export type SnapshotMode = 'token' | 'nft' | 'lp';
+export type SnapshotMode = 'token' | 'nft' | 'lp' | 'suffix';
 
 export const ACCOUNT_RE = /^[a-z1-5.]{1,12}$/;
 /** RAM bytes a fresh token balance row costs the sender. */
@@ -197,6 +198,8 @@ interface AirdropContextValue {
   setSnapSymbol: (value: string) => void;
   snapCollection: string;
   setSnapCollection: (value: string) => void;
+  snapSuffix: string;
+  setSnapSuffix: (value: string) => void;
   snapSchema: string;
   setSnapSchema: (value: string) => void;
   snapTemplate: string;
@@ -333,6 +336,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
   const [snapContract, setSnapContract] = useState('');
   const [snapSymbol, setSnapSymbol] = useState('');
   const [snapCollection, setSnapCollection] = useState('');
+  const [snapSuffix, setSnapSuffix] = useState('');
   const [snapSchema, setSnapSchema] = useState('');
   const [snapTemplate, setSnapTemplate] = useState('');
   const [snapshot, setSnapshot] = useState<HolderSnapshot | null>(null);
@@ -398,6 +402,8 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
         setLpPoolsScanned(lpSnap.poolsScanned);
         setLpPositions(lpSnap.positions);
         snap = lpSnap;
+      } else if (snapshotMode === 'suffix') {
+        snap = await getSuffixHolders(snapSuffix);
       } else {
         snap =
         snapshotMode === 'token'
@@ -441,6 +447,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     snapCollection,
     snapSchema,
     snapTemplate,
+    snapSuffix,
     lpPair,
     actor,
     sendContract,
@@ -1268,7 +1275,9 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     const what =
       snapshotMode === 'token'
         ? `token ${snapSymbol.toUpperCase()}@${snapContract}`
-        : snapshotMode === 'nft'
+        : snapshotMode === 'suffix'
+          ? `accounts ending in .${snapSuffix.replace(/^\.+/, '')}`
+          : snapshotMode === 'nft'
           ? `NFT collection ${snapCollection}${snapSchema ? ` / schema ${snapSchema}` : ''}${snapTemplate ? ` / template ${snapTemplate}` : ''}`
           : lpPair
             ? `${venueLabel(lpPair.venue)} LP ${venuePairLabel(lpPair)}`
@@ -1290,6 +1299,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     snapCollection,
     snapSchema,
     snapTemplate,
+    snapSuffix,
     lpPair,
     snapshotAt,
     sortedHolders,
@@ -1411,6 +1421,8 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     setSnapSymbol,
     snapCollection,
     setSnapCollection,
+    snapSuffix,
+    setSnapSuffix,
     snapSchema,
     setSnapSchema,
     snapTemplate,
