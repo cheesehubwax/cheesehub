@@ -34,6 +34,8 @@ export interface VenueLpPair {
   symbolB: string;
   contractB: string;
   tvlUSD: number;
+  /** Number of pools behind this pair (kept when the list is stored). */
+  poolCount?: number;
   /** Alcor only — fee tiers of the pools behind this pair. */
   fees?: number[];
   /** Alcor only — the underlying pair record. */
@@ -112,18 +114,62 @@ function alcorAsVenuePairs(pairs: AlcorPair[]): VenueLpPair[] {
 }
 
 let pairsCache: { data: VenueLpPair[]; at: number } | null = null;
+let inflight: Promise<VenueLpPair[]> | null = null;
+
+const STORAGE_KEY = 'cheeseair-venue-lp-pairs-v1';
+/** Stored lists older than this are not shown at all. */
+const STORAGE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
- * Every pair CHEESEAir can snapshot, across all three venues, sorted by TVL.
- * A venue that fails to answer is simply left out rather than failing the whole
- * picker — Alcor alone still gives a usable list.
+ * The last pair list this browser loaded, for an instant picker while a fresh
+ * list downloads. Only used for display — snapshots always re-resolve the pair
+ * against a fresh list (see `getVenueLpHolders`).
  */
-export async function fetchVenueLpPairs(): Promise<VenueLpPair[]> {
-  if (pairsCache && Date.now() - pairsCache.at < PAIRS_TTL_MS) return pairsCache.data;
+export function readStoredVenueLpPairs(): { data: VenueLpPair[]; at: number } | null {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { data?: VenueLpPair[]; at?: number };
+    if (!Array.isArray(parsed.data) || typeof parsed.at !== 'number') return null;
+    if (Date.now() - parsed.at > STORAGE_MAX_AGE_MS || parsed.data.length === 0) return null;
+    return { data: parsed.data, at: parsed.at };
+  } catch {
+    return null;
+  }
+}
 
-  const [alcorResult, pricesResult] = await Promise.allSettled([
+function storeVenueLpPairs(data: VenueLpPair[], at: number) {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    // Display fields only, and only pairs holding at least $1 — the full list is
+    // several megabytes, past the browser's storage limit.
+    const slim: VenueLpPair[] = data
+      .filter((p) => p.tvlUSD >= 1)
+      .map((p) => ({
+        venue: p.venue,
+        key: p.key,
+        symbolA: p.symbolA,
+        contractA: p.contractA,
+        symbolB: p.symbolB,
+        contractB: p.contractB,
+        tvlUSD: p.tvlUSD,
+        poolCount: p.alcor?.poolIds.length ?? p.pools?.length ?? p.poolCount,
+        ...(p.fees ? { fees: p.fees } : {}),
+      }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ data: slim, at }));
+  } catch {
+    // Quota or privacy mode — the in-memory cache still works.
+  }
+}
+
+async function loadVenueLpPairs(): Promise<VenueLpPair[]> {
+  // Every venue and the price table download at the same time.
+  const [alcorResult, pricesResult, tacoResult, defiboxResult] = await Promise.allSettled([
     fetchAlcorPairs(),
     fetchUsdPrices(),
+    fetchAllAmmPools('taco'),
+    fetchAllAmmPools('defibox'),
   ]);
 
   const out: VenueLpPair[] = [];
@@ -131,11 +177,7 @@ export async function fetchVenueLpPairs(): Promise<VenueLpPair[]> {
 
   if (pricesResult.status === 'fulfilled') {
     const prices = pricesResult.value;
-    const amm = await Promise.allSettled([
-      fetchAllAmmPools('taco'),
-      fetchAllAmmPools('defibox'),
-    ]);
-    for (const result of amm) {
+    for (const result of [tacoResult, defiboxResult]) {
       if (result.status !== 'fulfilled') continue;
       out.push(...ammPairs(result.value, prices));
     }
@@ -144,8 +186,25 @@ export async function fetchVenueLpPairs(): Promise<VenueLpPair[]> {
   if (out.length === 0) throw new Error('No liquidity venues answered — try again shortly');
 
   const sorted = out.sort((x, y) => y.tvlUSD - x.tvlUSD);
-  pairsCache = { data: sorted, at: Date.now() };
+  const at = Date.now();
+  pairsCache = { data: sorted, at };
+  storeVenueLpPairs(sorted, at);
   return sorted;
+}
+
+/**
+ * Every pair CHEESEAir can snapshot, across all three venues, sorted by TVL.
+ * A venue that fails to answer is simply left out rather than failing the whole
+ * picker — Alcor alone still gives a usable list.
+ */
+export async function fetchVenueLpPairs(): Promise<VenueLpPair[]> {
+  if (pairsCache && Date.now() - pairsCache.at < PAIRS_TTL_MS) return pairsCache.data;
+  if (!inflight) {
+    inflight = loadVenueLpPairs().finally(() => {
+      inflight = null;
+    });
+  }
+  return inflight;
 }
 
 /** "CHEESE / WAX" — the venue is shown separately as a badge. */
@@ -243,7 +302,12 @@ async function getAmmLpHolders(pair: VenueLpPair): Promise<LpHolderSnapshot> {
 }
 
 /** Providers of one pair on whichever venue it belongs to. */
-export async function getVenueLpHolders(pair: VenueLpPair): Promise<LpHolderSnapshot> {
+export async function getVenueLpHolders(picked: VenueLpPair): Promise<LpHolderSnapshot> {
+  // The picker may be showing a stored list; weights must use fresh reserves,
+  // share supplies and pool ids, so look the pair up in a fresh list first.
+  const fresh = await fetchVenueLpPairs();
+  const pair = fresh.find((p) => p.key === picked.key);
+  if (!pair) throw new Error(`${venuePairLabel(picked)} is no longer listed on ${venueLabel(picked.venue)}`);
   if (pair.venue === 'alcor') {
     if (!pair.alcor) throw new Error('Alcor pair details missing — reload the pair list');
     return getAlcorLpHolders(pair.alcor);
