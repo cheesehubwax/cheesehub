@@ -21,6 +21,8 @@ export interface AlcorPair {
   poolIds: number[];
   /** Fee tiers (in hundredths of a bip) aligned with `poolIds`. */
   fees: number[];
+  /** Original A-side token identity per pool, before pair normalization. */
+  poolTokenA?: Record<number, string>;
   tvlUSD: number;
 }
 
@@ -52,6 +54,8 @@ interface RawPosition {
   totalValue?: number;
   /** USD value originally deposited; only a fallback, it drifts badly. */
   depositedUSDTotal?: number;
+  amountA?: string | number;
+  amountB?: string | number;
 }
 
 async function fetchAlcorJson<T>(path: string): Promise<T> {
@@ -102,6 +106,7 @@ export async function fetchAlcorPairs(): Promise<AlcorPair[]> {
     if (existing) {
       existing.poolIds.push(pool.id);
       existing.fees.push(Number(pool.fee ?? 0));
+      existing.poolTokenA = { ...existing.poolTokenA, [pool.id]: tokenId(a) };
       existing.tvlUSD += Number(pool.tvlUSD ?? 0);
       continue;
     }
@@ -113,6 +118,7 @@ export async function fetchAlcorPairs(): Promise<AlcorPair[]> {
       contractB: second.contract ?? '',
       poolIds: [pool.id],
       fees: [Number(pool.fee ?? 0)],
+      poolTokenA: { [pool.id]: tokenId(a) },
       tvlUSD: Number(pool.tvlUSD ?? 0),
     });
   }
@@ -149,6 +155,27 @@ function formatUsd(value: number): string {
   return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function positionAmount(value: string | number | undefined): number | null {
+  if (value === undefined || (typeof value === 'string' && !value.trim())) return null;
+  const amount = typeof value === 'number' ? value : Number(value.trim().split(/\s+/)[0]);
+  return Number.isFinite(amount) && amount >= 0 ? amount : null;
+}
+
+function positionTokenAmounts(pos: RawPosition, pair: AlcorPair, poolId: number) {
+  const poolFirst = pair.poolTokenA?.[poolId];
+  const assetSymbolA = typeof pos.amountA === 'string' ? pos.amountA.trim().split(/\s+/)[1] : undefined;
+  const firstIsA = poolFirst !== undefined
+    ? poolFirst === tokenId({ symbol: pair.symbolA, contract: pair.contractA })
+    : pair.symbolA !== pair.symbolB && assetSymbolA
+      ? assetSymbolA.toUpperCase() === pair.symbolA.toUpperCase()
+      : null;
+  if (firstIsA === null) return { a: null, b: null };
+  return {
+    a: positionAmount(firstIsA ? pos.amountA : pos.amountB),
+    b: positionAmount(firstIsA ? pos.amountB : pos.amountA),
+  };
+}
+
 /**
  * Liquidity providers of every fee tier of one pair, weighted by the *current*
  * USD value of their open positions — the same figure Alcor's own UI shows.
@@ -174,9 +201,10 @@ export async function getAlcorLpHolders(pair: AlcorPair): Promise<LpHolderSnapsh
   }
 
   const usdByAccount = new Map<string, number>();
+  const tokensByAccount = new Map<string, { a: number | null; b: number | null }>();
   let positions = 0;
 
-  for (const result of results) {
+  for (const [index, result] of results.entries()) {
     if (result.status !== 'fulfilled') continue;
     for (const pos of result.value) {
       const account = pos.owner ?? '';
@@ -187,11 +215,23 @@ export async function getAlcorLpHolders(pair: AlcorPair): Promise<LpHolderSnapsh
       if (!(usd > 0)) continue;
       positions += 1;
       usdByAccount.set(account, (usdByAccount.get(account) ?? 0) + usd);
+      const amounts = positionTokenAmounts(pos, pair, pair.poolIds[index]);
+      const total = tokensByAccount.get(account) ?? { a: 0, b: 0 };
+      tokensByAccount.set(account, {
+        a: total.a === null || amounts.a === null ? null : total.a + amounts.a,
+        b: total.b === null || amounts.b === null ? null : total.b + amounts.b,
+      });
     }
   }
 
   const holders: Holder[] = [...usdByAccount.entries()]
-    .map(([account, usd]) => ({ account, weight: usd, raw: formatUsd(usd) }))
+    .map(([account, usd]) => ({
+      account, weight: usd, raw: formatUsd(usd),
+      lpTokens: {
+        tokenA: { symbol: pair.symbolA, amount: tokensByAccount.get(account)?.a ?? null },
+        tokenB: { symbol: pair.symbolB, amount: tokensByAccount.get(account)?.b ?? null },
+      },
+    }))
     .sort((a, b) => b.weight - a.weight);
 
   if (holders.length === 0) {
