@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type Context,
   type ReactNode,
 } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -265,7 +266,11 @@ interface AirdropContextValue {
   downloadResultsCsv: () => void;
 }
 
-const AirdropContext = createContext<AirdropContextValue | null>(null);
+// Keep mounted providers and refreshed consumers on the same context identity.
+// Fast Refresh can reload this module while preserving the existing page tree.
+const AirdropContext: Context<AirdropContextValue | null> =
+  import.meta.hot?.data.airdropContext ?? createContext<AirdropContextValue | null>(null);
+if (import.meta.hot) import.meta.hot.data.airdropContext = AirdropContext;
 
 export function useAirdrop(): AirdropContextValue {
   const ctx = useContext(AirdropContext);

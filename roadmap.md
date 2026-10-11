@@ -1,5 +1,7 @@
 # CHEESEHub roadmap
 
+- [ ] Prevent CHEESEAir context mismatch during preview updates and verify fresh loading and hot refresh.
+
 - [x] CHEESEAir: show current Token A and Token B quantities in a widened LP holder table without changing payouts.
 
 - [x] Update CHEESEAir subheading: "and liquidity providers" → "or liquidity providers"
