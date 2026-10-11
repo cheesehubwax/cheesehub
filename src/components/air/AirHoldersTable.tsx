@@ -41,7 +41,7 @@ export function AirHoldersTable() {
   );
 
   return (
-    <Card className="border-cheese/20 bg-card/80 backdrop-blur-sm">
+    <Card className={cn('w-full min-w-0 border-cheese/20 bg-card/80 backdrop-blur-sm', snapshotMode === 'lp' ? 'max-w-5xl' : 'max-w-xl')}>
       <CardContent className="p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
@@ -94,12 +94,18 @@ export function AirHoldersTable() {
 
 
         {snapshot ? (
-          <div className="max-h-[420px] overflow-y-auto rounded-md border border-border">
-            <table className="w-full text-left text-sm">
+          <div className="max-h-[420px] overflow-auto rounded-md border border-border">
+            <table className={cn('w-full text-left text-sm', snapshotMode === 'lp' && 'min-w-[800px] whitespace-nowrap')}>
               <thead className="sticky top-0 bg-secondary">
                 <tr>
                   <th className="px-3 py-2 text-xs font-medium text-muted-foreground">#</th>
                   <th className="px-3 py-2 text-xs font-medium text-muted-foreground">Account</th>
+                  {snapshotMode === 'lp' && (
+                    <>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Token A</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">Token B</th>
+                    </>
+                  )}
                   <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">
                     {snapshotMode === 'nft'
                       ? 'NFTs'
@@ -143,6 +149,19 @@ export function AirHoldersTable() {
                         </div>
                       </td>
                       <td className="px-3 py-1.5 text-foreground">{h.account}</td>
+                      {snapshotMode === 'lp' && (['tokenA', 'tokenB'] as const).map((key) => {
+                        const token = h.lpTokens?.[key];
+                        return (
+                          <td key={key} className="px-3 py-1.5 text-right text-muted-foreground">
+                            {token && token.amount !== null ? (
+                              <>
+                                {token.amount.toLocaleString('en-US', { maximumFractionDigits: 8 })}
+                                <span className="ml-1 text-xs">{token.symbol}</span>
+                              </>
+                            ) : '—'}
+                          </td>
+                        );
+                      })}
                       <td className="px-3 py-1.5 text-right text-muted-foreground">
                         {snapshotMode === 'nft' || snapshotMode === 'lp' || snapshotMode === 'suffix'
                           ? h.raw
