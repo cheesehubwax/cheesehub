@@ -142,10 +142,10 @@ export function readStoredVenueLpPairs(): { data: VenueLpPair[]; at: number } | 
 function storeVenueLpPairs(data: VenueLpPair[], at: number) {
   try {
     if (typeof localStorage === 'undefined') return;
-    // Display fields only, and only pairs holding value — the full list is
+    // Display fields only, and only pairs holding at least $1 — the full list is
     // several megabytes, past the browser's storage limit.
     const slim: VenueLpPair[] = data
-      .filter((p) => p.tvlUSD > 0)
+      .filter((p) => p.tvlUSD >= 1)
       .map((p) => ({
         venue: p.venue,
         key: p.key,
