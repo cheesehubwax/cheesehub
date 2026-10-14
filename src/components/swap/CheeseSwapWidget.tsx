@@ -257,25 +257,28 @@ export function CheeseSwapWidget({
           }
         );
       };
-      if (tokenIn && tokenOut) {
-        const inTok = tokenIn;
-        const outTok = tokenOut;
-        Promise.allSettled([
-          fetchSingleTokenBalance(accountName, inTok.contract, inTok.ticker),
-          fetchSingleTokenBalance(accountName, outTok.contract, outTok.ticker),
-        ]).then((results) => {
-          if (results[0].status === "fulfilled") patchToken(inTok, results[0].value);
-          if (results[1].status === "fulfilled") patchToken(outTok, results[1].value);
+      // Every swap refreshes BOTH the sent and received token. Hyperion lags
+      // behind the chain, so each pass refetches the shared list first and then
+      // overlays authoritative chain reads for both tokens — a stale Hyperion
+      // response can never overwrite the fresh received balance.
+      const inTok = tokenIn;
+      const outTok = tokenOut;
+      const refreshBalances = async () => {
+        await queryClient
+          .refetchQueries({ queryKey: balancesKey, exact: true })
+          .catch(() => undefined);
+        const pair = outTok ? [inTok, outTok] : [inTok];
+        const results = await Promise.allSettled(
+          pair.map((t) => fetchSingleTokenBalance(accountName, t.contract, t.ticker))
+        );
+        results.forEach((r, i) => {
+          if (r.status === "fulfilled") patchToken(pair[i], r.value);
         });
-      }
-      const refreshBalances = () => {
-        queryClient.invalidateQueries({ queryKey: ["all-token-balances", accountName] });
-        queryClient.invalidateQueries({ queryKey: ["swap-token-balance-fallback"] });
+        queryClient.invalidateQueries({ queryKey: ["swap-token-balance-fallback", accountName] });
       };
-      refreshBalances();
-      setTimeout(refreshBalances, 1500);
-      setTimeout(refreshBalances, 4000);
-      setTimeout(refreshBalances, 8000);
+      void refreshBalances();
+      [1500, 4000, 8000, 15000].forEach((ms) => setTimeout(() => void refreshBalances(), ms));
+
 
     } catch (e: any) {
       const msg = e?.message || "Swap failed";
