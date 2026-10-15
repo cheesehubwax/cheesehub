@@ -8,22 +8,26 @@ import type { ProviderCursor, ScanWindow, StoredFolio } from './storage';
 import type { RawTransfer } from './types';
 import { mapLimit } from '../chainRequest';
 import { waxRpcCall } from '../waxRpcFallback';
+import { applyAlcorDeals, fetchAlcorDeals, fetchAlcorMarkets } from './alcorDeals';
 
 const PAGE = 1000;
 /** Providers read in parallel for the union. */
 const PROVIDERS = 3;
 const PAGE_TIMEOUT_MS = 15_000;
 const PROBE_TIMEOUT_MS = 6_000;
+/** One transaction lookup; slow hosts are skipped rather than waited on. */
+const TX_TIMEOUT_MS = 5_000;
+const TX_PROBE_TIMEOUT_MS = 4_000;
 /** Date windows read in parallel when a provider is read from the start. */
 const BACKFILL_WINDOWS = 8;
 /** Order-book fill lookups in flight per provider. */
-const FILL_CONCURRENCY = 8;
+const FILL_CONCURRENCY = 12;
 /**
  * Extra history services tried alongside the shared list. Each one is probed
  * from this browser first, so a host that is down or blocked here is skipped
  * in seconds instead of stalling the scan.
  */
-const FOLIO_HYPERION_EXTRA = ['https://wax.eosdac.io', 'https://wax.eosusa.io', 'https://wax.eosphere.io', 'https://api.waxsweden.org'];
+const FOLIO_HYPERION_EXTRA = ['https://wax.eosdac.io', 'https://wax-history.eosdac.io', 'https://wax.eosusa.io', 'https://wax.eosphere.io', 'https://api.waxsweden.org'];
 
 export interface ProbeResult {
   base: string;
@@ -159,13 +163,14 @@ export function fillGaveFromActions(actions: HyperionActionRecord[], account: st
   return null;
 }
 
-async function fetchTx(base: string, trx: string): Promise<HyperionActionRecord[] | null> {
+async function fetchTx(base: string, trx: string, timeoutMs = TX_TIMEOUT_MS): Promise<HyperionActionRecord[] | null> {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), PAGE_TIMEOUT_MS);
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetch(`${base.replace(/\/$/, '')}/v2/history/get_transaction?id=${trx}`, { signal: ctrl.signal });
     if (!res.ok) return null;
-    return ((await res.json()) as { actions?: HyperionActionRecord[] }).actions ?? [];
+    const actions = ((await res.json()) as { actions?: HyperionActionRecord[] }).actions;
+    return Array.isArray(actions) && actions.length ? actions : null;
   } catch {
     return null;
   } finally {
@@ -173,13 +178,41 @@ async function fetchTx(base: string, trx: string): Promise<HyperionActionRecord[
   }
 }
 
+/** Keeps only providers that answer one real transaction lookup quickly. */
+export async function probeTxProviders(
+  bases: string[],
+  trx: string,
+  fetcher: (base: string, trx: string, timeoutMs: number) => Promise<unknown[] | null> = fetchTx,
+): Promise<string[]> {
+  const ok = await Promise.all(bases.map(async (b) => ((await fetcher(b, trx, TX_PROBE_TIMEOUT_MS)) ? b : null)));
+  return ok.filter((b): b is string => !!b);
+}
+
+export interface TxProvider {
+  base: string;
+  /** Oldest transfer this provider holds for the account (epoch ms). */
+  earliestTs: number | null;
+  /** Lookups in flight at once on this provider. */
+  slots: number;
+}
+
 /**
- * Looks up every unchecked order-book fill, spreading the transactions over
- * all working providers at once. A lookup that fails on one provider is
- * retried on the next; anything still unchecked is retried on the next sync.
+ * Providers that can hold a transaction at `ts`, fastest first. A provider
+ * whose history starts later than the fill is skipped instead of asked.
+ */
+export function txProvidersFor(ts: number, providers: TxProvider[]): TxProvider[] {
+  return providers.filter((p) => p.earliestTs != null && p.earliestTs <= ts + 60_000);
+}
+
+/**
+ * Looks up every order-book fill not yet checked. Each fill goes to the
+ * fastest provider whose history reaches back to it, with a cap on lookups
+ * in flight per provider, so a slow full-history host only gets the old
+ * fills nobody else has. A lookup that fails moves on to the next provider;
+ * anything still unchecked is retried on the next sync.
  */
 async function enrichFills(
-  bases: string[],
+  providers: TxProvider[],
   account: string,
   transfers: RawTransfer[],
   onProgress: (done: number, total: number) => void,
@@ -187,25 +220,68 @@ async function enrichFills(
 ) {
   const byTrx = new Map<string, RawTransfer[]>();
   for (const t of transfers) if (isFill(t, account) && !t.fillChecked) byTrx.set(t.trx, [...(byTrx.get(t.trx) ?? []), t]);
-  const jobs = [...byTrx.entries()];
+  const jobs = [...byTrx.entries()].sort((x, y) => y[1][0].ts - x[1][0].ts);
   const total = jobs.length;
-  if (!total || !bases.length) return;
-  let done = 0;
+  if (!total || !providers.length) return;
   onProgress(0, total);
-  await mapLimit(jobs.map((j, i) => [j, i] as const), FILL_CONCURRENCY * bases.length, async ([[trx, list], i]) => {
-    for (let k = 0; k < bases.length; k++) {
-      if (signal?.aborted) return;
-      const actions = await fetchTx(bases[(i + k) % bases.length], trx);
-      if (!actions) continue;
-      for (const t of list) {
-        t.fillGave = fillGaveFromActions(actions, account, t);
-        t.fillChecked = true;
+  // Probe with the newest fill so providers holding only recent history pass.
+  const passed = new Set(await probeTxProviders(providers.map((p) => p.base), jobs[0][0]));
+  const working = providers.filter((p) => passed.has(p.base));
+  if (!working.length || signal?.aborted) return;
+  const busy = new Map(working.map((p) => [p.base, 0]));
+  const waiters: (() => void)[] = [];
+  const release = (base: string) => {
+    busy.set(base, (busy.get(base) ?? 1) - 1);
+    waiters.splice(0).forEach((w) => w());
+  };
+  /** Waits for a free slot on the first provider in `order` that has one. */
+  const acquire = async (order: TxProvider[]): Promise<TxProvider | null> => {
+    for (;;) {
+      if (signal?.aborted) return null;
+      const free = order.find((p) => (busy.get(p.base) ?? 0) < p.slots);
+      if (free) {
+        busy.set(free.base, (busy.get(free.base) ?? 0) + 1);
+        return free;
       }
-      break;
+      await new Promise<void>((r) => waiters.push(r));
     }
-    done++;
+  };
+  let done = 0;
+  const totalSlots = working.reduce((s, p) => s + p.slots, 0);
+  // Busy full-history hosts sometimes refuse a burst; a short second and
+  // third pass over what is left recovers those without a new sync.
+  let remaining = jobs;
+  for (let pass = 0; pass < 3 && remaining.length && !signal?.aborted; pass++) {
+    if (pass) await new Promise((r) => setTimeout(r, 1500 * pass));
+    await runPass(remaining, pass > 0);
+    remaining = remaining.filter(([, list]) => !list[0].fillChecked);
+  }
+  async function runPass(batch: typeof jobs, retry: boolean) {
+  await mapLimit(batch, retry ? Math.max(4, Math.floor(totalSlots / 3)) : totalSlots, async ([trx, list]) => {
+    let order = txProvidersFor(list[0].ts, working);
+    while (order.length && !signal?.aborted) {
+      const p = await acquire(order);
+      if (!p) break;
+      let actions: HyperionActionRecord[] | null = null;
+      try {
+        actions = await fetchTx(p.base, trx);
+      } finally {
+        release(p.base);
+      }
+      if (actions) {
+        for (const t of list) {
+          t.fillGave = fillGaveFromActions(actions, account, t);
+          t.fillChecked = true;
+        }
+        break;
+      }
+      order = order.filter((x) => x !== p);
+    }
+    if (!retry) done++;
     if (done % 10 === 0 || done === total) onProgress(done, total);
   });
+  }
+  onProgress(done, total);
 }
 
 export interface ScanProgress {
@@ -248,6 +324,10 @@ export async function syncFolio(
   let reachedTs = rec.transfers.length ? Math.max(...rec.transfers.map((t) => t.ts)) : null;
   let done = 0;
   let ok = 0;
+
+  // Alcor's deal list explains most order-book fills in one request; start it
+  // now so it downloads while history is read.
+  const dealsP = Promise.all([fetchAlcorDeals(rec.account, signal), fetchAlcorMarkets(signal)]).catch(() => [null, null] as const);
 
   const earliestOf = new Map(probes.map((p) => [p.base, p.earliestTs]));
 
@@ -344,7 +424,12 @@ export async function syncFolio(
   rec.transfers.sort((a, b) => a.gs - b.gs);
   // Order-book fills need their match record to know what was given.
   if (ok > 0) {
-    await enrichFills(endpoints, rec.account, rec.transfers, (fd, ft) => {
+    const [deals, markets] = await dealsP;
+    if (deals && markets) applyAlcorDeals(rec.transfers, deals, markets, rec.account, (t) => isFill(t, rec.account));
+    const txProviders = [...probes]
+      .sort((x, y) => x.ms - y.ms)
+      .map((p) => ({ base: p.base, earliestTs: p.earliestTs, slots: FILL_CONCURRENCY }));
+    await enrichFills(txProviders, rec.account, rec.transfers, (fd, ft) => {
       void onPage(rec, { transfers: rec.transfers.length, reachedTs, providersDone: done, providers: endpoints.length, phase: 'fills', fillsDone: fd, fillsTotal: ft });
     }, signal);
   }

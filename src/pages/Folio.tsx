@@ -154,7 +154,7 @@ const Folio = () => {
                   {!p || p.phase === 'probing'
                     ? 'Finding history services that answer from your browser…'
                     : p.phase === 'fills'
-                      ? `Reading order-book fills ${(p.fillsDone ?? 0).toLocaleString()} / ${(p.fillsTotal ?? 0).toLocaleString()}`
+                      ? `Matching order-book fills ${(p.fillsDone ?? 0).toLocaleString()} / ${(p.fillsTotal ?? 0).toLocaleString()}`
                       : `${p.transfers.toLocaleString()} transfers found${p.reachedTs ? ` · reached ${new Date(p.reachedTs).toISOString().slice(0, 10)}` : ''} · ${p.providersDone}/${p.providers} services finished`}
                   {' · '}You can stop or leave — progress is saved and continues next time.
                 </div>
