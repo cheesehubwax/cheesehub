@@ -1,0 +1,55 @@
+.folio-holdings {
+  width: 100%;
+  table-layout: fixed;
+  font-size: 0.75rem;
+}
+
+.folio-holdings th,
+.folio-holdings td {
+  padding: 0.625rem 0.5rem;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+
+.folio-holdings th:first-child {
+  width: 20%;
+}
+
+.folio-holdings th:nth-child(2) {
+  width: 15%;
+}
+
+@media (max-width: 1023px) {
+  .folio-holdings,
+  .folio-holdings tbody {
+    display: block;
+  }
+
+  .folio-holdings thead {
+    display: none;
+  }
+
+  .folio-holdings tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 0.5rem;
+  }
+
+  .folio-holdings td {
+    min-width: 0;
+    text-align: left;
+  }
+
+  .folio-holdings td:first-child,
+  .folio-holdings td[colspan] {
+    grid-column: 1 / -1;
+  }
+
+  .folio-holdings td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 0.25rem;
+    color: hsl(var(--muted-foreground));
+    font-size: 0.6875rem;
+  }
+}

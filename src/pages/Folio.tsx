@@ -131,7 +131,7 @@ const Folio = () => {
         </div>
       </section>
 
-      <div className="container pb-12 flex flex-col items-center gap-6 max-w-6xl">
+      <div className="container pb-12 flex flex-col items-center gap-6 max-w-screen-2xl [&>*]:min-w-0">
         {!isConnected || !accountName ? (
           <div className="rounded-lg border border-cheese/20 bg-card/80 p-8 text-center space-y-4">
             <p className="text-muted-foreground">Connect your wallet to see your portfolio. CHEESEFolio only shows the account you're signed in with.</p>
@@ -240,7 +240,7 @@ const Folio = () => {
                   Couldn't read your {pooled.failed.map((v) => venueName[v] ?? v).join(' and ')} pool positions right now, so tokens there are left out. Refresh to try again.
                 </div>
               ) : null}
-              <HoldingsTable rows={holdings} waxUsd={waxUsd} cur={cur} realisable={realisable} onPick={setPicked} />
+              <HoldingsTable rows={holdings} events={folio.events} waxUsd={waxUsd} cur={cur} realisable={realisable} onPick={setPicked} />
             </div>
 
             <div className="w-full space-y-2">
