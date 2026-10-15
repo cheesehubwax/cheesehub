@@ -111,7 +111,7 @@ export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }:
             const receipts = acquisitions.get(r.key);
             return (
             <tr key={r.key} className="cursor-pointer border-b border-border/30 hover:bg-cheese/5" onClick={() => onPick(r)}>
-              <td className="w-[290px] min-w-[260px] whitespace-normal">
+              <td className="w-[290px] min-w-[240px] whitespace-normal">
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-1.5">
                   <TokenLogo contract={r.contract} symbol={r.symbol} size="sm" />
