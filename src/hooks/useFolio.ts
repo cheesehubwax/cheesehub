@@ -45,6 +45,7 @@ export function useFolio(account: string | null) {
       await saveFolio(start).catch(() => undefined);
       setRec({ ...start });
       if (result.providersOk === 0) setError('No history service answered. Your saved portfolio is shown — try Sync again shortly.');
+      else if (!result.complete) setError('Part of your history could not be read this time. Press Continue scan to finish — it picks up where it stopped.');
     } catch (e) {
       if (!ctrl.signal.aborted) setError(e instanceof Error ? e.message : 'History sync failed');
     } finally {

@@ -127,7 +127,7 @@ const Folio = () => {
                   <Button size="sm" variant="outline" onClick={folio.stop}>Stop scan</Button>
                 ) : (
                   <Button size="sm" disabled={!folio.loaded} onClick={folio.resync}>
-                    {folio.syncedAt ? 'Sync now' : folio.hasHistory ? 'Continue scan' : 'Scan my history'}
+                    {folio.error && folio.hasHistory ? 'Continue scan' : folio.syncedAt ? 'Sync now' : folio.hasHistory ? 'Continue scan' : 'Scan my history'}
                   </Button>
                 )}
                 <Button size="sm" variant="outline" disabled={!holdings.length} onClick={() => downloadHoldingsCsv(accountName, holdings.map((h) => ({

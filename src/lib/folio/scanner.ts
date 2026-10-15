@@ -227,7 +227,7 @@ export async function syncFolio(
   rec: StoredFolio,
   onPage: (rec: StoredFolio, p: ScanProgress) => Promise<void> | void,
   signal?: AbortSignal,
-): Promise<{ providersOk: number }> {
+): Promise<{ providersOk: number; providers: number; complete: boolean }> {
   await onPage(rec, { transfers: rec.transfers.length, reachedTs: null, providersDone: 0, providers: 0, phase: 'probing' });
   const shared = await resolveEndpoints('hyperion-v2', DEFAULT_HYPERION_ENDPOINTS, 8).catch(() => DEFAULT_HYPERION_ENDPOINTS);
   const candidates = [...new Set([...shared, ...FOLIO_HYPERION_EXTRA].map((u) => u.replace(/\/+$/, '')))];
@@ -329,7 +329,13 @@ export async function syncFolio(
 
   await Promise.all(
     endpoints.map(async (e) => {
-      const success = await readProvider(e).catch(() => false);
+      // A provider that drops out part-way resumes from its saved windows,
+      // so a retry only re-reads what is missing.
+      let success = false;
+      for (let pass = 0; pass < 3 && !success && !signal?.aborted; pass++) {
+        if (pass) await new Promise((r) => setTimeout(r, 2000 * pass));
+        success = await readProvider(e).catch(() => false);
+      }
       done++;
       if (success) ok++;
     }),
@@ -341,7 +347,10 @@ export async function syncFolio(
       void onPage(rec, { transfers: rec.transfers.length, reachedTs, providersDone: done, providers: endpoints.length, phase: 'fills', fillsDone: fd, fillsTotal: ft });
     }, signal);
   }
-  if (ok > 0) rec.syncedAt = Date.now();
+  // Only "up to date" when every chosen provider was read to the end; a
+  // partly read history would show wrong profit/loss.
+  const complete = endpoints.length > 0 && ok === endpoints.length;
+  if (complete) rec.syncedAt = Date.now();
   await onPage(rec, { transfers: rec.transfers.length, reachedTs, providersDone: done, providers: endpoints.length, phase: 'done' });
-  return { providersOk: ok };
+  return { providersOk: ok, providers: endpoints.length, complete };
 }
