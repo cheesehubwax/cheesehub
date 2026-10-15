@@ -124,39 +124,46 @@ export function buildLedger(events: FolioEvent[], priceAt: PriceAt = () => null)
     if (Math.abs(realized) > EPS) realizedByEvent.set(ev.id, realized);
   };
 
-  const sorted = [...events].sort((a, b) => a.ts - b.ts || a.id.localeCompare(b.id));
+  const sorted = [...events].sort((a, b) => a.seq - b.seq);
   for (const ev of sorted) {
     switch (ev.type) {
       case 'trade': {
         if (ev.venue === 'alcor-orderbook' && ev.out.length === 0) {
-          // Order-book fill: match to open orders asking for this token.
-          for (const got of ev.in) {
-            let remaining = got.amount;
-            const matched: { a: TokenAmount; cost: number }[] = [];
-            for (const o of orders) {
-              if (remaining <= EPS) break;
-              if (o.want.key !== got.key || o.want.amount <= EPS) continue;
-              const fillWant = Math.min(remaining, o.want.amount);
-              const frac = fillWant / o.want.amount;
-              const giveAmt = o.give.amount * frac;
-              const cost = o.giveCost * frac;
-              o.give.amount -= giveAmt;
-              o.giveCost -= cost;
-              o.want.amount -= fillWant;
-              pos(o.give).onOrderQty = Math.max(0, pos(o.give).onOrderQty - giveAmt);
-              matched.push({ a: { ...o.give, amount: giveAmt }, cost });
-              remaining -= fillWant;
-            }
-            // Merge matched slices per token for one clean settlement.
-            const merged = new Map<string, { a: TokenAmount; cost: number }>();
-            for (const m of matched) {
-              const cur = merged.get(m.a.key);
-              if (cur) { cur.a.amount += m.a.amount; cur.cost += m.cost; }
-              else merged.set(m.a.key, { a: { ...m.a }, cost: m.cost });
-            }
-            // Unmatched remainder = fill of an order placed before the scanned history.
-            settleTrade(ev, [...merged.values()], [got]);
+          // Order-book fill. With the fill record we know exactly what was
+          // given; it is taken from open orders that gave that token.
+          const got = ev.in[0];
+          const gave = ev.fillGave;
+          const candidates = orders.filter((o) => o.give.amount > EPS && (gave ? o.give.key === gave.key : o.want.key === got.key));
+          // Prefer orders asking for the token received (the right market).
+          candidates.sort((x, y) => Number(y.want.key === got.key) - Number(x.want.key === got.key));
+          let need = gave ? gave.amount : null;
+          let wantNeed = got.amount;
+          let matchedQty = 0;
+          let matchedCost = 0;
+          let matchedToken: TokenAmount | null = gave ?? null;
+          for (const o of candidates) {
+            if (need != null ? need <= EPS : wantNeed <= EPS) break;
+            const giveAmt = need != null
+              ? Math.min(need, o.give.amount)
+              : Math.min(o.give.amount, o.want.amount > EPS ? (o.give.amount * wantNeed) / o.want.amount : 0);
+            if (giveAmt <= EPS) continue;
+            const frac = giveAmt / o.give.amount;
+            const cost = o.giveCost * frac;
+            const wantPart = o.want.amount * frac;
+            o.give.amount -= giveAmt;
+            o.giveCost -= cost;
+            o.want.amount = Math.max(0, o.want.amount - wantPart);
+            pos(o.give).onOrderQty = Math.max(0, pos(o.give).onOrderQty - giveAmt);
+            matchedQty += giveAmt;
+            matchedCost += cost;
+            matchedToken = matchedToken ?? o.give;
+            if (need != null) need -= giveAmt;
+            wantNeed -= wantPart;
           }
+          const out = matchedToken && matchedQty > EPS ? [{ a: { ...matchedToken, amount: matchedQty }, cost: matchedCost }] : [];
+          // Unmatched remainder = an order placed before the scanned history.
+          if (gave && need != null && need > 10 ** -gave.precision) pos(gave).historyGap = true;
+          settleTrade(ev, out, [got]);
           break;
         }
         const out = ev.out.map((a) => ({ a, cost: take(a) }));
@@ -231,7 +238,7 @@ export function buildLedger(events: FolioEvent[], priceAt: PriceAt = () => null)
 
 /** Daily wallet quantity per token, replaying events up to each day's end. */
 export function quantitiesByDay(events: FolioEvent[], dayEnds: number[]): Map<TokenKey, number>[] {
-  const sorted = [...events].sort((a, b) => a.ts - b.ts);
+  const sorted = [...events].sort((a, b) => a.seq - b.seq);
   const qty = new Map<TokenKey, number>();
   const out: Map<TokenKey, number>[] = [];
   let i = 0;
