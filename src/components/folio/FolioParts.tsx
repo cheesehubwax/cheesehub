@@ -40,6 +40,19 @@ export const EVENT_LABELS: Record<FolioEventType, string> = {
 };
 const VENUE_LABELS: Record<string, string> = { alcor: 'Alcor', defibox: 'Defibox', taco: 'Taco', 'alcor-orderbook': 'Alcor order book' };
 
+/** Cumulative receipts, not an estimate of the source of today's balance. */
+export function acquisitionBreakdown(key: string, events: FolioEvent[], freeQty: number) {
+  const purchased = events.reduce((sum, e) => e.type === 'trade'
+    ? sum + e.in.reduce((n, a) => n + (a.key === key ? a.amount : 0), 0)
+    : sum, 0);
+  const total = purchased + freeQty;
+  return {
+    purchased, free: freeQty,
+    purchasedPct: total > 0 ? purchased / total * 100 : null,
+    freePct: total > 0 ? freeQty / total * 100 : null,
+  };
+}
+
 export function SummaryBox({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: number | null }) {
   return (
     <div className="flex-1 min-w-[160px] rounded-lg border border-cheese/20 bg-cheese/5 px-4 py-3 text-center">
@@ -268,10 +281,11 @@ export function TokenDialog({
   cur: Currency; realisable?: Realisable | null; onClose: () => void;
 }) {
   const p = row?.position;
+  const acquisitions = useMemo(() => row && p ? acquisitionBreakdown(row.key, events, p.freeQty) : null, [row, p, events]);
   const usd = cur === 'USD';
   return (
     <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto overflow-x-hidden [&>*]:min-w-0">
         {row ? (
           <>
             <DialogHeader>
@@ -291,11 +305,32 @@ export function TokenDialog({
               <SummaryBox label="Unrealised" value={(usd ? row.unrealizedUsd : row.unrealizedWax) == null ? '—' : signedMoney((usd ? row.unrealizedUsd : row.unrealizedWax)!, cur)} tone={usd ? row.unrealizedUsd : row.unrealizedWax} />
               <SummaryBox label="Realised" value={signedMoney(usd ? row.realizedUsd : row.realizedWax, cur)} tone={usd ? row.realizedUsd : row.realizedWax} />
             </div>
+            {p && acquisitions ? (
+              <section aria-label="Acquisition breakdown" className="border-y border-border/50 py-3 space-y-2">
+                <div className="flex flex-wrap items-baseline justify-between gap-1">
+                  <h3 className="text-sm font-semibold">Acquisition breakdown</h3>
+                  <span className="text-xs text-muted-foreground">All-time recorded receipts · not current balance</span>
+                </div>
+                <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 text-sm">
+                  <div>
+                    <dt className="text-muted-foreground">Purchased</dt>
+                    <dd className="font-medium break-words">{fmt(acquisitions.purchased, p.precision)} {row.symbol}
+                      <span className="ml-2 text-xs text-muted-foreground">{acquisitions.purchasedPct == null ? '—' : `${fmt(acquisitions.purchasedPct, 1)}%`}</span>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Gifted / Reward</dt>
+                    <dd className="font-medium break-words">{fmt(acquisitions.free, p.precision)} {row.symbol}
+                      <span className="ml-2 text-xs text-muted-foreground">{acquisitions.freePct == null ? '—' : `${fmt(acquisitions.freePct, 1)}%`}</span>
+                    </dd>
+                  </div>
+                </dl>
+                <p className="text-xs text-muted-foreground">Free receipts include transfers, airdrops, rewards and pool gains; their recorded cost is zero.{!row.complete ? ' Based on available history only.' : ''}</p>
+              </section>
+            ) : null}
             {p ? (
               <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm text-muted-foreground sm:grid-cols-3">
-                <div>Bought: <span className="text-foreground">{fmt(p.boughtQty, p.precision)}</span></div>
                 <div>Sold: <span className="text-foreground">{fmt(p.soldQty, p.precision)}</span></div>
-                <div>Free (rewards, airdrops, received): <span className="text-foreground">{fmt(p.freeQty, p.precision)}</span></div>
                 <div>On order: <span className="text-foreground">{fmt(p.onOrderQty, p.precision)}</span></div>
                 <div>In liquidity (at cost): <span className="text-foreground">{fmt(p.inLiquidityQty, p.precision)}</span></div>
                 <div>History total: <span className="text-foreground">{fmt(p.qty, p.precision)}</span></div>
