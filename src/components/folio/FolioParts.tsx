@@ -86,7 +86,7 @@ export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }:
   ])), [rows, events]);
   return (
     <div className="w-full overflow-x-auto rounded-lg border border-border/50 bg-card/60">
-      <table aria-label="Holdings" className="w-full min-w-[1080px] text-sm whitespace-nowrap [&_th]:px-2 [&_td]:px-2 [&_td]:py-4">
+      <table aria-label="Holdings" className="w-full min-w-[1080px] text-xs xl:text-sm whitespace-nowrap [&_th]:px-2 [&_td]:px-2 [&_td]:py-2">
         <thead className="text-xs uppercase text-muted-foreground whitespace-normal">
           <tr className="border-b border-border/50">
             <th className="px-3 py-2 text-left">Token</th>
@@ -111,14 +111,13 @@ export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }:
             const receipts = acquisitions.get(r.key);
             return (
             <tr key={r.key} className="cursor-pointer border-b border-border/30 hover:bg-cheese/5" onClick={() => onPick(r)}>
-              <td className="w-[230px] min-w-[210px] whitespace-normal">
-                <div className="flex items-start gap-2">
-                  <span className="shrink-0 pt-0.5">
+              <td className="w-[290px] min-w-[240px] whitespace-normal">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-1.5">
                   <TokenLogo contract={r.contract} symbol={r.symbol} size="sm" />
-                  </span>
-                  <div className="min-w-0 space-y-1">
-                    <div className="font-semibold break-words">{r.symbol}</div>
-                    <div className="text-xs text-muted-foreground break-all">{r.contract}</div>
+                    <span className="font-semibold">{r.symbol}</span>
+                    <span className="text-[11px] text-muted-foreground">{r.contract}</span>
+                  </div>
                     <div className="flex flex-wrap gap-1 empty:hidden">
                   {!r.complete ? (
                     <span className="rounded border border-destructive/40 px-1 text-[10px] text-destructive" title={r.pooledUnknown ? "Some pool positions couldn't be read, so profit/loss is hidden for this token." : "Your saved history doesn't add up to your live balance (wallet plus pools), so profit/loss is hidden for this token."}>
@@ -135,13 +134,11 @@ export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }:
                   ) : null}
                     </div>
                     {receipts ? (
-                      <div className="text-xs leading-relaxed text-muted-foreground" title="All-time recorded receipts, not the source of your current balance. Based on available history; average cost is unchanged.">
-                        <div className="text-[10px] uppercase">All-time receipts</div>
-                        <div>Bought: <span className="text-foreground">{fmt(receipts.purchased, r.precision)}</span>{receipts.purchasedPct == null ? '' : ` · ${fmt(receipts.purchasedPct, 1)}%`}</div>
+                      <div className="text-[11px] leading-4 text-muted-foreground" title="All-time recorded receipts, not the source of your current balance. Based on available history; average cost is unchanged.">
+                        <div>Bought (all-time): <span className="text-foreground">{fmt(receipts.purchased, r.precision)}</span>{receipts.purchasedPct == null ? '' : ` · ${fmt(receipts.purchasedPct, 1)}%`}</div>
                         <div>Gifted / Reward: <span className="text-foreground">{fmt(receipts.free, r.precision)}</span>{receipts.freePct == null ? '' : ` · ${fmt(receipts.freePct, 1)}%`}</div>
                       </div>
                     ) : null}
-                  </div>
                 </div>
               </td>
               <td className="px-3 py-2 text-right">
