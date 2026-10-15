@@ -1,6 +1,6 @@
 # CHEESEHub roadmap
 
-- [x] CHEESEFolio: widen holdings area, stack token badges and bought/gifted receipts under token names, verify Realised P/L fits.
+- [ ] CHEESEFolio: restore compact holdings rows while keeping badges, bought/gifted receipts and all numeric columns visible.
 
 - [x] Prevent CHEESEAir context mismatch during preview updates and verify fresh loading and hot refresh.
 
