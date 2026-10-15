@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { classifyTransfers } from '@/lib/folio/classify';
 import { buildLedger } from '@/lib/folio/ledger';
-import { loadPriceLookup } from '@/lib/folio/prices';
+import { fetchWaxUsdDaily, loadPriceLookup, waxUsdLookup } from '@/lib/folio/prices';
 import { syncFolio, type ScanProgress } from '@/lib/folio/scanner';
 import { clearFolio, FOLIO_SCHEMA, loadFolio, saveFolio, type StoredFolio } from '@/lib/folio/storage';
 import { WAX_KEY } from '@/lib/folio/types';
@@ -138,7 +138,17 @@ export function useFolio(account: string | null) {
     staleTime: 60 * 60 * 1000,
   });
 
-  const ledger = useMemo(() => buildLedger(events, lookup?.priceAt), [events, lookup]);
+  // WAX/USD on the day of each event, for USD profit/loss.
+  const firstDay = events.length ? Math.floor(Math.min(...events.map((e) => e.ts)) / 86_400_000) : null;
+  const { data: waxUsdDaily } = useQuery({
+    queryKey: ['folio-wax-usd', firstDay],
+    queryFn: () => fetchWaxUsdDaily(firstDay! * 86_400_000),
+    enabled: !syncing && loaded && firstDay != null,
+    staleTime: 6 * 60 * 60 * 1000,
+  });
+  const waxUsdAt = useMemo(() => (waxUsdDaily?.size ? waxUsdLookup(waxUsdDaily) : undefined), [waxUsdDaily]);
+
+  const ledger = useMemo(() => buildLedger(events, lookup?.priceAt, waxUsdAt), [events, lookup, waxUsdAt]);
 
   return {
     loaded,
@@ -147,6 +157,7 @@ export function useFolio(account: string | null) {
     error,
     events,
     ledger,
+    usdHistoryLoaded: !!waxUsdDaily?.size,
     syncedAt: rec?.syncedAt ?? null,
     coverageFrom: rec?.coverageFrom ?? null,
     accountCreated: rec?.accountCreated ?? null,
