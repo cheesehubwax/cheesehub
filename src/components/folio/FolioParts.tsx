@@ -77,14 +77,17 @@ export function AmountList({ items }: { items: TokenAmount[] }) {
   );
 }
 
-export function HoldingsTable({ rows, waxUsd, cur, realisable, onPick }: {
-  rows: HoldingRow[]; waxUsd: number; cur: Currency; realisable?: Map<string, Realisable>; onPick: (r: HoldingRow) => void;
+export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }: {
+  rows: HoldingRow[]; events: FolioEvent[]; waxUsd: number; cur: Currency; realisable?: Map<string, Realisable>; onPick: (r: HoldingRow) => void;
 }) {
   const usd = cur === 'USD';
+  const acquisitions = useMemo(() => new Map(rows.filter((r) => r.position).map((r) => [
+    r.key, acquisitionBreakdown(r.key, events, r.position?.freeQty ?? 0),
+  ])), [rows, events]);
   return (
     <div className="w-full overflow-x-auto rounded-lg border border-border/50 bg-card/60">
-      <table className="w-full min-w-[980px] text-sm whitespace-nowrap">
-        <thead className="text-xs uppercase text-muted-foreground">
+      <table aria-label="Holdings" className="w-full min-w-[1080px] text-sm whitespace-nowrap [&_th]:px-2 [&_td]:px-2 [&_td]:py-4">
+        <thead className="text-xs uppercase text-muted-foreground whitespace-normal">
           <tr className="border-b border-border/50">
             <th className="px-3 py-2 text-left">Token</th>
             <th className="px-3 py-2 text-right">Balance</th>
@@ -105,13 +108,18 @@ export function HoldingsTable({ rows, waxUsd, cur, realisable, onPick }: {
             const realized = usd ? r.realizedUsd : r.realizedWax;
             const avg = usd ? r.avgCostUsd : r.avgCostWax;
             const usdMissing = usd && r.complete && !r.usdComplete;
+            const receipts = acquisitions.get(r.key);
             return (
             <tr key={r.key} className="cursor-pointer border-b border-border/30 hover:bg-cheese/5" onClick={() => onPick(r)}>
-              <td className="px-3 py-2">
-                <span className="inline-flex items-center gap-2">
+              <td className="w-[230px] min-w-[210px] whitespace-normal">
+                <div className="flex items-start gap-2">
+                  <span className="shrink-0 pt-0.5">
                   <TokenLogo contract={r.contract} symbol={r.symbol} size="sm" />
-                  <span className="font-semibold">{r.symbol}</span>
-                  <span className="text-xs text-muted-foreground">{r.contract}</span>
+                  </span>
+                  <div className="min-w-0 space-y-1">
+                    <div className="font-semibold break-words">{r.symbol}</div>
+                    <div className="text-xs text-muted-foreground break-all">{r.contract}</div>
+                    <div className="flex flex-wrap gap-1 empty:hidden">
                   {!r.complete ? (
                     <span className="rounded border border-destructive/40 px-1 text-[10px] text-destructive" title={r.pooledUnknown ? "Some pool positions couldn't be read, so profit/loss is hidden for this token." : "Your saved history doesn't add up to your live balance (wallet plus pools), so profit/loss is hidden for this token."}>
                       history incomplete
@@ -125,7 +133,16 @@ export function HoldingsTable({ rows, waxUsd, cur, realisable, onPick }: {
                       partly unpriced
                     </span>
                   ) : null}
-                </span>
+                    </div>
+                    {receipts ? (
+                      <div className="text-xs leading-relaxed text-muted-foreground" title="All-time recorded receipts, not the source of your current balance. Based on available history; average cost is unchanged.">
+                        <div className="text-[10px] uppercase">All-time receipts</div>
+                        <div>Bought: <span className="text-foreground">{fmt(receipts.purchased, r.precision)}</span>{receipts.purchasedPct == null ? '' : ` · ${fmt(receipts.purchasedPct, 1)}%`}</div>
+                        <div>Gifted / Reward: <span className="text-foreground">{fmt(receipts.free, r.precision)}</span>{receipts.freePct == null ? '' : ` · ${fmt(receipts.freePct, 1)}%`}</div>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
               </td>
               <td className="px-3 py-2 text-right">
                 <div>{fmt(r.balance, r.precision)}</div>
