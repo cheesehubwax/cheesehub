@@ -23,3 +23,21 @@ describe('CHEESEFolio coverage gap', () => {
     expect(hasCoverageGap(Date.parse('2024-12-28T06:17:50Z'), created)).toBe(false);
   });
 });
+
+import { withoutRedispatches } from '@/lib/folio/classify';
+import type { RawTransfer } from '@/lib/folio/types';
+
+const tr = (gs: number, ord: number, parent: number, quantity = '100.0000 CHEESE'): RawTransfer => ({
+  gs, trx: 'abc', ts: 0, contract: 'cheeseburger', from: 'liquidcheese', to: 'swap.alcor', quantity, memo: 'deposit', ord, parent,
+});
+
+describe('CHEESEFolio notification copies', () => {
+  it('drops an inline copy created by an identical transfer, so the balance moves once', () => {
+    const kept = withoutRedispatches([tr(1, 2, 0), tr(2, 4, 2)]);
+    expect(kept.map((t) => t.gs)).toEqual([1]);
+  });
+  it('keeps two genuine identical transfers that are separate actions', () => {
+    const kept = withoutRedispatches([tr(1, 2, 0), tr(2, 3, 0)]);
+    expect(kept.map((t) => t.gs)).toEqual([1, 2]);
+  });
+});
