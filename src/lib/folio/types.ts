@@ -84,11 +84,17 @@ export interface TokenPosition {
   costWax: number;
   /** Profit/loss locked in by sells, in WAX. */
   realizedWax: number;
+  /** Same cost and profit/loss in USD, at the WAX/USD rate of each event's day. */
+  costUsd: number;
+  realizedUsd: number;
+  /** True when some event of this token had no known WAX/USD rate. */
+  usdGap: boolean;
   /** Tokens waiting in open Alcor order-book orders. */
   onOrderQty: number;
   /** Tokens deposited into liquidity pools (at cost). */
   inLiquidityQty: number;
   inLiquidityCostWax: number;
+  inLiquidityCostUsd: number;
   /** Quantity acquired for free (rewards, airdrops, incoming transfers). */
   freeQty: number;
   boughtQty: number;
@@ -103,8 +109,10 @@ export interface LedgerResult {
   positions: Map<TokenKey, TokenPosition>;
   /** Realized P&L per event id (WAX), for the activity feed. */
   realizedByEvent: Map<string, number>;
+  realizedUsdByEvent: Map<string, number>;
   /** WAX value used for each trade (when known). */
   valueByEvent: Map<string, number>;
+  valueUsdByEvent: Map<string, number>;
 }
 
 /** Daily price lookup: WAX per 1 token at (or just before) a time. */
