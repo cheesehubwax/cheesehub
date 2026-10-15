@@ -69,7 +69,7 @@ export function useFolio(account: string | null) {
         const start = saved ?? emptyRecord(account);
         setRec(start);
         setLoaded(true);
-        void runSync(start);
+        // Scanning only starts when the user presses the button.
       });
     return () => {
       cancelled = true;
@@ -91,9 +91,22 @@ export function useFolio(account: string | null) {
     void runSync(fresh);
   }, [account, runSync]);
 
+  const stop = useCallback(() => {
+    const ctrl = abortRef.current;
+    if (!ctrl) return;
+    ctrl.abort();
+    abortRef.current = null;
+    setSyncing(false);
+    if (rec) {
+      void saveFolio(rec).catch(() => undefined);
+      setRec({ ...rec });
+    }
+  }, [rec]);
+
   const clear = useCallback(async () => {
     if (!account) return;
     abortRef.current?.abort();
+    abortRef.current = null;
     await clearFolio(account).catch(() => undefined);
     setRec(emptyRecord(account));
     setProgress(null);
@@ -137,6 +150,7 @@ export function useFolio(account: string | null) {
     transferCount,
     hasHistory: transferCount > 0,
     resync,
+    stop,
     rescan,
     clear,
   };

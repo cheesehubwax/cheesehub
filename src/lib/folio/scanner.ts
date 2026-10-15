@@ -11,7 +11,41 @@ import { mapLimit } from '../chainRequest';
 const PAGE = 1000;
 /** Providers read in parallel for the union. */
 const PROVIDERS = 3;
-const PAGE_TIMEOUT_MS = 20_000;
+const PAGE_TIMEOUT_MS = 15_000;
+const PROBE_TIMEOUT_MS = 6_000;
+/** Order-book fill lookups in flight per provider. */
+const FILL_CONCURRENCY = 8;
+/**
+ * Extra history services tried alongside the shared list. Each one is probed
+ * from this browser first, so a host that is down or blocked here is skipped
+ * in seconds instead of stalling the scan.
+ */
+const FOLIO_HYPERION_EXTRA = ['https://wax.eosusa.io', 'https://wax.eosphere.io', 'https://api.waxsweden.org'];
+
+/** Hosts that answer a tiny history read from this browser, fastest first. */
+async function probeProviders(account: string, candidates: string[], signal?: AbortSignal): Promise<string[]> {
+  const results = await Promise.all(
+    candidates.map(async (base) => {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT_MS);
+      const onAbort = () => ctrl.abort();
+      signal?.addEventListener('abort', onAbort);
+      const t0 = performance.now();
+      try {
+        const res = await fetch(`${base.replace(/\/$/, '')}/v2/history/get_actions?account=${account}&filter=*:transfer&sort=asc&limit=1`, { signal: ctrl.signal });
+        if (!res.ok) return null;
+        const body = (await res.json()) as { actions?: unknown[] };
+        return Array.isArray(body.actions) ? { base, ms: performance.now() - t0 } : null;
+      } catch {
+        return null;
+      } finally {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
+      }
+    }),
+  );
+  return results.filter((r): r is { base: string; ms: number } => !!r).sort((a, b) => a.ms - b.ms).map((r) => r.base);
+}
 
 export function toRawTransfer(a: HyperionActionRecord): RawTransfer | null {
   if (a.act?.name !== 'transfer' || !a.act.account) return null;
@@ -29,7 +63,7 @@ export function toRawTransfer(a: HyperionActionRecord): RawTransfer | null {
 }
 
 async function fetchPage(url: string): Promise<HyperionActionRecord[] | null> {
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 2; attempt++) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), PAGE_TIMEOUT_MS);
     try {
@@ -83,27 +117,52 @@ export function fillGaveFromActions(actions: HyperionActionRecord[], account: st
   return null;
 }
 
-async function enrichFills(base: string, account: string, transfers: RawTransfer[], signal?: AbortSignal) {
-  const pending = transfers.filter((t) => isFill(t, account) && !t.fillChecked);
+async function fetchTx(base: string, trx: string): Promise<HyperionActionRecord[] | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), PAGE_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${base.replace(/\/$/, '')}/v2/history/get_transaction?id=${trx}`, { signal: ctrl.signal });
+    if (!res.ok) return null;
+    return ((await res.json()) as { actions?: HyperionActionRecord[] }).actions ?? [];
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Looks up every unchecked order-book fill, spreading the transactions over
+ * all working providers at once. A lookup that fails on one provider is
+ * retried on the next; anything still unchecked is retried on the next sync.
+ */
+async function enrichFills(
+  bases: string[],
+  account: string,
+  transfers: RawTransfer[],
+  onProgress: (done: number, total: number) => void,
+  signal?: AbortSignal,
+) {
   const byTrx = new Map<string, RawTransfer[]>();
-  for (const t of pending) byTrx.set(t.trx, [...(byTrx.get(t.trx) ?? []), t]);
-  await mapLimit([...byTrx.entries()], 4, async ([trx, list]) => {
-    if (signal?.aborted) return;
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), PAGE_TIMEOUT_MS);
-    try {
-      const res = await fetch(`${base.replace(/\/$/, '')}/v2/history/get_transaction?id=${trx}`, { signal: ctrl.signal });
-      if (!res.ok) return; // left unchecked, retried on the next sync
-      const actions = ((await res.json()) as { actions?: HyperionActionRecord[] }).actions ?? [];
+  for (const t of transfers) if (isFill(t, account) && !t.fillChecked) byTrx.set(t.trx, [...(byTrx.get(t.trx) ?? []), t]);
+  const jobs = [...byTrx.entries()];
+  const total = jobs.length;
+  if (!total || !bases.length) return;
+  let done = 0;
+  onProgress(0, total);
+  await mapLimit(jobs.map((j, i) => [j, i] as const), FILL_CONCURRENCY * bases.length, async ([[trx, list], i]) => {
+    for (let k = 0; k < bases.length; k++) {
+      if (signal?.aborted) return;
+      const actions = await fetchTx(bases[(i + k) % bases.length], trx);
+      if (!actions) continue;
       for (const t of list) {
         t.fillGave = fillGaveFromActions(actions, account, t);
         t.fillChecked = true;
       }
-    } catch {
-      /* retried on the next sync */
-    } finally {
-      clearTimeout(timer);
+      break;
     }
+    done++;
+    if (done % 10 === 0 || done === total) onProgress(done, total);
   });
 }
 
@@ -113,6 +172,9 @@ export interface ScanProgress {
   reachedTs: number | null;
   providersDone: number;
   providers: number;
+  phase: 'probing' | 'history' | 'fills' | 'done';
+  fillsDone?: number;
+  fillsTotal?: number;
 }
 
 /**
@@ -125,7 +187,10 @@ export async function syncFolio(
   onPage: (rec: StoredFolio, p: ScanProgress) => Promise<void> | void,
   signal?: AbortSignal,
 ): Promise<{ providersOk: number }> {
-  const endpoints = (await resolveEndpoints('hyperion-v2', DEFAULT_HYPERION_ENDPOINTS)).slice(0, PROVIDERS);
+  await onPage(rec, { transfers: rec.transfers.length, reachedTs: null, providersDone: 0, providers: 0, phase: 'probing' });
+  const shared = await resolveEndpoints('hyperion-v2', DEFAULT_HYPERION_ENDPOINTS, 8).catch(() => DEFAULT_HYPERION_ENDPOINTS);
+  const candidates = [...new Set([...shared, ...FOLIO_HYPERION_EXTRA].map((u) => u.replace(/\/$/, '')))];
+  const endpoints = (await probeProviders(rec.account, candidates, signal)).slice(0, PROVIDERS);
   const seen = new Set(rec.transfers.map((t) => t.gs));
   let reachedTs = rec.transfers.length ? Math.max(...rec.transfers.map((t) => t.ts)) : null;
   let done = 0;
@@ -161,11 +226,11 @@ export async function syncFolio(
         cursor.after = next;
         if (stalled) {
           cursor.caughtUp = true;
-          await onPage(rec, { transfers: rec.transfers.length, reachedTs, providersDone: done, providers: endpoints.length });
+          await onPage(rec, { transfers: rec.transfers.length, reachedTs, providersDone: done, providers: endpoints.length, phase: 'history' });
           return true;
         }
       }
-      await onPage(rec, { transfers: rec.transfers.length, reachedTs, providersDone: done, providers: endpoints.length });
+      await onPage(rec, { transfers: rec.transfers.length, reachedTs, providersDone: done, providers: endpoints.length, phase: 'history' });
       if (actions.length < PAGE) {
         cursor.caughtUp = true;
         return true;
@@ -182,13 +247,12 @@ export async function syncFolio(
   );
   rec.transfers.sort((a, b) => a.gs - b.gs);
   // Order-book fills need their match record to know what was given.
-  if (endpoints[0]) {
-    for (const base of endpoints) {
-      await enrichFills(base, rec.account, rec.transfers, signal);
-      if (!rec.transfers.some((t) => isFill(t, rec.account) && !t.fillChecked)) break;
-    }
+  if (ok > 0) {
+    await enrichFills(endpoints, rec.account, rec.transfers, (fd, ft) => {
+      void onPage(rec, { transfers: rec.transfers.length, reachedTs, providersDone: done, providers: endpoints.length, phase: 'fills', fillsDone: fd, fillsTotal: ft });
+    }, signal);
   }
   if (ok > 0) rec.syncedAt = Date.now();
-  await onPage(rec, { transfers: rec.transfers.length, reachedTs, providersDone: done, providers: endpoints.length });
+  await onPage(rec, { transfers: rec.transfers.length, reachedTs, providersDone: done, providers: endpoints.length, phase: 'done' });
   return { providersOk: ok };
 }
