@@ -147,6 +147,8 @@ export function useFolio(account: string | null) {
     events,
     ledger,
     syncedAt: rec?.syncedAt ?? null,
+    coverageFrom: rec?.coverageFrom ?? null,
+    accountCreated: rec?.accountCreated ?? null,
     transferCount,
     hasHistory: transferCount > 0,
     resync,

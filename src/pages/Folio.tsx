@@ -10,6 +10,7 @@ import { useAllTokenBalances } from '@/hooks/useAllTokenBalances';
 import { useAlcorTokenPrices } from '@/hooks/useAlcorTokenPrices';
 import { useWaxPrice } from '@/hooks/useWaxPrice';
 import { useFolio } from '@/hooks/useFolio';
+import { hasCoverageGap } from '@/lib/folio/scanner';
 import { buildHoldings, type HoldingRow } from '@/lib/folio/holdings';
 import { downloadActivityCsv, downloadHoldingsCsv } from '@/lib/folio/csv';
 import { ActivityList, HoldingsTable, PlChart, SummaryBox, TokenDialog, usdFmt, waxFmt } from '@/components/folio/FolioParts';
@@ -162,6 +163,12 @@ const Folio = () => {
               <div className="w-full rounded-lg border border-cheese/20 bg-card/80 p-6 text-center space-y-3">
                 <p className="text-muted-foreground">Press <span className="text-foreground font-medium">Scan my history</span> to read your past trades from the blockchain. It only runs when you ask, and the result is saved in this browser.</p>
                 <Button onClick={folio.resync}>Scan my history</Button>
+              </div>
+            ) : null}
+            {!folio.syncing && hasCoverageGap(folio.coverageFrom, folio.accountCreated) ? (
+              <div className="w-full rounded-lg border border-cheese/30 bg-card/80 p-3 text-sm text-center text-muted-foreground">
+                History available from {new Date(folio.coverageFrom!).toISOString().slice(0, 10)}, but this account was created {new Date(folio.accountCreated!).toISOString().slice(0, 10)}.
+                No history service answering right now reaches further back, so profit/loss for older holdings can't be checked yet. Try Sync now later.
               </div>
             ) : null}
             {folio.error ? <div className="w-full text-sm text-destructive text-center">{folio.error}</div> : null}

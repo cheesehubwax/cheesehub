@@ -22,6 +22,10 @@ export interface StoredFolio {
   cursors: Record<string, ProviderCursor>;
   /** Epoch ms of the last completed sync. */
   syncedAt: number | null;
+  /** Oldest transfer any chosen provider holds (epoch ms). */
+  coverageFrom?: number;
+  /** Account creation time from the chain (epoch ms). */
+  accountCreated?: number;
 }
 
 function open(): Promise<IDBDatabase> {

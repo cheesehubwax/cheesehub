@@ -7,6 +7,7 @@ import { resolveEndpoints } from '../endpointHealth';
 import type { ProviderCursor, StoredFolio } from './storage';
 import type { RawTransfer } from './types';
 import { mapLimit } from '../chainRequest';
+import { waxRpcCall } from '../waxRpcFallback';
 
 const PAGE = 1000;
 /** Providers read in parallel for the union. */
@@ -20,10 +21,37 @@ const FILL_CONCURRENCY = 8;
  * from this browser first, so a host that is down or blocked here is skipped
  * in seconds instead of stalling the scan.
  */
-const FOLIO_HYPERION_EXTRA = ['https://wax.eosusa.io', 'https://wax.eosphere.io', 'https://api.waxsweden.org'];
+const FOLIO_HYPERION_EXTRA = ['https://wax.eosdac.io', 'https://wax.eosusa.io', 'https://wax.eosphere.io', 'https://api.waxsweden.org'];
 
-/** Hosts that answer a tiny history read from this browser, fastest first. */
-async function probeProviders(account: string, candidates: string[], signal?: AbortSignal): Promise<string[]> {
+export interface ProbeResult {
+  base: string;
+  ms: number;
+  /** Oldest transfer this provider holds for the account (epoch ms), null if none. */
+  earliestTs: number | null;
+}
+
+/**
+ * Chooses which providers to read: the one reaching furthest back is always
+ * included (it is the only one that can hold the full record), then the
+ * fastest of the rest fill any holes.
+ */
+export function selectProviders(probes: ProbeResult[], max = PROVIDERS): string[] {
+  const withData = probes.filter((p) => p.earliestTs != null);
+  const deepest = [...withData].sort((a, b) => a.earliestTs! - b.earliestTs! || a.ms - b.ms)[0];
+  const rest = probes.filter((p) => p !== deepest).sort((a, b) => a.ms - b.ms);
+  return [...(deepest ? [deepest] : []), ...rest].slice(0, max).map((p) => p.base);
+}
+
+/** True when the oldest history found starts more than a day after the account was created. */
+export function hasCoverageGap(coverageFrom: number | null | undefined, accountCreated: number | null | undefined): boolean {
+  if (accountCreated == null || coverageFrom == null) return false;
+  return coverageFrom - accountCreated > 86_400_000;
+}
+
+const parseTs = (ts: string | undefined) => (ts ? Date.parse(ts.endsWith('Z') ? ts : `${ts}Z`) : NaN);
+
+/** Hosts that answer a tiny history read from this browser. */
+async function probeProviders(account: string, candidates: string[], signal?: AbortSignal): Promise<ProbeResult[]> {
   const results = await Promise.all(
     candidates.map(async (base) => {
       const ctrl = new AbortController();
@@ -34,8 +62,11 @@ async function probeProviders(account: string, candidates: string[], signal?: Ab
       try {
         const res = await fetch(`${base.replace(/\/$/, '')}/v2/history/get_actions?account=${account}&filter=*:transfer&sort=asc&limit=1`, { signal: ctrl.signal });
         if (!res.ok) return null;
-        const body = (await res.json()) as { actions?: unknown[] };
-        return Array.isArray(body.actions) ? { base, ms: performance.now() - t0 } : null;
+        const body = (await res.json()) as { actions?: HyperionActionRecord[] };
+        if (!Array.isArray(body.actions)) return null;
+        const first = body.actions[0];
+        const t = parseTs((first?.['@timestamp'] ?? first?.timestamp) as string | undefined);
+        return { base, ms: performance.now() - t0, earliestTs: Number.isFinite(t) ? t : null };
       } catch {
         return null;
       } finally {
@@ -44,7 +75,7 @@ async function probeProviders(account: string, candidates: string[], signal?: Ab
       }
     }),
   );
-  return results.filter((r): r is { base: string; ms: number } => !!r).sort((a, b) => a.ms - b.ms).map((r) => r.base);
+  return results.filter((r): r is ProbeResult => !!r);
 }
 
 export function toRawTransfer(a: HyperionActionRecord): RawTransfer | null {
@@ -190,7 +221,18 @@ export async function syncFolio(
   await onPage(rec, { transfers: rec.transfers.length, reachedTs: null, providersDone: 0, providers: 0, phase: 'probing' });
   const shared = await resolveEndpoints('hyperion-v2', DEFAULT_HYPERION_ENDPOINTS, 8).catch(() => DEFAULT_HYPERION_ENDPOINTS);
   const candidates = [...new Set([...shared, ...FOLIO_HYPERION_EXTRA].map((u) => u.replace(/\/$/, '')))];
-  const endpoints = (await probeProviders(rec.account, candidates, signal)).slice(0, PROVIDERS);
+  const [probes, created] = await Promise.all([
+    probeProviders(rec.account, candidates, signal),
+    waxRpcCall<{ created?: string }>('/v1/chain/get_account', { account_name: rec.account }).catch(() => null),
+  ]);
+  const createdTs = parseTs(created?.created);
+  if (Number.isFinite(createdTs)) rec.accountCreated = createdTs;
+  const endpoints = selectProviders(probes);
+  const starts = probes.filter((p) => endpoints.includes(p.base) && p.earliestTs != null).map((p) => p.earliestTs!);
+  if (starts.length) {
+    const from = Math.min(...starts);
+    rec.coverageFrom = rec.coverageFrom == null ? from : Math.min(rec.coverageFrom, from);
+  }
   const seen = new Set(rec.transfers.map((t) => t.gs));
   let reachedTs = rec.transfers.length ? Math.max(...rec.transfers.map((t) => t.ts)) : null;
   let done = 0;
