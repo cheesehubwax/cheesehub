@@ -15,6 +15,9 @@ export interface RawTransfer {
   /** Asset string exactly as on chain, e.g. `12.3400 CHEESE`. */
   quantity: string;
   memo: string;
+  /** Action ordinal inside the transaction, and the ordinal of the action that created it. */
+  ord?: number;
+  parent?: number;
   /**
    * Alcor order-book fills only: what the account gave for this fill, read
    * from the `sellmatch`/`buymatch` record in the same transaction.

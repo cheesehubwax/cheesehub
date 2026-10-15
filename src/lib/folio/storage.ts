@@ -6,7 +6,7 @@ const DB_VERSION = 1;
 const STORE = 'accounts';
 
 /** Bump when the stored shape changes; older records are discarded and rescanned. */
-export const FOLIO_SCHEMA = 1;
+export const FOLIO_SCHEMA = 2;
 
 export interface ProviderCursor {
   /** Last block time read from this provider, ISO string. */

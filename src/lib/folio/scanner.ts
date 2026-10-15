@@ -92,6 +92,7 @@ export function toRawTransfer(a: HyperionActionRecord): RawTransfer | null {
   return {
     gs: Number(a.global_sequence), trx: a.trx_id, ts: t, contract: a.act.account,
     from: d.from, to: d.to, quantity, memo: typeof d.memo === 'string' ? d.memo : '',
+    ord: a.action_ordinal, parent: a.creator_action_ordinal,
   };
 }
 

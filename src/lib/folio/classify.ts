@@ -84,6 +84,23 @@ function clean(a: number, precision: number) {
  * global sequence (history services repeat notifications) and processed in
  * chain order, so results are deterministic.
  */
+/**
+ * Some token contracts re-send a transfer as an inline copy of itself (same
+ * from/to/amount/memo, created by the original action) only to notify the
+ * receiver. Hyperion lists it as its own action, but the balance moves once,
+ * so the copy is dropped. Genuine repeated transfers are separate top-level
+ * or sibling actions and are kept.
+ */
+export function withoutRedispatches(transfers: RawTransfer[]): RawTransfer[] {
+  const byOrd = new Map<string, RawTransfer>();
+  for (const t of transfers) if (t.ord != null) byOrd.set(`${t.trx}:${t.ord}`, t);
+  return transfers.filter((t) => {
+    if (!t.parent) return true;
+    const p = byOrd.get(`${t.trx}:${t.parent}`);
+    return !(p && p.contract === t.contract && p.from === t.from && p.to === t.to && p.quantity === t.quantity && p.memo === t.memo);
+  });
+}
+
 export function classifyTransfers(transfers: RawTransfer[], account: string): FolioEvent[] {
   const unique = new Map<number, RawTransfer>();
   for (const t of transfers) {
@@ -91,7 +108,7 @@ export function classifyTransfers(transfers: RawTransfer[], account: string): Fo
     if (t.from !== account && t.to !== account) continue;
     if (!unique.has(t.gs)) unique.set(t.gs, t);
   }
-  const ordered = [...unique.values()].sort((a, b) => a.gs - b.gs);
+  const ordered = withoutRedispatches([...unique.values()]).sort((a, b) => a.gs - b.gs);
   const byTrx = new Map<string, RawTransfer[]>();
   for (const t of ordered) {
     const list = byTrx.get(t.trx);
