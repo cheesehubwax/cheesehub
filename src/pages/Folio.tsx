@@ -10,6 +10,7 @@ import { useAllTokenBalances } from '@/hooks/useAllTokenBalances';
 import { useAlcorTokenPrices } from '@/hooks/useAlcorTokenPrices';
 import { useWaxPrice } from '@/hooks/useWaxPrice';
 import { useFolio } from '@/hooks/useFolio';
+import { usePooledTokens } from '@/hooks/usePooledTokens';
 import { hasCoverageGap } from '@/lib/folio/scanner';
 import { buildHoldings, type HoldingRow } from '@/lib/folio/holdings';
 import { downloadActivityCsv, downloadHoldingsCsv } from '@/lib/folio/csv';
@@ -159,7 +160,7 @@ const Folio = () => {
                   </Button>
                 )}
                 <Button size="sm" variant="outline" disabled={!holdings.length} onClick={() => downloadHoldingsCsv(accountName, holdings.map((h) => ({
-                  symbol: h.symbol, contract: h.contract, balance: h.balance, avgCostWax: h.avgCostWax, priceWax: h.priceWax ?? 0,
+                  symbol: h.symbol, contract: h.contract, balance: h.balance, walletBalance: h.walletBalance, pooledBalance: h.pooledBalance, avgCostWax: h.avgCostWax, priceWax: h.priceWax ?? 0,
                   valueWax: h.valueWax ?? 0, unrealizedWax: h.unrealizedWax, realizedWax: h.realizedWax, complete: h.complete,
                   avgCostUsd: h.avgCostUsd, valueUsd: h.valueUsd, unrealizedUsd: h.unrealizedUsd, realizedUsd: h.realizedUsd,
                   realisableWax: h.key === 'eosio.token:WAX' ? h.balance : realisable?.get(h.key)?.wax ?? null,
@@ -223,6 +224,7 @@ const Folio = () => {
                 ? 'USD profit/loss uses the WAX/USD rate on the day of each trade, so it includes WAX\'s own price moves.'
                 : 'Profit/loss is measured in WAX using the average price you paid. USD figures under WAX amounts use today\'s WAX price.'}
               {' '}Rewards, airdrops, pool fees and tokens sent to you count as free (zero cost).
+              Balances include tokens you have in Alcor, Taco and Defibox pools (uncollected pool fees are not counted).
               Paper value is amount × price; realisable is what selling each whole balance on Alcor would return right now.
               {usd && !folio.usdHistoryLoaded && folio.hasHistory ? ' Past WAX/USD rates are still loading or unavailable.' : ''}
             </p>
@@ -230,8 +232,14 @@ const Folio = () => {
             <div className="w-full space-y-2">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold">Holdings</h2>
-                {liveLoading ? <span className="text-xs text-muted-foreground">Loading balances…</span> : null}
+                {liveLoading ? <span className="text-xs text-muted-foreground">Loading balances…</span>
+                  : pooledLoading && !pooled ? <span className="text-xs text-muted-foreground">Reading your pool positions…</span> : null}
               </div>
+              {pooled?.failed.length ? (
+                <div className="text-xs text-destructive">
+                  Couldn't read your {pooled.failed.map((v) => venueName[v] ?? v).join(' and ')} pool positions right now, so tokens there are left out. Refresh to try again.
+                </div>
+              ) : null}
               <HoldingsTable rows={holdings} waxUsd={waxUsd} cur={cur} realisable={realisable} onPick={setPicked} />
             </div>
 
