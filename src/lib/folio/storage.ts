@@ -13,6 +13,16 @@ export interface ProviderCursor {
   after: string | null;
   /** True once this provider has been read up to the present at least once. */
   caughtUp: boolean;
+  /** Page size this provider accepts, learned from its "limit too big" reply. */
+  limit?: number;
+  /** Date windows still being read during the first full read of this provider. */
+  windows?: ScanWindow[];
+}
+
+export interface ScanWindow {
+  after: string | null;
+  before: string | null;
+  done: boolean;
 }
 
 export interface StoredFolio {

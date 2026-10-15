@@ -4,7 +4,7 @@
 // provider can silently hold only part of the history.
 import { DEFAULT_HYPERION_ENDPOINTS, type HyperionActionRecord } from '../hyperionHistory';
 import { resolveEndpoints } from '../endpointHealth';
-import type { ProviderCursor, StoredFolio } from './storage';
+import type { ProviderCursor, ScanWindow, StoredFolio } from './storage';
 import type { RawTransfer } from './types';
 import { mapLimit } from '../chainRequest';
 import { waxRpcCall } from '../waxRpcFallback';
@@ -14,6 +14,8 @@ const PAGE = 1000;
 const PROVIDERS = 3;
 const PAGE_TIMEOUT_MS = 15_000;
 const PROBE_TIMEOUT_MS = 6_000;
+/** Date windows read in parallel when a provider is read from the start. */
+const BACKFILL_WINDOWS = 8;
 /** Order-book fill lookups in flight per provider. */
 const FILL_CONCURRENCY = 8;
 /**
@@ -93,13 +95,19 @@ export function toRawTransfer(a: HyperionActionRecord): RawTransfer | null {
   };
 }
 
-async function fetchPage(url: string): Promise<HyperionActionRecord[] | null> {
-  for (let attempt = 0; attempt < 2; attempt++) {
+type PageResult = { actions: HyperionActionRecord[] } | { maxLimit: number } | null;
+
+async function fetchPage(url: string): Promise<PageResult> {
+  for (let attempt = 0; attempt < 3; attempt++) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), PAGE_TIMEOUT_MS);
     try {
       const res = await fetch(url, { signal: ctrl.signal });
-      if (res.ok) return ((await res.json()) as { actions?: HyperionActionRecord[] }).actions ?? [];
+      if (res.ok) return { actions: ((await res.json()) as { actions?: HyperionActionRecord[] }).actions ?? [] };
+      // Some providers cap the page size (e.g. "limit too big, maximum: 100").
+      const text = await res.text().catch(() => '');
+      const cap = /limit too big, maximum:\s*(\d+)/i.exec(text);
+      if (cap) return { maxLimit: Number(cap[1]) };
       if (res.status === 400 || res.status === 404) return null;
     } catch {
       /* retry */
@@ -220,7 +228,7 @@ export async function syncFolio(
 ): Promise<{ providersOk: number }> {
   await onPage(rec, { transfers: rec.transfers.length, reachedTs: null, providersDone: 0, providers: 0, phase: 'probing' });
   const shared = await resolveEndpoints('hyperion-v2', DEFAULT_HYPERION_ENDPOINTS, 8).catch(() => DEFAULT_HYPERION_ENDPOINTS);
-  const candidates = [...new Set([...shared, ...FOLIO_HYPERION_EXTRA].map((u) => u.replace(/\/$/, '')))];
+  const candidates = [...new Set([...shared, ...FOLIO_HYPERION_EXTRA].map((u) => u.replace(/\/+$/, '')))];
   const [probes, created] = await Promise.all([
     probeProviders(rec.account, candidates, signal),
     waxRpcCall<{ created?: string }>('/v1/chain/get_account', { account_name: rec.account }).catch(() => null),
@@ -238,21 +246,29 @@ export async function syncFolio(
   let done = 0;
   let ok = 0;
 
-  const readProvider = async (base: string) => {
-    const cursor: ProviderCursor = rec.cursors[base] ?? { after: null, caughtUp: false };
-    rec.cursors[base] = cursor;
-    const root = `${base.replace(/\/$/, '')}/v2/history/get_actions?account=${rec.account}&filter=*:transfer&sort=asc&limit=${PAGE}`;
+  const earliestOf = new Map(probes.map((p) => [p.base, p.earliestTs]));
+
+  /** Reads one time range oldest → newest, moving `range.after` forward. */
+  const readRange = async (base: string, cursor: ProviderCursor, range: ScanWindow): Promise<boolean> => {
     for (;;) {
       if (signal?.aborted) return false;
-      const url = cursor.after ? `${root}&after=${encodeURIComponent(cursor.after)}` : root;
-      const actions = await fetchPage(url);
-      if (!actions) return false;
+      const limit = cursor.limit ?? PAGE;
+      let url = `${base}/v2/history/get_actions?account=${rec.account}&filter=*:transfer&sort=asc&limit=${limit}`;
+      if (range.after) url += `&after=${encodeURIComponent(range.after)}`;
+      if (range.before) url += `&before=${encodeURIComponent(range.before)}`;
+      const page = await fetchPage(url);
+      if (!page) return false;
+      if ('maxLimit' in page) {
+        if (!(page.maxLimit > 0) || page.maxLimit >= limit) return false;
+        cursor.limit = page.maxLimit;
+        continue;
+      }
+      const { actions } = page;
       let added = 0;
       let lastTs: number | null = null;
       for (const a of actions) {
         const t = toRawTransfer(a);
-        const ts = (a['@timestamp'] ?? a.timestamp) as string | undefined;
-        const pt = ts ? Date.parse(ts.endsWith('Z') ? ts : `${ts}Z`) : NaN;
+        const pt = parseTs((a['@timestamp'] ?? a.timestamp) as string | undefined);
         if (Number.isFinite(pt)) lastTs = pt;
         if (!t || seen.has(t.gs)) continue;
         seen.add(t.gs);
@@ -262,22 +278,51 @@ export async function syncFolio(
       }
       // Move the cursor 1 ms back so rows sharing the page-edge block are
       // re-read (and de-duplicated) instead of lost.
+      let stalled = false;
       if (lastTs != null) {
         const next = new Date(lastTs - 1).toISOString();
-        const stalled = next === cursor.after && added === 0;
-        cursor.after = next;
-        if (stalled) {
-          cursor.caughtUp = true;
-          await onPage(rec, { transfers: rec.transfers.length, reachedTs, providersDone: done, providers: endpoints.length, phase: 'history' });
-          return true;
-        }
+        stalled = next === range.after && added === 0;
+        range.after = next;
       }
       await onPage(rec, { transfers: rec.transfers.length, reachedTs, providersDone: done, providers: endpoints.length, phase: 'history' });
-      if (actions.length < PAGE) {
-        cursor.caughtUp = true;
+      if (stalled || actions.length < limit) {
+        range.done = true;
         return true;
       }
     }
+  };
+
+  const readProvider = async (base: string) => {
+    const cursor: ProviderCursor = rec.cursors[base] ?? { after: null, caughtUp: false };
+    rec.cursors[base] = cursor;
+    // First read of a provider: split its whole history into date windows
+    // read side by side, so small-page providers are not one long queue.
+    if (!cursor.caughtUp && cursor.after == null && !cursor.windows) {
+      const start = earliestOf.get(base);
+      if (start != null) {
+        const end = Date.now();
+        const step = Math.max(1, Math.ceil((end - start) / BACKFILL_WINDOWS));
+        cursor.windows = Array.from({ length: BACKFILL_WINDOWS }, (_, i) => ({
+          after: new Date(start + i * step - 1).toISOString(),
+          before: i === BACKFILL_WINDOWS - 1 ? null : new Date(start + (i + 1) * step).toISOString(),
+          done: false,
+        }));
+      }
+    }
+    if (cursor.windows) {
+      const results = await Promise.all(cursor.windows.filter((w) => !w.done).map((w) => readRange(base, cursor, w).catch(() => false)));
+      if (results.some((r) => !r) || cursor.windows.some((w) => !w.done)) return false;
+      // Backfill complete: continue incrementally from the newest window.
+      cursor.after = cursor.windows[cursor.windows.length - 1].after;
+      cursor.windows = undefined;
+      cursor.caughtUp = true;
+      return true;
+    }
+    const range: ScanWindow = { after: cursor.after, before: null, done: false };
+    const ok = await readRange(base, cursor, range);
+    cursor.after = range.after;
+    if (ok) cursor.caughtUp = true;
+    return ok;
   };
 
   await Promise.all(
