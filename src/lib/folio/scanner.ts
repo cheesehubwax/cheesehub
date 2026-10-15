@@ -98,11 +98,13 @@ export function toRawTransfer(a: HyperionActionRecord): RawTransfer | null {
 type PageResult = { actions: HyperionActionRecord[] } | { maxLimit: number } | null;
 
 async function fetchPage(url: string): Promise<PageResult> {
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 5; attempt++) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), PAGE_TIMEOUT_MS);
+    let wait = 800 * (attempt + 1);
     try {
       const res = await fetch(url, { signal: ctrl.signal });
+      if (res.status === 429) wait = Math.min(8000, 1500 * 2 ** attempt);
       if (res.ok) return { actions: ((await res.json()) as { actions?: HyperionActionRecord[] }).actions ?? [] };
       // Some providers cap the page size (e.g. "limit too big, maximum: 100").
       const text = await res.text().catch(() => '');
@@ -114,7 +116,7 @@ async function fetchPage(url: string): Promise<PageResult> {
     } finally {
       clearTimeout(timer);
     }
-    await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+    await new Promise((r) => setTimeout(r, wait));
   }
   return null;
 }
