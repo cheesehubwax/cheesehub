@@ -7,7 +7,6 @@ import { TokenLogo } from '@/components/TokenLogo';
 import type { FolioEvent, FolioEventType, TokenAmount } from '@/lib/folio/types';
 import type { HoldingRow } from '@/lib/folio/holdings';
 import type { Realisable } from '@/hooks/useRealisableValues';
-import './folio.css';
 
 export type Currency = 'WAX' | 'USD';
 
@@ -78,26 +77,13 @@ export function AmountList({ items }: { items: TokenAmount[] }) {
   );
 }
 
-export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }: {
-  rows: HoldingRow[]; events: FolioEvent[]; waxUsd: number; cur: Currency; realisable?: Map<string, Realisable>; onPick: (r: HoldingRow) => void;
+export function HoldingsTable({ rows, waxUsd, cur, realisable, onPick }: {
+  rows: HoldingRow[]; waxUsd: number; cur: Currency; realisable?: Map<string, Realisable>; onPick: (r: HoldingRow) => void;
 }) {
   const usd = cur === 'USD';
-  const acquisitions = useMemo(() => {
-    const purchased = new Map<string, number>();
-    for (const event of events) {
-      if (event.type !== 'trade') continue;
-      for (const amount of event.in) purchased.set(amount.key, (purchased.get(amount.key) ?? 0) + amount.amount);
-    }
-    return new Map(rows.map((row) => {
-      const paid = purchased.get(row.key) ?? 0;
-      const free = row.position?.freeQty ?? 0;
-      const total = paid + free;
-      return [row.key, total > 0 ? { paid: paid / total * 100, free: free / total * 100 } : null];
-    }));
-  }, [rows, events]);
   return (
-    <div className="w-full min-w-0 rounded-lg border border-border/50 bg-card/60">
-      <table aria-label="Holdings" className="folio-holdings tabular-nums">
+    <div className="w-full overflow-x-auto rounded-lg border border-border/50 bg-card/60">
+      <table className="w-full min-w-[980px] text-sm whitespace-nowrap">
         <thead className="text-xs uppercase text-muted-foreground">
           <tr className="border-b border-border/50">
             <th className="px-3 py-2 text-left">Token</th>
@@ -119,16 +105,13 @@ export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }:
             const realized = usd ? r.realizedUsd : r.realizedWax;
             const avg = usd ? r.avgCostUsd : r.avgCostWax;
             const usdMissing = usd && r.complete && !r.usdComplete;
-            const receipt = acquisitions.get(r.key);
             return (
             <tr key={r.key} className="cursor-pointer border-b border-border/30 hover:bg-cheese/5" onClick={() => onPick(r)}>
               <td className="px-3 py-2">
-                <Button variant="ghost" className="h-auto max-w-full justify-start gap-1.5 p-0 text-xs hover:bg-transparent" onClick={(e) => { e.stopPropagation(); onPick(r); }} aria-label={`View ${r.symbol} details`}>
+                <span className="inline-flex items-center gap-2">
                   <TokenLogo contract={r.contract} symbol={r.symbol} size="sm" />
                   <span className="font-semibold">{r.symbol}</span>
-                  <span aria-hidden="true" className="text-muted-foreground">↗</span>
-                </Button>
-                <div className="text-[10px] text-muted-foreground">{r.contract}</div>
+                  <span className="text-xs text-muted-foreground">{r.contract}</span>
                   {!r.complete ? (
                     <span className="rounded border border-destructive/40 px-1 text-[10px] text-destructive" title={r.pooledUnknown ? "Some pool positions couldn't be read, so profit/loss is hidden for this token." : "Your saved history doesn't add up to your live balance (wallet plus pools), so profit/loss is hidden for this token."}>
                       history incomplete
@@ -142,12 +125,9 @@ export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }:
                       partly unpriced
                     </span>
                   ) : null}
-                {receipt ? <div className="mt-1 text-[10px] text-muted-foreground" title="Shares of all-time recorded receipts, not the current balance. Exact amounts are in token details.">
-                  <div>Receipts: purchased {fmt(receipt.paid, 1)}%</div>
-                  <div>Gifted / reward {fmt(receipt.free, 1)}%</div>
-                </div> : null}
+                </span>
               </td>
-              <td data-label="Balance" className="px-3 py-2 text-right">
+              <td className="px-3 py-2 text-right">
                 <div>{fmt(r.balance, r.precision)}</div>
                 {r.pooledBalance > 0 ? (
                   <div className="text-xs text-muted-foreground" title={r.pooledParts.map((x) => `${fmt(x.qty, r.precision)} in ${x.venue} ${x.pair}`).join('\n')}>
@@ -155,13 +135,13 @@ export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }:
                   </div>
                 ) : null}
               </td>
-              <td data-label="Avg cost" className="px-3 py-2 text-right">{avg == null ? '—' : usd ? `$${fmt(avg, 6)}` : fmt(avg, 6)}</td>
-              <td data-label="Price" className="px-3 py-2 text-right">{r.priceWax == null ? '—' : usd ? (waxUsd ? `$${fmt(r.priceWax * waxUsd, 6)}` : '—') : fmt(r.priceWax, 6)}</td>
-              <td data-label="Paper value" className="px-3 py-2 text-right">
+              <td className="px-3 py-2 text-right">{avg == null ? '—' : usd ? `$${fmt(avg, 6)}` : fmt(avg, 6)}</td>
+              <td className="px-3 py-2 text-right">{r.priceWax == null ? '—' : usd ? (waxUsd ? `$${fmt(r.priceWax * waxUsd, 6)}` : '—') : fmt(r.priceWax, 6)}</td>
+              <td className="px-3 py-2 text-right">
                 <div>{usd ? money(r.valueUsd, cur) : waxFmt(r.valueWax)}</div>
                 {!usd ? <div className="text-xs text-muted-foreground">{usdFmt(r.valueWax, waxUsd)}</div> : null}
               </td>
-              <td data-label="Realisable" className="px-3 py-2 text-right">
+              <td className="px-3 py-2 text-right">
                 {rzWax == null ? (
                   <span className="text-muted-foreground">{realisable || r.key === 'eosio.token:WAX' ? '—' : '…'}</span>
                 ) : (
@@ -171,11 +151,11 @@ export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }:
                   </>
                 )}
               </td>
-              <td data-label="Unrealised P/L" className={`px-3 py-2 text-right ${plClass(unreal)}`}>
+              <td className={`px-3 py-2 text-right ${plClass(unreal)}`}>
                 {unreal == null ? '—' : signedMoney(unreal, cur)}
                 {unrealPct != null ? <div className="text-xs">{signed(unrealPct)}%</div> : null}
               </td>
-              <td data-label="Realised P/L" className={`px-3 py-2 text-right ${plClass(realized || null)}`}>{realized ? signedMoney(realized, cur) : '—'}</td>
+              <td className={`px-3 py-2 text-right ${plClass(realized || null)}`}>{realized ? signedMoney(realized, cur) : '—'}</td>
             </tr>
             );
           })}
@@ -303,10 +283,9 @@ export function TokenDialog({
   const p = row?.position;
   const acquisitions = useMemo(() => row && p ? acquisitionBreakdown(row.key, events, p.freeQty) : null, [row, p, events]);
   const usd = cur === 'USD';
-  const unrealized = row ? (usd ? row.unrealizedUsd : row.unrealizedWax) : null;
   return (
     <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="w-[calc(100%-1rem)] max-w-5xl max-h-[90vh] overflow-y-auto overflow-x-hidden p-4 sm:p-6 [&>*]:min-w-0">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto overflow-x-hidden [&>*]:min-w-0">
         {row ? (
           <>
             <DialogHeader>
@@ -323,13 +302,13 @@ export function TokenDialog({
                 value={realisable?.wax == null ? '—' : usd ? money(waxUsd ? realisable.wax * waxUsd : null, cur) : waxFmt(realisable.wax)}
                 sub={realisable?.gapPct != null ? `${signed(realisable.gapPct)}% vs paper value` : undefined}
               />
-              <SummaryBox label="Unrealised" value={unrealized == null ? '—' : signedMoney(unrealized, cur)} tone={unrealized} />
+              <SummaryBox label="Unrealised" value={(usd ? row.unrealizedUsd : row.unrealizedWax) == null ? '—' : signedMoney((usd ? row.unrealizedUsd : row.unrealizedWax)!, cur)} tone={usd ? row.unrealizedUsd : row.unrealizedWax} />
               <SummaryBox label="Realised" value={signedMoney(usd ? row.realizedUsd : row.realizedWax, cur)} tone={usd ? row.realizedUsd : row.realizedWax} />
             </div>
             {p && acquisitions ? (
               <section aria-label="Acquisition breakdown" className="border-y border-border/50 py-3 space-y-2">
                 <div className="flex flex-wrap items-baseline justify-between gap-1">
-                  <h3 className="text-sm font-semibold">Purchased / Gifted &amp; Reward</h3>
+                  <h3 className="text-sm font-semibold">Acquisition breakdown</h3>
                   <span className="text-xs text-muted-foreground">All-time recorded receipts · not current balance</span>
                 </div>
                 <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 text-sm">
