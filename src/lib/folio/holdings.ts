@@ -75,10 +75,16 @@ export function buildHoldings(
       valueUsd, avgCostUsd: avgUsd, unrealizedUsd,
       unrealizedPctUsd: unrealizedUsd != null && costNowUsd && costNowUsd > 0 ? (unrealizedUsd / costNowUsd) * 100 : null,
       realizedUsd: p?.realizedUsd ?? 0,
-      usdComplete: usdOk || isWax && !p,
+      usdComplete: usdOk,
       complete: isWax ? true : complete,
       position: p,
     });
   }
   return rows.sort((a, b) => (b.valueWax ?? 0) - (a.valueWax ?? 0));
+}
+
+/** Realisable vs paper value in %, null when either side is unknown. */
+export function realisableGapPct(realisableWax: number | null, paperWax: number | null): number | null {
+  if (realisableWax == null || paperWax == null || !(paperWax > 0)) return null;
+  return ((realisableWax - paperWax) / paperWax) * 100;
 }
