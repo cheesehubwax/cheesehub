@@ -15,6 +15,13 @@ export interface RawTransfer {
   /** Asset string exactly as on chain, e.g. `12.3400 CHEESE`. */
   quantity: string;
   memo: string;
+  /**
+   * Alcor order-book fills only: what the account gave for this fill, read
+   * from the `sellmatch`/`buymatch` record in the same transaction.
+   */
+  fillGave?: { contract: string; quantity: string } | null;
+  /** True once the fill record lookup ran (even if nothing matched). */
+  fillChecked?: boolean;
 }
 
 export type TokenKey = string; // `${contract}:${SYMBOL}`
@@ -56,6 +63,10 @@ export interface FolioEvent {
   memo?: string;
   /** Order-book placement: what the order asks for in return. */
   orderWant?: TokenAmount;
+  /** Order-book fill: what was given for it, when the fill record was read. */
+  fillGave?: TokenAmount;
+  /** First global sequence of the transaction — the true chain order. */
+  seq: number;
 }
 
 /** Per-token running position produced by the ledger. */

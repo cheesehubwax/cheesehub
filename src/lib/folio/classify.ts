@@ -52,7 +52,7 @@ function kindOf(t: RawTransfer, account: string, trxHasTacoSwap: boolean): Kind 
     return { k: 'out' };
   }
   if (other === 'swap.alcor') {
-    return /^Swap tokenOut/.test(memo) ? { k: 'swap-in', venue: 'alcor' } : { k: 'lp-remove', venue: 'alcor' };
+    return /^Swap (tokenOut|Change)/.test(memo) ? { k: 'swap-in', venue: 'alcor' } : { k: 'lp-remove', venue: 'alcor' };
   }
   if (other === 'swap.box') {
     return /swap token/i.test(memo) ? { k: 'swap-in', venue: 'defibox' } : { k: 'lp-remove', venue: 'defibox' };
@@ -102,6 +102,7 @@ export function classifyTransfers(transfers: RawTransfer[], account: string): Fo
   const events: FolioEvent[] = [];
   for (const [trx, list] of byTrx) {
     const ts = list[0].ts;
+    const seq = list[0].gs;
     const hasTacoSwap = list.some((t) => t.from === account && t.to === 'swap.taco' && !!parseOrderMemo(t.memo));
     let n = 0;
     const nextId = () => `${trx}:${n++}`;
@@ -134,7 +135,7 @@ export function classifyTransfers(transfers: RawTransfer[], account: string): Fo
       }
       if (out.length || inn.length) {
         events.push({
-          id: nextId(), trx, ts, type: 'trade',
+          id: nextId(), trx, ts, seq, type: 'trade',
           venue: venues.size === 1 ? [...venues][0] : 'alcor',
           out, in: inn,
         });
@@ -146,11 +147,12 @@ export function classifyTransfers(transfers: RawTransfer[], account: string): Fo
     for (const { t, kind, asset } of simple) {
       if (kind.k === 'order-place') {
         // Each placement is its own order so fills can be matched to its price.
-        events.push({ id: nextId(), trx, ts, type: 'order-placed', venue: 'alcor-orderbook', out: [asset], in: [], orderWant: kind.want, memo: t.memo });
+        events.push({ id: nextId(), trx, ts, seq, type: 'order-placed', venue: 'alcor-orderbook', out: [asset], in: [], orderWant: kind.want, memo: t.memo });
         continue;
       }
       if (kind.k === 'order-fill') {
-        events.push({ id: nextId(), trx, ts, type: 'trade', venue: 'alcor-orderbook', out: [], in: [asset] });
+        const gave = t.fillGave ? parseAsset(t.fillGave.quantity, t.fillGave.contract) : null;
+        events.push({ id: nextId(), trx, ts, seq, type: 'trade', venue: 'alcor-orderbook', out: [], in: [asset], ...(gave ? { fillGave: gave } : {}) });
         continue;
       }
       const type =
@@ -166,7 +168,7 @@ export function classifyTransfers(transfers: RawTransfer[], account: string): Fo
       const gk = `${type}|${venue ?? ''}|${type === 'sent' || type === 'received' ? counterparty : ''}`;
       let ev = groups.get(gk);
       if (!ev) {
-        ev = { id: nextId(), trx, ts, type, venue, out: [], in: [], counterparty, memo: t.memo };
+        ev = { id: nextId(), trx, ts, seq, type, venue, out: [], in: [], counterparty, memo: t.memo };
         groups.set(gk, ev);
         events.push(ev);
       }
