@@ -100,7 +100,7 @@ export function HoldingsTable({ rows, waxUsd, cur, realisable, onPick }: {
                   <span className="font-semibold">{r.symbol}</span>
                   <span className="text-xs text-muted-foreground">{r.contract}</span>
                   {!r.complete ? (
-                    <span className="rounded border border-destructive/40 px-1 text-[10px] text-destructive" title="Your saved history doesn't add up to your live balance, so profit/loss is hidden for this token.">
+                    <span className="rounded border border-destructive/40 px-1 text-[10px] text-destructive" title={r.pooledUnknown ? "Some pool positions couldn't be read, so profit/loss is hidden for this token." : "Your saved history doesn't add up to your live balance (wallet plus pools), so profit/loss is hidden for this token."}>
                       history incomplete
                     </span>
                   ) : usdMissing ? (
@@ -114,7 +114,14 @@ export function HoldingsTable({ rows, waxUsd, cur, realisable, onPick }: {
                   ) : null}
                 </span>
               </td>
-              <td className="px-3 py-2 text-right">{fmt(r.balance, r.precision)}</td>
+              <td className="px-3 py-2 text-right">
+                <div>{fmt(r.balance, r.precision)}</div>
+                {r.pooledBalance > 0 ? (
+                  <div className="text-xs text-muted-foreground" title={r.pooledParts.map((x) => `${fmt(x.qty, r.precision)} in ${x.venue} ${x.pair}`).join('\n')}>
+                    {fmt(r.pooledBalance, r.precision)} in pools
+                  </div>
+                ) : null}
+              </td>
               <td className="px-3 py-2 text-right">{avg == null ? '—' : usd ? `$${fmt(avg, 6)}` : fmt(avg, 6)}</td>
               <td className="px-3 py-2 text-right">{r.priceWax == null ? '—' : usd ? (waxUsd ? `$${fmt(r.priceWax * waxUsd, 6)}` : '—') : fmt(r.priceWax, 6)}</td>
               <td className="px-3 py-2 text-right">
@@ -294,9 +301,26 @@ export function TokenDialog({
                 <div>History total: <span className="text-foreground">{fmt(p.qty, p.precision)}</span></div>
               </div>
             ) : null}
+            {row.pooledBalance > 0 ? (
+              <div className="rounded-md border border-border/50 p-3 text-sm space-y-1">
+                <div className="text-muted-foreground">
+                  Wallet <span className="text-foreground">{fmt(row.walletBalance, row.precision)}</span> · In pools <span className="text-foreground">{fmt(row.pooledBalance, row.precision)}</span>
+                </div>
+                {row.pooledParts.map((x) => (
+                  <div key={`${x.venue}:${x.pair}`} className="flex justify-between gap-4">
+                    <span>{x.venue === 'alcor' ? 'Alcor' : x.venue === 'taco' ? 'Taco' : 'Defibox'} · {x.pair}</span>
+                    <span>{fmt(x.qty, row.precision)} {row.symbol}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {!row.complete ? (
               <p className="text-sm text-destructive">
-                Your saved history adds up to a different balance than your wallet shows, so profit/loss for this token is hidden.
+                {row.pooledUnknown
+                  ? "Some of your pool positions couldn't be read right now, so profit/loss for this token is hidden. "
+                  : row.pooledBalance > 0 && !(row.position && row.position.inLiquidityQty > 0)
+                    ? "This token is in a pool, but your saved history has no deposit of it, so its cost is unknown and profit/loss is hidden. "
+                    : 'Your saved history adds up to a different balance than your wallet shows, so profit/loss for this token is hidden. '}
                 This usually means some history wasn't available — try "Rescan from scratch".
               </p>
             ) : null}

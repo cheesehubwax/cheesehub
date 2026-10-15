@@ -709,6 +709,15 @@ export interface AnyAmmPool {
   symbolB: string;
   contractB: string;
   reserveB: number;
+  /** Decimal places of each reserve, as written on chain. */
+  precisionA?: number;
+  precisionB?: number;
+}
+
+function decimalsOf(asset: unknown): number | undefined {
+  const amount = String(asset ?? '').trim().split(' ')[0] ?? '';
+  if (!/^[0-9]+(\.[0-9]+)?$/.test(amount)) return undefined;
+  return amount.split('.')[1]?.length ?? 0;
 }
 
 /** Every pool on Taco or Defibox, regardless of which tokens it pairs. */
@@ -738,6 +747,8 @@ export async function fetchAllAmmPools(venue: 'taco' | 'defibox'): Promise<AnyAm
         symbolB,
         contractB,
         reserveB,
+        precisionA: decimalsOf(row.pool1?.quantity),
+        precisionB: decimalsOf(row.pool2?.quantity),
       });
     }
     return out;
@@ -767,6 +778,8 @@ export async function fetchAllAmmPools(venue: 'taco' | 'defibox'): Promise<AnyAm
       symbolB,
       contractB,
       reserveB,
+      precisionA: decimalsOf(row.reserve0),
+      precisionB: decimalsOf(row.reserve1),
     });
   }
   return out;
