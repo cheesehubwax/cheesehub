@@ -113,14 +113,22 @@ const Folio = () => {
               <div className="text-muted-foreground">
                 {folio.syncing ? (
                   folio.hasHistory && folio.syncedAt ? 'Checking for new transactions…' : `Scanning history for ${accountName}…`
+                ) : !folio.loaded ? (
+                  'Loading saved history…'
                 ) : folio.syncedAt ? (
                   `Up to date · last checked ${new Date(folio.syncedAt).toLocaleTimeString()} · ${folio.transferCount.toLocaleString()} transfers saved in this browser`
                 ) : (
-                  'Not synced yet'
+                  folio.hasHistory ? 'Scan paused — press Continue scan to pick up where it stopped' : 'No history scanned yet'
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" disabled={folio.syncing} onClick={folio.resync}>Sync now</Button>
+                {folio.syncing ? (
+                  <Button size="sm" variant="outline" onClick={folio.stop}>Stop scan</Button>
+                ) : (
+                  <Button size="sm" disabled={!folio.loaded} onClick={folio.resync}>
+                    {folio.syncedAt ? 'Sync now' : folio.hasHistory ? 'Continue scan' : 'Scan my history'}
+                  </Button>
+                )}
                 <Button size="sm" variant="outline" disabled={!holdings.length} onClick={() => downloadHoldingsCsv(accountName, holdings.map((h) => ({
                   symbol: h.symbol, contract: h.contract, balance: h.balance, avgCostWax: h.avgCostWax, priceWax: h.priceWax ?? 0,
                   valueWax: h.valueWax ?? 0, unrealizedWax: h.unrealizedWax, realizedWax: h.realizedWax, complete: h.complete,
@@ -131,14 +139,29 @@ const Folio = () => {
               </div>
             </div>
 
-            {folio.syncing && !folio.syncedAt ? (
+            {folio.syncing ? (
               <div className="w-full space-y-1">
-                <Progress value={p && p.providers ? (p.providersDone / p.providers) * 100 : 5} />
+                <Progress
+                  value={
+                    !p || p.phase === 'probing' ? 3
+                      : p.phase === 'fills' && p.fillsTotal ? 60 + ((p.fillsDone ?? 0) / p.fillsTotal) * 40
+                      : p.phase === 'done' ? 100
+                      : 5 + (p.providers ? (p.providersDone / p.providers) * 55 : 0)
+                  }
+                />
                 <div className="text-xs text-muted-foreground text-center">
-                  {(p?.transfers ?? 0).toLocaleString()} transfers found
-                  {p?.reachedTs ? ` · reached ${new Date(p.reachedTs).toISOString().slice(0, 10)}` : ''}
-                  {' · '}Heavy trading accounts can take a minute or more. You can leave — it continues from here next time.
+                  {!p || p.phase === 'probing'
+                    ? 'Finding history services that answer from your browser…'
+                    : p.phase === 'fills'
+                      ? `Reading order-book fills ${(p.fillsDone ?? 0).toLocaleString()} / ${(p.fillsTotal ?? 0).toLocaleString()}`
+                      : `${p.transfers.toLocaleString()} transfers found${p.reachedTs ? ` · reached ${new Date(p.reachedTs).toISOString().slice(0, 10)}` : ''} · ${p.providersDone}/${p.providers} services finished`}
+                  {' · '}You can stop or leave — progress is saved and continues next time.
                 </div>
+              </div>
+            ) : !folio.hasHistory && folio.loaded ? (
+              <div className="w-full rounded-lg border border-cheese/20 bg-card/80 p-6 text-center space-y-3">
+                <p className="text-muted-foreground">Press <span className="text-foreground font-medium">Scan my history</span> to read your past trades from the blockchain. It only runs when you ask, and the result is saved in this browser.</p>
+                <Button onClick={folio.resync}>Scan my history</Button>
               </div>
             ) : null}
             {folio.error ? <div className="w-full text-sm text-destructive text-center">{folio.error}</div> : null}
