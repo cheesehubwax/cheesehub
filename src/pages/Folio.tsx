@@ -40,6 +40,11 @@ const Folio = () => {
   };
   const usd = cur === 'USD';
 
+  const shares = useMemo(
+    () => live.filter((t) => t.isLpToken).map((t) => ({ contract: t.contract, symbol: t.symbol, balance: t.balance })),
+    [live],
+  );
+  const { data: pooled, isFetching: pooledLoading } = usePooledTokens(accountName, shares, !liveLoading);
   const holdings = useMemo(
     () =>
       buildHoldings(
@@ -49,9 +54,11 @@ const Folio = () => {
         })),
         (key) => priceMap?.get(key) ?? null,
         waxUsd,
+        pooled ?? null,
       ),
-    [folio.ledger, live, priceMap, waxUsd],
+    [folio.ledger, live, priceMap, waxUsd, pooled],
   );
+  const venueName: Record<string, string> = { alcor: 'Alcor', taco: 'Taco', defibox: 'Defibox' };
   const { data: realisable } = useRealisableValues(holdings, accountName);
 
   const totals = useMemo(() => {
