@@ -6,6 +6,7 @@ import { DEFAULT_HYPERION_ENDPOINTS, type HyperionActionRecord } from '../hyperi
 import { resolveEndpoints } from '../endpointHealth';
 import type { ProviderCursor, StoredFolio } from './storage';
 import type { RawTransfer } from './types';
+import { mapLimit } from '../chainRequest';
 
 const PAGE = 1000;
 /** Providers read in parallel for the union. */
@@ -43,6 +44,67 @@ async function fetchPage(url: string): Promise<HyperionActionRecord[] | null> {
     await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
   }
   return null;
+}
+
+const isFill = (t: RawTransfer, account: string) =>
+  t.from === 'alcordexmain' && t.to === account && /order match/i.test(t.memo);
+
+interface MatchRecord {
+  bid?: string;
+  ask?: string;
+  market?: { base_token?: { sym?: string; contract?: string }; quote_token?: { sym?: string; contract?: string } };
+  bidder?: string;
+  asker?: string;
+}
+
+const symOf = (asset: string | undefined) => asset?.trim().split(/\s+/)[1];
+const amountOf = (asset: string | undefined) => parseFloat(asset?.trim().split(/\s+/)[0] ?? 'NaN');
+
+/**
+ * What the account gave for one order-book fill. The fill's `sellmatch` /
+ * `buymatch` record has both sides; whichever side equals what the account
+ * received, the other side is what it gave. Role-agnostic on purpose.
+ */
+export function fillGaveFromActions(actions: HyperionActionRecord[], account: string, t: RawTransfer): RawTransfer['fillGave'] {
+  const gotSym = symOf(t.quantity);
+  const gotAmt = amountOf(t.quantity);
+  const records = actions
+    .filter((a) => a.act?.account === 'alcordexmain' && /match$/.test(a.act?.name ?? ''))
+    .map((a) => (a.act?.data as { record?: MatchRecord } | undefined)?.record)
+    .filter((r): r is MatchRecord => !!r && (r.bidder === account || r.asker === account));
+  for (const r of records) {
+    for (const [got, gave] of [[r.bid, r.ask], [r.ask, r.bid]] as const) {
+      if (symOf(got) !== gotSym || Math.abs(amountOf(got) - gotAmt) > 1e-9) continue;
+      const gaveSym = symOf(gave);
+      const side = [r.market?.base_token, r.market?.quote_token].find((x) => x?.sym?.split(',')[1] === gaveSym);
+      if (gave && side?.contract) return { contract: side.contract, quantity: gave };
+    }
+  }
+  return null;
+}
+
+async function enrichFills(base: string, account: string, transfers: RawTransfer[], signal?: AbortSignal) {
+  const pending = transfers.filter((t) => isFill(t, account) && !t.fillChecked);
+  const byTrx = new Map<string, RawTransfer[]>();
+  for (const t of pending) byTrx.set(t.trx, [...(byTrx.get(t.trx) ?? []), t]);
+  await mapLimit([...byTrx.entries()], 4, async ([trx, list]) => {
+    if (signal?.aborted) return;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), PAGE_TIMEOUT_MS);
+    try {
+      const res = await fetch(`${base.replace(/\/$/, '')}/v2/history/get_transaction?id=${trx}`, { signal: ctrl.signal });
+      if (!res.ok) return; // left unchecked, retried on the next sync
+      const actions = ((await res.json()) as { actions?: HyperionActionRecord[] }).actions ?? [];
+      for (const t of list) {
+        t.fillGave = fillGaveFromActions(actions, account, t);
+        t.fillChecked = true;
+      }
+    } catch {
+      /* retried on the next sync */
+    } finally {
+      clearTimeout(timer);
+    }
+  });
 }
 
 export interface ScanProgress {
@@ -119,6 +181,13 @@ export async function syncFolio(
     }),
   );
   rec.transfers.sort((a, b) => a.gs - b.gs);
+  // Order-book fills need their match record to know what was given.
+  if (endpoints[0]) {
+    for (const base of endpoints) {
+      await enrichFills(base, rec.account, rec.transfers, signal);
+      if (!rec.transfers.some((t) => isFill(t, rec.account) && !t.fillChecked)) break;
+    }
+  }
   if (ok > 0) rec.syncedAt = Date.now();
   await onPage(rec, { transfers: rec.transfers.length, reachedTs, providersDone: done, providers: endpoints.length });
   return { providersOk: ok };
