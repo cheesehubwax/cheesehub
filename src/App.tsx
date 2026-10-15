@@ -19,6 +19,7 @@ import CheeseNull from "./pages/CheeseNull";
 import Drip from "./pages/Drip";
 import Air from "./pages/Air";
 import CheeseAnal from "./pages/CheeseAnal";
+import Folio from "./pages/Folio";
 import BannerAds from "./pages/BannerAds";
 import Disclaimer from "./pages/Disclaimer";
 import Terms from "./pages/Terms";
@@ -63,6 +64,8 @@ const App = () => {
                 <Route path="/air" element={<Air />} />
                 {/* CHEESEAnal — intentionally not linked from the header */}
                 <Route path="/anal" element={<CheeseAnal />} />
+                {/* CHEESEFolio — in testing, intentionally not linked anywhere */}
+                <Route path="/folio" element={<Folio />} />
                 <Route path="/bannerads" element={<BannerAds />} />
 
                 <Route path="/disclaimer" element={<Disclaimer />} />

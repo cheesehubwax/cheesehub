@@ -17,3 +17,5 @@
 - [x] CHEESESwap: place manual sliders beneath their pool rows with easier dragging and 1% controls
 - [x] CHEESESwap: compact manual pool rows and add viewport-safe scrolling for zoomed and small screens
 - [x] CHEESESwap: retain the completed Auto quote for comparison while adjusting Manual routes
+
+- [ ] CHEESEFolio at /folio (hidden, no header link while testing): scanner, classifier, average-cost ledger, holdings/activity/P&L UI, daily token price workflow. Open: speed up order-book fill lookups for heavy traders, add tests, browser check with a signed-in wallet.

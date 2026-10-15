@@ -1,0 +1,79 @@
+name: Token Price History
+
+on:
+  schedule:
+    # One record per UTC day. Several ticks because GitHub often delays or
+    # drops scheduled runs; the recorder skips days already recorded.
+    - cron: "17 0 * * *"
+    - cron: "17 6 * * *"
+    - cron: "17 12 * * *"
+    - cron: "17 18 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Set to '1' to overwrite today's record"
+        required: false
+        default: "0"
+
+concurrency:
+  group: token-price-history
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Prepare data branch checkout
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git clone --depth 1 --branch token-price-data "$REPO_URL" /tmp/price-data 2>/dev/null; then
+            echo "Existing token-price-data branch checked out."
+          else
+            echo "Creating orphan token-price-data branch..."
+            git clone --depth 1 "$REPO_URL" /tmp/price-data
+            cd /tmp/price-data
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git checkout --orphan token-price-data
+            git rm -rf --quiet . || true
+            mkdir -p data/days
+            echo '{"dates":[]}' > data/index.json
+            printf '%s\n' "# CHEESEFolio token prices" "" "Data-only branch written by .github/workflows/token-price-history.yml." > README.md
+            git add -A
+            git commit -m "chore: init token price data branch"
+            git push -u origin token-price-data
+          fi
+
+      - name: Record token prices
+        working-directory: scripts/token-price-history
+        env:
+          TOKEN_PRICE_DIR: /tmp/price-data/data
+          FORCE: ${{ github.event.inputs.force }}
+        run: bun run sample.ts
+
+      - name: Commit record
+        run: |
+          set -euo pipefail
+          cd /tmp/price-data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A data
+          if git diff --cached --quiet; then
+            echo "No change to commit."
+            exit 0
+          fi
+          git commit -m "chore: token prices $(date -u +'%Y-%m-%d')"
+          git push origin token-price-data
