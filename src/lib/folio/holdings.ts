@@ -24,6 +24,14 @@ export interface HoldingRow {
   unrealizedWax: number | null;
   unrealizedPct: number | null;
   realizedWax: number;
+  /** USD figures: value at today's WAX/USD rate, cost at each purchase day's rate. */
+  valueUsd: number | null;
+  avgCostUsd: number | null;
+  unrealizedUsd: number | null;
+  unrealizedPctUsd: number | null;
+  realizedUsd: number;
+  /** False when some of this token's history had no known WAX/USD rate. */
+  usdComplete: boolean;
   /** False when history and the live balance disagree. */
   complete: boolean;
   position: TokenPosition | null;
@@ -39,6 +47,7 @@ export function buildHoldings(
   positions: Map<TokenKey, TokenPosition>,
   live: LiveBalance[],
   priceWax: (key: TokenKey) => number | null,
+  waxUsdNow = 0,
 ): HoldingRow[] {
   const rows: HoldingRow[] = [];
   for (const b of live) {
@@ -51,12 +60,22 @@ export function buildHoldings(
     const isWax = b.key === WAX_KEY;
     const unrealized = !isWax && avg != null && price != null ? b.balance * (price - avg) : null;
     const costNow = avg != null ? avg * b.balance : null;
+    const rate = waxUsdNow > 0 ? waxUsdNow : null;
+    const usdOk = !!p && !p.usdGap;
+    const valueUsd = value != null && rate != null ? value * rate : null;
+    const avgUsd = complete && usdOk && p && p.qty > 0 ? p.costUsd / p.qty : null;
+    const unrealizedUsd = avgUsd != null && valueUsd != null ? valueUsd - avgUsd * b.balance : null;
+    const costNowUsd = avgUsd != null ? avgUsd * b.balance : null;
     rows.push({
       key: b.key, contract: b.contract, symbol: b.symbol, precision: b.precision, balance: b.balance,
       priceWax: price, valueWax: value, avgCostWax: isWax ? 1 : avg,
       unrealizedWax: unrealized,
       unrealizedPct: unrealized != null && costNow && costNow > 0 ? (unrealized / costNow) * 100 : null,
       realizedWax: p?.realizedWax ?? 0,
+      valueUsd, avgCostUsd: avgUsd, unrealizedUsd,
+      unrealizedPctUsd: unrealizedUsd != null && costNowUsd && costNowUsd > 0 ? (unrealizedUsd / costNowUsd) * 100 : null,
+      realizedUsd: p?.realizedUsd ?? 0,
+      usdComplete: usdOk || isWax && !p,
       complete: isWax ? true : complete,
       position: p,
     });
