@@ -285,7 +285,7 @@ export function TokenDialog({
   const usd = cur === 'USD';
   return (
     <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto overflow-x-hidden [&>*]:min-w-0">
         {row ? (
           <>
             <DialogHeader>
