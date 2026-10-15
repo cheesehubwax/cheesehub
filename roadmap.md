@@ -1,5 +1,7 @@
 # CHEESEHub roadmap
 
+- [ ] CHEESEFolio: widen holdings area, stack token badges and bought/gifted receipts under token names, verify Realised P/L fits.
+
 - [x] Prevent CHEESEAir context mismatch during preview updates and verify fresh loading and hot refresh.
 
 - [x] CHEESEAir: show current Token A and Token B quantities in a widened LP holder table without changing payouts.
