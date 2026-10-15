@@ -18,7 +18,7 @@ export function downloadActivityCsv(account: string, events: FolioEvent[], value
       value.get(e.id) ?? '', realized.get(e.id) ?? '', e.counterparty ?? '', e.trx,
     ].join(','));
   }
-  downloadCsvFile(lines.join('\n'), `cheesefolio-activity-${account}.csv`);
+  downloadCsvFile(`cheesefolio-activity-${account}.csv`, lines);
 }
 
 export interface HoldingCsvRow {
@@ -34,5 +34,5 @@ export function downloadHoldingsCsv(account: string, rows: HoldingCsvRow[]) {
   for (const r of rows) {
     lines.push([r.symbol, r.contract, r.balance, r.avgCostWax ?? '', r.priceWax, r.valueWax, r.unrealizedWax ?? '', r.realizedWax, r.complete ? 'yes' : 'no'].join(','));
   }
-  downloadCsvFile(lines.join('\n'), `cheesefolio-holdings-${account}.csv`);
+  downloadCsvFile(`cheesefolio-holdings-${account}.csv`, lines);
 }
