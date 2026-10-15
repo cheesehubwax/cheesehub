@@ -1,7 +1,9 @@
 // Alcor Farms library for interacting with Alcor Exchange API and swap.alcor contract
 // Includes blockchain fallback for resilience when Alcor API is unavailable
 import { waxRpcCall, fetchTableRows } from './waxRpcFallback';
-import type { PoolSlot } from './alcorV3Amounts';
+import { positionRawAmounts, type PoolSlot } from './alcorV3Amounts';
+import { fetchActionsUnion } from './hyperionHistory';
+import { mapLimit } from './chainRequest';
 
 // Contract name for transactions
 const ALCOR_SWAP_CONTRACT = 'swap.alcor';
@@ -156,94 +158,97 @@ function parseAsset(assetStr: string): { amount: number; symbol: string; precisi
 // ============= On-Chain Query Functions (Blockchain Fallback) =============
 
 /**
- * Fetch user's LP positions directly from blockchain
+ * Pools the account ever added liquidity to, from its `swap.alcor::addliquid`
+ * history (union of Hyperion providers). Positions are stored per pool on
+ * chain, so this is how the fallback knows which pools to look in.
+ */
+async function fetchUserPoolIdsFromHistory(accountName: string): Promise<number[]> {
+  const { actions } = await fetchActionsUnion(
+    `account=${encodeURIComponent(accountName)}&filter=swap.alcor:addliquid`,
+    { timeoutMs: 15000 },
+  );
+  const ids = new Set<number>();
+  for (const a of actions) {
+    const data = a.act?.data as { poolId?: unknown; owner?: unknown } | undefined;
+    if (data?.owner !== accountName) continue;
+    const id = Number(data.poolId);
+    if (Number.isInteger(id) && id >= 0) ids.add(id);
+  }
+  return [...ids].sort((x, y) => x - y);
+}
+
+/**
+ * Fetch user's LP positions directly from blockchain. `swap.alcor::positions`
+ * is scoped per pool and indexed by owner (index 3), so each pool the account
+ * used is read on its own.
  */
 async function fetchUserPositionsOnChain(accountName: string): Promise<AlcorApiPosition[]> {
-  // Check cache first
   const cached = positionsCache.get(accountName);
   if (cached && Date.now() - cached.timestamp < POSITIONS_CACHE_TTL) {
-    console.log('[Alcor] Using cached on-chain positions for', accountName);
     return enrichOnChainPositions(cached.data);
   }
 
-  console.log('[Alcor] Fetching positions from blockchain for', accountName);
-  const allPositions: OnChainPosition[] = [];
-  let lower_bound = '';
-  let hasMore = true;
-
-  // Query positions table - secondary index by owner (index_position: 2)
-  while (hasMore) {
-    const result = await fetchTableRows<OnChainPosition>({
-      code: ALCOR_SWAP_CONTRACT,
-      scope: ALCOR_SWAP_CONTRACT,
-      table: 'positions',
-      index_position: 2,
-      key_type: 'name',
-      lower_bound: lower_bound || accountName,
-      upper_bound: accountName,
-      limit: 100,
-    });
-
-    if (result?.rows?.length) {
-      allPositions.push(...result.rows);
-      if (result.more && result.next_key) {
-        lower_bound = result.next_key;
-      } else {
-        hasMore = false;
-      }
-    } else {
-      hasMore = false;
+  const poolIds = await fetchUserPoolIdsFromHistory(accountName);
+  const perPool = await mapLimit(poolIds, 6, async (poolId) => {
+    const rows: OnChainPosition[] = [];
+    let lower = accountName;
+    for (let page = 0; page < 20; page++) {
+      const result = await fetchTableRows<Omit<OnChainPosition, 'pool'>>({
+        code: ALCOR_SWAP_CONTRACT,
+        scope: String(poolId),
+        table: 'positions',
+        index_position: 3,
+        key_type: 'name',
+        lower_bound: lower,
+        upper_bound: accountName,
+        limit: 100,
+      });
+      const got = result?.rows ?? [];
+      for (const r of got) if (r.owner === accountName) rows.push({ ...r, pool: poolId });
+      if (!result?.more || !result.next_key || got.length === 0) break;
+      lower = String(result.next_key);
     }
-  }
+    return rows;
+  });
+  const allPositions = perPool.flat().filter((p) => Number(p.liquidity) > 0);
 
-  // Cache the raw data
   positionsCache.set(accountName, { data: allPositions, timestamp: Date.now() });
-
   return enrichOnChainPositions(allPositions);
 }
 
 /**
- * Enrich on-chain positions with real token amounts from pool data
+ * Enrich on-chain positions with their token amounts at the pool's current
+ * price. Uncollected fees aren't computed here and stay at zero.
  */
 async function enrichOnChainPositions(positions: OnChainPosition[]): Promise<AlcorApiPosition[]> {
   if (positions.length === 0) return [];
 
-  // Batch-fetch pool details for all unique pools
   const uniquePoolIds = [...new Set(positions.map(p => p.pool))];
-  const poolMap = new Map<number, any>();
-
   await Promise.all(
     uniquePoolIds.map(async (poolId) => {
       try {
-        const pool = await fetchPoolDetailsOnChain(poolId);
-        if (pool) poolMap.set(poolId, pool);
-      } catch (e) {
+        await fetchPoolDetailsOnChain(poolId);
+      } catch {
         console.warn(`[Alcor] Failed to fetch pool ${poolId} for position enrichment`);
       }
     })
   );
 
   return positions.map(pos => {
-    const pool = poolMap.get(pos.pool);
+    const pool = poolCache.get(pos.pool)?.data;
     let amountA = '0 TOKEN';
     let amountB = '0 TOKEN';
     let inRange = true;
 
     if (pool) {
-      const tokenAParsed = parseAsset(pool.tokenA?.quantity || '0 TOKEN');
-      const tokenBParsed = parseAsset(pool.tokenB?.quantity || '0 TOKEN');
-      const symbolA = tokenAParsed.symbol || 'TOKEN';
-      const symbolB = tokenBParsed.symbol || 'TOKEN';
-      const precA = tokenAParsed.precision || 8;
-      const precB = tokenBParsed.precision || 8;
-
-      // Check if position is in range based on pool's current tick
-      const currentTick = pool.tick || 0;
-      inRange = currentTick >= pos.tickLower && currentTick < pos.tickUpper;
-
-      // Use placeholder amounts with correct symbols/precision
-      amountA = `${(0).toFixed(precA)} ${symbolA}`;
-      amountB = `${(0).toFixed(precB)} ${symbolB}`;
+      const a = parseAsset(pool.tokenA.quantity);
+      const b = parseAsset(pool.tokenB.quantity);
+      const tick = pool.currSlot?.tick ?? 0;
+      inRange = tick >= pos.tickLower && tick < pos.tickUpper;
+      const raw = positionRawAmounts(Number(pos.liquidity), pos.tickLower, pos.tickUpper, pool.currSlot?.sqrtPriceX64);
+      const qty = (r: number, prec: number) => (Math.floor(r + 1e-9) / 10 ** prec).toFixed(prec);
+      amountA = `${qty(raw?.rawA ?? 0, a.precision)} ${a.symbol}`;
+      amountB = `${qty(raw?.rawB ?? 0, b.precision)} ${b.symbol}`;
     }
 
     return {
@@ -251,7 +256,7 @@ async function enrichOnChainPositions(positions: OnChainPosition[]): Promise<Alc
       owner: pos.owner,
       tickLower: pos.tickLower,
       tickUpper: pos.tickUpper,
-      liquidity: pos.liquidity,
+      liquidity: String(pos.liquidity),
       pool: pos.pool,
       inRange,
       amountA,

@@ -88,3 +88,23 @@ export function poolDepositRatio(
   if (!Number.isFinite(ratio) || ratio <= 0) return { state, ratio: null };
   return { state, ratio };
 }
+
+/**
+ * Token amounts (raw, smallest units) behind a concentrated-liquidity position
+ * at the pool's current price. The price is clamped into the position's range:
+ * below it the position is all token A, above it all token B.
+ */
+export function positionRawAmounts(
+  liquidity: number,
+  tickLower: number,
+  tickUpper: number,
+  sqrtPriceX64: string,
+): { rawA: number; rawB: number } | null {
+  const sqrtP = sqrtPriceFromX64(sqrtPriceX64);
+  const sqrtL = sqrtPriceAtTick(tickLower);
+  const sqrtU = sqrtPriceAtTick(tickUpper);
+  if (!Number.isFinite(sqrtP) || !(sqrtP > 0) || !(sqrtU > sqrtL) || !(liquidity >= 0)) return null;
+  const p = Math.min(Math.max(sqrtP, sqrtL), sqrtU);
+  return { rawA: liquidity * (1 / p - 1 / sqrtU), rawB: liquidity * (p - sqrtL) };
+}
+
