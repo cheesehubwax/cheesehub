@@ -21,7 +21,9 @@ export type EndpointFeature =
   | 'atomic-assets-api';
 
 /** Hosts confirmed dead — never queued, no matter which list names them. */
-export const DEAD_ENDPOINTS = ['https://wax.pink.gg', 'https://wax.blokcrafters.io'];
+// wax.hivebp.io (503) and wax.cryptolions.io (403) answer without CORS headers,
+// so every browser read fails preflight (checked 2026-10-15).
+export const DEAD_ENDPOINTS = ['https://wax.pink.gg', 'https://wax.blokcrafters.io', 'https://wax.hivebp.io', 'https://wax.cryptolions.io'];
 
 /**
  * Built-in fallback order, used until (or instead of) a health read.
@@ -38,26 +40,20 @@ export const STATIC_ENDPOINTS: Record<EndpointFeature, string[]> = {
     'https://wax.eosusa.io',
     'https://api.waxsweden.org',
     'https://wax.greymass.com',
-    'https://wax.cryptolions.io',
     'https://wax.eosdac.io',
     'https://api.wax.alohaeos.com',
     'https://wax.eosphere.io',
-    'https://wax.hivebp.io',
   ],
   'hyperion-v2': [
     'https://wax.eosusa.io',
-    'https://wax.cryptolions.io',
     'https://api.waxsweden.org',
     'https://wax.eosphere.io',
     'https://wax.eosdac.io',
-    'https://wax.hivebp.io',
   ],
   'history-v1': [
     'https://api.waxsweden.org',
     'https://wax.eosusa.io',
-    'https://wax.cryptolions.io',
     'https://wax.eosphere.io',
-    'https://wax.hivebp.io',
   ],
   'atomic-assets-api': [
     'https://wax.api.atomicassets.io',

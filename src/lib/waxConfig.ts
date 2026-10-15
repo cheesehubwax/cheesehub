@@ -5,10 +5,11 @@ export const WAX_CHAIN = {
   // Fallback RPC order. Live ordering comes from src/lib/endpointHealth.ts;
   // this list is only used before/without a health read.
   rpcUrls: [
-    'https://wax.hivebp.io',
+    'https://wax.eosusa.io',
+    'https://api.waxsweden.org',
+    'https://wax.greymass.com',
     'https://api.wax.alohaeos.com',
     'https://wax.eosphere.io',
-    'https://wax.greymass.com',
   ],
 };
 

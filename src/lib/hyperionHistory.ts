@@ -12,10 +12,10 @@ import { mapLimit, MAX_CONCURRENT } from './chainRequest';
 
 /** Offline fallback order; live ordering comes from the health resolver. */
 export const DEFAULT_HYPERION_ENDPOINTS = [
-  'https://wax.hivebp.io',
-  'https://wax.cryptolions.io',
-  'https://wax.eosphere.io',
+  'https://wax.eosusa.io',
   'https://api.waxsweden.org',
+  'https://wax.eosphere.io',
+  'https://wax.eosdac.io',
 ];
 
 export interface HyperionActionRecord {
