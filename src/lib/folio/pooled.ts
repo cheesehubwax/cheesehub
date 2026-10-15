@@ -100,40 +100,51 @@ function add(out: Map<TokenKey, PooledToken>, contract: string, symbol: string, 
   out.set(key, t);
 }
 
-async function readAlcor(account: string, out: Map<TokenKey, PooledToken>): Promise<void> {
-  const positions: ChainPosition[] = [];
-  let lower = account;
-  for (let page = 0; page < 50; page++) {
-    const res = await fetchTableRows<ChainPosition>({
-      code: 'swap.alcor', scope: 'swap.alcor', table: 'positions',
-      index_position: 2, key_type: 'name', lower_bound: lower, upper_bound: account, limit: 100,
-    });
-    const rows = res?.rows ?? [];
-    positions.push(...rows.filter((r) => r.owner === account));
-    if (!res?.more || !res.next_key || rows.length === 0) break;
-    lower = String(res.next_key);
+const ALCOR_API = 'https://wax.alcor.exchange/api/v2';
+
+async function alcorPoolIds(account: string): Promise<number[]> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12_000);
+  try {
+    const res = await fetch(`${ALCOR_API}/account/${encodeURIComponent(account)}/positions`, { signal: ctrl.signal });
+    if (!res.ok) throw new Error(`Alcor positions ${res.status}`);
+    const data = (await res.json()) as { pool?: number; closed?: boolean }[];
+    if (!Array.isArray(data)) throw new Error('Unexpected Alcor positions');
+    return [...new Set(data.filter((p) => !p.closed && Number.isFinite(Number(p.pool))).map((p) => Number(p.pool)))];
+  } finally {
+    clearTimeout(timer);
   }
-  const live = positions.filter((p) => Number(p.liquidity) > 0);
-  const poolIds = [...new Set(live.map((p) => p.pool))];
-  const pools = new Map<number, ChainPool>();
+}
+
+/**
+ * Alcor's API says which pools the account is in; the amounts come from the
+ * chain itself (positions are stored per pool, indexed by owner).
+ */
+async function readAlcor(account: string, out: Map<TokenKey, PooledToken>): Promise<void> {
+  const poolIds = await alcorPoolIds(account);
   await Promise.all(poolIds.map(async (id) => {
-    const res = await fetchTableRows<ChainPool>({
-      code: 'swap.alcor', scope: 'swap.alcor', table: 'pools', lower_bound: String(id), upper_bound: String(id), limit: 1,
-    });
-    const row = res?.rows?.[0];
-    if (!row || row.id !== id) throw new Error(`Alcor pool ${id} not found`);
-    pools.set(id, row);
-  }));
-  for (const pos of live) {
-    const pool = pools.get(pos.pool)!;
+    const [posRes, poolRes] = await Promise.all([
+      fetchTableRows<ChainPosition>({
+        code: 'swap.alcor', scope: String(id), table: 'positions',
+        index_position: 3, key_type: 'name', lower_bound: account, upper_bound: account, limit: 100,
+      }),
+      fetchTableRows<ChainPool>({
+        code: 'swap.alcor', scope: 'swap.alcor', table: 'pools', lower_bound: String(id), upper_bound: String(id), limit: 1,
+      }),
+    ]);
+    const pool = poolRes?.rows?.[0];
+    if (!pool || pool.id !== id) throw new Error(`Alcor pool ${id} not found`);
     const a = parseQty(pool.tokenA.quantity);
     const b = parseQty(pool.tokenB.quantity);
-    const raw = positionRawAmounts(Number(pos.liquidity), pos.tickLower, pos.tickUpper, pool.currSlot?.sqrtPriceX64);
-    if (!raw) throw new Error(`Alcor pool ${pos.pool} has no usable price`);
     const pair = `${a.symbol} / ${b.symbol}`;
-    add(out, pool.tokenA.contract, a.symbol, a.precision, floorTo(raw.rawA / 10 ** a.precision, a.precision), { venue: 'alcor', pair });
-    add(out, pool.tokenB.contract, b.symbol, b.precision, floorTo(raw.rawB / 10 ** b.precision, b.precision), { venue: 'alcor', pair });
-  }
+    for (const pos of posRes?.rows ?? []) {
+      if (pos.owner !== account || !(Number(pos.liquidity) > 0)) continue;
+      const raw = positionRawAmounts(Number(pos.liquidity), pos.tickLower, pos.tickUpper, pool.currSlot?.sqrtPriceX64);
+      if (!raw) throw new Error(`Alcor pool ${id} has no usable price`);
+      add(out, pool.tokenA.contract, a.symbol, a.precision, floorTo(raw.rawA / 10 ** a.precision, a.precision), { venue: 'alcor', pair });
+      add(out, pool.tokenB.contract, b.symbol, b.precision, floorTo(raw.rawB / 10 ** b.precision, b.precision), { venue: 'alcor', pair });
+    }
+  }));
 }
 
 /** Underlying amounts for share tokens of one Taco/Defibox venue. */
