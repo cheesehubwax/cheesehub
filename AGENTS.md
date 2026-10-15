@@ -7,3 +7,7 @@
 - CHEESEAir suffix snapshots read `eosio::newaccount` history from every Hyperion provider with a timestamp cursor (not skip) and union the results — providers index different slices of history and skip paging stops at 10,000 rows.
 
 - CHEESEFolio data is client-only (IndexedDB per account) and always re-derived from saved raw transfers, so classifier changes never need a rescan; live balances are the truth, history only supplies cost.
+
+- CHEESEFolio scans always include the history provider reaching furthest back (probed per browser) and only mark a sync complete when every chosen provider finished — partial history silently produces wrong profit/loss.
+
+- CHEESEFolio de-duplicates by global sequence and drops inline transfer copies whose creator action is an identical transfer — some Hyperion nodes list the receiver notification as a separate action, which double-counts the movement.

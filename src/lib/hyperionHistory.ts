@@ -21,6 +21,7 @@ export const DEFAULT_HYPERION_ENDPOINTS = [
 export interface HyperionActionRecord {
   trx_id?: string;
   action_ordinal?: number;
+  creator_action_ordinal?: number;
   global_sequence?: number;
   '@timestamp'?: string;
   timestamp?: string;

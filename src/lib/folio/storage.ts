@@ -6,13 +6,23 @@ const DB_VERSION = 1;
 const STORE = 'accounts';
 
 /** Bump when the stored shape changes; older records are discarded and rescanned. */
-export const FOLIO_SCHEMA = 1;
+export const FOLIO_SCHEMA = 2;
 
 export interface ProviderCursor {
   /** Last block time read from this provider, ISO string. */
   after: string | null;
   /** True once this provider has been read up to the present at least once. */
   caughtUp: boolean;
+  /** Page size this provider accepts, learned from its "limit too big" reply. */
+  limit?: number;
+  /** Date windows still being read during the first full read of this provider. */
+  windows?: ScanWindow[];
+}
+
+export interface ScanWindow {
+  after: string | null;
+  before: string | null;
+  done: boolean;
 }
 
 export interface StoredFolio {
@@ -22,6 +32,10 @@ export interface StoredFolio {
   cursors: Record<string, ProviderCursor>;
   /** Epoch ms of the last completed sync. */
   syncedAt: number | null;
+  /** Oldest transfer any chosen provider holds (epoch ms). */
+  coverageFrom?: number;
+  /** Account creation time from the chain (epoch ms). */
+  accountCreated?: number;
 }
 
 function open(): Promise<IDBDatabase> {
