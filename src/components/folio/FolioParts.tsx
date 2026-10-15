@@ -86,7 +86,17 @@ export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }:
   ])), [rows, events]);
   return (
     <div className="w-full overflow-x-auto rounded-lg border border-border/50 bg-card/60">
-      <table aria-label="Holdings" className="w-full min-w-[1080px] text-xs xl:text-sm whitespace-nowrap [&_th]:px-2 [&_td]:px-2 [&_td]:py-2">
+      <table aria-label="Holdings" className="w-full min-w-[1080px] table-fixed text-xs xl:text-sm [&_th]:px-2 [&_td]:px-2 [&_td]:py-2 [&_td]:break-words [&_th:first-child]:pl-3 [&_td:first-child]:pl-3 [&_th:last-child]:pr-6 [&_td:last-child]:pr-6">
+        <colgroup>
+          <col className="w-[19%]" />
+          <col className="w-[12%]" />
+          <col className="w-[11%]" />
+          <col className="w-[11%]" />
+          <col className="w-[11%]" />
+          <col className="w-[12%]" />
+          <col className="w-[13%]" />
+          <col className="w-[11%]" />
+        </colgroup>
         <thead className="text-xs uppercase text-muted-foreground whitespace-normal">
           <tr className="border-b border-border/50">
             <th className="px-3 py-2 text-left">Token</th>
@@ -111,7 +121,7 @@ export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }:
             const receipts = acquisitions.get(r.key);
             return (
             <tr key={r.key} className="cursor-pointer border-b border-border/30 hover:bg-cheese/5" onClick={() => onPick(r)}>
-              <td className="w-[290px] min-w-[240px] whitespace-normal">
+              <td className="whitespace-normal">
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-1.5">
                   <TokenLogo contract={r.contract} symbol={r.symbol} size="sm" />

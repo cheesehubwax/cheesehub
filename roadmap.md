@@ -1,5 +1,7 @@
 # CHEESEHub roadmap
 
+- [x] CHEESEFolio: balance column spacing, close Token-to-Balance gap and inset Realised P/L from the right edge.
+
 - [x] CHEESEFolio: restore compact holdings rows while keeping badges, bought/gifted receipts and all numeric columns visible.
 
 - [x] Prevent CHEESEAir context mismatch during preview updates and verify fresh loading and hot refresh.
