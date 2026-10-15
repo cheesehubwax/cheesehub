@@ -1,0 +1,196 @@
+// CHEESEFolio — personal profit/loss for the signed-in WAX account.
+// Intentionally not linked from the header yet: reachable at /folio only.
+import { useMemo, useState } from 'react';
+import { Layout } from '@/components/Layout';
+import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { useWax } from '@/context/WaxContext';
+import { useAllTokenBalances } from '@/hooks/useAllTokenBalances';
+import { useAlcorTokenPrices } from '@/hooks/useAlcorTokenPrices';
+import { useWaxPrice } from '@/hooks/useWaxPrice';
+import { useFolio } from '@/hooks/useFolio';
+import { buildHoldings, type HoldingRow } from '@/lib/folio/holdings';
+import { downloadActivityCsv, downloadHoldingsCsv } from '@/lib/folio/csv';
+import { ActivityList, HoldingsTable, PlChart, SummaryBox, TokenDialog, usdFmt, waxFmt } from '@/components/folio/FolioParts';
+import { playRandomFart } from '@/lib/fartSounds';
+import walletOrb from '@/assets/wallet-icon.png';
+
+const RANGES = [
+  { key: '7d', label: '7D', days: 7 },
+  { key: '30d', label: '30D', days: 30 },
+  { key: '90d', label: '90D', days: 90 },
+  { key: 'all', label: 'ALL', days: null },
+] as const;
+
+const Folio = () => {
+  const { accountName, isConnected, login } = useWax();
+  const folio = useFolio(accountName);
+  const { tokens: live, isLoading: liveLoading } = useAllTokenBalances(accountName ?? undefined);
+  const { data: priceMap } = useAlcorTokenPrices();
+  const { data: waxUsd = 0 } = useWaxPrice();
+  const [picked, setPicked] = useState<HoldingRow | null>(null);
+  const [range, setRange] = useState<(typeof RANGES)[number]['key']>('all');
+
+  const holdings = useMemo(
+    () =>
+      buildHoldings(
+        folio.ledger.positions,
+        live.filter((t) => !t.isLpToken).map((t) => ({
+          key: `${t.contract}:${t.symbol}`, contract: t.contract, symbol: t.symbol, precision: t.precision, balance: t.balance,
+        })),
+        (key) => priceMap?.get(key) ?? null,
+      ),
+    [folio.ledger, live, priceMap],
+  );
+
+  const totals = useMemo(() => {
+    let value = 0, unrealized = 0, realized = 0;
+    for (const h of holdings) {
+      value += h.valueWax ?? 0;
+      unrealized += h.unrealizedWax ?? 0;
+    }
+    for (const p of folio.ledger.positions.values()) realized += p.realizedWax;
+    return { value, unrealized, realized };
+  }, [holdings, folio.ledger]);
+
+  // Cumulative realised profit/loss, one point per day with a sale.
+  const plSeries = useMemo(() => {
+    const byDay = new Map<string, number>();
+    for (const e of folio.events) {
+      const r = folio.ledger.realizedByEvent.get(e.id);
+      if (r == null) continue;
+      const d = new Date(e.ts).toISOString().slice(0, 10);
+      byDay.set(d, (byDay.get(d) ?? 0) + r);
+    }
+    let run = 0;
+    const all = [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([date, v]) => ({ date, value: (run += v) }));
+    const days = RANGES.find((r) => r.key === range)?.days;
+    if (!days) return all;
+    const from = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+    return all.filter((p) => p.date >= from);
+  }, [folio.events, folio.ledger, range]);
+
+  const p = folio.progress;
+
+  return (
+    <Layout>
+      <section className="relative pt-20 pb-14 overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
+        <div className="container relative z-10">
+          <div className="flex flex-col items-center gap-8">
+            <div className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer" onClick={playRandomFart}>
+              <img src={walletOrb} alt="CHEESEFolio" className="w-24 h-24 object-contain" />
+            </div>
+            <div className="text-center space-y-4">
+              <div className="flex items-center justify-center gap-2">
+                <OpenMojiIcon emoji="💰" size={26} />
+                <h1 className="text-3xl md:text-4xl font-bold">
+                  <span className="text-cheese">CHEESE</span>
+                  <span className="text-foreground">Folio</span>
+                </h1>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
+                <OpenMojiIcon emoji="💰" size={26} />
+              </div>
+              <p className="text-muted-foreground max-w-2xl mx-auto">
+                Your own WAX portfolio: what you paid, what it's worth now, and your profit or loss on every trade.
+                Read automatically from the blockchain and saved only in this browser.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="container pb-12 flex flex-col items-center gap-6 max-w-6xl">
+        {!isConnected || !accountName ? (
+          <div className="rounded-lg border border-cheese/20 bg-card/80 p-8 text-center space-y-4">
+            <p className="text-muted-foreground">Connect your wallet to see your portfolio. CHEESEFolio only shows the account you're signed in with.</p>
+            <Button onClick={() => void login()}>Connect wallet</Button>
+          </div>
+        ) : (
+          <>
+            <div className="w-full flex flex-wrap items-center justify-between gap-2 text-sm">
+              <div className="text-muted-foreground">
+                {folio.syncing ? (
+                  folio.hasHistory && folio.syncedAt ? 'Checking for new transactions…' : `Scanning history for ${accountName}…`
+                ) : folio.syncedAt ? (
+                  `Up to date · last checked ${new Date(folio.syncedAt).toLocaleTimeString()} · ${folio.transferCount.toLocaleString()} transfers saved in this browser`
+                ) : (
+                  'Not synced yet'
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" disabled={folio.syncing} onClick={folio.resync}>Sync now</Button>
+                <Button size="sm" variant="outline" disabled={!holdings.length} onClick={() => downloadHoldingsCsv(accountName, holdings.map((h) => ({
+                  symbol: h.symbol, contract: h.contract, balance: h.balance, avgCostWax: h.avgCostWax, priceWax: h.priceWax ?? 0,
+                  valueWax: h.valueWax ?? 0, unrealizedWax: h.unrealizedWax, realizedWax: h.realizedWax, complete: h.complete,
+                })))}>Holdings CSV</Button>
+                <Button size="sm" variant="outline" disabled={!folio.events.length} onClick={() => downloadActivityCsv(accountName, folio.events, folio.ledger.valueByEvent, folio.ledger.realizedByEvent)}>Activity CSV</Button>
+                <Button size="sm" variant="outline" onClick={() => { if (confirm('Delete the saved history and scan again from the start?')) void folio.rescan(); }}>Rescan from scratch</Button>
+                <Button size="sm" variant="ghost" onClick={() => { if (confirm('Delete everything CHEESEFolio saved in this browser for this account?')) void folio.clear(); }}>Clear saved data</Button>
+              </div>
+            </div>
+
+            {folio.syncing && !folio.syncedAt ? (
+              <div className="w-full space-y-1">
+                <Progress value={p && p.providers ? (p.providersDone / p.providers) * 100 : 5} />
+                <div className="text-xs text-muted-foreground text-center">
+                  {(p?.transfers ?? 0).toLocaleString()} transfers found
+                  {p?.reachedTs ? ` · reached ${new Date(p.reachedTs).toISOString().slice(0, 10)}` : ''}
+                  {' · '}Heavy trading accounts can take a minute or more. You can leave — it continues from here next time.
+                </div>
+              </div>
+            ) : null}
+            {folio.error ? <div className="w-full text-sm text-destructive text-center">{folio.error}</div> : null}
+
+            <div className="w-full flex flex-wrap gap-3">
+              <SummaryBox label="Portfolio value" value={waxFmt(totals.value)} sub={usdFmt(totals.value, waxUsd)} />
+              <SummaryBox label="Unrealised P/L" value={waxFmt(totals.unrealized)} sub={usdFmt(totals.unrealized, waxUsd)} tone={totals.unrealized} />
+              <SummaryBox label="Realised P/L" value={waxFmt(totals.realized)} sub={usdFmt(totals.realized, waxUsd)} tone={totals.realized} />
+            </div>
+            <p className="w-full text-xs text-muted-foreground text-center">
+              Profit/loss is measured in WAX using the average price you paid. USD figures use today's WAX price.
+              Rewards, airdrops and tokens sent to you count as free (zero cost).
+            </p>
+
+            <div className="w-full space-y-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Holdings</h2>
+                {liveLoading ? <span className="text-xs text-muted-foreground">Loading balances…</span> : null}
+              </div>
+              <HoldingsTable rows={holdings} waxUsd={waxUsd} onPick={setPicked} />
+            </div>
+
+            <div className="w-full space-y-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Realised profit/loss over time</h2>
+                <div className="flex gap-1">
+                  {RANGES.map((r) => (
+                    <Button key={r.key} size="sm" variant={range === r.key ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => setRange(r.key)}>{r.label}</Button>
+                  ))}
+                </div>
+              </div>
+              <PlChart data={plSeries} title="Realised P/L (WAX)" />
+            </div>
+
+            <div className="w-full space-y-2">
+              <h2 className="text-lg font-semibold">Activity</h2>
+              <ActivityList events={folio.events} value={folio.ledger.valueByEvent} realized={folio.ledger.realizedByEvent} />
+            </div>
+
+            <TokenDialog
+              row={picked}
+              events={folio.events}
+              value={folio.ledger.valueByEvent}
+              realized={folio.ledger.realizedByEvent}
+              waxUsd={waxUsd}
+              onClose={() => setPicked(null)}
+            />
+          </>
+        )}
+      </div>
+    </Layout>
+  );
+};
+
+export default Folio;
