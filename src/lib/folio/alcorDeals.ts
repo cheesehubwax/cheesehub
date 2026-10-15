@@ -4,8 +4,7 @@
 import type { RawTransfer } from './types';
 
 const ALCOR_API = 'https://wax.alcor.exchange/api';
-const PAGE = 1000;
-const TIMEOUT_MS = 20_000;
+const TIMEOUT_MS = 30_000;
 
 export interface AlcorDeal {
   market: number;
@@ -35,16 +34,18 @@ async function getJson<T>(url: string, signal?: AbortSignal): Promise<T | null> 
   }
 }
 
-/** All deals of `account`, or null when Alcor could not be read completely. */
+/**
+ * All deals of `account`, or null when Alcor could not be read. Read in ONE
+ * request: Alcor's `skip` paging returns overlapping, gappy pages, while a
+ * large `limit` returns the whole list.
+ */
 export async function fetchAlcorDeals(account: string, signal?: AbortSignal): Promise<AlcorDeal[] | null> {
-  const all: AlcorDeal[] = [];
-  for (let skip = 0; skip < 200_000; skip += PAGE) {
-    const page = await getJson<AlcorDeal[]>(`${ALCOR_API}/v2/account/${account}/deals?limit=${PAGE}&skip=${skip}`, signal);
-    if (!Array.isArray(page)) return null;
-    all.push(...page);
-    if (page.length < PAGE) return all;
+  for (let limit = 50_000; limit <= 800_000; limit *= 4) {
+    const list = await getJson<AlcorDeal[]>(`${ALCOR_API}/v2/account/${account}/deals?limit=${limit}`, signal);
+    if (!Array.isArray(list)) return null;
+    if (list.length < limit) return list;
   }
-  return all;
+  return null;
 }
 
 let marketsPromise: Promise<Map<number, AlcorMarket> | null> | null = null;
