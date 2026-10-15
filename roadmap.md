@@ -1,6 +1,6 @@
 # CHEESEHub roadmap
 
-- [ ] CHEESEFolio: widen holdings area, stack token badges and bought/gifted receipts under token names, verify Realised P/L fits.
+- [x] CHEESEFolio: widen holdings area, stack token badges and bought/gifted receipts under token names, verify Realised P/L fits.
 
 - [x] Prevent CHEESEAir context mismatch during preview updates and verify fresh loading and hot refresh.
 
