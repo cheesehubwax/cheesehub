@@ -65,62 +65,60 @@ export function buildLedger(events: FolioEvent[], priceAt: PriceAt = () => null)
     if (free) p.freeQty += a.amount;
   };
 
-  /** Books a disposal of `out` (with known cost) for `inn`, at `value` WAX if known. */
+  /** Books a disposal of `out` (with known cost) for `inn`. */
   const settleTrade = (ev: FolioEvent, out: { a: TokenAmount; cost: number }[], inn: TokenAmount[]) => {
     const outCost = out.reduce((s, o) => s + o.cost, 0);
-    const waxOut = out.find((o) => o.a.key === WAX_KEY)?.a.amount;
-    const waxIn = inn.find((a) => a.key === WAX_KEY)?.amount;
-    let value: number | null = null;
-    if (waxOut != null) value = waxOut;
-    else if (waxIn != null) value = waxIn;
-    else if (out.length) {
-      const priced = out.map((o) => priceAt(o.a.key, ev.ts));
-      if (priced.every((x) => x != null)) value = out.reduce((s, o, i) => s + o.a.amount * (priced[i] as number), 0);
-    } else if (inn.length) {
-      const priced = inn.map((a) => priceAt(a.key, ev.ts));
-      if (priced.every((x) => x != null)) value = inn.reduce((s, a, i) => s + a.amount * (priced[i] as number), 0);
-    }
-
-    // Disposal side: realize against value (WAX itself never realizes P&L).
-    let realized = 0;
+    const waxOut = out.filter((o) => o.a.key === WAX_KEY).reduce((s, o) => s + o.a.amount, 0);
+    const waxIn = inn.filter((a) => a.key === WAX_KEY).reduce((s, a) => s + a.amount, 0);
     const nonWaxOut = out.filter((o) => o.a.key !== WAX_KEY);
+    const nonWaxIn = inn.filter((a) => a.key !== WAX_KEY);
+    const pricedValue = (list: TokenAmount[]) => {
+      let sum = 0;
+      for (const a of list) {
+        if (a.key === WAX_KEY) { sum += a.amount; continue; }
+        const px = priceAt(a.key, ev.ts);
+        if (px == null) return null;
+        sum += a.amount * px;
+      }
+      return sum;
+    };
+
+    // Total WAX value of the trade. Exact when one whole side is WAX.
+    let value: number | null = null;
+    if (inn.length && nonWaxIn.length === 0) value = waxIn;
+    else if (out.length && nonWaxOut.length === 0) value = waxOut;
+    else if (out.length) value = pricedValue(out.map((o) => o.a));
+    if (value == null && inn.length) value = pricedValue(inn);
+
+    // Disposal side.
+    let realized = 0;
     if (value != null && nonWaxOut.length) {
+      const proceeds = Math.max(0, value - waxOut);
       const nonWaxCost = nonWaxOut.reduce((s, o) => s + o.cost, 0);
-      const proceeds = value - (waxIn ?? 0) - 0; // proceeds attributable to non-WAX tokens sent
-      const attributable = waxOut != null ? 0 : waxIn != null ? waxIn : proceeds;
-      // Split proceeds across non-WAX tokens sent in proportion to their cost
-      // (or evenly when all were free).
-      const totalWeight = nonWaxCost > EPS ? nonWaxCost : nonWaxOut.length;
       for (const o of nonWaxOut) {
-        const share = (nonWaxCost > EPS ? o.cost : 1) / totalWeight;
-        const r = attributable * share - o.cost;
+        const share = nonWaxCost > EPS ? o.cost / nonWaxCost : 1 / nonWaxOut.length;
+        const r = proceeds * share - o.cost;
         pos(o.a).realizedWax += r;
         realized += r;
       }
     }
     for (const o of out) pos(o.a).soldQty += o.a.amount;
 
-    // Acquisition side: what the bought tokens cost.
-    const nonWaxIn = inn.filter((a) => a.key !== WAX_KEY);
-    const acquireCost = value != null ? value - (waxIn ?? 0) : outCost;
+    // Acquisition side.
+    const acquireCost = Math.max(0, value != null ? value - waxIn : outCost - waxIn);
+    const weights = nonWaxIn.map((x) => {
+      const px = priceAt(x.key, ev.ts);
+      return px != null ? x.amount * px : null;
+    });
+    const weightSum = weights.every((w) => w != null) ? (weights as number[]).reduce((s, w) => s + w, 0) : 0;
     for (const a of inn) {
-      if (a.key === WAX_KEY) {
-        give(a, a.amount);
-      } else {
-        const weights = nonWaxIn.map((x) => {
-          const px = priceAt(x.key, ev.ts);
-          return px != null ? x.amount * px : null;
-        });
-        const allPriced = weights.every((w) => w != null) && weights.some((w) => (w as number) > 0);
-        const idx = nonWaxIn.indexOf(a);
-        const share = allPriced
-          ? (weights[idx] as number) / (weights as number[]).reduce((s, w) => s + w, 0)
-          : 1 / nonWaxIn.length;
-        give(a, Math.max(0, acquireCost) * share);
-        const p = pos(a);
-        p.boughtQty += a.amount;
-        if (value == null && outCost <= EPS) p.unpricedBuys = true;
-      }
+      if (a.key === WAX_KEY) { give(a, a.amount); continue; }
+      const i = nonWaxIn.indexOf(a);
+      const share = weightSum > EPS ? (weights[i] as number) / weightSum : 1 / nonWaxIn.length;
+      give(a, acquireCost * share);
+      const p = pos(a);
+      p.boughtQty += a.amount;
+      if (value == null && outCost <= EPS) p.unpricedBuys = true;
     }
     if (value != null) valueByEvent.set(ev.id, value);
     if (Math.abs(realized) > EPS) realizedByEvent.set(ev.id, realized);
@@ -156,11 +154,8 @@ export function buildLedger(events: FolioEvent[], priceAt: PriceAt = () => null)
               if (cur) { cur.a.amount += m.a.amount; cur.cost += m.cost; }
               else merged.set(m.a.key, { a: { ...m.a }, cost: m.cost });
             }
+            // Unmatched remainder = fill of an order placed before the scanned history.
             settleTrade(ev, [...merged.values()], [got]);
-            if (remaining > 10 ** -got.precision && !matched.length) {
-              // Fill of an order placed before the scanned history.
-              pos(got).unpricedBuys = pos(got).unpricedBuys || !valueByEvent.has(ev.id);
-            }
           }
           break;
         }
