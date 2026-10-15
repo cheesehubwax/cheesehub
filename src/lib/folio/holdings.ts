@@ -83,7 +83,7 @@ export function buildHoldings(
     const value = price != null ? balance * price : null;
 
     // Pools not read yet, or a venue failed while history says tokens are in pools.
-    const pooledUnknown = !pooled || (poolsFailed && !!p && p.inLiquidityQty > 0);
+    const pooledUnknown = (!pooled || poolsFailed) && !!p && p.inLiquidityQty > 0;
     const walletOk = !!p && !p.historyGap && balancesAgree(p.qty, wallet, precision);
     // Pool amounts need deposits in history to be costed.
     const poolOk = pool > 0 ? !!p && p.inLiquidityQty > 0 : true;
