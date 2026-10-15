@@ -41,3 +41,14 @@ describe('CHEESEFolio notification copies', () => {
     expect(kept.map((t) => t.gs)).toEqual([1, 2]);
   });
 });
+
+import { isSyncComplete } from '@/lib/folio/scanner';
+
+describe('CHEESEFolio sync completion', () => {
+  it('is complete when the deepest provider finished, even if a shallow one dropped out', () => {
+    expect(isSyncComplete(['deep', 'shallow'], new Set(['deep']))).toBe(true);
+  });
+  it('is not complete when the deepest provider failed', () => {
+    expect(isSyncComplete(['deep', 'shallow'], new Set(['shallow']))).toBe(false);
+  });
+});

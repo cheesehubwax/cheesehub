@@ -18,8 +18,17 @@ const PROBE_TIMEOUT_MS = 6_000;
 /** One transaction lookup; slow hosts are skipped rather than waited on. */
 const TX_TIMEOUT_MS = 5_000;
 const TX_PROBE_TIMEOUT_MS = 4_000;
-/** Date windows read in parallel when a provider is read from the start. */
+/**
+ * Date windows a small-page provider's history is split into when it is read
+ * from the start. Only providers capping pages below PAGE are windowed; big-page
+ * providers finish in a few sequential requests and bursts make them drop
+ * connections (api.waxsweden.org timed out under 8 parallel windows).
+ */
 const BACKFILL_WINDOWS = 8;
+/** Windows read at once on one provider (EOSDAC allows roughly 4 requests/s). */
+const WINDOW_CONCURRENCY = 3;
+/** Providers read at once. */
+const PROVIDER_CONCURRENCY = 2;
 /** Order-book fill lookups in flight per provider. */
 const FILL_CONCURRENCY = 12;
 /**
@@ -52,6 +61,15 @@ export function selectProviders(probes: ProbeResult[], max = PROVIDERS): string[
 export function hasCoverageGap(coverageFrom: number | null | undefined, accountCreated: number | null | undefined): boolean {
   if (accountCreated == null || coverageFrom == null) return false;
   return coverageFrom - accountCreated > 86_400_000;
+}
+
+/**
+ * A sync is complete when the deepest provider (always first) was read to the
+ * end. Shallower providers only add cover for its holes; one that dropped out
+ * keeps its cursor and is caught up on the next sync instead of blocking this one.
+ */
+export function isSyncComplete(endpoints: string[], succeeded: Set<string>): boolean {
+  return endpoints.length > 0 && succeeded.has(endpoints[0]);
 }
 
 const parseTs = (ts: string | undefined) => (ts ? Date.parse(ts.endsWith('Z') ? ts : `${ts}Z`) : NaN);
@@ -383,17 +401,26 @@ export async function syncFolio(
     if (!cursor.caughtUp && cursor.after == null && !cursor.windows) {
       const start = earliestOf.get(base);
       if (start != null) {
-        const end = Date.now();
-        const step = Math.max(1, Math.ceil((end - start) / BACKFILL_WINDOWS));
-        cursor.windows = Array.from({ length: BACKFILL_WINDOWS }, (_, i) => ({
-          after: new Date(start + i * step - 1).toISOString(),
-          before: i === BACKFILL_WINDOWS - 1 ? null : new Date(start + (i + 1) * step).toISOString(),
-          done: false,
-        }));
+        // Learn the page cap with a tiny read (rows up to 1 s after the first).
+        if (cursor.limit == null) {
+          const capProbe = await fetchPage(
+            `${base}/v2/history/get_actions?account=${rec.account}&filter=*:transfer&sort=asc&limit=${PAGE}&before=${encodeURIComponent(new Date(start + 1000).toISOString())}`,
+          );
+          if (capProbe && 'maxLimit' in capProbe && capProbe.maxLimit > 0) cursor.limit = capProbe.maxLimit;
+        }
+        if ((cursor.limit ?? PAGE) < PAGE) {
+          const end = Date.now();
+          const step = Math.max(1, Math.ceil((end - start) / BACKFILL_WINDOWS));
+          cursor.windows = Array.from({ length: BACKFILL_WINDOWS }, (_, i) => ({
+            after: new Date(start + i * step - 1).toISOString(),
+            before: i === BACKFILL_WINDOWS - 1 ? null : new Date(start + (i + 1) * step).toISOString(),
+            done: false,
+          }));
+        }
       }
     }
     if (cursor.windows) {
-      const results = await Promise.all(cursor.windows.filter((w) => !w.done).map((w) => readRange(base, cursor, w).catch(() => false)));
+      const results = await mapLimit(cursor.windows.filter((w) => !w.done), WINDOW_CONCURRENCY, (w) => readRange(base, cursor, w).catch(() => false));
       if (results.some((r) => !r) || cursor.windows.some((w) => !w.done)) return false;
       // Backfill complete: continue incrementally from the newest window.
       cursor.after = cursor.windows[cursor.windows.length - 1].after;
@@ -408,8 +435,10 @@ export async function syncFolio(
     return ok;
   };
 
-  await Promise.all(
-    endpoints.map(async (e) => {
+  const succeeded = new Set<string>();
+  // Deepest provider first (selectProviders order), at most two at a time.
+  await mapLimit(endpoints, PROVIDER_CONCURRENCY, async (e) => {
+    {
       // A provider that drops out part-way resumes from its saved windows,
       // so a retry only re-reads what is missing.
       let success = false;
@@ -418,9 +447,12 @@ export async function syncFolio(
         success = await readProvider(e).catch(() => false);
       }
       done++;
-      if (success) ok++;
-    }),
-  );
+      if (success) {
+        ok++;
+        succeeded.add(e);
+      }
+    }
+  });
   rec.transfers.sort((a, b) => a.gs - b.gs);
   // Order-book fills need their match record to know what was given.
   if (ok > 0) {
@@ -433,9 +465,7 @@ export async function syncFolio(
       void onPage(rec, { transfers: rec.transfers.length, reachedTs, providersDone: done, providers: endpoints.length, phase: 'fills', fillsDone: fd, fillsTotal: ft });
     }, signal);
   }
-  // Only "up to date" when every chosen provider was read to the end; a
-  // partly read history would show wrong profit/loss.
-  const complete = endpoints.length > 0 && ok === endpoints.length;
+  const complete = isSyncComplete(endpoints, succeeded);
   if (complete) rec.syncedAt = Date.now();
   await onPage(rec, { transfers: rec.transfers.length, reachedTs, providersDone: done, providers: endpoints.length, phase: 'done' });
   return { providersOk: ok, providers: endpoints.length, complete };
