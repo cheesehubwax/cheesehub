@@ -23,6 +23,7 @@ type Kind =
   | { k: 'order-return' }
   | { k: 'lp-add' | 'lp-remove'; venue: Venue }
   | { k: 'reward' }
+  | { k: 'lp-fee' }
   | { k: 'nulled' }
   | { k: 'in' }
   | { k: 'out' };
@@ -52,7 +53,11 @@ function kindOf(t: RawTransfer, account: string, trxHasTacoSwap: boolean): Kind 
     return { k: 'out' };
   }
   if (other === 'swap.alcor') {
-    return /^Swap (tokenOut|Change)/.test(memo) ? { k: 'swap-in', venue: 'alcor' } : { k: 'lp-remove', venue: 'alcor' };
+    if (/^Swap (tokenOut|Change)/.test(memo)) return { k: 'swap-in', venue: 'alcor' };
+    // "Collected Fee for TokenA - Pool ID #… - Position ID #…" is earned pool
+    // fees, not deposited tokens coming back; "Decrease liquidity …" is.
+    if (/^Collected Fee/i.test(memo)) return { k: 'lp-fee' };
+    return { k: 'lp-remove', venue: 'alcor' };
   }
   if (other === 'swap.box') {
     return /swap token/i.test(memo) ? { k: 'swap-in', venue: 'defibox' } : { k: 'lp-remove', venue: 'defibox' };
@@ -177,12 +182,12 @@ export function classifyTransfers(transfers: RawTransfer[], account: string): Fo
         kind.k === 'order-return' ? 'order-returned'
         : kind.k === 'lp-add' ? 'liquidity-add'
         : kind.k === 'lp-remove' ? 'liquidity-remove'
-        : kind.k === 'reward' ? 'reward'
+        : kind.k === 'reward' || kind.k === 'lp-fee' ? 'reward'
         : kind.k === 'nulled' ? 'nulled'
         : kind.k === 'in' ? 'received'
         : 'sent';
       const counterparty = t.from === account ? t.to : t.from;
-      const venue = 'venue' in kind ? kind.venue : kind.k === 'order-return' ? 'alcor-orderbook' : undefined;
+      const venue = 'venue' in kind ? kind.venue : kind.k === 'order-return' ? 'alcor-orderbook' : kind.k === 'lp-fee' ? 'alcor' : undefined;
       const gk = `${type}|${venue ?? ''}|${type === 'sent' || type === 'received' ? counterparty : ''}`;
       let ev = groups.get(gk);
       if (!ev) {

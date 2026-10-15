@@ -86,3 +86,47 @@ export async function loadPriceLookup(timestamps: number[]): Promise<{ priceAt: 
   };
   return { priceAt, days, dates };
 }
+
+const DAY_MS = 86_400_000;
+const BINANCE = ['https://data-api.binance.vision', 'https://api.binance.com'];
+
+/**
+ * Daily WAX/USD closes from `fromTs` to today (Binance WAXPUSDT, read in
+ * 1,000-day pages). Returns a map of `YYYY-MM-DD` → USD per WAX; empty when
+ * no source answers.
+ */
+export async function fetchWaxUsdDaily(fromTs: number, signal?: AbortSignal): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  for (const host of BINANCE) {
+    let start = Math.floor(fromTs / DAY_MS) * DAY_MS;
+    let ok = true;
+    while (start <= Date.now()) {
+      try {
+        const res = await fetch(`${host}/api/v3/klines?symbol=WAXPUSDT&interval=1d&startTime=${start}&limit=1000`, { signal });
+        if (!res.ok) { ok = false; break; }
+        const rows = (await res.json()) as [number, string, string, string, string][];
+        if (!Array.isArray(rows) || !rows.length) break;
+        for (const r of rows) {
+          const close = parseFloat(r[4]);
+          if (close > 0) out.set(dayOf(r[0]), close);
+        }
+        start = rows[rows.length - 1][0] + DAY_MS;
+        if (rows.length < 1000) break;
+      } catch {
+        ok = false;
+        break;
+      }
+    }
+    if (ok && out.size) return out;
+  }
+  return out;
+}
+
+/** Lookup over daily WAX/USD rates: the day's close, or the nearest earlier day within 3 days. */
+export function waxUsdLookup(daily: Map<string, number>): (ts: number) => number | null {
+  const dates = [...daily.keys()].sort();
+  return (ts) => {
+    const d = nearestDate(dates, dayOf(ts));
+    return d ? daily.get(d) ?? null : null;
+  };
+}

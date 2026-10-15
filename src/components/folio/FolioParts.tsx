@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button';
 import { TokenLogo } from '@/components/TokenLogo';
 import type { FolioEvent, FolioEventType, TokenAmount } from '@/lib/folio/types';
 import type { HoldingRow } from '@/lib/folio/holdings';
+import type { Realisable } from '@/hooks/useRealisableValues';
+
+export type Currency = 'WAX' | 'USD';
 
 export const fmt = (v: number, max = 4) =>
   v.toLocaleString(undefined, { maximumFractionDigits: Math.abs(v) < 1 && v !== 0 ? Math.max(max, 6) : max });
@@ -13,6 +16,13 @@ export const fmt = (v: number, max = 4) =>
 export const waxFmt = (v: number | null | undefined) => (v == null ? '—' : `${fmt(v, 2)} WAX`);
 export const usdFmt = (wax: number | null | undefined, waxUsd: number) =>
   wax == null || !waxUsd ? '' : `$${(wax * waxUsd).toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`;
+
+/** An amount already in `cur`. */
+export const money = (v: number | null | undefined, cur: Currency) =>
+  v == null ? '—' : cur === 'USD'
+    ? `${v < 0 ? '-' : ''}$${Math.abs(v).toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`
+    : `${fmt(v, 2)} WAX`;
+const signedMoney = (v: number, cur: Currency) => `${v >= 0 ? '+' : ''}${money(v, cur)}`;
 
 const plClass = (v: number | null | undefined) => (v == null ? 'text-muted-foreground' : v >= 0 ? 'text-primary' : 'text-destructive');
 const signed = (v: number) => `${v >= 0 ? '+' : ''}${fmt(v, 2)}`;
@@ -54,23 +64,35 @@ export function AmountList({ items }: { items: TokenAmount[] }) {
   );
 }
 
-export function HoldingsTable({ rows, waxUsd, onPick }: { rows: HoldingRow[]; waxUsd: number; onPick: (r: HoldingRow) => void }) {
+export function HoldingsTable({ rows, waxUsd, cur, realisable, onPick }: {
+  rows: HoldingRow[]; waxUsd: number; cur: Currency; realisable?: Map<string, Realisable>; onPick: (r: HoldingRow) => void;
+}) {
+  const usd = cur === 'USD';
   return (
     <div className="w-full overflow-x-auto rounded-lg border border-border/50 bg-card/60">
-      <table className="w-full min-w-[860px] text-sm whitespace-nowrap">
+      <table className="w-full min-w-[980px] text-sm whitespace-nowrap">
         <thead className="text-xs uppercase text-muted-foreground">
           <tr className="border-b border-border/50">
             <th className="px-3 py-2 text-left">Token</th>
             <th className="px-3 py-2 text-right">Balance</th>
             <th className="px-3 py-2 text-right">Avg cost</th>
             <th className="px-3 py-2 text-right">Price</th>
-            <th className="px-3 py-2 text-right">Value</th>
+            <th className="px-3 py-2 text-right" title="Amount × current price">Paper value</th>
+            <th className="px-3 py-2 text-right" title="What selling the whole balance on Alcor would return right now">Realisable</th>
             <th className="px-3 py-2 text-right">Unrealised P/L</th>
             <th className="px-3 py-2 text-right">Realised P/L</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {rows.map((r) => {
+            const rz = realisable?.get(r.key);
+            const rzWax = r.key === 'eosio.token:WAX' ? r.balance : rz?.wax ?? null;
+            const unreal = usd ? r.unrealizedUsd : r.unrealizedWax;
+            const unrealPct = usd ? r.unrealizedPctUsd : r.unrealizedPct;
+            const realized = usd ? r.realizedUsd : r.realizedWax;
+            const avg = usd ? r.avgCostUsd : r.avgCostWax;
+            const usdMissing = usd && r.complete && !r.usdComplete;
+            return (
             <tr key={r.key} className="cursor-pointer border-b border-border/30 hover:bg-cheese/5" onClick={() => onPick(r)}>
               <td className="px-3 py-2">
                 <span className="inline-flex items-center gap-2">
@@ -81,6 +103,10 @@ export function HoldingsTable({ rows, waxUsd, onPick }: { rows: HoldingRow[]; wa
                     <span className="rounded border border-destructive/40 px-1 text-[10px] text-destructive" title="Your saved history doesn't add up to your live balance, so profit/loss is hidden for this token.">
                       history incomplete
                     </span>
+                  ) : usdMissing ? (
+                    <span className="rounded border border-cheese/40 px-1 text-[10px] text-cheese" title="Some of this token's trades happened on days with no recorded WAX/USD rate.">
+                      no USD rate
+                    </span>
                   ) : r.position?.unpricedBuys ? (
                     <span className="rounded border border-cheese/40 px-1 text-[10px] text-cheese" title="Some of this token was acquired without a known WAX value.">
                       partly unpriced
@@ -89,21 +115,32 @@ export function HoldingsTable({ rows, waxUsd, onPick }: { rows: HoldingRow[]; wa
                 </span>
               </td>
               <td className="px-3 py-2 text-right">{fmt(r.balance, r.precision)}</td>
-              <td className="px-3 py-2 text-right">{r.avgCostWax == null ? '—' : `${fmt(r.avgCostWax, 6)}`}</td>
-              <td className="px-3 py-2 text-right">{r.priceWax == null ? '—' : fmt(r.priceWax, 6)}</td>
+              <td className="px-3 py-2 text-right">{avg == null ? '—' : usd ? `$${fmt(avg, 6)}` : fmt(avg, 6)}</td>
+              <td className="px-3 py-2 text-right">{r.priceWax == null ? '—' : usd ? (waxUsd ? `$${fmt(r.priceWax * waxUsd, 6)}` : '—') : fmt(r.priceWax, 6)}</td>
               <td className="px-3 py-2 text-right">
-                <div>{waxFmt(r.valueWax)}</div>
-                <div className="text-xs text-muted-foreground">{usdFmt(r.valueWax, waxUsd)}</div>
+                <div>{usd ? money(r.valueUsd, cur) : waxFmt(r.valueWax)}</div>
+                {!usd ? <div className="text-xs text-muted-foreground">{usdFmt(r.valueWax, waxUsd)}</div> : null}
               </td>
-              <td className={`px-3 py-2 text-right ${plClass(r.unrealizedWax)}`}>
-                {r.unrealizedWax == null ? '—' : `${signed(r.unrealizedWax)} WAX`}
-                {r.unrealizedPct != null ? <div className="text-xs">{signed(r.unrealizedPct)}%</div> : null}
+              <td className="px-3 py-2 text-right">
+                {rzWax == null ? (
+                  <span className="text-muted-foreground">{realisable || r.key === 'eosio.token:WAX' ? '—' : '…'}</span>
+                ) : (
+                  <>
+                    <div>{usd ? money(waxUsd ? rzWax * waxUsd : null, cur) : waxFmt(rzWax)}</div>
+                    {rz?.gapPct != null ? <div className={`text-xs ${rz.gapPct < -0.05 ? 'text-destructive' : 'text-muted-foreground'}`}>{signed(rz.gapPct)}% vs paper</div> : null}
+                  </>
+                )}
               </td>
-              <td className={`px-3 py-2 text-right ${plClass(r.realizedWax || null)}`}>{r.realizedWax ? `${signed(r.realizedWax)} WAX` : '—'}</td>
+              <td className={`px-3 py-2 text-right ${plClass(unreal)}`}>
+                {unreal == null ? '—' : signedMoney(unreal, cur)}
+                {unrealPct != null ? <div className="text-xs">{signed(unrealPct)}%</div> : null}
+              </td>
+              <td className={`px-3 py-2 text-right ${plClass(realized || null)}`}>{realized ? signedMoney(realized, cur) : '—'}</td>
             </tr>
-          ))}
+            );
+          })}
           {rows.length === 0 ? (
-            <tr><td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">No tokens with a balance.</td></tr>
+            <tr><td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">No tokens with a balance.</td></tr>
           ) : null}
         </tbody>
       </table>
@@ -114,8 +151,8 @@ export function HoldingsTable({ rows, waxUsd, onPick }: { rows: HoldingRow[]; wa
 const PAGE = 100;
 
 export function ActivityList({
-  events, value, realized, filter,
-}: { events: FolioEvent[]; value: Map<string, number>; realized: Map<string, number>; filter?: string }) {
+  events, value, realized, filter, cur = 'WAX',
+}: { events: FolioEvent[]; value: Map<string, number>; realized: Map<string, number>; filter?: string; cur?: Currency }) {
   const [type, setType] = useState<FolioEventType | 'all'>('all');
   const [shown, setShown] = useState(PAGE);
   const list = useMemo(
@@ -161,8 +198,8 @@ export function ActivityList({
                   </td>
                   <td className="px-3 py-2"><AmountList items={e.out} /></td>
                   <td className="px-3 py-2"><AmountList items={e.in} /></td>
-                  <td className="px-3 py-2 text-right whitespace-nowrap">{value.has(e.id) ? waxFmt(value.get(e.id)) : '—'}</td>
-                  <td className={`px-3 py-2 text-right whitespace-nowrap ${plClass(r)}`}>{r == null ? '—' : `${signed(r)} WAX`}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">{value.has(e.id) ? money(value.get(e.id), cur) : '—'}</td>
+                  <td className={`px-3 py-2 text-right whitespace-nowrap ${plClass(r)}`}>{r == null ? '—' : signedMoney(r, cur)}</td>
                   <td className="px-3 py-2 text-right">
                     <a className="text-cheese hover:underline" href={`https://waxblock.io/transaction/${e.trx}`} target="_blank" rel="noopener noreferrer">
                       {e.trx.slice(0, 8)}
@@ -186,7 +223,7 @@ export function ActivityList({
   );
 }
 
-export function PlChart({ data, title }: { data: { date: string; value: number }[]; title: string }) {
+export function PlChart({ data, title, cur = 'WAX' }: { data: { date: string; value: number }[]; title: string; cur?: Currency }) {
   if (data.length < 2) {
     return <div className="flex h-48 items-center justify-center rounded-lg border border-border/50 bg-card/60 text-sm text-muted-foreground">Not enough history for a chart yet.</div>;
   }
@@ -207,7 +244,7 @@ export function PlChart({ data, title }: { data: { date: string; value: number }
             <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--foreground))' }} width={70} tickFormatter={(v: number) => fmt(v, 0)} />
             <Tooltip
               contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-              formatter={(v: number) => [`${fmt(v, 2)} WAX`, title]}
+              formatter={(v: number) => [money(v, cur), title]}
             />
             <Area type="monotone" dataKey="value" stroke="hsl(var(--primary))" fill={`url(#folio-${title})`} strokeWidth={2} />
           </AreaChart>
@@ -218,11 +255,13 @@ export function PlChart({ data, title }: { data: { date: string; value: number }
 }
 
 export function TokenDialog({
-  row, events, value, realized, waxUsd, onClose,
+  row, events, value, realized, waxUsd, cur, realisable, onClose,
 }: {
-  row: HoldingRow | null; events: FolioEvent[]; value: Map<string, number>; realized: Map<string, number>; waxUsd: number; onClose: () => void;
+  row: HoldingRow | null; events: FolioEvent[]; value: Map<string, number>; realized: Map<string, number>; waxUsd: number;
+  cur: Currency; realisable?: Realisable | null; onClose: () => void;
 }) {
   const p = row?.position;
+  const usd = cur === 'USD';
   return (
     <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
@@ -235,10 +274,15 @@ export function TokenDialog({
               </DialogTitle>
             </DialogHeader>
             <div className="flex flex-wrap gap-2">
-              <SummaryBox label="Balance" value={fmt(row.balance, row.precision)} sub={usdFmt(row.valueWax, waxUsd)} />
-              <SummaryBox label="Avg cost" value={row.avgCostWax == null ? '—' : `${fmt(row.avgCostWax, 6)} WAX`} />
-              <SummaryBox label="Unrealised" value={row.unrealizedWax == null ? '—' : `${signed(row.unrealizedWax)} WAX`} tone={row.unrealizedWax} />
-              <SummaryBox label="Realised" value={`${signed(row.realizedWax)} WAX`} tone={row.realizedWax} />
+              <SummaryBox label="Balance" value={fmt(row.balance, row.precision)} sub={usd ? money(row.valueUsd, cur) : usdFmt(row.valueWax, waxUsd)} />
+              <SummaryBox label="Avg cost" value={usd ? (row.avgCostUsd == null ? '—' : `$${fmt(row.avgCostUsd, 6)}`) : row.avgCostWax == null ? '—' : `${fmt(row.avgCostWax, 6)} WAX`} />
+              <SummaryBox
+                label="Realisable now"
+                value={realisable?.wax == null ? '—' : usd ? money(waxUsd ? realisable.wax * waxUsd : null, cur) : waxFmt(realisable.wax)}
+                sub={realisable?.gapPct != null ? `${signed(realisable.gapPct)}% vs paper value` : undefined}
+              />
+              <SummaryBox label="Unrealised" value={(usd ? row.unrealizedUsd : row.unrealizedWax) == null ? '—' : signedMoney((usd ? row.unrealizedUsd : row.unrealizedWax)!, cur)} tone={usd ? row.unrealizedUsd : row.unrealizedWax} />
+              <SummaryBox label="Realised" value={signedMoney(usd ? row.realizedUsd : row.realizedWax, cur)} tone={usd ? row.realizedUsd : row.realizedWax} />
             </div>
             {p ? (
               <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm text-muted-foreground sm:grid-cols-3">
@@ -256,7 +300,7 @@ export function TokenDialog({
                 This usually means some history wasn't available — try "Rescan from scratch".
               </p>
             ) : null}
-            <ActivityList events={events} value={value} realized={realized} filter={row.key} />
+            <ActivityList events={events} value={value} realized={realized} filter={row.key} cur={cur} />
           </>
         ) : null}
       </DialogContent>
