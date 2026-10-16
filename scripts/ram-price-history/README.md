@@ -20,7 +20,29 @@ CHEESERam can chart day-to-day history.
 ```
 
 `t` is epoch milliseconds. The file is a JSON array sorted ascending by `t` and
-capped at 1600 records (~2 years at two samples per day).
+capped at 20,000 records. Backfilled records have `cheesePerKb` and
+`waxPerCheese` set to `null` (no CHEESE price exists for those dates) and
+`usdPerKb` from the consolidated WAX/USD history (`null` if that day has none).
+
+## Backfill (history before live sampling)
+
+`backfill.ts` rebuilds the price for every past 12h slot from Hyperion
+`get_deltas` on the `eosio::rammarket` table — the exact Bancor reserves at that
+moment, priced the same way as the live sampler (`WAX ÷ bytes × 1024`). Only
+the EOSDAC history nodes index these deltas back to WAX launch (June 2019).
+
+- Takes the first RAM market state inside each empty slot; slots that already
+  hold a sample are never changed, so re-running only fills gaps.
+- Slots with no RAM market change are left empty, never guessed.
+- Checkpoints to the file as it goes; failed slots are listed and the run exits
+  non-zero, and the workflow still commits what was fetched.
+
+Run it from **Actions → RAM Price Backfill → Run workflow** (defaults to
+2019-06-20 onward; takes roughly 30–45 minutes), or locally:
+
+```bash
+RAM_HISTORY_FILE=/tmp/ram-price-history.json FROM=2024-03-01 TO=2024-03-31 bun run backfill.ts
+```
 
 ## Run locally
 

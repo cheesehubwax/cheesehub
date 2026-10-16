@@ -6,20 +6,22 @@ export interface RamHistoryRecord {
   t: number;
   /** WAX per KB of RAM. */
   waxPerKb: number;
-  /** CHEESE per KB of RAM. */
-  cheesePerKb: number;
-  /** WAX per 1 CHEESE at sample time. */
-  waxPerCheese: number;
-  /** USD per KB of RAM. */
-  usdPerKb: number;
+  /** CHEESE per KB of RAM. Null on records backfilled from chain history. */
+  cheesePerKb: number | null;
+  /** WAX per 1 CHEESE at sample time. Null on backfilled records. */
+  waxPerCheese: number | null;
+  /** USD per KB of RAM. Null when no WAX/USD rate exists for that day. */
+  usdPerKb: number | null;
 }
 
-export type RamHistoryRange = '24h' | '7d' | '30d' | 'all';
+export type RamHistoryRange = '24h' | '7d' | '30d' | '90d' | '1y' | 'all';
 
 export const RAM_HISTORY_RANGES: { key: RamHistoryRange; label: string; ms: number | null }[] = [
   { key: '24h', label: '24H', ms: 24 * 60 * 60 * 1000 },
   { key: '7d', label: '7D', ms: 7 * 24 * 60 * 60 * 1000 },
   { key: '30d', label: '30D', ms: 30 * 24 * 60 * 60 * 1000 },
+  { key: '90d', label: '90D', ms: 90 * 24 * 60 * 60 * 1000 },
+  { key: '1y', label: '1Y', ms: 365 * 24 * 60 * 60 * 1000 },
   { key: 'all', label: 'ALL', ms: null },
 ];
 
@@ -74,7 +76,7 @@ export function sliceRange(
   return downsample(windowed);
 }
 
-/** Historical RAM price samples recorded every 4 hours by GitHub Actions. */
+/** RAM price history: twice-daily samples, backfilled from on-chain rammarket state. */
 export function useRamPriceHistory() {
   const query = useQuery({
     queryKey: ['cheeseRam', 'priceHistory'],
@@ -88,6 +90,8 @@ export function useRamPriceHistory() {
   return {
     records,
     firstSampleAt: records.length ? records[0].t : null,
+    /** First live sample (has a CHEESE price); earlier points are backfilled. */
+    firstLiveAt: records.find((r) => r.cheesePerKb != null)?.t ?? null,
     isLoading: query.isLoading,
     isError: query.isError,
   };

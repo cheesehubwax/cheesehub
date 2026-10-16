@@ -1,0 +1,65 @@
+name: RAM Price Backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      from:
+        description: "First UTC day to backfill (YYYY-MM-DD)"
+        required: false
+        default: "2019-06-20"
+      to:
+        description: "Last UTC day to backfill (blank = up to the previous 12h slot)"
+        required: false
+        default: ""
+
+# Shares the sampler's group so the two never push the same file at once.
+concurrency:
+  group: ram-price-history
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Check out data branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git clone --depth 1 --branch ram-price-data "$REPO_URL" /tmp/ram-data
+
+      - name: Backfill RAM prices from rammarket history
+        working-directory: scripts/ram-price-history
+        env:
+          RAM_HISTORY_FILE: /tmp/ram-data/data/ram-price-history.json
+          FROM: ${{ github.event.inputs.from }}
+          TO: ${{ github.event.inputs.to }}
+        run: bun run backfill.ts
+
+      # Runs even if some slots failed: everything fetched is exact on-chain
+      # state, and a re-run only fills the slots still missing.
+      - name: Commit backfill
+        if: always()
+        run: |
+          set -euo pipefail
+          cd /tmp/ram-data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- data/ram-price-history.json; then
+            echo "No change to commit."
+            exit 0
+          fi
+          git add data/ram-price-history.json
+          git commit -m "chore: backfill RAM price history"
+          git push origin ram-price-data

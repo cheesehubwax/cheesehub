@@ -37,8 +37,8 @@ const slotStart = (t: number) => Math.floor(t / SLOT_LENGTH_MS) * SLOT_LENGTH_MS
 const slotLabel = (start: number) =>
   `${new Date(start).toISOString().slice(0, 13)}:00Z slot`;
 
-/** ~2 years of twice-daily samples. */
-const MAX_RECORDS = 1600;
+/** Room for the full backfilled history (2019 onward) plus decades of samples. */
+const MAX_RECORDS = 20_000;
 const TIMEOUT_MS = 10_000;
 
 
@@ -47,12 +47,12 @@ export interface RamHistoryRecord {
   t: number;
   /** WAX per KB of RAM. */
   waxPerKb: number;
-  /** CHEESE per KB of RAM. */
-  cheesePerKb: number;
-  /** WAX per 1 CHEESE at sample time. */
-  waxPerCheese: number;
-  /** USD per KB of RAM, derived via the WAXUSDC bridge. */
-  usdPerKb: number;
+  /** CHEESE per KB of RAM (null on backfilled records — no CHEESE price then). */
+  cheesePerKb: number | null;
+  /** WAX per 1 CHEESE at sample time (null on backfilled records). */
+  waxPerCheese: number | null;
+  /** USD per KB of RAM, via WAXUSDC live or the WAX/USD history when backfilled. */
+  usdPerKb: number | null;
 }
 
 async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
