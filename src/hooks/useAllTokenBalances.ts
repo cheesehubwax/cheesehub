@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { WAX_TOKENS, TokenConfig } from '@/lib/tokenRegistry';
 import { fetchAllTokenBalances, fetchAllTokenBalancesViaRpc, HyperionToken } from '@/lib/waxRpcFallback';
+import { fetchTokenSnapshot, readTokenSnapshot } from '@/lib/tokenSnapshot';
 
 export interface TokenWithBalance extends TokenConfig {
   balance: number;
@@ -22,6 +23,9 @@ function isLpToken(contract: string): boolean {
 }
 
 async function fetchBalancesForAccount(accountName: string): Promise<{ tokens: TokenWithBalance[]; usedFallback: boolean }> {
+  // Metadata refresh is shared with swaps and never expands the balance scan
+  // into thousands of speculative contract requests.
+  void fetchTokenSnapshot();
   let results: TokenWithBalance[] = [];
   let usedFallback = false;
 
@@ -127,6 +131,11 @@ async function fetchBalancesForAccount(accountName: string): Promise<{ tokens: T
   }
 
   // Sort: alphabetically, with LP tokens at bottom
+  const metadata = new Map(readTokenSnapshot()?.tokens.map(t => [`${t.contract}:${t.symbol}`, t]) ?? []);
+  results = results.map(token => {
+    const saved = metadata.get(`${token.contract}:${token.symbol}`);
+    return saved ? { ...token, precision: saved.precision, displayName: saved.name, logo: saved.logo } : token;
+  });
   const sorted = results
     .filter(t => t.balance > 0)
     .sort((a, b) => {
@@ -148,7 +157,10 @@ export function useAllTokenBalances(accountName: string | null | undefined) {
 
   const { data, isLoading } = useQuery({
     queryKey: ['all-token-balances', accountName],
-    queryFn: () => fetchBalancesForAccount(accountName!),
+    queryFn: () => {
+      if (!accountName) throw new Error('An account is required');
+      return fetchBalancesForAccount(accountName);
+    },
     enabled: !!accountName,
     staleTime: 15_000,
     gcTime: 120_000,
