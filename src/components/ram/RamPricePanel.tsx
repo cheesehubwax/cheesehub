@@ -21,11 +21,16 @@ type RangeKey = 'live' | RamHistoryRange;
 const formatStamp = (time: number, range: RangeKey) =>
   range === 'live' || range === '24h'
     ? new Date(time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : new Date(time).toLocaleDateString([], { day: 'numeric', month: 'short' });
+    : range === '7d' || range === '30d'
+      ? new Date(time).toLocaleDateString([], { day: 'numeric', month: 'short' })
+      : new Date(time).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+
+const formatDay = (time: number) =>
+  new Date(time).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
 
 export function RamPricePanel({ cheesePerKb, pricePerByte, history }: RamPricePanelProps) {
   const [range, setRange] = useState<RangeKey>('live');
-  const { records, firstSampleAt, isLoading: historyLoading } = useRamPriceHistory();
+  const { records, firstSampleAt, firstLiveAt, isLoading: historyLoading } = useRamPriceHistory();
 
   const chartData = useMemo<ChartPoint[]>(() => {
     if (range === 'live') {
@@ -45,6 +50,8 @@ export function RamPricePanel({ cheesePerKb, pricePerByte, history }: RamPricePa
   }, [range, history, records]);
 
   const hasChart = chartData.length >= 2;
+  // Backfilled points carry no CHEESE price, so a long range may have none at all.
+  const hasCheeseChart = chartData.filter((point) => point.cheesePerKb != null).length >= 2;
   const emptyMessage =
     range === 'live'
       ? 'Building price history...'
@@ -56,17 +63,15 @@ export function RamPricePanel({ cheesePerKb, pricePerByte, history }: RamPricePa
     range === 'live'
       ? 'Updates every 30s • Session data only'
       : firstSampleAt
-        ? `Recorded twice daily since ${new Date(firstSampleAt).toLocaleDateString([], {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-          })}`
+        ? firstLiveAt && firstLiveAt > firstSampleAt
+          ? `Twice daily since ${formatDay(firstSampleAt)} • Before ${formatDay(firstLiveAt)} rebuilt from on-chain RAM market history (WAX only)`
+          : `Recorded twice daily since ${formatDay(firstSampleAt)}`
         : 'Recorded twice daily';
 
 
   const renderTooltip = (decimals: number, unit: string, textClass: string) =>
     ({ active, payload }: { active?: boolean; payload?: { value?: unknown; payload?: ChartPoint }[] }) =>
-      active && payload?.length ? (
+      active && payload?.length && typeof payload[0].value === 'number' ? (
         <div className="bg-background/95 border border-border px-2 py-1 rounded text-xs font-mono">
           <span className={textClass}>
             {(payload[0].value as number).toFixed(decimals)} {unit}
@@ -161,7 +166,7 @@ export function RamPricePanel({ cheesePerKb, pricePerByte, history }: RamPricePa
             </span>
           )}
         </div>
-        {hasChart ? (
+        {hasCheeseChart ? (
           <div className="h-12">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
@@ -185,7 +190,9 @@ export function RamPricePanel({ cheesePerKb, pricePerByte, history }: RamPricePa
           </div>
         ) : (
           <div className="h-12 flex items-center justify-center">
-            <span className="text-xs text-muted-foreground">{emptyMessage}</span>
+            <span className="text-xs text-muted-foreground">
+              {hasChart ? 'No CHEESE price recorded for this range' : emptyMessage}
+            </span>
           </div>
         )}
       </div>
