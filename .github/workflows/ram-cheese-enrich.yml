@@ -1,0 +1,51 @@
+name: RAM Price CHEESE Enrichment
+
+on:
+  workflow_dispatch:
+
+# Shares the sampler's group so the two never push the same file at once.
+concurrency:
+  group: ram-price-history
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  enrich:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Check out data branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git clone --depth 1 --branch ram-price-data "$REPO_URL" /tmp/ram-data
+
+      - name: Add CHEESE prices to RAM history
+        working-directory: scripts/ram-price-history
+        env:
+          RAM_HISTORY_FILE: /tmp/ram-data/data/ram-price-history.json
+        run: bun run cheese-enrich.ts
+
+      - name: Commit
+        run: |
+          set -euo pipefail
+          cd /tmp/ram-data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- data/ram-price-history.json; then
+            echo "No change to commit."
+            exit 0
+          fi
+          git add data/ram-price-history.json
+          git commit -m "chore: add CHEESE prices to RAM price history"
+          git push origin ram-price-data

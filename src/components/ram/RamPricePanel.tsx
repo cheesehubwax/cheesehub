@@ -64,7 +64,7 @@ export function RamPricePanel({ cheesePerKb, pricePerByte, history }: RamPricePa
       ? 'Updates every 30s • Session data only'
       : firstSampleAt
         ? firstLiveAt && firstLiveAt > firstSampleAt
-          ? `Twice daily since ${formatDay(firstSampleAt)} • Before ${formatDay(firstLiveAt)} rebuilt from on-chain RAM market history (WAX only)`
+          ? `Twice daily since ${formatDay(firstSampleAt)} • Older points rebuilt from on-chain RAM market history • CHEESE from ${formatDay(firstLiveAt)} (daily close)`
           : `Recorded twice daily since ${formatDay(firstSampleAt)}`
         : 'Recorded twice daily';
 

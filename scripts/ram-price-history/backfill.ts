@@ -23,6 +23,7 @@
  *   WAX_USD_URL       override for the consolidated WAX/USD map
  */
 import { applyHealthOrder } from "../shared/herdcheck";
+import { cheeseFields, loadCheeseDays, type CheeseDays } from "./cheesePrice";
 
 /** Only these providers index rammarket table deltas back to WAX genesis. */
 const DELTA_ENDPOINTS = ["https://wax-history.eosdac.io", "https://wax.eosdac.io"];
@@ -176,6 +177,10 @@ async function main() {
   );
 
   const rates = await loadWaxUsd();
+  const cheeseDays = await loadCheeseDays().catch((error) => {
+    console.warn("CHEESE history unavailable — CHEESE fields left empty:", (error as Error).message);
+    return new Map() as CheeseDays;
+  });
   const added: RamHistoryRecord[] = [];
   const failed: number[] = [];
   let empty = 0;
@@ -190,6 +195,8 @@ async function main() {
         if (record) {
           const usd = usdOn(rates, record.t);
           record.usdPerKb = usd ? round(record.waxPerKb * usd, 8) : null;
+          const cheese = cheeseFields(cheeseDays, record.t, record.waxPerKb);
+          if (cheese) Object.assign(record, cheese);
           added.push(record);
         } else {
           empty++;
