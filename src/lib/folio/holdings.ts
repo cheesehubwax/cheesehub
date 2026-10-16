@@ -42,6 +42,8 @@ export interface HoldingRow {
   /** False when history and the live balance disagree. */
   complete: boolean;
   position: TokenPosition | null;
+  /** Fully sold/sent: nothing held now, only realised profit/loss remains. */
+  closed: boolean;
 }
 
 /** History matches the live balance within 2 smallest units or 1%. */
@@ -62,6 +64,7 @@ export function buildHoldings(
   priceWax: (key: TokenKey) => number | null,
   waxUsdNow = 0,
   pooled: { tokens: Map<TokenKey, PooledToken>; failed: string[] } | null = null,
+  includeClosed = false,
 ): HoldingRow[] {
   const rows: HoldingRow[] = [];
   const keys = new Map<TokenKey, { contract: string; symbol: string; precision: number }>();
@@ -115,7 +118,23 @@ export function buildHoldings(
       usdComplete: usdOk,
       complete: isWax ? true : complete,
       position: p,
+      closed: false,
     });
+  }
+  if (includeClosed) {
+    const shown = new Set(rows.map((r) => r.key));
+    for (const p of positions.values()) {
+      if (shown.has(p.key) || p.key === WAX_KEY) continue;
+      if (!p.realizedWax && !p.realizedUsd) continue;
+      rows.push({
+        key: p.key, contract: p.contract, symbol: p.symbol, precision: p.precision, balance: 0,
+        walletBalance: 0, pooledBalance: 0, pooledParts: [], pooledUnknown: false,
+        priceWax: p.key === WAX_KEY ? 1 : priceWax(p.key), valueWax: null, avgCostWax: null,
+        unrealizedWax: null, unrealizedPct: null, realizedWax: p.realizedWax,
+        valueUsd: null, avgCostUsd: null, unrealizedUsd: null, unrealizedPctUsd: null,
+        realizedUsd: p.realizedUsd, usdComplete: !p.usdGap, complete: true, position: p, closed: true,
+      });
+    }
   }
   return rows.sort((a, b) => (b.valueWax ?? 0) - (a.valueWax ?? 0));
 }
