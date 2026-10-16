@@ -22,4 +22,4 @@
 
 - CHEESEFolio's history-gap warning trusts the deepest provider when its get_creator answer includes the creation transaction — an account's first transfer can come days after creation, which is idleness, not missing history.
 
-- CHEESERam history before live sampling is rebuilt from Hyperion `eosio::rammarket` table deltas (exact Bancor state, EOSDAC nodes only) into the same 12h slots; backfill never alters an existing sample and leaves CHEESE fields null rather than inventing a past CHEESE price.
+- CHEESERam history before live sampling is rebuilt from Hyperion `eosio::rammarket` table deltas (exact Bancor state, EOSDAC nodes only) into the same 12h slots; backfill never alters an existing sample and leaves CHEESE fields null before CHEESE history exists (2024-01-28); from then each record takes its UTC day's CHEESE close from cheese-usd-history.json and live samples are never re-priced.
