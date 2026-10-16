@@ -143,12 +143,12 @@ async function readHistory(file: string): Promise<RamHistoryRecord[]> {
 }
 
 async function writeMerged(file: string, existing: RamHistoryRecord[], added: RamHistoryRecord[]) {
-  const bySlot = new Map<number, RamHistoryRecord>();
-  for (const r of added) bySlot.set(slotStart(r.t), r);
-  for (const r of existing) {
-    if (Number.isFinite(r?.t) && r.waxPerKb > 0) bySlot.set(slotStart(r.t), r); // live samples win
-  }
-  const next = [...bySlot.values()].sort((a, b) => a.t - b.t).slice(-MAX_RECORDS);
+  // Every existing record is kept as-is (older runs may hold two live samples
+  // in one slot); a backfilled record only lands in a slot nothing else holds.
+  const kept = existing.filter((r) => Number.isFinite(r?.t) && r.waxPerKb > 0);
+  const taken = new Set(kept.map((r) => slotStart(r.t)));
+  const merged = [...kept, ...added.filter((r) => !taken.has(slotStart(r.t)))];
+  const next = merged.sort((a, b) => a.t - b.t).slice(-MAX_RECORDS);
   await Bun.write(file, `${JSON.stringify(next)}\n`);
   return next.length;
 }
