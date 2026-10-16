@@ -19,3 +19,5 @@
 - CHEESEFolio holdings roll live pool positions (Alcor positions read per pool scope on chain, Taco/Defibox share tokens × reserves) into each token row; a venue that can't be read hides P/L for tokens history says are pooled, never counts as zero.
 
 - Alcor's on-chain `positions` table is scoped per pool and indexed by owner (index 3); the farm manager's API fallback finds the account's pools from its `swap.alcor:addliquid` history, then sizes each position from the pool's current price.
+
+- CHEESEFolio's history-gap warning trusts the deepest provider when its get_creator answer includes the creation transaction — an account's first transfer can come days after creation, which is idleness, not missing history.

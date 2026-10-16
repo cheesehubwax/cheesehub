@@ -77,6 +77,8 @@ export function AmountList({ items }: { items: TokenAmount[] }) {
   );
 }
 
+type SortCol = 'token' | 'balance' | 'avg' | 'price' | 'paper' | 'realisable' | 'unrealised' | 'realised';
+
 export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }: {
   rows: HoldingRow[]; events: FolioEvent[]; waxUsd: number; cur: Currency; realisable?: Map<string, Realisable>; onPick: (r: HoldingRow) => void;
 }) {
@@ -84,6 +86,37 @@ export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }:
   const acquisitions = useMemo(() => new Map(rows.filter((r) => r.position).map((r) => [
     r.key, acquisitionBreakdown(r.key, events, r.position?.freeQty ?? 0),
   ])), [rows, events]);
+  const [sort, setSort] = useState<{ col: SortCol; dir: 1 | -1 }>({ col: 'paper', dir: -1 });
+  const sorted = useMemo(() => {
+    const val = (r: HoldingRow): number | string | null => {
+      switch (sort.col) {
+        case 'token': return r.symbol.toLowerCase();
+        case 'balance': return r.balance;
+        case 'avg': return usd ? r.avgCostUsd : r.avgCostWax;
+        case 'price': return r.priceWax;
+        case 'paper': return r.valueWax;
+        case 'realisable': return r.key === 'eosio.token:WAX' ? r.balance : realisable?.get(r.key)?.wax ?? null;
+        case 'unrealised': return usd ? r.unrealizedUsd : r.unrealizedWax;
+        case 'realised': return (usd ? r.realizedUsd : r.realizedWax) || null;
+      }
+    };
+    return rows.map((r) => ({ r, v: val(r) })).sort((a, b) => {
+      if (a.v == null || b.v == null) return a.v == null ? (b.v == null ? 0 : 1) : -1; // blanks last
+      const c = typeof a.v === 'string' ? a.v.localeCompare(b.v as string) : a.v - (b.v as number);
+      return c * sort.dir;
+    }).map((x) => x.r);
+  }, [rows, sort, usd, realisable]);
+  const head = (col: SortCol, label: string, left = false, title?: string) => (
+    <th className={`px-3 py-2 ${left ? 'text-left' : 'text-right'}`} title={title} aria-sort={sort.col === col ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'}>
+      <button
+        type="button"
+        className={`inline-flex items-center gap-1 uppercase hover:text-foreground ${sort.col === col ? 'text-foreground' : ''}`}
+        onClick={() => setSort((s) => (s.col === col ? { col, dir: s.dir === 1 ? -1 : 1 } : { col, dir: col === 'token' ? 1 : -1 }))}
+      >
+        {label}<span className="text-[10px]">{sort.col === col ? (sort.dir === 1 ? '▲' : '▼') : '↕'}</span>
+      </button>
+    </th>
+  );
   return (
     <div className="w-full overflow-x-auto rounded-lg border border-border/50 bg-card/60">
       <table aria-label="Holdings" className="w-full min-w-[1080px] table-fixed text-xs xl:text-sm [&_th]:px-2 [&_td]:px-2 [&_td]:py-2 [&_td]:break-words [&_th:first-child]:pl-3 [&_td:first-child]:pl-3 [&_th:last-child]:pr-6 [&_td:last-child]:pr-6">
@@ -99,18 +132,18 @@ export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }:
         </colgroup>
         <thead className="text-xs uppercase text-muted-foreground whitespace-normal">
           <tr className="border-b border-border/50">
-            <th className="px-3 py-2 text-left">Token</th>
-            <th className="px-3 py-2 text-right">Balance</th>
-            <th className="px-3 py-2 text-right">Avg cost</th>
-            <th className="px-3 py-2 text-right">Price</th>
-            <th className="px-3 py-2 text-right" title="Amount × current price">Paper value</th>
-            <th className="px-3 py-2 text-right" title="What selling the whole balance on Alcor would return right now">Realisable</th>
-            <th className="px-3 py-2 text-right">Unrealised P/L</th>
-            <th className="px-3 py-2 text-right">Realised P/L</th>
+            {head('token', 'Token', true)}
+            {head('balance', 'Balance')}
+            {head('avg', 'Avg cost')}
+            {head('price', 'Price')}
+            {head('paper', 'Paper value', false, 'Amount × current price')}
+            {head('realisable', 'Realisable', false, 'What selling the whole balance on Alcor would return right now')}
+            {head('unrealised', 'Unrealised P/L')}
+            {head('realised', 'Realised P/L')}
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => {
+          {sorted.map((r) => {
             const rz = realisable?.get(r.key);
             const rzWax = r.key === 'eosio.token:WAX' ? r.balance : rz?.wax ?? null;
             const unreal = usd ? r.unrealizedUsd : r.unrealizedWax;
@@ -129,7 +162,11 @@ export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }:
                     <span className="text-[11px] text-muted-foreground">{r.contract}</span>
                   </div>
                     <div className="flex flex-wrap gap-1 empty:hidden">
-                  {!r.complete ? (
+                  {r.closed ? (
+                    <span className="rounded border border-border px-1 text-[10px] text-muted-foreground" title="Nothing held now; only the profit/loss already locked in is shown.">
+                      closed
+                    </span>
+                  ) : !r.complete ? (
                     <span className="rounded border border-destructive/40 px-1 text-[10px] text-destructive" title={r.pooledUnknown ? "Some pool positions couldn't be read, so profit/loss is hidden for this token." : "Your saved history doesn't add up to your live balance (wallet plus pools), so profit/loss is hidden for this token."}>
                       history incomplete
                     </span>
@@ -166,7 +203,7 @@ export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }:
                 {!usd ? <div className="text-xs text-muted-foreground">{usdFmt(r.valueWax, waxUsd)}</div> : null}
               </td>
               <td className="px-3 py-2 text-right">
-                {rzWax == null ? (
+                {r.closed ? <span className="text-muted-foreground">—</span> : rzWax == null ? (
                   <span className="text-muted-foreground">{realisable || r.key === 'eosio.token:WAX' ? '—' : '…'}</span>
                 ) : (
                   <>
