@@ -23,3 +23,12 @@ gaps carried forward up to 7 days). Built once by
 `.github/workflows/token-price-backfill.yml` (`backfill.ts`, run manually);
 the daily recorder appends each new day. Backfilled day files get `waxUsd`
 with `prices: {}`; days that already have token prices are left untouched.
+
+## CHEESE price history
+
+`data/cheese-usd-history.json` — `{ "YYYY-MM-DD": { "wax": waxPerCheese, "usd": usdPerCheese } }`
+from 28 Jan 2024 (first traded day of Alcor CHEESE/WAX pool 1252) to today.
+Built once by `.github/workflows/cheese-price-backfill.yml` (`cheese-backfill.ts`,
+run manually after the WAX/USD backfill); the daily recorder appends each new day.
+Day files missing a CHEESE price get `prices["cheeseburger:CHEESE"]`; recorded
+prices are never overwritten.
