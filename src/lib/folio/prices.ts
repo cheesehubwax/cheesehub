@@ -3,6 +3,7 @@
 import { mapLimit } from '../chainRequest';
 import type { PriceAt, TokenKey } from './types';
 import { WAX_KEY } from './types';
+import { tokenPriceDataUrl as baseUrl } from '../tokenPriceData';
 
 export interface PriceDay {
   date: string; // YYYY-MM-DD
@@ -10,20 +11,6 @@ export interface PriceDay {
   waxUsd: number;
   /** WAX per 1 token, keyed `contract:SYMBOL`. */
   prices: Record<TokenKey, number>;
-}
-
-const DEFAULT_OWNER = 'cheesehubwax';
-const REPO = 'cheesehub';
-const BRANCH = 'token-price-data';
-
-function baseUrl(): string {
-  const override = import.meta.env.VITE_TOKEN_PRICE_BASE_URL as string | undefined;
-  if (override) return override.replace(/\/$/, '');
-  let owner = DEFAULT_OWNER;
-  if (typeof window !== 'undefined' && window.location.hostname.endsWith('.github.io')) {
-    owner = window.location.hostname.replace('.github.io', '');
-  }
-  return `https://raw.githubusercontent.com/${owner}/${REPO}/${BRANCH}/data`;
 }
 
 const dayCache = new Map<string, Promise<PriceDay | null>>();

@@ -11,6 +11,7 @@
  */
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { recordTokenRegistry } from './registry';
 
 const ALCOR_TOKENS_URL = "https://wax.alcor.exchange/api/v2/tokens";
 const TIMEOUT_MS = 20_000;
@@ -21,6 +22,7 @@ interface AlcorToken {
   system_price?: number | string;
   usd_price?: number | string;
   is_scam?: boolean;
+  decimals?: number;
 }
 
 async function fetchTokens(): Promise<AlcorToken[]> {
@@ -52,12 +54,13 @@ async function main() {
   const daysDir = join(dir, "days");
   mkdirSync(daysDir, { recursive: true });
   const dayFile = join(daysDir, `${date}.json`);
+  const tokens = await fetchTokens();
+  await recordTokenRegistry(dir, tokens);
   if (existsSync(dayFile) && !force) {
     console.log(`${date} already recorded — nothing to do.`);
     return;
   }
 
-  const tokens = await fetchTokens();
   const prices: Record<string, number> = {};
   let waxUsd = 0;
   for (const t of tokens) {

@@ -1,5 +1,6 @@
 import { waxRpcCall } from "@/lib/waxRpcFallback";
 import { getTokenConfig } from "@/lib/tokenRegistry";
+import { fetchTokenSnapshot, readTokenSnapshot } from './tokenSnapshot';
 
 // Cache of resolved precisions, keyed by contract:SYMBOL
 const precisionCache = new Map<string, number>();
@@ -55,11 +56,15 @@ export async function getTokenPrecision(
       console.warn(`Could not read precision for ${key} from chain:`, error);
     }
 
+    const metadata = (readTokenSnapshot() ?? await fetchTokenSnapshot())?.tokens.find(
+      t => t.contract === contract && t.symbol === symbol.toUpperCase()
+    );
+    if (metadata) return metadata.precision;
+
     const registry = getTokenConfig(symbol.toUpperCase());
     if (registry && registry.contract === contract) {
       return registry.precision;
     }
-    if (registry) return registry.precision;
 
     const fromBalance = decimalsInAmountString(balanceFallback);
     if (fromBalance > 0) return fromBalance;

@@ -1,5 +1,8 @@
 # CHEESEHub roadmap
 
+- [x] Token registry: daily chain-verified metadata snapshot, cached app fallback, and simulated Alcor outage/offline tests (1,974 verified tokens).
+- [ ] Token registry activation: user must run GitHub Actions → Token Price History once after these changes reach GitHub; connected-wallet UI verification remains pending a wallet session.
+
 - [x] CHEESEFolio: balance column spacing, close Token-to-Balance gap and inset Realised P/L from the right edge.
 
 - [x] CHEESEFolio: restore compact holdings rows while keeping badges, bought/gifted receipts and all numeric columns visible.

@@ -8,6 +8,16 @@ the portfolio value chart. Public market data only — no user data.
 - Output branch: `token-price-data`
   - `data/index.json` — list of recorded dates
   - `data/days/YYYY-MM-DD.json` — `{ date, waxUsd, prices: { "contract:SYMBOL": waxPerToken } }`
+  - `data/tokens.json` — versioned public metadata: contract, symbol, chain-verified precision, name (symbol when no official name is supplied), and Alcor logo URL. No prices or user data.
+
+The existing **Token Price History** workflow also refreshes the registry, even
+when today's prices already exist. Run it manually once to create the first
+snapshot. New/changed identities are checked against `get_currency_stats` using
+six workers and health-ordered RPC fallback; unchanged verified identities are
+reused. Invalid/scam entries are excluded and an abnormally small snapshot is
+rejected. A logo URL is a reference, not a guarantee the image exists offline.
+The app caches metadata for offline fallback; live prices remain separate and
+unknown prices are not replaced by yesterday's values.
 
 Local run:
 

@@ -1,4 +1,5 @@
 // Token logo URL utilities using Alcor Exchange's token logo repository
+import { readTokenSnapshot } from './tokenSnapshot';
 
 const ALCOR_LOGO_BASE = 'https://wax.alcor.exchange/api/v2/tokens';
 
@@ -28,8 +29,6 @@ let cacheInitialized = false;
  * This avoids a separate fetch to /api/v2/tokens.
  */
 export function initializeTokenCacheFromData(tokens: Array<{ symbol?: string; contract?: string }>) {
-  if (cacheInitialized && tokenContractCache.size > 0) return;
-
   tokens.forEach((token) => {
     if (token.symbol && token.contract) {
       const key = token.symbol.toUpperCase();
@@ -82,7 +81,8 @@ function useFallbackMap() {
  * Get the contract address for a token symbol
  */
 export function getTokenContract(symbol: string): string | undefined {
-  return tokenContractCache.get(symbol.toUpperCase());
+  const upper = symbol.toUpperCase();
+  return tokenContractCache.get(upper) ?? readTokenSnapshot()?.tokens.find(t => t.symbol === upper)?.contract;
 }
 
 /**
