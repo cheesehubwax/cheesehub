@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo, useEffect } from "react";
-import { fetchSwapTokenList, POPULAR_TICKERS, type SwapToken } from "@/lib/swapApi";
+import { fetchSwapTokenList, snapshotSwapTokens, POPULAR_TICKERS, type SwapToken } from "@/lib/swapApi";
+import { readTokenSnapshot } from '@/lib/tokenSnapshot';
 import { initializeTokenCacheFromData } from "@/lib/tokenLogos";
 import { cached, readStatCache } from "@/lib/statCache";
 
@@ -13,7 +14,12 @@ export function useSwapTokens() {
     queryKey: ["swap-tokens"],
     queryFn: ({ signal }) => cached(CACHE_KEY, () => fetchSwapTokenList(signal))(),
     // Prices show from the last good list while the fresh one loads.
-    placeholderData: () => readStatCache<SwapToken[]>(CACHE_KEY),
+    placeholderData: () => {
+      const cachedTokens = readStatCache<SwapToken[]>(CACHE_KEY);
+      if (cachedTokens?.length) return cachedTokens;
+      const snapshot = readTokenSnapshot();
+      return snapshot ? snapshotSwapTokens(snapshot) : undefined;
+    },
     staleTime: 10 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
     refetchOnWindowFocus: false,

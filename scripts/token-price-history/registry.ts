@@ -50,7 +50,8 @@ export async function recordTokenRegistry(dir: string, raw: unknown): Promise<vo
       else { failed++; if (saved) verified.push(saved); }
     }
   }));
-  if (verified.length < 50 || (previous && verified.length < previous.tokens.length * 0.8)) {
+  if (verified.length < 50 || verified.length < candidates.length * 0.8
+    || (previous && verified.length < previous.tokens.length * 0.8)) {
     throw new Error(`Only ${verified.length} verified tokens — keeping the last snapshot`);
   }
   const snapshot: TokenSnapshot = {
