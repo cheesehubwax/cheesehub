@@ -106,7 +106,9 @@ async function fetchSlot(start: number): Promise<RamHistoryRecord | null> {
       }
     }
     if (answered) return null;
-    await sleep(2000 * (attempt + 1));
+    // Rate limits (429) come in bursts lasting tens of seconds: back off much longer.
+    const limited = lastError instanceof Error && lastError.message.startsWith("429");
+    await sleep((limited ? 15_000 : 2000) * (attempt + 1));
   }
   throw lastError instanceof Error ? lastError : new Error("rammarket deltas unavailable");
 }
