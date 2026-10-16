@@ -40,6 +40,7 @@ const Folio = () => {
     try { localStorage.setItem('cheesefolio-currency', c); } catch { /* private mode */ }
   };
   const usd = cur === 'USD';
+  const [showClosed, setShowClosed] = useState(false);
 
   const shares = useMemo(
     () => live.filter((t) => t.isLpToken).map((t) => ({ contract: t.contract, symbol: t.symbol, balance: t.balance })),
@@ -56,8 +57,9 @@ const Folio = () => {
         (key) => priceMap?.get(key) ?? null,
         waxUsd,
         pooled ?? null,
+        showClosed,
       ),
-    [folio.ledger, live, priceMap, waxUsd, pooled],
+    [folio.ledger, live, priceMap, waxUsd, pooled, showClosed],
   );
   const venueName: Record<string, string> = { alcor: 'Alcor', taco: 'Taco', defibox: 'Defibox' };
   const { data: realisable } = useRealisableValues(holdings, accountName);
@@ -231,7 +233,13 @@ const Folio = () => {
 
             <div className="w-full space-y-2">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Holdings</h2>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-lg font-semibold">Holdings</h2>
+                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                    <input type="checkbox" className="accent-primary" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} />
+                    Show closed positions
+                  </label>
+                </div>
                 {liveLoading ? <span className="text-xs text-muted-foreground">Loading balances…</span>
                   : pooledLoading && !pooled ? <span className="text-xs text-muted-foreground">Reading your pool positions…</span> : null}
               </div>
