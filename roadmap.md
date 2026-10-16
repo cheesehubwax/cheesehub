@@ -1,5 +1,7 @@
 # CHEESEHub roadmap
 
+- [ ] Token registry: daily chain-verified metadata snapshot, cached app fallback, and outage verification.
+
 - [x] CHEESEFolio: balance column spacing, close Token-to-Balance gap and inset Realised P/L from the right edge.
 
 - [x] CHEESEFolio: restore compact holdings rows while keeping badges, bought/gifted receipts and all numeric columns visible.
