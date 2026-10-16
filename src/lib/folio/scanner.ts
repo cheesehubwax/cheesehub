@@ -57,6 +57,12 @@ export function selectProviders(probes: ProbeResult[], max = PROVIDERS): string[
   return [...(deepest ? [deepest] : []), ...rest].slice(0, max).map((p) => p.base);
 }
 
+/** True when a Hyperion get_creator answer includes the creation transaction (the node indexed that block). */
+export function creationIndexed(body: unknown): boolean {
+  const b = body as { trx_id?: string; block_num?: number } | null;
+  return !!b && typeof b.trx_id === 'string' && b.trx_id.length > 0 && (b.block_num ?? 0) > 0;
+}
+
 /** True when the oldest history found starts more than a day after the account was created. */
 export function hasCoverageGap(coverageFrom: number | null | undefined, accountCreated: number | null | undefined): boolean {
   if (accountCreated == null || coverageFrom == null) return false;
@@ -337,6 +343,16 @@ export async function syncFolio(
   if (starts.length) {
     const from = Math.min(...starts);
     rec.coverageFrom = rec.coverageFrom == null ? from : Math.min(rec.coverageFrom, from);
+  }
+  // A first transfer days after creation may just mean the account was idle.
+  // If the deepest provider holds the account's creation transaction, its
+  // history reaches day one.
+  if (endpoints[0] && Number.isFinite(createdTs) && hasCoverageGap(rec.coverageFrom, createdTs)) {
+    const reaches = await fetch(`${endpoints[0]}/v2/history/get_creator?account=${rec.account}`, { signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b) => creationIndexed(b))
+      .catch(() => false);
+    if (reaches) rec.coverageFrom = createdTs;
   }
   const seen = new Set(rec.transfers.map((t) => t.gs));
   let reachedTs = rec.transfers.length ? Math.max(...rec.transfers.map((t) => t.ts)) : null;
