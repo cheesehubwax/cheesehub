@@ -2,6 +2,8 @@
 import { waxRpcCall } from "./waxRpcFallback";
 import { markAlcorRateLimited } from "./alcorRouter";
 import { getTokenLogoUrl as resolveTokenLogoUrl } from "./tokenLogos";
+import { fetchTokenSnapshot, readTokenSnapshot } from './tokenSnapshot';
+import { parseTokenMetadata, type TokenSnapshot } from './tokenSnapshotSchema';
 
 export interface SwapToken {
   contract: string;
@@ -111,33 +113,53 @@ export function getTokenLogoUrl(contract: string, ticker: string): string {
 }
 
 export async function fetchSwapTokenList(signal?: AbortSignal): Promise<SwapToken[]> {
-  const res = await fetch(`${ALCOR_API}/tokens`, { signal });
-  if (!res.ok) {
-    if (res.status === 429) {
-      markAlcorRateLimited();
-      throw new Error("Rate limited — please wait a moment and try again");
-    }
-    throw new Error("Failed to fetch token list");
-  }
-  const data = await res.json();
-  const seen = new Set<string>();
-  return (data as Array<{ contract: string; decimals: number; symbol: string; id: string; is_scam?: boolean }>)
-    .filter((t) => {
-      if (t.is_scam) return false;
-      const key = `${t.symbol}_${t.contract}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .map((t: any) => ({
-      contract: t.contract,
-      ticker: t.symbol,
-      precision: t.decimals,
-      id: t.id,
-      logo: getTokenLogoUrl(t.contract, t.symbol),
-      system_price: t.system_price ?? 0,
-      usd_price: t.usd_price ?? 0,
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (signal?.aborted) controller.abort();
+  signal?.addEventListener('abort', abort, { once: true });
+  const timer = setTimeout(abort, 5000);
+  // Warm the shared metadata cache without adding another Alcor request.
+  const snapshot = fetchTokenSnapshot();
+  try {
+    const res = await fetch(`${ALCOR_API}/tokens`, { signal: controller.signal });
+    if (res.status === 429) markAlcorRateLimited();
+    if (!res.ok) throw new Error(`Token list returned ${res.status}`);
+    const raw: unknown = await res.json();
+    const metadata = parseTokenMetadata(raw);
+    if (!metadata.length || !Array.isArray(raw)) throw new Error('Invalid token list');
+    const prices = new Map(raw.filter(t => t && typeof t === 'object').map(t => {
+      const row = t as Record<string, unknown>;
+      return [`${row.contract}:${row.symbol}`, row] as const;
     }));
+    return metadata.map(t => {
+      const row = prices.get(`${t.contract}:${t.symbol}`);
+      const wax = Number(row?.system_price);
+      const usd = Number(row?.usd_price);
+      return {
+        contract: t.contract, ticker: t.symbol, precision: t.precision,
+        id: `${t.symbol.toLowerCase()}-${t.contract}`, logo: getTokenLogoUrl(t.contract, t.symbol),
+        system_price: Number.isFinite(wax) && wax > 0 ? wax : 0,
+        usd_price: Number.isFinite(usd) && usd > 0 ? usd : 0,
+      };
+    });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    const fallback = readTokenSnapshot() ?? await snapshot;
+    if (!fallback) throw error;
+    return snapshotSwapTokens(fallback);
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', abort);
+  }
+}
+
+export function snapshotSwapTokens(snapshot: TokenSnapshot): SwapToken[] {
+  return snapshot.tokens.map(t => ({
+    contract: t.contract, ticker: t.symbol, precision: t.precision,
+    id: `${t.symbol.toLowerCase()}-${t.contract}`, logo: getTokenLogoUrl(t.contract, t.symbol),
+    // Metadata is safe offline. Historical prices are not current valuations.
+    system_price: t.contract === 'eosio.token' && t.symbol === 'WAX' ? 1 : undefined,
+  }));
 }
 
 export async function fetchSwapRoute(
