@@ -4,6 +4,7 @@ import { applyHealthOrder } from '../shared/herdcheck';
 import { parseTokenMetadata, parseTokenSnapshot, type SnapshotToken, type TokenSnapshot } from '../../src/lib/tokenSnapshotSchema';
 
 const ENDPOINTS = ['https://wax.eosusa.io', 'https://api.waxsweden.org', 'https://wax.greymass.com'];
+const REFRESH_MS = 30 * 86_400_000;
 
 export function precisionFromStats(value: unknown, symbol: string): number | null {
   if (!value || typeof value !== 'object') return null;
@@ -35,6 +36,12 @@ export async function recordTokenRegistry(dir: string, raw: unknown): Promise<vo
   if (candidates.length < 50) throw new Error('Refusing a partial token registry');
   const file = join(dir, 'tokens.json');
   const previous = existsSync(file) ? parseTokenSnapshot(JSON.parse(readFileSync(file, 'utf8'))) : null;
+  // Token identities are effectively static — refresh the registry monthly.
+  const age = previous ? Date.now() - Date.parse(previous.updatedAt) : Infinity;
+  if (process.env.FORCE !== '1' && age < REFRESH_MS) {
+    console.log(`Token registry is ${Math.floor(age / 86_400_000)} days old — next refresh after 30 days.`);
+    return;
+  }
   const old = new Map(previous?.tokens.map(t => [`${t.contract}:${t.symbol}`, t]) ?? []);
   await applyHealthOrder(ENDPOINTS, 'chain-api');
   let cursor = 0;
