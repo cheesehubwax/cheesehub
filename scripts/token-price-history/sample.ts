@@ -86,6 +86,20 @@ async function main() {
     const sorted = Object.fromEntries(Object.entries(history).sort(([a], [b]) => a.localeCompare(b)));
     writeFileSync(historyFile, JSON.stringify(sorted));
   }
+  // Keep the consolidated CHEESE map (written by cheese-backfill.ts) current.
+  const cheeseWax = prices["cheeseburger:CHEESE"];
+  if (cheeseWax > 0) {
+    const cheeseFile = join(dir, "cheese-usd-history.json");
+    const cheese: Record<string, { wax: number; usd: number | null }> = existsSync(cheeseFile)
+      ? JSON.parse(readFileSync(cheeseFile, "utf8"))
+      : {};
+    cheese[date] = {
+      wax: cheeseWax,
+      usd: waxUsd > 0 ? Number((cheeseWax * waxUsd).toPrecision(6)) : null,
+    };
+    const sortedCheese = Object.fromEntries(Object.entries(cheese).sort(([a], [b]) => a.localeCompare(b)));
+    writeFileSync(cheeseFile, JSON.stringify(sortedCheese));
+  }
   const indexFile = join(dir, "index.json");
   const index = existsSync(indexFile)
     ? (JSON.parse(readFileSync(indexFile, "utf8")) as { dates?: string[] })
