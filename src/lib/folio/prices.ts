@@ -90,13 +90,34 @@ export async function loadPriceLookup(timestamps: number[]): Promise<{ priceAt: 
 const DAY_MS = 86_400_000;
 const BINANCE = ['https://data-api.binance.vision', 'https://api.binance.com'];
 
+/** The consolidated `wax-usd-history.json` map (Dec 2019 → today), or null. */
+export async function fetchWaxUsdHistoryFile(signal?: AbortSignal): Promise<Map<string, number> | null> {
+  const bucket = Math.floor(Date.now() / 3_600_000);
+  try {
+    const res = await fetch(`${baseUrl()}/wax-usd-history.json?t=${bucket}`, { signal });
+    if (!res.ok) return null;
+    const data = (await res.json()) as Record<string, number>;
+    const out = new Map<string, number>();
+    for (const [d, px] of Object.entries(data ?? {})) if (typeof px === 'number' && px > 0) out.set(d, px);
+    return out.size ? out : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Daily WAX/USD closes from `fromTs` to today (Binance WAXPUSDT, read in
- * 1,000-day pages). Returns a map of `YYYY-MM-DD` → USD per WAX; empty when
- * no source answers.
+ * Daily WAX/USD closes from `fromTs` to today. Reads the shared consolidated
+ * history file first; falls back to Binance WAXPUSDT (1,000-day pages) when
+ * the file is unreachable or doesn't reach today. Returns `YYYY-MM-DD` → USD
+ * per WAX; empty when no source answers.
  */
 export async function fetchWaxUsdDaily(fromTs: number, signal?: AbortSignal): Promise<Map<string, number>> {
-  const out = new Map<string, number>();
+  const file = await fetchWaxUsdHistoryFile(signal);
+  if (file) {
+    const latest = [...file.keys()].sort().pop()!;
+    if (Date.now() - Date.parse(latest) <= 3 * DAY_MS) return file;
+  }
+  const out = new Map<string, number>(file ?? []);
   for (const host of BINANCE) {
     let start = Math.floor(fromTs / DAY_MS) * DAY_MS;
     let ok = true;

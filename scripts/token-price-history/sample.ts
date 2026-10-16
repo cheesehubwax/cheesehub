@@ -76,6 +76,16 @@ async function main() {
   if (count < 50) throw new Error(`Only ${count} priced tokens returned — refusing to record a partial day`);
 
   writeFileSync(dayFile, JSON.stringify({ date, waxUsd, prices }));
+  // Keep the consolidated WAX/USD map (written by backfill.ts) current.
+  if (waxUsd > 0) {
+    const historyFile = join(dir, "wax-usd-history.json");
+    const history: Record<string, number> = existsSync(historyFile)
+      ? JSON.parse(readFileSync(historyFile, "utf8"))
+      : {};
+    history[date] = Number(waxUsd.toPrecision(6));
+    const sorted = Object.fromEntries(Object.entries(history).sort(([a], [b]) => a.localeCompare(b)));
+    writeFileSync(historyFile, JSON.stringify(sorted));
+  }
   const indexFile = join(dir, "index.json");
   const index = existsSync(indexFile)
     ? (JSON.parse(readFileSync(indexFile, "utf8")) as { dates?: string[] })

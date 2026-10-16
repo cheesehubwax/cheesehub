@@ -14,3 +14,12 @@ Local run:
 ```sh
 TOKEN_PRICE_DIR=/tmp/token-prices bun run sample.ts
 ```
+
+## WAX/USD backfill
+
+`data/wax-usd-history.json` — one flat `{ "YYYY-MM-DD": usdPerWax }` map from
+Dec 2019 to today (Bitfinex tWAXUSD before Aug 2021, Binance WAXPUSDT after,
+gaps carried forward up to 7 days). Built once by
+`.github/workflows/token-price-backfill.yml` (`backfill.ts`, run manually);
+the daily recorder appends each new day. Backfilled day files get `waxUsd`
+with `prices: {}`; days that already have token prices are left untouched.

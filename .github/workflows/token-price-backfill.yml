@@ -1,0 +1,56 @@
+name: Token Price Backfill (WAX/USD)
+
+on:
+  workflow_dispatch:
+    inputs:
+      from:
+        description: "First day to backfill (YYYY-MM-DD)"
+        required: false
+        default: "2019-12-01"
+
+concurrency:
+  group: token-price-history
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Check out data branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git clone --depth 1 --branch token-price-data "$REPO_URL" /tmp/price-data
+
+      - name: Backfill WAX/USD
+        working-directory: scripts/token-price-history
+        env:
+          TOKEN_PRICE_DIR: /tmp/price-data/data
+          FROM: ${{ github.event.inputs.from }}
+        run: bun run backfill.ts
+
+      - name: Commit backfill
+        run: |
+          set -euo pipefail
+          cd /tmp/price-data
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A data
+          if git diff --cached --quiet; then
+            echo "No change to commit."
+            exit 0
+          fi
+          git commit -m "chore: backfill WAX/USD history"
+          git push origin token-price-data
