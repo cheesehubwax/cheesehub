@@ -90,7 +90,7 @@ export function useRamPriceHistory() {
   return {
     records,
     firstSampleAt: records.length ? records[0].t : null,
-    /** First live sample (has a CHEESE price); earlier points are backfilled. */
+    /** First record with a CHEESE price (CHEESE history starts 2024-01-28). */
     firstLiveAt: records.find((r) => r.cheesePerKb != null)?.t ?? null,
     isLoading: query.isLoading,
     isError: query.isError,
