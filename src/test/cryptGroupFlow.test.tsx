@@ -38,6 +38,7 @@ describe('group creation and signing gate', () => {
     fireEvent.click(send);
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
     const actions = calls.transact.mock.calls[0][0];
-    expect(actions.map((a: { data: { to: string } }) => a.data.to)).toEqual(['bob', 'eosio.null', 'carol', 'eosio.null']);
+    expect(actions.map((a: { data: { to: string } }) => a.data.to)).toEqual(['bob', 'eosio.null', 'carol']);
+    expect(actions.reduce((total: number, a: { data: { quantity: string } }) => total + Math.round(parseFloat(a.data.quantity) * 10000), 0)).toBe(120);
   });
 });

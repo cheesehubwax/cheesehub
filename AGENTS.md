@@ -32,6 +32,8 @@
 
 - CHEESECrypt group envelopes live inside legacy pairwise encryption; immutable validated membership is discovered only after authenticated full assembly, and assembly isolates transactions/recipients before deduplicating sender fanout so separate copies cannot corrupt each other.
 
+- CHEESECrypt group transaction construction and composer totals share group pricing logic; historical group totals are labelled current-rate estimates because legacy memos do not encode the fee paid.
+
 - CHEESECrypt avatars are validated palette-index data in optional key-file fields and separate per-account contact storage; imports rasterize locally, and on-chain key memos stay unchanged to preserve compatibility and avoid executable or remote avatar payloads.
 
 - CHEESECrypt folder saving requests Desktop as the picker start and guides users to create/select its vault subfolder, not grant Desktop-root access, because Chromium can reject protected folders; permission errors keep the backup prompt retryable.

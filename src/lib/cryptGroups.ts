@@ -1,7 +1,7 @@
 import nacl from 'tweetnacl';
 import {
   assembleMessages, buildSendMessageActions, ChainMemo, decryptMemo, encryptMemo,
-  MAX_MESSAGE_BYTES, MessagingKey, partCount, plaintextBytes, splitMessage,
+  MAX_MESSAGE_BYTES, MESSAGE_FEE_QUANTITY, MESSAGE_RECIPIENT_QUANTITY, MessagingKey, partCount, plaintextBytes, splitMessage,
 } from '@/lib/cheeseCrypt';
 
 export interface CryptGroup { id: string; members: string[] }
@@ -43,6 +43,13 @@ export function groupMessageSize(group: CryptGroup, text: string) {
   return { parts: partCount(payload), maxBytes: MAX_MESSAGE_BYTES - plaintextBytes(groupPayload(group, '')), bytes: plaintextBytes(text) };
 }
 
+/** One shared nulled fee per part, plus a payment to every recipient. */
+export function groupMessageCost(parts: number, recipients: number): string {
+  const feeUnits = Math.round(parseFloat(MESSAGE_FEE_QUANTITY) * 10000);
+  const recipientUnits = Math.round(parseFloat(MESSAGE_RECIPIENT_QUANTITY) * 10000);
+  return `${((feeUnits + recipientUnits * recipients) * parts / 10000).toFixed(4)} CHEESE`;
+}
+
 export function buildGroupMessageActions(key: MessagingKey, group: CryptGroup, text: string, contacts: Record<string, string>, auth: unknown[]) {
   if (!text.trim()) throw new Error('Message is empty');
   const valid = parseGroup(group);
@@ -50,8 +57,13 @@ export function buildGroupMessageActions(key: MessagingKey, group: CryptGroup, t
   const recipients = valid.members.filter(m => m !== key.account);
   if (recipients.some(m => !contacts[m])) throw new Error('Load every group member’s public key before sending.');
   const parts = splitMessage(groupPayload(valid, text));
-  return recipients.flatMap(to => buildSendMessageActions(key.account, to,
-    parts.map(p => encryptMemo(p, contacts[to], key.secretKey)), auth));
+  return recipients.flatMap((to, recipientIndex) => {
+    const actions = buildSendMessageActions(key.account, to,
+      parts.map(p => encryptMemo(p, contacts[to], key.secretKey)), auth);
+    // The direct-message builder alternates recipient payment and fee for each part.
+    // Keep the fee only for the first recipient; every encrypted copy still gets paid.
+    return recipientIndex === 0 ? actions : actions.filter((_, index) => index % 2 === 0);
+  });
 }
 
 /** Only authenticated, fully reassembled envelopes can define a group. */

@@ -1,5 +1,7 @@
 # CHEESEHub roadmap
 
+- [ ] CHEESECrypt: one nulled fee per group-message part, recipient payments unchanged; update totals, guide and pricing regression tests.
+
 - [x] CHEESECrypt: matching heading About button, simple guide and clickable accurate cryptography details.
 
 - [x] CHEESECrypt: ad-hoc groups, encrypted recipient copies, automatic discovery, participant display and compatibility tests (29 tests passed).

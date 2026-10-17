@@ -21,7 +21,7 @@ import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { VaultPrompt } from '@/components/crypt/VaultPrompt';
 import { CreateGroupDialog } from '@/components/crypt/CreateGroupDialog';
 import { CryptAbout } from '@/components/crypt/CryptAbout';
-import { buildGroupMessageActions, createGroup, decodeConversations, groupMessageSize, loadGroups, mergeGroups, saveGroups } from '@/lib/cryptGroups';
+import { buildGroupMessageActions, createGroup, decodeConversations, groupMessageCost, groupMessageSize, loadGroups, mergeGroups, saveGroups } from '@/lib/cryptGroups';
 import {
   DirHandle, FRIENDS_DIR, PRIVATE_DIR, VAULT_DIR, VaultFileExistsError, friendKeyName, pickVault, privateKeyName,
   recallVault, rememberVault, vaultSupported, vaultWritable, writeFriendKey,
@@ -262,7 +262,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const { bytes, parts, maxBytes } = size;
   const tooLong = bytes > maxBytes || parts > MAX_PARTS;
   const copies = activeGroup ? recipients.length : 1;
-  const totalCost = messageCost((parts || 1) * copies);
+  const totalCost = activeGroup ? groupMessageCost(parts || 1, copies) : messageCost(parts || 1);
   const fileInput = (
     <input ref={fileRef} type="file" accept="application/json,.json" className="hidden"
       onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }} />
@@ -388,7 +388,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                     {m.text ?? <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
                   </p>
                   <p className="text-[10px] opacity-70 mt-1">
-                    {new Date(m.time).toLocaleString()} · {messageCost(m.parts * (m.group ? m.group.members.length - 1 : 1))}
+                    {new Date(m.time).toLocaleString()} · {m.group ? `${groupMessageCost(m.parts, m.group.members.length - 1)} at current rate` : messageCost(m.parts)}
                     {m.parts > 1 && ` · ${m.parts} parts`}
                     {m.missing > 0 && <span className="text-destructive"> · {m.missing} part{m.missing > 1 ? 's' : ''} not loaded</span>}
                     {m.txId && <> · <a href={`https://waxblock.io/transaction/${encodeURIComponent(m.txId)}`} target="_blank" rel="noreferrer"
@@ -414,7 +414,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                     className="bg-cheese text-primary-foreground hover:bg-cheese/90">Send</Button>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  {activeGroup ? `Each part, per recipient: ${MESSAGE_RECIPIENT_QUANTITY} + ${MESSAGE_FEE_QUANTITY} nulled. Group delivery uses ${copies} encrypted copies in one transaction. Membership is fixed; start a new group to change participants.` : `Each part: ${MESSAGE_RECIPIENT_QUANTITY} to ${active} + ${MESSAGE_FEE_QUANTITY} nulled (${MESSAGE_TOTAL_QUANTITY}). Long messages split into up to ${MAX_PARTS} parts (${MAX_PLAINTEXT_BYTES} bytes for one, ${PART_BODY_BYTES} per part after that), all in one transaction.`}
+                  {activeGroup ? `Each part: ${MESSAGE_FEE_QUANTITY} nulled once for the group + ${MESSAGE_RECIPIENT_QUANTITY} to each of ${copies} recipients. Group delivery uses ${copies} encrypted copies in one transaction. Membership is fixed; start a new group to change participants.` : `Each part: ${MESSAGE_RECIPIENT_QUANTITY} to ${active} + ${MESSAGE_FEE_QUANTITY} nulled (${MESSAGE_TOTAL_QUANTITY}). Long messages split into up to ${MAX_PARTS} parts (${MAX_PLAINTEXT_BYTES} bytes for one, ${PART_BODY_BYTES} per part after that), all in one transaction.`}
                 </p>
               </div>
             )}
