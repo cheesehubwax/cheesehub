@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Session } from '@wharfkit/session';
 import { generateKey, saveContact, saveKey, encryptMemo, loadContacts, loadKey, loadContactAvatars, loadRemovedContacts } from '@/lib/cheeseCrypt';
 import { loadCryptNames, saveCryptName } from '@/lib/cryptNames';
-import { loadGroups } from '@/lib/cryptGroups';
+import { groupPayload, loadGroups, loadHiddenGroups, saveGroups } from '@/lib/cryptGroups';
 import { Messenger } from '@/pages/CheeseCrypt';
 
 const calls = vi.hoisted(() => ({ transact: vi.fn(), fetch: vi.fn() }));
@@ -25,6 +25,41 @@ beforeEach(() => {
 });
 
 describe('group creation and signing gate', () => {
+  it('hides a group persistently while preserving its history and permits restoration', async () => {
+    const alice = generateKey('alice'), bob = generateKey('bob');
+    saveKey(alice); saveContact('alice', 'bob', bob.publicKey);
+    const group = { id: '0123456789abcdef', members: ['alice', 'bob', 'carol'] };
+    saveGroups('alice', [group]);
+    const history = [{ txId: 'old', time: 1, from: 'bob', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo(groupPayload(group, 'original history'), alice.publicKey, bob.secretKey) }];
+    calls.fetch.mockResolvedValue(history);
+    const props = { account: 'alice', session: { permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session };
+    const view = render(<Messenger {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: /Group · 3 people/ }));
+    await screen.findByText('original history');
+    fireEvent.click(screen.getByRole('button', { name: `Hide group ${group.id}` }));
+    expect(loadHiddenGroups('alice')).toEqual([group.id]);
+    expect(loadHiddenGroups('bob')).toEqual([]);
+    expect(loadGroups('alice')).toEqual([group]);
+    expect(loadKey('alice')).toEqual(alice);
+    expect(loadContacts('alice').bob).toBe(bob.publicKey);
+    expect(loadContacts('alice').carol).toBeDefined();
+    expect(screen.queryByRole('button', { name: /Group · 3 people/ })).not.toBeInTheDocument();
+    calls.fetch.mockResolvedValue([...history, { ...history[0], txId: 'new', memo: encryptMemo(groupPayload(group, 'new message'), alice.publicKey, bob.secretKey) }]);
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh messages' }));
+    await waitFor(() => expect(calls.fetch).toHaveBeenCalledTimes(2));
+    view.unmount();
+    render(<Messenger {...props} />);
+    await waitFor(() => expect(calls.fetch).toHaveBeenCalledTimes(3));
+    expect(screen.queryByRole('button', { name: /Group · 3 people/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Hidden groups (1)' }));
+    fireEvent.click(screen.getByRole('button', { name: /Group · 3 people/ }));
+    await screen.findByText('original history');
+    await screen.findByText('new message');
+    fireEvent.click(screen.getByRole('button', { name: `Restore group ${group.id}` }));
+    expect(loadHiddenGroups('alice')).toEqual([]);
+    expect(loadGroups('alice')).toEqual([group]);
+    expect(screen.getByRole('button', { name: `Hide group ${group.id}` })).toBeInTheDocument();
+  });
   it('removes friend metadata, stays removed after history refresh/remount, and permits explicit re-add', async () => {
     const alice = generateKey('alice'), bob = generateKey('bob');
     saveKey(alice);
