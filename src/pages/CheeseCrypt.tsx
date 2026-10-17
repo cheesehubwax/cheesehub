@@ -407,7 +407,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
       }} />}
       {profileEditor}
       {showSharePrompt && key && <ShareKeyDialog account={account} busy={busy} agreed={agreed} onAgreedChange={setAgreed} onClose={() => setShowSharePrompt(false)}
-        onDownload={() => { download(`${account}-cheesecrypt-public.json`, toPublicFile(key)); setShowSharePrompt(false); }}
+        onDownload={() => { void sharePublicKey(); setShowSharePrompt(false); }}
         onPublish={async () => { if (await publish()) setShowSharePrompt(false); }} />}
       <aside className="border-b md:border-b-0 md:border-r border-border flex flex-col min-h-0">
         <div className="p-3 space-y-2 border-b border-border">
@@ -430,7 +430,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={() => setEditingAvatar(true)}>🎨 Edit profile</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => download(`${account}-cheesecrypt-public.json`, toPublicFile(key))}>Share public key</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void sharePublicKey()}>Share public key</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => download(`${account}-cheesecrypt-key-PRIVATE.json`, key)}>Back up private key</DropdownMenuItem>
                 <DropdownMenuItem disabled={busy} onSelect={publish}>Publish to chain ({MESSAGE_FEE_QUANTITY} nulled)</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => fileRef.current?.click()}>Load file (your key or a contact's)</DropdownMenuItem>
