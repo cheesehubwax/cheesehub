@@ -18,6 +18,12 @@ import { playRandomFart } from '@/lib/fartSounds';
 import { cn } from '@/lib/utils';
 import { AvatarEditor } from '@/components/crypt/AvatarEditor';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
+import { VaultPrompt } from '@/components/crypt/VaultPrompt';
+import {
+  DirHandle, FRIENDS_DIR, PRIVATE_DIR, VAULT_DIR, VaultFileExistsError, friendKeyName, pickVault, privateKeyName,
+  recallVault, rememberVault, vaultSupported, vaultWritable, writeFriendKey,
+} from '@/lib/cryptVault';
+import type { PublicKeyFile } from '@/lib/cheeseCrypt';
 import {
   ChainMemo, MAX_PLAINTEXT_BYTES, MESSAGE_FEE_QUANTITY, MESSAGE_RECIPIENT_QUANTITY, MESSAGE_TOTAL_QUANTITY, MessagingKey,
   MAX_MESSAGE_BYTES, MAX_PARTS, PART_BODY_BYTES, assembleMessages, messageCost, partCount, splitMessage,
@@ -96,6 +102,9 @@ function Messenger({ account, session }: { account: string; session: NonNullable
   const [agreed, setAgreed] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLLIElement>(null);
+  const [backupKey, setBackupKey] = useState<MessagingKey | null>(null);
+  const [vault, setVault] = useState<DirHandle | null>(null);
+  useEffect(() => { recallVault(account).then(setVault); }, [account]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -132,8 +141,40 @@ function Messenger({ account, session }: { account: string; session: NonNullable
     if (key && !confirm('Replace your existing key? Messages encrypted with the old key can no longer be read unless you kept its file.')) return;
     const k = generateKey(account);
     saveKey(k); setKey(k);
-    download(`${account}-cheesecrypt-key-PRIVATE.json`, k);
+    setBackupKey(k); // one-time prompt to save it into Desktop/cheesecrypt/my private key/
+  };
+
+  const backupDownloaded = () => {
+    if (!backupKey) return;
+    download(privateKeyName(account), backupKey);
+    setBackupKey(null);
     toast({ title: 'Messaging key created', description: 'A private backup file was downloaded. Keep it safe and never share it.' });
+  };
+
+  const backupSaved = (root: DirHandle) => {
+    setBackupKey(null); setVault(root);
+    rememberVault(account, root).catch(() => {});
+    toast({ title: 'Key saved', description: `Saved in ${VAULT_DIR}/${PRIVATE_DIR}. Never share this file.` });
+  };
+
+  const saveFriend = async (name: string, ask: boolean) => {
+    const pub = contacts[name] ?? loadContacts(account)[name];
+    if (!pub) return;
+    const file: PublicKeyFile = { type: 'gpk-msg-pubkey', version: 1, account: name, publicKey: pub, ...(loadContactAvatars(account)[name] ? { avatar: loadContactAvatars(account)[name] } : {}) };
+    try {
+      let root = vault;
+      if (!root || !(await vaultWritable(root, ask))) {
+        if (!ask) return;
+        if (!vaultSupported()) { download(friendKeyName(name), file); return; }
+        root = await pickVault(); setVault(root); rememberVault(account, root).catch(() => {});
+      }
+      await writeFriendKey(root, file);
+      toast({ title: `Saved ${name}'s key`, description: `In ${VAULT_DIR}/${FRIENDS_DIR}` });
+    } catch (e) {
+      if (!ask || (e as DOMException)?.name === 'AbortError') return;
+      if (e instanceof VaultFileExistsError) toast({ title: `${name}'s key is already in ${FRIENDS_DIR}`, description: 'The existing file was left untouched.' });
+      else toast({ title: 'Could not save to the friends folder', variant: 'destructive' });
+    }
   };
 
   const addContact = async () => {
@@ -143,7 +184,7 @@ function Messenger({ account, session }: { account: string; session: NonNullable
     try {
       const pub = await lookupPublishedKey(name);
       if (!pub) { toast({ title: `${name} has not published a key`, description: 'Ask them for their public key file and load it here.' }); return; }
-      saveContact(account, name, pub); setContacts(loadContacts(account)); setActive(name); setNewContact('');
+      saveContact(account, name, pub); setContacts(loadContacts(account)); setActive(name); setNewContact(''); saveFriend(name, false);
       toast({ title: `Found ${name}'s key` });
     } catch { toast({ title: 'Key lookup failed', variant: 'destructive' }); }
     finally { setBusy(false); }
@@ -158,7 +199,7 @@ function Messenger({ account, session }: { account: string; session: NonNullable
         saveKey(parsed); setKey(parsed); toast({ title: 'Your messaging key was loaded' });
       } else {
         if (parsed.account === account) { toast({ title: 'That is your own public key' }); return; }
-        saveContact(account, parsed.account, parsed.publicKey, parsed.avatar); setContacts(loadContacts(account)); setAvatars(loadContactAvatars(account)); setActive(parsed.account);
+        saveContact(account, parsed.account, parsed.publicKey, parsed.avatar); setContacts(loadContacts(account)); setAvatars(loadContactAvatars(account)); setActive(parsed.account); saveFriend(parsed.account, false);
         toast({ title: `Added ${parsed.account}` });
       }
     } catch { toast({ title: 'Not a messaging key file', variant: 'destructive' }); }
@@ -219,6 +260,7 @@ function Messenger({ account, session }: { account: string; session: NonNullable
   return (
     <div className="w-full rounded-lg border border-cheese/20 bg-card/80 overflow-hidden grid md:grid-cols-[240px_1fr] h-[70dvh] min-h-[480px]">
       {fileInput}
+      {backupKey && <VaultPrompt cryptKey={backupKey} onSaved={backupSaved} onDownload={backupDownloaded} />}
       {editingAvatar && <AvatarEditor account={account} avatar={key.avatar} onClose={() => setEditingAvatar(false)} onSave={avatar => {
         const updated = { ...key, avatar }; saveKey(updated); setKey(updated); setEditingAvatar(false);
         toast({ title: 'Avatar saved', description: 'Share your updated public key file so contacts can see it. Publishing your key does not share the avatar.' });
@@ -280,7 +322,8 @@ function Messenger({ account, session }: { account: string; session: NonNullable
           <p className="text-sm text-muted-foreground m-auto">💬 Pick or add a contact.</p>
         ) : (
           <>
-            <div className="px-4 py-3 border-b border-border font-semibold flex items-center gap-2"><PixelAvatar account={active} avatar={avatars[active]} />{active}</div>
+            <div className="px-4 py-3 border-b border-border font-semibold flex items-center gap-2"><PixelAvatar account={active} avatar={avatars[active]} />{active}
+              {contacts[active] && <Button size="sm" variant="ghost" className="ml-auto h-7 text-xs font-normal" onClick={() => saveFriend(active, true)}>💾 Save to {FRIENDS_DIR}</Button>}</div>
             <ol className="flex-1 overflow-y-auto space-y-2 p-4">
               {thread.map((m) => (
                 <li key={m.key}
