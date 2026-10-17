@@ -39,6 +39,8 @@ import {
 } from '@/lib/cheeseCrypt';
 
 const ACCOUNT_RE = /^[a-z1-5.]{1,12}$/;
+/** How often an open, visible messenger checks history for new messages. */
+const LIVE_POLL_MS = 6000;
 
 function download(name: string, data: unknown) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
