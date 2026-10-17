@@ -266,7 +266,7 @@ export async function lookupPublishedKey(account: string): Promise<string | null
 
 /** Encrypted messages sent or received by the account (newest first, deduped). */
 export async function fetchMessages(account: string): Promise<ChainMemo[]> {
-  const rows = await hyperionTransfers(`account=${account}&${FILTER}&sort=desc&limit=1000`);
+  const rows = await hyperionTransfers(`account=${account}&${FILTER}&sort=desc&limit=500`);
   const seen = new Set<string>();
   return rows.filter((r) => {
     if (!r.memo.startsWith(MSG_PREFIX) || (r.from !== account && r.to !== account)) return false;
