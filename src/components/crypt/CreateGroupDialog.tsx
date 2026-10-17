@@ -5,8 +5,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import type { CryptAvatar } from '@/lib/cryptAvatar';
 
-export function CreateGroupDialog({ contacts, avatars, onClose, onCreate }: {
+export function CreateGroupDialog({ contacts, avatars, nameFor = account => account, onClose, onCreate }: {
   contacts: Record<string, string>; avatars: Record<string, CryptAvatar>; onClose: () => void; onCreate: (members: string[]) => void;
+  nameFor?: (account: string) => string;
 }) {
   const [selected, setSelected] = useState<string[]>([]);
   return <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
@@ -16,7 +17,7 @@ export function CreateGroupDialog({ contacts, avatars, onClose, onCreate }: {
         {Object.keys(contacts).sort().map(name => <label key={name} className="flex items-center gap-3 py-2 cursor-pointer">
           <Checkbox aria-label={name} checked={selected.includes(name)} disabled={selected.length === 5 && !selected.includes(name)}
             onCheckedChange={checked => setSelected(current => checked ? [...current, name] : current.filter(m => m !== name))} />
-          <PixelAvatar account={name} avatar={avatars[name]} /><span className="min-w-0 break-all text-sm">{name}</span>
+          <PixelAvatar account={name} avatar={avatars[name]} /><span className="min-w-0 break-words text-sm">{nameFor(name)}{nameFor(name) !== name && <span className="block text-xs text-muted-foreground">{name}</span>}</span>
         </label>)}
         {!Object.keys(contacts).length && <p className="text-sm text-muted-foreground">Add friends’ public keys first.</p>}
       </div>
