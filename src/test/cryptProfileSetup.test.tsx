@@ -38,7 +38,8 @@ describe('profile-first key setup', () => {
     expect(calls.backup).toHaveBeenCalledWith(original);
     expect(await screen.findByText('📣 Share your public key')).toBeInTheDocument();
     expect(loadKey('alice')?.displayName).toBeUndefined();
-    expect(toPublicFile(original as NonNullable<typeof original>).avatar).toEqual(accountAvatar('alice'));
+    if (!original) throw new Error('Key not created');
+    expect(toPublicFile(original).avatar).toEqual(accountAvatar('alice'));
     view.unmount();
     render(<Messenger {...props} />);
     await waitFor(() => expect(screen.queryByLabelText('CHEESECrypt name')).not.toBeInTheDocument());
@@ -83,7 +84,7 @@ describe('profile-first key setup', () => {
     if (outcome === 'denied') calls.writable.mockResolvedValue(false);
     render(<Messenger {...props} />);
     await act(async () => {});
-    fireEvent.pointerDown(screen.getByRole('button', { name: /Your key/ }), { button: 0, ctrlKey: false });
+    fireEvent.keyDown(screen.getByRole('button', { name: /Your key/ }), { key: 'Enter' });
     fireEvent.click(await screen.findByRole('menuitem', { name: '🎨 Edit profile' }));
     fireEvent.change(await screen.findByLabelText('CHEESECrypt name'), { target: { value: 'Updated Alice' } });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save profile' })); });
