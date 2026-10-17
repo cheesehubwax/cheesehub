@@ -1,4 +1,5 @@
 # CHEESEHub roadmap
+- [x] CHEESECrypt: one cheesecrypt folder shared by all accounts on this device; friends loaded from friends/ for every account (nicknames/removals per account); Save to friends refreshes the friend file. 59 tests passed; real OS folder unverified.
 - [x] CHEESECrypt: reversible group hiding and collapsible Hidden groups; 28 tests passed, history preserved after new messages/remount, isolated Chrome hide/reload/view/restore verified.
 - [x] CHEESECrypt: profile-first key creation, backup then sharing; verified matching-key profile-only backup updates, download fallback, 57 regression tests passed. Isolated Chrome walkthrough verified initial private/public profile files, edit download and persistence; actual OS folder picker and real-wallet publishing remain unverified.
 - [x] CHEESECrypt: hover bin removes saved browser contact details and prevents history rediscovery until explicit re-add; 28 regression tests passed and isolated browser removal checked. Downloaded files and chain messages stay unchanged.

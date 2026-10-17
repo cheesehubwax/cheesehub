@@ -38,3 +38,5 @@
 - CHEESECrypt avatars are validated palette-index data in optional key-file fields and separate per-account contact storage; imports rasterize locally, and on-chain key memos stay unchanged to preserve compatibility and avoid executable or remote avatar payloads.
 
 - CHEESECrypt folder pickers start at Desktop but request the vault subfolder; retry permission failures because Chromium protects Desktop-root access. Profile precedes key generation/backup; profile edits refresh only verified matching-key backups with staged writes, otherwise download, preserving other keys.
+
+- CHEESECrypt remembers one vault folder per device and imports `friends/` public files into every account; nicknames and removals stay per account, and only explicit friend saves replace an existing public file (private keys never overwritten).
