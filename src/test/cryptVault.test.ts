@@ -85,3 +85,16 @@ describe('cheesecrypt key folder', () => {
     expect(dir.files.get('alice-cheesecrypt-key-PRIVATE.json')).toBe(before);
   });
 });
+
+describe('shared friends folder', () => {
+  it('explicit save refreshes an existing friend file; automatic save never overwrites', async () => {
+    const { readFriendKeys } = await import('@/lib/cryptVault');
+    const root = await prepareVault(memDir('cheesecrypt'));
+    const pub = 'A'.repeat(43) + '=';
+    await writeFriendKey(root, { type: 'gpk-msg-pubkey', version: 1, account: 'bob', publicKey: pub });
+    await expect(writeFriendKey(root, { type: 'gpk-msg-pubkey', version: 1, account: 'bob', publicKey: pub, displayName: 'Bobby' })).rejects.toBeInstanceOf(VaultFileExistsError);
+    await writeFriendKey(root, { type: 'gpk-msg-pubkey', version: 1, account: 'bob', publicKey: pub, displayName: 'Bobby' }, true);
+    const files = await readFriendKeys(root);
+    expect(files.map(f => [f.account, f.displayName])).toEqual([['bob', 'Bobby']]);
+  });
+});
