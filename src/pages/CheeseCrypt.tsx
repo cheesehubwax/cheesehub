@@ -20,6 +20,7 @@ import { AvatarEditor } from '@/components/crypt/AvatarEditor';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { VaultPrompt } from '@/components/crypt/VaultPrompt';
 import { CreateGroupDialog } from '@/components/crypt/CreateGroupDialog';
+import { CryptAbout } from '@/components/crypt/CryptAbout';
 import { buildGroupMessageActions, createGroup, decodeConversations, groupMessageSize, loadGroups, mergeGroups, saveGroups } from '@/lib/cryptGroups';
 import {
   DirHandle, FRIENDS_DIR, PRIVATE_DIR, VAULT_DIR, VaultFileExistsError, friendKeyName, pickVault, privateKeyName,
@@ -54,7 +55,8 @@ const CheeseCrypt = () => {
             <div className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer" onClick={playRandomFart}>
               <OpenMojiIcon emoji="🔐" size={72} />
             </div>
-            <div className="text-center space-y-4">
+            <div className="w-full text-center space-y-4">
+              <CryptAbout>
               <div className="flex items-center justify-center gap-2">
                 <OpenMojiIcon emoji="🔐" size={26} />
                 <h1 className="text-3xl md:text-4xl font-bold">
@@ -64,6 +66,7 @@ const CheeseCrypt = () => {
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
                 <OpenMojiIcon emoji="🔐" size={26} />
               </div>
+              </CryptAbout>
               <p className="text-muted-foreground max-w-2xl mx-auto">
                 Encrypted messages sent on the WAX blockchain with CHEESE. Anyone can see that a message was sent —
                 only the conversation’s participants can read it.

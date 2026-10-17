@@ -11,7 +11,7 @@ export interface AboutSection {
 interface DappAboutProps {
   children: ReactNode;
   title: string;
-  introduction: string;
+  introduction: ReactNode;
   sections: AboutSection[];
 }
 
