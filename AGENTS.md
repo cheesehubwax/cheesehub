@@ -2,7 +2,7 @@
 
 - Token metadata snapshots share one versioned schema and public data URL across recorder and app; precisions are chain-verified, cached metadata contains no prices, and unknown live prices remain unknown so API outages cannot fabricate portfolio valuations.
 
-- CHEESEAir preserves its React context identity in Vite hot data during Fast Refresh so mounted providers and updated cards share the same state.
+- CHEESEAir preserves its React context identity in Vite hot data during Fast Refresh so providers and cards share state.
 
 - CHEESEAir LP holder token columns aggregate current underlying quantities in the selected pair's normalized token order, separate from USD payout weights, so presentation never changes distribution.
 
