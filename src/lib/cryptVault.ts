@@ -21,6 +21,7 @@ export interface DirHandle {
   name: string;
   getDirectoryHandle(name: string, o?: { create?: boolean }): Promise<DirHandle>;
   getFileHandle(name: string, o?: { create?: boolean }): Promise<{ getFile?(): Promise<{ text(): Promise<string> }>; createWritable(): Promise<{ write(d: string): Promise<void>; close(): Promise<void>; abort?(): Promise<void> }> }>;
+  values?(): AsyncIterable<{ kind: string; name: string }>;
   queryPermission?(o: { mode: 'readwrite' }): Promise<PermissionState>;
   requestPermission?(o: { mode: 'readwrite' }): Promise<PermissionState>;
 }
@@ -79,9 +80,32 @@ export async function updatePrivateKeyProfile(root: DirHandle, key: MessagingKey
   }
 }
 
-export async function writeFriendKey(root: DirHandle, file: PublicKeyFile) {
+/** Saves a friend's public key. `replace` (explicit user save) refreshes an existing file for that friend. */
+export async function writeFriendKey(root: DirHandle, file: PublicKeyFile, replace = false) {
   const name = friendKeyName(file.account);
-  await writeNew(await root.getDirectoryHandle(FRIENDS_DIR, { create: true }), name, file, `${VAULT_DIR}/${FRIENDS_DIR}/${name}`);
+  const dir = await root.getDirectoryHandle(FRIENDS_DIR, { create: true });
+  if (!replace) { await writeNew(dir, name, file, `${VAULT_DIR}/${FRIENDS_DIR}/${name}`); return; }
+  const writable = await (await dir.getFileHandle(name, { create: true })).createWritable();
+  try { await writable.write(JSON.stringify(file, null, 2)); await writable.close(); }
+  catch (error) { await writable.abort?.().catch(() => {}); throw error; }
+}
+
+/** Reads every valid public key file in the shared friends folder (shared by all accounts on this device). */
+export async function readFriendKeys(root: DirHandle): Promise<PublicKeyFile[]> {
+  let dir: DirHandle;
+  try { dir = await root.getDirectoryHandle(FRIENDS_DIR); } catch { return []; }
+  if (!dir.values) return [];
+  const out = new Map<string, PublicKeyFile>();
+  for await (const entry of dir.values()) {
+    if (entry.kind !== 'file' || !entry.name.toLowerCase().endsWith('.json')) continue;
+    try {
+      const handle = await dir.getFileHandle(entry.name);
+      if (!handle.getFile) continue;
+      const parsed = parseKeyFile(JSON.parse(await (await handle.getFile()).text()));
+      if (parsed?.type === 'gpk-msg-pubkey') out.set(parsed.account, parsed);
+    } catch { /* skip unreadable or malformed files */ }
+  }
+  return [...out.values()];
 }
 
 /** Requests Desktop as the picker's starting location; users create/select cheesecrypt there. */
@@ -102,10 +126,12 @@ function db(): Promise<IDBDatabase> {
     r.onerror = () => rej(r.error);
   });
 }
+// One folder serves every account on this device (private keys sit side by side, friends are shared).
+const SHARED = '*shared*';
 export async function rememberVault(account: string, h: DirHandle) {
   const d = await db();
   await new Promise<void>((res, rej) => {
-    const t = d.transaction(STORE, 'readwrite'); t.objectStore(STORE).put(h, account);
+    const t = d.transaction(STORE, 'readwrite'); t.objectStore(STORE).put(h, account); t.objectStore(STORE).put(h, SHARED);
     t.oncomplete = () => res(); t.onerror = () => rej(t.error);
   });
 }
@@ -114,8 +140,14 @@ export async function recallVault(account: string): Promise<DirHandle | null> {
   try {
     const d = await db();
     return await new Promise((res) => {
-      const r = d.transaction(STORE).objectStore(STORE).get(account);
-      r.onsuccess = () => res((r.result as DirHandle) ?? null); r.onerror = () => res(null);
+      const store = d.transaction(STORE).objectStore(STORE);
+      const r = store.get(SHARED);
+      r.onsuccess = () => {
+        if (r.result) { res(r.result as DirHandle); return; }
+        const own = store.get(account);
+        own.onsuccess = () => res((own.result as DirHandle) ?? null); own.onerror = () => res(null);
+      };
+      r.onerror = () => res(null);
     });
   } catch { return null; }
 }

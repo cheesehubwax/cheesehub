@@ -28,7 +28,7 @@ import { CryptAbout } from '@/components/crypt/CryptAbout';
 import { buildGroupMessageActions, createGroup, decodeConversations, groupMessageCost, groupMessageSize, loadGroups, loadHiddenGroups, mergeGroups, saveGroups, setGroupHidden, type CryptGroup } from '@/lib/cryptGroups';
 import {
   DirHandle, FRIENDS_DIR, PRIVATE_DIR, VAULT_DIR, VaultFileExistsError, friendKeyName, pickVault, privateKeyName,
-  recallVault, rememberVault, updatePrivateKeyProfile, vaultSupported, vaultWritable, writeFriendKey,
+  readFriendKeys, recallVault, rememberVault, updatePrivateKeyProfile, vaultSupported, vaultWritable, writeFriendKey,
 } from '@/lib/cryptVault';
 import type { PublicKeyFile } from '@/lib/cheeseCrypt';
 import {
@@ -125,6 +125,24 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [backupKey, setBackupKey] = useState<MessagingKey | null>(null);
   const [vault, setVault] = useState<DirHandle | null>(null);
   useEffect(() => { recallVault(account).then(setVault); }, [account]);
+  // Friends folder is shared by every account on this device; nicknames and removals stay per account.
+  useEffect(() => {
+    if (!vault) return;
+    let cancelled = false;
+    (async () => {
+      if (!(await vaultWritable(vault, false).catch(() => false))) return;
+      const files = await readFriendKeys(vault).catch(() => []);
+      if (cancelled || !files.length) return;
+      const removed = loadRemovedContacts(account);
+      let changed = false;
+      for (const f of files) {
+        if (f.account === account || removed.includes(f.account)) continue;
+        saveContact(account, f.account, f.publicKey, f.avatar, f.displayName); changed = true;
+      }
+      if (changed && !cancelled) { setContacts(loadContacts(account)); setAvatars(loadContactAvatars(account)); setNames(loadCryptNames(account)); }
+    })();
+    return () => { cancelled = true; };
+  }, [vault, account]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -234,7 +252,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         if (!vaultSupported()) { download(friendKeyName(name), file); return; }
         root = await pickVault(); setVault(root); rememberVault(account, root).catch(() => {});
       }
-      await writeFriendKey(root, file);
+      await writeFriendKey(root, file, ask);
       toast({ title: `Saved ${name}'s key`, description: `In ${VAULT_DIR}/${FRIENDS_DIR}` });
     } catch (e) {
       if (!ask || (e as DOMException)?.name === 'AbortError') return;

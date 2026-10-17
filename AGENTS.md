@@ -2,7 +2,7 @@
 
 - Token metadata snapshots share one versioned schema and public data URL across recorder and app; precisions are chain-verified, cached metadata contains no prices, and unknown live prices remain unknown so API outages cannot fabricate portfolio valuations.
 
-- CHEESEAir preserves its React context identity in Vite hot data during Fast Refresh so mounted providers and updated cards share the same state.
+- CHEESEAir preserves its React context identity in Vite hot data during Fast Refresh so providers and cards share state.
 
 - CHEESEAir LP holder token columns aggregate current underlying quantities in the selected pair's normalized token order, separate from USD payout weights, so presentation never changes distribution.
 
@@ -37,4 +37,6 @@
 
 - CHEESECrypt avatars are validated palette-index data in optional key-file fields and separate per-account contact storage; imports rasterize locally, and on-chain key memos stay unchanged to preserve compatibility and avoid executable or remote avatar payloads.
 
-- CHEESECrypt folder pickers start at Desktop but request the vault subfolder; retry permission failures because Chromium protects Desktop-root access. Profile precedes key generation/backup; profile edits refresh only verified matching-key backups with staged writes, otherwise download, preserving other keys.
+- CHEESECrypt folder pickers start at Desktop but request the vault subfolder; retry permission failures because Chromium protects Desktop-root access. Profile precedes keys; edits refresh only verified matching-key backups (staged writes), else download.
+
+- CHEESECrypt shares one vault folder per device; `friends/` files load into every account (nicknames/removals per account); only explicit saves replace friend files.

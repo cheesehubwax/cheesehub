@@ -18,6 +18,7 @@ function fakeDir(name: string): DirHandle & { dirs: Map<string, any>; files: Map
         return { write: async (d: string) => { staged = d; }, close: async () => { files.set(n, staged); }, abort: async () => {} };
       } };
     },
+    async *values() { for (const n of files.keys()) yield { kind: 'file', name: n }; },
   };
 }
 const key = { type: 'gpk-msg-key', version: 1, account: 'alice', publicKey: 'p', secretKey: 's', created: '' } as MessagingKey;
@@ -83,5 +84,18 @@ describe('cheesecrypt key folder', () => {
     await expect(updatePrivateKeyProfile(root, { ...current, displayName: 'Updated' })).rejects.toThrow('Disk full');
     expect(aborted).toBe(true);
     expect(dir.files.get('alice-cheesecrypt-key-PRIVATE.json')).toBe(before);
+  });
+});
+
+describe('shared friends folder', () => {
+  it('explicit save refreshes an existing friend file; automatic save never overwrites', async () => {
+    const { readFriendKeys } = await import('@/lib/cryptVault');
+    const root = await prepareVault(fakeDir('cheesecrypt'));
+    const pub = 'A'.repeat(43) + '=';
+    await writeFriendKey(root, { type: 'gpk-msg-pubkey', version: 1, account: 'bob', publicKey: pub });
+    await expect(writeFriendKey(root, { type: 'gpk-msg-pubkey', version: 1, account: 'bob', publicKey: pub, displayName: 'Bobby' })).rejects.toBeInstanceOf(VaultFileExistsError);
+    await writeFriendKey(root, { type: 'gpk-msg-pubkey', version: 1, account: 'bob', publicKey: pub, displayName: 'Bobby' }, true);
+    const files = await readFriendKeys(root);
+    expect(files.map(f => [f.account, f.displayName])).toEqual([['bob', 'Bobby']]);
   });
 });
