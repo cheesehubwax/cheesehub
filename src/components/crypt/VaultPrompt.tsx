@@ -23,7 +23,8 @@ export function VaultPrompt({ cryptKey, onSaved, onDownload }: {
     } catch (e) {
       if ((e as DOMException)?.name === 'AbortError') setError(null);
       else if (e instanceof VaultFileExistsError) setError(`${e.path} already exists, so nothing was saved. Move or rename the old file, then try again — or download instead.`);
-      else setError('Could not create the folders there. Try another location or download instead.');
+      else if (['SecurityError', 'NotAllowedError'].includes((e as DOMException)?.name)) setError(`Chrome may block access to the Desktop itself, or folder permission was denied. Try again: on your Desktop, create or select the ${VAULT_DIR} folder, then allow access to that folder — not the Desktop itself. You can also download instead.`);
+      else setError(`Could not save there. Try again and create or select a ${VAULT_DIR} folder on your Desktop, allow access to it, or download instead.`);
     } finally { setBusy(false); }
   };
 
@@ -44,8 +45,10 @@ export function VaultPrompt({ cryptKey, onSaved, onDownload }: {
     └── 📁 ${FRIENDS_DIR}/          ← your friends' public keys`}</pre>
         {supported ? (
           <p className="text-xs text-muted-foreground">
-            A folder window opens on your Desktop — just press <span className="font-semibold text-foreground">Select</span> (or Allow).
-            The folders are created for you. An existing key file is never overwritten.
+            In the folder window, go to your Desktop. Click <span className="font-semibold text-foreground">New folder</span> and
+            name it <span className="font-mono text-foreground">{VAULT_DIR}</span>, or open that folder if it already exists.
+            Select the <span className="font-mono text-foreground">{VAULT_DIR}</span> folder and allow access — not the Desktop itself.
+            The {PRIVATE_DIR} and {FRIENDS_DIR} subfolders are created for you. An existing key file is never overwritten.
           </p>
         ) : (
           <p className="text-xs text-muted-foreground">
@@ -56,7 +59,7 @@ export function VaultPrompt({ cryptKey, onSaved, onDownload }: {
         <div className="flex flex-col gap-2">
           {supported && (
             <Button disabled={busy} onClick={save} className="bg-cheese text-primary-foreground hover:bg-cheese/90">
-              {busy ? 'Saving…' : `Save to Desktop/${VAULT_DIR}`}
+              {busy ? 'Saving…' : `Choose Desktop/${VAULT_DIR} folder`}
             </Button>
           )}
           <Button variant="outline" disabled={busy} onClick={onDownload}>Download the file instead</Button>

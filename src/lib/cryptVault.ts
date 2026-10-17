@@ -1,7 +1,8 @@
 // CHEESECrypt key folder: Desktop/cheesecrypt/{my private key, friends}.
 // Uses the browser's folder access (Chromium only). Browsers never let a site
 // write to the Desktop silently — the user picks the folder once (the picker
-// opens on the Desktop) and the remembered handle is reused afterwards.
+// requests Desktop as its starting location) and the remembered handle is reused afterwards.
+// Select/create cheesecrypt there: Chromium can reject access to Desktop itself.
 import type { MessagingKey, PublicKeyFile } from './cheeseCrypt';
 
 export const VAULT_DIR = 'cheesecrypt';
@@ -60,7 +61,7 @@ export async function writeFriendKey(root: DirHandle, file: PublicKeyFile) {
   await writeNew(await root.getDirectoryHandle(FRIENDS_DIR, { create: true }), name, file, `${VAULT_DIR}/${FRIENDS_DIR}/${name}`);
 }
 
-/** Opens the folder picker on the Desktop and builds the cheesecrypt tree inside the chosen folder. */
+/** Requests Desktop as the picker's starting location; users create/select cheesecrypt there. */
 export async function pickVault(): Promise<DirHandle> {
   const p = picker();
   if (!p) throw new Error('This browser cannot create folders');
