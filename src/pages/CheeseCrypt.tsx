@@ -459,7 +459,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 <li key={m.key}
                   className={cn('max-w-[80%] rounded-lg px-3 py-2 text-sm',
                     m.from === account ? 'ml-auto bg-cheese/20 border border-cheese/30' : 'bg-muted')}>
-                  <div className={cn('flex items-center gap-2 mb-1', m.from === account && 'flex-row-reverse')}>
+                  <div className="flex items-center gap-2 mb-1">
                     <PixelAvatar account={m.from} avatar={m.from === account ? key.avatar : avatars[m.from]} className="h-6 w-6" />
                     <p className="text-[10px] font-semibold opacity-80 break-words">{m.from === account ? `you · ${nameFor(account)}` : nameFor(m.from)}{nameFor(m.from) !== m.from && <span className="block font-normal">{m.from}</span>}</p>
                   </div>
