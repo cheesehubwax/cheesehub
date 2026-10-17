@@ -39,6 +39,8 @@ import {
 } from '@/lib/cheeseCrypt';
 
 const ACCOUNT_RE = /^[a-z1-5.]{1,12}$/;
+/** How often an open, visible messenger checks history for new messages. */
+const LIVE_POLL_MS = 6000;
 
 function download(name: string, data: unknown) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
@@ -144,14 +146,39 @@ export function Messenger({ account, session }: { account: string; session: NonN
     return () => { cancelled = true; };
   }, [vault, account]);
 
+  const inFlight = useRef(false);
+  // Only replace the list when something changed, so a quiet poll never re-renders the chat.
+  const applyMemos = useCallback((next: Awaited<ReturnType<typeof fetchMessages>>) => {
+    setMemos(prev => {
+      const sig = (l: typeof next) => l.map(m => `${m.txId}:${m.memo}`).join('|');
+      return prev.length === next.length && sig(prev) === sig(next) ? prev : next;
+    });
+  }, []);
   const refresh = useCallback(async () => {
     setLoading(true);
-    try { setMemos(await fetchMessages(account)); }
+    inFlight.current = true;
+    try { applyMemos(await fetchMessages(account)); }
     catch { toast({ title: 'Could not load messages', description: 'History servers did not answer. Try again shortly.', variant: 'destructive' }); }
-    finally { setLoading(false); }
-  }, [account, toast]);
+    finally { setLoading(false); inFlight.current = false; }
+  }, [account, toast, applyMemos]);
+  // Background check: no spinner, no error toast — a missed poll is retried on the next tick.
+  const poll = useCallback(async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    try { applyMemos(await fetchMessages(account)); } catch { /* retry next tick */ }
+    finally { inFlight.current = false; }
+  }, [account, applyMemos]);
 
   useEffect(() => { if (key) refresh(); }, [key, refresh]);
+  useEffect(() => {
+    if (!key) return;
+    const tick = () => { if (document.visibilityState === 'visible') poll(); };
+    const id = window.setInterval(tick, LIVE_POLL_MS);
+    const onVisible = () => { if (document.visibilityState === 'visible') poll(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('focus', onVisible); };
+  }, [key, poll]);
 
   const partners = useMemo(() => {
     const s = new Set(Object.keys(contacts));
@@ -199,7 +226,15 @@ export function Messenger({ account, session }: { account: string; session: NonN
     ? m.group?.id === activeGroup.id && m.group.members.join(',') === activeGroup.members.join(',')
     : !m.group && ((m.from === account && m.to === active) || (m.from === active && m.to === account)));
 
-  useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [thread.length, active]);
+  const listRef = useRef<HTMLOListElement>(null);
+  const nearBottom = useRef(true);
+  const lastActive = useRef<string | null>(null);
+  useEffect(() => {
+    const switched = lastActive.current !== active;
+    lastActive.current = active;
+    // Follow new messages only when the reader is already at the bottom; never yank them out of history.
+    if (switched || nearBottom.current) endRef.current?.scrollIntoView({ block: 'end', behavior: switched ? 'auto' : 'smooth' });
+  }, [thread.length, active]);
 
   const makeKey = () => {
     if (key && !confirm('Replace your existing key? Messages encrypted with the old key can no longer be read unless you kept its file.')) return;
@@ -348,7 +383,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
       const actions = activeGroup ? buildGroupMessageActions(key, activeGroup, text, contacts, [permission])
         : buildSendMessageActions(account, active, splitMessage(text).map(p => encryptMemo(p, contacts[active], key.secretKey)), [permission]);
       const r = await executeTransaction(actions, { successTitle: 'Message sent' });
-      if (r.success) { setText(''); setTimeout(refresh, 3000); }
+      if (r.success) { setText(''); nearBottom.current = true; [2000, 5000, 10000].forEach(ms => setTimeout(poll, ms)); }
     } catch (e) { toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' }); }
     finally { setBusy(false); }
   };
@@ -492,7 +527,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 {member !== account && <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" aria-label={`Edit nickname for ${member}`} title={`Edit nickname for ${member}`} onClick={() => setEditingFriend(member)}><Pencil className="h-3 w-3" /></Button>}
               </span>) : <><PixelAvatar account={active} avatar={avatars[active]} /><span className="min-w-0 break-words">{nameFor(active)}{nameFor(active) !== active && <span className="block text-xs text-muted-foreground">{active}</span>}</span><Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label={`Edit nickname for ${active}`} title={`Edit nickname for ${active}`} onClick={() => setEditingFriend(active)}><Pencil className="h-3 w-3" /></Button></>}
               {!activeGroup && contacts[active] && <Button size="sm" variant="ghost" className="ml-auto h-7 text-xs font-normal" onClick={() => saveFriend(active, true)}>💾 Save to {FRIENDS_DIR}</Button>}</div>
-            <ol className="flex-1 overflow-y-auto space-y-2 p-4">
+            <ol ref={listRef} className="flex-1 overflow-y-auto space-y-2 p-4"
+              onScroll={(e) => { const el = e.currentTarget; nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
               {thread.map((m) => (
                 <li key={m.key}
                   className={cn('max-w-[80%] rounded-lg px-3 py-2 text-sm',
