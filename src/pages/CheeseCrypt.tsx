@@ -25,6 +25,7 @@ import { VaultPrompt } from '@/components/crypt/VaultPrompt';
 import { CreateGroupDialog } from '@/components/crypt/CreateGroupDialog';
 import { ShareKeyDialog } from '@/components/crypt/ShareKeyDialog';
 import { CryptAbout } from '@/components/crypt/CryptAbout';
+import { baselineMarks, conversationId, loadReadMarks, saveReadMarks, unreadCounts, type ReadMarks } from '@/lib/cryptUnread';
 import { buildGroupMessageActions, createGroup, decodeConversations, groupMessageCost, groupMessageSize, loadGroups, loadHiddenGroups, mergeGroups, saveGroups, setGroupHidden, type CryptGroup } from '@/lib/cryptGroups';
 import {
   DirHandle, FRIENDS_DIR, PRIVATE_DIR, VAULT_DIR, VaultFileExistsError, friendKeyName, pickVault, privateKeyName,
@@ -119,6 +120,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [newContact, setNewContact] = useState('');
   const [memos, setMemos] = useState<ChainMemo[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [readMarks, setReadMarks] = useState<ReadMarks | null>(() => loadReadMarks(account));
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [agreed, setAgreed] = useState(false);
@@ -157,7 +160,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const refresh = useCallback(async () => {
     setLoading(true);
     inFlight.current = true;
-    try { applyMemos(await fetchMessages(account)); }
+    try { applyMemos(await fetchMessages(account)); setLoaded(true); }
     catch { toast({ title: 'Could not load messages', description: 'History servers did not answer. Try again shortly.', variant: 'destructive' }); }
     finally { setLoading(false); inFlight.current = false; }
   }, [account, toast, applyMemos]);
@@ -165,7 +168,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const poll = useCallback(async () => {
     if (inFlight.current) return;
     inFlight.current = true;
-    try { applyMemos(await fetchMessages(account)); } catch { /* retry next tick */ }
+    try { applyMemos(await fetchMessages(account)); setLoaded(true); } catch { /* retry next tick */ }
     finally { inFlight.current = false; }
   }, [account, applyMemos]);
 
@@ -225,6 +228,24 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const thread = conversations.filter(m => activeGroup
     ? m.group?.id === activeGroup.id && m.group.members.join(',') === activeGroup.members.join(',')
     : !m.group && ((m.from === account && m.to === active) || (m.from === active && m.to === account)));
+
+  // Unread badges: first load on this device marks existing history read; afterwards only newer incoming messages count.
+  useEffect(() => {
+    if (!loaded || !key || readMarks) return;
+    const base = baselineMarks(conversations, account);
+    saveReadMarks(account, base); setReadMarks(base);
+  }, [loaded, key, readMarks, conversations, account]);
+  useEffect(() => {
+    if (!active || !readMarks) return;
+    const newest = thread.reduce((t, m) => Math.max(t, m.time), 0);
+    if (newest <= (readMarks[active] ?? 0)) return;
+    const next = { ...readMarks, [active]: newest };
+    saveReadMarks(account, next); setReadMarks(next);
+  }, [active, thread, readMarks, account]);
+  const unread = useMemo(() => readMarks ? unreadCounts(conversations, account, readMarks) : {}, [conversations, account, readMarks]);
+  const badge = (id: string) => unread[id] && active !== id
+    ? <span aria-label={`${unread[id]} unread`} className="ml-auto shrink-0 min-w-5 h-5 px-1.5 rounded-full bg-cheese text-primary-foreground text-[11px] font-bold leading-5 text-center">{unread[id] > 99 ? '99+' : unread[id]}</span>
+    : null;
 
   const listRef = useRef<HTMLOListElement>(null);
   const nearBottom = useRef(true);
@@ -338,6 +359,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     <Button variant="ghost" onClick={() => setActive(`group:${g.id}`)} className={cn('flex-1 min-w-0 h-auto justify-start text-left px-3 py-2', active === `group:${g.id}` && 'bg-cheese/15 text-cheese')}>
       <span className="min-w-0"><span className="block text-sm">Group · {g.members.length} people</span>
         <span className="block text-[10px] text-muted-foreground whitespace-normal break-words">{g.members.filter(m => m !== account).map(nameFor).join(', ')}</span></span>
+      {badge(`group:${g.id}`)}
     </Button>
     <Button variant="ghost" size="icon" aria-label={`${hidden ? 'Restore' : 'Hide'} group ${g.id}`} title={`${hidden ? 'Restore' : 'Hide'} group`}
       className="h-7 w-7 shrink-0 text-muted-foreground hover:text-cheese opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 focus-visible:opacity-100 transition-opacity"
@@ -506,6 +528,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 <span className="block text-[10px] text-muted-foreground">
                   {!contacts[p] ? 'no key yet' : lastAt[p] ? new Date(lastAt[p]).toLocaleDateString() : 'no messages'}
                 </span></span>
+                {badge(p)}
               </Button>
               <Button variant="ghost" size="icon" aria-label={`Remove friend ${p}`} title={`Remove friend ${p}`}
                 className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 focus-visible:opacity-100 transition-opacity"
