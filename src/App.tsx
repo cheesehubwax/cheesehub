@@ -20,6 +20,7 @@ import Drip from "./pages/Drip";
 import Air from "./pages/Air";
 import CheeseAnal from "./pages/CheeseAnal";
 import Folio from "./pages/Folio";
+import CheeseCrypt from "./pages/CheeseCrypt";
 import BannerAds from "./pages/BannerAds";
 import Disclaimer from "./pages/Disclaimer";
 import Terms from "./pages/Terms";
@@ -66,6 +67,8 @@ const App = () => {
                 <Route path="/anal" element={<CheeseAnal />} />
                 {/* CHEESEFolio — in testing, intentionally not linked anywhere */}
                 <Route path="/folio" element={<Folio />} />
+                {/* CHEESECrypt — encrypted messaging, intentionally not linked anywhere */}
+                <Route path="/crypt" element={<CheeseCrypt />} />
                 <Route path="/bannerads" element={<BannerAds />} />
 
                 <Route path="/disclaimer" element={<Disclaimer />} />
