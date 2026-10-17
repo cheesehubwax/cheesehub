@@ -18,6 +18,7 @@ import { playRandomFart } from '@/lib/fartSounds';
 import { cn } from '@/lib/utils';
 import {
   ChainMemo, MAX_PLAINTEXT_BYTES, MESSAGE_FEE_QUANTITY, MESSAGE_RECIPIENT_QUANTITY, MESSAGE_TOTAL_QUANTITY, MessagingKey,
+  MAX_MESSAGE_BYTES, MAX_PARTS, PART_BODY_BYTES, assembleMessages, messageCost, partCount, splitMessage,
   buildPublishKeyActions, buildSendMessageActions, decryptMemo, encryptMemo, fetchMessages, generateKey,
   loadContacts, loadKey, lookupPublishedKey, parseKeyFile, plaintextBytes, saveContact, saveKey, toPublicFile,
 } from '@/lib/cheeseCrypt';
@@ -116,10 +117,9 @@ function Messenger({ account, session }: { account: string; session: NonNullable
   const thread = useMemo(() => {
     if (!active) return [];
     const pub = contacts[active];
-    return memos
+    return assembleMessages(memos
       .filter((m) => (m.from === account && m.to === active) || (m.from === active && m.to === account))
-      .map((m) => ({ ...m, text: pub && key ? decryptMemo(m.memo, pub, key.secretKey) : null }))
-      .sort((a, b) => a.time - b.time);
+      .map((m) => ({ ...m, text: pub && key ? decryptMemo(m.memo, pub, key.secretKey) : null })));
   }, [active, memos, contacts, key, account]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [thread.length, active]);
@@ -172,14 +172,16 @@ function Messenger({ account, session }: { account: string; session: NonNullable
     if (!key || !active || !contacts[active] || !agreed) return;
     setBusy(true);
     try {
-      const memo = encryptMemo(text, contacts[active], key.secretKey);
-      const r = await executeTransaction(buildSendMessageActions(account, active, memo, [permission]), { successTitle: 'Message sent' });
+      const memos = splitMessage(text).map((p) => encryptMemo(p, contacts[active], key.secretKey));
+      const r = await executeTransaction(buildSendMessageActions(account, active, memos, [permission]), { successTitle: 'Message sent' });
       if (r.success) { setText(''); setTimeout(refresh, 3000); }
     } catch (e) { toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' }); }
     finally { setBusy(false); }
   };
 
   const bytes = plaintextBytes(text);
+  const parts = partCount(text);
+  const tooLong = bytes > MAX_MESSAGE_BYTES;
   const fileInput = (
     <input ref={fileRef} type="file" accept="application/json,.json" className="hidden"
       onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }} />
@@ -271,14 +273,18 @@ function Messenger({ account, session }: { account: string; session: NonNullable
             <div className="px-4 py-3 border-b border-border font-semibold">{active}</div>
             <ol className="flex-1 overflow-y-auto space-y-2 p-4">
               {thread.map((m) => (
-                <li key={m.txId + m.memo}
+                <li key={m.key}
                   className={cn('max-w-[80%] rounded-lg px-3 py-2 text-sm',
                     m.from === account ? 'ml-auto bg-cheese/20 border border-cheese/30' : 'bg-muted')}>
                   <p className="text-[10px] font-semibold tracking-wide opacity-80">{m.from === account ? `you · ${account}` : m.from}</p>
                   <p className="whitespace-pre-wrap break-words">
                     {m.text ?? <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
                   </p>
-                  <p className="text-[10px] opacity-70 mt-1">{new Date(m.time).toLocaleString()} · {m.quantity}</p>
+                  <p className="text-[10px] opacity-70 mt-1">
+                    {new Date(m.time).toLocaleString()} · {messageCost(m.parts)}
+                    {m.parts > 1 && ` · ${m.parts} parts`}
+                    {m.missing > 0 && <span className="text-destructive"> · {m.missing} part{m.missing > 1 ? 's' : ''} not loaded</span>}
+                  </p>
                 </li>
               ))}
               {!thread.length && <li className="text-sm text-muted-foreground">No messages with {active} yet.</li>}
@@ -290,14 +296,16 @@ function Messenger({ account, session }: { account: string; session: NonNullable
               <div className="space-y-2 p-4 border-t border-border">
                 <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder={`Message ${active}`} />
                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className={bytes > MAX_PLAINTEXT_BYTES ? 'text-destructive' : 'text-muted-foreground'}>{bytes}/{MAX_PLAINTEXT_BYTES}</span>
+                  <span className={tooLong ? 'text-destructive' : 'text-muted-foreground'}>
+                    {bytes}/{MAX_MESSAGE_BYTES} · {parts || 1} part{parts > 1 ? 's' : ''}
+                  </span>
                   <TermsCheckbox checked={agreed} onCheckedChange={setAgreed} className="ml-2" />
-                  <span className="ml-auto text-muted-foreground">{MESSAGE_TOTAL_QUANTITY} per message</span>
-                  <Button size="sm" disabled={busy || !agreed || !text.trim() || bytes > MAX_PLAINTEXT_BYTES} onClick={send}
+                  <span className="ml-auto text-muted-foreground">{messageCost(parts || 1)}</span>
+                  <Button size="sm" disabled={busy || !agreed || !text.trim() || tooLong} onClick={send}
                     className="bg-cheese text-primary-foreground hover:bg-cheese/90">Send</Button>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  {MESSAGE_RECIPIENT_QUANTITY} to {active} carrying your encrypted message + {MESSAGE_FEE_QUANTITY} nulled, together in one transaction.
+                  Each part: {MESSAGE_RECIPIENT_QUANTITY} to {active} + {MESSAGE_FEE_QUANTITY} nulled ({MESSAGE_TOTAL_QUANTITY}). Long messages split into up to {MAX_PARTS} parts ({MAX_PLAINTEXT_BYTES} bytes for one, {PART_BODY_BYTES} per part after that), all in one transaction.
                 </p>
               </div>
             )}
