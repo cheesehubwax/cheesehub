@@ -1,5 +1,5 @@
 # CHEESEHub roadmap
-- [x] CHEESECrypt: prompt for optional name/avatar after new-key folder backup or download; defaults retained on skip, encryption keys unchanged; regression tests and isolated browser download-to-profile flow checked.
+- [x] CHEESECrypt: profile-first key creation, backup then sharing; verified matching-key profile-only backup updates, download fallback, 57 regression tests passed. Isolated Chrome walkthrough verified initial private/public profile files, edit download and persistence; actual OS folder picker and real-wallet publishing remain unverified.
 - [x] CHEESECrypt: hover bin removes saved browser contact details and prevents history rediscovery until explicit re-add; 28 regression tests passed and isolated browser removal checked. Downloaded files and chain messages stay unchanged.
 - [x] CHEESECrypt: profile names in key files, private friend nicknames, consistent conversation labels; 38 regression tests passed and isolated Chrome profile/nickname saving checked. Real-wallet contact sharing still needs connected wallets.
 

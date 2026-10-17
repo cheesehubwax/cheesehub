@@ -45,13 +45,15 @@ export interface PublicKeyFile {
 const keyStore = (a: string) => `cheesecrypt-key-${a}`;
 const contactStore = (a: string) => `cheesecrypt-contacts-${a}`;
 
-export function generateKey(account: string): MessagingKey {
+export function generateKey(account: string, profile: { avatar?: CryptAvatar; displayName?: string } = {}): MessagingKey {
   const kp = nacl.box.keyPair();
   return {
     type: 'gpk-msg-key', version: 1, account,
     publicKey: encodeBase64(kp.publicKey),
     secretKey: encodeBase64(kp.secretKey),
     created: new Date().toISOString(),
+    avatar: parseAvatar(profile.avatar),
+    displayName: parseCryptName(profile.displayName),
   };
 }
 

@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { AvatarEditor } from '@/components/crypt/AvatarEditor';
 import { FriendNameDialog } from '@/components/crypt/FriendNameDialog';
 import { cryptDisplayName, loadCryptNames, saveCryptName } from '@/lib/cryptNames';
+import { accountAvatar, type CryptAvatar } from '@/lib/cryptAvatar';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { VaultPrompt } from '@/components/crypt/VaultPrompt';
 import { CreateGroupDialog } from '@/components/crypt/CreateGroupDialog';
@@ -27,7 +28,7 @@ import { CryptAbout } from '@/components/crypt/CryptAbout';
 import { buildGroupMessageActions, createGroup, decodeConversations, groupMessageCost, groupMessageSize, loadGroups, mergeGroups, saveGroups } from '@/lib/cryptGroups';
 import {
   DirHandle, FRIENDS_DIR, PRIVATE_DIR, VAULT_DIR, VaultFileExistsError, friendKeyName, pickVault, privateKeyName,
-  recallVault, rememberVault, vaultSupported, vaultWritable, writeFriendKey,
+  recallVault, rememberVault, updatePrivateKeyProfile, vaultSupported, vaultWritable, writeFriendKey,
 } from '@/lib/cryptVault';
 import type { PublicKeyFile } from '@/lib/cheeseCrypt';
 import {
@@ -182,22 +183,40 @@ export function Messenger({ account, session }: { account: string; session: NonN
 
   const makeKey = () => {
     if (key && !confirm('Replace your existing key? Messages encrypted with the old key can no longer be read unless you kept its file.')) return;
-    const k = generateKey(account);
-    saveKey(k); setKey(k);
-    setBackupKey(k); // one-time prompt to save it into Desktop/cheesecrypt/my private key/
+    setSettingUpProfile(true); setEditingAvatar(true);
+  };
+
+  const completeProfile = async (avatar: CryptAvatar, displayName?: string) => {
+    setEditingAvatar(false);
+    if (settingUpProfile) {
+      const created = generateKey(account, { avatar, displayName });
+      saveKey(created); setKey(created); setBackupKey(created); setSettingUpProfile(false);
+      return;
+    }
+    if (!key) return;
+    const updated = { ...key, avatar, displayName };
+    saveKey(updated); setKey(updated);
+    try {
+      if (!vault || !(await vaultWritable(vault, true))) throw new Error('Folder access unavailable');
+      await updatePrivateKeyProfile(vault, updated);
+      toast({ title: 'Profile and private backup updated', description: 'Share your updated public key file so friends see your name and avatar.' });
+    } catch {
+      download(privateKeyName(account), updated);
+      toast({ title: 'Profile saved; refreshed backup downloaded', description: 'The existing disk file was not replaced. Keep this refreshed file safe; share only your public key.' });
+    }
   };
 
   const backupDownloaded = () => {
     if (!backupKey) return;
     download(privateKeyName(account), backupKey);
     setBackupKey(null);
-    setSettingUpProfile(true); setEditingAvatar(true);
+    setShowSharePrompt(true);
     toast({ title: 'Messaging key created', description: 'A private backup file was downloaded. Keep it safe and never share it.' });
   };
 
   const backupSaved = (root: DirHandle) => {
     setBackupKey(null); setVault(root);
-    setSettingUpProfile(true); setEditingAvatar(true);
+    setShowSharePrompt(true);
     rememberVault(account, root).catch(() => {});
     toast({ title: 'Key saved', description: `Saved in ${VAULT_DIR}/${PRIVATE_DIR}. Never share this file.` });
   };
@@ -260,10 +279,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
   };
 
   const publish = async () => {
-    if (!key) return;
-    if (!agreed) { toast({ title: 'Please agree to the Terms of Use first', variant: 'destructive' }); return; }
+    if (!key) return false;
+    if (!agreed) { toast({ title: 'Please agree to the Terms of Use first', variant: 'destructive' }); return false; }
     setBusy(true);
-    try { await executeTransaction(buildPublishKeyActions(account, key.publicKey, [permission]), { successTitle: 'Public key published' }); }
+    try { const result = await executeTransaction(buildPublishKeyActions(account, key.publicKey, [permission]), { successTitle: 'Public key published' }); return result.success; }
     finally { setBusy(false); }
   };
 
@@ -288,11 +307,16 @@ export function Messenger({ account, session }: { account: string; session: NonN
     <input ref={fileRef} type="file" accept="application/json,.json" className="hidden"
       onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }} />
   );
+  const profileEditor = editingAvatar && <AvatarEditor account={account} avatar={settingUpProfile ? undefined : key?.avatar}
+    displayName={settingUpProfile ? undefined : key?.displayName} initialSetup={settingUpProfile}
+    onClose={() => { if (settingUpProfile) void completeProfile(accountAvatar(account)); else setEditingAvatar(false); }}
+    onSave={() => {}} onSaveProfile={(avatar, displayName) => void completeProfile(avatar, displayName)} />;
 
   if (!key) {
     return (
       <div className="w-full max-w-md space-y-5 text-center">
         {fileInput}
+        {profileEditor}
         <div className="space-y-2">
           <p className="text-lg font-semibold">🔑 Unlock your messages</p>
           <p className="text-sm text-muted-foreground">
@@ -307,7 +331,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         </div>
         <div className="rounded-lg border border-border bg-card/80 p-4 space-y-2 text-left">
           <p className="font-semibold text-sm">I'm new here</p>
-          <p className="text-xs text-muted-foreground">Creates a new key and downloads a private backup file. Keep it safe. A new key cannot read messages sent to an older one.</p>
+          <p className="text-xs text-muted-foreground">Choose your name and avatar first, then save your new private key. A new key cannot read messages sent to an older one.</p>
           <Button className="w-full" variant="outline" onClick={makeKey}>Create a new key</Button>
         </div>
       </div>
@@ -326,14 +350,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
       {editingFriend && <FriendNameDialog account={editingFriend} nickname={nicknames[editingFriend]} sharedName={names[editingFriend]} onClose={() => setEditingFriend(null)} onSave={name => {
         saveCryptName(account, editingFriend, name, 'nicknames'); setNicknames(loadCryptNames(account, 'nicknames')); setEditingFriend(null);
       }} />}
-      {editingAvatar && <AvatarEditor account={account} avatar={key.avatar} displayName={key.displayName} initialSetup={settingUpProfile} onClose={() => { setEditingAvatar(false); if (settingUpProfile) { setSettingUpProfile(false); setShowSharePrompt(true); } }} onSave={() => {}} onSaveProfile={(avatar, displayName) => {
-        const updated = { ...key, avatar, displayName }; saveKey(updated); setKey(updated); setEditingAvatar(false);
-        if (settingUpProfile) { setSettingUpProfile(false); setShowSharePrompt(true); }
-        else toast({ title: 'Profile saved', description: 'Share your updated public key file so friends can see your name and avatar. Refresh your private backup too.' });
-      }} />}
-      {showSharePrompt && key && <ShareKeyDialog account={account} busy={busy} onClose={() => setShowSharePrompt(false)}
+      {profileEditor}
+      {showSharePrompt && key && <ShareKeyDialog account={account} busy={busy} agreed={agreed} onAgreedChange={setAgreed} onClose={() => setShowSharePrompt(false)}
         onDownload={() => { download(`${account}-cheesecrypt-public.json`, toPublicFile(key)); setShowSharePrompt(false); }}
-        onPublish={async () => { await publish(); setShowSharePrompt(false); }} />}
+        onPublish={async () => { if (await publish()) setShowSharePrompt(false); }} />}
       <aside className="border-b md:border-b-0 md:border-r border-border flex flex-col min-h-0">
         <div className="p-3 space-y-2 border-b border-border">
           <div className="flex gap-2">
