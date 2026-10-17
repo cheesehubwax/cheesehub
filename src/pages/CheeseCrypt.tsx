@@ -10,13 +10,15 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
-import { ChevronDown, RefreshCw } from 'lucide-react';
+import { ChevronDown, Pencil, RefreshCw } from 'lucide-react';
 import { useWax } from '@/context/WaxContext';
 import { useWaxTransaction } from '@/hooks/useWaxTransaction';
 import { useToast } from '@/hooks/use-toast';
 import { playRandomFart } from '@/lib/fartSounds';
 import { cn } from '@/lib/utils';
 import { AvatarEditor } from '@/components/crypt/AvatarEditor';
+import { FriendNameDialog } from '@/components/crypt/FriendNameDialog';
+import { cryptDisplayName, loadCryptNames, saveCryptName } from '@/lib/cryptNames';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { VaultPrompt } from '@/components/crypt/VaultPrompt';
 import { CreateGroupDialog } from '@/components/crypt/CreateGroupDialog';
@@ -97,6 +99,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [key, setKey] = useState<MessagingKey | null>(() => loadKey(account));
   const [contacts, setContacts] = useState<Record<string, string>>(() => loadContacts(account));
   const [avatars, setAvatars] = useState(() => loadContactAvatars(account));
+  const [names, setNames] = useState(() => loadCryptNames(account));
+  const [nicknames, setNicknames] = useState(() => loadCryptNames(account, 'nicknames'));
+  const [editingFriend, setEditingFriend] = useState<string | null>(null);
+  const nameFor = (id: string) => id === account ? key?.displayName ?? account : cryptDisplayName(id, names, nicknames);
   const [editingAvatar, setEditingAvatar] = useState(false);
   const [active, setActive] = useState<string | null>(null);
   const [groups, setGroups] = useState(() => loadGroups(account));
@@ -193,7 +199,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const saveFriend = async (name: string, ask: boolean) => {
     const pub = contacts[name] ?? loadContacts(account)[name];
     if (!pub) return;
-    const file: PublicKeyFile = { type: 'gpk-msg-pubkey', version: 1, account: name, publicKey: pub, ...(loadContactAvatars(account)[name] ? { avatar: loadContactAvatars(account)[name] } : {}) };
+    const file: PublicKeyFile = { type: 'gpk-msg-pubkey', version: 1, account: name, publicKey: pub, ...(loadContactAvatars(account)[name] ? { avatar: loadContactAvatars(account)[name] } : {}), ...(loadCryptNames(account)[name] ? { displayName: loadCryptNames(account)[name] } : {}) };
     try {
       let root = vault;
       if (!root || !(await vaultWritable(root, ask))) {
@@ -232,7 +238,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         saveKey(parsed); setKey(parsed); toast({ title: 'Your messaging key was loaded' });
       } else {
         if (parsed.account === account) { toast({ title: 'That is your own public key' }); return; }
-        saveContact(account, parsed.account, parsed.publicKey, parsed.avatar); setContacts(loadContacts(account)); setAvatars(loadContactAvatars(account)); setActive(parsed.account); saveFriend(parsed.account, false);
+        saveContact(account, parsed.account, parsed.publicKey, parsed.avatar, parsed.displayName ?? ''); setContacts(loadContacts(account)); setAvatars(loadContactAvatars(account)); setNames(loadCryptNames(account)); setActive(parsed.account); saveFriend(parsed.account, false);
         toast({ title: `Added ${parsed.account}` });
       }
     } catch { toast({ title: 'Not a messaging key file', variant: 'destructive' }); }
@@ -297,14 +303,17 @@ export function Messenger({ account, session }: { account: string; session: NonN
     <div className="w-full rounded-lg border border-cheese/20 bg-card/80 overflow-hidden grid md:grid-cols-[240px_1fr] h-[70dvh] min-h-[480px]">
       {fileInput}
       {backupKey && <VaultPrompt cryptKey={backupKey} onSaved={backupSaved} onDownload={backupDownloaded} />}
-      {creatingGroup && <CreateGroupDialog contacts={contacts} avatars={avatars} onClose={() => setCreatingGroup(false)} onCreate={members => {
+      {creatingGroup && <CreateGroupDialog contacts={contacts} avatars={avatars} nameFor={nameFor} onClose={() => setCreatingGroup(false)} onCreate={members => {
         const group = createGroup(account, members);
         const updated = mergeGroups(groups, [group]); saveGroups(account, updated); setGroups(updated);
         setActive(`group:${group.id}`); setCreatingGroup(false); setText('');
       }} />}
-      {editingAvatar && <AvatarEditor account={account} avatar={key.avatar} onClose={() => setEditingAvatar(false)} onSave={avatar => {
-        const updated = { ...key, avatar }; saveKey(updated); setKey(updated); setEditingAvatar(false);
-        toast({ title: 'Avatar saved', description: 'Share your updated public key file so contacts can see it. Publishing your key does not share the avatar.' });
+      {editingFriend && <FriendNameDialog account={editingFriend} nickname={nicknames[editingFriend]} sharedName={names[editingFriend]} onClose={() => setEditingFriend(null)} onSave={name => {
+        saveCryptName(account, editingFriend, name, 'nicknames'); setNicknames(loadCryptNames(account, 'nicknames')); setEditingFriend(null);
+      }} />}
+      {editingAvatar && <AvatarEditor account={account} avatar={key.avatar} displayName={key.displayName} onClose={() => setEditingAvatar(false)} onSave={() => {}} onSaveProfile={(avatar, displayName) => {
+        const updated = { ...key, avatar, displayName }; saveKey(updated); setKey(updated); setEditingAvatar(false);
+        toast({ title: 'Profile saved', description: 'Share your updated public key file so friends can see your name and avatar. Refresh your private backup too.' });
       }} />}
       <aside className="border-b md:border-b-0 md:border-r border-border flex flex-col min-h-0">
         <div className="p-3 space-y-2 border-b border-border">
@@ -317,7 +326,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm" variant="outline" className="flex-1 justify-between">
-                  <PixelAvatar account={account} avatar={key.avatar} className="h-6 w-6" /> Your key <ChevronDown className="h-4 w-4 opacity-70" />
+                  <PixelAvatar account={account} avatar={key.avatar} className="h-6 w-6 shrink-0" /> <span className="truncate">{key.displayName ?? 'Your key'}</span> <ChevronDown className="h-4 w-4 opacity-70 shrink-0" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-72">
@@ -326,7 +335,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                   <span className="block text-[11px] font-normal text-muted-foreground break-all">{key.publicKey}</span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => setEditingAvatar(true)}>🎨 Edit avatar</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setEditingAvatar(true)}>🎨 Edit profile</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => download(`${account}-cheesecrypt-public.json`, toPublicFile(key))}>Share public key</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => download(`${account}-cheesecrypt-key-PRIVATE.json`, key)}>Back up private key</DropdownMenuItem>
                 <DropdownMenuItem disabled={busy} onSelect={publish}>Publish to chain ({MESSAGE_FEE_QUANTITY} nulled)</DropdownMenuItem>
@@ -348,7 +357,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
           {groups.map(g => <li key={g.id}>
             <Button variant="ghost" onClick={() => setActive(`group:${g.id}`)} className={cn('w-full h-auto justify-start text-left px-3 py-2', active === `group:${g.id}` && 'bg-cheese/15 text-cheese')}>
               <span className="min-w-0"><span className="block text-sm">Group · {g.members.length} people</span>
-                <span className="block text-[10px] text-muted-foreground whitespace-normal break-words">{g.members.filter(m => m !== account).join(', ')}</span></span>
+                <span className="block text-[10px] text-muted-foreground whitespace-normal break-words">{g.members.filter(m => m !== account).map(nameFor).join(', ')}</span></span>
             </Button>
           </li>)}
           {!groups.length && <li className="text-xs text-muted-foreground px-2 pb-1">No groups yet.</li>}
@@ -361,7 +370,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 className={cn('w-full h-auto justify-start gap-2 text-left rounded-md px-3 py-2 text-sm transition-colors',
                   active === p ? 'bg-cheese/15 text-cheese font-semibold' : 'hover:bg-muted')}>
                 <PixelAvatar account={p} avatar={avatars[p]} />
-                <span className="min-w-0"><span className="block truncate">{p}</span>
+                <span className="min-w-0"><span className="block truncate">{nameFor(p)}</span>
+                {nameFor(p) !== p && <span className="block text-[10px] text-muted-foreground truncate">{p}</span>}
                 <span className="block text-[10px] text-muted-foreground">
                   {!contacts[p] ? 'no key yet' : lastAt[p] ? new Date(lastAt[p]).toLocaleDateString() : 'no messages'}
                 </span></span>
@@ -379,8 +389,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
           <>
             <div className="px-4 py-3 border-b border-border font-semibold flex flex-wrap items-center gap-2">
               {activeGroup ? activeGroup.members.map(member => <span key={member} className="flex items-center gap-1 text-xs min-w-0">
-                <PixelAvatar account={member} avatar={member === account ? key.avatar : avatars[member]} className="h-6 w-6" /><span className="break-all">{member === account ? `${member} (you)` : member}</span>
-              </span>) : <><PixelAvatar account={active} avatar={avatars[active]} /><span className="break-all">{active}</span></>}
+                <PixelAvatar account={member} avatar={member === account ? key.avatar : avatars[member]} className="h-6 w-6 shrink-0" /><span className="break-words">{nameFor(member)}{member === account && ' (you)'}{nameFor(member) !== member && <span className="block text-[10px] text-muted-foreground">{member}</span>}</span>
+                {member !== account && <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" aria-label={`Edit nickname for ${member}`} title={`Edit nickname for ${member}`} onClick={() => setEditingFriend(member)}><Pencil className="h-3 w-3" /></Button>}
+              </span>) : <><PixelAvatar account={active} avatar={avatars[active]} /><span className="min-w-0 break-words">{nameFor(active)}{nameFor(active) !== active && <span className="block text-xs text-muted-foreground">{active}</span>}</span><Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label={`Edit nickname for ${active}`} title={`Edit nickname for ${active}`} onClick={() => setEditingFriend(active)}><Pencil className="h-3 w-3" /></Button></>}
               {!activeGroup && contacts[active] && <Button size="sm" variant="ghost" className="ml-auto h-7 text-xs font-normal" onClick={() => saveFriend(active, true)}>💾 Save to {FRIENDS_DIR}</Button>}</div>
             <ol className="flex-1 overflow-y-auto space-y-2 p-4">
               {thread.map((m) => (
@@ -389,7 +400,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                     m.from === account ? 'ml-auto bg-cheese/20 border border-cheese/30' : 'bg-muted')}>
                   <div className={cn('flex items-center gap-2 mb-1', m.from === account && 'flex-row-reverse')}>
                     <PixelAvatar account={m.from} avatar={m.from === account ? key.avatar : avatars[m.from]} className="h-6 w-6" />
-                    <p className="text-[10px] font-semibold opacity-80">{m.from === account ? `you · ${account}` : m.from}</p>
+                    <p className="text-[10px] font-semibold opacity-80 break-words">{m.from === account ? `you · ${nameFor(account)}` : nameFor(m.from)}{nameFor(m.from) !== m.from && <span className="block font-normal">{m.from}</span>}</p>
                   </div>
                   <p className="whitespace-pre-wrap break-words">
                     {m.text ?? <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
@@ -403,14 +414,14 @@ export function Messenger({ account, session }: { account: string; session: NonN
                   </p>
                 </li>
               ))}
-              {!thread.length && <li className="text-sm text-muted-foreground">{activeGroup ? 'No group messages yet.' : `No messages with ${active} yet.`}</li>}
+              {!thread.length && <li className="text-sm text-muted-foreground">{activeGroup ? 'No group messages yet.' : `No messages with ${nameFor(active)} yet.`}</li>}
               <li ref={endRef} aria-hidden />
             </ol>
             {missingKeys.length ? (
               <p className="text-sm text-muted-foreground p-4 border-t border-border">Public keys needed: {missingKeys.join(', ')}. Add them by name or load their public files.</p>
             ) : (
               <div className="space-y-2 p-4 border-t border-border">
-                <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder={activeGroup ? 'Message group' : `Message ${active}`} />
+                <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder={activeGroup ? 'Message group' : `Message ${nameFor(active)}`} />
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                   <span className={tooLong ? 'text-destructive' : 'text-muted-foreground'}>
                     {bytes}/{maxBytes} · {parts || 1} part{parts > 1 ? 's' : ''}{activeGroup && ` × ${copies} recipients`}
