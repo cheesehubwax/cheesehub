@@ -15,6 +15,7 @@ vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import
 
 beforeEach(() => {
   localStorage.clear(); vi.clearAllMocks();
+  Element.prototype.scrollIntoView = vi.fn();
   saveKey(generateKey('alice'));
   saveContact('alice', 'bob', generateKey('bob').publicKey);
   saveContact('alice', 'carol', generateKey('carol').publicKey);
@@ -31,7 +32,7 @@ describe('group creation and signing gate', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
     expect(loadGroups('alice')[0].members).toEqual(['alice', 'bob', 'carol']);
     fireEvent.change(screen.getByPlaceholderText('Message group'), { target: { value: 'hello group' } });
-    const send = screen.getByRole('button', { name: 'Send', exact: true });
+    const send = screen.getByRole('button', { name: /^Send$/ });
     expect(send).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(send);
