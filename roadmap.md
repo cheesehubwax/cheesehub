@@ -1,6 +1,6 @@
 # CHEESEHub roadmap
 
-- [ ] CHEESECrypt: one nulled fee per group-message part, recipient payments unchanged; update totals, guide and pricing regression tests.
+- [x] CHEESECrypt: one nulled fee per group-message part, recipient payments unchanged; composer/history current-rate totals, guide and 20 passing regression/compatibility tests. Real WAX signing remains gated on connected wallets below.
 
 - [x] CHEESECrypt: matching heading About button, simple guide and clickable accurate cryptography details.
 
