@@ -22,6 +22,7 @@ import { cryptDisplayName, loadCryptNames, saveCryptName } from '@/lib/cryptName
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { VaultPrompt } from '@/components/crypt/VaultPrompt';
 import { CreateGroupDialog } from '@/components/crypt/CreateGroupDialog';
+import { ShareKeyDialog } from '@/components/crypt/ShareKeyDialog';
 import { CryptAbout } from '@/components/crypt/CryptAbout';
 import { buildGroupMessageActions, createGroup, decodeConversations, groupMessageCost, groupMessageSize, loadGroups, mergeGroups, saveGroups } from '@/lib/cryptGroups';
 import {
