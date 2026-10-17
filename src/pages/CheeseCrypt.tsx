@@ -106,6 +106,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const nameFor = (id: string) => id === account ? key?.displayName ?? account : cryptDisplayName(id, names, nicknames);
   const [editingAvatar, setEditingAvatar] = useState(false);
   const [settingUpProfile, setSettingUpProfile] = useState(false);
+  const [showSharePrompt, setShowSharePrompt] = useState(false);
   const [active, setActive] = useState<string | null>(null);
   const [groups, setGroups] = useState(() => loadGroups(account));
   const [creatingGroup, setCreatingGroup] = useState(false);
@@ -324,10 +325,14 @@ export function Messenger({ account, session }: { account: string; session: NonN
       {editingFriend && <FriendNameDialog account={editingFriend} nickname={nicknames[editingFriend]} sharedName={names[editingFriend]} onClose={() => setEditingFriend(null)} onSave={name => {
         saveCryptName(account, editingFriend, name, 'nicknames'); setNicknames(loadCryptNames(account, 'nicknames')); setEditingFriend(null);
       }} />}
-      {editingAvatar && <AvatarEditor account={account} avatar={key.avatar} displayName={key.displayName} initialSetup={settingUpProfile} onClose={() => { setEditingAvatar(false); setSettingUpProfile(false); }} onSave={() => {}} onSaveProfile={(avatar, displayName) => {
-        const updated = { ...key, avatar, displayName }; saveKey(updated); setKey(updated); setEditingAvatar(false); setSettingUpProfile(false);
-        toast({ title: 'Profile saved', description: 'Share your updated public key file so friends can see your name and avatar. Refresh your private backup too.' });
+      {editingAvatar && <AvatarEditor account={account} avatar={key.avatar} displayName={key.displayName} initialSetup={settingUpProfile} onClose={() => { setEditingAvatar(false); if (settingUpProfile) { setSettingUpProfile(false); setShowSharePrompt(true); } }} onSave={() => {}} onSaveProfile={(avatar, displayName) => {
+        const updated = { ...key, avatar, displayName }; saveKey(updated); setKey(updated); setEditingAvatar(false);
+        if (settingUpProfile) { setSettingUpProfile(false); setShowSharePrompt(true); }
+        else toast({ title: 'Profile saved', description: 'Share your updated public key file so friends can see your name and avatar. Refresh your private backup too.' });
       }} />}
+      {showSharePrompt && key && <ShareKeyDialog account={account} busy={busy} onClose={() => setShowSharePrompt(false)}
+        onDownload={() => { download(`${account}-cheesecrypt-public.json`, toPublicFile(key)); setShowSharePrompt(false); }}
+        onPublish={async () => { await publish(); setShowSharePrompt(false); }} />}
       <aside className="border-b md:border-b-0 md:border-r border-border flex flex-col min-h-0">
         <div className="p-3 space-y-2 border-b border-border">
           <div className="flex gap-2">
