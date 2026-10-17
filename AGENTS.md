@@ -28,6 +28,8 @@
 
 - CHEESECrypt keeps the original collection-manager wire formats (GPKM1:/GPKMKEY1: memos, gpk-msg-key files) so existing messages, published keys and backups stay readable.
 
+- CHEESECrypt's guide composes the shared DappAbout shell with a separate cryptography dialog; introductions accept ReactNode so inline detail triggers do not duplicate the shared presentation.
+
 - CHEESECrypt group envelopes live inside legacy pairwise encryption; immutable validated membership is discovered only after authenticated full assembly, and assembly isolates transactions/recipients before deduplicating sender fanout so separate copies cannot corrupt each other.
 
 - CHEESECrypt avatars are validated palette-index data in optional key-file fields and separate per-account contact storage; imports rasterize locally, and on-chain key memos stay unchanged to preserve compatibility and avoid executable or remote avatar payloads.

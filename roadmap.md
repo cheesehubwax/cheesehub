@@ -1,5 +1,7 @@
 # CHEESEHub roadmap
 
+- [x] CHEESECrypt: matching heading About button, simple guide and clickable accurate cryptography details.
+
 - [x] CHEESECrypt: ad-hoc groups, encrypted recipient copies, automatic discovery, participant display and compatibility tests (29 tests passed).
 - [ ] CHEESECrypt: verify group send/reply and recipient read-back on WAX — requires connected wallets and signing approval; local creation/signing gate and encrypted fanout round-trips tested.
 
