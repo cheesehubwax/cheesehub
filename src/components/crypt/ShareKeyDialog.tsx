@@ -31,10 +31,10 @@ export const ShareKeyDialog = ({ account, busy, agreed, onAgreedChange, onDownlo
         <div className="rounded-lg border border-cheese/40 bg-card/80 p-3 space-y-2">
           <p className="text-sm font-semibold">1. Share it with your friends directly <span className="text-cheese">(Recommended)</span></p>
           <p className="text-xs text-muted-foreground">
-            Download your public key file and send it to your friends — and ask for theirs in return. Nothing is posted publicly.
+            Save your public key file — it goes into your cheesecrypt "my private key" folder, beside your private key — then send it to your friends and ask for theirs in return. Nothing is posted publicly.
           </p>
           <Button size="sm" className="w-full bg-cheese text-primary-foreground hover:bg-cheese/90" onClick={onDownload}>
-            Download public key file
+            Save public key file
           </Button>
         </div>
         <div className="rounded-lg border border-border bg-card/80 p-3 space-y-2">

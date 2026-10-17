@@ -99,3 +99,24 @@ describe('shared friends folder', () => {
     expect(files.map(f => [f.account, f.displayName])).toEqual([['bob', 'Bobby']]);
   });
 });
+
+describe('own public key', () => {
+  it('saves into "my private key" beside the private key, refreshes it, and never touches friends/', async () => {
+    const { writeOwnPublicKey } = await import('@/lib/cryptVault');
+    const root = await prepareVault(fakeDir('cheesecrypt'));
+    await writePrivateKey(root, key);
+    await writeOwnPublicKey(root, { type: 'gpk-msg-pubkey', version: 1, account: 'alice', publicKey: 'p' });
+    await writeOwnPublicKey(root, { type: 'gpk-msg-pubkey', version: 1, account: 'alice', publicKey: 'p', displayName: 'Al' });
+    const priv = (await root.getDirectoryHandle('my private key')) as ReturnType<typeof fakeDir>;
+    const friends = (await root.getDirectoryHandle('friends')) as ReturnType<typeof fakeDir>;
+    expect([...priv.files.keys()].sort()).toEqual(['alice-cheesecrypt-key-PRIVATE.json', 'alice-cheesecrypt-public.json']);
+    expect(JSON.parse(priv.files.get('alice-cheesecrypt-public.json')!)).not.toHaveProperty('secretKey');
+    expect(JSON.parse(priv.files.get('alice-cheesecrypt-public.json')!).displayName).toBe('Al');
+    expect(friends.files.size).toBe(0);
+  });
+  it('refuses to write a private key as the public file', async () => {
+    const { writeOwnPublicKey } = await import('@/lib/cryptVault');
+    const root = await prepareVault(fakeDir('cheesecrypt'));
+    await expect(writeOwnPublicKey(root, key as never)).rejects.toThrow();
+  });
+});
