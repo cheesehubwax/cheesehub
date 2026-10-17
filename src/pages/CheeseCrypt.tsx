@@ -18,6 +18,12 @@ import { playRandomFart } from '@/lib/fartSounds';
 import { cn } from '@/lib/utils';
 import { AvatarEditor } from '@/components/crypt/AvatarEditor';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
+import { VaultPrompt } from '@/components/crypt/VaultPrompt';
+import {
+  DirHandle, FRIENDS_DIR, PRIVATE_DIR, VAULT_DIR, VaultFileExistsError, friendKeyName, pickVault, privateKeyName,
+  recallVault, rememberVault, vaultSupported, vaultWritable, writeFriendKey,
+} from '@/lib/cryptVault';
+import type { PublicKeyFile } from '@/lib/cheeseCrypt';
 import {
   ChainMemo, MAX_PLAINTEXT_BYTES, MESSAGE_FEE_QUANTITY, MESSAGE_RECIPIENT_QUANTITY, MESSAGE_TOTAL_QUANTITY, MessagingKey,
   MAX_MESSAGE_BYTES, MAX_PARTS, PART_BODY_BYTES, assembleMessages, messageCost, partCount, splitMessage,
@@ -96,6 +102,9 @@ function Messenger({ account, session }: { account: string; session: NonNullable
   const [agreed, setAgreed] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLLIElement>(null);
+  const [backupKey, setBackupKey] = useState<MessagingKey | null>(null);
+  const [vault, setVault] = useState<DirHandle | null>(null);
+  useEffect(() => { recallVault(account).then(setVault); }, [account]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -132,8 +141,40 @@ function Messenger({ account, session }: { account: string; session: NonNullable
     if (key && !confirm('Replace your existing key? Messages encrypted with the old key can no longer be read unless you kept its file.')) return;
     const k = generateKey(account);
     saveKey(k); setKey(k);
-    download(`${account}-cheesecrypt-key-PRIVATE.json`, k);
+    setBackupKey(k); // one-time prompt to save it into Desktop/cheesecrypt/my private key/
+  };
+
+  const backupDownloaded = () => {
+    if (!backupKey) return;
+    download(privateKeyName(account), backupKey);
+    setBackupKey(null);
     toast({ title: 'Messaging key created', description: 'A private backup file was downloaded. Keep it safe and never share it.' });
+  };
+
+  const backupSaved = (root: DirHandle) => {
+    setBackupKey(null); setVault(root);
+    rememberVault(account, root).catch(() => {});
+    toast({ title: 'Key saved', description: `Saved in ${VAULT_DIR}/${PRIVATE_DIR}. Never share this file.` });
+  };
+
+  const saveFriend = async (name: string, ask: boolean) => {
+    const pub = contacts[name] ?? loadContacts(account)[name];
+    if (!pub) return;
+    const file: PublicKeyFile = { type: 'gpk-msg-pubkey', version: 1, account: name, publicKey: pub, ...(avatars[name] ? { avatar: avatars[name] } : {}) };
+    try {
+      let root = vault;
+      if (!root || !(await vaultWritable(root, ask))) {
+        if (!ask) return;
+        if (!vaultSupported()) { download(friendKeyName(name), file); return; }
+        root = await pickVault(); setVault(root); rememberVault(account, root).catch(() => {});
+      }
+      await writeFriendKey(root, file);
+      toast({ title: `Saved ${name}'s key`, description: `In ${VAULT_DIR}/${FRIENDS_DIR}` });
+    } catch (e) {
+      if (!ask || (e as DOMException)?.name === 'AbortError') return;
+      if (e instanceof VaultFileExistsError) toast({ title: `${name}'s key is already in ${FRIENDS_DIR}`, description: 'The existing file was left untouched.' });
+      else toast({ title: 'Could not save to the friends folder', variant: 'destructive' });
+    }
   };
 
   const addContact = async () => {
