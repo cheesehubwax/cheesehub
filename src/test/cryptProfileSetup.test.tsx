@@ -71,7 +71,7 @@ describe('profile-first key setup', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: action })); });
     fireEvent.click(screen.getByRole('button', { name: 'Save backup' }));
     expect(await screen.findByText('📣 Share your public key')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Download public key file' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save public key file' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Publish my key on chain' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Maybe later' }));
     await waitFor(() => expect(screen.queryByText('📣 Share your public key')).not.toBeInTheDocument());
