@@ -1,5 +1,7 @@
 # CHEESEHub roadmap
 
+- [x] CHEESECrypt: correct Desktop folder-selection guidance and permission-error recovery; actual OS folder picker requires user verification.
+
 - [x] CHEESECrypt: pixel avatar editor, image/NFT import, key-file sharing and conversation thumbnails; paint/upload/save/read-back checked in browser and 16 compatibility tests passed.
 - [ ] CHEESECrypt: verify owned-NFT selection and avatar sharing inside a real conversation — requires a connected WAX wallet.
 
