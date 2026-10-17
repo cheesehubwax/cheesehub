@@ -10,7 +10,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
-import { ChevronDown, Pencil, RefreshCw } from 'lucide-react';
+import { ChevronDown, Pencil, RefreshCw, Trash2 } from 'lucide-react';
 import { useWax } from '@/context/WaxContext';
 import { useWaxTransaction } from '@/hooks/useWaxTransaction';
 import { useToast } from '@/hooks/use-toast';
@@ -33,7 +33,7 @@ import {
   ChainMemo, MAX_PLAINTEXT_BYTES, MESSAGE_FEE_QUANTITY, MESSAGE_RECIPIENT_QUANTITY, MESSAGE_TOTAL_QUANTITY, MessagingKey,
   MAX_MESSAGE_BYTES, MAX_PARTS, PART_BODY_BYTES, messageCost, partCount, splitMessage,
   buildPublishKeyActions, buildSendMessageActions, encryptMemo, fetchMessages, generateKey,
-  loadContacts, loadContactAvatars, loadKey, lookupPublishedKey, parseKeyFile, plaintextBytes, saveContact, saveKey, toPublicFile,
+  loadContacts, loadContactAvatars, loadKey, loadRemovedContacts, removeContact, lookupPublishedKey, parseKeyFile, plaintextBytes, saveContact, saveKey, toPublicFile,
 } from '@/lib/cheeseCrypt';
 
 const ACCOUNT_RE = /^[a-z1-5.]{1,12}$/;
@@ -98,6 +98,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const permission = session.permissionLevel;
   const [key, setKey] = useState<MessagingKey | null>(() => loadKey(account));
   const [contacts, setContacts] = useState<Record<string, string>>(() => loadContacts(account));
+  const [removedContacts, setRemovedContacts] = useState(() => loadRemovedContacts(account));
   const [avatars, setAvatars] = useState(() => loadContactAvatars(account));
   const [names, setNames] = useState(() => loadCryptNames(account));
   const [nicknames, setNicknames] = useState(() => loadCryptNames(account, 'nicknames'));
@@ -131,8 +132,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const partners = useMemo(() => {
     const s = new Set(Object.keys(contacts));
     memos.forEach((m) => s.add(m.from === account ? m.to : m.from));
-    return [...s].sort();
-  }, [contacts, memos, account]);
+    return [...s].filter(name => !removedContacts.includes(name)).sort();
+  }, [contacts, memos, account, removedContacts]);
 
   const lastAt = useMemo(() => {
     const out: Record<string, number> = {};
@@ -155,10 +156,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
     groups.forEach(g => g.members.forEach(m => { if (m !== account) names.add(m); }));
     const discover = async () => {
       for (const name of names) {
-        if (contacts[name] || !ACCOUNT_RE.test(name) || cancelled) continue;
+        if (contacts[name] || loadRemovedContacts(account).includes(name) || !ACCOUNT_RE.test(name) || cancelled) continue;
         try {
           const pub = await lookupPublishedKey(name);
-          if (pub && !cancelled && !loadContacts(account)[name]) {
+          if (pub && !cancelled && !loadContacts(account)[name] && !loadRemovedContacts(account).includes(name)) {
             saveContact(account, name, pub); setContacts(loadContacts(account));
           }
         } catch { /* A friend’s public key file remains the fallback. */ }
@@ -223,10 +224,19 @@ export function Messenger({ account, session }: { account: string; session: NonN
     try {
       const pub = await lookupPublishedKey(name);
       if (!pub) { toast({ title: `${name} has not published a key`, description: 'Ask them for their public key file and load it here.' }); return; }
-      saveContact(account, name, pub); setContacts(loadContacts(account)); setActive(name); setNewContact(''); saveFriend(name, false);
+      saveContact(account, name, pub); setContacts(loadContacts(account)); setRemovedContacts(loadRemovedContacts(account)); setActive(name); setNewContact(''); saveFriend(name, false);
       toast({ title: `Found ${name}'s key` });
     } catch { toast({ title: 'Key lookup failed', variant: 'destructive' }); }
     finally { setBusy(false); }
+  };
+
+  const removeFriend = (name: string) => {
+    removeContact(account, name);
+    setContacts(loadContacts(account)); setRemovedContacts(loadRemovedContacts(account));
+    setAvatars(loadContactAvatars(account)); setNames(loadCryptNames(account)); setNicknames(loadCryptNames(account, 'nicknames'));
+    if (active === name) { setActive(null); setText(''); }
+    if (editingFriend === name) setEditingFriend(null);
+    toast({ title: 'Friend removed', description: 'Saved public key, name, nickname and avatar cleared from this browser. Messages and downloaded files are unchanged.' });
   };
 
   const onFile = async (f: File) => {
@@ -238,7 +248,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         saveKey(parsed); setKey(parsed); toast({ title: 'Your messaging key was loaded' });
       } else {
         if (parsed.account === account) { toast({ title: 'That is your own public key' }); return; }
-        saveContact(account, parsed.account, parsed.publicKey, parsed.avatar, parsed.displayName ?? ''); setContacts(loadContacts(account)); setAvatars(loadContactAvatars(account)); setNames(loadCryptNames(account)); setActive(parsed.account); saveFriend(parsed.account, false);
+        saveContact(account, parsed.account, parsed.publicKey, parsed.avatar, parsed.displayName ?? ''); setContacts(loadContacts(account)); setRemovedContacts(loadRemovedContacts(account)); setAvatars(loadContactAvatars(account)); setNames(loadCryptNames(account)); setActive(parsed.account); saveFriend(parsed.account, false);
         toast({ title: `Added ${parsed.account}` });
       }
     } catch { toast({ title: 'Not a messaging key file', variant: 'destructive' }); }
@@ -365,17 +375,20 @@ export function Messenger({ account, session }: { account: string; session: NonN
             <span className="block px-2 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">🤝 Friends</span>
           </li>
           {partners.map((p) => (
-            <li key={p}>
+            <li key={p} className="group flex items-center gap-1">
               <Button variant="ghost" onClick={() => setActive(p)}
-                className={cn('w-full h-auto justify-start gap-2 text-left rounded-md px-3 py-2 text-sm transition-colors',
+                className={cn('flex-1 min-w-0 h-auto justify-start gap-2 text-left rounded-md px-3 py-2 text-sm transition-colors',
                   active === p ? 'bg-cheese/15 text-cheese font-semibold' : 'hover:bg-muted')}>
                 <PixelAvatar account={p} avatar={avatars[p]} />
-                <span className="min-w-0"><span className="block truncate">{nameFor(p)}</span>
+                <span className="min-w-0 flex-1"><span className="block truncate">{nameFor(p)}</span>
                 {nameFor(p) !== p && <span className="block text-[10px] text-muted-foreground truncate">{p}</span>}
                 <span className="block text-[10px] text-muted-foreground">
                   {!contacts[p] ? 'no key yet' : lastAt[p] ? new Date(lastAt[p]).toLocaleDateString() : 'no messages'}
                 </span></span>
               </Button>
+              <Button variant="ghost" size="icon" aria-label={`Remove friend ${p}`} title={`Remove friend ${p}`}
+                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 focus-visible:opacity-100 transition-opacity"
+                onClick={() => removeFriend(p)}><Trash2 className="h-3.5 w-3.5" /></Button>
             </li>
           ))}
           {!partners.length && <li className="text-xs text-muted-foreground px-2 pb-2">{loading ? 'Loading…' : 'No conversations yet. Add a WAX account above.'}</li>}

@@ -1,4 +1,5 @@
 # CHEESEHub roadmap
+- [ ] CHEESECrypt: friend removal clears browser details and persists through history refresh until explicit re-add; verify regression checks.
 - [x] CHEESECrypt: profile names in key files, private friend nicknames, consistent conversation labels; 38 regression tests passed and isolated Chrome profile/nickname saving checked. Real-wallet contact sharing still needs connected wallets.
 
 - [x] CHEESECrypt: one nulled fee per group-message part, recipient payments unchanged; composer/history current-rate totals, guide and 20 passing regression/compatibility tests. Real WAX signing remains gated on connected wallets below.

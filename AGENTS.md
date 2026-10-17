@@ -27,7 +27,7 @@
 - CHEESERam history before live sampling is rebuilt from Hyperion `eosio::rammarket` table deltas (exact Bancor state, EOSDAC nodes only) into the same 12h slots; backfill never alters an existing sample and leaves CHEESE fields null before CHEESE history exists (2024-01-28); from then each record takes its UTC day's CHEESE close from cheese-usd-history.json and live samples are never re-priced.
 
 - CHEESECrypt keeps the original collection-manager wire formats (GPKM1:/GPKMKEY1: memos, gpk-msg-key files) so existing messages, published keys and backups stay readable.
-- CHEESECrypt display names are validated optional key-file metadata, with imported names and private nicknames stored separately per owner; all cryptographic, group and transaction identities stay WAX accounts so renaming cannot redirect delivery.
+- CHEESECrypt names are validated optional key-file metadata, separate from per-owner nicknames; WAX accounts remain delivery identities. Friend removal clears contact metadata and excludes rediscovery until explicit re-add, preserving history and groups.
 
 - CHEESECrypt's guide composes the shared DappAbout shell with a separate cryptography dialog; introductions accept ReactNode so inline detail triggers do not duplicate the shared presentation.
 
