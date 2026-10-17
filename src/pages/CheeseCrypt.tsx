@@ -160,7 +160,7 @@ function Messenger({ account, session }: { account: string; session: NonNullable
   const saveFriend = async (name: string, ask: boolean) => {
     const pub = contacts[name] ?? loadContacts(account)[name];
     if (!pub) return;
-    const file: PublicKeyFile = { type: 'gpk-msg-pubkey', version: 1, account: name, publicKey: pub, ...(avatars[name] ? { avatar: avatars[name] } : {}) };
+    const file: PublicKeyFile = { type: 'gpk-msg-pubkey', version: 1, account: name, publicKey: pub, ...(loadContactAvatars(account)[name] ? { avatar: loadContactAvatars(account)[name] } : {}) };
     try {
       let root = vault;
       if (!root || !(await vaultWritable(root, ask))) {
@@ -184,7 +184,7 @@ function Messenger({ account, session }: { account: string; session: NonNullable
     try {
       const pub = await lookupPublishedKey(name);
       if (!pub) { toast({ title: `${name} has not published a key`, description: 'Ask them for their public key file and load it here.' }); return; }
-      saveContact(account, name, pub); setContacts(loadContacts(account)); setActive(name); setNewContact('');
+      saveContact(account, name, pub); setContacts(loadContacts(account)); setActive(name); setNewContact(''); saveFriend(name, false);
       toast({ title: `Found ${name}'s key` });
     } catch { toast({ title: 'Key lookup failed', variant: 'destructive' }); }
     finally { setBusy(false); }
@@ -199,7 +199,7 @@ function Messenger({ account, session }: { account: string; session: NonNullable
         saveKey(parsed); setKey(parsed); toast({ title: 'Your messaging key was loaded' });
       } else {
         if (parsed.account === account) { toast({ title: 'That is your own public key' }); return; }
-        saveContact(account, parsed.account, parsed.publicKey, parsed.avatar); setContacts(loadContacts(account)); setAvatars(loadContactAvatars(account)); setActive(parsed.account);
+        saveContact(account, parsed.account, parsed.publicKey, parsed.avatar); setContacts(loadContacts(account)); setAvatars(loadContactAvatars(account)); setActive(parsed.account); saveFriend(parsed.account, false);
         toast({ title: `Added ${parsed.account}` });
       }
     } catch { toast({ title: 'Not a messaging key file', variant: 'destructive' }); }
@@ -260,6 +260,7 @@ function Messenger({ account, session }: { account: string; session: NonNullable
   return (
     <div className="w-full rounded-lg border border-cheese/20 bg-card/80 overflow-hidden grid md:grid-cols-[240px_1fr] h-[70dvh] min-h-[480px]">
       {fileInput}
+      {backupKey && <VaultPrompt cryptKey={backupKey} onSaved={backupSaved} onDownload={backupDownloaded} />}
       {editingAvatar && <AvatarEditor account={account} avatar={key.avatar} onClose={() => setEditingAvatar(false)} onSave={avatar => {
         const updated = { ...key, avatar }; saveKey(updated); setKey(updated); setEditingAvatar(false);
         toast({ title: 'Avatar saved', description: 'Share your updated public key file so contacts can see it. Publishing your key does not share the avatar.' });
@@ -321,7 +322,8 @@ function Messenger({ account, session }: { account: string; session: NonNullable
           <p className="text-sm text-muted-foreground m-auto">💬 Pick or add a contact.</p>
         ) : (
           <>
-            <div className="px-4 py-3 border-b border-border font-semibold flex items-center gap-2"><PixelAvatar account={active} avatar={avatars[active]} />{active}</div>
+            <div className="px-4 py-3 border-b border-border font-semibold flex items-center gap-2"><PixelAvatar account={active} avatar={avatars[active]} />{active}
+              {contacts[active] && <Button size="sm" variant="ghost" className="ml-auto h-7 text-xs font-normal" onClick={() => saveFriend(active, true)}>💾 Save to {FRIENDS_DIR}</Button>}</div>
             <ol className="flex-1 overflow-y-auto space-y-2 p-4">
               {thread.map((m) => (
                 <li key={m.key}
