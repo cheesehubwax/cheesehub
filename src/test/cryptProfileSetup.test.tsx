@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Session } from '@wharfkit/session';
 import { loadKey } from '@/lib/cheeseCrypt';
@@ -6,6 +6,7 @@ import { accountAvatar } from '@/lib/cryptAvatar';
 import { Messenger } from '@/pages/CheeseCrypt';
 
 vi.mock('@/hooks/useWaxTransaction', () => ({ useWaxTransaction: () => ({ executeTransaction: vi.fn() }) }));
+vi.mock('@/context/WaxContext', () => ({ useWax: vi.fn() }));
 vi.mock('@/lib/cheeseCrypt', async original => ({ ...await original<typeof import('@/lib/cheeseCrypt')>(), fetchMessages: async () => [] }));
 vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import('@/lib/cryptVault')>(), recallVault: async () => null, rememberVault: async () => {} }));
 vi.mock('@/components/crypt/VaultPrompt', () => ({ VaultPrompt: ({ onSaved, onDownload }: { onSaved: (root: unknown) => void; onDownload: () => void }) => <div><button onClick={() => onSaved({})}>Save backup</button><button onClick={onDownload}>Download backup</button></div> }));
@@ -40,7 +41,7 @@ describe('post-backup profile setup', () => {
     const original = loadKey('alice');
     fireEvent.click(screen.getByRole('button', { name: 'Save backup' }));
     fireEvent.change(await screen.findByLabelText('CHEESECrypt name'), { target: { value: 'Alice Cheese' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save profile' })); });
     expect(loadKey('alice')?.displayName).toBe('Alice Cheese');
     expect(loadKey('alice')?.avatar).toEqual(accountAvatar('alice'));
     expect(loadKey('alice')?.publicKey).toBe(original?.publicKey);
