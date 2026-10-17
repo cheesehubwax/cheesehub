@@ -1,5 +1,5 @@
 # CHEESEHub roadmap
-- [ ] CHEESECrypt: reversible group hiding, collapsible Hidden groups, persisted visibility and intact history; regression/browser checks.
+- [x] CHEESECrypt: reversible group hiding and collapsible Hidden groups; 28 tests passed, history preserved after new messages/remount, isolated Chrome hide/reload/view/restore verified.
 - [x] CHEESECrypt: profile-first key creation, backup then sharing; verified matching-key profile-only backup updates, download fallback, 57 regression tests passed. Isolated Chrome walkthrough verified initial private/public profile files, edit download and persistence; actual OS folder picker and real-wallet publishing remain unverified.
 - [x] CHEESECrypt: hover bin removes saved browser contact details and prevents history rediscovery until explicit re-add; 28 regression tests passed and isolated browser removal checked. Downloaded files and chain messages stay unchanged.
 - [x] CHEESECrypt: profile names in key files, private friend nicknames, consistent conversation labels; 38 regression tests passed and isolated Chrome profile/nickname saving checked. Real-wallet contact sharing still needs connected wallets.
