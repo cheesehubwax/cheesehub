@@ -48,4 +48,20 @@ describe('post-backup profile setup', () => {
     expect(loadKey('alice')?.publicKey).toBe(original?.publicKey);
     expect(loadKey('alice')?.secretKey).toBe(original?.secretKey);
   });
+  it.each([
+    ['Save profile', 'Alice Cheese'],
+    ['Use defaults', null],
+  ])('opens the share-key prompt after profile setup via %s', async (action, name) => {
+    render(<Messenger {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Create a new key' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save backup' }));
+    if (name) fireEvent.change(await screen.findByLabelText('CHEESECrypt name'), { target: { value: name } });
+    else await screen.findByLabelText('CHEESECrypt name');
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: action })); });
+    expect(await screen.findByText('📣 Share your public key')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Download public key file' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Publish my key on chain' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Maybe later' }));
+    await waitFor(() => expect(screen.queryByText('📣 Share your public key')).not.toBeInTheDocument());
+  });
 });
