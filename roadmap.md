@@ -1,5 +1,8 @@
 # CHEESEHub roadmap
 
+- [x] CHEESECrypt: pixel avatar editor, image/NFT import, key-file sharing and conversation thumbnails; paint/upload/save/read-back checked in browser and 16 compatibility tests passed.
+- [ ] CHEESECrypt: verify owned-NFT selection and avatar sharing inside a real conversation — requires a connected WAX wallet.
+
 - [x] Token registry: daily chain-verified metadata snapshot, cached app fallback, and simulated Alcor outage/offline tests (1,974 verified tokens).
 - [ ] Token registry activation: user must run GitHub Actions → Token Price History once after these changes reach GitHub; connected-wallet UI verification remains pending a wallet session.
 

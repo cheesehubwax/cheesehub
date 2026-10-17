@@ -38,6 +38,24 @@
 
     --radius: 0.75rem;
 
+    /* Shared pixel-art palette, persisted as indices rather than colors. */
+    --avatar-0: transparent;
+    --avatar-1: #171923;
+    --avatar-2: #f4f5f7;
+    --avatar-3: #f4bc27;
+    --avatar-4: #ed7547;
+    --avatar-5: #dc4357;
+    --avatar-6: #f18fa8;
+    --avatar-7: #994c99;
+    --avatar-8: #5558b7;
+    --avatar-9: #3882cc;
+    --avatar-10: #68c6da;
+    --avatar-11: #2e8974;
+    --avatar-12: #6eba55;
+    --avatar-13: #bccd69;
+    --avatar-14: #986950;
+    --avatar-15: #8d929f;
+
     --cheese: 45 100% 50%;
     --cheese-light: 48 100% 65%;
     --cheese-dark: 40 90% 40%;

@@ -16,11 +16,13 @@ import { useWaxTransaction } from '@/hooks/useWaxTransaction';
 import { useToast } from '@/hooks/use-toast';
 import { playRandomFart } from '@/lib/fartSounds';
 import { cn } from '@/lib/utils';
+import { AvatarEditor } from '@/components/crypt/AvatarEditor';
+import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import {
   ChainMemo, MAX_PLAINTEXT_BYTES, MESSAGE_FEE_QUANTITY, MESSAGE_RECIPIENT_QUANTITY, MESSAGE_TOTAL_QUANTITY, MessagingKey,
   MAX_MESSAGE_BYTES, MAX_PARTS, PART_BODY_BYTES, assembleMessages, messageCost, partCount, splitMessage,
   buildPublishKeyActions, buildSendMessageActions, decryptMemo, encryptMemo, fetchMessages, generateKey,
-  loadContacts, loadKey, lookupPublishedKey, parseKeyFile, plaintextBytes, saveContact, saveKey, toPublicFile,
+  loadContacts, loadContactAvatars, loadKey, lookupPublishedKey, parseKeyFile, plaintextBytes, saveContact, saveKey, toPublicFile,
 } from '@/lib/cheeseCrypt';
 
 const ACCOUNT_RE = /^[a-z1-5.]{1,12}$/;
@@ -83,6 +85,8 @@ function Messenger({ account, session }: { account: string; session: NonNullable
   const permission = session.permissionLevel;
   const [key, setKey] = useState<MessagingKey | null>(() => loadKey(account));
   const [contacts, setContacts] = useState<Record<string, string>>(() => loadContacts(account));
+  const [avatars, setAvatars] = useState(() => loadContactAvatars(account));
+  const [editingAvatar, setEditingAvatar] = useState(false);
   const [active, setActive] = useState<string | null>(null);
   const [newContact, setNewContact] = useState('');
   const [memos, setMemos] = useState<ChainMemo[]>([]);
@@ -154,7 +158,7 @@ function Messenger({ account, session }: { account: string; session: NonNullable
         saveKey(parsed); setKey(parsed); toast({ title: 'Your messaging key was loaded' });
       } else {
         if (parsed.account === account) { toast({ title: 'That is your own public key' }); return; }
-        saveContact(account, parsed.account, parsed.publicKey); setContacts(loadContacts(account)); setActive(parsed.account);
+        saveContact(account, parsed.account, parsed.publicKey, parsed.avatar); setContacts(loadContacts(account)); setAvatars(loadContactAvatars(account)); setActive(parsed.account);
         toast({ title: `Added ${parsed.account}` });
       }
     } catch { toast({ title: 'Not a messaging key file', variant: 'destructive' }); }
@@ -215,6 +219,10 @@ function Messenger({ account, session }: { account: string; session: NonNullable
   return (
     <div className="w-full rounded-lg border border-cheese/20 bg-card/80 overflow-hidden grid md:grid-cols-[240px_1fr] h-[70dvh] min-h-[480px]">
       {fileInput}
+      {editingAvatar && <AvatarEditor account={account} avatar={key.avatar} onClose={() => setEditingAvatar(false)} onSave={avatar => {
+        const updated = { ...key, avatar }; saveKey(updated); setKey(updated); setEditingAvatar(false);
+        toast({ title: 'Avatar saved', description: 'Share your updated public key file so contacts can see it. Publishing your key does not share the avatar.' });
+      }} />}
       <aside className="border-b md:border-b-0 md:border-r border-border flex flex-col min-h-0">
         <div className="p-3 space-y-2 border-b border-border">
           <div className="flex gap-2">
@@ -226,7 +234,7 @@ function Messenger({ account, session }: { account: string; session: NonNullable
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm" variant="outline" className="flex-1 justify-between">
-                  🔑 Your key <ChevronDown className="h-4 w-4 opacity-70" />
+                  <PixelAvatar account={account} avatar={key.avatar} className="h-6 w-6" /> Your key <ChevronDown className="h-4 w-4 opacity-70" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-72">
@@ -235,6 +243,7 @@ function Messenger({ account, session }: { account: string; session: NonNullable
                   <span className="block text-[11px] font-normal text-muted-foreground break-all">{key.publicKey}</span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setEditingAvatar(true)}>🎨 Edit avatar</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => download(`${account}-cheesecrypt-public.json`, toPublicFile(key))}>Share public key</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => download(`${account}-cheesecrypt-key-PRIVATE.json`, key)}>Back up private key</DropdownMenuItem>
                 <DropdownMenuItem disabled={busy} onSelect={publish}>Publish to chain ({MESSAGE_FEE_QUANTITY} nulled)</DropdownMenuItem>
@@ -251,14 +260,15 @@ function Messenger({ account, session }: { account: string; session: NonNullable
         <ul className="flex-1 overflow-y-auto p-2 space-y-1">
           {partners.map((p) => (
             <li key={p}>
-              <button onClick={() => setActive(p)}
-                className={cn('w-full text-left rounded-md px-3 py-2 text-sm transition-colors',
+              <Button variant="ghost" onClick={() => setActive(p)}
+                className={cn('w-full h-auto justify-start gap-2 text-left rounded-md px-3 py-2 text-sm transition-colors',
                   active === p ? 'bg-cheese/15 text-cheese font-semibold' : 'hover:bg-muted')}>
-                <span className="block truncate">{p}</span>
+                <PixelAvatar account={p} avatar={avatars[p]} />
+                <span className="min-w-0"><span className="block truncate">{p}</span>
                 <span className="block text-[10px] text-muted-foreground">
                   {!contacts[p] ? 'no key yet' : lastAt[p] ? new Date(lastAt[p]).toLocaleDateString() : 'no messages'}
-                </span>
-              </button>
+                </span></span>
+              </Button>
             </li>
           ))}
           {!partners.length && <li className="text-xs text-muted-foreground p-2">{loading ? 'Loading…' : 'No conversations yet. Add a WAX account above.'}</li>}
@@ -270,13 +280,16 @@ function Messenger({ account, session }: { account: string; session: NonNullable
           <p className="text-sm text-muted-foreground m-auto">💬 Pick or add a contact.</p>
         ) : (
           <>
-            <div className="px-4 py-3 border-b border-border font-semibold">{active}</div>
+            <div className="px-4 py-3 border-b border-border font-semibold flex items-center gap-2"><PixelAvatar account={active} avatar={avatars[active]} />{active}</div>
             <ol className="flex-1 overflow-y-auto space-y-2 p-4">
               {thread.map((m) => (
                 <li key={m.key}
                   className={cn('max-w-[80%] rounded-lg px-3 py-2 text-sm',
                     m.from === account ? 'ml-auto bg-cheese/20 border border-cheese/30' : 'bg-muted')}>
-                  <p className="text-[10px] font-semibold tracking-wide opacity-80">{m.from === account ? `you · ${account}` : m.from}</p>
+                  <div className={cn('flex items-center gap-2 mb-1', m.from === account && 'flex-row-reverse')}>
+                    <PixelAvatar account={m.from} avatar={m.from === account ? key.avatar : avatars[m.from]} className="h-6 w-6" />
+                    <p className="text-[10px] font-semibold opacity-80">{m.from === account ? `you · ${account}` : m.from}</p>
+                  </div>
                   <p className="whitespace-pre-wrap break-words">
                     {m.text ?? <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
                   </p>
