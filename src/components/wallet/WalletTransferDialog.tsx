@@ -419,7 +419,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                               <span className="flex items-center gap-2">
                                 <TokenLogo contract={selectedToken.contract} symbol={selectedToken.symbol} size="sm" />
                                 <span className="font-medium">{selectedToken.symbol}</span>
-                                <span className="text-muted-foreground">({selectedToken.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: selectedToken.precision })})</span>
+                                <span className="text-muted-foreground">({selectedToken.balance.toLocaleString(undefined, { minimumFractionDigits: Math.min(2, selectedToken.precision), maximumFractionDigits: selectedToken.precision })})</span>
                               </span>
                             )}
                           </SelectValue>
@@ -430,7 +430,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                               <span className="flex items-center gap-2">
                                 <TokenLogo contract={b.contract} symbol={b.symbol} size="sm" />
                                 <span className="font-medium">{b.symbol}</span>
-                                <span className="text-muted-foreground ml-1">({b.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: b.precision })})</span>
+                                <span className="text-muted-foreground ml-1">({b.balance.toLocaleString(undefined, { minimumFractionDigits: Math.min(2, b.precision), maximumFractionDigits: b.precision })})</span>
                               </span>
                             </SelectItem>
                           ))}
@@ -445,7 +445,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                         {selectedToken && (
                           <span className="text-xs text-muted-foreground flex items-center gap-1">
                             Balance: <TokenLogo contract={selectedToken.contract} symbol={selectedToken.symbol} size="sm" />
-                            <span>{selectedToken.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: selectedToken.precision })} {selectedToken.symbol}</span>
+                            <span>{selectedToken.balance.toLocaleString(undefined, { minimumFractionDigits: Math.min(2, selectedToken.precision), maximumFractionDigits: selectedToken.precision })} {selectedToken.symbol}</span>
                           </span>
                         )}
                       </div>
