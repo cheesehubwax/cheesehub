@@ -119,18 +119,108 @@ export function decryptMemo(memo: string, theirPublic: string, mySecret: string)
   } catch { return null; }
 }
 
+// ---- Multi-part messages ----
+// A long message is split into parts sent as separate memos in ONE transaction. Each part's
+// plaintext starts with a 9-byte header: \u0001 + 6-char id + part index + part count (base36).
+// Single-part messages carry no header, so they stay identical to the original wire format.
+export const PART_MARK = '\u0001';
+export const PART_HEADER_BYTES = 9;
+export const MAX_PARTS = 20;
+export const PART_BODY_BYTES = MAX_PLAINTEXT_BYTES - PART_HEADER_BYTES;
+export const MAX_MESSAGE_BYTES = PART_BODY_BYTES * MAX_PARTS;
+
+/** Split text into bodies of at most `max` UTF-8 bytes without cutting a character. */
+function splitBytes(text: string, max: number): string[] {
+  const out: string[] = [];
+  let cur = '', curLen = 0;
+  for (const ch of text) {
+    const l = utf8Len(ch);
+    if (curLen + l > max) { out.push(cur); cur = ''; curLen = 0; }
+    cur += ch; curLen += l;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+/** Number of parts (transfers) a message needs; 0 for empty text. */
+export function partCount(text: string): number {
+  if (!text) return 0;
+  if (utf8Len(text) <= MAX_PLAINTEXT_BYTES) return 1;
+  return splitBytes(text, PART_BODY_BYTES).length;
+}
+
+/** Plaintext payloads to encrypt, one per memo. */
+export function splitMessage(text: string, id = randomId()): string[] {
+  if (!text) throw new Error('Message is empty');
+  if (utf8Len(text) <= MAX_PLAINTEXT_BYTES) return [text];
+  const bodies = splitBytes(text, PART_BODY_BYTES);
+  if (bodies.length > MAX_PARTS) throw new Error(`Message is longer than ${MAX_PARTS} parts`);
+  return bodies.map((b, i) => `${PART_MARK}${id}${i.toString(36)}${bodies.length.toString(36)}${b}`);
+}
+
+function randomId(): string {
+  const b = nacl.randomBytes(6);
+  return Array.from(b, (x) => (x % 36).toString(36)).join('');
+}
+
+export interface MessagePart { id: string; index: number; total: number; body: string }
+export function parsePart(plain: string): MessagePart | null {
+  if (!plain.startsWith(PART_MARK) || plain.length < PART_HEADER_BYTES) return null;
+  const id = plain.slice(1, 7), index = parseInt(plain[7], 36), total = parseInt(plain[8], 36);
+  if (!/^[0-9a-z]{6}$/.test(id) || !(total >= 2) || !(index >= 0 && index < total)) return null;
+  return { id, index, total, body: plain.slice(PART_HEADER_BYTES) };
+}
+
+export interface DecodedMemo { txId: string; time: number; from: string; to: string; quantity: string; memo: string; text: string | null }
+export interface AssembledMessage {
+  key: string; txId: string; time: number; from: string; to: string;
+  text: string | null; parts: number; missing: number;
+}
+
+/** Join multi-part memos back into single messages (grouped by sender + part id). */
+export function assembleMessages(memos: DecodedMemo[]): AssembledMessage[] {
+  const out: AssembledMessage[] = [];
+  const groups = new Map<string, { m: DecodedMemo; p: MessagePart }[]>();
+  for (const m of memos) {
+    const p = m.text != null ? parsePart(m.text) : null;
+    if (!p) {
+      out.push({ key: m.txId + m.memo, txId: m.txId, time: m.time, from: m.from, to: m.to, text: m.text, parts: 1, missing: 0 });
+      continue;
+    }
+    const k = `${m.from}:${p.id}`;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k)!.push({ m, p });
+  }
+  for (const [k, g] of groups) {
+    const total = g[0].p.total;
+    const byIndex = new Map<number, string>();
+    g.forEach(({ p }) => { if (p.total === total && !byIndex.has(p.index)) byIndex.set(p.index, p.body); });
+    const text = Array.from({ length: total }, (_, i) => byIndex.get(i) ?? ' […] ').join('');
+    const first = g.reduce((a, b) => (b.m.time < a.m.time ? b : a)).m;
+    out.push({ key: k, txId: first.txId, time: first.time, from: first.from, to: first.to, text, parts: total, missing: total - byIndex.size });
+  }
+  return out.sort((a, b) => a.time - b.time);
+}
+
+/** Total CHEESE for a message of `parts` parts (each part pays the full per-message price). */
+export function messageCost(parts: number): string {
+  const units = Math.round(parseFloat(MESSAGE_TOTAL_QUANTITY) * 10000) * parts;
+  return `${(units / 10000).toFixed(4)} CHEESE`;
+}
+
 export const keyMemo = (publicKey: string) => `${KEY_PREFIX}${publicKey}`;
 
 function cheeseTransfer(from: string, to: string, quantity: string, memo: string, auth: unknown[]) {
   return { account: 'cheeseburger', name: 'transfer', authorization: auth, data: { from, to, quantity, memo } };
 }
 
-/** Submit both actions together: both succeed or neither does. */
-export function buildSendMessageActions(from: string, to: string, memo: string, auth: unknown[]) {
-  return [
-    cheeseTransfer(from, to, MESSAGE_RECIPIENT_QUANTITY, memo, auth),
+/** Every part pays recipient + nulled fee; all actions go in one transaction (all or nothing). */
+export function buildSendMessageActions(from: string, to: string, memo: string | string[], auth: unknown[]) {
+  const memos = Array.isArray(memo) ? memo : [memo];
+  return memos.flatMap((m) => [
+    cheeseTransfer(from, to, MESSAGE_RECIPIENT_QUANTITY, m, auth),
     cheeseTransfer(from, KEY_PUBLISH_TO, MESSAGE_FEE_QUANTITY, FEE_MEMO, auth),
-  ];
+  ]);
 }
 
 /** Publishing is a single public-key transfer, not a message. */
@@ -176,7 +266,7 @@ export async function lookupPublishedKey(account: string): Promise<string | null
 
 /** Encrypted messages sent or received by the account (newest first, deduped). */
 export async function fetchMessages(account: string): Promise<ChainMemo[]> {
-  const rows = await hyperionTransfers(`account=${account}&${FILTER}&sort=desc&limit=500`);
+  const rows = await hyperionTransfers(`account=${account}&${FILTER}&sort=desc&limit=1000`);
   const seen = new Set<string>();
   return rows.filter((r) => {
     if (!r.memo.startsWith(MSG_PREFIX) || (r.from !== account && r.to !== account)) return false;
