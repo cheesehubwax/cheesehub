@@ -342,12 +342,19 @@ export function Messenger({ account, session }: { account: string; session: NonN
           <Button size="sm" variant="outline" className="w-full" onClick={() => setCreatingGroup(true)}>👥 New group</Button>
         </div>
         <ul className="flex-1 overflow-y-auto p-2 space-y-1">
+          <li aria-hidden className="px-2 pt-1 pb-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">👥 Groups</span>
+          </li>
           {groups.map(g => <li key={g.id}>
             <Button variant="ghost" onClick={() => setActive(`group:${g.id}`)} className={cn('w-full h-auto justify-start text-left px-3 py-2', active === `group:${g.id}` && 'bg-cheese/15 text-cheese')}>
-              <span className="min-w-0"><span className="block text-sm">👥 Group · {g.members.length} people</span>
+              <span className="min-w-0"><span className="block text-sm">Group · {g.members.length} people</span>
                 <span className="block text-[10px] text-muted-foreground whitespace-normal break-words">{g.members.filter(m => m !== account).join(', ')}</span></span>
             </Button>
           </li>)}
+          {!groups.length && <li className="text-xs text-muted-foreground px-2 pb-1">No groups yet.</li>}
+          <li aria-hidden className="border-t border-border my-2" role="presentation">
+            <span className="block px-2 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">🤝 Friends</span>
+          </li>
           {partners.map((p) => (
             <li key={p}>
               <Button variant="ghost" onClick={() => setActive(p)}
@@ -361,7 +368,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
               </Button>
             </li>
           ))}
-          {!partners.length && <li className="text-xs text-muted-foreground p-2">{loading ? 'Loading…' : 'No conversations yet. Add a WAX account above.'}</li>}
+          {!partners.length && <li className="text-xs text-muted-foreground px-2 pb-2">{loading ? 'Loading…' : 'No conversations yet. Add a WAX account above.'}</li>}
         </ul>
       </aside>
 
