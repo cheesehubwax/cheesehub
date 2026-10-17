@@ -19,6 +19,8 @@ import { cn } from '@/lib/utils';
 import { AvatarEditor } from '@/components/crypt/AvatarEditor';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { VaultPrompt } from '@/components/crypt/VaultPrompt';
+import { CreateGroupDialog } from '@/components/crypt/CreateGroupDialog';
+import { buildGroupMessageActions, createGroup, decodeConversations, groupMessageSize, loadGroups, mergeGroups, saveGroups } from '@/lib/cryptGroups';
 import {
   DirHandle, FRIENDS_DIR, PRIVATE_DIR, VAULT_DIR, VaultFileExistsError, friendKeyName, pickVault, privateKeyName,
   recallVault, rememberVault, vaultSupported, vaultWritable, writeFriendKey,
@@ -64,7 +66,7 @@ const CheeseCrypt = () => {
               </div>
               <p className="text-muted-foreground max-w-2xl mx-auto">
                 Encrypted messages sent on the WAX blockchain with CHEESE. Anyone can see that a message was sent —
-                only you and the other person can read it.
+                only the conversation’s participants can read it.
               </p>
             </div>
           </div>
@@ -94,6 +96,8 @@ function Messenger({ account, session }: { account: string; session: NonNullable
   const [avatars, setAvatars] = useState(() => loadContactAvatars(account));
   const [editingAvatar, setEditingAvatar] = useState(false);
   const [active, setActive] = useState<string | null>(null);
+  const [groups, setGroups] = useState(() => loadGroups(account));
+  const [creatingGroup, setCreatingGroup] = useState(false);
   const [newContact, setNewContact] = useState('');
   const [memos, setMemos] = useState<ChainMemo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -127,13 +131,21 @@ function Messenger({ account, session }: { account: string; session: NonNullable
     return out;
   }, [memos, account]);
 
-  const thread = useMemo(() => {
-    if (!active) return [];
-    const pub = contacts[active];
-    return assembleMessages(memos
-      .filter((m) => (m.from === account && m.to === active) || (m.from === active && m.to === account))
-      .map((m) => ({ ...m, text: pub && key ? decryptMemo(m.memo, pub, key.secretKey) : null })));
-  }, [active, memos, contacts, key, account]);
+  const conversations = useMemo(() => key ? decodeConversations(memos, key, contacts) : [], [memos, key, contacts]);
+  useEffect(() => {
+    setGroups(current => {
+      const merged = mergeGroups(current, conversations.flatMap(m => m.group ? [m.group] : []));
+      if (merged.length === current.length) return current;
+      saveGroups(account, merged);
+      return merged;
+    });
+  }, [conversations, account]);
+  const activeGroup = groups.find(g => `group:${g.id}` === active);
+  const recipients = activeGroup ? activeGroup.members.filter(m => m !== account) : active ? [active] : [];
+  const missingKeys = recipients.filter(m => !contacts[m]);
+  const thread = conversations.filter(m => activeGroup
+    ? m.group?.id === activeGroup.id && m.group.members.join(',') === activeGroup.members.join(',')
+    : !m.group && ((m.from === account && m.to === active) || (m.from === active && m.to === account)));
 
   useEffect(() => { endRef.current?.scrollIntoView({ block: 'end' }); }, [thread.length, active]);
 
@@ -214,19 +226,22 @@ function Messenger({ account, session }: { account: string; session: NonNullable
   };
 
   const send = async () => {
-    if (!key || !active || !contacts[active] || !agreed) return;
+    if (!key || !active || missingKeys.length || !agreed || !text.trim() || tooLong) return;
     setBusy(true);
     try {
-      const memos = splitMessage(text).map((p) => encryptMemo(p, contacts[active], key.secretKey));
-      const r = await executeTransaction(buildSendMessageActions(account, active, memos, [permission]), { successTitle: 'Message sent' });
+      const actions = activeGroup ? buildGroupMessageActions(key, activeGroup, text, contacts, [permission])
+        : buildSendMessageActions(account, active, splitMessage(text).map(p => encryptMemo(p, contacts[active], key.secretKey)), [permission]);
+      const r = await executeTransaction(actions, { successTitle: 'Message sent' });
       if (r.success) { setText(''); setTimeout(refresh, 3000); }
     } catch (e) { toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' }); }
     finally { setBusy(false); }
   };
 
-  const bytes = plaintextBytes(text);
-  const parts = partCount(text);
-  const tooLong = bytes > MAX_MESSAGE_BYTES;
+  const size = activeGroup ? groupMessageSize(activeGroup, text) : { bytes: plaintextBytes(text), parts: partCount(text), maxBytes: MAX_MESSAGE_BYTES };
+  const { bytes, parts, maxBytes } = size;
+  const tooLong = bytes > maxBytes || parts > MAX_PARTS;
+  const copies = activeGroup ? recipients.length : 1;
+  const totalCost = messageCost((parts || 1) * copies);
   const fileInput = (
     <input ref={fileRef} type="file" accept="application/json,.json" className="hidden"
       onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }} />
