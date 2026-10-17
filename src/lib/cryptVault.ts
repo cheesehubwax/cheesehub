@@ -3,7 +3,7 @@
 // write to the Desktop silently — the user picks the folder once (the picker
 // requests Desktop as its starting location) and the remembered handle is reused afterwards.
 // Select/create cheesecrypt there: Chromium can reject access to Desktop itself.
-import type { MessagingKey, PublicKeyFile } from './cheeseCrypt';
+import { parseKeyFile, type MessagingKey, type PublicKeyFile } from './cheeseCrypt';
 
 export const VAULT_DIR = 'cheesecrypt';
 export const PRIVATE_DIR = 'my private key';
@@ -20,7 +20,7 @@ export class VaultFileExistsError extends Error {
 export interface DirHandle {
   name: string;
   getDirectoryHandle(name: string, o?: { create?: boolean }): Promise<DirHandle>;
-  getFileHandle(name: string, o?: { create?: boolean }): Promise<{ createWritable(): Promise<{ write(d: string): Promise<void>; close(): Promise<void> }> }>;
+  getFileHandle(name: string, o?: { create?: boolean }): Promise<{ getFile?(): Promise<{ text(): Promise<string> }>; createWritable(): Promise<{ write(d: string): Promise<void>; close(): Promise<void>; abort?(): Promise<void> }> }>;
   queryPermission?(o: { mode: 'readwrite' }): Promise<PermissionState>;
   requestPermission?(o: { mode: 'readwrite' }): Promise<PermissionState>;
 }
@@ -54,6 +54,29 @@ async function writeNew(dir: DirHandle, name: string, data: unknown, path: strin
 export async function writePrivateKey(root: DirHandle, key: MessagingKey) {
   const name = privateKeyName(key.account);
   await writeNew(await root.getDirectoryHandle(PRIVATE_DIR, { create: true }), name, key, `${VAULT_DIR}/${PRIVATE_DIR}/${name}`);
+}
+
+/** Refresh profile fields only in an existing backup of the exact same key pair. */
+export async function updatePrivateKeyProfile(root: DirHandle, key: MessagingKey) {
+  const incoming = parseKeyFile(key);
+  if (!incoming || incoming.type !== 'gpk-msg-key') throw new Error('Invalid private key');
+  const dir = await root.getDirectoryHandle(PRIVATE_DIR);
+  const file = await dir.getFileHandle(privateKeyName(key.account));
+  if (!file.getFile) throw new Error('Cannot verify existing backup');
+  const existing = parseKeyFile(JSON.parse(await (await file.getFile()).text()));
+  if (!existing || existing.type !== 'gpk-msg-key' || existing.account !== incoming.account
+    || existing.publicKey !== incoming.publicKey || existing.secretKey !== incoming.secretKey) {
+    throw new Error('Existing backup does not match this private key');
+  }
+  // File System Access stages writes until close; abort leaves the original intact.
+  const writable = await file.createWritable();
+  try {
+    await writable.write(JSON.stringify({ ...existing, avatar: incoming.avatar, displayName: incoming.displayName }, null, 2));
+    await writable.close();
+  } catch (error) {
+    await writable.abort?.().catch(() => {});
+    throw error;
+  }
 }
 
 export async function writeFriendKey(root: DirHandle, file: PublicKeyFile) {

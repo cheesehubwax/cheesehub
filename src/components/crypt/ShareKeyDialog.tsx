@@ -1,10 +1,13 @@
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MESSAGE_FEE_QUANTITY } from '@/lib/cheeseCrypt';
+import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 
 interface ShareKeyDialogProps {
   account: string;
   busy: boolean;
+  agreed: boolean;
+  onAgreedChange: (agreed: boolean) => void;
   onDownload: () => void;
   onPublish: () => void;
   onClose: () => void;
@@ -15,7 +18,7 @@ interface ShareKeyDialogProps {
  * share a public key — privately with friends (recommended) or broadcast on
  * chain so anyone who knows the WAX account name can look it up.
  */
-export const ShareKeyDialog = ({ account, busy, onDownload, onPublish, onClose }: ShareKeyDialogProps) => (
+export const ShareKeyDialog = ({ account, busy, agreed, onAgreedChange, onDownload, onPublish, onClose }: ShareKeyDialogProps) => (
   <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
     <DialogContent className="max-w-md">
       <DialogHeader>
@@ -42,7 +45,8 @@ export const ShareKeyDialog = ({ account, busy, onDownload, onPublish, onClose }
             To read their replies you still need their public key — imported from their file, or found
             automatically if they broadcast theirs too. Costs {MESSAGE_FEE_QUANTITY} (nulled) and requires the Terms of Use checkbox.
           </p>
-          <Button size="sm" variant="outline" className="w-full" disabled={busy} onClick={onPublish}>
+          <TermsCheckbox checked={agreed} onCheckedChange={onAgreedChange} />
+          <Button size="sm" variant="outline" className="w-full" disabled={busy || !agreed} onClick={onPublish}>
             Publish my key on chain
           </Button>
         </div>
