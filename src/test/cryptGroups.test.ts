@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateKey, decryptMemo, messageCost, MSG_PREFIX } from '@/lib/cheeseCrypt';
-import { buildGroupMessageActions, createGroup, decodeConversations, groupMessageSize, parseGroup } from '@/lib/cryptGroups';
+import { buildGroupMessageActions, createGroup, decodeConversations, groupMessageCost, groupMessageSize, parseGroup } from '@/lib/cryptGroups';
 
 const alice = generateKey('alice'), bob = generateKey('bob'), carol = generateKey('carol'), eve = generateKey('eve');
 const group = createGroup('alice', ['bob', 'carol']);
@@ -17,11 +17,32 @@ describe('ad-hoc group messages', () => {
     expect(() => createGroup('alice', ['bob', 'bob'])).toThrow();
     expect(() => createGroup('alice', ['bob', 'carol', 'dave', 'eve', 'frank', 'grace'])).toThrow();
   });
-  it('charges the existing fee for each recipient copy', () => {
+  it('charges one nulled fee and two recipient payments for a three-person group', () => {
     const actions = buildGroupMessageActions(alice, group, 'hello', contacts, []);
-    expect(actions).toHaveLength(4);
-    expect(actions.map(a => a.data.quantity)).toEqual(['0.0010 CHEESE', '0.0100 CHEESE', '0.0010 CHEESE', '0.0100 CHEESE']);
-    expect(messageCost(groupMessageSize(group, 'hello').parts * 2)).toBe('0.0220 CHEESE');
+    expect(actions).toHaveLength(3);
+    expect(actions.map(a => a.data.quantity)).toEqual(['0.0010 CHEESE', '0.0100 CHEESE', '0.0010 CHEESE']);
+    expect(groupMessageCost(groupMessageSize(group, 'hello').parts, 2)).toBe('0.0120 CHEESE');
+    expect(messageCost(1)).toBe('0.0110 CHEESE');
+  });
+  it.each([[4, '0.0140 CHEESE'], [5, '0.0150 CHEESE']])('charges one shared fee with %i recipients', (count, expected) => {
+    const friends = ['bob', 'carol', 'dave', 'eve', 'frank'].slice(0, count);
+    const keys = Object.fromEntries(friends.map(name => [name, generateKey(name).publicKey]));
+    const actions = buildGroupMessageActions(alice, createGroup('alice', friends), 'hello', keys, []);
+    expect(actions.filter(a => a.data.to === 'eosio.null')).toHaveLength(1);
+    expect(actions.filter(a => a.data.to !== 'eosio.null').map(a => a.data.to)).toEqual(friends);
+    expect(actions.reduce((sum, a) => sum + Math.round(parseFloat(a.data.quantity) * 10000), 0)).toBe(count * 10 + 100);
+    expect(groupMessageCost(1, count)).toBe(expected);
+  });
+  it('charges the shared fee once per multipart part, not per recipient copy', () => {
+    const text = '🧀'.repeat(200);
+    const parts = groupMessageSize(group, text).parts;
+    const actions = buildGroupMessageActions(alice, group, text, contacts, []);
+    expect(parts).toBeGreaterThan(1);
+    expect(actions.filter(a => a.data.to === 'eosio.null')).toHaveLength(parts);
+    expect(actions.filter(a => a.data.to === 'bob')).toHaveLength(parts);
+    expect(actions.filter(a => a.data.to === 'carol')).toHaveLength(parts);
+    expect(actions.reduce((sum, a) => sum + Math.round(parseFloat(a.data.quantity) * 10000), 0)).toBe(parts * 120);
+    expect(groupMessageCost(parts, 2)).toBe(`${(parts * 0.012).toFixed(4)} CHEESE`);
   });
   it('discovers the same participants for both recipients and shows one sender message', () => {
     const rows = history('hello group');
