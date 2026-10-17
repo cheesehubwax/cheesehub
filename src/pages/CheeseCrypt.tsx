@@ -28,8 +28,8 @@ import {
 import type { PublicKeyFile } from '@/lib/cheeseCrypt';
 import {
   ChainMemo, MAX_PLAINTEXT_BYTES, MESSAGE_FEE_QUANTITY, MESSAGE_RECIPIENT_QUANTITY, MESSAGE_TOTAL_QUANTITY, MessagingKey,
-  MAX_MESSAGE_BYTES, MAX_PARTS, PART_BODY_BYTES, assembleMessages, messageCost, partCount, splitMessage,
-  buildPublishKeyActions, buildSendMessageActions, decryptMemo, encryptMemo, fetchMessages, generateKey,
+  MAX_MESSAGE_BYTES, MAX_PARTS, PART_BODY_BYTES, messageCost, partCount, splitMessage,
+  buildPublishKeyActions, buildSendMessageActions, encryptMemo, fetchMessages, generateKey,
   loadContacts, loadContactAvatars, loadKey, lookupPublishedKey, parseKeyFile, plaintextBytes, saveContact, saveKey, toPublicFile,
 } from '@/lib/cheeseCrypt';
 
@@ -87,7 +87,7 @@ const CheeseCrypt = () => {
   );
 };
 
-function Messenger({ account, session }: { account: string; session: NonNullable<ReturnType<typeof useWax>['session']> }) {
+export function Messenger({ account, session }: { account: string; session: NonNullable<ReturnType<typeof useWax>['session']> }) {
   const { toast } = useToast();
   const { executeTransaction } = useWaxTransaction(session);
   const permission = session.permissionLevel;
