@@ -140,6 +140,24 @@ function Messenger({ account, session }: { account: string; session: NonNullable
       return merged;
     });
   }, [conversations, account]);
+  useEffect(() => {
+    let cancelled = false;
+    const names = new Set(memos.map(m => m.from === account ? m.to : m.from));
+    groups.forEach(g => g.members.forEach(m => { if (m !== account) names.add(m); }));
+    const discover = async () => {
+      for (const name of names) {
+        if (contacts[name] || !ACCOUNT_RE.test(name) || cancelled) continue;
+        try {
+          const pub = await lookupPublishedKey(name);
+          if (pub && !cancelled && !loadContacts(account)[name]) {
+            saveContact(account, name, pub); setContacts(loadContacts(account));
+          }
+        } catch { /* A friend’s public key file remains the fallback. */ }
+      }
+    };
+    discover();
+    return () => { cancelled = true; };
+  }, [memos, groups, account]);
   const activeGroup = groups.find(g => `group:${g.id}` === active);
   const recipients = activeGroup ? activeGroup.members.filter(m => m !== account) : active ? [active] : [];
   const missingKeys = recipients.filter(m => !contacts[m]);
@@ -276,6 +294,11 @@ function Messenger({ account, session }: { account: string; session: NonNullable
     <div className="w-full rounded-lg border border-cheese/20 bg-card/80 overflow-hidden grid md:grid-cols-[240px_1fr] h-[70dvh] min-h-[480px]">
       {fileInput}
       {backupKey && <VaultPrompt cryptKey={backupKey} onSaved={backupSaved} onDownload={backupDownloaded} />}
+      {creatingGroup && <CreateGroupDialog contacts={contacts} avatars={avatars} onClose={() => setCreatingGroup(false)} onCreate={members => {
+        const group = createGroup(account, members);
+        const updated = mergeGroups(groups, [group]); saveGroups(account, updated); setGroups(updated);
+        setActive(`group:${group.id}`); setCreatingGroup(false); setText('');
+      }} />}
       {editingAvatar && <AvatarEditor account={account} avatar={key.avatar} onClose={() => setEditingAvatar(false)} onSave={avatar => {
         const updated = { ...key, avatar }; saveKey(updated); setKey(updated); setEditingAvatar(false);
         toast({ title: 'Avatar saved', description: 'Share your updated public key file so contacts can see it. Publishing your key does not share the avatar.' });
@@ -313,8 +336,15 @@ function Messenger({ account, session }: { account: string; session: NonNullable
               <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
             </Button>
           </div>
+          <Button size="sm" variant="outline" className="w-full" onClick={() => setCreatingGroup(true)}>👥 New group</Button>
         </div>
         <ul className="flex-1 overflow-y-auto p-2 space-y-1">
+          {groups.map(g => <li key={g.id}>
+            <Button variant="ghost" onClick={() => setActive(`group:${g.id}`)} className={cn('w-full h-auto justify-start text-left px-3 py-2', active === `group:${g.id}` && 'bg-cheese/15 text-cheese')}>
+              <span className="min-w-0"><span className="block text-sm">👥 Group · {g.members.length} people</span>
+                <span className="block text-[10px] text-muted-foreground whitespace-normal break-words">{g.members.filter(m => m !== account).join(', ')}</span></span>
+            </Button>
+          </li>)}
           {partners.map((p) => (
             <li key={p}>
               <Button variant="ghost" onClick={() => setActive(p)}
@@ -337,8 +367,11 @@ function Messenger({ account, session }: { account: string; session: NonNullable
           <p className="text-sm text-muted-foreground m-auto">💬 Pick or add a contact.</p>
         ) : (
           <>
-            <div className="px-4 py-3 border-b border-border font-semibold flex items-center gap-2"><PixelAvatar account={active} avatar={avatars[active]} />{active}
-              {contacts[active] && <Button size="sm" variant="ghost" className="ml-auto h-7 text-xs font-normal" onClick={() => saveFriend(active, true)}>💾 Save to {FRIENDS_DIR}</Button>}</div>
+            <div className="px-4 py-3 border-b border-border font-semibold flex flex-wrap items-center gap-2">
+              {activeGroup ? activeGroup.members.map(member => <span key={member} className="flex items-center gap-1 text-xs min-w-0">
+                <PixelAvatar account={member} avatar={member === account ? key.avatar : avatars[member]} className="h-6 w-6" /><span className="break-all">{member === account ? `${member} (you)` : member}</span>
+              </span>) : <><PixelAvatar account={active} avatar={avatars[active]} /><span className="break-all">{active}</span></>}
+              {!activeGroup && contacts[active] && <Button size="sm" variant="ghost" className="ml-auto h-7 text-xs font-normal" onClick={() => saveFriend(active, true)}>💾 Save to {FRIENDS_DIR}</Button>}</div>
             <ol className="flex-1 overflow-y-auto space-y-2 p-4">
               {thread.map((m) => (
                 <li key={m.key}
@@ -352,7 +385,7 @@ function Messenger({ account, session }: { account: string; session: NonNullable
                     {m.text ?? <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
                   </p>
                   <p className="text-[10px] opacity-70 mt-1">
-                    {new Date(m.time).toLocaleString()} · {messageCost(m.parts)}
+                    {new Date(m.time).toLocaleString()} · {messageCost(m.parts * (m.group ? m.group.members.length - 1 : 1))}
                     {m.parts > 1 && ` · ${m.parts} parts`}
                     {m.missing > 0 && <span className="text-destructive"> · {m.missing} part{m.missing > 1 ? 's' : ''} not loaded</span>}
                     {m.txId && <> · <a href={`https://waxblock.io/transaction/${encodeURIComponent(m.txId)}`} target="_blank" rel="noreferrer"
@@ -360,25 +393,25 @@ function Messenger({ account, session }: { account: string; session: NonNullable
                   </p>
                 </li>
               ))}
-              {!thread.length && <li className="text-sm text-muted-foreground">No messages with {active} yet.</li>}
+              {!thread.length && <li className="text-sm text-muted-foreground">{activeGroup ? 'No group messages yet.' : `No messages with ${active} yet.`}</li>}
               <li ref={endRef} aria-hidden />
             </ol>
-            {!contacts[active] ? (
-              <p className="text-sm text-muted-foreground p-4 border-t border-border">You need {active}'s public key. Add them by name or load their public file.</p>
+            {missingKeys.length ? (
+              <p className="text-sm text-muted-foreground p-4 border-t border-border">Public keys needed: {missingKeys.join(', ')}. Add them by name or load their public files.</p>
             ) : (
               <div className="space-y-2 p-4 border-t border-border">
-                <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder={`Message ${active}`} />
+                <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder={activeGroup ? 'Message group' : `Message ${active}`} />
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                   <span className={tooLong ? 'text-destructive' : 'text-muted-foreground'}>
-                    {bytes}/{MAX_MESSAGE_BYTES} · {parts || 1} part{parts > 1 ? 's' : ''}
+                    {bytes}/{maxBytes} · {parts || 1} part{parts > 1 ? 's' : ''}{activeGroup && ` × ${copies} recipients`}
                   </span>
                   <TermsCheckbox checked={agreed} onCheckedChange={setAgreed} className="ml-2" />
-                  <span className="ml-auto text-muted-foreground">{messageCost(parts || 1)}</span>
+                  <span className="ml-auto text-muted-foreground">{totalCost}</span>
                   <Button size="sm" disabled={busy || !agreed || !text.trim() || tooLong} onClick={send}
                     className="bg-cheese text-primary-foreground hover:bg-cheese/90">Send</Button>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  Each part: {MESSAGE_RECIPIENT_QUANTITY} to {active} + {MESSAGE_FEE_QUANTITY} nulled ({MESSAGE_TOTAL_QUANTITY}). Long messages split into up to {MAX_PARTS} parts ({MAX_PLAINTEXT_BYTES} bytes for one, {PART_BODY_BYTES} per part after that), all in one transaction.
+                  {activeGroup ? `Each part, per recipient: ${MESSAGE_RECIPIENT_QUANTITY} + ${MESSAGE_FEE_QUANTITY} nulled. Group delivery uses ${copies} encrypted copies in one transaction. Membership is fixed; start a new group to change participants.` : `Each part: ${MESSAGE_RECIPIENT_QUANTITY} to ${active} + ${MESSAGE_FEE_QUANTITY} nulled (${MESSAGE_TOTAL_QUANTITY}). Long messages split into up to ${MAX_PARTS} parts (${MAX_PLAINTEXT_BYTES} bytes for one, ${PART_BODY_BYTES} per part after that), all in one transaction.`}
                 </p>
               </div>
             )}
