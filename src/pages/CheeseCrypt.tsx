@@ -105,6 +105,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [editingFriend, setEditingFriend] = useState<string | null>(null);
   const nameFor = (id: string) => id === account ? key?.displayName ?? account : cryptDisplayName(id, names, nicknames);
   const [editingAvatar, setEditingAvatar] = useState(false);
+  const [settingUpProfile, setSettingUpProfile] = useState(false);
   const [active, setActive] = useState<string | null>(null);
   const [groups, setGroups] = useState(() => loadGroups(account));
   const [creatingGroup, setCreatingGroup] = useState(false);
@@ -188,11 +189,13 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if (!backupKey) return;
     download(privateKeyName(account), backupKey);
     setBackupKey(null);
+    setSettingUpProfile(true); setEditingAvatar(true);
     toast({ title: 'Messaging key created', description: 'A private backup file was downloaded. Keep it safe and never share it.' });
   };
 
   const backupSaved = (root: DirHandle) => {
     setBackupKey(null); setVault(root);
+    setSettingUpProfile(true); setEditingAvatar(true);
     rememberVault(account, root).catch(() => {});
     toast({ title: 'Key saved', description: `Saved in ${VAULT_DIR}/${PRIVATE_DIR}. Never share this file.` });
   };
@@ -321,8 +324,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
       {editingFriend && <FriendNameDialog account={editingFriend} nickname={nicknames[editingFriend]} sharedName={names[editingFriend]} onClose={() => setEditingFriend(null)} onSave={name => {
         saveCryptName(account, editingFriend, name, 'nicknames'); setNicknames(loadCryptNames(account, 'nicknames')); setEditingFriend(null);
       }} />}
-      {editingAvatar && <AvatarEditor account={account} avatar={key.avatar} displayName={key.displayName} onClose={() => setEditingAvatar(false)} onSave={() => {}} onSaveProfile={(avatar, displayName) => {
-        const updated = { ...key, avatar, displayName }; saveKey(updated); setKey(updated); setEditingAvatar(false);
+      {editingAvatar && <AvatarEditor account={account} avatar={key.avatar} displayName={key.displayName} initialSetup={settingUpProfile} onClose={() => { setEditingAvatar(false); setSettingUpProfile(false); }} onSave={() => {}} onSaveProfile={(avatar, displayName) => {
+        const updated = { ...key, avatar, displayName }; saveKey(updated); setKey(updated); setEditingAvatar(false); setSettingUpProfile(false);
         toast({ title: 'Profile saved', description: 'Share your updated public key file so friends can see your name and avatar. Refresh your private backup too.' });
       }} />}
       <aside className="border-b md:border-b-0 md:border-r border-border flex flex-col min-h-0">

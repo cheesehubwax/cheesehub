@@ -93,7 +93,7 @@ function WalletAvatarPicker({ account, busy, onPick }: { account: string; busy: 
   </div>;
 }
 
-export function AvatarEditor({ account, avatar, displayName, onSave, onSaveProfile, onClose }: { account: string; avatar?: CryptAvatar; displayName?: string; onSave: (avatar: CryptAvatar) => void; onSaveProfile?: (avatar: CryptAvatar, displayName?: string) => void; onClose: () => void }) {
+export function AvatarEditor({ account, avatar, displayName, onSave, onSaveProfile, onClose, initialSetup = false }: { account: string; avatar?: CryptAvatar; displayName?: string; onSave: (avatar: CryptAvatar) => void; onSaveProfile?: (avatar: CryptAvatar, displayName?: string) => void; onClose: () => void; initialSetup?: boolean }) {
   const [name, setName] = useState(displayName ?? '');
   const invalidName = !!name.trim() && !parseCryptName(name);
   const [pixels, setPixels] = useState(() => (avatar ?? accountAvatar(account)).pixels);
@@ -154,7 +154,7 @@ export function AvatarEditor({ account, avatar, displayName, onSave, onSaveProfi
       </Tabs>
       {busy && <p className="text-sm text-muted-foreground" role="status">Importing image…</p>}
       {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-      <div className="flex justify-end gap-2"><Button variant="outline" onClick={onClose}>Cancel</Button><Button disabled={busy || invalidName} onClick={() => onSaveProfile ? onSaveProfile({ version: 1, pixels }, parseCryptName(name)) : onSave({ version: 1, pixels })}><Save className="h-4 w-4 mr-2" />{onSaveProfile ? 'Save profile' : 'Save avatar'}</Button></div>
+      <div className="flex justify-end gap-2"><Button variant="outline" onClick={onClose}>{initialSetup ? 'Use defaults' : 'Cancel'}</Button><Button disabled={busy || invalidName} onClick={() => onSaveProfile ? onSaveProfile({ version: 1, pixels }, parseCryptName(name)) : onSave({ version: 1, pixels })}><Save className="h-4 w-4 mr-2" />{onSaveProfile ? 'Save profile' : 'Save avatar'}</Button></div>
     </DialogContent>
   </Dialog>;
 }
