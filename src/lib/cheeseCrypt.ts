@@ -8,6 +8,7 @@
  * existing messages, published keys and backup files keep working.
  */
 import nacl from 'tweetnacl';
+import { CryptAvatar, parseAvatar } from '@/lib/cryptAvatar';
 import { decodeBase64, encodeBase64, decodeUTF8, encodeUTF8 } from 'tweetnacl-util';
 import { benchEndpoint, normalizeEndpoint, resolveEndpoints } from '@/lib/endpointHealth';
 
@@ -28,12 +29,14 @@ export interface MessagingKey {
   publicKey: string;
   secretKey: string;
   created: string;
+  avatar?: CryptAvatar;
 }
 export interface PublicKeyFile {
   type: 'gpk-msg-pubkey';
   version: 1;
   account: string;
   publicKey: string;
+  avatar?: CryptAvatar;
 }
 
 const keyStore = (a: string) => `cheesecrypt-key-${a}`;
@@ -62,14 +65,14 @@ export function parseKeyFile(raw: unknown): MessagingKey | PublicKeyFile | null 
     // the public key must belong to the secret key
     const derived = nacl.box.keyPair.fromSecretKey(decodeBase64(o.secretKey));
     if (encodeBase64(derived.publicKey) !== o.publicKey) return null;
-    return o as unknown as MessagingKey;
+    return { ...o, avatar: parseAvatar(o.avatar) } as unknown as MessagingKey;
   }
-  if (o.type === 'gpk-msg-pubkey') return o as unknown as PublicKeyFile;
+  if (o.type === 'gpk-msg-pubkey') return { ...o, avatar: parseAvatar(o.avatar) } as unknown as PublicKeyFile;
   return null;
 }
 
 export const toPublicFile = (k: MessagingKey): PublicKeyFile =>
-  ({ type: 'gpk-msg-pubkey', version: 1, account: k.account, publicKey: k.publicKey });
+  ({ type: 'gpk-msg-pubkey', version: 1, account: k.account, publicKey: k.publicKey, ...(k.avatar ? { avatar: k.avatar } : {}) });
 
 export function loadKey(account: string): MessagingKey | null {
   try {
@@ -82,10 +85,26 @@ export const saveKey = (k: MessagingKey) => localStorage.setItem(keyStore(k.acco
 export function loadContacts(account: string): Record<string, string> {
   try { return JSON.parse(localStorage.getItem(contactStore(account)) || '{}') || {}; } catch { return {}; }
 }
-export function saveContact(account: string, contact: string, publicKey: string) {
+export function loadContactAvatars(account: string): Record<string, CryptAvatar> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(`cheesecrypt-avatars-${account}`) || '{}');
+    const result: Record<string, CryptAvatar> = {};
+    for (const [name, value] of Object.entries(raw || {})) {
+      const avatar = parseAvatar(value);
+      if (avatar) result[name] = avatar;
+    }
+    return result;
+  } catch { return {}; }
+}
+export function saveContact(account: string, contact: string, publicKey: string, avatar?: CryptAvatar) {
   const c = loadContacts(account);
   c[contact] = publicKey;
   localStorage.setItem(contactStore(account), JSON.stringify(c));
+  if (avatar) {
+    const avatars = loadContactAvatars(account);
+    avatars[contact] = avatar;
+    localStorage.setItem(`cheesecrypt-avatars-${account}`, JSON.stringify(avatars));
+  }
 }
 
 const utf8Len = (s: string) => new TextEncoder().encode(s).length;
