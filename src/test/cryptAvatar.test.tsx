@@ -45,8 +45,8 @@ describe('CHEESECrypt avatar data', () => {
     vi.stubGlobal('matchMedia', () => ({ matches: true }));
     const onSave = vi.fn();
     render(<AvatarEditor account="alice.wam" avatar={{ version: 1, pixels: '0'.repeat(64) }} onSave={onSave} onClose={() => {}} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Color 5', exact: true }));
-    fireEvent.click(screen.getByRole('button', { name: 'Pixel 1', exact: true }), { detail: 0 });
+    fireEvent.click(screen.getByRole('button', { name: /^Color 5$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Pixel 1$/ }), { detail: 0 });
     fireEvent.click(screen.getByRole('button', { name: 'Save avatar' }));
     expect(onSave).toHaveBeenCalledWith({ version: 1, pixels: '5' + '0'.repeat(63) });
     cleanup(); vi.unstubAllGlobals();
