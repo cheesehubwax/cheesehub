@@ -30,7 +30,7 @@ describe('group creation and signing gate', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'carol' }));
     fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
     expect(loadGroups('alice')[0].members).toEqual(['alice', 'bob', 'carol']);
-    fireEvent.change(screen.getByRole('textbox', { name: '' }).closest('section')?.querySelector('textarea') ?? screen.getByPlaceholderText('Message group'), { target: { value: 'hello group' } });
+    fireEvent.change(screen.getByPlaceholderText('Message group'), { target: { value: 'hello group' } });
     const send = screen.getByRole('button', { name: 'Send', exact: true });
     expect(send).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox'));
