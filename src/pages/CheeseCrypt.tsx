@@ -106,6 +106,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const nameFor = (id: string) => id === account ? key?.displayName ?? account : cryptDisplayName(id, names, nicknames);
   const [editingAvatar, setEditingAvatar] = useState(false);
   const [settingUpProfile, setSettingUpProfile] = useState(false);
+  const [showSharePrompt, setShowSharePrompt] = useState(false);
   const [active, setActive] = useState<string | null>(null);
   const [groups, setGroups] = useState(() => loadGroups(account));
   const [creatingGroup, setCreatingGroup] = useState(false);
