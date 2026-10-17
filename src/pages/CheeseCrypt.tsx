@@ -28,7 +28,7 @@ import { CryptAbout } from '@/components/crypt/CryptAbout';
 import { buildGroupMessageActions, createGroup, decodeConversations, groupMessageCost, groupMessageSize, loadGroups, loadHiddenGroups, mergeGroups, saveGroups, setGroupHidden, type CryptGroup } from '@/lib/cryptGroups';
 import {
   DirHandle, FRIENDS_DIR, PRIVATE_DIR, VAULT_DIR, VaultFileExistsError, friendKeyName, pickVault, privateKeyName,
-  readFriendKeys, recallVault, rememberVault, updatePrivateKeyProfile, vaultSupported, vaultWritable, writeFriendKey,
+  readFriendKeys, recallVault, rememberVault, updatePrivateKeyProfile, vaultSupported, vaultWritable, writeFriendKey, writeOwnPublicKey,
 } from '@/lib/cryptVault';
 import type { PublicKeyFile } from '@/lib/cheeseCrypt';
 import {
@@ -219,10 +219,30 @@ export function Messenger({ account, session }: { account: string; session: NonN
     try {
       if (!vault || !(await vaultWritable(vault, true))) throw new Error('Folder access unavailable');
       await updatePrivateKeyProfile(vault, updated);
+      await writeOwnPublicKey(vault, toPublicFile(updated)).catch(() => {});
       toast({ title: 'Profile and private backup updated', description: 'Share your updated public key file so friends see your name and avatar.' });
     } catch {
       download(privateKeyName(account), updated);
       toast({ title: 'Profile saved; refreshed backup downloaded', description: 'The existing disk file was not replaced. Keep this refreshed file safe; share only your public key.' });
+    }
+  };
+
+  /** Saves your public key into cheesecrypt/my private key/ (beside your private key); downloads if no folder access. */
+  const sharePublicKey = async () => {
+    if (!key) return;
+    const file = toPublicFile(key);
+    try {
+      let root = vault;
+      if (!root || !(await vaultWritable(root, true))) {
+        if (!vaultSupported()) { download(friendKeyName(account), file); return; }
+        root = await pickVault(); setVault(root); rememberVault(account, root).catch(() => {});
+      }
+      await writeOwnPublicKey(root, file);
+      toast({ title: 'Public key saved', description: `In ${VAULT_DIR}/${PRIVATE_DIR} beside your private key. Share only the -public.json file.` });
+    } catch (e) {
+      if ((e as DOMException)?.name === 'AbortError') return;
+      download(friendKeyName(account), file);
+      toast({ title: 'Public key downloaded', description: 'Folder access was unavailable, so the file went to your Downloads.' });
     }
   };
 
