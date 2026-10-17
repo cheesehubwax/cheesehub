@@ -92,7 +92,16 @@ const NULL_CONTRACTS = [
   { account: 'cheesebannad', displayName: 'cheesebannad' },
   { account: 'cheesenftwax', displayName: 'cheesenftwax' },
   { account: 'liquidcheese', displayName: 'Liquidity Fees' },
+  { account: 'crypt', displayName: 'crypt' },
 ] as const;
+
+// Memos CHEESECrypt uses on its eosio.null transfers (kept in sync with cheeseCrypt.ts).
+const CRYPT_FEE_MEMO = 'CHEESECrypt messaging fee';
+const CRYPT_KEY_PREFIX = 'GPKMKEY1:';
+
+export function isCryptNullMemo(memo: unknown): boolean {
+  return typeof memo === 'string' && (memo === CRYPT_FEE_MEMO || memo.startsWith(CRYPT_KEY_PREFIX));
+}
 
 export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
   const coverage: CoverageTracker = { succeeded: 0, reads: 0 };
@@ -173,7 +182,13 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
   // Period figures come ONLY from what each contract actually sent to
   // eosio.null. Deposits into cheesepowerz are not nulls yet, and counting them
   // here double-counted cheesepowerz in the 24h/7d/30d columns.
-  addActions(nullActions, (data) => data.to === 'eosio.null' && typeof data.from === 'string' ? data.from : null);
+  // CHEESECrypt is client-side: users null its fees straight from their own
+  // wallets, so it is attributed by memo (message fees and key publishing).
+  addActions(nullActions, (data) => {
+    if (data.to !== 'eosio.null' || typeof data.from !== 'string') return null;
+    if (isCryptNullMemo(data.memo)) return 'crypt';
+    return data.from;
+  });
 
   // Incoming cheesepowerz transfers are kept as a lifetime-only fallback for
   // when the contract's authoritative counter is unavailable. They also mark
