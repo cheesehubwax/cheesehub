@@ -90,6 +90,15 @@ export async function writeFriendKey(root: DirHandle, file: PublicKeyFile, repla
   catch (error) { await writable.abort?.().catch(() => {}); throw error; }
 }
 
+/** Saves (or refreshes) your own public key beside your private key, ready for sharing. */
+export async function writeOwnPublicKey(root: DirHandle, file: PublicKeyFile) {
+  if (file.type !== 'gpk-msg-pubkey' || 'secretKey' in file) throw new Error('Not a public key file');
+  const dir = await root.getDirectoryHandle(PRIVATE_DIR, { create: true });
+  const writable = await (await dir.getFileHandle(friendKeyName(file.account), { create: true })).createWritable();
+  try { await writable.write(JSON.stringify(file, null, 2)); await writable.close(); }
+  catch (error) { await writable.abort?.().catch(() => {}); throw error; }
+}
+
 /** Reads every valid public key file in the shared friends folder (shared by all accounts on this device). */
 export async function readFriendKeys(root: DirHandle): Promise<PublicKeyFile[]> {
   let dir: DirHandle;
