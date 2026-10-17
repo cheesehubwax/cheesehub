@@ -1,5 +1,8 @@
 # CHEESEHub roadmap
 
+- [x] CHEESECrypt: ad-hoc groups, encrypted recipient copies, automatic discovery, participant display and compatibility tests (29 tests passed).
+- [ ] CHEESECrypt: verify group send/reply and recipient read-back on WAX — requires connected wallets and signing approval; local creation/signing gate and encrypted fanout round-trips tested.
+
 - [x] CHEESECrypt: correct Desktop folder-selection guidance and permission-error recovery; actual OS folder picker requires user verification.
 
 - [x] CHEESECrypt: pixel avatar editor, image/NFT import, key-file sharing and conversation thumbnails; paint/upload/save/read-back checked in browser and 16 compatibility tests passed.
