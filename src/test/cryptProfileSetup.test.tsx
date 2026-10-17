@@ -7,6 +7,7 @@ import { Messenger } from '@/pages/CheeseCrypt';
 
 vi.mock('@/hooks/useWaxTransaction', () => ({ useWaxTransaction: () => ({ executeTransaction: vi.fn() }) }));
 vi.mock('@/context/WaxContext', () => ({ useWax: vi.fn() }));
+vi.mock('@/components/Layout', () => ({ Layout: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock('@/lib/cheeseCrypt', async original => ({ ...await original<typeof import('@/lib/cheeseCrypt')>(), fetchMessages: async () => [] }));
 vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import('@/lib/cryptVault')>(), recallVault: async () => null, rememberVault: async () => {} }));
 vi.mock('@/components/crypt/VaultPrompt', () => ({ VaultPrompt: ({ onSaved, onDownload }: { onSaved: (root: unknown) => void; onDownload: () => void }) => <div><button onClick={() => onSaved({})}>Save backup</button><button onClick={onDownload}>Download backup</button></div> }));
