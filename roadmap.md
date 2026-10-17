@@ -29,3 +29,5 @@
 
 - [x] CHEESEFolio: scan starts only on button press; probe working history services; parallel fill lookups (heavy account 6+ min → ~14 s)
 - [x] CHEESEFolio full history: deepest provider always used, windows backfill, notification-copy de-dupe
+
+- [x] CHEESECrypt at /crypt (hidden, no header/menu link): encrypted CHEESE-memo messenger migrated from gpkonwax/collection-manager.
