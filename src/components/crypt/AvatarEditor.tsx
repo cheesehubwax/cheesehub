@@ -12,6 +12,7 @@ import { accountAvatar, CryptAvatar, quantizeAvatar } from '@/lib/cryptAvatar';
 import { extractIpfsHash, ipfsImageCandidates } from '@/lib/ipfsGateways';
 import { PixelAvatar } from './PixelAvatar';
 import { cn } from '@/lib/utils';
+import { MAX_CRYPT_NAME_LENGTH, parseCryptName } from '@/lib/cryptNames';
 
 async function pixelsFromBlob(blob: Blob): Promise<CryptAvatar> {
   const bitmap = await createImageBitmap(blob);
@@ -92,7 +93,9 @@ function WalletAvatarPicker({ account, busy, onPick }: { account: string; busy: 
   </div>;
 }
 
-export function AvatarEditor({ account, avatar, onSave, onClose }: { account: string; avatar?: CryptAvatar; onSave: (avatar: CryptAvatar) => void; onClose: () => void }) {
+export function AvatarEditor({ account, avatar, displayName, onSave, onSaveProfile, onClose }: { account: string; avatar?: CryptAvatar; displayName?: string; onSave: (avatar: CryptAvatar) => void; onSaveProfile?: (avatar: CryptAvatar, displayName?: string) => void; onClose: () => void }) {
+  const [name, setName] = useState(displayName ?? '');
+  const invalidName = !!name.trim() && !parseCryptName(name);
   const [pixels, setPixels] = useState(() => (avatar ?? accountAvatar(account)).pixels);
   const [color, setColor] = useState('3');
   const [tab, setTab] = useState('paint');
@@ -115,7 +118,12 @@ export function AvatarEditor({ account, avatar, onSave, onClose }: { account: st
   };
   return <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
     <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto" aria-describedby={undefined}>
-      <DialogHeader><DialogTitle>🎨 Your avatar</DialogTitle></DialogHeader>
+      <DialogHeader><DialogTitle>{onSaveProfile ? '🎨 Your profile' : '🎨 Your avatar'}</DialogTitle></DialogHeader>
+      {onSaveProfile && <div className="space-y-2">
+        <label htmlFor="crypt-profile-name" className="text-sm font-medium">CHEESECrypt name</label>
+        <Input id="crypt-profile-name" value={name} maxLength={MAX_CRYPT_NAME_LENGTH} onChange={e => setName(e.target.value)} placeholder={account} aria-invalid={invalidName} />
+        <p className="text-xs text-muted-foreground">WAX account: {account}. Your name and avatar are shared in your public key file, not when publishing to chain.</p>
+      </div>}
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="w-full"><TabsTrigger value="paint" className="flex-1"><Pencil className="h-4 w-4 mr-2" />Paint</TabsTrigger><TabsTrigger value="nft" className="flex-1">🖼️ Wallet NFT</TabsTrigger></TabsList>
         <TabsContent value="paint" className="space-y-4">
@@ -146,7 +154,7 @@ export function AvatarEditor({ account, avatar, onSave, onClose }: { account: st
       </Tabs>
       {busy && <p className="text-sm text-muted-foreground" role="status">Importing image…</p>}
       {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-      <div className="flex justify-end gap-2"><Button variant="outline" onClick={onClose}>Cancel</Button><Button disabled={busy} onClick={() => onSave({ version: 1, pixels })}><Save className="h-4 w-4 mr-2" />Save avatar</Button></div>
+      <div className="flex justify-end gap-2"><Button variant="outline" onClick={onClose}>Cancel</Button><Button disabled={busy || invalidName} onClick={() => onSaveProfile ? onSaveProfile({ version: 1, pixels }, parseCryptName(name)) : onSave({ version: 1, pixels })}><Save className="h-4 w-4 mr-2" />{onSaveProfile ? 'Save profile' : 'Save avatar'}</Button></div>
     </DialogContent>
   </Dialog>;
 }

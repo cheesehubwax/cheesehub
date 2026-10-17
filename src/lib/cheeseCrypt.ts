@@ -8,6 +8,7 @@
  * existing messages, published keys and backup files keep working.
  */
 import nacl from 'tweetnacl';
+import { parseCryptName, saveCryptName } from '@/lib/cryptNames';
 import { CryptAvatar, parseAvatar } from '@/lib/cryptAvatar';
 import { decodeBase64, encodeBase64, decodeUTF8, encodeUTF8 } from 'tweetnacl-util';
 import { benchEndpoint, normalizeEndpoint, resolveEndpoints } from '@/lib/endpointHealth';
@@ -30,6 +31,7 @@ export interface MessagingKey {
   secretKey: string;
   created: string;
   avatar?: CryptAvatar;
+  displayName?: string;
 }
 export interface PublicKeyFile {
   type: 'gpk-msg-pubkey';
@@ -37,6 +39,7 @@ export interface PublicKeyFile {
   account: string;
   publicKey: string;
   avatar?: CryptAvatar;
+  displayName?: string;
 }
 
 const keyStore = (a: string) => `cheesecrypt-key-${a}`;
@@ -65,14 +68,14 @@ export function parseKeyFile(raw: unknown): MessagingKey | PublicKeyFile | null 
     // the public key must belong to the secret key
     const derived = nacl.box.keyPair.fromSecretKey(decodeBase64(o.secretKey));
     if (encodeBase64(derived.publicKey) !== o.publicKey) return null;
-    return { ...o, avatar: parseAvatar(o.avatar) } as unknown as MessagingKey;
+    return { ...o, avatar: parseAvatar(o.avatar), displayName: parseCryptName(o.displayName) } as unknown as MessagingKey;
   }
-  if (o.type === 'gpk-msg-pubkey') return { ...o, avatar: parseAvatar(o.avatar) } as unknown as PublicKeyFile;
+  if (o.type === 'gpk-msg-pubkey') return { ...o, avatar: parseAvatar(o.avatar), displayName: parseCryptName(o.displayName) } as unknown as PublicKeyFile;
   return null;
 }
 
 export const toPublicFile = (k: MessagingKey): PublicKeyFile =>
-  ({ type: 'gpk-msg-pubkey', version: 1, account: k.account, publicKey: k.publicKey, ...(k.avatar ? { avatar: k.avatar } : {}) });
+  ({ type: 'gpk-msg-pubkey', version: 1, account: k.account, publicKey: k.publicKey, ...(k.avatar ? { avatar: k.avatar } : {}), ...(parseCryptName(k.displayName) ? { displayName: parseCryptName(k.displayName) } : {}) });
 
 export function loadKey(account: string): MessagingKey | null {
   try {
@@ -96,10 +99,11 @@ export function loadContactAvatars(account: string): Record<string, CryptAvatar>
     return result;
   } catch { return {}; }
 }
-export function saveContact(account: string, contact: string, publicKey: string, avatar?: CryptAvatar) {
+export function saveContact(account: string, contact: string, publicKey: string, avatar?: CryptAvatar, displayName?: string) {
   const c = loadContacts(account);
   c[contact] = publicKey;
   localStorage.setItem(contactStore(account), JSON.stringify(c));
+  if (displayName !== undefined) saveCryptName(account, contact, displayName);
   if (avatar) {
     const avatars = loadContactAvatars(account);
     avatars[contact] = avatar;
