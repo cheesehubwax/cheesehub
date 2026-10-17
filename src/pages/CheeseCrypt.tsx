@@ -10,7 +10,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
-import { ChevronDown, Pencil, RefreshCw, Trash2 } from 'lucide-react';
+import { ChevronDown, Eye, EyeOff, Pencil, RefreshCw, Trash2 } from 'lucide-react';
 import { useWax } from '@/context/WaxContext';
 import { useWaxTransaction } from '@/hooks/useWaxTransaction';
 import { useToast } from '@/hooks/use-toast';
@@ -25,7 +25,7 @@ import { VaultPrompt } from '@/components/crypt/VaultPrompt';
 import { CreateGroupDialog } from '@/components/crypt/CreateGroupDialog';
 import { ShareKeyDialog } from '@/components/crypt/ShareKeyDialog';
 import { CryptAbout } from '@/components/crypt/CryptAbout';
-import { buildGroupMessageActions, createGroup, decodeConversations, groupMessageCost, groupMessageSize, loadGroups, mergeGroups, saveGroups } from '@/lib/cryptGroups';
+import { buildGroupMessageActions, createGroup, decodeConversations, groupMessageCost, groupMessageSize, loadGroups, loadHiddenGroups, mergeGroups, saveGroups, setGroupHidden, type CryptGroup } from '@/lib/cryptGroups';
 import {
   DirHandle, FRIENDS_DIR, PRIVATE_DIR, VAULT_DIR, VaultFileExistsError, friendKeyName, pickVault, privateKeyName,
   recallVault, rememberVault, updatePrivateKeyProfile, vaultSupported, vaultWritable, writeFriendKey,
@@ -111,6 +111,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [showSharePrompt, setShowSharePrompt] = useState(false);
   const [active, setActive] = useState<string | null>(null);
   const [groups, setGroups] = useState(() => loadGroups(account));
+  const [hiddenGroups, setHiddenGroups] = useState(() => loadHiddenGroups(account));
+  const [showHiddenGroups, setShowHiddenGroups] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [newContact, setNewContact] = useState('');
   const [memos, setMemos] = useState<ChainMemo[]>([]);
@@ -254,6 +256,21 @@ export function Messenger({ account, session }: { account: string; session: NonN
     finally { setBusy(false); }
   };
 
+  const changeGroupVisibility = (id: string, hidden: boolean) => {
+    setGroupHidden(account, id, hidden);
+    setHiddenGroups(loadHiddenGroups(account));
+    if (hidden && active === `group:${id}`) { setActive(null); setText(''); }
+  };
+  const groupRow = (g: CryptGroup, hidden: boolean) => <li key={g.id} className="group flex items-center gap-1">
+    <Button variant="ghost" onClick={() => setActive(`group:${g.id}`)} className={cn('flex-1 min-w-0 h-auto justify-start text-left px-3 py-2', active === `group:${g.id}` && 'bg-cheese/15 text-cheese')}>
+      <span className="min-w-0"><span className="block text-sm">Group · {g.members.length} people</span>
+        <span className="block text-[10px] text-muted-foreground whitespace-normal break-words">{g.members.filter(m => m !== account).map(nameFor).join(', ')}</span></span>
+    </Button>
+    <Button variant="ghost" size="icon" aria-label={`${hidden ? 'Restore' : 'Hide'} group ${g.id}`} title={`${hidden ? 'Restore' : 'Hide'} group`}
+      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-cheese opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 focus-visible:opacity-100 transition-opacity"
+      onClick={() => changeGroupVisibility(g.id, !hidden)}>{hidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}</Button>
+  </li>;
+
   const removeFriend = (name: string) => {
     removeContact(account, name);
     setContacts(loadContacts(account)); setRemovedContacts(loadRemovedContacts(account));
@@ -393,13 +410,15 @@ export function Messenger({ account, session }: { account: string; session: NonN
           <li aria-hidden className="px-2 pt-1 pb-1">
             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">👥 Groups</span>
           </li>
-          {groups.map(g => <li key={g.id}>
-            <Button variant="ghost" onClick={() => setActive(`group:${g.id}`)} className={cn('w-full h-auto justify-start text-left px-3 py-2', active === `group:${g.id}` && 'bg-cheese/15 text-cheese')}>
-              <span className="min-w-0"><span className="block text-sm">Group · {g.members.length} people</span>
-                <span className="block text-[10px] text-muted-foreground whitespace-normal break-words">{g.members.filter(m => m !== account).map(nameFor).join(', ')}</span></span>
+          {groups.filter(g => !hiddenGroups.includes(g.id)).map(g => groupRow(g, false))}
+          {!groups.some(g => !hiddenGroups.includes(g.id)) && <li className="text-xs text-muted-foreground px-2 pb-1">No groups yet.</li>}
+          {groups.some(g => hiddenGroups.includes(g.id)) && <li>
+            <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-muted-foreground" aria-expanded={showHiddenGroups} aria-controls="crypt-hidden-groups" onClick={() => setShowHiddenGroups(v => !v)}>
+              <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', !showHiddenGroups && '-rotate-90')} />
+              Hidden groups ({groups.filter(g => hiddenGroups.includes(g.id)).length})
             </Button>
-          </li>)}
-          {!groups.length && <li className="text-xs text-muted-foreground px-2 pb-1">No groups yet.</li>}
+            {showHiddenGroups && <ul id="crypt-hidden-groups" className="space-y-1">{groups.filter(g => hiddenGroups.includes(g.id)).map(g => groupRow(g, true))}</ul>}
+          </li>}
           <li aria-hidden className="border-t border-border my-2" role="presentation">
             <span className="block px-2 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">🤝 Friends</span>
           </li>

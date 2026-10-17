@@ -33,6 +33,20 @@ export function saveGroups(account: string, groups: CryptGroup[]) {
   localStorage.setItem(`cheesecrypt-groups-${account}`, JSON.stringify(groups));
 }
 
+export function loadHiddenGroups(account: string): string[] {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(`cheesecrypt-hidden-groups-${account}`) || '[]');
+    return Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string' && /^[a-f0-9]{16}$/.test(id)) : [];
+  } catch { return []; }
+}
+
+export function setGroupHidden(account: string, id: string, hidden: boolean) {
+  if (!/^[a-f0-9]{16}$/.test(id)) return;
+  const ids = new Set(loadHiddenGroups(account));
+  if (hidden) ids.add(id); else ids.delete(id);
+  localStorage.setItem(`cheesecrypt-hidden-groups-${account}`, JSON.stringify([...ids]));
+}
+
 export function groupPayload(group: CryptGroup, text: string): string {
   const valid = parseGroup(group);
   if (!valid) throw new Error('Invalid group.');

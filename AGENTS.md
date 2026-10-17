@@ -31,7 +31,7 @@
 
 - CHEESECrypt's guide composes the shared DappAbout shell with a separate cryptography dialog; introductions accept ReactNode so inline detail triggers do not duplicate the shared presentation.
 
-- CHEESECrypt group envelopes live inside legacy pairwise encryption; immutable validated membership is discovered only after authenticated full assembly, and assembly isolates transactions/recipients before deduplicating sender fanout so separate copies cannot corrupt each other.
+- CHEESECrypt group envelopes use legacy pairwise encryption; discover immutable membership only after authenticated assembly, isolating transactions/recipients before deduplicating fanout. Per-owner hidden-group IDs affect visibility only, preserving definitions/history for restoration.
 
 - CHEESECrypt group transaction construction and composer totals share group pricing logic; historical group totals are labelled current-rate estimates because legacy memos do not encode the fee paid.
 
