@@ -206,9 +206,10 @@ export function assembleMessages(memos: DecodedMemo[]): AssembledMessage[] {
       out.push({ key: m.txId + m.memo, txId: m.txId, time: m.time, from: m.from, to: m.to, text: m.text, parts: 1, missing: 0 });
       continue;
     }
-    const k = `${m.from}:${p.id}`;
-    if (!groups.has(k)) groups.set(k, []);
-    groups.get(k)!.push({ m, p });
+    const k = `${m.txId}:${m.from}:${p.id}:${m.to}`;
+    const group = groups.get(k);
+    if (group) group.push({ m, p });
+    else groups.set(k, [{ m, p }]);
   }
   for (const [k, g] of groups) {
     const total = g[0].p.total;
