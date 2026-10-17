@@ -285,7 +285,7 @@ function Messenger({ account, session }: { account: string; session: NonNullable
                     {m.parts > 1 && ` · ${m.parts} parts`}
                     {m.missing > 0 && <span className="text-destructive"> · {m.missing} part{m.missing > 1 ? 's' : ''} not loaded</span>}
                     {m.txId && <> · <a href={`https://waxblock.io/transaction/${encodeURIComponent(m.txId)}`} target="_blank" rel="noreferrer"
-                      className="underline hover:text-cheese">Tx</a></>}
+                      className="font-semibold text-cheese underline underline-offset-2 hover:text-cheese/80">Tx</a></>}
                   </p>
                 </li>
               ))}
