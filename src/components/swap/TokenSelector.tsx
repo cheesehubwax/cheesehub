@@ -125,7 +125,7 @@ export function TokenSelector({ open, onClose, onSelect, selectedToken }: TokenS
                     </div>
                     {accountName && numBal > 0 && (
                       <span className="text-sm text-muted-foreground font-medium">
-                        {numBal.toLocaleString(undefined, { maximumFractionDigits: t.precision ?? 8 })}
+                        {numBal.toLocaleString(undefined, { maximumFractionDigits: Math.min(20, Math.max(0, t.precision ?? 8)) })}
                       </span>
                     )}
                   </button>
