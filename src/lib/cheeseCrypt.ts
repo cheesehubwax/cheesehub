@@ -99,10 +99,28 @@ export function loadContactAvatars(account: string): Record<string, CryptAvatar>
     return result;
   } catch { return {}; }
 }
+export function loadRemovedContacts(account: string): string[] {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(`cheesecrypt-removed-contacts-${account}`) || '[]');
+    return Array.isArray(raw) ? raw.filter((value): value is string => typeof value === 'string') : [];
+  } catch { return []; }
+}
+export function removeContact(account: string, contact: string) {
+  const contacts = loadContacts(account);
+  delete contacts[contact];
+  localStorage.setItem(contactStore(account), JSON.stringify(contacts));
+  const avatars = loadContactAvatars(account);
+  delete avatars[contact];
+  localStorage.setItem(`cheesecrypt-avatars-${account}`, JSON.stringify(avatars));
+  saveCryptName(account, contact, '');
+  saveCryptName(account, contact, '', 'nicknames');
+  localStorage.setItem(`cheesecrypt-removed-contacts-${account}`, JSON.stringify([...new Set([...loadRemovedContacts(account), contact])]));
+}
 export function saveContact(account: string, contact: string, publicKey: string, avatar?: CryptAvatar, displayName?: string) {
   const c = loadContacts(account);
   c[contact] = publicKey;
   localStorage.setItem(contactStore(account), JSON.stringify(c));
+  localStorage.setItem(`cheesecrypt-removed-contacts-${account}`, JSON.stringify(loadRemovedContacts(account).filter(name => name !== contact)));
   if (displayName !== undefined) saveCryptName(account, contact, displayName);
   if (avatar) {
     const avatars = loadContactAvatars(account);

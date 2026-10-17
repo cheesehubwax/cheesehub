@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Session } from '@wharfkit/session';
-import { generateKey, saveContact, saveKey, encryptMemo } from '@/lib/cheeseCrypt';
+import { generateKey, saveContact, saveKey, encryptMemo, loadContacts, loadKey, loadContactAvatars, loadRemovedContacts } from '@/lib/cheeseCrypt';
 import { loadCryptNames, saveCryptName } from '@/lib/cryptNames';
 import { loadGroups } from '@/lib/cryptGroups';
 import { Messenger } from '@/pages/CheeseCrypt';
@@ -25,6 +25,39 @@ beforeEach(() => {
 });
 
 describe('group creation and signing gate', () => {
+  it('removes friend metadata, stays removed after history refresh/remount, and permits explicit re-add', async () => {
+    const alice = generateKey('alice'), bob = generateKey('bob');
+    saveKey(alice);
+    saveContact('alice', 'bob', bob.publicKey, { version: 1, pixels: '0'.repeat(64) }, 'Bob Cheese');
+    saveCryptName('alice', 'bob', 'Best friend', 'nicknames');
+    const history = [{ txId: 'abc', time: 1, from: 'bob', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo('hi', alice.publicKey, bob.secretKey) }];
+    calls.fetch.mockResolvedValue(history);
+    const props = { account: 'alice', session: { permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session };
+    const view = render(<Messenger {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: /Best friend/ }));
+    await screen.findByText('hi');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove friend bob' }));
+    expect(loadContacts('alice').bob).toBeUndefined();
+    expect(loadContactAvatars('alice').bob).toBeUndefined();
+    expect(loadCryptNames('alice').bob).toBeUndefined();
+    expect(loadCryptNames('alice', 'nicknames').bob).toBeUndefined();
+    expect(loadContacts('alice').carol).toBeDefined();
+    expect(loadKey('alice')).toEqual(alice);
+    expect(loadRemovedContacts('alice')).toContain('bob');
+    expect(screen.queryByRole('button', { name: 'Remove friend bob' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh messages' }));
+    await waitFor(() => expect(calls.fetch).toHaveBeenCalledTimes(2));
+    view.unmount();
+    const remounted = render(<Messenger {...props} />);
+    await waitFor(() => expect(calls.fetch).toHaveBeenCalledTimes(3));
+    expect(screen.queryByRole('button', { name: 'Remove friend bob' })).not.toBeInTheDocument();
+    remounted.unmount();
+    saveContact('alice', 'bob', bob.publicKey);
+    render(<Messenger {...props} />);
+    expect(loadRemovedContacts('alice')).not.toContain('bob');
+    fireEvent.click(screen.getByRole('button', { name: /^bob/ }));
+    await screen.findByText('hi');
+  });
   it('renames a friend locally, reads it back after remount, and still sends to their WAX account', async () => {
     const alice = generateKey('alice'), bob = generateKey('bob');
     saveKey({ ...alice, displayName: 'Alice Cheese' });
