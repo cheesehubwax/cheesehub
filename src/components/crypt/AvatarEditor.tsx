@@ -39,14 +39,18 @@ async function nftPixels(image: string): Promise<CryptAvatar> {
   const controllers = urls.map(() => new AbortController());
   const timers = controllers.map(ctl => setTimeout(() => ctl.abort(), 10000));
   try {
-    return await Promise.any(urls.map(async (url, i) => {
+    const attempts = urls.map(async (url, i) => {
       if (!url.startsWith('/') && !url.startsWith('https://')) throw new Error('Unsupported image URL');
       const response = await fetch(url, { signal: controllers[i].signal });
       if (!response.ok) throw new Error('Image unavailable');
       const blob = await response.blob();
       if (blob.size > 10 * 1024 * 1024) throw new Error('Image too large');
       return pixelsFromBlob(blob);
-    }));
+    });
+    return await new Promise<CryptAvatar>((resolve, reject) => {
+      let remaining = attempts.length;
+      attempts.forEach(attempt => attempt.then(resolve, () => { if (--remaining === 0) reject(new Error('No image source answered')); }));
+    });
   } catch { throw new Error('Could not import this NFT image. Try another NFT or upload its image.'); }
   finally { timers.forEach(clearTimeout); controllers.forEach(ctl => ctl.abort()); }
 }
