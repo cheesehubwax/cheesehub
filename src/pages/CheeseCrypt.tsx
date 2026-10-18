@@ -478,15 +478,6 @@ export function Messenger({ account, session }: { account: string; session: NonN
     return (
       <div className="w-full max-w-md space-y-5 text-center">
         {fileInput}
-      {attachingMusic && <Dialog open onOpenChange={o => { if (!o) setAttachingMusic(false); }}>
-        <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto" aria-describedby={undefined}>
-          <DialogHeader><DialogTitle>🎵 Share a music NFT</DialogTitle></DialogHeader>
-          <p className="text-xs text-muted-foreground">Only the NFT's asset ID is added to your encrypted message. The sound and artwork are public on WAX.</p>
-          <MusicNftPicker account={account} onPick={nft => {
-            setText(t => `${t.trimEnd()}${t.trim() ? ' ' : ''}${nftToken(nft.asset_id)} `); setAttachingMusic(false);
-          }} />
-        </DialogContent>
-      </Dialog>}
       {profileEditor}
         <div className="space-y-2">
           <p className="text-lg font-semibold">🔑 Unlock your messages</p>
@@ -521,13 +512,21 @@ export function Messenger({ account, session }: { account: string; session: NonN
       {editingFriend && <FriendNameDialog account={editingFriend} nickname={nicknames[editingFriend]} sharedName={names[editingFriend]} onClose={() => setEditingFriend(null)} onSave={name => {
         saveCryptName(account, editingFriend, name, 'nicknames'); setNicknames(loadCryptNames(account, 'nicknames')); setEditingFriend(null);
       }} />}
-      {attachingNft && <Dialog open onOpenChange={o => { if (!o) setAttachingNft(false); }}>
+      {attachingNft && <Dialog open onOpenChange={o => { if (!o) { setAttachingNft(false); setAttachingMusic(false); } }}>
         <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto" aria-describedby={undefined}>
-          <DialogHeader><DialogTitle>🖼️ Share an NFT</DialogTitle></DialogHeader>
-          <p className="text-xs text-muted-foreground">Only the NFT's asset ID is added to your encrypted message. The artwork itself is public on WAX.</p>
-          <WalletAvatarPicker account={account} busy={false} onPick={nft => {
-            setText(t => `${t.trimEnd()}${t.trim() ? ' ' : ''}${nftToken(nft.asset_id)} `); setAttachingNft(false);
-          }} />
+          <DialogHeader><DialogTitle>🖼️ Attach an NFT</DialogTitle></DialogHeader>
+          <div className="flex gap-2">
+            <Button size="sm" variant={attachingMusic ? 'outline' : 'default'} className="h-7 text-xs" onClick={() => setAttachingMusic(false)}>🖼️ Pictures</Button>
+            <Button size="sm" variant={attachingMusic ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => setAttachingMusic(true)}>🎵 Music &amp; sound</Button>
+          </div>
+          <p className="text-xs text-muted-foreground">Only the NFT's asset ID is added to your encrypted message. The artwork and sound are public on WAX.</p>
+          {attachingMusic
+            ? <MusicNftPicker account={account} onPick={nft => {
+                setText(t => `${t.trimEnd()}${t.trim() ? ' ' : ''}${nftToken(nft.asset_id)} `); setAttachingNft(false); setAttachingMusic(false);
+              }} />
+            : <WalletAvatarPicker account={account} busy={false} onPick={nft => {
+                setText(t => `${t.trimEnd()}${t.trim() ? ' ' : ''}${nftToken(nft.asset_id)} `); setAttachingNft(false);
+              }} />}
         </DialogContent>
       </Dialog>}
       {profileEditor}
@@ -652,8 +651,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                   <span className={!voice && tooLong ? 'text-destructive' : 'text-muted-foreground'}>
                     {voice ? `${voiceParts} parts · ${voiceTxs} transaction${voiceTxs > 1 ? 's' : ''}` : `${bytes}/${maxBytes} · ${parts || 1} part${parts > 1 ? 's' : ''}`}{activeGroup && ` × ${copies} recipients`}
                   </span>
-                  {!voice && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAttachingNft(true)}>🖼️ Attach NFT</Button>}
-                  {!voice && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAttachingMusic(true)}>🎵 Attach music</Button>}
+                  {!voice && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setAttachingMusic(false); setAttachingNft(true); }}>🖼️ Attach NFT</Button>}
                   {!text.trim() && <VoiceRecorder clip={voice} onChange={setVoice} disabled={busy} />}
                   <TermsCheckbox checked={agreed} onCheckedChange={setAgreed} className="ml-2" />
                   <span className="ml-auto text-muted-foreground">{totalCost}</span>
