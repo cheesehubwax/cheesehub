@@ -432,8 +432,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     return (
       <div className="w-full max-w-md space-y-5 text-center">
         {fileInput}
-        {profileEditor}
-      {attachingNft && <Dialog open onOpenChange={o => { if (!o) setAttachingNft(false); }}>
+        {attachingNft && <Dialog open onOpenChange={o => { if (!o) setAttachingNft(false); }}>
         <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>🖼️ Share an NFT</DialogTitle></DialogHeader>
           <p className="text-xs text-muted-foreground">Only the NFT's asset ID is added to your encrypted message. The artwork itself is public on WAX.</p>
@@ -442,6 +441,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
           }} />
         </DialogContent>
       </Dialog>}
+      {profileEditor}
         <div className="space-y-2">
           <p className="text-lg font-semibold">🔑 Unlock your messages</p>
           <p className="text-sm text-muted-foreground">
