@@ -1,7 +1,7 @@
 import nacl from 'tweetnacl';
 import {
   assembleMessages, buildSendMessageActions, ChainMemo, decryptMemo, encryptMemo,
-  MAX_MESSAGE_BYTES, MESSAGE_FEE_QUANTITY, MESSAGE_RECIPIENT_QUANTITY, MessagingKey, partCount, plaintextBytes, splitMessage,
+  MAX_MESSAGE_BYTES, MESSAGE_FEE_QUANTITY, MESSAGE_RECIPIENT_QUANTITY, NFT_FEE_QUANTITY, MessagingKey, partCount, plaintextBytes, splitMessage,
 } from '@/lib/cheeseCrypt';
 
 export interface CryptGroup { id: string; members: string[] }
@@ -58,13 +58,14 @@ export function groupMessageSize(group: CryptGroup, text: string) {
 }
 
 /** One shared nulled fee per part, plus a payment to every recipient. */
-export function groupMessageCost(parts: number, recipients: number): string {
+export function groupMessageCost(parts: number, recipients: number, hasNft = false): string {
   const feeUnits = Math.round(parseFloat(MESSAGE_FEE_QUANTITY) * 10000);
   const recipientUnits = Math.round(parseFloat(MESSAGE_RECIPIENT_QUANTITY) * 10000);
-  return `${((feeUnits + recipientUnits * recipients) * parts / 10000).toFixed(4)} CHEESE`;
+  const nftExtra = hasNft ? Math.round(parseFloat(NFT_FEE_QUANTITY) * 10000) - feeUnits : 0;
+  return `${(((feeUnits + recipientUnits * recipients) * parts + nftExtra) / 10000).toFixed(4)} CHEESE`;
 }
 
-export function buildGroupMessageActions(key: MessagingKey, group: CryptGroup, text: string, contacts: Record<string, string>, auth: unknown[]) {
+export function buildGroupMessageActions(key: MessagingKey, group: CryptGroup, text: string, contacts: Record<string, string>, auth: unknown[], hasNft = false) {
   if (!text.trim()) throw new Error('Message is empty');
   const valid = parseGroup(group);
   if (!valid || !valid.members.includes(key.account)) throw new Error('You are not a member of this group.');
@@ -73,7 +74,7 @@ export function buildGroupMessageActions(key: MessagingKey, group: CryptGroup, t
   const parts = splitMessage(groupPayload(valid, text));
   return recipients.flatMap((to, recipientIndex) => {
     const actions = buildSendMessageActions(key.account, to,
-      parts.map(p => encryptMemo(p, contacts[to], key.secretKey)), auth);
+      parts.map(p => encryptMemo(p, contacts[to], key.secretKey)), auth, hasNft);
     // The direct-message builder alternates recipient payment and fee for each part.
     // Keep the fee only for the first recipient; every encrypted copy still gets paid.
     return recipientIndex === 0 ? actions : actions.filter((_, index) => index % 2 === 0);
