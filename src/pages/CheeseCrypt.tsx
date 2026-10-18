@@ -58,6 +58,41 @@ function download(name: string, data: unknown) {
   URL.revokeObjectURL(url);
 }
 
+/** Pure sound-effect-NFT posts render without the bubble box — sender header, playback and timestamp stay. */
+function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt }: {
+  m: ConversationEntry; account: string; keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>;
+  contacts: Record<string, string>; active: string; activeGroup: CryptGroup | null;
+  nameFor: (id: string) => string; openedAt: { current: number };
+}) {
+  const segments = m.text != null ? parseNftMessage(m.text) : null;
+  const soloAssetId = segments && segments.length === 1 && segments[0].type === 'nft' ? segments[0].assetId : null;
+  const { data } = useQuery({
+    queryKey: ['crypt-nft', soloAssetId], queryFn: () => fetchAssetById(soloAssetId!),
+    enabled: !!soloAssetId, staleTime: 3600_000,
+  });
+  const bare = !!soloAssetId && !!data?.isSfx;
+  return (
+    <li className={cn('w-fit max-w-[80%] text-sm',
+      bare ? (m.from === account ? 'ml-auto py-1' : 'py-1') : m.from === account
+        ? 'ml-auto rounded-lg px-3 py-2 bg-cheese/20 border border-cheese/30' : 'rounded-lg px-3 py-2 bg-muted')}>
+      <div className="flex items-center gap-2 mb-1">
+        <PixelAvatar account={m.from} avatar={m.from === account ? keyAvatar : avatars[m.from]} className="h-6 w-6" />
+        <p className="text-[10px] font-semibold opacity-80 break-words">{m.from === account ? `you · ${nameFor(account)}` : nameFor(m.from)}{nameFor(m.from) !== m.from && <span className="block font-normal">{m.from}</span>}</p>
+      </div>
+      <div className="whitespace-pre-wrap break-words">
+        {m.voice ? <VoiceNoteBubble note={m.voice} /> : m.text != null ? parseNftMessage(m.text).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} autoplayKey={m.time > openedAt.current ? `${m.key}:${i}` : undefined} /> : <span key={i} className="block">{seg.text}</span>) : <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
+      </div>
+      <p className="text-[10px] opacity-70 mt-1">
+        {new Date(m.time).toLocaleString()} · {m.group ? `${groupMessageCost(m.parts, m.group.members.length - 1, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))} at current rate` : messageCost(m.parts, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))}
+        {m.parts > 1 && ` · ${m.parts} parts`}
+        {m.missing > 0 && !m.voice && <span className="text-destructive"> · {m.missing} part{m.missing > 1 ? 's' : ''} not loaded</span>}
+        {m.txId && <> · <a href={`https://waxblock.io/transaction/${encodeURIComponent(m.txId)}`} target="_blank" rel="noreferrer"
+          className="font-semibold text-cheese underline underline-offset-2 hover:text-cheese/80">Tx</a></>}
+      </p>
+    </li>
+  );
+}
+
 const CheeseCrypt = () => {
   const { accountName, isConnected, login, session } = useWax();
 
