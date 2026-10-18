@@ -154,21 +154,39 @@ export const MAX_PLAINTEXT_BYTES = (() => {
 
 export const plaintextBytes = utf8Len;
 
-export function encryptMemo(text: string, theirPublic: string, mySecret: string): string {
-  if (!text) throw new Error('Message is empty');
-  if (utf8Len(text) > MAX_PLAINTEXT_BYTES) throw new Error(`Message is longer than ${MAX_PLAINTEXT_BYTES} bytes`);
+/** Encrypt raw bytes (at most MAX_PLAINTEXT_BYTES) into a CRYPT1: memo. */
+export function encryptBytesMemo(bytes: Uint8Array, theirPublic: string, mySecret: string): string {
+  if (!bytes.length) throw new Error('Message is empty');
+  if (bytes.length > MAX_PLAINTEXT_BYTES) throw new Error(`Message is longer than ${MAX_PLAINTEXT_BYTES} bytes`);
   const nonce = nacl.randomBytes(24);
-  const box = nacl.box(decodeUTF8(text), nonce, decodeBase64(theirPublic), decodeBase64(mySecret));
+  const box = nacl.box(bytes, nonce, decodeBase64(theirPublic), decodeBase64(mySecret));
   return `${MSG_PREFIX}${encodeBase64(nonce)}:${encodeBase64(box)}`;
 }
 
-export function decryptMemo(memo: string, theirPublic: string, mySecret: string): string | null {
-  if (!memo.startsWith(MSG_PREFIX)) return null;
-  const [n, c] = memo.slice(MSG_PREFIX.length).split(':');
+export function encryptMemo(text: string, theirPublic: string, mySecret: string): string {
+  if (!text) throw new Error('Message is empty');
+  if (utf8Len(text) > MAX_PLAINTEXT_BYTES) throw new Error(`Message is longer than ${MAX_PLAINTEXT_BYTES} bytes`);
+  return encryptBytesMemo(decodeUTF8(text), theirPublic, mySecret);
+}
+
+/** Decrypt a CRYPT1: or legacy GPKM1: memo to raw bytes; null if it is not readable with these keys. */
+export function decryptMemoBytes(memo: string, theirPublic: string, mySecret: string): Uint8Array | null {
+  const prefix = msgPrefixOf(memo);
+  if (!prefix) return null;
+  const [n, c] = memo.slice(prefix.length).split(':');
   try {
-    const out = nacl.box.open(decodeBase64(c), decodeBase64(n), decodeBase64(theirPublic), decodeBase64(mySecret));
-    return out ? encodeUTF8(out) : null;
+    return nacl.box.open(decodeBase64(c), decodeBase64(n), decodeBase64(theirPublic), decodeBase64(mySecret)) || null;
   } catch { return null; }
+}
+
+/** UTF-8 text from decrypted bytes, or null when they are not valid text. */
+export function bytesToText(bytes: Uint8Array): string | null {
+  try { return encodeUTF8(bytes); } catch { return null; }
+}
+
+export function decryptMemo(memo: string, theirPublic: string, mySecret: string): string | null {
+  const out = decryptMemoBytes(memo, theirPublic, mySecret);
+  return out ? bytesToText(out) : null;
 }
 
 // ---- Multi-part messages ----
