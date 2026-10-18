@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Pause, Play, Loader2 } from 'lucide-react';
 import { IpfsImage } from '@/components/shared/IpfsImage';

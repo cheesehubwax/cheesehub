@@ -1,4 +1,4 @@
-import { nftMediaTracks, type NftMediaTrack } from '@/lib/nftMedia';
+import { isSfxNft, nftMediaTracks, type NftMediaTrack } from '@/lib/nftMedia';
 import { ATOMIC_API, CHEESE_CONFIG, NFTHIVE_CONFIG } from '@/lib/waxConfig';
 import { fetchWithFallback } from '@/lib/fetchWithFallback';
 import { resolveEndpoints } from '@/lib/endpointHealth';
@@ -1067,7 +1067,7 @@ export async function fetchCollectionSales(collectionName: string, limit = 50): 
 export { getIpfsUrl };
 
 // Single asset lookup (CHEESECrypt shared NFT cards). Returns null when the asset is unknown.
-export async function fetchAssetById(assetId: string): Promise<{ asset_id: string; name: string; image: string; collection: string; mint: string; title?: string; artist?: string; tracks: NftMediaTrack[] } | null> {
+export async function fetchAssetById(assetId: string): Promise<{ asset_id: string; name: string; image: string; collection: string; mint: string; title?: string; artist?: string; tracks: NftMediaTrack[]; isSfx: boolean } | null> {
   if (!/^\d{1,20}$/.test(assetId)) return null;
   const response = await fetchWithFallback(ATOMIC_API.baseUrls, `${ATOMIC_API.paths.assets}/${assetId}`);
   const json = await response.json();
