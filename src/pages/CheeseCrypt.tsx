@@ -430,12 +430,38 @@ export function Messenger({ account, session }: { account: string; session: NonN
     finally { setBusy(false); }
   };
 
+  /** Signs each batch of up to 30 parts in turn; parts already sent stay on chain if a later one fails. */
+  const sendVoice = async () => {
+    if (!key || !active || !voice || missingKeys.length || !agreed) return;
+    setBusy(true);
+    let sent = 0, total = 0;
+    try {
+      const batches = buildVoiceBatches(key, recipients, activeGroup ?? null, voice, contacts, [permission]);
+      total = batches.length;
+      for (let i = 0; i < batches.length; i++) {
+        const r = await executeTransaction(batches[i], { successTitle: total > 1 ? `Voice note: transaction ${i + 1} of ${total} sent` : 'Voice note sent' });
+        if (!r.success) break;
+        sent++;
+      }
+    } catch (e) { toast({ title: 'Could not send voice note', description: (e as Error).message, variant: 'destructive' }); }
+    finally {
+      setBusy(false);
+      if (sent && sent === total) { setVoice(null); nearBottom.current = true; }
+      else if (sent) toast({ title: 'Voice note partly sent', description: `${sent} of ${total} transactions went through. The receiver will see it as incomplete and it will not play. You can send the recording again.`, variant: 'destructive' });
+      if (sent) [2000, 5000, 10000].forEach(ms => setTimeout(poll, ms));
+    }
+  };
+
   const hasNft = parseNftMessage(text).some(seg => seg.type === 'nft');
   const size = activeGroup ? groupMessageSize(activeGroup, text) : { bytes: plaintextBytes(text), parts: partCount(text), maxBytes: MAX_MESSAGE_BYTES };
   const { bytes, parts, maxBytes } = size;
   const tooLong = bytes > maxBytes || parts > MAX_PARTS;
   const copies = activeGroup ? recipients.length : 1;
-  const totalCost = activeGroup ? groupMessageCost(parts || 1, copies, hasNft) : messageCost(parts || 1, hasNft);
+  const voiceParts = voice ? voicePartCount(voice) : 0;
+  const voiceTxs = voiceTransactions(voiceParts);
+  const totalCost = voice
+    ? (activeGroup ? groupMessageCost(voiceParts, copies) : messageCost(voiceParts))
+    : activeGroup ? groupMessageCost(parts || 1, copies, hasNft) : messageCost(parts || 1, hasNft);
   const fileInput = (
     <input ref={fileRef} type="file" accept="application/json,.json" className="hidden"
       onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }} />
