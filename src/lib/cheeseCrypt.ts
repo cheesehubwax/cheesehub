@@ -22,6 +22,9 @@ export const FEE_MEMO = 'CHEESECrypt messaging fee';
 export const MESSAGE_RECIPIENT_QUANTITY = '0.0010 CHEESE';
 export const MESSAGE_FEE_QUANTITY = '0.0100 CHEESE';
 export const MESSAGE_TOTAL_QUANTITY = '0.0110 CHEESE';
+/** Nulled fee for the first part of a message that carries an NFT (replaces the normal fee). */
+export const NFT_FEE_QUANTITY = '0.0200 CHEESE';
+const units = (q: string) => Math.round(parseFloat(q) * 10000);
 
 export interface MessagingKey {
   type: 'gpk-msg-key';
@@ -247,9 +250,9 @@ export function assembleMessages(memos: DecodedMemo[]): AssembledMessage[] {
 }
 
 /** Total CHEESE for a message of `parts` parts (each part pays the full per-message price). */
-export function messageCost(parts: number): string {
-  const units = Math.round(parseFloat(MESSAGE_TOTAL_QUANTITY) * 10000) * parts;
-  return `${(units / 10000).toFixed(4)} CHEESE`;
+export function messageCost(parts: number, hasNft = false): string {
+  const total = units(MESSAGE_TOTAL_QUANTITY) * parts + (hasNft ? units(NFT_FEE_QUANTITY) - units(MESSAGE_FEE_QUANTITY) : 0);
+  return `${(total / 10000).toFixed(4)} CHEESE`;
 }
 
 export const keyMemo = (publicKey: string) => `${KEY_PREFIX}${publicKey}`;
@@ -259,11 +262,11 @@ function cheeseTransfer(from: string, to: string, quantity: string, memo: string
 }
 
 /** Every part pays recipient + nulled fee; all actions go in one transaction (all or nothing). */
-export function buildSendMessageActions(from: string, to: string, memo: string | string[], auth: unknown[]) {
+export function buildSendMessageActions(from: string, to: string, memo: string | string[], auth: unknown[], hasNft = false) {
   const memos = Array.isArray(memo) ? memo : [memo];
-  return memos.flatMap((m) => [
+  return memos.flatMap((m, i) => [
     cheeseTransfer(from, to, MESSAGE_RECIPIENT_QUANTITY, m, auth),
-    cheeseTransfer(from, KEY_PUBLISH_TO, MESSAGE_FEE_QUANTITY, FEE_MEMO, auth),
+    cheeseTransfer(from, KEY_PUBLISH_TO, hasNft && i === 0 ? NFT_FEE_QUANTITY : MESSAGE_FEE_QUANTITY, FEE_MEMO, auth),
   ]);
 }
 

@@ -75,3 +75,15 @@ describe('ad-hoc group messages', () => {
     expect(decodeConversations(rows.slice(1), bob, { alice: alice.publicKey }).some(m => m.group)).toBe(false);
   });
 });
+describe('NFT message pricing', () => {
+  it('direct NFT message costs 0.0210 CHEESE with 0.0200 nulled', async () => {
+    const { buildSendMessageActions } = await import('@/lib/cheeseCrypt');
+    const a = buildSendMessageActions('alice.wam', 'bob.wam', ['m'], [], true);
+    expect(a.map(x => x.data.quantity)).toEqual(['0.0010 CHEESE', '0.0200 CHEESE']);
+    expect(messageCost(1, true)).toBe('0.0210 CHEESE');
+  });
+  it('group NFT message nulls 0.0200 once plus 0.0010 per recipient', () => {
+    expect(groupMessageCost(1, 2, true)).toBe('0.0220 CHEESE');
+    expect(groupMessageCost(1, 5, true)).toBe('0.0250 CHEESE');
+  });
+});

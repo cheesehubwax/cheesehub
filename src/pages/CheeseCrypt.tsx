@@ -36,7 +36,7 @@ import {
 } from '@/lib/cryptVault';
 import type { PublicKeyFile } from '@/lib/cheeseCrypt';
 import {
-  ChainMemo, MAX_PLAINTEXT_BYTES, MESSAGE_FEE_QUANTITY, MESSAGE_RECIPIENT_QUANTITY, MESSAGE_TOTAL_QUANTITY, MessagingKey,
+  ChainMemo, MAX_PLAINTEXT_BYTES, MESSAGE_FEE_QUANTITY, MESSAGE_RECIPIENT_QUANTITY, MESSAGE_TOTAL_QUANTITY, NFT_FEE_QUANTITY, MessagingKey,
   MAX_MESSAGE_BYTES, MAX_PARTS, PART_BODY_BYTES, messageCost, partCount, splitMessage,
   buildPublishKeyActions, buildSendMessageActions, encryptMemo, fetchMessages, generateKey,
   loadContacts, loadContactAvatars, loadKey, loadRemovedContacts, removeContact, lookupPublishedKey, parseKeyFile, plaintextBytes, saveContact, saveKey, toPublicFile,
@@ -406,19 +406,20 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if (!key || !active || missingKeys.length || !agreed || !text.trim() || tooLong) return;
     setBusy(true);
     try {
-      const actions = activeGroup ? buildGroupMessageActions(key, activeGroup, text, contacts, [permission])
-        : buildSendMessageActions(account, active, splitMessage(text).map(p => encryptMemo(p, contacts[active], key.secretKey)), [permission]);
+      const actions = activeGroup ? buildGroupMessageActions(key, activeGroup, text, contacts, [permission], hasNft)
+        : buildSendMessageActions(account, active, splitMessage(text).map(p => encryptMemo(p, contacts[active], key.secretKey)), [permission], hasNft);
       const r = await executeTransaction(actions, { successTitle: 'Message sent' });
       if (r.success) { setText(''); nearBottom.current = true; [2000, 5000, 10000].forEach(ms => setTimeout(poll, ms)); }
     } catch (e) { toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' }); }
     finally { setBusy(false); }
   };
 
+  const hasNft = parseNftMessage(text).some(seg => seg.type === 'nft');
   const size = activeGroup ? groupMessageSize(activeGroup, text) : { bytes: plaintextBytes(text), parts: partCount(text), maxBytes: MAX_MESSAGE_BYTES };
   const { bytes, parts, maxBytes } = size;
   const tooLong = bytes > maxBytes || parts > MAX_PARTS;
   const copies = activeGroup ? recipients.length : 1;
-  const totalCost = activeGroup ? groupMessageCost(parts || 1, copies) : messageCost(parts || 1);
+  const totalCost = activeGroup ? groupMessageCost(parts || 1, copies, hasNft) : messageCost(parts || 1, hasNft);
   const fileInput = (
     <input ref={fileRef} type="file" accept="application/json,.json" className="hidden"
       onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }} />
@@ -577,7 +578,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                     {m.text != null ? parseNftMessage(m.text).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} /> : <span key={i} className="block">{seg.text}</span>) : <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
                   </div>
                   <p className="text-[10px] opacity-70 mt-1">
-                    {new Date(m.time).toLocaleString()} · {m.group ? `${groupMessageCost(m.parts, m.group.members.length - 1)} at current rate` : messageCost(m.parts)}
+                    {new Date(m.time).toLocaleString()} · {m.group ? `${groupMessageCost(m.parts, m.group.members.length - 1, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))} at current rate` : messageCost(m.parts, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))}
                     {m.parts > 1 && ` · ${m.parts} parts`}
                     {m.missing > 0 && <span className="text-destructive"> · {m.missing} part{m.missing > 1 ? 's' : ''} not loaded</span>}
                     {m.txId && <> · <a href={`https://waxblock.io/transaction/${encodeURIComponent(m.txId)}`} target="_blank" rel="noreferrer"
@@ -605,6 +606,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   {activeGroup ? `Each part: ${MESSAGE_FEE_QUANTITY} nulled once for the group + ${MESSAGE_RECIPIENT_QUANTITY} to each of ${copies} recipients. Group delivery uses ${copies} encrypted copies in one transaction. Membership is fixed; start a new group to change participants.` : `Each part: ${MESSAGE_RECIPIENT_QUANTITY} to ${active} + ${MESSAGE_FEE_QUANTITY} nulled (${MESSAGE_TOTAL_QUANTITY}). Long messages split into up to ${MAX_PARTS} parts (${MAX_PLAINTEXT_BYTES} bytes for one, ${PART_BODY_BYTES} per part after that), all in one transaction.`}
+                  {` Attaching an NFT raises the first part's nulled fee to ${NFT_FEE_QUANTITY}.`}
                 </p>
               </div>
             )}
