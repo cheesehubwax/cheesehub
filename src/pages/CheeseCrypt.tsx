@@ -618,12 +618,12 @@ export function Messenger({ account, session }: { account: string; session: NonN
                     <p className="text-[10px] font-semibold opacity-80 break-words">{m.from === account ? `you · ${nameFor(account)}` : nameFor(m.from)}{nameFor(m.from) !== m.from && <span className="block font-normal">{m.from}</span>}</p>
                   </div>
                   <div className="whitespace-pre-wrap break-words">
-                    {m.text != null ? parseNftMessage(m.text).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} /> : <span key={i} className="block">{seg.text}</span>) : <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
+                    {m.voice ? <VoiceNoteBubble note={m.voice} /> : m.text != null ? parseNftMessage(m.text).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} /> : <span key={i} className="block">{seg.text}</span>) : <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
                   </div>
                   <p className="text-[10px] opacity-70 mt-1">
                     {new Date(m.time).toLocaleString()} · {m.group ? `${groupMessageCost(m.parts, m.group.members.length - 1, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))} at current rate` : messageCost(m.parts, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))}
                     {m.parts > 1 && ` · ${m.parts} parts`}
-                    {m.missing > 0 && <span className="text-destructive"> · {m.missing} part{m.missing > 1 ? 's' : ''} not loaded</span>}
+                    {m.missing > 0 && !m.voice && <span className="text-destructive"> · {m.missing} part{m.missing > 1 ? 's' : ''} not loaded</span>}
                     {m.txId && <> · <a href={`https://waxblock.io/transaction/${encodeURIComponent(m.txId)}`} target="_blank" rel="noreferrer"
                       className="font-semibold text-cheese underline underline-offset-2 hover:text-cheese/80">Tx</a></>}
                   </p>
@@ -636,17 +636,21 @@ export function Messenger({ account, session }: { account: string; session: NonN
               <p className="text-sm text-muted-foreground p-4 border-t border-border">Public keys needed: {missingKeys.join(', ')}. Add them by name or load their public files.</p>
             ) : (
               <div className="space-y-2 p-4 border-t border-border">
-                <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder={activeGroup ? 'Message group' : `Message ${nameFor(active)}`} />
+                <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} disabled={!!voice} placeholder={voice ? 'Sending a voice note — discard it to type a message' : activeGroup ? 'Message group' : `Message ${nameFor(active)}`} />
                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className={tooLong ? 'text-destructive' : 'text-muted-foreground'}>
-                    {bytes}/{maxBytes} · {parts || 1} part{parts > 1 ? 's' : ''}{activeGroup && ` × ${copies} recipients`}
+                  <span className={!voice && tooLong ? 'text-destructive' : 'text-muted-foreground'}>
+                    {voice ? `${voiceParts} parts · ${voiceTxs} transaction${voiceTxs > 1 ? 's' : ''}` : `${bytes}/${maxBytes} · ${parts || 1} part${parts > 1 ? 's' : ''}`}{activeGroup && ` × ${copies} recipients`}
                   </span>
-                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAttachingNft(true)}>🖼️ Attach NFT</Button>
+                  {!voice && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAttachingNft(true)}>🖼️ Attach NFT</Button>}
+                  {!text.trim() && <VoiceRecorder clip={voice} onChange={setVoice} disabled={busy} />}
                   <TermsCheckbox checked={agreed} onCheckedChange={setAgreed} className="ml-2" />
                   <span className="ml-auto text-muted-foreground">{totalCost}</span>
-                  <Button size="sm" disabled={busy || !agreed || !text.trim() || tooLong} onClick={send}
-                    className="bg-cheese text-primary-foreground hover:bg-cheese/90">Send</Button>
+                  {voice
+                    ? <Button size="sm" disabled={busy || !agreed} onClick={sendVoice} className="bg-cheese text-primary-foreground hover:bg-cheese/90">Send voice{voiceTxs > 1 ? ` (${voiceTxs} signatures)` : ''}</Button>
+                    : <Button size="sm" disabled={busy || !agreed || !text.trim() || tooLong} onClick={send}
+                      className="bg-cheese text-primary-foreground hover:bg-cheese/90">Send</Button>}
                 </div>
+                {voice && <p className="text-[11px] text-muted-foreground">🎙️ Voice note: {voiceParts} encrypted parts, up to {VOICE_PARTS_PER_TX} per transaction, signed one after another. Each part costs the normal message rate. If a later transaction fails, the parts already sent stay on chain and the note shows as incomplete.</p>}
                 <p className="text-[11px] text-muted-foreground">
                   {activeGroup ? `Each part: ${MESSAGE_FEE_QUANTITY} nulled once for the group + ${MESSAGE_RECIPIENT_QUANTITY} to each of ${copies} recipients. Group delivery uses ${copies} encrypted copies in one transaction. Membership is fixed; start a new group to change participants.` : `Each part: ${MESSAGE_RECIPIENT_QUANTITY} to ${active} + ${MESSAGE_FEE_QUANTITY} nulled (${MESSAGE_TOTAL_QUANTITY}). Long messages split into up to ${MAX_PARTS} parts (${MAX_PLAINTEXT_BYTES} bytes for one, ${PART_BODY_BYTES} per part after that), all in one transaction.`}
                   {` Attaching an NFT raises the first part's nulled fee to ${NFT_FEE_QUANTITY}.`}
