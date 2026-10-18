@@ -1,45 +1,45 @@
-# CHEESECrypt Live Photo Drop (WebRTC, on-chain handshake, DMs + groups)
+# CHEESECrypt Encrypted Voice Notes (up to 10 seconds, on chain)
 
 ## What users get
-- A "📸 Live photo" button beside Attach NFT, in direct chats and groups.
-- The photo goes straight from your browser to your friends' browsers. It is never uploaded or pinned anywhere.
-- It only works while everyone is online with CHEESECrypt open. The sender sees each person's status: waiting → connecting → sent, or failed/timed out.
-- Photos are shrunk and compressed before sending: longest side up to 1024px, WebP/JPEG, 300 KB maximum. Big pictures are reduced automatically.
-- Received photos appear in the conversation for that session only. They are kept in memory, not stored on chain, and disappear on reload unless the receiver clicks Save. The chat shows a small "Live photo (not stored)" note.
-- Groups use a mesh: the sender connects to each friend separately, with up to 5 friends. Each friend who is online gets the photo; anyone who is offline gets "missed live photo".
+- A "🎙️ Voice" button beside Attach NFT, in direct chats and groups.
+- Press to record (up to 10 s, with a countdown ring). Stop, listen back, then Send or Discard.
+- Before signing, the sender sees the duration, the number of parts and transactions, and the total CHEESE cost.
+- The recording is encrypted in your browser before it goes on chain, in exactly the same way as text messages. Only the people in the chat can play it.
+- The receiver sees a play bubble with the duration. If any parts have not arrived yet, it shows "Voice note loading (x/y parts)". If parts are missing, it shows "Voice note incomplete" and does not try to play the broken audio.
+- Recordings are never uploaded anywhere. The audio exists only as encrypted memos on WAX.
 
-## Cost (same as messages)
-- Every connection message costs 0.0010 CHEESE to the other person plus 0.0100 CHEESE nulled per part, which is the normal message rate.
-- One drop = an offer to each recipient + a reply from each recipient. The receiver signs their reply, so they also pay their side.
-- The sender sees an estimated cost before signing. The receiver sees a prompt "alice wants to send you a live photo — Accept (costs X)" and nothing happens without their approval.
-- The usual Terms checkbox applies to both sending and accepting.
-- These fees count toward the `crypt` row in Null by Contract, because they use the same memo.
+## Size and sending
+- Recording format: Opus mono at the lowest speech bitrate the browser accepts (about 6–8 kbps). 10 s comes to roughly 8–10 KB.
+- Each memo carries about 135 bytes of audio, so a 10 s note is roughly 60–75 parts.
+- Parts are sent in batches of up to 30 per transaction, so about 2–3 transactions per note (5 at most). Each transaction is a separate wallet signature, and they are signed one after another.
+- If a later transaction fails or is cancelled, the parts already sent stay on chain. The sender sees "Voice note partly sent". The receiver sees it as incomplete, and it is never played.
 
-## How the handshake works
-```text
-Sender                                 WAX chain                       Receiver
-pick photo -> compress
-create connection offer --(encrypted multipart memo, 1 tx per recipient set)-->
-                                                             live polling (6s) sees offer
-                                                             Accept -> build answer
-               <--------(encrypted multipart memo, 1 tx)---------------
-sender polling sees answer -> direct browser link opens -> photo streams in chunks -> done
-```
-- Offers expire after 3 minutes. Late answers are ignored.
-- While a drop is pending, polling runs every 3s, then returns to 6s.
+## Cost (message rate, as agreed)
+- Each part costs 0.0010 CHEESE to each recipient plus 0.0100 CHEESE nulled. Groups use the existing group rule: one nulled fee per part plus 0.0010 per recipient.
+- Example: a 10 s DM with about 70 parts costs about 0.77 CHEESE.
+- The Terms checkbox is required. The fees count toward the `crypt` row in Null by Contract automatically, because they use the same fee memo.
 
-## Limitations to state in the UI/About
-- It needs both people online at roughly the same time.
-- Some strict networks (corporate, some mobile carriers) cannot connect directly without a relay server, and we are not adding one. In that case the drop fails clearly and nothing is charged beyond the signed handshake messages.
-- The handshake memos are encrypted, but the fact that a handshake happened (accounts, time) is public on WAX, the same as messages.
-- Connecting directly exposes each side's IP address to the other person. This will be stated in the About guide.
+## Limitations to show in the About guide
+- Safari and iPhone record in a different audio format. Recording there may be disabled or produce larger files. Playback of Opus/WebM on Safari will be checked, with a clear "not supported in this browser" note as the fallback.
+- A voice note uses many transactions, so the sender needs enough CPU/NET.
+- As with all messages, the accounts involved and the time are public on WAX. The audio itself is not.
 
 ## Technical details
-- New `src/lib/cryptLive.ts`: a payload prefix `\u0003CL1:` with JSON `{t:"offer"|"answer", id, sdp, exp, group?}`. The SDP is non-trickle (ICE gathered before sending), with unused lines stripped and compressed with `CompressionStream('deflate-raw')` + base64. It is sent through the existing `splitMessage`/`encryptMemo`/`buildSendMessageActions`, so existing message formats and fees stay unchanged. Groups reuse the per-recipient fanout and envelope validation from `cryptGroups` (offers are only accepted from members, and the `id` is bound to sender + recipient).
-- Handshake payloads are filtered out of the visible message list and handled by a `useLiveDrop` hook inside `Messenger`. The hook ignores expired, duplicate (txId) and own messages, and offers from removed contacts.
-- `RTCPeerConnection` uses public STUN (`stun:stun.l.google.com:19302`, `stun:stun.cloudflare.com:3478`) and has no TURN server. The data channel sends 16 KB chunks with a header carrying the size and SHA-256 hash. The receiver checks the size cap and hash, and checks the image MIME by its magic bytes, before rendering it through a blob URL.
-- Compression is done with canvas re-encoding, which also strips EXIF/location data.
-- The fee estimate uses the shared pricing helpers (`groupMessageCost` per recipient part count).
-- Tests: offer/answer encode→decode round trip; expired/duplicate/non-member offers rejected; fee for a 3-person group drop equals the sum of message-rate parts; oversize and wrong-hash transfers rejected; 300 KB cap enforced after compression.
-- A rule will be added to AGENTS.md: live drops use encrypted on-chain signaling at message rates, with no relay or storage, and photos are memory-only.
-- Mute memory-only photos on reload; hidden groups and removed friends cannot start drops.
+- New `src/lib/cryptVoice.ts`:
+  - Recording uses `MediaRecorder` with `audio/webm;codecs=opus`, `audioBitsPerSecond` 6000, a hard stop at 10 s and an 12 KB byte cap.
+  - New byte-level encryption helpers (`encryptBytesMemo` / `decryptBytesMemo`) share the `GPKM1:` memo prefix, so the memo format and Null tracking stay unchanged. The plaintext is raw bytes, not base64 text, which keeps the parts dense.
+  - Each part starts with a header: marker byte `0x02` + 6-char voice id + 2-byte part index + 2-byte total + 1-byte MIME code. The first part also carries the duration and a SHA-256 of the full audio.
+  - Reassembly groups parts by sender + recipient + voice id across transactions (not by txId). The note plays only when every part is present and the hash matches.
+  - The audio type is checked by its magic bytes (WebM/Ogg) before a blob URL is made.
+- Existing text decoding: plaintext that starts with `0x02` is routed to the voice assembler, so old clients' message formats are not affected. Older clients will show it as unreadable, which is acceptable.
+- Sending reuses `buildSendMessageActions` per batch for DMs and the `cryptGroups` per-recipient fanout for groups. Cost is shown through `messageCost` / `groupMessageCost`.
+- History fetch: a single 500-row page may cut a note in half. `fetchMessages` will page further (cursor by time) until the current window's voice notes are complete or a set cap is reached. Live polling also keeps notes that are still incomplete waiting for their remaining parts.
+- UI: a recorder component in `src/components/crypt/VoiceRecorder.tsx`, and a playback bubble in `VoiceNoteBubble.tsx` (play/pause, duration, progress), wired into `CheeseCrypt.tsx`. Unread badges count a voice note once.
+- Tests (`src/test/cryptVoice.test.ts`):
+  - split→encrypt→decrypt→assemble round trip
+  - parts arriving out of order and across transactions
+  - a missing part or a wrong hash is rejected
+  - a 10 s / 12 KB cap is enforced
+  - batches never exceed 30 parts
+  - DM and 3-person group cost equals the per-part message rate × parts
+- AGENTS.md rule: voice notes are byte-encrypted `GPKM1:` multipart memos assembled by voice id across transactions, played only when complete and hash-verified.
