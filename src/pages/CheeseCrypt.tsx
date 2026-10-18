@@ -649,24 +649,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
             <ol ref={listRef} className="flex-1 overflow-y-auto space-y-2 p-4"
               onScroll={(e) => { const el = e.currentTarget; nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
               {thread.map((m) => (
-                <li key={m.key}
-                  className={cn('w-fit max-w-[80%] rounded-lg px-3 py-2 text-sm',
-                    m.from === account ? 'ml-auto bg-cheese/20 border border-cheese/30' : 'bg-muted')}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <PixelAvatar account={m.from} avatar={m.from === account ? key.avatar : avatars[m.from]} className="h-6 w-6" />
-                    <p className="text-[10px] font-semibold opacity-80 break-words">{m.from === account ? `you · ${nameFor(account)}` : nameFor(m.from)}{nameFor(m.from) !== m.from && <span className="block font-normal">{m.from}</span>}</p>
-                  </div>
-                  <div className="whitespace-pre-wrap break-words">
-                    {m.voice ? <VoiceNoteBubble note={m.voice} /> : m.text != null ? parseNftMessage(m.text).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} autoplayKey={m.time > openedAt.current ? `${m.key}:${i}` : undefined} /> : <span key={i} className="block">{seg.text}</span>) : <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
-                  </div>
-                  <p className="text-[10px] opacity-70 mt-1">
-                    {new Date(m.time).toLocaleString()} · {m.group ? `${groupMessageCost(m.parts, m.group.members.length - 1, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))} at current rate` : messageCost(m.parts, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))}
-                    {m.parts > 1 && ` · ${m.parts} parts`}
-                    {m.missing > 0 && !m.voice && <span className="text-destructive"> · {m.missing} part{m.missing > 1 ? 's' : ''} not loaded</span>}
-                    {m.txId && <> · <a href={`https://waxblock.io/transaction/${encodeURIComponent(m.txId)}`} target="_blank" rel="noreferrer"
-                      className="font-semibold text-cheese underline underline-offset-2 hover:text-cheese/80">Tx</a></>}
-                  </p>
-                </li>
+                <ChatMessageItem key={m.key} m={m} account={account} keyAvatar={key?.avatar} avatars={avatars}
+                  contacts={contacts} active={active} activeGroup={activeGroup} nameFor={nameFor} openedAt={openedAt} />
               ))}
               {!thread.length && <li className="text-sm text-muted-foreground">{activeGroup ? 'No group messages yet.' : `No messages with ${nameFor(active)} yet.`}</li>}
               <li ref={endRef} aria-hidden />
