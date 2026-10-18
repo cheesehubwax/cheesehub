@@ -136,6 +136,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   /** Ticks so a stalled voice note moves from "loading" to "incomplete" without new history. */
   const [clock, setClock] = useState(() => Date.now());
   useEffect(() => { const id = window.setInterval(() => setClock(Date.now()), 30_000); return () => clearInterval(id); }, []);
+  useEffect(() => { setVoice(null); }, [active]);
   const [busy, setBusy] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
