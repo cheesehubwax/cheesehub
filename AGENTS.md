@@ -34,7 +34,7 @@
 
 - CHEESECrypt group envelopes use legacy pairwise encryption; discover immutable membership only after authenticated assembly, isolating transactions/recipients before deduplicating fanout. Per-owner hidden-group IDs affect visibility only, preserving definitions/history for restoration.
 
-- CHEESECrypt group transactions and composer totals share one pricing helper; history totals are current-rate estimates (memos don't encode fees).
+- CHEESECrypt group transactions and composer totals share one pricing helper; history totals are current-rate estimates (memos lack fees).
 
 - CHEESECrypt avatars are validated palette-index data in optional key-file fields and separate per-account contact storage; imports rasterize locally, and on-chain key memos stay unchanged to preserve compatibility and avoid executable or remote avatar payloads.
 
