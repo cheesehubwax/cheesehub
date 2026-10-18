@@ -18,7 +18,6 @@ import { playRandomFart } from '@/lib/fartSounds';
 import { cn } from '@/lib/utils';
 import { AvatarEditor, WalletAvatarPicker } from '@/components/crypt/AvatarEditor';
 import { CryptNftCard } from '@/components/crypt/CryptNftCard';
-import { MusicNftPicker } from '@/components/crypt/MusicNftPicker';
 import { nftToken, parseNftMessage } from '@/lib/cryptNft';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FriendNameDialog } from '@/components/crypt/FriendNameDialog';
@@ -124,7 +123,6 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [hiddenGroups, setHiddenGroups] = useState(() => loadHiddenGroups(account));
   const [showHiddenGroups, setShowHiddenGroups] = useState(false);
   const [attachingNft, setAttachingNft] = useState(false);
-  const [attachingMusic, setAttachingMusic] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [newContact, setNewContact] = useState('');
   const [memos, setMemos] = useState<ChainMemo[]>([]);
