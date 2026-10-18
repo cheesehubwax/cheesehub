@@ -12,7 +12,7 @@ export function VoiceRecorder({ clip, onChange, disabled }: { clip: VoiceClip | 
   const streamRef = useRef<MediaStream | null>(null);
   const timers = useRef<number[]>([]);
 
-  const url = useMemo(() => clip ? URL.createObjectURL(new Blob([clip.bytes], { type: clip.mime })) : null, [clip]);
+  const url = useMemo(() => clip ? URL.createObjectURL(new Blob([clip.bytes as BlobPart], { type: clip.mime })) : null, [clip]);
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
   const cleanup = () => {
     timers.current.forEach(t => { clearInterval(t); clearTimeout(t); }); timers.current = [];

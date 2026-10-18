@@ -9,7 +9,7 @@ export function VoiceNoteBubble({ note }: { note: VoiceNote }) {
     if (!note.mime || typeof document === 'undefined') return false;
     try { return document.createElement('audio').canPlayType(note.mime) !== ''; } catch { return false; }
   }, [note.mime]);
-  const url = useMemo(() => note.status === 'ready' && note.audio && canPlay ? URL.createObjectURL(new Blob([note.audio], { type: note.mime! })) : null, [note.status, note.audio, note.mime, canPlay]);
+  const url = useMemo(() => note.status === 'ready' && note.audio && canPlay ? URL.createObjectURL(new Blob([note.audio as BlobPart], { type: note.mime! })) : null, [note.status, note.audio, note.mime, canPlay]);
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
