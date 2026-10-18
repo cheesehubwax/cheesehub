@@ -6,9 +6,9 @@
 
 - CHEESEAir LP token columns aggregate current underlying quantities in normalized pair order, separate from USD payout weights so presentation never changes distribution.
 
-- CHEESEAir suffix snapshots read `eosio::newaccount` history from every Hyperion provider with a timestamp cursor (not skip) and union the results — providers index different slices of history and skip paging stops at 10,000 rows.
+- CHEESEAir suffix snapshots union every Hyperion provider's `eosio::newaccount` history using timestamp cursors, never skip: providers cover different slices and skip stops at 10,000 rows.
 
-- CHEESEFolio data is client-only (IndexedDB per account) and always re-derived from saved raw transfers, so classifier changes never need a rescan; live balances are the truth, history only supplies cost.
+- CHEESEFolio is client-only (IndexedDB per account), re-derived from saved raw transfers so classifier changes need no rescan; live balances are truth, history supplies cost.
 
 - CHEESEFolio's acquisition breakdown uses cumulative trade receipts and ledger free receipts, explicitly separate from current holdings; it never alters cost basis or infers which source remains after disposals.
 
