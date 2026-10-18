@@ -8,7 +8,7 @@ export function MusicNftPicker({ account, onPick }: { account: string; onPick: (
   const { nfts, isLoading, error, refetch } = useMusicNFTs(account);
   useEffect(() => { if (!nfts.length && !isLoading) void refetch(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (isLoading && !nfts.length) return <p className="text-sm text-muted-foreground">Loading your music NFTs…</p>;
-  if (error && !nfts.length) return <p className="text-sm text-destructive">Couldn't load your NFTs. <Button variant="link" className="h-auto p-0" onClick={() => void refetch(true)}>Try again</Button></p>;
+  if (error && !nfts.length) return <p className="text-sm text-destructive">Couldn't load your NFTs. <Button variant="link" className="h-auto p-0" onClick={() => void refetch()}>Try again</Button></p>;
   if (!nfts.length) return <p className="text-sm text-muted-foreground">No NFTs with sound or video found in {account}.</p>;
   return (
     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
