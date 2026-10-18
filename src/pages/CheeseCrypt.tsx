@@ -208,7 +208,14 @@ export function Messenger({ account, session }: { account: string; session: NonN
     return out;
   }, [memos, account]);
 
-  const conversations = useMemo(() => key ? decodeConversations(memos, key, contacts) : [], [memos, key, contacts]);
+  const conversations = useMemo(() => key ? decodeConversations(memos, key, contacts, clock) : [], [memos, key, contacts, clock]);
+  // A voice note spans several transactions; if one is unfinished right at the oldest loaded memo,
+  // its earlier parts are probably on the next history page, so read one page further (bounded).
+  useEffect(() => {
+    if (depth >= MAX_HISTORY_PAGES || !memos.length) return;
+    const oldest = memos.reduce((t, m) => Math.min(t, m.time), Infinity);
+    if (conversations.some(c => c.voice && c.voice.missing > 0 && c.time - oldest < 60_000)) setDepth(d => Math.min(MAX_HISTORY_PAGES, d + 1));
+  }, [conversations, memos, depth]);
   useEffect(() => {
     setGroups(current => {
       const merged = mergeGroups(current, conversations.flatMap(m => m.group ? [m.group] : []));
