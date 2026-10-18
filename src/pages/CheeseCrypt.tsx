@@ -567,7 +567,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
               onScroll={(e) => { const el = e.currentTarget; nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
               {thread.map((m) => (
                 <li key={m.key}
-                  className={cn('max-w-[80%] rounded-lg px-3 py-2 text-sm',
+                  className={cn('w-fit max-w-[80%] rounded-lg px-3 py-2 text-sm',
                     m.from === account ? 'ml-auto bg-cheese/20 border border-cheese/30' : 'bg-muted')}>
                   <div className="flex items-center gap-2 mb-1">
                     <PixelAvatar account={m.from} avatar={m.from === account ? key.avatar : avatars[m.from]} className="h-6 w-6" />
