@@ -80,8 +80,9 @@ describe('CHEESECrypt voice notes', () => {
   it('never puts more than 30 parts in one transaction', () => {
     const v = clip(VOICE_MAX_BYTES, 10_000);
     const batches = buildVoiceBatches(a, ['bob.wam'], null, v, { 'bob.wam': b.publicKey }, []);
-    batches.forEach(t => expect(t.length / 2).toBeLessThanOrEqual(VOICE_PARTS_PER_TX));
-    expect(batches.reduce((n, t) => n + t.length / 2, 0)).toBe(voicePartCount(v));
+    const partsIn = (t: unknown[]) => (t as { data: { to: string } }[]).filter(x => x.data.to === 'bob.wam').length;
+    batches.forEach(t => expect(partsIn(t)).toBeLessThanOrEqual(VOICE_PARTS_PER_TX));
+    expect(batches.reduce((n, t) => n + partsIn(t), 0)).toBe(voicePartCount(v));
   });
   it('costs 1 CHEESE nulled once plus 0.0010 per part per recipient', () => {
     const v = clip();
