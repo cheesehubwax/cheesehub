@@ -78,3 +78,12 @@ export function nftMediaTracks(allData: Record<string, unknown>, resolve: Resolv
   for (const e of extractExtraAudioUrls(allData, resolve)) add(e.label, e.url);
   return tracks;
 }
+
+/** Sound-effect NFTs: any field (any case) whose value is "sfx", or an `sfx` flag set to true/1/yes. */
+export function isSfxNft(data: Record<string, unknown>): boolean {
+  return Object.entries(data).some(([k, v]) => {
+    const val = typeof v === 'string' ? v.trim().toLowerCase() : v;
+    if (val === 'sfx') return true;
+    return k.trim().toLowerCase() === 'sfx' && (val === true || val === 1 || val === '1' || val === 'true' || val === 'yes');
+  });
+}
