@@ -18,6 +18,8 @@ import { playRandomFart } from '@/lib/fartSounds';
 import { cn } from '@/lib/utils';
 import { AvatarEditor, WalletAvatarPicker } from '@/components/crypt/AvatarEditor';
 import { CryptNftCard } from '@/components/crypt/CryptNftCard';
+import { useQuery } from '@tanstack/react-query';
+import { fetchAssetById } from '@/services/atomicApi';
 import { nftToken, parseNftMessage } from '@/lib/cryptNft';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FriendNameDialog } from '@/components/crypt/FriendNameDialog';
@@ -32,7 +34,7 @@ import { VoiceRecorder } from '@/components/crypt/VoiceRecorder';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { buildVoiceBatches, voicePartCount, voiceTransactions, VOICE_PARTS_PER_TX, type VoiceClip } from '@/lib/cryptVoice';
 import { baselineMarks, loadReadMarks, saveReadMarks, unreadCounts, type ReadMarks } from '@/lib/cryptUnread';
-import { buildGroupMessageActions, createGroup, decodeConversations, groupMessageCost, groupMessageSize, loadGroups, loadHiddenGroups, mergeGroups, saveGroups, setGroupHidden, type CryptGroup } from '@/lib/cryptGroups';
+import { buildGroupMessageActions, createGroup, decodeConversations, groupMessageCost, groupMessageSize, loadGroups, loadHiddenGroups, mergeGroups, saveGroups, setGroupHidden, type ConversationEntry, type CryptGroup } from '@/lib/cryptGroups';
 import {
   DirHandle, FRIENDS_DIR, PRIVATE_DIR, VAULT_DIR, VaultFileExistsError, friendKeyName, pickVault, privateKeyName,
   readFriendKeys, recallVault, rememberVault, updatePrivateKeyProfile, vaultSupported, vaultWritable, writeFriendKey, writeOwnPublicKey,
