@@ -512,21 +512,13 @@ export function Messenger({ account, session }: { account: string; session: NonN
       {editingFriend && <FriendNameDialog account={editingFriend} nickname={nicknames[editingFriend]} sharedName={names[editingFriend]} onClose={() => setEditingFriend(null)} onSave={name => {
         saveCryptName(account, editingFriend, name, 'nicknames'); setNicknames(loadCryptNames(account, 'nicknames')); setEditingFriend(null);
       }} />}
-      {attachingNft && <Dialog open onOpenChange={o => { if (!o) { setAttachingNft(false); setAttachingMusic(false); } }}>
+      {attachingNft && <Dialog open onOpenChange={o => { if (!o) setAttachingNft(false); }}>
         <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>🖼️ Attach an NFT</DialogTitle></DialogHeader>
-          <div className="flex gap-2">
-            <Button size="sm" variant={attachingMusic ? 'outline' : 'default'} className="h-7 text-xs" onClick={() => setAttachingMusic(false)}>🖼️ Pictures</Button>
-            <Button size="sm" variant={attachingMusic ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => setAttachingMusic(true)}>🎵 Music &amp; sound</Button>
-          </div>
-          <p className="text-xs text-muted-foreground">Only the NFT's asset ID is added to your encrypted message. The artwork and sound are public on WAX.</p>
-          {attachingMusic
-            ? <MusicNftPicker account={account} onPick={nft => {
-                setText(t => `${t.trimEnd()}${t.trim() ? ' ' : ''}${nftToken(nft.asset_id)} `); setAttachingNft(false); setAttachingMusic(false);
-              }} />
-            : <WalletAvatarPicker account={account} busy={false} onPick={nft => {
-                setText(t => `${t.trimEnd()}${t.trim() ? ' ' : ''}${nftToken(nft.asset_id)} `); setAttachingNft(false);
-              }} />}
+          <p className="text-xs text-muted-foreground">Pick any NFT. If it has sound, a play button appears in the chat. Only the NFT's asset ID is added to your encrypted message; the artwork and sound are public on WAX.</p>
+          <WalletAvatarPicker account={account} busy={false} onPick={nft => {
+            setText(t => `${t.trimEnd()}${t.trim() ? ' ' : ''}${nftToken(nft.asset_id)} `); setAttachingNft(false);
+          }} />
         </DialogContent>
       </Dialog>}
       {profileEditor}
