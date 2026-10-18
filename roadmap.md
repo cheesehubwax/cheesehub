@@ -1,5 +1,5 @@
 # CHEESEHub roadmap
-- [ ] Fix uppercase Audio/common sound fields in both NFT players and refresh stale music classifications.
+- [x] Uppercase Audio/common sound fields recognized in both NFT players; stale music cache refreshed and raw bafk playback fallback corrected; 17 tests passed. Real-wallet sound playback remains unverified without the user's NFT/account.
 - [x] CHEESECrypt: one cheesecrypt folder shared by all accounts on this device; friends loaded from friends/ for every account (nicknames/removals per account); Save to friends refreshes the friend file. 59 tests passed; real OS folder unverified.
 - [x] CHEESECrypt: reversible group hiding and collapsible Hidden groups; 28 tests passed, history preserved after new messages/remount, isolated Chrome hide/reload/view/restore verified.
 - [x] CHEESECrypt: profile-first key creation, backup then sharing; verified matching-key profile-only backup updates, download fallback, 57 regression tests passed. Isolated Chrome walkthrough verified initial private/public profile files, edit download and persistence; actual OS folder picker and real-wallet publishing remain unverified.
