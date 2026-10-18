@@ -324,23 +324,43 @@ async function hyperionTransfers(query: string): Promise<ChainMemo[]> {
 // Continue reading legacy WAX messages and published keys.
 const FILTER = 'filter=eosio.token:transfer,cheeseburger:transfer';
 
-/** Newest key the account published on chain, if any. */
+/** Newest key the account published on chain (new or legacy prefix), if any. */
 export async function lookupPublishedKey(account: string): Promise<string | null> {
-  const rows = await hyperionTransfers(`account=${account}&${FILTER}&transfer.to=${KEY_PUBLISH_TO}&sort=desc&limit=100`);
+  return newestPublishedKey(account, await hyperionTransfers(`account=${account}&${FILTER}&transfer.to=${KEY_PUBLISH_TO}&sort=desc&limit=100`));
+}
+
+/** Rows are newest first; the first valid key memo from the account wins, whichever prefix it uses. */
+export function newestPublishedKey(account: string, rows: ChainMemo[]): string | null {
   for (const r of rows) {
-    if (r.from !== account || !r.memo.startsWith(KEY_PREFIX)) continue;
-    const k = r.memo.slice(KEY_PREFIX.length).trim();
+    const prefix = keyPrefixOf(r.memo);
+    if (r.from !== account || !prefix) continue;
+    const k = r.memo.slice(prefix.length).trim();
     if (validKey(k, 32)) return k;
   }
   return null;
 }
 
-/** Encrypted messages sent or received by the account (newest first, deduped). */
-export async function fetchMessages(account: string): Promise<ChainMemo[]> {
-  const rows = await hyperionTransfers(`account=${account}&${FILTER}&sort=desc&limit=500`);
+export const HISTORY_PAGE = 500;
+export const MAX_HISTORY_PAGES = 4;
+
+/**
+ * Encrypted messages sent or received by the account (newest first, deduped).
+ * `pages` > 1 reads further back by timestamp, so multi-transaction voice notes are not cut in half.
+ */
+export async function fetchMessages(account: string, pages = 1): Promise<ChainMemo[]> {
+  let rows: ChainMemo[] = [];
+  let before: string | null = null;
+  for (let p = 0; p < Math.min(Math.max(1, pages), MAX_HISTORY_PAGES); p++) {
+    const page = await hyperionTransfers(`account=${account}&${FILTER}&sort=desc&limit=${HISTORY_PAGE}${before ? `&before=${encodeURIComponent(before)}` : ''}`);
+    rows = rows.concat(page);
+    if (page.length < HISTORY_PAGE) break;
+    const oldest = Math.min(...page.map(r => r.time).filter(Number.isFinite));
+    if (!Number.isFinite(oldest)) break;
+    before = new Date(oldest).toISOString();
+  }
   const seen = new Set<string>();
   return rows.filter((r) => {
-    if (!r.memo.startsWith(MSG_PREFIX) || (r.from !== account && r.to !== account)) return false;
+    if (!msgPrefixOf(r.memo) || (r.from !== account && r.to !== account)) return false;
     const id = `${r.txId}:${r.memo}`;
     if (seen.has(id)) return false;
     seen.add(id);
