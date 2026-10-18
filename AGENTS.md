@@ -34,7 +34,7 @@
 
 - CHEESECrypt group envelopes use legacy pairwise encryption; discover immutable membership only after authenticated assembly, isolating transactions/recipients before deduplicating fanout. Per-owner hidden-group IDs affect visibility only, preserving definitions/history for restoration.
 
-- Crypt uses integer fee splits and explicit fee omission for fanout; never filter action indexes. Confirm payment before local key creation; imports stay free. History uses current rates.
+- Crypt uses integer fee splits; fanout omits fees explicitly, not by indexes. Confirm payment before local key creation; imports stay free. History uses current rates.
 
 - CHEESECrypt avatars are validated palette-index data in optional key-file fields and separate per-account contact storage; imports rasterize locally, and on-chain key memos stay unchanged to preserve compatibility and avoid executable or remote avatar payloads.
 
