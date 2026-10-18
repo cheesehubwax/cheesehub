@@ -32,7 +32,7 @@ import { ShareKeyDialog } from '@/components/crypt/ShareKeyDialog';
 import { CryptAbout } from '@/components/crypt/CryptAbout';
 import { VoiceRecorder } from '@/components/crypt/VoiceRecorder';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
-import { buildVoiceBatches, voicePartCount, voiceTransactions, VOICE_PARTS_PER_TX, type VoiceClip } from '@/lib/cryptVoice';
+import { buildVoiceBatches, voiceNoteCost, voicePartCount, voiceTransactions, VOICE_PARTS_PER_TX, type VoiceClip } from '@/lib/cryptVoice';
 import { baselineMarks, loadReadMarks, saveReadMarks, unreadCounts, type ReadMarks } from '@/lib/cryptUnread';
 import { buildGroupMessageActions, createGroup, decodeConversations, groupMessageCost, groupMessageSize, loadGroups, loadHiddenGroups, mergeGroups, saveGroups, setGroupHidden, type ConversationEntry, type CryptGroup } from '@/lib/cryptGroups';
 import {
@@ -500,7 +500,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const voiceParts = voice ? voicePartCount(voice) : 0;
   const voiceTxs = voiceTransactions(voiceParts);
   const totalCost = voice
-    ? (activeGroup ? groupMessageCost(voiceParts, copies) : messageCost(voiceParts))
+    ? voiceNoteCost(voiceParts, copies)
     : activeGroup ? groupMessageCost(parts || 1, copies, hasNft) : messageCost(parts || 1, hasNft);
   const fileInput = (
     <input ref={fileRef} type="file" accept="application/json,.json" className="hidden"
@@ -673,7 +673,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                     : <Button size="sm" disabled={busy || !agreed || !text.trim() || tooLong} onClick={send}
                       className="bg-cheese text-primary-foreground hover:bg-cheese/90">Send</Button>}
                 </div>
-                {voice && <p className="text-[11px] text-muted-foreground">🎙️ Voice note: {voiceParts} encrypted parts, up to {VOICE_PARTS_PER_TX} per transaction, signed one after another. Each part costs the normal message rate. If a later transaction fails, the parts already sent stay on chain and the note shows as incomplete.</p>}
+                {voice && <p className="text-[11px] text-muted-foreground">🎙️ Voice note: {voiceParts} encrypted parts, up to {VOICE_PARTS_PER_TX} per transaction, signed one after another. A flat 1 CHEESE is nulled once (in the first transaction), plus 0.0010 CHEESE per part to each recipient. If a later transaction fails, the parts already sent stay on chain and the note shows as incomplete.</p>}
                 <p className="text-[11px] text-muted-foreground">
                   {activeGroup ? `Each part: ${MESSAGE_FEE_QUANTITY} nulled once for the group + ${MESSAGE_RECIPIENT_QUANTITY} to each of ${copies} recipients. Group delivery uses ${copies} encrypted copies in one transaction. Membership is fixed; start a new group to change participants.` : `Each part: ${MESSAGE_RECIPIENT_QUANTITY} to ${active} + ${MESSAGE_FEE_QUANTITY} nulled (${MESSAGE_TOTAL_QUANTITY}). Long messages split into up to ${MAX_PARTS} parts (${MAX_PLAINTEXT_BYTES} bytes for one, ${PART_BODY_BYTES} per part after that), all in one transaction.`}
                   {` Attaching an NFT raises the first part's nulled fee to ${NFT_FEE_QUANTITY}.`}

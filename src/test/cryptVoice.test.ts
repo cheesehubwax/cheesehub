@@ -6,7 +6,7 @@ import {
 } from '@/lib/cheeseCrypt';
 import { isCryptNullMemo } from '@/lib/cheeseNullBreakdown';
 import { decodeConversations, groupMessageCost, createGroup } from '@/lib/cryptGroups';
-import { buildVoiceBatches, splitVoice, voicePartCount, VOICE_MAX_BYTES, VOICE_PARTS_PER_TX, type VoiceClip } from '@/lib/cryptVoice';
+import { buildVoiceBatches, splitVoice, voiceNoteCost, voicePartCount, VOICE_MAX_BYTES, VOICE_PARTS_PER_TX, type VoiceClip } from '@/lib/cryptVoice';
 
 const a = generateKey('alice.wam'), b = generateKey('bob.wam'), c = generateKey('carol.wam');
 const webm = (n: number) => { const x = nacl.randomBytes(n); x.set([0x1a, 0x45, 0xdf, 0xa3]); return x; };
@@ -80,20 +80,26 @@ describe('CHEESECrypt voice notes', () => {
   it('never puts more than 30 parts in one transaction', () => {
     const v = clip(VOICE_MAX_BYTES, 10_000);
     const batches = buildVoiceBatches(a, ['bob.wam'], null, v, { 'bob.wam': b.publicKey }, []);
-    batches.forEach(t => expect(t.length / 2).toBeLessThanOrEqual(VOICE_PARTS_PER_TX));
-    expect(batches.reduce((n, t) => n + t.length / 2, 0)).toBe(voicePartCount(v));
+    const partsIn = (t: unknown[]) => (t as { data: { to: string } }[]).filter(x => x.data.to === 'bob.wam').length;
+    batches.forEach(t => expect(partsIn(t)).toBeLessThanOrEqual(VOICE_PARTS_PER_TX));
+    expect(batches.reduce((n, t) => n + partsIn(t), 0)).toBe(voicePartCount(v));
   });
-  it('costs the message rate per part in DMs and groups', () => {
+  it('costs 1 CHEESE nulled once plus 0.0010 per part per recipient', () => {
     const v = clip();
     const parts = voicePartCount(v);
-    const dm = buildVoiceBatches(a, ['bob.wam'], null, v, { 'bob.wam': b.publicKey }, []).flat() as { data: { quantity: string } }[];
-    const sum = (l: { data: { quantity: string } }[]) => (l.reduce((t, x) => t + Math.round(parseFloat(x.data.quantity) * 10000), 0) / 10000).toFixed(4) + ' CHEESE';
-    expect(sum(dm)).toBe(messageCost(parts));
-    expect(messageCost(parts)).toBe(`${(parts * 0.011).toFixed(4)} CHEESE`);
+    type T = { data: { to: string; quantity: string } };
+    const sum = (l: T[]) => (l.reduce((t, x) => t + Math.round(parseFloat(x.data.quantity) * 10000), 0) / 10000).toFixed(4) + ' CHEESE';
+    const dmBatches = buildVoiceBatches(a, ['bob.wam'], null, v, { 'bob.wam': b.publicKey }, []);
+    const dm = dmBatches.flat() as T[];
+    expect(dm.filter(x => x.data.to === 'eosio.null').map(x => x.data.quantity)).toEqual(['1.0000 CHEESE']);
+    expect((dmBatches[0] as T[]).some(x => x.data.to === 'eosio.null')).toBe(true);
+    expect(sum(dm)).toBe(voiceNoteCost(parts, 1));
+    expect(voiceNoteCost(parts, 1)).toBe(`${(1 + parts * 0.001).toFixed(4)} CHEESE`);
     const group = createGroup('alice.wam', ['bob.wam', 'carol.wam']);
-    const g = buildVoiceBatches(a, ['bob.wam', 'carol.wam'], group, v, { 'bob.wam': b.publicKey, 'carol.wam': c.publicKey }, []).flat() as { data: { quantity: string } }[];
-    expect(sum(g)).toBe(groupMessageCost(parts, 2));
-    expect(groupMessageCost(parts, 2)).toBe(`${(parts * 0.012).toFixed(4)} CHEESE`);
+    const g = buildVoiceBatches(a, ['bob.wam', 'carol.wam'], group, v, { 'bob.wam': b.publicKey, 'carol.wam': c.publicKey }, []).flat() as T[];
+    expect(g.filter(x => x.data.to === 'eosio.null')).toHaveLength(1);
+    expect(sum(g)).toBe(voiceNoteCost(parts, 2));
+    expect(voiceNoteCost(parts, 2)).toBe(`${(1 + parts * 0.002).toFixed(4)} CHEESE`);
   });
   it('group notes land in the group and show once for the sender', () => {
     const group = createGroup('alice.wam', ['bob.wam', 'carol.wam']);
