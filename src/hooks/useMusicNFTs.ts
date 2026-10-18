@@ -3,12 +3,9 @@ import { useWax } from '@/context/WaxContext';
 import { fetchWithFallback } from '@/lib/fetchWithFallback';
 import { ATOMIC_API } from '@/lib/waxConfig';
 import { waxRpcCall } from '@/lib/waxRpcFallback';
+import { isMusicNFT, extractExtraAudioUrls as extractSharedExtraAudioUrls, type ExtraAudioEntry } from '@/lib/nftMedia';
 
-export interface ExtraAudioEntry {
-  label: string;
-  url: string;
-  key: string;
-}
+export type { ExtraAudioEntry };
 
 export interface MusicNFT {
   asset_id: string;
@@ -121,44 +118,7 @@ function getMediaUrl(field: string | undefined): string {
   return field;
 }
 
-function isMusicNFT(data: Record<string, unknown>): boolean {
-  if (data.audio) return true;
-  if (data.clip) return true;
-  if (data.video) return true;
-  return false;
-}
-
-const EXTRA_AUDIO_PATTERN = /^(audio\s*\d+|track\s*\d+|fulltrack|full_audio|full_song|bonus_track)$/i;
-
-function extractExtraAudioUrls(allData: Record<string, unknown>): ExtraAudioEntry[] {
-  const entries: ExtraAudioEntry[] = [];
-  const keys = Object.keys(allData).filter(k => EXTRA_AUDIO_PATTERN.test(k) && allData[k] && typeof allData[k] === 'string');
-  
-  // Sort so audio1 < audio2 < track1 etc.
-  keys.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-  
-  for (const key of keys) {
-    const url = getMediaUrl(allData[key] as string);
-    if (url) {
-      // Generate a friendly label
-      const num = key.match(/\d+/);
-      let label: string;
-      if (key.toLowerCase().startsWith('audio') && num) {
-        label = `Track ${num[0]}`;
-      } else if (key.toLowerCase().startsWith('track') && num) {
-        label = `Track ${num[0]}`;
-      } else if (key.toLowerCase().includes('full')) {
-        label = 'Full Track';
-      } else if (key.toLowerCase().includes('bonus')) {
-        label = 'Bonus Track';
-      } else {
-        label = key;
-      }
-      entries.push({ label, url, key });
-    }
-  }
-  return entries;
-}
+const extractExtraAudioUrls = (allData: Record<string, unknown>) => extractSharedExtraAudioUrls(allData, getMediaUrl);
 
 function getCachedMusicNFTs(owner: string): CachedMusicData | null {
   try {
