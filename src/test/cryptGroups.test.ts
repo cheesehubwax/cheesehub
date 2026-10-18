@@ -77,13 +77,17 @@ describe('ad-hoc group messages', () => {
   });
 });
 describe('NFT message pricing', () => {
-  it('direct NFT message costs 0.0210 CHEESE with 0.0200 nulled', async () => {
+  it('direct NFT message costs 0.0210 CHEESE with a split 0.0200 platform fee', async () => {
     const { buildSendMessageActions } = await import('@/lib/cheeseCrypt');
     const a = buildSendMessageActions('alice.wam', 'bob.wam', ['m'], [], true);
     expect(a.map(x => x.data.quantity)).toEqual(['0.0010 CHEESE', '0.0160 CHEESE', '0.0040 CHEESE']);
     expect(messageCost(1, true)).toBe('0.0210 CHEESE');
   });
-  it('group NFT message nulls 0.0200 once plus 0.0010 per recipient', () => {
+  it('group NFT message splits 0.0200 once plus 0.0010 per recipient', () => {
+    const actions = buildGroupMessageActions(alice, group, '[nft:1099512345678]', contacts, [], true);
+    expect(actions.filter(a => a.data.to === 'eosio.null').map(a => a.data.quantity)).toEqual(['0.0160 CHEESE']);
+    expect(actions.filter(a => a.data.to === 'xcheeseliqst').map(a => a.data.quantity)).toEqual(['0.0040 CHEESE']);
+    expect(actions.filter(a => contacts[a.data.to]).map(a => a.data.quantity)).toEqual(['0.0010 CHEESE', '0.0010 CHEESE']);
     expect(groupMessageCost(1, 2, true)).toBe('0.0220 CHEESE');
     expect(groupMessageCost(1, 5, true)).toBe('0.0250 CHEESE');
   });

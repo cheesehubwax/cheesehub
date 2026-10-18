@@ -111,6 +111,32 @@ describe('profile-first key setup', () => {
     expect(loadKey('alice')).toEqual(existing);
     expect(calls.transact).not.toHaveBeenCalled();
   });
+  it('preserves the selected profile after wallet rejection and permits retry without double payment', async () => {
+    render(<Messenger {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Create a new key' }));
+    fireEvent.change(await screen.findByLabelText('CHEESECrypt name'), { target: { value: 'Alice Cheese' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+    fireEvent.click(screen.getByRole('checkbox'));
+    calls.transact.mockRejectedValueOnce(new Error('Wallet rejected'));
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Pay 100 CHEESE & create key' })); });
+    expect(loadKey('alice')).toBeNull();
+    let confirmPayment: ((value: { success: boolean; txId: string }) => void) | undefined;
+    calls.transact.mockImplementationOnce(() => new Promise(resolve => { confirmPayment = resolve; }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pay 100 CHEESE & create key' }));
+    expect(screen.getByRole('button', { name: 'Confirming payment…' })).toBeDisabled();
+    expect(calls.transact).toHaveBeenCalledTimes(2);
+    await act(async () => { confirmPayment?.({ success: true, txId: 'confirmed' }); });
+    expect(loadKey('alice')?.displayName).toBe('Alice Cheese');
+    expect(calls.transact).toHaveBeenCalledTimes(2);
+  });
+  it('cancels creation without charging or generating a key', async () => {
+    render(<Messenger {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Create a new key' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Use defaults' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(loadKey('alice')).toBeNull();
+    expect(calls.transact).not.toHaveBeenCalled();
+  });
   it.each(['success', 'failure', 'denied', 'no folder'])('keeps the same encryption keys and refreshes or downloads a backup after edits: %s', async outcome => {
     const original = generateKey('alice'); saveKey(original);
     const root = { name: 'cheesecrypt' };
