@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pause, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { VoiceNote } from '@/lib/cryptVoice';
+import { CRYPT_NOW_PLAYING, announcePlaying } from '@/lib/cryptAudio';
+import { getAudioPlayer } from '@/lib/musicPlayer';
 
 /** Plays a voice note only when every part arrived and the audio passed its integrity check. */
 export function VoiceNoteBubble({ note }: { note: VoiceNote }) {
@@ -14,6 +16,12 @@ export function VoiceNoteBubble({ note }: { note: VoiceNote }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [at, setAt] = useState(0);
+  const id = useMemo(() => `voice-${Math.random().toString(36).slice(2)}`, []);
+  useEffect(() => {
+    const onOther = (e: Event) => { if ((e as CustomEvent).detail !== id) audioRef.current?.pause(); };
+    window.addEventListener(CRYPT_NOW_PLAYING, onOther);
+    return () => window.removeEventListener(CRYPT_NOW_PLAYING, onOther);
+  }, [id]);
   const seconds = ((note.durationMs ?? 0) / 1000).toFixed(1);
 
   if (note.status === 'loading') return <span className="italic opacity-80">🎙️ Voice note loading ({note.received}/{note.total} parts)</span>;
@@ -24,7 +32,7 @@ export function VoiceNoteBubble({ note }: { note: VoiceNote }) {
   const toggle = () => {
     const el = audioRef.current;
     if (!el) return;
-    if (el.paused) void el.play().catch(() => setPlaying(false)); else el.pause();
+    if (el.paused) { getAudioPlayer().pause(); announcePlaying(id); } if (el.paused) void el.play().catch(() => setPlaying(false)); else el.pause();
   };
   const total = (note.durationMs ?? 0) / 1000 || 1;
   return (
