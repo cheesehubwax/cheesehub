@@ -49,9 +49,9 @@ export function CryptNftCard({ assetId, autoplayKey }: { assetId: string; autopl
   const hasImage = !!data?.image && data.image !== '/placeholder.svg';
   return <>
     <span className={tracks.length ? 'block w-56 my-1 space-y-1' : 'contents'}>
-      <button type="button" onClick={() => setOpen(true)} disabled={!data}
+    <button type="button" onClick={() => setOpen(true)} disabled={!data}
         title={details} aria-label={`View larger: ${details.replace(/\n/g, ' · ')}`}
-        className={`block ${tracks.length ? 'w-full' : 'w-44 my-1'} overflow-hidden rounded-md cursor-zoom-in disabled:cursor-default`}>
+        className={`block ${tracks.length ? 'w-full' : 'w-44 my-1'} cursor-zoom-in disabled:cursor-default ${data?.isSfx ? '' : 'overflow-hidden rounded-md'}`}>
         {hasImage ? <IpfsImage src={data!.image} alt={data!.name} className="w-full h-auto object-contain" />
           : <div className="aspect-square w-full flex items-center justify-center text-2xl">{isLoading ? '⏳' : tracks.length ? '🎵' : '🖼️'}</div>}
       </button>
