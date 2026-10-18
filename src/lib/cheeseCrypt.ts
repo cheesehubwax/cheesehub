@@ -4,8 +4,9 @@
  * encrypted with nacl.box (X25519 + XSalsa20-Poly1305). Box keys are symmetric between the
  * pair, so the sender can also read their own sent messages.
  *
- * Wire formats (memo prefixes, key file types) are kept identical to the original app so
- * existing messages, published keys and backup files keep working.
+ * New memos use the CHEESECrypt prefixes (CRYPT1: / CRYPTKEY1:). Readers also accept the
+ * original GPKM1: / GPKMKEY1: prefixes so existing messages and published keys keep working.
+ * Key file types (gpk-msg-key / gpk-msg-pubkey) are unchanged so backups keep loading.
  */
 import nacl from 'tweetnacl';
 import { parseCryptName, saveCryptName } from '@/lib/cryptNames';
@@ -13,8 +14,13 @@ import { CryptAvatar, parseAvatar } from '@/lib/cryptAvatar';
 import { decodeBase64, encodeBase64, decodeUTF8, encodeUTF8 } from 'tweetnacl-util';
 import { benchEndpoint, normalizeEndpoint, resolveEndpoints } from '@/lib/endpointHealth';
 
-export const MSG_PREFIX = 'GPKM1:';
-export const KEY_PREFIX = 'GPKMKEY1:';
+export const MSG_PREFIX = 'CRYPT1:';
+export const KEY_PREFIX = 'CRYPTKEY1:';
+export const LEGACY_MSG_PREFIX = 'GPKM1:';
+export const LEGACY_KEY_PREFIX = 'GPKMKEY1:';
+/** The message prefix a memo carries (new or legacy), or null if it is not a message. */
+export const msgPrefixOf = (memo: string) => memo.startsWith(MSG_PREFIX) ? MSG_PREFIX : memo.startsWith(LEGACY_MSG_PREFIX) ? LEGACY_MSG_PREFIX : null;
+export const keyPrefixOf = (memo: string) => memo.startsWith(KEY_PREFIX) ? KEY_PREFIX : memo.startsWith(LEGACY_KEY_PREFIX) ? LEGACY_KEY_PREFIX : null;
 export const MEMO_MAX_BYTES = 256;
 export const KEY_PUBLISH_TO = 'eosio.null';
 export const FEE_MEMO = 'CHEESECrypt messaging fee';
@@ -148,21 +154,39 @@ export const MAX_PLAINTEXT_BYTES = (() => {
 
 export const plaintextBytes = utf8Len;
 
-export function encryptMemo(text: string, theirPublic: string, mySecret: string): string {
-  if (!text) throw new Error('Message is empty');
-  if (utf8Len(text) > MAX_PLAINTEXT_BYTES) throw new Error(`Message is longer than ${MAX_PLAINTEXT_BYTES} bytes`);
+/** Encrypt raw bytes (at most MAX_PLAINTEXT_BYTES) into a CRYPT1: memo. */
+export function encryptBytesMemo(bytes: Uint8Array, theirPublic: string, mySecret: string): string {
+  if (!bytes.length) throw new Error('Message is empty');
+  if (bytes.length > MAX_PLAINTEXT_BYTES) throw new Error(`Message is longer than ${MAX_PLAINTEXT_BYTES} bytes`);
   const nonce = nacl.randomBytes(24);
-  const box = nacl.box(decodeUTF8(text), nonce, decodeBase64(theirPublic), decodeBase64(mySecret));
+  const box = nacl.box(bytes, nonce, decodeBase64(theirPublic), decodeBase64(mySecret));
   return `${MSG_PREFIX}${encodeBase64(nonce)}:${encodeBase64(box)}`;
 }
 
-export function decryptMemo(memo: string, theirPublic: string, mySecret: string): string | null {
-  if (!memo.startsWith(MSG_PREFIX)) return null;
-  const [n, c] = memo.slice(MSG_PREFIX.length).split(':');
+export function encryptMemo(text: string, theirPublic: string, mySecret: string): string {
+  if (!text) throw new Error('Message is empty');
+  if (utf8Len(text) > MAX_PLAINTEXT_BYTES) throw new Error(`Message is longer than ${MAX_PLAINTEXT_BYTES} bytes`);
+  return encryptBytesMemo(decodeUTF8(text), theirPublic, mySecret);
+}
+
+/** Decrypt a CRYPT1: or legacy GPKM1: memo to raw bytes; null if it is not readable with these keys. */
+export function decryptMemoBytes(memo: string, theirPublic: string, mySecret: string): Uint8Array | null {
+  const prefix = msgPrefixOf(memo);
+  if (!prefix) return null;
+  const [n, c] = memo.slice(prefix.length).split(':');
   try {
-    const out = nacl.box.open(decodeBase64(c), decodeBase64(n), decodeBase64(theirPublic), decodeBase64(mySecret));
-    return out ? encodeUTF8(out) : null;
+    return nacl.box.open(decodeBase64(c), decodeBase64(n), decodeBase64(theirPublic), decodeBase64(mySecret)) || null;
   } catch { return null; }
+}
+
+/** UTF-8 text from decrypted bytes, or null when they are not valid text. */
+export function bytesToText(bytes: Uint8Array): string | null {
+  try { return encodeUTF8(bytes); } catch { return null; }
+}
+
+export function decryptMemo(memo: string, theirPublic: string, mySecret: string): string | null {
+  const out = decryptMemoBytes(memo, theirPublic, mySecret);
+  return out ? bytesToText(out) : null;
 }
 
 // ---- Multi-part messages ----
@@ -300,23 +324,43 @@ async function hyperionTransfers(query: string): Promise<ChainMemo[]> {
 // Continue reading legacy WAX messages and published keys.
 const FILTER = 'filter=eosio.token:transfer,cheeseburger:transfer';
 
-/** Newest key the account published on chain, if any. */
+/** Newest key the account published on chain (new or legacy prefix), if any. */
 export async function lookupPublishedKey(account: string): Promise<string | null> {
-  const rows = await hyperionTransfers(`account=${account}&${FILTER}&transfer.to=${KEY_PUBLISH_TO}&sort=desc&limit=100`);
+  return newestPublishedKey(account, await hyperionTransfers(`account=${account}&${FILTER}&transfer.to=${KEY_PUBLISH_TO}&sort=desc&limit=100`));
+}
+
+/** Rows are newest first; the first valid key memo from the account wins, whichever prefix it uses. */
+export function newestPublishedKey(account: string, rows: ChainMemo[]): string | null {
   for (const r of rows) {
-    if (r.from !== account || !r.memo.startsWith(KEY_PREFIX)) continue;
-    const k = r.memo.slice(KEY_PREFIX.length).trim();
+    const prefix = keyPrefixOf(r.memo);
+    if (r.from !== account || !prefix) continue;
+    const k = r.memo.slice(prefix.length).trim();
     if (validKey(k, 32)) return k;
   }
   return null;
 }
 
-/** Encrypted messages sent or received by the account (newest first, deduped). */
-export async function fetchMessages(account: string): Promise<ChainMemo[]> {
-  const rows = await hyperionTransfers(`account=${account}&${FILTER}&sort=desc&limit=500`);
+export const HISTORY_PAGE = 500;
+export const MAX_HISTORY_PAGES = 4;
+
+/**
+ * Encrypted messages sent or received by the account (newest first, deduped).
+ * `pages` > 1 reads further back by timestamp, so multi-transaction voice notes are not cut in half.
+ */
+export async function fetchMessages(account: string, pages = 1): Promise<ChainMemo[]> {
+  let rows: ChainMemo[] = [];
+  let before: string | null = null;
+  for (let p = 0; p < Math.min(Math.max(1, pages), MAX_HISTORY_PAGES); p++) {
+    const page = await hyperionTransfers(`account=${account}&${FILTER}&sort=desc&limit=${HISTORY_PAGE}${before ? `&before=${encodeURIComponent(before)}` : ''}`);
+    rows = rows.concat(page);
+    if (page.length < HISTORY_PAGE) break;
+    const oldest = Math.min(...page.map(r => r.time).filter(Number.isFinite));
+    if (!Number.isFinite(oldest)) break;
+    before = new Date(oldest).toISOString();
+  }
   const seen = new Set<string>();
   return rows.filter((r) => {
-    if (!r.memo.startsWith(MSG_PREFIX) || (r.from !== account && r.to !== account)) return false;
+    if (!msgPrefixOf(r.memo) || (r.from !== account && r.to !== account)) return false;
     const id = `${r.txId}:${r.memo}`;
     if (seen.has(id)) return false;
     seen.add(id);

@@ -28,6 +28,9 @@ import { VaultPrompt } from '@/components/crypt/VaultPrompt';
 import { CreateGroupDialog } from '@/components/crypt/CreateGroupDialog';
 import { ShareKeyDialog } from '@/components/crypt/ShareKeyDialog';
 import { CryptAbout } from '@/components/crypt/CryptAbout';
+import { VoiceRecorder } from '@/components/crypt/VoiceRecorder';
+import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
+import { buildVoiceBatches, voicePartCount, voiceTransactions, VOICE_PARTS_PER_TX, type VoiceClip } from '@/lib/cryptVoice';
 import { baselineMarks, loadReadMarks, saveReadMarks, unreadCounts, type ReadMarks } from '@/lib/cryptUnread';
 import { buildGroupMessageActions, createGroup, decodeConversations, groupMessageCost, groupMessageSize, loadGroups, loadHiddenGroups, mergeGroups, saveGroups, setGroupHidden, type CryptGroup } from '@/lib/cryptGroups';
 import {
@@ -37,7 +40,7 @@ import {
 import type { PublicKeyFile } from '@/lib/cheeseCrypt';
 import {
   ChainMemo, MAX_PLAINTEXT_BYTES, MESSAGE_FEE_QUANTITY, MESSAGE_RECIPIENT_QUANTITY, MESSAGE_TOTAL_QUANTITY, NFT_FEE_QUANTITY, MessagingKey,
-  MAX_MESSAGE_BYTES, MAX_PARTS, PART_BODY_BYTES, messageCost, partCount, splitMessage,
+  MAX_MESSAGE_BYTES, MAX_HISTORY_PAGES, MAX_PARTS, PART_BODY_BYTES, messageCost, partCount, splitMessage,
   buildPublishKeyActions, buildSendMessageActions, encryptMemo, fetchMessages, generateKey,
   loadContacts, loadContactAvatars, loadKey, loadRemovedContacts, removeContact, lookupPublishedKey, parseKeyFile, plaintextBytes, saveContact, saveKey, toPublicFile,
 } from '@/lib/cheeseCrypt';
@@ -127,6 +130,13 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [loaded, setLoaded] = useState(false);
   const [readMarks, setReadMarks] = useState<ReadMarks | null>(() => loadReadMarks(account));
   const [text, setText] = useState('');
+  const [voice, setVoice] = useState<VoiceClip | null>(null);
+  /** History pages to read; grows only when a voice note touches the edge of the loaded window. */
+  const [depth, setDepth] = useState(1);
+  /** Ticks so a stalled voice note moves from "loading" to "incomplete" without new history. */
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => { const id = window.setInterval(() => setClock(Date.now()), 30_000); return () => clearInterval(id); }, []);
+  useEffect(() => { setVoice(null); }, [active]);
   const [busy, setBusy] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -164,17 +174,17 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const refresh = useCallback(async () => {
     setLoading(true);
     inFlight.current = true;
-    try { applyMemos(await fetchMessages(account)); setLoaded(true); }
+    try { applyMemos(await fetchMessages(account, depth)); setLoaded(true); }
     catch { toast({ title: 'Could not load messages', description: 'History servers did not answer. Try again shortly.', variant: 'destructive' }); }
     finally { setLoading(false); inFlight.current = false; }
-  }, [account, toast, applyMemos]);
+  }, [account, toast, applyMemos, depth]);
   // Background check: no spinner, no error toast — a missed poll is retried on the next tick.
   const poll = useCallback(async () => {
     if (inFlight.current) return;
     inFlight.current = true;
-    try { applyMemos(await fetchMessages(account)); setLoaded(true); } catch { /* retry next tick */ }
+    try { applyMemos(await fetchMessages(account, depth)); setLoaded(true); } catch { /* retry next tick */ }
     finally { inFlight.current = false; }
-  }, [account, applyMemos]);
+  }, [account, applyMemos, depth]);
 
   useEffect(() => { if (key) refresh(); }, [key, refresh]);
   useEffect(() => {
@@ -199,7 +209,14 @@ export function Messenger({ account, session }: { account: string; session: NonN
     return out;
   }, [memos, account]);
 
-  const conversations = useMemo(() => key ? decodeConversations(memos, key, contacts) : [], [memos, key, contacts]);
+  const conversations = useMemo(() => key ? decodeConversations(memos, key, contacts, clock) : [], [memos, key, contacts, clock]);
+  // A voice note spans several transactions; if one is unfinished right at the oldest loaded memo,
+  // its earlier parts are probably on the next history page, so read one page further (bounded).
+  useEffect(() => {
+    if (depth >= MAX_HISTORY_PAGES || !memos.length) return;
+    const oldest = memos.reduce((t, m) => Math.min(t, m.time), Infinity);
+    if (conversations.some(c => c.voice && c.voice.missing > 0 && c.time - oldest < 60_000)) setDepth(d => Math.min(MAX_HISTORY_PAGES, d + 1));
+  }, [conversations, memos, depth]);
   useEffect(() => {
     setGroups(current => {
       const merged = mergeGroups(current, conversations.flatMap(m => m.group ? [m.group] : []));
@@ -414,12 +431,38 @@ export function Messenger({ account, session }: { account: string; session: NonN
     finally { setBusy(false); }
   };
 
+  /** Signs each batch of up to 30 parts in turn; parts already sent stay on chain if a later one fails. */
+  const sendVoice = async () => {
+    if (!key || !active || !voice || missingKeys.length || !agreed) return;
+    setBusy(true);
+    let sent = 0, total = 0;
+    try {
+      const batches = buildVoiceBatches(key, recipients, activeGroup ?? null, voice, contacts, [permission]);
+      total = batches.length;
+      for (let i = 0; i < batches.length; i++) {
+        const r = await executeTransaction(batches[i], { successTitle: total > 1 ? `Voice note: transaction ${i + 1} of ${total} sent` : 'Voice note sent' });
+        if (!r.success) break;
+        sent++;
+      }
+    } catch (e) { toast({ title: 'Could not send voice note', description: (e as Error).message, variant: 'destructive' }); }
+    finally {
+      setBusy(false);
+      if (sent && sent === total) { setVoice(null); nearBottom.current = true; }
+      else if (sent) toast({ title: 'Voice note partly sent', description: `${sent} of ${total} transactions went through. The receiver will see it as incomplete and it will not play. You can send the recording again.`, variant: 'destructive' });
+      if (sent) [2000, 5000, 10000].forEach(ms => setTimeout(poll, ms));
+    }
+  };
+
   const hasNft = parseNftMessage(text).some(seg => seg.type === 'nft');
   const size = activeGroup ? groupMessageSize(activeGroup, text) : { bytes: plaintextBytes(text), parts: partCount(text), maxBytes: MAX_MESSAGE_BYTES };
   const { bytes, parts, maxBytes } = size;
   const tooLong = bytes > maxBytes || parts > MAX_PARTS;
   const copies = activeGroup ? recipients.length : 1;
-  const totalCost = activeGroup ? groupMessageCost(parts || 1, copies, hasNft) : messageCost(parts || 1, hasNft);
+  const voiceParts = voice ? voicePartCount(voice) : 0;
+  const voiceTxs = voiceTransactions(voiceParts);
+  const totalCost = voice
+    ? (activeGroup ? groupMessageCost(voiceParts, copies) : messageCost(voiceParts))
+    : activeGroup ? groupMessageCost(parts || 1, copies, hasNft) : messageCost(parts || 1, hasNft);
   const fileInput = (
     <input ref={fileRef} type="file" accept="application/json,.json" className="hidden"
       onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }} />
@@ -575,12 +618,12 @@ export function Messenger({ account, session }: { account: string; session: NonN
                     <p className="text-[10px] font-semibold opacity-80 break-words">{m.from === account ? `you · ${nameFor(account)}` : nameFor(m.from)}{nameFor(m.from) !== m.from && <span className="block font-normal">{m.from}</span>}</p>
                   </div>
                   <div className="whitespace-pre-wrap break-words">
-                    {m.text != null ? parseNftMessage(m.text).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} /> : <span key={i} className="block">{seg.text}</span>) : <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
+                    {m.voice ? <VoiceNoteBubble note={m.voice} /> : m.text != null ? parseNftMessage(m.text).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} /> : <span key={i} className="block">{seg.text}</span>) : <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
                   </div>
                   <p className="text-[10px] opacity-70 mt-1">
                     {new Date(m.time).toLocaleString()} · {m.group ? `${groupMessageCost(m.parts, m.group.members.length - 1, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))} at current rate` : messageCost(m.parts, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))}
                     {m.parts > 1 && ` · ${m.parts} parts`}
-                    {m.missing > 0 && <span className="text-destructive"> · {m.missing} part{m.missing > 1 ? 's' : ''} not loaded</span>}
+                    {m.missing > 0 && !m.voice && <span className="text-destructive"> · {m.missing} part{m.missing > 1 ? 's' : ''} not loaded</span>}
                     {m.txId && <> · <a href={`https://waxblock.io/transaction/${encodeURIComponent(m.txId)}`} target="_blank" rel="noreferrer"
                       className="font-semibold text-cheese underline underline-offset-2 hover:text-cheese/80">Tx</a></>}
                   </p>
@@ -593,17 +636,21 @@ export function Messenger({ account, session }: { account: string; session: NonN
               <p className="text-sm text-muted-foreground p-4 border-t border-border">Public keys needed: {missingKeys.join(', ')}. Add them by name or load their public files.</p>
             ) : (
               <div className="space-y-2 p-4 border-t border-border">
-                <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder={activeGroup ? 'Message group' : `Message ${nameFor(active)}`} />
+                <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} disabled={!!voice} placeholder={voice ? 'Sending a voice note — discard it to type a message' : activeGroup ? 'Message group' : `Message ${nameFor(active)}`} />
                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className={tooLong ? 'text-destructive' : 'text-muted-foreground'}>
-                    {bytes}/{maxBytes} · {parts || 1} part{parts > 1 ? 's' : ''}{activeGroup && ` × ${copies} recipients`}
+                  <span className={!voice && tooLong ? 'text-destructive' : 'text-muted-foreground'}>
+                    {voice ? `${voiceParts} parts · ${voiceTxs} transaction${voiceTxs > 1 ? 's' : ''}` : `${bytes}/${maxBytes} · ${parts || 1} part${parts > 1 ? 's' : ''}`}{activeGroup && ` × ${copies} recipients`}
                   </span>
-                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAttachingNft(true)}>🖼️ Attach NFT</Button>
+                  {!voice && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAttachingNft(true)}>🖼️ Attach NFT</Button>}
+                  {!text.trim() && <VoiceRecorder clip={voice} onChange={setVoice} disabled={busy} />}
                   <TermsCheckbox checked={agreed} onCheckedChange={setAgreed} className="ml-2" />
                   <span className="ml-auto text-muted-foreground">{totalCost}</span>
-                  <Button size="sm" disabled={busy || !agreed || !text.trim() || tooLong} onClick={send}
-                    className="bg-cheese text-primary-foreground hover:bg-cheese/90">Send</Button>
+                  {voice
+                    ? <Button size="sm" disabled={busy || !agreed} onClick={sendVoice} className="bg-cheese text-primary-foreground hover:bg-cheese/90">Send voice{voiceTxs > 1 ? ` (${voiceTxs} signatures)` : ''}</Button>
+                    : <Button size="sm" disabled={busy || !agreed || !text.trim() || tooLong} onClick={send}
+                      className="bg-cheese text-primary-foreground hover:bg-cheese/90">Send</Button>}
                 </div>
+                {voice && <p className="text-[11px] text-muted-foreground">🎙️ Voice note: {voiceParts} encrypted parts, up to {VOICE_PARTS_PER_TX} per transaction, signed one after another. Each part costs the normal message rate. If a later transaction fails, the parts already sent stay on chain and the note shows as incomplete.</p>}
                 <p className="text-[11px] text-muted-foreground">
                   {activeGroup ? `Each part: ${MESSAGE_FEE_QUANTITY} nulled once for the group + ${MESSAGE_RECIPIENT_QUANTITY} to each of ${copies} recipients. Group delivery uses ${copies} encrypted copies in one transaction. Membership is fixed; start a new group to change participants.` : `Each part: ${MESSAGE_RECIPIENT_QUANTITY} to ${active} + ${MESSAGE_FEE_QUANTITY} nulled (${MESSAGE_TOTAL_QUANTITY}). Long messages split into up to ${MAX_PARTS} parts (${MAX_PLAINTEXT_BYTES} bytes for one, ${PART_BODY_BYTES} per part after that), all in one transaction.`}
                   {` Attaching an NFT raises the first part's nulled fee to ${NFT_FEE_QUANTITY}.`}

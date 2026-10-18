@@ -96,11 +96,12 @@ const NULL_CONTRACTS = [
 ] as const;
 
 // Memos CHEESECrypt uses on its eosio.null transfers (kept in sync with cheeseCrypt.ts).
+// Key publications use CRYPTKEY1: now and GPKMKEY1: on older transactions; both count.
 const CRYPT_FEE_MEMO = 'CHEESECrypt messaging fee';
-const CRYPT_KEY_PREFIX = 'GPKMKEY1:';
+const CRYPT_KEY_PREFIXES = ['CRYPTKEY1:', 'GPKMKEY1:'];
 
 export function isCryptNullMemo(memo: unknown): boolean {
-  return typeof memo === 'string' && (memo === CRYPT_FEE_MEMO || memo.startsWith(CRYPT_KEY_PREFIX));
+  return typeof memo === 'string' && (memo === CRYPT_FEE_MEMO || CRYPT_KEY_PREFIXES.some(p => memo.startsWith(p)));
 }
 
 export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
