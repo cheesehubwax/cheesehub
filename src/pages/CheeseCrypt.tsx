@@ -18,6 +18,7 @@ import { playRandomFart } from '@/lib/fartSounds';
 import { cn } from '@/lib/utils';
 import { AvatarEditor, WalletAvatarPicker } from '@/components/crypt/AvatarEditor';
 import { CryptNftCard } from '@/components/crypt/CryptNftCard';
+import { MusicNftPicker } from '@/components/crypt/MusicNftPicker';
 import { nftToken, parseNftMessage } from '@/lib/cryptNft';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FriendNameDialog } from '@/components/crypt/FriendNameDialog';
@@ -123,6 +124,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [hiddenGroups, setHiddenGroups] = useState(() => loadHiddenGroups(account));
   const [showHiddenGroups, setShowHiddenGroups] = useState(false);
   const [attachingNft, setAttachingNft] = useState(false);
+  const [attachingMusic, setAttachingMusic] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [newContact, setNewContact] = useState('');
   const [memos, setMemos] = useState<ChainMemo[]>([]);
@@ -476,6 +478,15 @@ export function Messenger({ account, session }: { account: string; session: NonN
     return (
       <div className="w-full max-w-md space-y-5 text-center">
         {fileInput}
+      {attachingMusic && <Dialog open onOpenChange={o => { if (!o) setAttachingMusic(false); }}>
+        <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto" aria-describedby={undefined}>
+          <DialogHeader><DialogTitle>🎵 Share a music NFT</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground">Only the NFT's asset ID is added to your encrypted message. The sound and artwork are public on WAX.</p>
+          <MusicNftPicker account={account} onPick={nft => {
+            setText(t => `${t.trimEnd()}${t.trim() ? ' ' : ''}${nftToken(nft.asset_id)} `); setAttachingMusic(false);
+          }} />
+        </DialogContent>
+      </Dialog>}
       {profileEditor}
         <div className="space-y-2">
           <p className="text-lg font-semibold">🔑 Unlock your messages</p>
@@ -642,6 +653,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                     {voice ? `${voiceParts} parts · ${voiceTxs} transaction${voiceTxs > 1 ? 's' : ''}` : `${bytes}/${maxBytes} · ${parts || 1} part${parts > 1 ? 's' : ''}`}{activeGroup && ` × ${copies} recipients`}
                   </span>
                   {!voice && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAttachingNft(true)}>🖼️ Attach NFT</Button>}
+                  {!voice && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAttachingMusic(true)}>🎵 Attach music</Button>}
                   {!text.trim() && <VoiceRecorder clip={voice} onChange={setVoice} disabled={busy} />}
                   <TermsCheckbox checked={agreed} onCheckedChange={setAgreed} className="ml-2" />
                   <span className="ml-auto text-muted-foreground">{totalCost}</span>
