@@ -3,7 +3,7 @@ import { useWax } from '@/context/WaxContext';
 import { fetchWithFallback } from '@/lib/fetchWithFallback';
 import { ATOMIC_API } from '@/lib/waxConfig';
 import { waxRpcCall } from '@/lib/waxRpcFallback';
-import { isMusicNFT, extractExtraAudioUrls as extractSharedExtraAudioUrls, type ExtraAudioEntry } from '@/lib/nftMedia';
+import { isMusicNFT, normalizeNftMedia, extractExtraAudioUrls as extractSharedExtraAudioUrls, type ExtraAudioEntry } from '@/lib/nftMedia';
 
 export type { ExtraAudioEntry };
 
@@ -77,13 +77,13 @@ const IPFS_GATEWAYS = [
 
 export const CHEESEAMP_GLOBAL_ACCOUNT = 'cheeseamphub';
 
-const CACHE_KEY_PREFIX = 'cheesehub_music_nfts_';
+const CACHE_KEY_PREFIX = 'cheesehub_music_nfts_v2_';
 const CACHE_TTL = 5 * 60 * 1000;
 
 function extractIpfsHash(url: string | undefined): string | null {
   if (!url) return null;
   
-  if (url.startsWith('Qm') || url.startsWith('bafy')) {
+  if (url.startsWith('Qm') || url.startsWith('bafy') || url.startsWith('bafk')) {
     return url;
   }
   
@@ -255,7 +255,7 @@ async function fetchAssetMetadata(assetIds: string[]): Promise<MusicNFT[]> {
               const immutableData = asset.immutable_data || {};
               const mutableData = asset.mutable_data || {};
               const templateData = asset.template?.immutable_data || {};
-              const allData = { ...templateData, ...immutableData, ...mutableData };
+              const allData = normalizeNftMedia({ ...templateData, ...immutableData, ...mutableData });
               
               if (isMusicNFT(allData)) {
                 const videoUrl = allData.video ? getMediaUrl(allData.video as string) : undefined;
@@ -354,7 +354,7 @@ async function fetchApiPage(owner: string, page: number, limit: number): Promise
       const immutableData = asset.immutable_data || {};
       const mutableData = asset.mutable_data || {};
       const templateData = asset.template?.immutable_data || {};
-      const allData = { ...templateData, ...immutableData, ...mutableData };
+      const allData = normalizeNftMedia({ ...templateData, ...immutableData, ...mutableData });
       
       if (isMusicNFT(allData)) {
         const videoUrl = allData.video ? getMediaUrl(allData.video as string) : undefined;
