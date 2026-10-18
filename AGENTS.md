@@ -14,7 +14,7 @@
 
 - CHEESEFolio scans always include the history provider reaching furthest back (probed per browser) and mark a sync complete only when that deepest provider was read to the end (shallower ones are cover, caught up next sync); big-page providers are read sequentially and only small-page ones are windowed, with capped concurrency — bursts make Hyperion nodes drop connections and stall the scan.
 
-- CHEESEFolio de-duplicates by global sequence and drops inline transfer copies whose creator action is an identical transfer — some Hyperion nodes list the receiver notification as a separate action, which double-counts the movement.
+- CHEESEFolio de-duplicates by global sequence and drops inline copies with identical transfer creator actions; Hyperion receiver notifications otherwise double-count movements.
 
 - CHEESEFolio explains order-book fills from Alcor's per-account deal list (read in one large-limit request — its skip paging is gappy) and only looks up leftovers on Hyperion, routed by each provider's history start; per-transaction lookups alone take minutes on heavy accounts.
 
