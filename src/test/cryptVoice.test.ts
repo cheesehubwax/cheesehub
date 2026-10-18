@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import nacl from 'tweetnacl';
-import { encodeBase64, decodeUTF8 } from 'tweetnacl-util';
+import { encodeBase64, decodeBase64, decodeUTF8 } from 'tweetnacl-util';
 import {
   generateKey, encryptMemo, decryptMemo, keyMemo, buildPublishKeyActions, newestPublishedKey, MAX_PLAINTEXT_BYTES, MEMO_MAX_BYTES, messageCost,
 } from '@/lib/cheeseCrypt';
@@ -24,7 +24,7 @@ describe('CHEESECrypt memo prefixes', () => {
   });
   it('legacy GPKM1: messages still decrypt', () => {
     const nonce = nacl.randomBytes(24);
-    const legacy = `GPKM1:${encodeBase64(nonce)}:${encodeBase64(nacl.box(decodeUTF8('old hello'), nonce, Buffer.from(b.publicKey, 'base64'), Buffer.from(a.secretKey, 'base64')))}`;
+    const legacy = `GPKM1:${encodeBase64(nonce)}:${encodeBase64(nacl.box(decodeUTF8('old hello'), nonce, decodeBase64(b.publicKey), decodeBase64(a.secretKey)))}`;
     expect(decryptMemo(legacy, a.publicKey, b.secretKey)).toBe('old hello');
   });
   it('legacy GPKMKEY1: keys still resolve, newest of either prefix wins', () => {
@@ -109,5 +109,5 @@ describe('CHEESECrypt voice notes', () => {
 
 function encryptBytes(p: Uint8Array) {
   const nonce = nacl.randomBytes(24);
-  return `CRYPT1:${encodeBase64(nonce)}:${encodeBase64(nacl.box(p, nonce, Buffer.from(b.publicKey, 'base64'), Buffer.from(a.secretKey, 'base64')))}`;
+  return `CRYPT1:${encodeBase64(nonce)}:${encodeBase64(nacl.box(p, nonce, decodeBase64(b.publicKey), decodeBase64(a.secretKey)))}`;
 }
