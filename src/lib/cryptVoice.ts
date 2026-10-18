@@ -83,7 +83,7 @@ export function splitVoice(clip: VoiceClip, group: VoiceGroupRef | null = null, 
   });
 }
 
-export const voicePartCount = (clip: VoiceClip, group: VoiceGroupRef | null = null) => 1 + Math.ceil(clip.bytes.length / VOICE_BODY_BYTES) + (group ? 0 : 0);
+export const voicePartCount = (clip: VoiceClip) => 1 + Math.ceil(clip.bytes.length / VOICE_BODY_BYTES);
 export const voiceTransactions = (parts: number) => Math.ceil(parts / VOICE_PARTS_PER_TX);
 
 export interface VoicePart { id: string; index: number; total: number; isGroup: boolean; body: Uint8Array }

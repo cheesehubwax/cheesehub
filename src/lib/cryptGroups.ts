@@ -1,8 +1,9 @@
 import nacl from 'tweetnacl';
 import {
-  assembleMessages, buildSendMessageActions, ChainMemo, decryptMemo, encryptMemo,
+  assembleMessages, buildSendMessageActions, bytesToText, ChainMemo, decryptMemoBytes, encryptMemo, type AssembledMessage, type DecodedMemo,
   MAX_MESSAGE_BYTES, MESSAGE_FEE_QUANTITY, MESSAGE_RECIPIENT_QUANTITY, NFT_FEE_QUANTITY, MessagingKey, partCount, plaintextBytes, splitMessage,
 } from '@/lib/cheeseCrypt';
+import { assembleVoice, parseVoicePart, type VoiceNote, type VoicePartMemo } from '@/lib/cryptVoice';
 
 export interface CryptGroup { id: string; members: string[] }
 const PREFIX = '\u0002CG1:';
@@ -81,14 +82,23 @@ export function buildGroupMessageActions(key: MessagingKey, group: CryptGroup, t
   });
 }
 
+export type ConversationEntry = AssembledMessage & { group: CryptGroup | null; voice?: VoiceNote };
+
 /** Only authenticated, fully reassembled envelopes can define a group. */
-export function decodeConversations(memos: ChainMemo[], key: MessagingKey, contacts: Record<string, string>) {
-  const assembled = assembleMessages(memos.filter(m => m.from === key.account || m.to === key.account).map(m => {
+export function decodeConversations(memos: ChainMemo[], key: MessagingKey, contacts: Record<string, string>, now = Date.now()): ConversationEntry[] {
+  const textMemos: DecodedMemo[] = [];
+  const voiceParts: VoicePartMemo[] = [];
+  for (const m of memos) {
+    if (m.from !== key.account && m.to !== key.account) continue;
     const partner = m.from === key.account ? m.to : m.from;
-    return { ...m, text: contacts[partner] ? decryptMemo(m.memo, contacts[partner], key.secretKey) : null };
-  }));
+    const bytes = contacts[partner] ? decryptMemoBytes(m.memo, contacts[partner], key.secretKey) : null;
+    const part = bytes ? parseVoicePart(bytes) : null;
+    if (part) voiceParts.push({ txId: m.txId, time: m.time, from: m.from, to: m.to, part });
+    else textMemos.push({ ...m, text: bytes ? bytesToText(bytes) : null });
+  }
+  const assembled = assembleMessages(textMemos);
   const seen = new Set<string>();
-  return assembled.flatMap(m => {
+  const texts: ConversationEntry[] = assembled.flatMap(m => {
     if (!m.text?.startsWith(PREFIX)) return [{ ...m, group: null as CryptGroup | null }];
     if (m.missing) return []; // partial metadata is never accepted as a group definition
     try {
@@ -103,6 +113,21 @@ export function decodeConversations(memos: ChainMemo[], key: MessagingKey, conta
       return [{ ...m, key: fanoutId, text: raw.text as string, group }];
     } catch { return []; }
   });
+  // Voice notes: one entry per note; a group note's per-recipient copies (seen by the sender) collapse into one.
+  const voices = new Map<string, ConversationEntry>();
+  for (const n of assembleVoice(voiceParts, now)) {
+    let group: CryptGroup | null = null;
+    if (n.isGroup) {
+      group = n.group ? parseGroup(n.group) : null;
+      // Without authenticated metadata a group note cannot be placed in a conversation.
+      if (!group || !group.members.includes(key.account) || !group.members.includes(n.from) || !group.members.includes(n.to)) continue;
+    }
+    const k = group ? `voice:${n.from}:${group.id}:${n.id}` : `voice:${n.key}`;
+    const prev = voices.get(k);
+    if (prev?.voice && prev.voice.received >= n.received) continue;
+    voices.set(k, { key: k, txId: n.txId, time: n.time, from: n.from, to: n.to, text: null, parts: n.total, missing: n.missing, group, voice: n });
+  }
+  return [...texts, ...voices.values()].sort((a, b) => a.time - b.time);
 }
 
 export function mergeGroups(existing: CryptGroup[], incoming: CryptGroup[]): CryptGroup[] {
