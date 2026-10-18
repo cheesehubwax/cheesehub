@@ -432,15 +432,6 @@ export function Messenger({ account, session }: { account: string; session: NonN
     return (
       <div className="w-full max-w-md space-y-5 text-center">
         {fileInput}
-        {attachingNft && <Dialog open onOpenChange={o => { if (!o) setAttachingNft(false); }}>
-        <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto" aria-describedby={undefined}>
-          <DialogHeader><DialogTitle>🖼️ Share an NFT</DialogTitle></DialogHeader>
-          <p className="text-xs text-muted-foreground">Only the NFT's asset ID is added to your encrypted message. The artwork itself is public on WAX.</p>
-          <WalletAvatarPicker account={account} busy={false} onPick={nft => {
-            setText(t => `${t.trimEnd()}${t.trim() ? ' ' : ''}${nftToken(nft.asset_id)} `); setAttachingNft(false);
-          }} />
-        </DialogContent>
-      </Dialog>}
       {profileEditor}
         <div className="space-y-2">
           <p className="text-lg font-semibold">🔑 Unlock your messages</p>
@@ -475,6 +466,15 @@ export function Messenger({ account, session }: { account: string; session: NonN
       {editingFriend && <FriendNameDialog account={editingFriend} nickname={nicknames[editingFriend]} sharedName={names[editingFriend]} onClose={() => setEditingFriend(null)} onSave={name => {
         saveCryptName(account, editingFriend, name, 'nicknames'); setNicknames(loadCryptNames(account, 'nicknames')); setEditingFriend(null);
       }} />}
+      {attachingNft && <Dialog open onOpenChange={o => { if (!o) setAttachingNft(false); }}>
+        <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto" aria-describedby={undefined}>
+          <DialogHeader><DialogTitle>🖼️ Share an NFT</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground">Only the NFT's asset ID is added to your encrypted message. The artwork itself is public on WAX.</p>
+          <WalletAvatarPicker account={account} busy={false} onPick={nft => {
+            setText(t => `${t.trimEnd()}${t.trim() ? ' ' : ''}${nftToken(nft.asset_id)} `); setAttachingNft(false);
+          }} />
+        </DialogContent>
+      </Dialog>}
       {profileEditor}
       {showSharePrompt && key && <ShareKeyDialog account={account} busy={busy} agreed={agreed} onAgreedChange={setAgreed} onClose={() => setShowSharePrompt(false)}
         onDownload={() => { void sharePublicKey(); setShowSharePrompt(false); }}
