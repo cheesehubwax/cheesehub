@@ -1064,3 +1064,19 @@ export async function fetchCollectionSales(collectionName: string, limit = 50): 
 }
 
 export { getIpfsUrl };
+
+// Single asset lookup (CHEESECrypt shared NFT cards). Returns null when the asset is unknown.
+export async function fetchAssetById(assetId: string): Promise<{ asset_id: string; name: string; image: string; collection: string; mint: string } | null> {
+  if (!/^\d{1,20}$/.test(assetId)) return null;
+  const response = await fetchWithFallback(ATOMIC_API.baseUrls, `${ATOMIC_API.paths.assets}/${assetId}`);
+  const json = await response.json();
+  const a = json?.data;
+  if (!json?.success || !a) return null;
+  return {
+    asset_id: a.asset_id,
+    name: a.data?.name || a.name || `NFT #${a.asset_id}`,
+    image: getImageUrl(a.data?.img || a.data?.image),
+    collection: a.collection?.collection_name || '',
+    mint: a.template_mint || '',
+  };
+}

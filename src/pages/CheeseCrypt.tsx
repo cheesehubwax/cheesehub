@@ -16,7 +16,10 @@ import { useWaxTransaction } from '@/hooks/useWaxTransaction';
 import { useToast } from '@/hooks/use-toast';
 import { playRandomFart } from '@/lib/fartSounds';
 import { cn } from '@/lib/utils';
-import { AvatarEditor } from '@/components/crypt/AvatarEditor';
+import { AvatarEditor, WalletAvatarPicker } from '@/components/crypt/AvatarEditor';
+import { CryptNftCard } from '@/components/crypt/CryptNftCard';
+import { nftToken, parseNftMessage } from '@/lib/cryptNft';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FriendNameDialog } from '@/components/crypt/FriendNameDialog';
 import { cryptDisplayName, loadCryptNames, saveCryptName } from '@/lib/cryptNames';
 import { accountAvatar, type CryptAvatar } from '@/lib/cryptAvatar';
@@ -116,6 +119,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [groups, setGroups] = useState(() => loadGroups(account));
   const [hiddenGroups, setHiddenGroups] = useState(() => loadHiddenGroups(account));
   const [showHiddenGroups, setShowHiddenGroups] = useState(false);
+  const [attachingNft, setAttachingNft] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [newContact, setNewContact] = useState('');
   const [memos, setMemos] = useState<ChainMemo[]>([]);
@@ -429,6 +433,15 @@ export function Messenger({ account, session }: { account: string; session: NonN
       <div className="w-full max-w-md space-y-5 text-center">
         {fileInput}
         {profileEditor}
+      {attachingNft && <Dialog open onOpenChange={o => { if (!o) setAttachingNft(false); }}>
+        <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto" aria-describedby={undefined}>
+          <DialogHeader><DialogTitle>🖼️ Share an NFT</DialogTitle></DialogHeader>
+          <p className="text-xs text-muted-foreground">Only the NFT's asset ID is added to your encrypted message. The artwork itself is public on WAX.</p>
+          <WalletAvatarPicker account={account} busy={false} onPick={nft => {
+            setText(t => `${t.trimEnd()}${t.trim() ? ' ' : ''}${nftToken(nft.asset_id)} `); setAttachingNft(false);
+          }} />
+        </DialogContent>
+      </Dialog>}
         <div className="space-y-2">
           <p className="text-lg font-semibold">🔑 Unlock your messages</p>
           <p className="text-sm text-muted-foreground">
@@ -560,9 +573,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
                     <PixelAvatar account={m.from} avatar={m.from === account ? key.avatar : avatars[m.from]} className="h-6 w-6" />
                     <p className="text-[10px] font-semibold opacity-80 break-words">{m.from === account ? `you · ${nameFor(account)}` : nameFor(m.from)}{nameFor(m.from) !== m.from && <span className="block font-normal">{m.from}</span>}</p>
                   </div>
-                  <p className="whitespace-pre-wrap break-words">
-                    {m.text ?? <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
-                  </p>
+                  <div className="whitespace-pre-wrap break-words">
+                    {m.text != null ? parseNftMessage(m.text).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} /> : <span key={i} className="block">{seg.text}</span>) : <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
+                  </div>
                   <p className="text-[10px] opacity-70 mt-1">
                     {new Date(m.time).toLocaleString()} · {m.group ? `${groupMessageCost(m.parts, m.group.members.length - 1)} at current rate` : messageCost(m.parts)}
                     {m.parts > 1 && ` · ${m.parts} parts`}
@@ -584,6 +597,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                   <span className={tooLong ? 'text-destructive' : 'text-muted-foreground'}>
                     {bytes}/{maxBytes} · {parts || 1} part{parts > 1 ? 's' : ''}{activeGroup && ` × ${copies} recipients`}
                   </span>
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAttachingNft(true)}>🖼️ Attach NFT</Button>
                   <TermsCheckbox checked={agreed} onCheckedChange={setAgreed} className="ml-2" />
                   <span className="ml-auto text-muted-foreground">{totalCost}</span>
                   <Button size="sm" disabled={busy || !agreed || !text.trim() || tooLong} onClick={send}

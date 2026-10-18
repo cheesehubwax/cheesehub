@@ -56,7 +56,7 @@ async function nftPixels(image: string): Promise<CryptAvatar> {
   finally { timers.forEach(clearTimeout); controllers.forEach(ctl => ctl.abort()); }
 }
 
-function WalletAvatarPicker({ account, busy, onPick }: { account: string; busy: boolean; onPick: (nft: UserNFT) => void }) {
+export function WalletAvatarPicker({ account, busy, onPick }: { account: string; busy: boolean; onPick: (nft: UserNFT) => void }) {
   const { nfts, isLoading, error, refetch, collections } = useUserNFTs(account);
   const [search, setSearch] = useState('');
   const [collection, setCollection] = useState('');
