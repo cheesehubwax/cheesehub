@@ -130,6 +130,12 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [loaded, setLoaded] = useState(false);
   const [readMarks, setReadMarks] = useState<ReadMarks | null>(() => loadReadMarks(account));
   const [text, setText] = useState('');
+  const [voice, setVoice] = useState<VoiceClip | null>(null);
+  /** History pages to read; grows only when a voice note touches the edge of the loaded window. */
+  const [depth, setDepth] = useState(1);
+  /** Ticks so a stalled voice note moves from "loading" to "incomplete" without new history. */
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => { const id = window.setInterval(() => setClock(Date.now()), 30_000); return () => clearInterval(id); }, []);
   const [busy, setBusy] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
