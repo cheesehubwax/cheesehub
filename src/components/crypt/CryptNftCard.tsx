@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Pause, Play, Loader2 } from 'lucide-react';
 import { IpfsImage } from '@/components/shared/IpfsImage';
@@ -28,10 +28,19 @@ function TrackControl({ trackKey, url, label }: { trackKey: string; url: string;
   );
 }
 
-export function CryptNftCard({ assetId }: { assetId: string }) {
+/** Message keys whose sound effect already autoplayed this session (never replay on re-render or poll). */
+const autoplayed = new Set<string>();
+
+/** `autoplayKey` is set only for messages that arrived while the chat was open; sound-effect NFTs then play once. */
+export function CryptNftCard({ assetId, autoplayKey }: { assetId: string; autoplayKey?: string }) {
   const [open, setOpen] = useState(false);
   const { data, isLoading } = useQuery({ queryKey: ['crypt-nft', assetId], queryFn: () => fetchAssetById(assetId), staleTime: 3600_000 });
   const tracks = data?.tracks ?? [];
+  useEffect(() => {
+    if (!autoplayKey || !data?.isSfx || !tracks.length || autoplayed.has(autoplayKey)) return;
+    autoplayed.add(autoplayKey);
+    cryptAudio.toggle(`${assetId}:0`, tracks[0].url);
+  }, [autoplayKey, data, tracks, assetId]);
   const heading = data ? (data.title || data.name) : '';
   const details = data
     ? `${heading}${data.artist ? `\n${data.artist}` : ''}\n${data.collection}${data.mint ? ` · #${data.mint}` : ''}\nID ${assetId}`
