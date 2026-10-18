@@ -173,17 +173,17 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const refresh = useCallback(async () => {
     setLoading(true);
     inFlight.current = true;
-    try { applyMemos(await fetchMessages(account)); setLoaded(true); }
+    try { applyMemos(await fetchMessages(account, depth)); setLoaded(true); }
     catch { toast({ title: 'Could not load messages', description: 'History servers did not answer. Try again shortly.', variant: 'destructive' }); }
     finally { setLoading(false); inFlight.current = false; }
-  }, [account, toast, applyMemos]);
+  }, [account, toast, applyMemos, depth]);
   // Background check: no spinner, no error toast — a missed poll is retried on the next tick.
   const poll = useCallback(async () => {
     if (inFlight.current) return;
     inFlight.current = true;
-    try { applyMemos(await fetchMessages(account)); setLoaded(true); } catch { /* retry next tick */ }
+    try { applyMemos(await fetchMessages(account, depth)); setLoaded(true); } catch { /* retry next tick */ }
     finally { inFlight.current = false; }
-  }, [account, applyMemos]);
+  }, [account, applyMemos, depth]);
 
   useEffect(() => { if (key) refresh(); }, [key, refresh]);
   useEffect(() => {
