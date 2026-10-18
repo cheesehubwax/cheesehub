@@ -4,8 +4,9 @@
  * encrypted with nacl.box (X25519 + XSalsa20-Poly1305). Box keys are symmetric between the
  * pair, so the sender can also read their own sent messages.
  *
- * Wire formats (memo prefixes, key file types) are kept identical to the original app so
- * existing messages, published keys and backup files keep working.
+ * New memos use the CHEESECrypt prefixes (CRYPT1: / CRYPTKEY1:). Readers also accept the
+ * original GPKM1: / GPKMKEY1: prefixes so existing messages and published keys keep working.
+ * Key file types (gpk-msg-key / gpk-msg-pubkey) are unchanged so backups keep loading.
  */
 import nacl from 'tweetnacl';
 import { parseCryptName, saveCryptName } from '@/lib/cryptNames';
@@ -13,8 +14,13 @@ import { CryptAvatar, parseAvatar } from '@/lib/cryptAvatar';
 import { decodeBase64, encodeBase64, decodeUTF8, encodeUTF8 } from 'tweetnacl-util';
 import { benchEndpoint, normalizeEndpoint, resolveEndpoints } from '@/lib/endpointHealth';
 
-export const MSG_PREFIX = 'GPKM1:';
-export const KEY_PREFIX = 'GPKMKEY1:';
+export const MSG_PREFIX = 'CRYPT1:';
+export const KEY_PREFIX = 'CRYPTKEY1:';
+export const LEGACY_MSG_PREFIX = 'GPKM1:';
+export const LEGACY_KEY_PREFIX = 'GPKMKEY1:';
+/** The message prefix a memo carries (new or legacy), or null if it is not a message. */
+export const msgPrefixOf = (memo: string) => memo.startsWith(MSG_PREFIX) ? MSG_PREFIX : memo.startsWith(LEGACY_MSG_PREFIX) ? LEGACY_MSG_PREFIX : null;
+export const keyPrefixOf = (memo: string) => memo.startsWith(KEY_PREFIX) ? KEY_PREFIX : memo.startsWith(LEGACY_KEY_PREFIX) ? LEGACY_KEY_PREFIX : null;
 export const MEMO_MAX_BYTES = 256;
 export const KEY_PUBLISH_TO = 'eosio.null';
 export const FEE_MEMO = 'CHEESECrypt messaging fee';
