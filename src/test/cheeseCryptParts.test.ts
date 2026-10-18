@@ -33,11 +33,12 @@ describe('CHEESECrypt multi-part messages', () => {
     const text = '🧀'.repeat(200);
     expect(roundtrip(text).msgs[0].text).toBe(text);
   });
-  it('each part pays 0.0010 CHEESE to recipient and nulls 0.0100 CHEESE (option A)', () => {
+  it('each part pays 0.0010 CHEESE to recipient and splits 0.0100 CHEESE 80/20 (option A)', () => {
     const actions = buildSendMessageActions('alice.wam', 'bob.wam', ['m1', 'm2', 'm3'], []);
-    expect(actions).toHaveLength(6);
+    expect(actions).toHaveLength(9);
     expect(actions.filter((x) => x.data.to === 'bob.wam').map((x) => x.data.quantity)).toEqual(Array(3).fill('0.0010 CHEESE'));
-    expect(actions.filter((x) => x.data.to === 'eosio.null').map((x) => x.data.quantity)).toEqual(Array(3).fill('0.0100 CHEESE'));
+    expect(actions.filter((x) => x.data.to === 'eosio.null').map((x) => x.data.quantity)).toEqual(Array(3).fill('0.0080 CHEESE'));
+    expect(actions.filter(x => x.data.to === 'xcheeseliqst').map(x => x.data.quantity)).toEqual(Array(3).fill('0.0020 CHEESE'));
     expect(messageCost(3)).toBe('0.0330 CHEESE');
   });
   it('limits messages to the maximum part count', () => {

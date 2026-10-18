@@ -40,6 +40,7 @@ describe('CHEESECrypt memo prefixes', () => {
     expect(isCryptNullMemo('CRYPTKEY1:abc')).toBe(true);
     expect(isCryptNullMemo('GPKMKEY1:abc')).toBe(true);
     expect(isCryptNullMemo('CHEESECrypt messaging fee')).toBe(true);
+    expect(isCryptNullMemo('CHEESECrypt key creation fee')).toBe(true);
     expect(isCryptNullMemo('something else')).toBe(false);
   });
 });
@@ -84,20 +85,24 @@ describe('CHEESECrypt voice notes', () => {
     batches.forEach(t => expect(partsIn(t)).toBeLessThanOrEqual(VOICE_PARTS_PER_TX));
     expect(batches.reduce((n, t) => n + partsIn(t), 0)).toBe(voicePartCount(v));
   });
-  it('costs 1 CHEESE nulled once plus 0.0010 per part per recipient', () => {
+  it('splits 1 CHEESE once 80/20 plus 0.0010 per part per recipient', () => {
     const v = clip();
     const parts = voicePartCount(v);
     type T = { data: { to: string; quantity: string } };
     const sum = (l: T[]) => (l.reduce((t, x) => t + Math.round(parseFloat(x.data.quantity) * 10000), 0) / 10000).toFixed(4) + ' CHEESE';
     const dmBatches = buildVoiceBatches(a, ['bob.wam'], null, v, { 'bob.wam': b.publicKey }, []);
     const dm = dmBatches.flat() as T[];
-    expect(dm.filter(x => x.data.to === 'eosio.null').map(x => x.data.quantity)).toEqual(['1.0000 CHEESE']);
+    expect(dm.filter(x => x.data.to === 'eosio.null').map(x => x.data.quantity)).toEqual(['0.8000 CHEESE']);
     expect((dmBatches[0] as T[]).some(x => x.data.to === 'eosio.null')).toBe(true);
+    expect(dm.filter(x => x.data.to === 'xcheeseliqst').map(x => x.data.quantity)).toEqual(['0.2000 CHEESE']);
+    dmBatches.slice(1).forEach(batch => expect((batch as T[]).every(x => x.data.to === 'bob.wam')).toBe(true));
     expect(sum(dm)).toBe(voiceNoteCost(parts, 1));
     expect(voiceNoteCost(parts, 1)).toBe(`${(1 + parts * 0.001).toFixed(4)} CHEESE`);
     const group = createGroup('alice.wam', ['bob.wam', 'carol.wam']);
     const g = buildVoiceBatches(a, ['bob.wam', 'carol.wam'], group, v, { 'bob.wam': b.publicKey, 'carol.wam': c.publicKey }, []).flat() as T[];
     expect(g.filter(x => x.data.to === 'eosio.null')).toHaveLength(1);
+    expect(g.filter(x => x.data.to === 'eosio.null').map(x => x.data.quantity)).toEqual(['0.8000 CHEESE']);
+    expect(g.filter(x => x.data.to === 'xcheeseliqst').map(x => x.data.quantity)).toEqual(['0.2000 CHEESE']);
     expect(sum(g)).toBe(voiceNoteCost(parts, 2));
     expect(voiceNoteCost(parts, 2)).toBe(`${(1 + parts * 0.002).toFixed(4)} CHEESE`);
   });
