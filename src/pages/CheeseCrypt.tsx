@@ -43,7 +43,7 @@ import type { PublicKeyFile } from '@/lib/cheeseCrypt';
 import {
   ChainMemo, MAX_PLAINTEXT_BYTES, MESSAGE_FEE_QUANTITY, MESSAGE_RECIPIENT_QUANTITY, MESSAGE_TOTAL_QUANTITY, NFT_FEE_QUANTITY, MessagingKey,
   MAX_MESSAGE_BYTES, MAX_HISTORY_PAGES, MAX_PARTS, PART_BODY_BYTES, messageCost, partCount, splitMessage,
-  buildPublishKeyActions, buildSendMessageActions, encryptMemo, fetchMessages, generateKey,
+  buildCreateKeyActions, KEY_CREATION_QUANTITY, buildPublishKeyActions, buildSendMessageActions, encryptMemo, fetchMessages, generateKey,
   loadContacts, loadContactAvatars, loadKey, loadRemovedContacts, removeContact, lookupPublishedKey, parseKeyFile, plaintextBytes, saveContact, saveKey, toPublicFile,
 } from '@/lib/cheeseCrypt';
 
@@ -83,7 +83,7 @@ function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, act
         {m.voice ? <VoiceNoteBubble note={m.voice} /> : m.text != null ? parseNftMessage(m.text).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} autoplayKey={m.time > openedAt.current ? `${m.key}:${i}` : undefined} /> : <span key={i} className="block">{seg.text}</span>) : <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
       </div>
       <p className="text-[10px] opacity-70 mt-1">
-        {new Date(m.time).toLocaleString()} · {m.group ? `${groupMessageCost(m.parts, m.group.members.length - 1, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))} at current rate` : messageCost(m.parts, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))}
+        {new Date(m.time).toLocaleString()} · {m.voice ? `${voiceNoteCost(m.parts, m.group ? m.group.members.length - 1 : 1)} at current rate` : m.group ? `${groupMessageCost(m.parts, m.group.members.length - 1, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))} at current rate` : messageCost(m.parts, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))}
         {m.parts > 1 && ` · ${m.parts} parts`}
         {m.missing > 0 && !m.voice && <span className="text-destructive"> · {m.missing} part{m.missing > 1 ? 's' : ''} not loaded</span>}
         {m.txId && <> · <a href={`https://waxblock.io/transaction/${encodeURIComponent(m.txId)}`} target="_blank" rel="noreferrer"
@@ -154,6 +154,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const nameFor = (id: string) => id === account ? key?.displayName ?? account : cryptDisplayName(id, names, nicknames);
   const [editingAvatar, setEditingAvatar] = useState(false);
   const [settingUpProfile, setSettingUpProfile] = useState(false);
+  const [pendingProfile, setPendingProfile] = useState<{ avatar: CryptAvatar; displayName?: string } | null>(null);
+  const [creationAgreed, setCreationAgreed] = useState(false);
+  const creatingKey = useRef(false);
   const [showSharePrompt, setShowSharePrompt] = useState(false);
   const [active, setActive] = useState<string | null>(null);
   const [groups, setGroups] = useState(() => loadGroups(account));
@@ -325,8 +328,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const completeProfile = async (avatar: CryptAvatar, displayName?: string) => {
     setEditingAvatar(false);
     if (settingUpProfile) {
-      const created = generateKey(account, { avatar, displayName });
-      saveKey(created); setKey(created); setBackupKey(created); setSettingUpProfile(false);
+      setPendingProfile({ avatar, displayName }); setCreationAgreed(false); setSettingUpProfile(false);
       return;
     }
     if (!key) return;
@@ -341,6 +343,22 @@ export function Messenger({ account, session }: { account: string; session: NonN
       download(privateKeyName(account), updated);
       toast({ title: 'Profile saved; refreshed backup downloaded', description: 'The existing disk file was not replaced. Keep this refreshed file safe; share only your public key.' });
     }
+  };
+
+  const payAndCreateKey = async () => {
+    if (!pendingProfile || !creationAgreed || creatingKey.current) return;
+    creatingKey.current = true; setBusy(true);
+    try {
+      const result = await executeTransaction(buildCreateKeyActions(account, [permission]), { successTitle: 'Key creation fee paid' });
+      if (!result.success || !result.txId) {
+        if (result.success) toast({ title: 'Payment could not be confirmed', description: 'No new key was created. Check your wallet transaction before retrying.', variant: 'destructive' });
+        return;
+      }
+      const created = generateKey(account, pendingProfile);
+      saveKey(created); setKey(created); setBackupKey(created); setPendingProfile(null); setCreationAgreed(false); setAgreed(false);
+    } catch (e) {
+      toast({ title: 'Could not create key', description: (e as Error).message, variant: 'destructive' });
+    } finally { creatingKey.current = false; setBusy(false); }
   };
 
   /** Saves your public key into cheesecrypt/my private key/ (beside your private key); downloads if no folder access. */
@@ -511,11 +529,22 @@ export function Messenger({ account, session }: { account: string; session: NonN
     onClose={() => { if (settingUpProfile) void completeProfile(accountAvatar(account)); else setEditingAvatar(false); }}
     onSave={() => {}} onSaveProfile={(avatar, displayName) => void completeProfile(avatar, displayName)} />;
 
+  const creationDialog = pendingProfile && <Dialog open onOpenChange={open => { if (!open && !busy) setPendingProfile(null); }}>
+    <DialogContent className="max-w-md" aria-describedby="crypt-creation-fee" onEscapeKeyDown={e => { if (busy) e.preventDefault(); }} onPointerDownOutside={e => { if (busy) e.preventDefault(); }}>
+      <DialogHeader><DialogTitle>🔑 Create your messaging key</DialogTitle></DialogHeader>
+      <p id="crypt-creation-fee" className="text-sm text-muted-foreground">A new key costs {KEY_CREATION_QUANTITY}: 80 CHEESE to eosio.null and 20 CHEESE to xcheeseliqst. Keys are created privately on this device after payment is confirmed. Your public key is not broadcast. Loading an existing key is free.</p>
+      <TermsCheckbox id="crypt-create-terms" checked={creationAgreed} onCheckedChange={setCreationAgreed} />
+      <Button disabled={busy || !creationAgreed} onClick={payAndCreateKey}>{busy ? 'Confirming payment…' : 'Pay 100 CHEESE & create key'}</Button>
+      <Button variant="ghost" disabled={busy} onClick={() => setPendingProfile(null)}>Cancel</Button>
+    </DialogContent>
+  </Dialog>;
+
   if (!key) {
     return (
       <div className="w-full max-w-md space-y-5 text-center">
         {fileInput}
       {profileEditor}
+      {creationDialog}
         <div className="space-y-2">
           <p className="text-lg font-semibold">🔑 Unlock your messages</p>
           <p className="text-sm text-muted-foreground">
@@ -530,7 +559,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         </div>
         <div className="rounded-lg border border-border bg-card/80 p-4 space-y-2 text-left">
           <p className="font-semibold text-sm">I'm new here</p>
-          <p className="text-xs text-muted-foreground">Choose your name and avatar first, then save your new private key. A new key cannot read messages sent to an older one.</p>
+          <p className="text-xs text-muted-foreground">Choose your name and avatar first, then pay 100 CHEESE and save your new private key. Restoring an existing key is free. A new key cannot read messages sent to an older one.</p>
           <Button className="w-full" variant="outline" onClick={makeKey}>Create a new key</Button>
         </div>
       </div>
@@ -559,6 +588,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         </DialogContent>
       </Dialog>}
       {profileEditor}
+      {creationDialog}
       {showSharePrompt && key && <ShareKeyDialog account={account} busy={busy} agreed={agreed} onAgreedChange={setAgreed} onClose={() => setShowSharePrompt(false)}
         onDownload={() => { void sharePublicKey(); setShowSharePrompt(false); }}
         onPublish={async () => { if (await publish()) setShowSharePrompt(false); }} />}
@@ -585,7 +615,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 <DropdownMenuItem onSelect={() => setEditingAvatar(true)}>🎨 Edit profile</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => void sharePublicKey()}>Share public key</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => download(`${account}-cheesecrypt-key-PRIVATE.json`, key)}>Back up private key</DropdownMenuItem>
-                <DropdownMenuItem disabled={busy} onSelect={publish}>Publish to chain ({MESSAGE_FEE_QUANTITY} nulled)</DropdownMenuItem>
+                <DropdownMenuItem disabled={busy} onSelect={publish}>Publish to chain ({MESSAGE_FEE_QUANTITY})</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => fileRef.current?.click()}>Load file (your key or a contact's)</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={makeKey}>New key</DropdownMenuItem>
@@ -673,10 +703,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
                     : <Button size="sm" disabled={busy || !agreed || !text.trim() || tooLong} onClick={send}
                       className="bg-cheese text-primary-foreground hover:bg-cheese/90">Send</Button>}
                 </div>
-                {voice && <p className="text-[11px] text-muted-foreground">🎙️ Voice note: {voiceParts} encrypted parts, up to {VOICE_PARTS_PER_TX} per transaction, signed one after another. A flat 1 CHEESE is nulled once (in the first transaction), plus 0.0010 CHEESE per part to each recipient. If a later transaction fails, the parts already sent stay on chain and the note shows as incomplete.</p>}
+                {voice && <p className="text-[11px] text-muted-foreground">🎙️ Voice note: {voiceParts} encrypted parts, up to {VOICE_PARTS_PER_TX} per transaction, signed one after another. A flat 1 CHEESE fee is paid once in the first transaction (0.8000 nulled, 0.2000 to xcheeseliqst), plus 0.0010 CHEESE per part to each recipient. If a later transaction fails, the parts already sent stay on chain and the note shows as incomplete.</p>}
                 <p className="text-[11px] text-muted-foreground">
-                  {activeGroup ? `Each part: ${MESSAGE_FEE_QUANTITY} nulled once for the group + ${MESSAGE_RECIPIENT_QUANTITY} to each of ${copies} recipients. Group delivery uses ${copies} encrypted copies in one transaction. Membership is fixed; start a new group to change participants.` : `Each part: ${MESSAGE_RECIPIENT_QUANTITY} to ${active} + ${MESSAGE_FEE_QUANTITY} nulled (${MESSAGE_TOTAL_QUANTITY}). Long messages split into up to ${MAX_PARTS} parts (${MAX_PLAINTEXT_BYTES} bytes for one, ${PART_BODY_BYTES} per part after that), all in one transaction.`}
-                  {` Attaching an NFT raises the first part's nulled fee to ${NFT_FEE_QUANTITY}.`}
+                  {activeGroup ? `Each part: ${MESSAGE_FEE_QUANTITY} shared platform fee for the group + ${MESSAGE_RECIPIENT_QUANTITY} to each of ${copies} recipients. Group delivery uses ${copies} encrypted copies in one transaction. Membership is fixed; start a new group to change participants.` : `Each part: ${MESSAGE_RECIPIENT_QUANTITY} to ${active} + ${MESSAGE_FEE_QUANTITY} platform fee (${MESSAGE_TOTAL_QUANTITY}). Long messages split into up to ${MAX_PARTS} parts (${MAX_PLAINTEXT_BYTES} bytes for one, ${PART_BODY_BYTES} per part after that), all in one transaction.`}
+                  {` Attaching an NFT raises the first part's platform fee to ${NFT_FEE_QUANTITY}. Platform fees split 80% to eosio.null and 20% to xcheeseliqst; recipient payments are unchanged.`}
                 </p>
               </div>
             )}

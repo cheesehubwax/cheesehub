@@ -101,7 +101,7 @@ const CRYPT_FEE_MEMO = 'CHEESECrypt messaging fee';
 const CRYPT_KEY_PREFIXES = ['CRYPTKEY1:', 'GPKMKEY1:'];
 
 export function isCryptNullMemo(memo: unknown): boolean {
-  return typeof memo === 'string' && (memo === CRYPT_FEE_MEMO || CRYPT_KEY_PREFIXES.some(p => memo.startsWith(p)));
+  return typeof memo === 'string' && (memo === CRYPT_FEE_MEMO || memo === 'CHEESECrypt key creation fee' || CRYPT_KEY_PREFIXES.some(p => memo.startsWith(p)));
 }
 
 export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {

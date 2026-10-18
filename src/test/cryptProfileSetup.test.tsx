@@ -24,6 +24,14 @@ beforeEach(() => {
   URL.revokeObjectURL = vi.fn();
   vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 });
+async function payCreation() {
+  expect(loadKey('alice')).toBeNull();
+  const pay = await screen.findByRole('button', { name: 'Pay 100 CHEESE & create key' });
+  expect(pay).toBeDisabled();
+  fireEvent.click(screen.getByRole('checkbox'));
+  calls.transact.mockResolvedValueOnce({ success: true, txId: 'confirmed-create-tx' });
+  await act(async () => { fireEvent.click(pay); });
+}
 describe('profile-first key setup', () => {
   it.each(['Save backup', 'Download backup'])('creates default-profile keys before %s, then offers sharing without repeating setup', async action => {
     const view = render(<Messenger {...props} />);
@@ -32,6 +40,7 @@ describe('profile-first key setup', () => {
     expect(screen.queryByRole('button', { name: action })).not.toBeInTheDocument();
     await screen.findByLabelText('CHEESECrypt name');
     fireEvent.click(screen.getByRole('button', { name: 'Use defaults' }));
+    await payCreation();
     const original = loadKey('alice');
     expect(original?.avatar).toEqual(accountAvatar('alice'));
     fireEvent.click(screen.getByRole('button', { name: action }));
@@ -50,6 +59,7 @@ describe('profile-first key setup', () => {
     expect(loadKey('alice')).toBeNull();
     fireEvent.change(await screen.findByLabelText('CHEESECrypt name'), { target: { value: 'Alice Cheese' } });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save profile' })); });
+    await payCreation();
     const created = loadKey('alice');
     expect(created?.displayName).toBe('Alice Cheese');
     expect(created?.avatar).toEqual(accountAvatar('alice'));
@@ -69,12 +79,63 @@ describe('profile-first key setup', () => {
     if (name) fireEvent.change(await screen.findByLabelText('CHEESECrypt name'), { target: { value: name } });
     else await screen.findByLabelText('CHEESECrypt name');
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: action })); });
+    await payCreation();
     fireEvent.click(screen.getByRole('button', { name: 'Save backup' }));
     expect(await screen.findByText('📣 Share your public key')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save public key file' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Publish my key on chain' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Maybe later' }));
     await waitFor(() => expect(screen.queryByText('📣 Share your public key')).not.toBeInTheDocument());
+  });
+  it.each([{ success: false, txId: null }, { success: true, txId: null }])('does not create a key after failed or unverified payment: %o', async result => {
+    render(<Messenger {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Create a new key' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Use defaults' }));
+    fireEvent.click(screen.getByRole('checkbox'));
+    calls.transact.mockResolvedValueOnce(result);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Pay 100 CHEESE & create key' })); });
+    expect(loadKey('alice')).toBeNull();
+    expect(calls.transact.mock.calls[0][0].map((a: { data: unknown }) => a.data)).toEqual([
+      { from: 'alice', to: 'eosio.null', quantity: '80.0000 CHEESE', memo: 'CHEESECrypt key creation fee' },
+      { from: 'alice', to: 'xcheeseliqst', quantity: '20.0000 CHEESE', memo: 'CHEESECrypt key creation fee' },
+    ]);
+  });
+  it('loads an existing private key for free', async () => {
+    const existing = generateKey('alice');
+    const { container } = render(<Messenger {...props} />);
+    const input = container.querySelector('input[type="file"]');
+    if (!input) throw new Error('Missing import');
+    const file = new File([], 'key.json');
+    Object.defineProperty(file, 'text', { value: async () => JSON.stringify(existing) });
+    await act(async () => { fireEvent.change(input, { target: { files: [file] } }); });
+    expect(loadKey('alice')).toEqual(existing);
+    expect(calls.transact).not.toHaveBeenCalled();
+  });
+  it('preserves the selected profile after wallet rejection and permits retry without double payment', async () => {
+    render(<Messenger {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Create a new key' }));
+    fireEvent.change(await screen.findByLabelText('CHEESECrypt name'), { target: { value: 'Alice Cheese' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
+    fireEvent.click(screen.getByRole('checkbox'));
+    calls.transact.mockRejectedValueOnce(new Error('Wallet rejected'));
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Pay 100 CHEESE & create key' })); });
+    expect(loadKey('alice')).toBeNull();
+    let confirmPayment: ((value: { success: boolean; txId: string }) => void) | undefined;
+    calls.transact.mockImplementationOnce(() => new Promise(resolve => { confirmPayment = resolve; }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pay 100 CHEESE & create key' }));
+    expect(screen.getByRole('button', { name: 'Confirming payment…' })).toBeDisabled();
+    expect(calls.transact).toHaveBeenCalledTimes(2);
+    await act(async () => { confirmPayment?.({ success: true, txId: 'confirmed' }); });
+    expect(loadKey('alice')?.displayName).toBe('Alice Cheese');
+    expect(calls.transact).toHaveBeenCalledTimes(2);
+  });
+  it('cancels creation without charging or generating a key', async () => {
+    render(<Messenger {...props} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Create a new key' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Use defaults' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(loadKey('alice')).toBeNull();
+    expect(calls.transact).not.toHaveBeenCalled();
   });
   it.each(['success', 'failure', 'denied', 'no folder'])('keeps the same encryption keys and refreshes or downloads a backup after edits: %s', async outcome => {
     const original = generateKey('alice'); saveKey(original);
@@ -99,12 +160,13 @@ describe('profile-first key setup', () => {
     render(<Messenger {...props} />);
     fireEvent.click(screen.getByRole('button', { name: 'Create a new key' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Use defaults' }));
+    await payCreation();
     fireEvent.click(screen.getByRole('button', { name: 'Save backup' }));
     const publish = screen.getByRole('button', { name: 'Publish my key on chain' });
     expect(publish).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(publish);
-    await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(2));
     expect(await screen.findByText('📣 Share your public key')).toBeInTheDocument();
   });
 });

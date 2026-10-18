@@ -14,7 +14,7 @@
 
 - CHEESEFolio scans always include the history provider reaching furthest back (probed per browser) and mark a sync complete only when that deepest provider was read to the end (shallower ones are cover, caught up next sync); big-page providers are read sequentially and only small-page ones are windowed, with capped concurrency — bursts make Hyperion nodes drop connections and stall the scan.
 
-- CHEESEFolio de-duplicates by global sequence and drops inline transfer copies whose creator action is an identical transfer — some Hyperion nodes list the receiver notification as a separate action, which double-counts the movement.
+- CHEESEFolio de-duplicates by global sequence and drops inline copies with identical transfer creator actions; Hyperion receiver notifications otherwise double-count movements.
 
 - CHEESEFolio explains order-book fills from Alcor's per-account deal list (read in one large-limit request — its skip paging is gappy) and only looks up leftovers on Hyperion, routed by each provider's history start; per-transaction lookups alone take minutes on heavy accounts.
 
@@ -30,11 +30,11 @@
 - CHEESECrypt voice notes are 0x03-headed byte memos assembled by sender+recipient+id across 30-part transactions; play only when complete and digest-verified (batches can partly fail).
 - CHEESECrypt names are validated optional key-file metadata, separate from per-owner nicknames; WAX accounts remain delivery identities. Friend removal clears contact metadata and excludes rediscovery until explicit re-add, preserving history and groups.
 
-- Crypt About uses DappAbout with ReactNode intros and a separate cryptography dialog.
+- Crypt About uses DappAbout and a separate cryptography dialog.
 
 - CHEESECrypt group envelopes use legacy pairwise encryption; discover immutable membership only after authenticated assembly, isolating transactions/recipients before deduplicating fanout. Per-owner hidden-group IDs affect visibility only, preserving definitions/history for restoration.
 
-- Crypt group/composer pricing shares one helper; history estimates use current rates.
+- Crypt uses integer fee splits; fanout omits fees explicitly, not by indexes. Confirm payment before local key creation; imports stay free. History uses current rates.
 
 - CHEESECrypt avatars are validated palette-index data in optional key-file fields and separate per-account contact storage; imports rasterize locally, and on-chain key memos stay unchanged to preserve compatibility and avoid executable or remote avatar payloads.
 

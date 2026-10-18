@@ -43,7 +43,7 @@ export const ShareKeyDialog = ({ account, busy, agreed, onAgreedChange, onDownlo
             Like listing yourself in the telephone book: anyone who knows your WAX account name
             (<span className="font-mono">{account}</span>) can look up your public key and message you.
             To read their replies you still need their public key — imported from their file, or found
-            automatically if they broadcast theirs too. Costs {MESSAGE_FEE_QUANTITY} (nulled) and requires the Terms of Use checkbox.
+            automatically if they broadcast theirs too. Costs {MESSAGE_FEE_QUANTITY} (0.0080 nulled, 0.0020 to xcheeseliqst) and requires the Terms of Use checkbox.
           </p>
           <TermsCheckbox checked={agreed} onCheckedChange={onAgreedChange} />
           <Button size="sm" variant="outline" className="w-full" disabled={busy || !agreed} onClick={onPublish}>

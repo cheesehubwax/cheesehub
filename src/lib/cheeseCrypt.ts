@@ -24,11 +24,14 @@ export const keyPrefixOf = (memo: string) => memo.startsWith(KEY_PREFIX) ? KEY_P
 export const MEMO_MAX_BYTES = 256;
 export const KEY_PUBLISH_TO = 'eosio.null';
 export const FEE_MEMO = 'CHEESECrypt messaging fee';
+export const KEY_CREATION_MEMO = 'CHEESECrypt key creation fee';
+export const KEY_CREATION_QUANTITY = '100.0000 CHEESE';
+export const LIQUIDITY_FEE_TO = 'xcheeseliqst';
 
 export const MESSAGE_RECIPIENT_QUANTITY = '0.0010 CHEESE';
 export const MESSAGE_FEE_QUANTITY = '0.0100 CHEESE';
 export const MESSAGE_TOTAL_QUANTITY = '0.0110 CHEESE';
-/** Nulled fee for the first part of a message that carries an NFT (replaces the normal fee). */
+/** Platform fee for the first part of a message that carries an NFT (replaces the normal fee). */
 export const NFT_FEE_QUANTITY = '0.0200 CHEESE';
 const units = (q: string) => Math.round(parseFloat(q) * 10000);
 
@@ -285,18 +288,30 @@ function cheeseTransfer(from: string, to: string, quantity: string, memo: string
   return { account: 'cheeseburger', name: 'transfer', authorization: auth, data: { from, to, quantity, memo } };
 }
 
-/** Every part pays recipient + nulled fee; all actions go in one transaction (all or nothing). */
-export function buildSendMessageActions(from: string, to: string, memo: string | string[], auth: unknown[], hasNft = false) {
+/** Integer-unit split of platform fees only; recipient payments are separate. */
+export function buildCryptFeeActions(from: string, quantity: string, auth: unknown[], memo = FEE_MEMO) {
+  const total = units(quantity);
+  if (!Number.isSafeInteger(total) || total <= 0 || total % 5 !== 0) throw new Error('Invalid CHEESECrypt fee');
+  return [
+    cheeseTransfer(from, KEY_PUBLISH_TO, `${(total * 4 / 5 / 10000).toFixed(4)} CHEESE`, memo, auth),
+    cheeseTransfer(from, LIQUIDITY_FEE_TO, `${(total / 5 / 10000).toFixed(4)} CHEESE`, memo, auth),
+  ];
+}
+export function buildCreateKeyActions(from: string, auth: unknown[]) {
+  return buildCryptFeeActions(from, KEY_CREATION_QUANTITY, auth, KEY_CREATION_MEMO);
+}
+/** Group copies and voice parts explicitly omit per-part platform fees. */
+export function buildSendMessageActions(from: string, to: string, memo: string | string[], auth: unknown[], hasNft = false, includeFee = true) {
   const memos = Array.isArray(memo) ? memo : [memo];
   return memos.flatMap((m, i) => [
     cheeseTransfer(from, to, MESSAGE_RECIPIENT_QUANTITY, m, auth),
-    cheeseTransfer(from, KEY_PUBLISH_TO, hasNft && i === 0 ? NFT_FEE_QUANTITY : MESSAGE_FEE_QUANTITY, FEE_MEMO, auth),
+    ...(includeFee ? buildCryptFeeActions(from, hasNft && i === 0 ? NFT_FEE_QUANTITY : MESSAGE_FEE_QUANTITY, auth) : []),
   ]);
 }
 
-/** Publishing is a single public-key transfer, not a message. */
+/** Both fee legs carry the key; lookup reads the eosio.null leg. */
 export function buildPublishKeyActions(from: string, publicKey: string, auth: unknown[]) {
-  return [cheeseTransfer(from, KEY_PUBLISH_TO, MESSAGE_FEE_QUANTITY, keyMemo(publicKey), auth)];
+  return buildCryptFeeActions(from, MESSAGE_FEE_QUANTITY, auth, keyMemo(publicKey));
 }
 
 export interface ChainMemo { txId: string; time: number; from: string; to: string; memo: string; quantity: string }
