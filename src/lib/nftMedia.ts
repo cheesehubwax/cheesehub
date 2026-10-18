@@ -13,9 +13,34 @@ export interface NftMediaTrack {
 
 type Resolve = (field: string) => string;
 
-/** An NFT counts as playable media when it carries an audio, clip or video field. */
+/** Canonical fields win; sound aliases must be references, not category tags. */
+export function normalizeNftMedia(data: Record<string, unknown>): Record<string, unknown> {
+  const normalized = { ...data };
+  const value = (key: string) => {
+    const v = data[key];
+    return typeof v === 'string' && v.trim() ? v.trim() : undefined;
+  };
+  for (const field of ['audio', 'clip', 'video']) {
+    const matchingKey = Object.keys(data).find(key => key.trim().toLowerCase() === field && value(key));
+    normalized[field] = value(field) ?? (matchingKey ? value(matchingKey) : undefined);
+  }
+  if (!normalized.audio) {
+    for (const alias of ['sound', 'mp3', 'sfx']) {
+      const key = Object.keys(data).find(k => k.trim().toLowerCase() === alias && value(k));
+      const reference = key ? value(key) : undefined;
+      if (reference && /^(https?:\/\/|ipfs:\/\/|Qm|bafy|bafk)/.test(reference)) {
+        normalized.audio = reference;
+        break;
+      }
+    }
+  }
+  return normalized;
+}
+
+/** Only nonempty media fields count as playable. */
 export function isMusicNFT(data: Record<string, unknown>): boolean {
-  return !!(data.audio || data.clip || data.video);
+  const normalized = normalizeNftMedia(data);
+  return !!(normalized.audio || normalized.clip || normalized.video);
 }
 
 const EXTRA_AUDIO_PATTERN = /^(audio\s*\d+|track\s*\d+|fulltrack|full_audio|full_song|bonus_track)$/i;
@@ -41,6 +66,7 @@ export function extractExtraAudioUrls(allData: Record<string, unknown>, resolve:
 
 /** Every playable track in preference order: main (audio → clip → video), video as Full Track when distinct, then extras. */
 export function nftMediaTracks(allData: Record<string, unknown>, resolve: Resolve): NftMediaTrack[] {
+  allData = normalizeNftMedia(allData);
   if (!isMusicNFT(allData)) return [];
   const str = (v: unknown) => (typeof v === 'string' && v ? v : undefined);
   const main = str(allData.audio) ?? str(allData.clip) ?? str(allData.video);

@@ -119,7 +119,7 @@ export function extractIpfsHash(url: string): string | null {
   const ipfsMatch = url.match(/\/ipfs\/([a-zA-Z0-9]+(?:\/[^?#]*)?)/);
   if (ipfsMatch) return ipfsMatch[1];
 
-  if (/^Qm[a-zA-Z0-9]{44}/.test(url) || /^bafy[a-zA-Z0-9]+/.test(url)) {
+  if (/^Qm[a-zA-Z0-9]{44}/.test(url) || /^baf[yk][a-zA-Z0-9]+/.test(url)) {
     return url;
   }
 
