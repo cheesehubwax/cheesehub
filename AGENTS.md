@@ -30,7 +30,7 @@
 - CHEESECrypt voice notes are 0x03-headed byte memos assembled by sender+recipient+id across 30-part transactions; play only when complete and digest-verified (batches can partly fail).
 - CHEESECrypt names are validated optional key-file metadata, separate from per-owner nicknames; WAX accounts remain delivery identities. Friend removal clears contact metadata and excludes rediscovery until explicit re-add, preserving history and groups.
 
-- CHEESECrypt's guide uses the shared DappAbout shell plus a separate cryptography dialog; introductions accept ReactNode.
+- CHEESECrypt's guide uses the shared DappAbout shell plus a separate cryptography dialog; intros take ReactNode.
 
 - CHEESECrypt group envelopes use legacy pairwise encryption; discover immutable membership only after authenticated assembly, isolating transactions/recipients before deduplicating fanout. Per-owner hidden-group IDs affect visibility only, preserving definitions/history for restoration.
 
