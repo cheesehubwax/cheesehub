@@ -652,7 +652,6 @@ export function Messenger({ account, session }: { account: string; session: NonN
                     {voice ? `${voiceParts} parts · ${voiceTxs} transaction${voiceTxs > 1 ? 's' : ''}` : `${bytes}/${maxBytes} · ${parts || 1} part${parts > 1 ? 's' : ''}`}{activeGroup && ` × ${copies} recipients`}
                   </span>
                   {!voice && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAttachingNft(true)}>🖼️ Attach NFT</Button>}
-                  {!voice && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAttachingMusic(true)}>🎵 Attach music</Button>}
                   {!text.trim() && <VoiceRecorder clip={voice} onChange={setVoice} disabled={busy} />}
                   <TermsCheckbox checked={agreed} onCheckedChange={setAgreed} className="ml-2" />
                   <span className="ml-auto text-muted-foreground">{totalCost}</span>
