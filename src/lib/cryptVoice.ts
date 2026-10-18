@@ -8,7 +8,7 @@
  * 0x03 is used because 0x01 marks multipart text and 0x02 starts the group text envelope.
  */
 import nacl from 'tweetnacl';
-import { buildSendMessageActions, encryptBytesMemo, FEE_MEMO, KEY_PUBLISH_TO, MAX_PLAINTEXT_BYTES, MESSAGE_RECIPIENT_QUANTITY, type MessagingKey } from '@/lib/cheeseCrypt';
+import { buildCryptFeeActions, buildSendMessageActions, encryptBytesMemo, MAX_PLAINTEXT_BYTES, MESSAGE_RECIPIENT_QUANTITY, type MessagingKey } from '@/lib/cheeseCrypt';
 
 export const VOICE_MARK = 0x03;
 export const VOICE_HEADER_BYTES = 12;
@@ -155,18 +155,18 @@ export function assembleVoice(parts: VoicePartMemo[], now = Date.now()): VoiceNo
   return out;
 }
 
-/** Flat nulled fee per voice note, whatever its length or number of recipients. */
+/** Flat platform fee per voice note, whatever its length or number of recipients. */
 export const VOICE_FEE_QUANTITY = '1.0000 CHEESE';
 const units = (q: string) => Math.round(parseFloat(q) * 10000);
 
-/** Total CHEESE for a voice note: one flat nulled fee plus 0.0010 per part to every recipient. */
+/** Total CHEESE for a voice note: one flat platform fee plus 0.0010 per part to every recipient. */
 export function voiceNoteCost(parts: number, recipients = 1): string {
   return `${((units(VOICE_FEE_QUANTITY) + units(MESSAGE_RECIPIENT_QUANTITY) * parts * recipients) / 10000).toFixed(4)} CHEESE`;
 }
 
 /**
  * Transactions to sign, in order. Each carries up to 30 parts; every recipient gets its own encrypted
- * copy of each part paid 0.0010 CHEESE. The flat 1 CHEESE nulled fee is paid once, in the first transaction.
+ * copy of each part paid 0.0010 CHEESE. The split 1 CHEESE platform fee is paid once, in the first transaction.
  */
 export function buildVoiceBatches(key: MessagingKey, recipients: string[], group: VoiceGroupRef | null, clip: VoiceClip,
   contacts: Record<string, string>, auth: unknown[], id?: string): unknown[][] {
@@ -176,11 +176,9 @@ export function buildVoiceBatches(key: MessagingKey, recipients: string[], group
   const encrypted = recipients.map(to => plain.map(p => encryptBytesMemo(p, contacts[to], key.secretKey)));
   const batches: unknown[][] = [];
   for (let s = 0; s < plain.length; s += VOICE_PARTS_PER_TX) {
-    // The message builder alternates recipient payment and per-part fee; keep only the payments.
     const payments = recipients.flatMap((to, ri) =>
-      buildSendMessageActions(key.account, to, encrypted[ri].slice(s, s + VOICE_PARTS_PER_TX), auth).filter((_, i) => i % 2 === 0));
-    if (s === 0) payments.push({ account: 'cheeseburger', name: 'transfer', authorization: auth,
-      data: { from: key.account, to: KEY_PUBLISH_TO, quantity: VOICE_FEE_QUANTITY, memo: FEE_MEMO } });
+      buildSendMessageActions(key.account, to, encrypted[ri].slice(s, s + VOICE_PARTS_PER_TX), auth, false, false));
+    if (s === 0) payments.push(...buildCryptFeeActions(key.account, VOICE_FEE_QUANTITY, auth));
     batches.push(payments);
   }
   return batches;

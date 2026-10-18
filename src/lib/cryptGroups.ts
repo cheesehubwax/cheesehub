@@ -58,7 +58,7 @@ export function groupMessageSize(group: CryptGroup, text: string) {
   return { parts: partCount(payload), maxBytes: MAX_MESSAGE_BYTES - plaintextBytes(groupPayload(group, '')), bytes: plaintextBytes(text) };
 }
 
-/** One shared nulled fee per part, plus a payment to every recipient. */
+/** One shared platform fee per part, plus a payment to every recipient. */
 export function groupMessageCost(parts: number, recipients: number, hasNft = false): string {
   const feeUnits = Math.round(parseFloat(MESSAGE_FEE_QUANTITY) * 10000);
   const recipientUnits = Math.round(parseFloat(MESSAGE_RECIPIENT_QUANTITY) * 10000);
@@ -74,11 +74,8 @@ export function buildGroupMessageActions(key: MessagingKey, group: CryptGroup, t
   if (recipients.some(m => !contacts[m])) throw new Error('Load every group member’s public key before sending.');
   const parts = splitMessage(groupPayload(valid, text));
   return recipients.flatMap((to, recipientIndex) => {
-    const actions = buildSendMessageActions(key.account, to,
-      parts.map(p => encryptMemo(p, contacts[to], key.secretKey)), auth, hasNft);
-    // The direct-message builder alternates recipient payment and fee for each part.
-    // Keep the fee only for the first recipient; every encrypted copy still gets paid.
-    return recipientIndex === 0 ? actions : actions.filter((_, index) => index % 2 === 0);
+    return buildSendMessageActions(key.account, to,
+      parts.map(p => encryptMemo(p, contacts[to], key.secretKey)), auth, hasNft, recipientIndex === 0);
   });
 }
 

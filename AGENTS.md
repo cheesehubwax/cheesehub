@@ -30,11 +30,11 @@
 - CHEESECrypt voice notes are 0x03-headed byte memos assembled by sender+recipient+id across 30-part transactions; play only when complete and digest-verified (batches can partly fail).
 - CHEESECrypt names are validated optional key-file metadata, separate from per-owner nicknames; WAX accounts remain delivery identities. Friend removal clears contact metadata and excludes rediscovery until explicit re-add, preserving history and groups.
 
-- Crypt About uses DappAbout with ReactNode intros and a separate cryptography dialog.
+- Crypt About uses DappAbout and a separate cryptography dialog.
 
 - CHEESECrypt group envelopes use legacy pairwise encryption; discover immutable membership only after authenticated assembly, isolating transactions/recipients before deduplicating fanout. Per-owner hidden-group IDs affect visibility only, preserving definitions/history for restoration.
 
-- Crypt group/composer pricing shares one helper; history estimates use current rates.
+- Crypt uses integer fee splits and explicit fee omission for fanout; never filter action indexes. Confirm payment before local key creation; imports stay free. History uses current rates.
 
 - CHEESECrypt avatars are validated palette-index data in optional key-file fields and separate per-account contact storage; imports rasterize locally, and on-chain key memos stay unchanged to preserve compatibility and avoid executable or remote avatar payloads.
 
