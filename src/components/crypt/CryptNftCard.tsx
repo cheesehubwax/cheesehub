@@ -8,13 +8,14 @@ import { fetchAssetById } from '@/services/atomicApi';
 import { cryptAudio } from '@/lib/cryptAudio';
 import { formatTime } from '@/lib/musicPlayer';
 
-function TrackControl({ trackKey, url, label }: { trackKey: string; url: string; label?: string }) {
+function TrackControl({ trackKey, url, label, hiddenUntilHover }: { trackKey: string; url: string; label?: string; hiddenUntilHover?: boolean }) {
   const s = useSyncExternalStore(cryptAudio.subscribe, cryptAudio.getState);
   const mine = s.key === trackKey;
   if (s.failedKeys.has(trackKey)) return <span className="text-xs italic opacity-80">🔇 Sound unavailable{label ? ` (${label})` : ''}</span>;
   const pct = mine && s.duration ? Math.min(100, (s.time / s.duration) * 100) : 0;
+  const hoverHide = hiddenUntilHover && !(mine && s.playing);
   return (
-    <span className="flex items-center gap-2 min-w-[160px]">
+    <span className={`flex items-center gap-2 min-w-[160px] transition-opacity duration-150 ${hoverHide ? 'opacity-0 group-hover:opacity-100 focus-within:opacity-100' : ''}`}>
       <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 text-cheese" onClick={() => cryptAudio.toggle(trackKey, url)}
         aria-label={mine && s.playing ? `Pause ${label ?? 'sound'}` : `Play ${label ?? 'sound'}`}>
         {mine && s.loading ? <Loader2 className="h-4 w-4 animate-spin" /> : mine && s.playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
@@ -48,14 +49,14 @@ export function CryptNftCard({ assetId, autoplayKey }: { assetId: string; autopl
   const meta = data ? `${data.artist ? `${data.artist} · ` : ''}${data.collection}${data.mint ? ` · #${data.mint}` : ''} · ID ${assetId}` : '';
   const hasImage = !!data?.image && data.image !== '/placeholder.svg';
   return <>
-    <span className={tracks.length ? 'block w-56 my-1 space-y-1' : 'contents'}>
+    <span className={`group my-1 space-y-1 ${tracks.length ? (data?.isSfx ? 'block w-[10.5rem]' : 'block w-56') : 'contents'}`}>
     <button type="button" onClick={() => setOpen(true)} disabled={!data}
         title={details} aria-label={`View larger: ${details.replace(/\n/g, ' · ')}`}
         className={`block ${tracks.length ? 'w-full' : 'w-44 my-1'} cursor-zoom-in disabled:cursor-default ${data?.isSfx ? '' : 'overflow-hidden rounded-md'}`}>
         {hasImage ? <IpfsImage src={data!.image} alt={data!.name} className="w-full h-auto object-contain" />
           : <div className="aspect-square w-full flex items-center justify-center text-2xl">{isLoading ? '⏳' : tracks.length ? '🎵' : '🖼️'}</div>}
       </button>
-      {tracks.length > 0 && <TrackControl trackKey={`${assetId}:0`} url={tracks[0].url} />}
+      {tracks.length > 0 && <TrackControl trackKey={`${assetId}:0`} url={tracks[0].url} hiddenUntilHover={!!data?.isSfx} />}
     </span>
     {data && <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-3xl p-4 max-h-[90dvh] overflow-y-auto">

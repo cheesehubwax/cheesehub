@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Session } from '@wharfkit/session';
 import { generateKey, saveContact, saveKey, encryptMemo, loadContacts, loadKey, loadContactAvatars, loadRemovedContacts } from '@/lib/cheeseCrypt';
@@ -24,6 +25,11 @@ beforeEach(() => {
   calls.transact.mockResolvedValue({ success: false });
 });
 
+const mount = (ui: React.ReactElement) => {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+};
+
 describe('group creation and signing gate', () => {
   it('hides a group persistently while preserving its history and permits restoration', async () => {
     const alice = generateKey('alice'), bob = generateKey('bob');
@@ -33,7 +39,7 @@ describe('group creation and signing gate', () => {
     const history = [{ txId: 'old', time: 1, from: 'bob', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo(groupPayload(group, 'original history'), alice.publicKey, bob.secretKey) }];
     calls.fetch.mockResolvedValue(history);
     const props = { account: 'alice', session: { permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session };
-    const view = render(<Messenger {...props} />);
+    const view = mount(<Messenger {...props} />);
     fireEvent.click(screen.getByRole('button', { name: /Group · 3 people/ }));
     await screen.findByText('original history');
     fireEvent.click(screen.getByRole('button', { name: `Hide group ${group.id}` }));
@@ -48,7 +54,7 @@ describe('group creation and signing gate', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Refresh messages' }));
     await waitFor(() => expect(calls.fetch).toHaveBeenCalledTimes(2));
     view.unmount();
-    render(<Messenger {...props} />);
+    mount(<Messenger {...props} />);
     await waitFor(() => expect(calls.fetch).toHaveBeenCalledTimes(3));
     expect(screen.queryByRole('button', { name: /Group · 3 people/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Hidden groups (1)' }));
@@ -68,7 +74,7 @@ describe('group creation and signing gate', () => {
     const history = [{ txId: 'abc', time: 1, from: 'bob', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo('hi', alice.publicKey, bob.secretKey) }];
     calls.fetch.mockResolvedValue(history);
     const props = { account: 'alice', session: { permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session };
-    const view = render(<Messenger {...props} />);
+    const view = mount(<Messenger {...props} />);
     fireEvent.click(screen.getByRole('button', { name: /Best friend/ }));
     await screen.findByText('hi');
     fireEvent.click(screen.getByRole('button', { name: 'Remove friend bob' }));
@@ -83,12 +89,12 @@ describe('group creation and signing gate', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Refresh messages' }));
     await waitFor(() => expect(calls.fetch).toHaveBeenCalledTimes(2));
     view.unmount();
-    const remounted = render(<Messenger {...props} />);
+    const remounted = mount(<Messenger {...props} />);
     await waitFor(() => expect(calls.fetch).toHaveBeenCalledTimes(3));
     expect(screen.queryByRole('button', { name: 'Remove friend bob' })).not.toBeInTheDocument();
     remounted.unmount();
     saveContact('alice', 'bob', bob.publicKey);
-    render(<Messenger {...props} />);
+    mount(<Messenger {...props} />);
     expect(loadRemovedContacts('alice')).not.toContain('bob');
     fireEvent.click(screen.getByRole('button', { name: /^bob/ }));
     await screen.findByText('hi');
@@ -99,7 +105,7 @@ describe('group creation and signing gate', () => {
     saveContact('alice', 'bob', bob.publicKey, undefined, 'Bob Cheese');
     calls.fetch.mockResolvedValue([{ txId: 'abc', time: 1, from: 'bob', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo('hi', alice.publicKey, bob.secretKey) }]);
     const props = { account: 'alice', session: { permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session };
-    const view = render(<Messenger {...props} />);
+    const view = mount(<Messenger {...props} />);
     fireEvent.click(screen.getByRole('button', { name: /Bob Cheese/ }));
     await screen.findByText('hi');
     fireEvent.click(screen.getByRole('button', { name: 'Edit nickname for bob' }));
@@ -107,7 +113,7 @@ describe('group creation and signing gate', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save nickname' }));
     expect(loadCryptNames('alice', 'nicknames').bob).toBe('Best friend');
     view.unmount();
-    render(<Messenger {...props} />);
+    mount(<Messenger {...props} />);
     fireEvent.click(screen.getByRole('button', { name: /Best friend/ }));
     fireEvent.change(screen.getByPlaceholderText('Message Best friend'), { target: { value: 'reply' } });
     fireEvent.click(screen.getByRole('checkbox'));
@@ -118,7 +124,7 @@ describe('group creation and signing gate', () => {
     saveCryptName('alice', 'bob', '', 'nicknames');
   });
   it('saves the selected membership and submits both recipient copies only after terms acceptance', async () => {
-    render(<Messenger account="alice" session={{ permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} />);
+    mount(<Messenger account="alice" session={{ permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} />);
     fireEvent.click(screen.getByRole('button', { name: '👥 New group' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'bob' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'carol' }));
