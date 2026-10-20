@@ -9,12 +9,14 @@ import { fetchWaxUsdDaily, loadPriceLookup, waxUsdLookup } from '@/lib/folio/pri
 import { syncFolio, type ScanProgress } from '@/lib/folio/scanner';
 import { clearFolio, FOLIO_SCHEMA, loadFolio, saveFolio, type StoredFolio } from '@/lib/folio/storage';
 import { WAX_KEY } from '@/lib/folio/types';
+import { fetchFxHistory } from '@/lib/folio/fx';
+import { combineWaxFiat, fxLookup, type FiatCode } from '@/lib/folio/fxCore';
 
 const emptyRecord = (account: string): StoredFolio => ({
   account, schema: FOLIO_SCHEMA, transfers: [], cursors: {}, syncedAt: null,
 });
 
-export function useFolio(account: string | null) {
+export function useFolio(account: string | null, fiat: FiatCode = 'USD') {
   const [rec, setRec] = useState<StoredFolio | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -148,7 +150,27 @@ export function useFolio(account: string | null) {
   });
   const waxUsdAt = useMemo(() => (waxUsdDaily?.size ? waxUsdLookup(waxUsdDaily) : undefined), [waxUsdDaily]);
 
-  const ledger = useMemo(() => buildLedger(events, lookup?.priceAt, waxUsdAt), [events, lookup, waxUsdAt]);
+  // Daily fiat/USD rates; USD needs none and stays exactly as before.
+  const { data: fx, isFetched: fxFetched } = useQuery({
+    queryKey: ['folio-fx'],
+    queryFn: ({ signal }) => fetchFxHistory(signal),
+    enabled: fiat !== 'USD',
+    staleTime: 6 * 60 * 60 * 1000,
+  });
+  const fxUnavailable = fiat !== 'USD' && fxFetched && !fx?.[fiat];
+  const effectiveFiat: FiatCode = fxUnavailable ? 'USD' : fiat;
+  const fxAt = useMemo(
+    () => (effectiveFiat === 'USD' ? fxLookup('USD', undefined) : fx?.[effectiveFiat] ? fxLookup(effectiveFiat, fx[effectiveFiat]) : null),
+    [effectiveFiat, fx],
+  );
+  const waxFiatAt = useMemo(
+    () => (waxUsdAt && fxAt ? (effectiveFiat === 'USD' ? waxUsdAt : combineWaxFiat(waxUsdAt, fxAt)) : undefined),
+    [waxUsdAt, fxAt, effectiveFiat],
+  );
+  /** Fiat per 1 USD today (1 for USD); null while loading. */
+  const fxNow = fxAt ? fxAt(Date.now()) : null;
+
+  const ledger = useMemo(() => buildLedger(events, lookup?.priceAt, waxFiatAt), [events, lookup, waxFiatAt]);
 
   return {
     loaded,
@@ -157,7 +179,10 @@ export function useFolio(account: string | null) {
     error,
     events,
     ledger,
-    usdHistoryLoaded: !!waxUsdDaily?.size,
+    usdHistoryLoaded: !!waxUsdDaily?.size && !!fxAt,
+    fiat: effectiveFiat,
+    fxNow,
+    fxUnavailable,
     syncedAt: rec?.syncedAt ?? null,
     coverageFrom: rec?.coverageFrom ?? null,
     accountCreated: rec?.accountCreated ?? null,
