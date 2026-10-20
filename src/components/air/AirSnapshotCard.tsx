@@ -164,7 +164,7 @@ export function AirSnapshotCard() {
             <p className="text-xs text-muted-foreground">
               Lists every account ending in .{normaliseSuffix(snapSuffix) ?? 'suffix'}. Only the
               suffix owner can create these names, so the list comes from the accounts it created.
-              Each account counts once, so use Equal or Fixed. Large suffixes can take up to a minute. Cloud Wallet (.wam) is not
+              Each account counts once, so use Equal or Fixed. Cloud Wallet (.wam) is not
               supported — it has millions of accounts.
             </p>
           </div>
@@ -310,6 +310,12 @@ export function AirSnapshotCard() {
         {snapshot && !snapshot.hasBalances && snapshotMode !== 'suffix' && (
           <p className="mt-1 text-xs text-destructive">
             Fallback source has no balances — pro-rata distribution is unavailable.
+          </p>
+        )}
+        {snapshot?.truncated && snapshotMode === 'suffix' && (
+          <p className="mt-1 text-xs text-destructive">
+            Partial list — a history provider could not finish or the account limit was reached.
+            Some accounts may be missing. Reload before sending if you need every account.
           </p>
         )}
         {snapshotError && <p className="mt-2 text-xs text-destructive">{snapshotError}</p>}
