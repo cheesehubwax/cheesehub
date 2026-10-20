@@ -4,7 +4,6 @@ import { encodeBase64, decodeBase64, decodeUTF8 } from 'tweetnacl-util';
 import {
   generateKey, encryptMemo, decryptMemo, keyMemo, buildPublishKeyActions, newestPublishedKey, MAX_PLAINTEXT_BYTES, MEMO_MAX_BYTES, messageCost,
 } from '@/lib/cheeseCrypt';
-import { isCryptNullMemo } from '@/lib/cheeseNullBreakdown';
 import { decodeConversations, groupMessageCost, createGroup } from '@/lib/cryptGroups';
 import { buildVoiceBatches, splitVoice, voiceNoteCost, voicePartCount, VOICE_MAX_BYTES, VOICE_PARTS_PER_TX, type VoiceClip } from '@/lib/cryptVoice';
 
@@ -35,13 +34,6 @@ describe('CHEESECrypt memo prefixes', () => {
   it('one-part limit stays 146 bytes and fits the memo', () => {
     expect(MAX_PLAINTEXT_BYTES).toBe(146);
     expect(new TextEncoder().encode(encryptMemo('x'.repeat(146), b.publicKey, a.secretKey)).length).toBeLessThanOrEqual(MEMO_MAX_BYTES);
-  });
-  it('Null by Contract counts both key prefixes and the fee memo', () => {
-    expect(isCryptNullMemo('CRYPTKEY1:abc')).toBe(true);
-    expect(isCryptNullMemo('GPKMKEY1:abc')).toBe(true);
-    expect(isCryptNullMemo('CHEESECrypt messaging fee')).toBe(true);
-    expect(isCryptNullMemo('CHEESECrypt key creation fee')).toBe(true);
-    expect(isCryptNullMemo('something else')).toBe(false);
   });
 });
 
