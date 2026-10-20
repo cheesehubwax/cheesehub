@@ -24,7 +24,7 @@ export const money = (v: number | null | undefined, cur: Currency) =>
     : `${fmt(v, 2)} WAX`;
 const signedMoney = (v: number, cur: Currency) => `${v >= 0 ? '+' : ''}${money(v, cur)}`;
 
-const plClass = (v: number | null | undefined) => (v == null ? 'text-muted-foreground' : v >= 0 ? 'text-primary' : 'text-destructive');
+const plClass = (v: number | null | undefined) => (v == null ? 'text-muted-foreground' : v >= 0 ? 'text-positive' : 'text-destructive');
 const signed = (v: number) => `${v >= 0 ? '+' : ''}${fmt(v, 2)}`;
 
 export const EVENT_LABELS: Record<FolioEventType, string> = {
