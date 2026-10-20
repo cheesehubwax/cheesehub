@@ -419,6 +419,7 @@ export function TokenDialog({
 }) {
   const p = row?.position;
   const acquisitions = useMemo(() => row && p ? acquisitionBreakdown(row.key, events, p.freeQty) : null, [row, p, events]);
+  const [showGifts, setShowGifts] = useState(false);
   const usd = cur === 'USD';
   return (
     <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
@@ -503,6 +504,7 @@ export function TokenDialog({
               </p>
             ) : null}
             <ActivityList events={events} value={value} realized={realized} filter={row.key} cur={cur} />
+            {showGifts ? <GiftListDialog row={row} events={events} onClose={() => setShowGifts(false)} /> : null}
           </>
         ) : null}
       </DialogContent>
