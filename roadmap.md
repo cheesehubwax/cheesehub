@@ -1,5 +1,5 @@
 # CHEESEHub roadmap
-- [ ] Speed up CHEESEAir suffix snapshots without dropping provider coverage; verify .cheese loading and timeout regressions.
+- [x] CHEESEAir suffix: bounded requests, no dead-host retry waits, complete-only 60s cache and honest partial warnings; 29 regression tests pass, live .cheese returns 8 accounts in 1.48s (partial provider coverage).
 - [x] CHEESECrypt: 100 CHEESE paid key creation, free restores, 80/20 platform fees; fee and onboarding regressions pass. Live payment verification awaits a connected WAX wallet and signing approval.
 - [x] Uppercase Audio/common sound fields recognized in both NFT players; stale music cache refreshed and raw bafk playback fallback corrected; 17 tests passed. Real-wallet sound playback remains unverified without the user's NFT/account.
 - [x] CHEESECrypt: one cheesecrypt folder shared by all accounts on this device; friends loaded from friends/ for every account (nicknames/removals per account); Save to friends refreshes the friend file. 59 tests passed; real OS folder unverified.
