@@ -32,6 +32,10 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
+    /* Positive profit/loss - green, deliberately separate from brand yellow. */
+    --positive: 142 71% 30%;
+    --positive-foreground: 0 0% 100%;
+
     --border: 40 25% 80%;
     --input: 40 25% 85%;
     --ring: 45 100% 50%;
@@ -95,6 +99,9 @@
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 45 30% 92%;
+
+    --positive: 142 69% 55%;
+    --positive-foreground: 30 20% 8%;
 
     --border: 30 15% 22%;
     --input: 30 15% 18%;

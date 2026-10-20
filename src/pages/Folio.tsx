@@ -217,6 +217,7 @@ const Folio = () => {
                 label="Realisable now"
                 value={totals.realisableWax == null ? '…' : usd ? money(waxUsd ? totals.realisableWax * waxUsd : null, cur) : waxFmt(totals.realisableWax)}
                 sub={totals.realisableWax != null && totals.value > 0 ? `${totals.realisableWax >= totals.value ? '+' : ''}${(((totals.realisableWax - totals.value) / totals.value) * 100).toFixed(2)}% vs paper` : 'selling everything on Alcor now'}
+                subTone={totals.realisableWax != null && totals.value > 0 ? ((totals.realisableWax - totals.value) / totals.value) * 100 : null}
               />
               <SummaryBox label="Unrealised P/L" value={usd ? money(totals.unrealizedUsd, cur) : waxFmt(totals.unrealized)} sub={usd ? undefined : usdFmt(totals.unrealized, waxUsd)} tone={usd ? totals.unrealizedUsd : totals.unrealized} />
               <SummaryBox label="Realised P/L" value={usd ? money(totals.realizedUsd, cur) : waxFmt(totals.realized)} sub={usd ? undefined : usdFmt(totals.realized, waxUsd)} tone={usd ? totals.realizedUsd : totals.realized} />

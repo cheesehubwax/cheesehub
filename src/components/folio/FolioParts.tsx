@@ -24,7 +24,7 @@ export const money = (v: number | null | undefined, cur: Currency) =>
     : `${fmt(v, 2)} WAX`;
 const signedMoney = (v: number, cur: Currency) => `${v >= 0 ? '+' : ''}${money(v, cur)}`;
 
-const plClass = (v: number | null | undefined) => (v == null ? 'text-muted-foreground' : v >= 0 ? 'text-primary' : 'text-destructive');
+const plClass = (v: number | null | undefined) => (v == null ? 'text-muted-foreground' : v >= 0 ? 'text-positive' : 'text-destructive');
 const signed = (v: number) => `${v >= 0 ? '+' : ''}${fmt(v, 2)}`;
 
 export const EVENT_LABELS: Record<FolioEventType, string> = {
@@ -126,12 +126,12 @@ export function GiftListDialog({ row, events, onClose }: { row: HoldingRow | nul
   );
 }
 
-export function SummaryBox({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: number | null }) {
+export function SummaryBox({ label, value, sub, tone, subTone }: { label: string; value: string; sub?: string; tone?: number | null; subTone?: number | null }) {
   return (
     <div className="flex-1 min-w-[160px] rounded-lg border border-cheese/20 bg-cheese/5 px-4 py-3 text-center">
       <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className={`text-xl font-bold ${tone === undefined ? 'text-foreground' : plClass(tone)}`}>{value}</div>
-      {sub ? <div className="text-xs text-muted-foreground">{sub}</div> : null}
+      {sub ? <div className={`text-xs ${subTone == null ? 'text-muted-foreground' : plClass(subTone)}`}>{sub}</div> : null}
     </div>
   );
 }
@@ -283,7 +283,7 @@ export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }:
                 ) : (
                   <>
                     <div>{usd ? money(waxUsd ? rzWax * waxUsd : null, cur) : waxFmt(rzWax)}</div>
-                    {rz?.gapPct != null ? <div className={`text-xs ${rz.gapPct < -0.05 ? 'text-destructive' : 'text-muted-foreground'}`}>{signed(rz.gapPct)}% vs paper</div> : null}
+                    {rz?.gapPct != null ? <div className={`text-xs ${rz.gapPct >= 0 ? 'text-positive' : rz.gapPct < -0.05 ? 'text-destructive' : 'text-muted-foreground'}`}>{signed(rz.gapPct)}% vs paper</div> : null}
                   </>
                 )}
               </td>
@@ -439,6 +439,7 @@ export function TokenDialog({
                 label="Realisable now"
                 value={realisable?.wax == null ? '—' : usd ? money(waxUsd ? realisable.wax * waxUsd : null, cur) : waxFmt(realisable.wax)}
                 sub={realisable?.gapPct != null ? `${signed(realisable.gapPct)}% vs paper value` : undefined}
+                subTone={realisable?.gapPct}
               />
               <SummaryBox label="Unrealised" value={(usd ? row.unrealizedUsd : row.unrealizedWax) == null ? '—' : signedMoney((usd ? row.unrealizedUsd : row.unrealizedWax)!, cur)} tone={usd ? row.unrealizedUsd : row.unrealizedWax} />
               <SummaryBox label="Realised" value={signedMoney(usd ? row.realizedUsd : row.realizedWax, cur)} tone={usd ? row.realizedUsd : row.realizedWax} />
