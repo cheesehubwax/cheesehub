@@ -15,6 +15,8 @@ import { hasCoverageGap } from '@/lib/folio/scanner';
 import { buildHoldings, type HoldingRow } from '@/lib/folio/holdings';
 import { downloadActivityCsv, downloadHoldingsCsv } from '@/lib/folio/csv';
 import { ActivityList, HoldingsTable, money, PlChart, SummaryBox, TokenDialog, usdFmt, waxFmt, type Currency } from '@/components/folio/FolioParts';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { FIAT_CURRENCIES, isFiat, type FiatCode } from '@/lib/folio/fxCore';
 import { useRealisableValues } from '@/hooks/useRealisableValues';
 import { playRandomFart } from '@/lib/fartSounds';
 import walletOrb from '@/assets/wallet-icon.png';
@@ -28,18 +30,32 @@ const RANGES = [
 
 const Folio = () => {
   const { accountName, isConnected, login } = useWax();
-  const folio = useFolio(accountName);
+  const [shown, setShown] = useState<'WAX' | 'FIAT'>(() => (typeof localStorage !== 'undefined' && localStorage.getItem('cheesefolio-currency') === 'WAX' ? 'WAX' : localStorage.getItem('cheesefolio-currency') ? 'FIAT' : 'WAX'));
+  const [chosenFiat, setChosenFiat] = useState<FiatCode>(() => {
+    if (typeof localStorage === 'undefined') return 'USD';
+    const f = localStorage.getItem('cheesefolio-fiat') ?? localStorage.getItem('cheesefolio-currency') ?? '';
+    return isFiat(f) ? f : 'USD';
+  });
+  const folio = useFolio(accountName, chosenFiat);
+  const fiat = folio.fiat;
+  const cur: Currency = shown === 'WAX' ? 'WAX' : fiat;
+  const showWax = () => {
+    setShown('WAX');
+    try { localStorage.setItem('cheesefolio-currency', 'WAX'); } catch { /* private mode */ }
+  };
+  const showFiat = (f: FiatCode) => {
+    setShown('FIAT');
+    setChosenFiat(f);
+    try { localStorage.setItem('cheesefolio-currency', f); localStorage.setItem('cheesefolio-fiat', f); } catch { /* private mode */ }
+  };
   const { tokens: live, isLoading: liveLoading } = useAllTokenBalances(accountName ?? undefined);
   const { data: priceMap } = useAlcorTokenPrices();
-  const { data: waxUsd = 0 } = useWaxPrice();
+  const { data: waxUsdLive = 0 } = useWaxPrice();
+  // Fiat per WAX right now: today's WAX/USD × today's fiat/USD (0 while unknown).
+  const waxUsd = waxUsdLive && folio.fxNow ? waxUsdLive * folio.fxNow : 0;
   const [picked, setPicked] = useState<HoldingRow | null>(null);
   const [range, setRange] = useState<(typeof RANGES)[number]['key']>('all');
-  const [cur, setCurState] = useState<Currency>(() => (typeof localStorage !== 'undefined' && localStorage.getItem('cheesefolio-currency') === 'USD' ? 'USD' : 'WAX'));
-  const setCur = (c: Currency) => {
-    setCurState(c);
-    try { localStorage.setItem('cheesefolio-currency', c); } catch { /* private mode */ }
-  };
-  const usd = cur === 'USD';
+  const usd = cur !== 'WAX';
   const [showClosed, setShowClosed] = useState(false);
 
   const shares = useMemo(
@@ -161,13 +177,13 @@ const Folio = () => {
                     {folio.error && folio.hasHistory ? 'Continue scan' : folio.syncedAt ? 'Sync now' : folio.hasHistory ? 'Continue scan' : 'Scan my history'}
                   </Button>
                 )}
-                <Button size="sm" variant="outline" disabled={!holdings.length} onClick={() => downloadHoldingsCsv(accountName, holdings.map((h) => ({
+                <Button size="sm" variant="outline" disabled={!holdings.length} onClick={() => downloadHoldingsCsv(accountName, fiat, holdings.map((h) => ({
                   symbol: h.symbol, contract: h.contract, balance: h.balance, walletBalance: h.walletBalance, pooledBalance: h.pooledBalance, avgCostWax: h.avgCostWax, priceWax: h.priceWax ?? 0,
                   valueWax: h.valueWax ?? 0, unrealizedWax: h.unrealizedWax, realizedWax: h.realizedWax, complete: h.complete,
                   avgCostUsd: h.avgCostUsd, valueUsd: h.valueUsd, unrealizedUsd: h.unrealizedUsd, realizedUsd: h.realizedUsd,
                   realisableWax: h.key === 'eosio.token:WAX' ? h.balance : realisable?.get(h.key)?.wax ?? null,
                 })))}>Holdings CSV</Button>
-                <Button size="sm" variant="outline" disabled={!folio.events.length} onClick={() => downloadActivityCsv(accountName, folio.events, folio.ledger.valueByEvent, folio.ledger.realizedByEvent, folio.ledger.valueUsdByEvent, folio.ledger.realizedUsdByEvent)}>Activity CSV</Button>
+                <Button size="sm" variant="outline" disabled={!folio.events.length} onClick={() => downloadActivityCsv(accountName, folio.events, folio.ledger.valueByEvent, folio.ledger.realizedByEvent, folio.ledger.valueUsdByEvent, folio.ledger.realizedUsdByEvent, fiat)}>Activity CSV</Button>
                 <Button size="sm" variant="outline" onClick={() => { if (confirm('Delete the saved history and scan again from the start?')) void folio.rescan(); }}>Rescan from scratch</Button>
                 <Button size="sm" variant="ghost" onClick={() => { if (confirm('Delete everything CHEESEFolio saved in this browser for this account?')) void folio.clear(); }}>Clear saved data</Button>
               </div>
@@ -207,29 +223,44 @@ const Folio = () => {
             {folio.error ? <div className="w-full text-sm text-destructive text-center">{folio.error}</div> : null}
 
             <div className="w-full flex justify-center gap-1">
-              {(['WAX', 'USD'] as const).map((c) => (
-                <Button key={c} size="sm" variant={cur === c ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => setCur(c)}>Show in {c}</Button>
-              ))}
+              <Button size="sm" variant={cur === 'WAX' ? 'default' : 'outline'} className="h-7 text-xs" onClick={showWax}>Show in WAX</Button>
+              <Select value={chosenFiat} onValueChange={(v) => isFiat(v) && showFiat(v)}>
+                <SelectTrigger
+                  aria-label="Show in currency"
+                  className={`h-7 w-auto gap-1 text-xs ${cur !== 'WAX' ? 'bg-primary text-primary-foreground border-primary' : ''}`}
+                  onClick={() => { if (cur === 'WAX') showFiat(chosenFiat); }}
+                >
+                  <SelectValue>Show in {chosenFiat}</SelectValue>
+                </SelectTrigger>
+                <SelectContent className="max-h-80">
+                  {FIAT_CURRENCIES.map((c) => (
+                    <SelectItem key={c.code} value={c.code} className="text-xs">{c.code} · {c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+            {folio.fxUnavailable ? (
+              <div className="w-full text-xs text-destructive text-center">Exchange rates for {chosenFiat} couldn't be loaded right now, so figures are shown in USD. Refresh to try again.</div>
+            ) : null}
             <div className="w-full flex flex-wrap gap-3">
-              <SummaryBox label="Paper value" value={usd ? money(totals.valueUsd, cur) : waxFmt(totals.value)} sub={usd ? waxFmt(totals.value) : usdFmt(totals.value, waxUsd)} />
+              <SummaryBox label="Paper value" value={usd ? money(totals.valueUsd, cur) : waxFmt(totals.value)} sub={usd ? waxFmt(totals.value) : usdFmt(totals.value, waxUsd, fiat)} />
               <SummaryBox
                 label="Realisable now"
                 value={totals.realisableWax == null ? '…' : usd ? money(waxUsd ? totals.realisableWax * waxUsd : null, cur) : waxFmt(totals.realisableWax)}
                 sub={totals.realisableWax != null && totals.value > 0 ? `${totals.realisableWax >= totals.value ? '+' : ''}${(((totals.realisableWax - totals.value) / totals.value) * 100).toFixed(2)}% vs paper` : 'selling everything on Alcor now'}
                 subTone={totals.realisableWax != null && totals.value > 0 ? ((totals.realisableWax - totals.value) / totals.value) * 100 : null}
               />
-              <SummaryBox label="Unrealised P/L" value={usd ? money(totals.unrealizedUsd, cur) : waxFmt(totals.unrealized)} sub={usd ? undefined : usdFmt(totals.unrealized, waxUsd)} tone={usd ? totals.unrealizedUsd : totals.unrealized} />
-              <SummaryBox label="Realised P/L" value={usd ? money(totals.realizedUsd, cur) : waxFmt(totals.realized)} sub={usd ? undefined : usdFmt(totals.realized, waxUsd)} tone={usd ? totals.realizedUsd : totals.realized} />
+              <SummaryBox label="Unrealised P/L" value={usd ? money(totals.unrealizedUsd, cur) : waxFmt(totals.unrealized)} sub={usd ? undefined : usdFmt(totals.unrealized, waxUsd, fiat)} tone={usd ? totals.unrealizedUsd : totals.unrealized} />
+              <SummaryBox label="Realised P/L" value={usd ? money(totals.realizedUsd, cur) : waxFmt(totals.realized)} sub={usd ? undefined : usdFmt(totals.realized, waxUsd, fiat)} tone={usd ? totals.realizedUsd : totals.realized} />
             </div>
             <p className="w-full text-xs text-muted-foreground text-center">
               {usd
-                ? 'USD profit/loss uses the WAX/USD rate on the day of each trade, so it includes WAX\'s own price moves.'
-                : 'Profit/loss is measured in WAX using the average price you paid. USD figures under WAX amounts use today\'s WAX price.'}
+                ? `${fiat} profit/loss uses the WAX/USD rate and the USD/${fiat} exchange rate on the day of each trade, so it includes WAX's and ${fiat}'s own price moves.`
+                : `Profit/loss is measured in WAX using the average price you paid. ${fiat} figures under WAX amounts use today's rates.`}
               {' '}Rewards, airdrops, pool fees and tokens sent to you count as free (zero cost).
               Balances include tokens you have in Alcor, Taco and Defibox pools (uncollected pool fees are not counted).
               Paper value is amount × price; realisable is what selling each whole balance on Alcor would return right now.
-              {usd && !folio.usdHistoryLoaded && folio.hasHistory ? ' Past WAX/USD rates are still loading or unavailable.' : ''}
+              {usd && !folio.usdHistoryLoaded && folio.hasHistory ? ` Past WAX/${fiat} rates are still loading or unavailable.` : ''}
             </p>
 
             <div className="w-full space-y-2">
@@ -249,7 +280,7 @@ const Folio = () => {
                   Couldn't read your {pooled.failed.map((v) => venueName[v] ?? v).join(' and ')} pool positions right now, so tokens there are left out. Refresh to try again.
                 </div>
               ) : null}
-              <HoldingsTable rows={holdings} events={folio.events} waxUsd={waxUsd} cur={cur} realisable={realisable} onPick={setPicked} />
+              <HoldingsTable rows={holdings} events={folio.events} waxUsd={waxUsd} cur={cur} fiat={fiat} realisable={realisable} onPick={setPicked} />
             </div>
 
             <div className="w-full space-y-2">
@@ -276,6 +307,7 @@ const Folio = () => {
               realized={usd ? folio.ledger.realizedUsdByEvent : folio.ledger.realizedByEvent}
               waxUsd={waxUsd}
               cur={cur}
+              fiat={fiat}
               realisable={picked ? realisable?.get(picked.key) ?? (picked.key === 'eosio.token:WAX' ? { wax: picked.balance, gapPct: 0 } : null) : null}
               onClose={() => setPicked(null)}
             />
