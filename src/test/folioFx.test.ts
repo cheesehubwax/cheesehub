@@ -1,0 +1,58 @@
+import { describe, expect, it } from 'vitest';
+import { carryForward, combineWaxFiat, fxLookup, parseCbrDynamic, FIAT_CURRENCIES } from '@/lib/folio/fxCore';
+import { buildLedger } from '@/lib/folio/ledger';
+import type { FolioEvent } from '@/lib/folio/types';
+
+const ts = (d: string) => Date.parse(`${d}T12:00:00Z`);
+
+describe('FX history', () => {
+  it('offers AUD, CAD, EUR, GBP, JPY, CNY, INR and RUB', () => {
+    const codes = FIAT_CURRENCIES.map((c) => c.code);
+    for (const c of ['USD', 'AUD', 'CAD', 'EUR', 'GBP', 'JPY', 'CNY', 'INR', 'RUB']) expect(codes).toContain(c);
+  });
+
+  it('carries a rate forward for at most 7 days', () => {
+    const out = carryForward({ '2024-01-01': 1.5, '2024-01-20': 1.6 }, '2024-01-20');
+    expect(out['2024-01-08']).toBe(1.5);
+    expect(out['2024-01-09']).toBeUndefined();
+    expect(out['2024-01-20']).toBe(1.6);
+  });
+
+  it('reads RUB per USD from Central Bank of Russia records, honouring nominal', () => {
+    const xml = '<ValCurs><Record Date="03.12.2019" Id="R01235"><Nominal>1</Nominal><Value>64,4097</Value></Record>'
+      + '<Record Date="04.12.2019" Id="R01235"><Nominal>10</Nominal><Value>641,401</Value></Record></ValCurs>';
+    expect(parseCbrDynamic(xml)).toEqual({ '2019-12-03': 64.4097, '2019-12-04': 64.1401 });
+  });
+
+  it('USD is always exactly 1 and other currencies go unknown past 7 days', () => {
+    expect(fxLookup('USD', undefined)(ts('2020-01-01'))).toBe(1);
+    const aud = fxLookup('AUD', { '2024-01-01': 1.5 });
+    expect(aud(ts('2024-01-08'))).toBe(1.5);
+    expect(aud(ts('2024-01-09'))).toBeNull();
+    expect(aud(ts('2023-12-31'))).toBeNull();
+  });
+
+  it('costs a purchase at the purchase-day exchange rate, not today\'s', () => {
+    const waxUsd = () => 0.5;
+    const fx = fxLookup('AUD', { '2021-05-01': 1.3, '2026-10-01': 1.6 });
+    const events: FolioEvent[] = [{
+      id: 'a', ts: ts('2021-05-01'), trx: 't', type: 'trade', venue: 'alcor',
+      out: [{ key: 'eosio.token:WAX', contract: 'eosio.token', symbol: 'WAX', precision: 8, amount: 100 }],
+      in: [{ key: 'x:TOK', contract: 'x', symbol: 'TOK', precision: 4, amount: 10 }],
+    } as unknown as FolioEvent];
+    const ledger = buildLedger(events, undefined, combineWaxFiat(waxUsd, fx));
+    // 100 WAX × 0.5 USD × 1.3 AUD/USD
+    expect(ledger.positions.get('x:TOK')!.costUsd).toBeCloseTo(65, 6);
+  });
+
+  it('marks history incomplete when the exchange rate for a trade day is unknown', () => {
+    const fx = fxLookup('AUD', {});
+    const events: FolioEvent[] = [{
+      id: 'a', ts: ts('2021-05-01'), trx: 't', type: 'trade', venue: 'alcor',
+      out: [{ key: 'eosio.token:WAX', contract: 'eosio.token', symbol: 'WAX', precision: 8, amount: 100 }],
+      in: [{ key: 'x:TOK', contract: 'x', symbol: 'TOK', precision: 4, amount: 10 }],
+    } as unknown as FolioEvent];
+    const ledger = buildLedger(events, undefined, combineWaxFiat(() => 0.5, fx));
+    expect(ledger.positions.get('x:TOK')!.usdGap).toBe(true);
+  });
+});
