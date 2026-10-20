@@ -64,6 +64,14 @@ jobs:
           FORCE: ${{ github.event.inputs.force }}
         run: bun run sample.ts
 
+      - name: Update FX rates
+        # Exchange-rate sources failing must not block the token price record.
+        continue-on-error: true
+        working-directory: scripts/token-price-history
+        env:
+          TOKEN_PRICE_DIR: /tmp/price-data/data
+        run: bun run fx.ts
+
       - name: Commit record
         run: |
           set -euo pipefail
