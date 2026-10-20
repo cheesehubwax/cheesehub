@@ -159,6 +159,7 @@ export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }:
   const acquisitions = useMemo(() => new Map(rows.filter((r) => r.position).map((r) => [
     r.key, acquisitionBreakdown(r.key, events, r.position?.freeQty ?? 0),
   ])), [rows, events]);
+  const [giftsFor, setGiftsFor] = useState<HoldingRow | null>(null);
   const [sort, setSort] = useState<{ col: SortCol; dir: 1 | -1 }>({ col: 'paper', dir: -1 });
   const sorted = useMemo(() => {
     const val = (r: HoldingRow): number | string | null => {
@@ -257,7 +258,7 @@ export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }:
                       <div className="text-[11px] leading-4 text-muted-foreground" title="All-time recorded receipts, not the source of your current balance. Based on available history; average cost is unchanged.">
                         <div>Bought (all-time): <span className="text-foreground">{fmt(receipts.purchased, r.precision)}</span>{receipts.purchasedPct == null ? '' : ` · ${fmt(receipts.purchasedPct, 1)}%`}</div>
                         <div>Reward: <span className="text-foreground">{fmt(receipts.reward, r.precision)}</span>{receipts.rewardPct == null ? '' : ` · ${fmt(receipts.rewardPct, 1)}%`}</div>
-                        <div>Gifted: <span className="text-foreground">{fmt(receipts.gifted, r.precision)}</span>{receipts.giftedPct == null ? '' : ` · ${fmt(receipts.giftedPct, 1)}%`}</div>
+                        <div>Gifted: <button type="button" className="text-foreground underline decoration-dotted underline-offset-2 hover:text-cheese" title="Show every recorded gift" onClick={(e) => { e.stopPropagation(); setGiftsFor(r); }}>{fmt(receipts.gifted, r.precision)}</button>{receipts.giftedPct == null ? '' : ` · ${fmt(receipts.giftedPct, 1)}%`}</div>
                       </div>
                     ) : null}
                 </div>
