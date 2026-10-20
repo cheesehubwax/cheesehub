@@ -16,7 +16,7 @@ import { buildHoldings, type HoldingRow } from '@/lib/folio/holdings';
 import { downloadActivityCsv, downloadHoldingsCsv } from '@/lib/folio/csv';
 import { ActivityList, HoldingsTable, money, PlChart, SummaryBox, TokenDialog, usdFmt, waxFmt, type Currency } from '@/components/folio/FolioParts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FIAT_CURRENCIES, isFiat, type FiatCode } from '@/lib/folio/fxCore';
+import { CRYPTO_CURRENCIES, FIAT_CURRENCIES, isCrypto, isFiat, type CryptoCode, type DisplayCode, type FiatCode } from '@/lib/folio/fxCore';
 import { useRealisableValues } from '@/hooks/useRealisableValues';
 import { playRandomFart } from '@/lib/fartSounds';
 import walletOrb from '@/assets/wallet-icon.png';
@@ -30,21 +30,28 @@ const RANGES = [
 
 const Folio = () => {
   const { accountName, isConnected, login } = useWax();
-  const [shown, setShown] = useState<'WAX' | 'FIAT'>(() => (typeof localStorage !== 'undefined' && localStorage.getItem('cheesefolio-currency') === 'WAX' ? 'WAX' : localStorage.getItem('cheesefolio-currency') ? 'FIAT' : 'WAX'));
+  // Two pickers: crypto (WAX/BTC/ETH) or fiat; only one is active. Stored as one code.
+  type CryptoChoice = 'WAX' | CryptoCode;
+  const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('cheesefolio-currency') ?? '' : '';
+  const [mode, setMode] = useState<'CRYPTO' | 'FIAT'>(() => (!stored || stored === 'WAX' || isCrypto(stored) ? 'CRYPTO' : 'FIAT'));
+  const [chosenCrypto, setChosenCrypto] = useState<CryptoChoice>(() => (isCrypto(stored) ? stored : 'WAX'));
   const [chosenFiat, setChosenFiat] = useState<FiatCode>(() => {
     if (typeof localStorage === 'undefined') return 'USD';
-    const f = localStorage.getItem('cheesefolio-fiat') ?? localStorage.getItem('cheesefolio-currency') ?? '';
+    const f = localStorage.getItem('cheesefolio-fiat') ?? stored;
     return isFiat(f) ? f : 'USD';
   });
-  const folio = useFolio(accountName, chosenFiat);
+  const activeCode: DisplayCode = mode === 'CRYPTO' && chosenCrypto !== 'WAX' ? chosenCrypto : chosenFiat;
+  const folio = useFolio(accountName, activeCode);
+  const cryptoUnavailable = mode === 'CRYPTO' && chosenCrypto !== 'WAX' && folio.fxUnavailable;
   const fiat = folio.fiat;
-  const cur: Currency = shown === 'WAX' ? 'WAX' : fiat;
-  const showWax = () => {
-    setShown('WAX');
-    try { localStorage.setItem('cheesefolio-currency', 'WAX'); } catch { /* private mode */ }
+  const cur: Currency = mode === 'CRYPTO' ? (chosenCrypto === 'WAX' || cryptoUnavailable ? 'WAX' : fiat) : fiat;
+  const showCrypto = (c: CryptoChoice) => {
+    setMode('CRYPTO');
+    setChosenCrypto(c);
+    try { localStorage.setItem('cheesefolio-currency', c); } catch { /* private mode */ }
   };
   const showFiat = (f: FiatCode) => {
-    setShown('FIAT');
+    setMode('FIAT');
     setChosenFiat(f);
     try { localStorage.setItem('cheesefolio-currency', f); localStorage.setItem('cheesefolio-fiat', f); } catch { /* private mode */ }
   };
@@ -223,12 +230,26 @@ const Folio = () => {
             {folio.error ? <div className="w-full text-sm text-destructive text-center">{folio.error}</div> : null}
 
             <div className="w-full flex justify-center gap-1">
-              <Button size="sm" variant={cur === 'WAX' ? 'default' : 'outline'} className="h-7 text-xs" onClick={showWax}>Show in WAX</Button>
+              <Select value={chosenCrypto} onValueChange={(v) => (v === 'WAX' || isCrypto(v)) && showCrypto(v)}>
+                <SelectTrigger
+                  aria-label="Show in crypto"
+                  className={`h-7 w-auto gap-1 text-xs ${mode === 'CRYPTO' ? 'bg-primary text-primary-foreground border-primary' : 'opacity-60'}`}
+                  onClick={() => { if (mode !== 'CRYPTO') showCrypto(chosenCrypto); }}
+                >
+                  <SelectValue>Show in {chosenCrypto}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="WAX" className="text-xs">WAX · WAX</SelectItem>
+                  {CRYPTO_CURRENCIES.map((c) => (
+                    <SelectItem key={c.code} value={c.code} className="text-xs">{c.code} · {c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Select value={chosenFiat} onValueChange={(v) => isFiat(v) && showFiat(v)}>
                 <SelectTrigger
-                  aria-label="Show in currency"
-                  className={`h-7 w-auto gap-1 text-xs ${cur !== 'WAX' ? 'bg-primary text-primary-foreground border-primary' : ''}`}
-                  onClick={() => { if (cur === 'WAX') showFiat(chosenFiat); }}
+                  aria-label="Show in fiat currency"
+                  className={`h-7 w-auto gap-1 text-xs ${mode === 'FIAT' ? 'bg-primary text-primary-foreground border-primary' : 'opacity-60'}`}
+                  onClick={() => { if (mode !== 'FIAT') showFiat(chosenFiat); }}
                 >
                   <SelectValue>Show in {chosenFiat}</SelectValue>
                 </SelectTrigger>
@@ -239,7 +260,9 @@ const Folio = () => {
                 </SelectContent>
               </Select>
             </div>
-            {folio.fxUnavailable ? (
+            {cryptoUnavailable ? (
+              <div className="w-full text-xs text-destructive text-center">{chosenCrypto} price history couldn't be loaded right now, so figures are shown in WAX. Refresh to try again.</div>
+            ) : folio.fxUnavailable ? (
               <div className="w-full text-xs text-destructive text-center">Exchange rates for {chosenFiat} couldn't be loaded right now, so figures are shown in USD. Refresh to try again.</div>
             ) : null}
             <div className="w-full flex flex-wrap gap-3">
@@ -255,7 +278,9 @@ const Folio = () => {
             </div>
             <p className="w-full text-xs text-muted-foreground text-center">
               {usd
-                ? `${fiat} profit/loss uses the WAX/USD rate and the USD/${fiat} exchange rate on the day of each trade, so it includes WAX's and ${fiat}'s own price moves.`
+                ? isCrypto(fiat)
+                  ? `${fiat} profit/loss uses the WAX/USD and ${fiat}/USD prices on the day of each trade, so it shows whether you beat simply holding ${fiat}.`
+                  : `${fiat} profit/loss uses the WAX/USD rate and the USD/${fiat} exchange rate on the day of each trade, so it includes WAX's and ${fiat}'s own price moves.`
                 : `Profit/loss is measured in WAX using the average price you paid. ${fiat} figures under WAX amounts use today's rates.`}
               {' '}Rewards, airdrops, pool fees and tokens sent to you count as free (zero cost).
               Balances include tokens you have in Alcor, Taco and Defibox pools (uncollected pool fees are not counted).
