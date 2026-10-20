@@ -58,3 +58,26 @@ describe('FX history', () => {
     expect(ledger.positions.get('x:TOK')!.usdGap).toBe(true);
   });
 });
+
+describe('BTC/ETH history', () => {
+  it('turns Binance daily closes into coins per 1 USD', async () => {
+    const { parseBinanceKlines, invertUsd } = await import('@/lib/folio/fxCore');
+    const rows = [[Date.parse('2021-05-01T00:00:00Z'), '0', '0', '0', '50000'], [Date.parse('2021-05-02T00:00:00Z'), '0', '0', '0', '40000']];
+    const per = invertUsd(parseBinanceKlines(rows));
+    expect(per['2021-05-01']).toBeCloseTo(1 / 50000, 15);
+    expect(per['2021-05-02']).toBeCloseTo(1 / 40000, 15);
+  });
+
+  it('values a past WAX amount at that day\'s BTC price, not today\'s', () => {
+    const btc = fxLookup('BTC', { '2021-05-01': 1 / 50000, '2026-10-20': 1 / 100000 });
+    const waxFiat = combineWaxFiat(() => 0.5, btc);
+    expect(waxFiat(ts('2021-05-01'))).toBeCloseTo(0.5 / 50000, 15);
+    expect(waxFiat(ts('2026-10-20'))).toBeCloseTo(0.5 / 100000, 15);
+  });
+
+  it('leaves a BTC day unknown when the last price is over 7 days old', () => {
+    const btc = fxLookup('BTC', { '2021-05-01': 1 / 50000 });
+    expect(btc(ts('2021-05-08'))).toBeCloseTo(1 / 50000, 15);
+    expect(btc(ts('2021-05-09'))).toBeNull();
+  });
+});

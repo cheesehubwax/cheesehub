@@ -23,4 +23,4 @@
 - CHEESECrypt folder pickers start at Desktop but request the vault subfolder; retry permission failures because Chromium protects Desktop-root access. Profile precedes keys; edits refresh only verified matching-key backups (staged writes), else download.
 - CHEESECrypt shares one vault folder per device; `friends/` files load into every account (nicknames/removals per account); only explicit saves replace friend files.
 - Both NFT players normalize media via nftMedia (case-insensitive audio/clip/video, reference-only sound/mp3/sfx aliases); version music caches on detection changes to avoid stale classifications.
-- CHEESEFolio fiat figures are WAX→USD→fiat per day (shared fx-usd-history.json, USD exactly 1); unknown rates stay unknown.
+- CHEESEFolio fiat and BTC/ETH figures are WAX→USD→currency per day (shared fx-usd-history.json, all stored as units per USD, USD exactly 1); unknown rates stay unknown.
