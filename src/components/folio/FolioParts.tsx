@@ -8,20 +8,40 @@ import type { FolioEvent, FolioEventType, TokenAmount } from '@/lib/folio/types'
 import type { HoldingRow } from '@/lib/folio/holdings';
 import type { Realisable } from '@/hooks/useRealisableValues';
 
-export type Currency = 'WAX' | 'USD';
+import type { FiatCode } from '@/lib/folio/fxCore';
+
+/** WAX, or the fiat currency the figures are shown in. */
+export type Currency = 'WAX' | FiatCode;
+
+const fiatFormatters = new Map<string, Intl.NumberFormat>();
+/** Fiat amount; `small` keeps up to 6 decimals for sub-unit prices. */
+export function fiatFmt(v: number, code: FiatCode, small = false): string {
+  const digits = small && Math.abs(v) < 1 && v !== 0 ? 6 : undefined;
+  const key = `${code}:${digits ?? ''}`;
+  let f = fiatFormatters.get(key);
+  if (!f) {
+    const base = new Intl.NumberFormat(undefined, { style: 'currency', currency: code });
+    const def = base.resolvedOptions().maximumFractionDigits ?? 2;
+    f = new Intl.NumberFormat(undefined, {
+      style: 'currency', currency: code, currencyDisplay: 'narrowSymbol',
+      minimumFractionDigits: digits ? 0 : def, maximumFractionDigits: digits ?? def,
+    });
+    fiatFormatters.set(key, f);
+  }
+  return f.format(v);
+}
 
 export const fmt = (v: number, max = 4) =>
   v.toLocaleString(undefined, { maximumFractionDigits: Math.abs(v) < 1 && v !== 0 ? Math.max(max, 6) : max });
 
 export const waxFmt = (v: number | null | undefined) => (v == null ? '—' : `${fmt(v, 2)} WAX`);
-export const usdFmt = (wax: number | null | undefined, waxUsd: number) =>
-  wax == null || !waxUsd ? '' : `$${(wax * waxUsd).toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`;
+/** A WAX amount converted at `rate` (fiat per WAX) into `code`. */
+export const usdFmt = (wax: number | null | undefined, rate: number, code: FiatCode = 'USD') =>
+  wax == null || !rate ? '' : fiatFmt(wax * rate, code);
 
 /** An amount already in `cur`. */
 export const money = (v: number | null | undefined, cur: Currency) =>
-  v == null ? '—' : cur === 'USD'
-    ? `${v < 0 ? '-' : ''}$${Math.abs(v).toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`
-    : `${fmt(v, 2)} WAX`;
+  v == null ? '—' : cur !== 'WAX' ? fiatFmt(v, cur) : `${fmt(v, 2)} WAX`;
 const signedMoney = (v: number, cur: Currency) => `${v >= 0 ? '+' : ''}${money(v, cur)}`;
 
 const plClass = (v: number | null | undefined) => (v == null ? 'text-muted-foreground' : v >= 0 ? 'text-positive' : 'text-destructive');
@@ -152,10 +172,11 @@ export function AmountList({ items }: { items: TokenAmount[] }) {
 
 type SortCol = 'token' | 'balance' | 'avg' | 'price' | 'paper' | 'realisable' | 'unrealised' | 'realised';
 
-export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }: {
-  rows: HoldingRow[]; events: FolioEvent[]; waxUsd: number; cur: Currency; realisable?: Map<string, Realisable>; onPick: (r: HoldingRow) => void;
+export function HoldingsTable({ rows, events, waxUsd, cur, fiat = 'USD', realisable, onPick }: {
+  rows: HoldingRow[]; events: FolioEvent[]; waxUsd: number; cur: Currency; fiat?: FiatCode; realisable?: Map<string, Realisable>; onPick: (r: HoldingRow) => void;
 }) {
-  const usd = cur === 'USD';
+  const usd = cur !== 'WAX';
+  const fiatCode: FiatCode = cur === 'WAX' ? fiat : cur;
   const acquisitions = useMemo(() => new Map(rows.filter((r) => r.position).map((r) => [
     r.key, acquisitionBreakdown(r.key, events, r.position?.freeQty ?? 0),
   ])), [rows, events]);
@@ -245,8 +266,8 @@ export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }:
                       history incomplete
                     </span>
                   ) : usdMissing ? (
-                    <span className="rounded border border-cheese/40 px-1 text-[10px] text-cheese" title="Some of this token's trades happened on days with no recorded WAX/USD rate.">
-                      no USD rate
+                    <span className="rounded border border-cheese/40 px-1 text-[10px] text-cheese" title={`Some of this token's trades happened on days with no recorded WAX/${fiatCode} rate.`}>
+                      no {fiatCode} rate
                     </span>
                   ) : r.position?.unpricedBuys ? (
                     <span className="rounded border border-cheese/40 px-1 text-[10px] text-cheese" title="Some of this token was acquired without a known WAX value.">
@@ -271,11 +292,11 @@ export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }:
                   </div>
                 ) : null}
               </td>
-              <td className="px-3 py-2 text-right">{avg == null ? '—' : usd ? `$${fmt(avg, 6)}` : fmt(avg, 6)}</td>
-              <td className="px-3 py-2 text-right">{r.priceWax == null ? '—' : usd ? (waxUsd ? `$${fmt(r.priceWax * waxUsd, 6)}` : '—') : fmt(r.priceWax, 6)}</td>
+              <td className="px-3 py-2 text-right">{avg == null ? '—' : usd ? fiatFmt(avg, fiatCode, true) : fmt(avg, 6)}</td>
+              <td className="px-3 py-2 text-right">{r.priceWax == null ? '—' : usd ? (waxUsd ? fiatFmt(r.priceWax * waxUsd, fiatCode, true) : '—') : fmt(r.priceWax, 6)}</td>
               <td className="px-3 py-2 text-right">
                 <div>{usd ? money(r.valueUsd, cur) : waxFmt(r.valueWax)}</div>
-                {!usd ? <div className="text-xs text-muted-foreground">{usdFmt(r.valueWax, waxUsd)}</div> : null}
+                {!usd ? <div className="text-xs text-muted-foreground">{usdFmt(r.valueWax, waxUsd, fiatCode)}</div> : null}
               </td>
               <td className="px-3 py-2 text-right">
                 {r.closed ? <span className="text-muted-foreground">—</span> : rzWax == null ? (
@@ -412,15 +433,16 @@ export function PlChart({ data, title, cur = 'WAX' }: { data: { date: string; va
 }
 
 export function TokenDialog({
-  row, events, value, realized, waxUsd, cur, realisable, onClose,
+  row, events, value, realized, waxUsd, cur, fiat = 'USD', realisable, onClose,
 }: {
   row: HoldingRow | null; events: FolioEvent[]; value: Map<string, number>; realized: Map<string, number>; waxUsd: number;
-  cur: Currency; realisable?: Realisable | null; onClose: () => void;
+  cur: Currency; fiat?: FiatCode; realisable?: Realisable | null; onClose: () => void;
 }) {
   const p = row?.position;
   const acquisitions = useMemo(() => row && p ? acquisitionBreakdown(row.key, events, p.freeQty) : null, [row, p, events]);
   const [showGifts, setShowGifts] = useState(false);
-  const usd = cur === 'USD';
+  const usd = cur !== 'WAX';
+  const fiatCode: FiatCode = cur === 'WAX' ? fiat : cur;
   return (
     <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto overflow-x-hidden [&>*]:min-w-0">
@@ -433,8 +455,8 @@ export function TokenDialog({
               </DialogTitle>
             </DialogHeader>
             <div className="flex flex-wrap gap-2">
-              <SummaryBox label="Balance" value={fmt(row.balance, row.precision)} sub={usd ? money(row.valueUsd, cur) : usdFmt(row.valueWax, waxUsd)} />
-              <SummaryBox label="Avg cost" value={usd ? (row.avgCostUsd == null ? '—' : `$${fmt(row.avgCostUsd, 6)}`) : row.avgCostWax == null ? '—' : `${fmt(row.avgCostWax, 6)} WAX`} />
+              <SummaryBox label="Balance" value={fmt(row.balance, row.precision)} sub={usd ? money(row.valueUsd, cur) : usdFmt(row.valueWax, waxUsd, fiatCode)} />
+              <SummaryBox label="Avg cost" value={usd ? (row.avgCostUsd == null ? '—' : fiatFmt(row.avgCostUsd, fiatCode, true)) : row.avgCostWax == null ? '—' : `${fmt(row.avgCostWax, 6)} WAX`} />
               <SummaryBox
                 label="Realisable now"
                 value={realisable?.wax == null ? '—' : usd ? money(waxUsd ? realisable.wax * waxUsd : null, cur) : waxFmt(realisable.wax)}
