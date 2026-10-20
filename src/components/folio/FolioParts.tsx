@@ -300,6 +300,7 @@ export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }:
           ) : null}
         </tbody>
       </table>
+      <GiftListDialog row={giftsFor} events={events} onClose={() => setGiftsFor(null)} />
     </div>
   );
 }
@@ -462,7 +463,7 @@ export function TokenDialog({
                   </div>
                   <div>
                     <dt className="text-muted-foreground">Gifted</dt>
-                    <dd className="font-medium break-words">{fmt(acquisitions.gifted, p.precision)} {row.symbol}
+                    <dd className="font-medium break-words"><button type="button" className="underline decoration-dotted underline-offset-2 hover:text-cheese" title="Show every recorded gift" onClick={() => setShowGifts(true)}>{fmt(acquisitions.gifted, p.precision)} {row.symbol}</button>
                       <span className="ml-2 text-xs text-muted-foreground">{acquisitions.giftedPct == null ? '—' : `${fmt(acquisitions.giftedPct, 1)}%`}</span>
                     </dd>
                   </div>
