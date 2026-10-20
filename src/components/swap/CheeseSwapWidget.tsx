@@ -9,7 +9,7 @@ import { useSwapTokens } from "@/hooks/useSwapTokens";
 import { useSwapRoute, type TradeType } from "@/hooks/useSwapRoute";
 import { useSwapTokenBalance } from "@/hooks/useSwapTokenBalance";
 import { useWax } from "@/context/WaxContext";
-import { type SwapRoute, type SwapToken, type SwapRouteCandidate, formatTokenAmount, normalizeRouteActions, PREFERRED_CONTRACTS } from "@/lib/swapApi";
+import { type SwapRoute, type SwapToken, type SwapRouteCandidate, formatTokenAmount, normalizeRouteActions, exactOutputMaxInput, PREFERRED_CONTRACTS } from "@/lib/swapApi";
 import { type ManualAllocation } from "@/lib/manualSwap";
 import { getTransactPlugins } from "@/lib/wharfKit";
 import { fetchSingleTokenBalance } from "@/lib/waxRpcFallback";
@@ -215,16 +215,19 @@ export function CheeseSwapWidget({
   // For swap action, we always need the input amount
   const swapAmountIn = activeField === "in"
     ? amountIn
-    : (route?.input ? formatTokenAmount(route.input, tokenIn?.precision ?? 8) : "");
+    : (route ? exactOutputMaxInput(route, slippage, tokenIn?.precision ?? 8) : "");
+
+  // Exchange rate uses the expected (ideal) input, not the slippage maximum.
+  const displayRateInput = activeField === "in" ? parseFloat(amountIn) || 0 : (route?.input ?? 0);
 
   const handleSwap = async () => {
     if (!route || route.quoteComplete === false || !session || !accountName || !tokenIn) return;
     setIsSwapping(true);
     try {
-      const actions = normalizeRouteActions(route, accountName, tokenIn.contract, swapAmountIn, tokenIn);
+      const actions = normalizeRouteActions(route, accountName, tokenIn.contract, swapAmountIn, tokenIn, activeField === "out");
       await session.transact({ actions }, { transactPlugins: getTransactPlugins(session) });
       toast.success("Swap successful!", {
-        description: `Swapped ${swapAmountIn} ${tokenIn?.ticker} → ${displayAmountOut} ${tokenOut?.ticker}`,
+        description: `Swapped ${activeField === "out" ? "up to " : ""}${swapAmountIn} ${tokenIn?.ticker} → ${displayAmountOut} ${tokenOut?.ticker}`,
       });
       setAmountIn("");
       setAmountOut("");
@@ -282,6 +285,8 @@ export function CheeseSwapWidget({
 
     } catch (e: any) {
       const msg = e?.message || "Swap failed";
+      // Pools have likely moved; fetch a fresh quote so the next try is current.
+      void refetchRoute();
       if (!msg.includes("cancel") && !msg.includes("reject")) {
         toast.error("Swap failed", { description: msg });
       }
@@ -403,9 +408,9 @@ export function CheeseSwapWidget({
             <span className="text-muted-foreground">
               1 {tokenIn?.ticker} ≈{" "}
               <span className="text-foreground font-medium">
-                {route.output && swapAmountIn && parseFloat(swapAmountIn) > 0
+                {route.output && displayRateInput > 0
                   ? formatTokenAmount(
-                      route.output / parseFloat(swapAmountIn),
+                      route.output / displayRateInput,
                       tokenOut?.precision ?? 8
                     )
                   : "—"}{" "}
@@ -459,9 +464,11 @@ export function CheeseSwapWidget({
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Min. Received</span>
+                <span className="text-muted-foreground">{activeField === "out" ? "Max. Spend" : "Min. Received"}</span>
                 <span className="text-foreground">
-                  {formatTokenAmount(route.minReceived, tokenOut?.precision ?? 8)} {tokenOut?.ticker}
+                  {activeField === "out"
+                    ? `${swapAmountIn || "—"} ${tokenIn?.ticker ?? ""}`
+                    : `${formatTokenAmount(route.minReceived, tokenOut?.precision ?? 8)} ${tokenOut?.ticker}`}
                 </span>
               </div>
               {tokenIn && tokenOut && route.swaps && route.swaps.length > 0 && (

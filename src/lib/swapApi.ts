@@ -66,6 +66,8 @@ export interface SwapRoute {
   route: number[];
   executionPrice: { numerator: string; denominator: string };
   input?: number;
+  /** Slippage-adjusted maximum input reported by the HTTP router (EXACT_OUTPUT). */
+  maxSent?: number;
   swaps: SwapSplit[];
   quoteSource?: "http" | "sdk";
   quoteComplete?: boolean;
@@ -243,6 +245,7 @@ export async function fetchSwapRoute(
     route: data.route,
     executionPrice: data.executionPrice,
     input: data.input ? parseFloat(data.input) : undefined,
+    maxSent: data.maxSent != null && !isNaN(parseFloat(data.maxSent)) ? parseFloat(data.maxSent) : undefined,
     swaps,
     quoteSource: "http",
     quoteComplete: true,
@@ -270,13 +273,56 @@ export async function fetchAlcorPool(id: number, signal?: AbortSignal): Promise<
   };
 }
 
+function toRawUnits(value: string, precision: number, roundUp = false): bigint {
+  const v = value.trim();
+  if (!/^\d+(?:\.\d*)?$/.test(v)) throw new Error("Invalid swap amount");
+  const [whole, fraction = ""] = v.split(".");
+  let raw = BigInt(`${whole}${(fraction + "0".repeat(precision)).slice(0, precision)}`);
+  if (roundUp && /[1-9]/.test(fraction.slice(precision))) raw += 1n;
+  return raw;
+}
+
+function rawToHuman(raw: bigint, precision: number): string {
+  const s = raw.toString().padStart(precision + 1, "0");
+  return precision > 0 ? `${s.slice(0, -precision)}.${s.slice(-precision)}` : s;
+}
+
+function plainNumber(n: number): string {
+  return n.toLocaleString("en-US", { useGrouping: false, maximumFractionDigits: 20 });
+}
+
+/**
+ * Amount to transfer for an EXACT_OUTPUT swap: the slippage-adjusted maximum
+ * input (Alcor's `maxSent`), rounded UP to token precision. Sending only the
+ * ideal quoted input makes `swap.alcor` revert with "Insufficient transfer
+ * amount" as soon as the pool moves at all; the contract refunds any unused
+ * remainder. Returns "" when no input quote is available.
+ */
+export function exactOutputMaxInput(route: SwapRoute, slippagePercent: number, precision: number): string {
+  const splits = route.swaps ?? [];
+  if (splits.length > 0 && splits.every((s) => !!s.maxSent && !!s.memo)) {
+    const total = splits.reduce((sum, s) => sum + toRawUnits(s.maxSent!, precision, true), 0n);
+    return rawToHuman(total, precision);
+  }
+  if (route.maxSent != null && route.maxSent > 0) {
+    return rawToHuman(toRawUnits(plainNumber(route.maxSent), precision, true), precision);
+  }
+  if (route.input == null || !(route.input > 0)) return "";
+  // Fallback: apply the slippage tolerance ourselves in exact integer units.
+  const ideal = toRawUnits(plainNumber(route.input), precision, true);
+  const bps = BigInt(Math.ceil(Math.max(0, slippagePercent) * 100));
+  const max = (ideal * (10_000n + bps) + 9_999n) / 10_000n;
+  return rawToHuman(max, precision);
+}
+
 /** Build a single transfer action to swap.alcor with the routing memo */
 export function normalizeRouteActions(
   route: SwapRoute,
   accountName: string,
   inputTokenContract: string,
   amount: string,
-  tokenIn: SwapToken
+  tokenIn: SwapToken,
+  exactOutput = false,
 ): SwapAction[] {
   const auth = [{ actor: accountName, permission: "active" }];
 
@@ -298,10 +344,16 @@ export function normalizeRouteActions(
       const [whole, fraction = ""] = value.trim().split(".");
       return BigInt(`${whole}${(fraction + "0".repeat(precision)).slice(0, precision)}`);
     };
-    const totalRaw = toRaw(amount);
-    const rawParts = splits.map((s) => toRaw(s.input));
-    const sumFirst = rawParts.slice(0, -1).reduce((a, b) => a + b, 0n);
-    rawParts[rawParts.length - 1] = totalRaw - sumFirst;
+    let rawParts: bigint[];
+    if (exactOutput && splits.every((s) => !!s.maxSent)) {
+      // Each leg's memo fixes its output; fund each with its own slippage max.
+      rawParts = splits.map((s) => toRawUnits(s.maxSent!, precision, true));
+    } else {
+      const totalRaw = toRaw(amount);
+      rawParts = splits.map((s) => toRaw(s.input));
+      const sumFirst = rawParts.slice(0, -1).reduce((a, b) => a + b, 0n);
+      rawParts[rawParts.length - 1] = totalRaw - sumFirst;
+    }
     if (rawParts.some((part) => part <= 0n)) throw new Error("One selected route is too small for this amount");
 
     return splits.map((split, i) => {
