@@ -10,13 +10,13 @@ import { syncFolio, type ScanProgress } from '@/lib/folio/scanner';
 import { clearFolio, FOLIO_SCHEMA, loadFolio, saveFolio, type StoredFolio } from '@/lib/folio/storage';
 import { WAX_KEY } from '@/lib/folio/types';
 import { fetchFxHistory } from '@/lib/folio/fx';
-import { combineWaxFiat, fxLookup, type FiatCode } from '@/lib/folio/fxCore';
+import { combineWaxFiat, fxLookup, isCrypto, type DisplayCode } from '@/lib/folio/fxCore';
 
 const emptyRecord = (account: string): StoredFolio => ({
   account, schema: FOLIO_SCHEMA, transfers: [], cursors: {}, syncedAt: null,
 });
 
-export function useFolio(account: string | null, fiat: FiatCode = 'USD') {
+export function useFolio(account: string | null, fiat: DisplayCode = 'USD') {
   const [rec, setRec] = useState<StoredFolio | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -158,7 +158,7 @@ export function useFolio(account: string | null, fiat: FiatCode = 'USD') {
     staleTime: 6 * 60 * 60 * 1000,
   });
   const fxUnavailable = fiat !== 'USD' && fxFetched && !fx?.[fiat];
-  const effectiveFiat: FiatCode = fxUnavailable ? 'USD' : fiat;
+  const effectiveFiat: DisplayCode = fxUnavailable ? 'USD' : fiat;
   const fxAt = useMemo(
     () => (effectiveFiat === 'USD' ? fxLookup('USD', undefined) : fx?.[effectiveFiat] ? fxLookup(effectiveFiat, fx[effectiveFiat]) : null),
     [effectiveFiat, fx],
@@ -167,8 +167,26 @@ export function useFolio(account: string | null, fiat: FiatCode = 'USD') {
     () => (waxUsdAt && fxAt ? (effectiveFiat === 'USD' ? waxUsdAt : combineWaxFiat(waxUsdAt, fxAt)) : undefined),
     [waxUsdAt, fxAt, effectiveFiat],
   );
-  /** Fiat per 1 USD today (1 for USD); null while loading. */
-  const fxNow = fxAt ? fxAt(Date.now()) : null;
+  // BTC/ETH move intraday, so "now" uses the live price; the last recorded day is the fallback.
+  const { data: liveCryptoUsd } = useQuery({
+    queryKey: ['folio-crypto-live', effectiveFiat],
+    queryFn: async ({ signal }) => {
+      for (const host of ['https://data-api.binance.vision', 'https://api.binance.com']) {
+        try {
+          const res = await fetch(`${host}/api/v3/ticker/price?symbol=${effectiveFiat}USDT`, { signal });
+          if (!res.ok) continue;
+          const px = parseFloat(((await res.json()) as { price?: string }).price ?? '');
+          if (px > 0) return px;
+        } catch { /* next host */ }
+      }
+      return null;
+    },
+    enabled: isCrypto(effectiveFiat),
+    staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000,
+  });
+  /** Currency units per 1 USD today (1 for USD); null while loading. */
+  const fxNow = isCrypto(effectiveFiat) && liveCryptoUsd ? 1 / liveCryptoUsd : fxAt ? fxAt(Date.now()) : null;
 
   const ledger = useMemo(() => buildLedger(events, lookup?.priceAt, waxFiatAt), [events, lookup, waxFiatAt]);
 

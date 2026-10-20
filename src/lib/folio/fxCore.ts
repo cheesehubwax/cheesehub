@@ -40,6 +40,46 @@ export type FiatCode = (typeof FIAT_CURRENCIES)[number]['code'];
 export const ECB_CODES = FIAT_CURRENCIES.map((c) => c.code).filter((c) => c !== 'USD' && c !== 'RUB');
 export const isFiat = (c: string): c is FiatCode => FIAT_CURRENCIES.some((f) => f.code === c);
 
+/** Crypto display currencies; BTC/ETH are stored like fiat, as units per 1 USD. */
+export const CRYPTO_CURRENCIES = [
+  { code: 'BTC', name: 'Bitcoin', symbol: '₿', decimals: 8 },
+  { code: 'ETH', name: 'Ether', symbol: 'Ξ', decimals: 6 },
+] as const;
+export type CryptoCode = (typeof CRYPTO_CURRENCIES)[number]['code'];
+/** Any non-WAX currency figures can be shown in. */
+export type DisplayCode = FiatCode | CryptoCode;
+export const isCrypto = (c: string): c is CryptoCode => CRYPTO_CURRENCIES.some((f) => f.code === c);
+export const isDisplay = (c: string): c is DisplayCode => isFiat(c) || isCrypto(c);
+
+/** Binance 1d klines → close (USD per coin) by UTC day. */
+export function parseBinanceKlines(rows: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!Array.isArray(rows)) return out;
+  for (const r of rows) {
+    if (!Array.isArray(r)) continue;
+    const close = parseFloat(String(r[4]));
+    if (typeof r[0] === 'number' && close > 0) out[new Date(r[0]).toISOString().slice(0, 10)] = close;
+  }
+  return out;
+}
+
+/** Bitfinex 1D candles [MTS, OPEN, CLOSE, HIGH, LOW, VOL] → close by UTC day. */
+export function parseBitfinexCandles(rows: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!Array.isArray(rows)) return out;
+  for (const r of rows) {
+    if (Array.isArray(r) && typeof r[0] === 'number' && r[2] > 0) out[new Date(r[0]).toISOString().slice(0, 10)] = r[2];
+  }
+  return out;
+}
+
+/** USD per coin → coins per 1 USD. */
+export function invertUsd(series: Record<string, number>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [d, v] of Object.entries(series)) if (v > 0) out[d] = 1 / v;
+  return out;
+}
+
 export const FX_CARRY_DAYS = 7;
 const DAY = 86_400_000;
 const dayOf = (ts: number) => new Date(ts).toISOString().slice(0, 10);
@@ -76,7 +116,7 @@ export function parseCbrDynamic(xml: string): Record<string, number> {
 }
 
 /** Rate on the day of `ts`, or the nearest earlier day within FX_CARRY_DAYS; USD is always exactly 1. */
-export function fxLookup(code: FiatCode, series: Record<string, number> | undefined): (ts: number) => number | null {
+export function fxLookup(code: DisplayCode, series: Record<string, number> | undefined): (ts: number) => number | null {
   if (code === 'USD') return () => 1;
   const dates = Object.keys(series ?? {}).sort();
   return (ts) => {

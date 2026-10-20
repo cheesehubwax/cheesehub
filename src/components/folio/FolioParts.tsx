@@ -8,14 +8,19 @@ import type { FolioEvent, FolioEventType, TokenAmount } from '@/lib/folio/types'
 import type { HoldingRow } from '@/lib/folio/holdings';
 import type { Realisable } from '@/hooks/useRealisableValues';
 
-import type { FiatCode } from '@/lib/folio/fxCore';
+import { CRYPTO_CURRENCIES, type DisplayCode } from '@/lib/folio/fxCore';
 
-/** WAX, or the fiat currency the figures are shown in. */
-export type Currency = 'WAX' | FiatCode;
+/** WAX, or the fiat/crypto currency the figures are shown in. */
+export type Currency = 'WAX' | DisplayCode;
 
 const fiatFormatters = new Map<string, Intl.NumberFormat>();
 /** Fiat amount; `small` keeps up to 6 decimals for sub-unit prices. */
-export function fiatFmt(v: number, code: FiatCode, small = false): string {
+export function fiatFmt(v: number, code: DisplayCode, small = false): string {
+  const crypto = CRYPTO_CURRENCIES.find((c) => c.code === code);
+  if (crypto) {
+    // Intl has no BTC/ETH currency; use the symbol with fixed decimals.
+    return `${v < 0 ? '-' : ''}${crypto.symbol}${Math.abs(v).toLocaleString(undefined, { minimumFractionDigits: crypto.decimals, maximumFractionDigits: crypto.decimals })}`;
+  }
   const digits = small && Math.abs(v) < 1 && v !== 0 ? 6 : undefined;
   const key = `${code}:${digits ?? ''}`;
   let f = fiatFormatters.get(key);
@@ -36,7 +41,7 @@ export const fmt = (v: number, max = 4) =>
 
 export const waxFmt = (v: number | null | undefined) => (v == null ? '—' : `${fmt(v, 2)} WAX`);
 /** A WAX amount converted at `rate` (fiat per WAX) into `code`. */
-export const usdFmt = (wax: number | null | undefined, rate: number, code: FiatCode = 'USD') =>
+export const usdFmt = (wax: number | null | undefined, rate: number, code: DisplayCode = 'USD') =>
   wax == null || !rate ? '' : fiatFmt(wax * rate, code);
 
 /** An amount already in `cur`. */
@@ -173,10 +178,10 @@ export function AmountList({ items }: { items: TokenAmount[] }) {
 type SortCol = 'token' | 'balance' | 'avg' | 'price' | 'paper' | 'realisable' | 'unrealised' | 'realised';
 
 export function HoldingsTable({ rows, events, waxUsd, cur, fiat = 'USD', realisable, onPick }: {
-  rows: HoldingRow[]; events: FolioEvent[]; waxUsd: number; cur: Currency; fiat?: FiatCode; realisable?: Map<string, Realisable>; onPick: (r: HoldingRow) => void;
+  rows: HoldingRow[]; events: FolioEvent[]; waxUsd: number; cur: Currency; fiat?: DisplayCode; realisable?: Map<string, Realisable>; onPick: (r: HoldingRow) => void;
 }) {
   const usd = cur !== 'WAX';
-  const fiatCode: FiatCode = cur === 'WAX' ? fiat : cur;
+  const fiatCode: DisplayCode = cur === 'WAX' ? fiat : cur;
   const acquisitions = useMemo(() => new Map(rows.filter((r) => r.position).map((r) => [
     r.key, acquisitionBreakdown(r.key, events, r.position?.freeQty ?? 0),
   ])), [rows, events]);
@@ -436,13 +441,13 @@ export function TokenDialog({
   row, events, value, realized, waxUsd, cur, fiat = 'USD', realisable, onClose,
 }: {
   row: HoldingRow | null; events: FolioEvent[]; value: Map<string, number>; realized: Map<string, number>; waxUsd: number;
-  cur: Currency; fiat?: FiatCode; realisable?: Realisable | null; onClose: () => void;
+  cur: Currency; fiat?: DisplayCode; realisable?: Realisable | null; onClose: () => void;
 }) {
   const p = row?.position;
   const acquisitions = useMemo(() => row && p ? acquisitionBreakdown(row.key, events, p.freeQty) : null, [row, p, events]);
   const [showGifts, setShowGifts] = useState(false);
   const usd = cur !== 'WAX';
-  const fiatCode: FiatCode = cur === 'WAX' ? fiat : cur;
+  const fiatCode: DisplayCode = cur === 'WAX' ? fiat : cur;
   return (
     <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto overflow-x-hidden [&>*]:min-w-0">
