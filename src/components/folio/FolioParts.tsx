@@ -45,11 +45,17 @@ export function acquisitionBreakdown(key: string, events: FolioEvent[], freeQty:
   const purchased = events.reduce((sum, e) => e.type === 'trade'
     ? sum + e.in.reduce((n, a) => n + (a.key === key ? a.amount : 0), 0)
     : sum, 0);
+  // Rewards are what reward.alcor sent; every other free receipt is gifted.
+  const reward = events.reduce((sum, e) => e.type === 'reward' && e.counterparty === 'reward.alcor'
+    ? sum + e.in.reduce((n, a) => n + (a.key === key ? a.amount : 0), 0)
+    : sum, 0);
+  const gifted = Math.max(0, freeQty - reward);
   const total = purchased + freeQty;
   return {
-    purchased, free: freeQty,
+    purchased, reward, gifted,
     purchasedPct: total > 0 ? purchased / total * 100 : null,
-    freePct: total > 0 ? freeQty / total * 100 : null,
+    rewardPct: total > 0 ? reward / total * 100 : null,
+    giftedPct: total > 0 ? gifted / total * 100 : null,
   };
 }
 
@@ -183,7 +189,8 @@ export function HoldingsTable({ rows, events, waxUsd, cur, realisable, onPick }:
                     {receipts ? (
                       <div className="text-[11px] leading-4 text-muted-foreground" title="All-time recorded receipts, not the source of your current balance. Based on available history; average cost is unchanged.">
                         <div>Bought (all-time): <span className="text-foreground">{fmt(receipts.purchased, r.precision)}</span>{receipts.purchasedPct == null ? '' : ` · ${fmt(receipts.purchasedPct, 1)}%`}</div>
-                        <div>Gifted / Reward: <span className="text-foreground">{fmt(receipts.free, r.precision)}</span>{receipts.freePct == null ? '' : ` · ${fmt(receipts.freePct, 1)}%`}</div>
+                        <div>Reward: <span className="text-foreground">{fmt(receipts.reward, r.precision)}</span>{receipts.rewardPct == null ? '' : ` · ${fmt(receipts.rewardPct, 1)}%`}</div>
+                        <div>Gifted: <span className="text-foreground">{fmt(receipts.gifted, r.precision)}</span>{receipts.giftedPct == null ? '' : ` · ${fmt(receipts.giftedPct, 1)}%`}</div>
                       </div>
                     ) : null}
                 </div>
@@ -372,7 +379,7 @@ export function TokenDialog({
                   <h3 className="text-sm font-semibold">Acquisition breakdown</h3>
                   <span className="text-xs text-muted-foreground">All-time recorded receipts · not current balance</span>
                 </div>
-                <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 text-sm">
+                <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3 text-sm">
                   <div>
                     <dt className="text-muted-foreground">Purchased</dt>
                     <dd className="font-medium break-words">{fmt(acquisitions.purchased, p.precision)} {row.symbol}
@@ -380,13 +387,19 @@ export function TokenDialog({
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-muted-foreground">Gifted / Reward</dt>
-                    <dd className="font-medium break-words">{fmt(acquisitions.free, p.precision)} {row.symbol}
-                      <span className="ml-2 text-xs text-muted-foreground">{acquisitions.freePct == null ? '—' : `${fmt(acquisitions.freePct, 1)}%`}</span>
+                    <dt className="text-muted-foreground">Reward</dt>
+                    <dd className="font-medium break-words">{fmt(acquisitions.reward, p.precision)} {row.symbol}
+                      <span className="ml-2 text-xs text-muted-foreground">{acquisitions.rewardPct == null ? '—' : `${fmt(acquisitions.rewardPct, 1)}%`}</span>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Gifted</dt>
+                    <dd className="font-medium break-words">{fmt(acquisitions.gifted, p.precision)} {row.symbol}
+                      <span className="ml-2 text-xs text-muted-foreground">{acquisitions.giftedPct == null ? '—' : `${fmt(acquisitions.giftedPct, 1)}%`}</span>
                     </dd>
                   </div>
                 </dl>
-                <p className="text-xs text-muted-foreground">Free receipts include transfers, airdrops, rewards and pool gains; their recorded cost is zero.{!row.complete ? ' Based on available history only.' : ''}</p>
+                <p className="text-xs text-muted-foreground">Rewards are transfers from reward.alcor; gifted covers other free receipts such as transfers, airdrops and pool gains. Their recorded cost is zero.{!row.complete ? ' Based on available history only.' : ''}</p>
               </section>
             ) : null}
             {p ? (
