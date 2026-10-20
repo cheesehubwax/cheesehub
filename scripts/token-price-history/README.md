@@ -42,3 +42,12 @@ Built once by `.github/workflows/cheese-price-backfill.yml` (`cheese-backfill.ts
 run manually after the WAX/USD backfill); the daily recorder appends each new day.
 Day files missing a CHEESE price get `prices["cheeseburger:CHEESE"]`; recorded
 prices are never overwritten.
+
+## Fiat exchange rates (`data/fx-usd-history.json`)
+
+`{ updatedAt, currencies: { AUD: { "YYYY-MM-DD": perUsd } } }` for 30 currencies
+(ECB reference rates via Frankfurter; RUB from the Central Bank of Russia since
+the ECB dropped it in March 2022). Weekends/holidays carry the last rate up to
+7 days. Built once by `.github/workflows/fx-backfill.yml` (`fx.ts`, `FULL=1`);
+the daily recorder refreshes the last 21 days and never blanks existing days.
+CHEESEFolio converts WAX → USD → chosen currency using each day's rates.
