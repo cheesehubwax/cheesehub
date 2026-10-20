@@ -101,22 +101,16 @@ describe('fetchNullBreakdown averages', () => {
   });
 });
 
-describe('fetchNullBreakdown crypt attribution', () => {
-  const memoAction = (from: string, amount: number, memo: string) => ({
-    act: { data: { from, to: 'eosio.null', quantity: `${amount.toFixed(4)} CHEESE`, memo } },
-    '@timestamp': new Date(Date.now() - DAY_MS / 2).toISOString(),
-  });
-
-  it('counts message fees and key publishing under crypt, not the sender', async () => {
+describe('fetchNullBreakdown contract rows', () => {
+  it('does not list crypt, so CHEESECrypt nulls are not tallied there', async () => {
     mockHistory([
-      memoAction('alice.wam', 0.01, 'CHEESECrypt messaging fee'),
-      memoAction('bob.wam', 0.01, 'GPKMKEY1:abc123'),
-      memoAction('alice.wam', 5, 'something else'),
+      {
+        act: { data: { from: 'alice.wam', to: 'eosio.null', quantity: '0.0100 CHEESE', memo: 'CHEESECrypt messaging fee' } },
+        '@timestamp': new Date(Date.now() - DAY_MS / 2).toISOString(),
+      },
     ]);
     const { entries } = await fetchNullBreakdown();
-    const crypt = entries.find((e) => e.contract === 'crypt')!;
-    expect(crypt.amount).toBeCloseTo(0.02, 6);
-    expect(crypt.amount24h).toBeCloseTo(0.02, 6);
-    expect(entries.find((e) => e.contract === 'alice.wam')).toBeUndefined();
+    expect(entries.some((e) => e.contract === 'crypt')).toBe(false);
+    expect(entries.find((e) => e.contract === 'crypt')?.amount).toBeUndefined();
   });
 });
