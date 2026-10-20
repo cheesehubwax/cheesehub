@@ -217,6 +217,9 @@ export function CheeseSwapWidget({
     ? amountIn
     : (route ? exactOutputMaxInput(route, slippage, tokenIn?.precision ?? 8) : "");
 
+  // Exchange rate uses the expected (ideal) input, not the slippage maximum.
+  const displayRateInput = activeField === "in" ? parseFloat(amountIn) || 0 : (route?.input ?? 0);
+
   const handleSwap = async () => {
     if (!route || route.quoteComplete === false || !session || !accountName || !tokenIn) return;
     setIsSwapping(true);
@@ -405,9 +408,9 @@ export function CheeseSwapWidget({
             <span className="text-muted-foreground">
               1 {tokenIn?.ticker} ≈{" "}
               <span className="text-foreground font-medium">
-                {route.output && swapAmountIn && parseFloat(swapAmountIn) > 0
+                {route.output && displayRateInput > 0
                   ? formatTokenAmount(
-                      route.output / parseFloat(swapAmountIn),
+                      route.output / displayRateInput,
                       tokenOut?.precision ?? 8
                     )
                   : "—"}{" "}
