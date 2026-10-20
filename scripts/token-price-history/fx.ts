@@ -99,9 +99,8 @@ async function main() {
 
   const currencies: Record<string, Record<string, number>> = {};
   for (const c of [...ECB_CODES, "RUB"]) {
-    // Published days from prior + fresh (fresh wins), then carry forward across the whole series.
-    const raw: Record<string, number> = { ...(prior[c] ?? {}), ...fresh[c] };
-    const filled = carryForward(raw, today);
+    // Carry only from genuinely published days (prior entries may themselves be carried).
+    const filled = carryForward(fresh[c], today);
     const merged: Record<string, number> = { ...(prior[c] ?? {}) };
     for (const [d, v] of Object.entries(filled)) merged[d] = sig(v);
     currencies[c] = Object.fromEntries(Object.entries(merged).sort(([a], [b]) => a.localeCompare(b)));
