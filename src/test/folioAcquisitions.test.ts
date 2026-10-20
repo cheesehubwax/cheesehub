@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { acquisitionBreakdown } from '@/components/folio/FolioParts';
+import { acquisitionBreakdown, giftReceipts } from '@/components/folio/FolioParts';
 import { buildLedger } from '@/lib/folio/ledger';
 import type { FolioEvent } from '@/lib/folio/types';
 
@@ -32,5 +32,22 @@ describe('CHEESEFolio acquisition breakdown', () => {
   });
   it('does not invent percentages without recorded acquisitions', () => {
     expect(acquisitionBreakdown(token.key, [], 0)).toEqual({ purchased: 0, reward: 0, gifted: 0, purchasedPct: null, rewardPct: null, giftedPct: null });
+  });
+});
+
+describe('CHEESEFolio gift receipts list', () => {
+  it('lists direct gifts with sender and amount, excluding reward.alcor rewards and purchases', () => {
+    const list = giftReceipts(token.key, events);
+    expect(list).toHaveLength(1);
+    expect(list[0].e.counterparty).toBe('friendacct12');
+    expect(list[0].amount).toBe(50);
+  });
+  it('includes rewards from other senders as gifts, newest first', () => {
+    const farmReward: FolioEvent = { id: 'farm', trx: 'farm', ts: 4, seq: 5, type: 'reward', out: [], in: [{ ...token, amount: 10 }], counterparty: 'farms.waxdao' };
+    const list = giftReceipts(token.key, [...events, farmReward]);
+    expect(list.map((x) => x.amount)).toEqual([10, 50]);
+  });
+  it('ignores receipts of other tokens', () => {
+    expect(giftReceipts(wax.key, events)).toHaveLength(0);
   });
 });
