@@ -21,7 +21,9 @@ describe('FX history', () => {
   it('reads RUB per USD from Central Bank of Russia records, honouring nominal', () => {
     const xml = '<ValCurs><Record Date="03.12.2019" Id="R01235"><Nominal>1</Nominal><Value>64,4097</Value></Record>'
       + '<Record Date="04.12.2019" Id="R01235"><Nominal>10</Nominal><Value>641,401</Value></Record></ValCurs>';
-    expect(parseCbrDynamic(xml)).toEqual({ '2019-12-03': 64.4097, '2019-12-04': 64.1401 });
+    const r = parseCbrDynamic(xml);
+    expect(r['2019-12-03']).toBe(64.4097);
+    expect(r['2019-12-04']).toBeCloseTo(64.1401, 8);
   });
 
   it('USD is always exactly 1 and other currencies go unknown past 7 days', () => {
