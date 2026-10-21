@@ -1,4 +1,5 @@
 # CHEESEHub roadmap
+- [ ] CHEESEFolio: add Total Cost and order summary boxes Paper Value, Total Cost, Unrealised P/L, Realised P/L, Realisable Now.
 - [x] CHEESEFolio: named portfolios with scoped holdings/activity/P&L/CSVs and combined JSON restore; automated creation/save/clear/load/sync/account isolation verified.
 - [ ] CHEESEFolio portfolios: verify with real wallet balances/history in the live page — requires a connected WAX wallet; automated flow uses controlled balances and history services.
 - [x] CHEESEAir suffix: bounded requests, no dead-host retry waits, complete-only 60s cache and honest partial warnings; 29 regression tests pass, live .cheese returns 8 accounts in 1.48s (partial provider coverage).
