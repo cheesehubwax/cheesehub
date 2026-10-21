@@ -210,6 +210,7 @@ const Folio = () => {
                 <Button size="sm" variant="outline" disabled={!folio.events.length} onClick={() => downloadActivityCsv(accountName, folio.events, folio.ledger.valueByEvent, folio.ledger.realizedByEvent, folio.ledger.valueUsdByEvent, folio.ledger.realizedUsdByEvent, fiat)}>Activity CSV</Button>
                 <Button size="sm" variant="outline" disabled={!folio.hasHistory} onClick={() => void folio.exportFile()}>Save history (JSON)</Button>
                 <Button size="sm" variant="outline" disabled={!folio.loaded} onClick={pickImport}>Load history (JSON)</Button>
+                <input ref={importRef} type="file" accept=".json,application/json" className="hidden" onChange={onImport} />
                 <Button size="sm" variant="outline" onClick={() => { if (confirm('Delete the saved history and scan again from the start?')) void folio.rescan(); }}>Rescan from scratch</Button>
                 <Button size="sm" variant="ghost" onClick={() => { if (confirm('Delete everything CHEESEFolio saved in this browser for this account?')) void folio.clear(); }}>Clear saved data</Button>
               </div>
@@ -242,7 +243,6 @@ const Folio = () => {
                   <Button variant="outline" onClick={pickImport}>Load saved history (JSON)</Button>
                 </div>
                 <p className="text-xs text-muted-foreground">Saved a history file before? Load it to skip the full scan — Sync then fetches only newer transfers.</p>
-                <input ref={importRef} type="file" accept=".json,application/json" className="hidden" onChange={onImport} />
               </div>
             ) : null}
             {!folio.syncing && hasCoverageGap(folio.coverageFrom, folio.accountCreated) ? (
