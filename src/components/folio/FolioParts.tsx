@@ -8,6 +8,7 @@ import type { FolioEvent, FolioEventType, TokenAmount } from '@/lib/folio/types'
 import { WAX_KEY } from '@/lib/folio/types';
 import type { HoldingRow } from '@/lib/folio/holdings';
 import type { Realisable } from '@/hooks/useRealisableValues';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 import { CRYPTO_CURRENCIES, type DisplayCode } from '@/lib/folio/fxCore';
 

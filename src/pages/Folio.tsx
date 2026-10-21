@@ -156,12 +156,12 @@ const Folio = () => {
 
   return (
     <Layout>
-      <section className="relative pt-20 pb-14 overflow-hidden">
+      <section className="relative pt-8 pb-6 md:pt-20 md:pb-14 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
         <div className="container relative z-10">
           <div className="flex flex-col items-center gap-8">
-            <div className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer" onClick={playRandomFart}>
-              <img src={walletOrb} alt="CHEESEFolio" className="w-24 h-24 object-contain" />
+            <div className="h-20 w-20 md:h-32 md:w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer" onClick={playRandomFart}>
+              <img src={walletOrb} alt="CHEESEFolio" className="w-14 h-14 md:w-24 md:h-24 object-contain" />
             </div>
             <div className="text-center space-y-4">
               <div className="flex items-center justify-center gap-2">
@@ -300,7 +300,7 @@ const Folio = () => {
             ) : folio.fxUnavailable ? (
               <div className="w-full text-xs text-destructive text-center">Exchange rates for {chosenFiat} couldn't be loaded right now, so figures are shown in USD. Refresh to try again.</div>
             ) : null}
-            <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="w-full grid grid-cols-2 lg:grid-cols-5 gap-2 md:gap-3">
               <SummaryBox
                 label="Total cost"
                 value={usd ? money(totalCost.usd, cur) : waxFmt(totalCost.wax)}
