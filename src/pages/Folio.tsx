@@ -268,7 +268,7 @@ const Folio = () => {
               <Select value={chosenCrypto} onValueChange={(v) => (v === 'WAX' || isCrypto(v)) && showCrypto(v)}>
                 <SelectTrigger
                   aria-label="Show in crypto"
-                  className={`h-7 w-auto gap-1 text-xs ${mode === 'CRYPTO' ? 'bg-primary text-primary-foreground border-primary' : 'opacity-60'}`}
+                  className={`h-9 md:h-7 w-auto gap-1 text-xs ${mode === 'CRYPTO' ? 'bg-primary text-primary-foreground border-primary' : 'opacity-60'}`}
                   onClick={() => { if (mode !== 'CRYPTO') showCrypto(chosenCrypto); }}
                 >
                   <SelectValue>Show in {chosenCrypto}</SelectValue>
@@ -283,7 +283,7 @@ const Folio = () => {
               <Select value={chosenFiat} onValueChange={(v) => isFiat(v) && showFiat(v)}>
                 <SelectTrigger
                   aria-label="Show in fiat currency"
-                  className={`h-7 w-auto gap-1 text-xs ${mode === 'FIAT' ? 'bg-primary text-primary-foreground border-primary' : 'opacity-60'}`}
+                  className={`h-9 md:h-7 w-auto gap-1 text-xs ${mode === 'FIAT' ? 'bg-primary text-primary-foreground border-primary' : 'opacity-60'}`}
                   onClick={() => { if (mode !== 'FIAT') showFiat(chosenFiat); }}
                 >
                   <SelectValue>Show in {chosenFiat}</SelectValue>
@@ -355,7 +355,7 @@ const Folio = () => {
                 <h2 className="text-lg font-semibold">Realised profit/loss over time</h2>
                 <div className="flex gap-1">
                   {RANGES.map((r) => (
-                    <Button key={r.key} size="sm" variant={range === r.key ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => setRange(r.key)}>{r.label}</Button>
+                    <Button key={r.key} size="sm" variant={range === r.key ? 'default' : 'outline'} className="h-9 md:h-7 text-xs" onClick={() => setRange(r.key)}>{r.label}</Button>
                   ))}
                 </div>
               </div>
