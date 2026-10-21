@@ -221,6 +221,8 @@ export function HoldingsTable({ rows, events, waxUsd, cur, fiat = 'USD', realisa
   ])), [rows, events]);
   const [giftsFor, setGiftsFor] = useState<HoldingRow | null>(null);
   const [sort, setSort] = useState<{ col: SortCol; dir: 1 | -1 }>({ col: 'paper', dir: -1 });
+  const isMobile = useIsMobile();
+  const [view, setView] = useState<'cards' | 'table'>('cards');
   const sorted = useMemo(() => {
     const val = (r: HoldingRow): number | string | null => {
       switch (sort.col) {
@@ -251,8 +253,57 @@ export function HoldingsTable({ rows, events, waxUsd, cur, fiat = 'USD', realisa
       </button>
     </th>
   );
+  if (isMobile && view === 'cards') {
+    return (
+      <div className="w-full space-y-2">
+        <ViewToggle view={view} setView={setView} />
+        {sorted.map((r) => {
+          const rz = realisable?.get(r.key);
+          const rzWax = r.key === 'eosio.token:WAX' ? r.balance : rz?.wax ?? null;
+          const unreal = usd ? r.unrealizedUsd : r.unrealizedWax;
+          const unrealPct = usd ? r.unrealizedPctUsd : r.unrealizedPct;
+          const realized = usd ? r.realizedUsd : r.realizedWax;
+          const avg = usd ? r.avgCostUsd : r.avgCostWax;
+          const usdMissing = usd && r.complete && !r.usdComplete;
+          return (
+            <div key={r.key} role="button" tabIndex={0} className="cursor-pointer rounded-lg border border-border/50 bg-card/60 p-3 space-y-2" onClick={() => onPick(r)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onPick(r); }}>
+              <div className="flex items-center gap-2">
+                <TokenLogo contract={r.contract} symbol={r.symbol} size="sm" />
+                <span className="font-semibold">{r.symbol}</span>
+                <span className="min-w-0 break-all text-xs text-muted-foreground">{r.contract}</span>
+                {portfolioAction ? <span className="ml-auto" onClick={(e) => e.stopPropagation()}>{portfolioAction(r)}</span> : null}
+              </div>
+              <div className="flex flex-wrap gap-1 empty:hidden">
+                {r.closed ? (
+                  <span className="rounded border border-border px-1 text-[10px] text-muted-foreground">closed</span>
+                ) : !r.complete ? (
+                  <span className="rounded border border-destructive/40 px-1 text-[10px] text-destructive" title={r.pooledUnknown ? "Some pool positions couldn't be read, so profit/loss is hidden for this token." : "Your saved history doesn't add up to your live balance (wallet plus pools), so profit/loss is hidden for this token."}>history incomplete</span>
+                ) : usdMissing ? (
+                  <span className="rounded border border-cheese/40 px-1 text-[10px] text-cheese" title={`Some of this token's trades happened on days with no recorded WAX/${fiatCode} rate.`}>no {fiatCode} rate</span>
+                ) : r.position?.unpricedBuys ? (
+                  <span className="rounded border border-cheese/40 px-1 text-[10px] text-cheese" title="Some of this token was acquired without a known WAX value.">partly unpriced</span>
+                ) : null}
+              </div>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                <div className="flex items-baseline justify-between gap-2"><dt className="text-muted-foreground">Balance</dt><dd className="text-right">{fmt(r.balance, r.precision)}{r.pooledBalance > 0 ? <span className="block text-xs text-muted-foreground">{fmt(r.pooledBalance, r.precision)} in pools</span> : null}</dd></div>
+                <div className="flex items-baseline justify-between gap-2"><dt className="text-muted-foreground">Avg cost</dt><dd className="text-right">{avg == null ? '—' : usd ? fiatFmt(avg, fiatCode, true) : fmt(avg, 6)}</dd></div>
+                <div className="flex items-baseline justify-between gap-2"><dt className="text-muted-foreground">Price</dt><dd className="text-right">{r.priceWax == null ? '—' : usd ? (waxUsd ? fiatFmt(r.priceWax * waxUsd, fiatCode, true) : '—') : fmt(r.priceWax, 6)}</dd></div>
+                <div className="flex items-baseline justify-between gap-2"><dt className="text-muted-foreground">Paper value</dt><dd className="text-right">{usd ? money(r.valueUsd, cur) : waxFmt(r.valueWax)}</dd></div>
+                <div className="flex items-baseline justify-between gap-2"><dt className="text-muted-foreground">Realisable</dt><dd className="text-right">{r.closed ? '—' : rzWax == null ? '—' : usd ? money(waxUsd ? rzWax * waxUsd : null, cur) : waxFmt(rzWax)}</dd></div>
+                <div className={`flex items-baseline justify-between gap-2 ${plClass(unreal)}`}><dt className="text-muted-foreground">Unrealised</dt><dd className="text-right">{unreal == null ? '—' : signedMoney(unreal, cur)}{unrealPct != null ? ` (${signed(unrealPct)}%)` : ''}</dd></div>
+                <div className={`flex items-baseline justify-between gap-2 ${plClass(realized || null)}`}><dt className="text-muted-foreground">Realised</dt><dd className="text-right">{realized ? signedMoney(realized, cur) : '—'}</dd></div>
+              </dl>
+            </div>
+          );
+        })}
+        {rows.length === 0 ? <div className="rounded-lg border border-border/50 bg-card/60 px-3 py-6 text-center text-sm text-muted-foreground">No tokens with a balance.</div> : null}
+        <GiftListDialog row={giftsFor} events={events} onClose={() => setGiftsFor(null)} />
+      </div>
+    );
+  }
   return (
     <div className="w-full overflow-x-auto rounded-lg border border-border/50 bg-card/60">
+      {isMobile ? <div className="border-b border-border/50 p-2"><ViewToggle view={view} setView={setView} /></div> : null}
       <table aria-label="Holdings" className="w-full min-w-[1080px] table-fixed text-xs xl:text-sm [&_th]:px-2 [&_td]:px-2 [&_td]:py-2 [&_td]:break-words [&_th:first-child]:pl-3 [&_td:first-child]:pl-3 [&_th:last-child]:pr-6 [&_td:last-child]:pr-6">
         <colgroup>
           <col className="w-[19%]" />
@@ -373,6 +424,7 @@ export function ActivityList({
 }: { events: FolioEvent[]; value: Map<string, number>; realized: Map<string, number>; filter?: string; cur?: Currency }) {
   const [type, setType] = useState<FolioEventType | 'all'>('all');
   const [shown, setShown] = useState(PAGE);
+  const isMobile = useIsMobile();
   const list = useMemo(
     () =>
       [...events]
@@ -386,11 +438,35 @@ export function ActivityList({
     <div className="w-full space-y-2">
       <div className="flex flex-wrap gap-1">
         {(['all', ...types] as const).map((t) => (
-          <Button key={t} size="sm" variant={type === t ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => { setType(t); setShown(PAGE); }}>
+          <Button key={t} size="sm" variant={type === t ? 'default' : 'outline'} className="h-9 md:h-7 text-xs" onClick={() => { setType(t); setShown(PAGE); }}>
             {t === 'all' ? 'All' : EVENT_LABELS[t]}
           </Button>
         ))}
       </div>
+      {isMobile ? (
+        <div className="space-y-2">
+          {list.slice(0, shown).map((e) => {
+            const r = realized.get(e.id);
+            return (
+              <div key={e.id} className="rounded-lg border border-border/50 bg-card/60 p-3 space-y-1.5 text-sm">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="font-medium">{EVENT_LABELS[e.type]}</span>
+                  <span className="whitespace-nowrap text-xs text-muted-foreground">{new Date(e.ts).toISOString().slice(0, 16).replace('T', ' ')}</span>
+                </div>
+                <div className="text-xs text-muted-foreground">{e.venue ? VENUE_LABELS[e.venue] : e.counterparty}</div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                  <div><div className="text-xs text-muted-foreground">Sent</div><AmountList items={e.out} /></div>
+                  <div><div className="text-xs text-muted-foreground">Received</div><AmountList items={e.in} /></div>
+                  <div><div className="text-xs text-muted-foreground">Value</div>{value.has(e.id) ? money(value.get(e.id), cur) : '—'}</div>
+                  <div className={plClass(r)}><div className="text-xs text-muted-foreground">Realised P/L</div>{r == null ? '—' : signedMoney(r, cur)}</div>
+                </div>
+                <a className="text-xs text-cheese hover:underline" href={`https://waxblock.io/transaction/${e.trx}`} target="_blank" rel="noopener noreferrer">tx {e.trx.slice(0, 8)}</a>
+              </div>
+            );
+          })}
+          {list.length === 0 ? <div className="rounded-lg border border-border/50 bg-card/60 px-3 py-6 text-center text-sm text-muted-foreground">Nothing here yet.</div> : null}
+        </div>
+      ) : (
       <div className="w-full overflow-x-auto rounded-lg border border-border/50 bg-card/60">
         <table className="w-full min-w-[820px] text-sm">
           <thead className="text-xs uppercase text-muted-foreground">
@@ -432,6 +508,7 @@ export function ActivityList({
           </tbody>
         </table>
       </div>
+      )}
       {list.length > shown ? (
         <div className="flex justify-center">
           <Button variant="outline" size="sm" onClick={() => setShown((s) => s + PAGE)}>Show more ({list.length - shown} left)</Button>
@@ -448,7 +525,7 @@ export function PlChart({ data, title, cur = 'WAX' }: { data: { date: string; va
   return (
     <div className="rounded-lg border border-border/50 bg-card/60 p-3">
       <div className="mb-2 text-center text-sm font-semibold">{title}</div>
-      <div className="h-72">
+      <div className="h-48 sm:h-72">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
             <defs>
