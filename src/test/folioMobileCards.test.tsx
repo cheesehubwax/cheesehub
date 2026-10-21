@@ -36,7 +36,7 @@ describe('CHEESEFolio mobile layout', () => {
 
   it('shows activity as cards without the wide table', () => {
     render(<ActivityList events={[event]} value={new Map([['e1', 10]])} realized={new Map()} cur="WAX" />);
-    expect(screen.getByText('Trade')).toBeInTheDocument();
+    expect(screen.getAllByText('Trade').length).toBeGreaterThanOrEqual(2); // filter chip + card label
     expect(screen.getByText('Sent')).toBeInTheDocument();
     expect(screen.getByText('Realised P/L')).toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
