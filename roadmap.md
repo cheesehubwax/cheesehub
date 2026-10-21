@@ -1,6 +1,7 @@
 # CHEESEHub roadmap
 - [x] CHEESEFolio: summary boxes in capital-first order Total Cost, Paper Value, Realisable Now, Unrealised P/L, Realised P/L.
 - [x] CHEESEFolio: named portfolios with scoped holdings/activity/P&L/CSVs and combined JSON restore; automated creation/save/clear/load/sync/account isolation verified.
+- [x] CHEESEFolio mobile layout: smaller hero/orb, 2-col summary boxes, card view with card/table toggle for holdings and activity, shorter chart, larger touch targets; signed-out phone-width view checked and card/table toggle tested.
 - [ ] CHEESEFolio portfolios: verify with real wallet balances/history in the live page — requires a connected WAX wallet; automated flow uses controlled balances and history services.
 - [x] CHEESEAir suffix: bounded requests, no dead-host retry waits, complete-only 60s cache and honest partial warnings; 29 regression tests pass, live .cheese returns 8 accounts in 1.48s (partial provider coverage).
 - [x] CHEESECrypt: 100 CHEESE paid key creation, free restores, 80/20 platform fees; fee and onboarding regressions pass. Live payment verification awaits a connected WAX wallet and signing approval.
