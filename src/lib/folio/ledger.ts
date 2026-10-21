@@ -43,6 +43,8 @@ export function buildLedger(events: FolioEvent[], priceAt: PriceAt = () => null,
   const positions = new Map<TokenKey, TokenPosition>();
   const realizedByEvent = new Map<string, number>();
   const realizedUsdByEvent = new Map<string, number>();
+  const realizedByEventToken = new Map<string, Map<TokenKey, number>>();
+  const realizedUsdByEventToken = new Map<string, Map<TokenKey, number>>();
   const valueByEvent = new Map<string, number>();
   const valueUsdByEvent = new Map<string, number>();
   const orders: OpenOrder[] = [];
@@ -106,6 +108,15 @@ export function buildLedger(events: FolioEvent[], priceAt: PriceAt = () => null,
     };
     if (rate == null) markUsdGap();
     const r = rate ?? 0;
+    const attribute = (key: TokenKey, w: number, u: number) => {
+      const put = (map: Map<string, Map<TokenKey, number>>, amount: number) => {
+        const tokens = map.get(ev.id) ?? new Map<TokenKey, number>();
+        tokens.set(key, (tokens.get(key) ?? 0) + amount);
+        map.set(ev.id, tokens);
+      };
+      put(realizedByEventToken, w);
+      if (rate != null) put(realizedUsdByEventToken, u);
+    };
 
     // Total WAX value of the trade. Exact when one whole side is WAX.
     let value: number | null = null;
@@ -127,6 +138,7 @@ export function buildLedger(events: FolioEvent[], priceAt: PriceAt = () => null,
         const p = pos(o.a);
         p.realizedWax += rw;
         p.realizedUsd += ru;
+        attribute(o.a.key, rw, ru);
         realized += rw;
         realizedUsd += ru;
       }
@@ -137,6 +149,7 @@ export function buildLedger(events: FolioEvent[], priceAt: PriceAt = () => null,
         if (o.a.key !== WAX_KEY) continue;
         const ru = o.a.amount * r - o.cost.u;
         pos(o.a).realizedUsd += ru;
+        attribute(o.a.key, 0, ru);
         realizedUsd += ru;
       }
     }
@@ -285,7 +298,7 @@ export function buildLedger(events: FolioEvent[], priceAt: PriceAt = () => null,
         break;
     }
   }
-  return { positions, realizedByEvent, realizedUsdByEvent, valueByEvent, valueUsdByEvent };
+  return { positions, realizedByEvent, realizedUsdByEvent, realizedByEventToken, realizedUsdByEventToken, valueByEvent, valueUsdByEvent };
 }
 
 /** Daily wallet quantity per token, replaying events up to each day's end. */

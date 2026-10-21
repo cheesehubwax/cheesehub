@@ -1,6 +1,6 @@
 // CHEESEFolio — personal profit/loss for the signed-in WAX account.
 // Intentionally not linked from the header yet: reachable at /folio only.
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from '@/hooks/use-toast';
 import { Layout } from '@/components/Layout';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
@@ -11,6 +11,8 @@ import { useAllTokenBalances } from '@/hooks/useAllTokenBalances';
 import { useAlcorTokenPrices } from '@/hooks/useAlcorTokenPrices';
 import { useWaxPrice } from '@/hooks/useWaxPrice';
 import { useFolio } from '@/hooks/useFolio';
+import { PortfolioControls, PortfolioTokenPicker } from '@/components/folio/PortfolioControls';
+import { scopePortfolio } from '@/lib/folio/portfolios';
 import { usePooledTokens } from '@/hooks/usePooledTokens';
 import { hasCoverageGap } from '@/lib/folio/scanner';
 import { buildHoldings, type HoldingRow } from '@/lib/folio/holdings';
@@ -43,6 +45,11 @@ const Folio = () => {
   });
   const activeCode: DisplayCode = mode === 'CRYPTO' && chosenCrypto !== 'WAX' ? chosenCrypto : chosenFiat;
   const folio = useFolio(accountName, activeCode);
+  const [selectedPortfolio, setSelectedPortfolio] = useState<string | null>(null);
+  useEffect(() => { setSelectedPortfolio(null); setPicked(null); }, [accountName]);
+  const currentPortfolio = folio.portfolios.find((p) => p.id === selectedPortfolio);
+  const portfolioKeys = useMemo(() => currentPortfolio ? new Set(currentPortfolio.tokenKeys) : null, [currentPortfolio]);
+  const scoped = useMemo(() => scopePortfolio(folio.ledger, folio.events, portfolioKeys), [folio.ledger, folio.events, portfolioKeys]);
   const importRef = useRef<HTMLInputElement>(null);
   const pickImport = () => importRef.current?.click();
   const onImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -53,7 +60,7 @@ const Folio = () => {
       const r = await folio.importFile(file);
       toast({
         title: 'History loaded',
-        description: `Added ${r.added.toLocaleString()} new transfers (${r.alreadySaved.toLocaleString()} already saved). Press Sync to fetch anything newer.`,
+        description: `Added ${r.added.toLocaleString()} new transfers (${r.alreadySaved.toLocaleString()} already saved). ${r.rec.portfolios?.length ?? 0} portfolios restored. Press Sync to fetch anything newer.`,
       });
     } catch (err) {
       toast({ title: 'Could not load this file', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
@@ -87,7 +94,7 @@ const Folio = () => {
     [live],
   );
   const { data: pooled, isFetching: pooledLoading } = usePooledTokens(accountName, shares, !liveLoading);
-  const holdings = useMemo(
+  const allHoldings = useMemo(
     () =>
       buildHoldings(
         folio.ledger.positions,
@@ -97,10 +104,11 @@ const Folio = () => {
         (key) => priceMap?.get(key) ?? null,
         waxUsd,
         pooled ?? null,
-        showClosed,
+        true,
       ),
-    [folio.ledger, live, priceMap, waxUsd, pooled, showClosed],
+    [folio.ledger, live, priceMap, waxUsd, pooled],
   );
+  const holdings = useMemo(() => allHoldings.filter((h) => (showClosed || !h.closed) && (!portfolioKeys || portfolioKeys.has(h.key))), [allHoldings, showClosed, portfolioKeys]);
   const venueName: Record<string, string> = { alcor: 'Alcor', taco: 'Taco', defibox: 'Defibox' };
   const { data: realisable } = useRealisableValues(holdings, accountName);
 
@@ -119,18 +127,18 @@ const Folio = () => {
         else realisableWax += r;
       }
     }
-    for (const p of folio.ledger.positions.values()) {
+    for (const p of scoped.ledger.positions.values()) {
       realized += p.realizedWax;
       realizedUsd += p.realizedUsd;
     }
     return { value, unrealized, realized, valueUsd, unrealizedUsd, realizedUsd, realisableWax: realisable && realisableKnown ? realisableWax : null };
-  }, [holdings, folio.ledger, realisable]);
+  }, [holdings, scoped.ledger, realisable]);
 
   // Cumulative realised profit/loss, one point per day with a sale.
   const plSeries = useMemo(() => {
     const byDay = new Map<string, number>();
-    for (const e of folio.events) {
-      const r = (usd ? folio.ledger.realizedUsdByEvent : folio.ledger.realizedByEvent).get(e.id);
+    for (const e of scoped.events) {
+      const r = (usd ? scoped.ledger.realizedUsdByEvent : scoped.ledger.realizedByEvent).get(e.id);
       if (r == null) continue;
       const d = new Date(e.ts).toISOString().slice(0, 10);
       byDay.set(d, (byDay.get(d) ?? 0) + r);
@@ -141,7 +149,7 @@ const Folio = () => {
     if (!days) return all;
     const from = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
     return all.filter((p) => p.date >= from);
-  }, [folio.events, folio.ledger, range, usd]);
+  }, [scoped, range, usd]);
 
   const p = folio.progress;
 
@@ -207,8 +215,8 @@ const Folio = () => {
                   avgCostUsd: h.avgCostUsd, valueUsd: h.valueUsd, unrealizedUsd: h.unrealizedUsd, realizedUsd: h.realizedUsd,
                   realisableWax: h.key === 'eosio.token:WAX' ? h.balance : realisable?.get(h.key)?.wax ?? null,
                 })))}>Holdings CSV</Button>
-                <Button size="sm" variant="outline" disabled={!folio.events.length} onClick={() => downloadActivityCsv(accountName, folio.events, folio.ledger.valueByEvent, folio.ledger.realizedByEvent, folio.ledger.valueUsdByEvent, folio.ledger.realizedUsdByEvent, fiat)}>Activity CSV</Button>
-                <Button size="sm" variant="outline" disabled={!folio.hasHistory} onClick={() => void folio.exportFile()}>Save history (JSON)</Button>
+                <Button size="sm" variant="outline" disabled={!scoped.events.length} onClick={() => downloadActivityCsv(accountName, scoped.events, scoped.ledger.valueByEvent, scoped.ledger.realizedByEvent, scoped.ledger.valueUsdByEvent, scoped.ledger.realizedUsdByEvent, fiat)}>Activity CSV</Button>
+                <Button size="sm" variant="outline" disabled={!folio.loaded || (!folio.hasHistory && !folio.portfolios.length)} onClick={() => void folio.exportFile().catch((e) => toast({ title: 'Could not save file', description: e instanceof Error ? e.message : 'Please try again.', variant: 'destructive' }))}>Save history & portfolios (JSON)</Button>
                 <Button size="sm" variant="outline" disabled={!folio.loaded} onClick={pickImport}>Load history (JSON)</Button>
                 <input ref={importRef} type="file" accept=".json,application/json" className="hidden" onChange={onImport} />
                 <Button size="sm" variant="outline" onClick={() => { if (confirm('Delete the saved history and scan again from the start?')) void folio.rescan(); }}>Rescan from scratch</Button>
@@ -252,6 +260,8 @@ const Folio = () => {
               </div>
             ) : null}
             {folio.error ? <div className="w-full text-sm text-destructive text-center">{folio.error}</div> : null}
+
+            <PortfolioControls key={accountName} portfolios={folio.portfolios} selected={currentPortfolio?.id ?? null} onSelect={(id) => { setSelectedPortfolio(id); setPicked(null); }} onSave={folio.savePortfolios} rows={allHoldings} disabled={!folio.loaded || folio.syncing} />
 
             <div className="w-full flex justify-center gap-1">
               <Select value={chosenCrypto} onValueChange={(v) => (v === 'WAX' || isCrypto(v)) && showCrypto(v)}>
@@ -313,9 +323,9 @@ const Folio = () => {
             </p>
 
             <div className="w-full space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-lg font-semibold">Holdings</h2>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex min-w-0 max-w-full flex-wrap items-center gap-3">
+                  <h2 className="max-w-full text-lg font-semibold break-words">{currentPortfolio?.name ?? 'Holdings'}</h2>
                   <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
                     <input type="checkbox" className="accent-primary" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} />
                     Show closed positions
@@ -329,7 +339,7 @@ const Folio = () => {
                   Couldn't read your {pooled.failed.map((v) => venueName[v] ?? v).join(' and ')} pool positions right now, so tokens there are left out. Refresh to try again.
                 </div>
               ) : null}
-              <HoldingsTable rows={holdings} events={folio.events} waxUsd={waxUsd} cur={cur} fiat={fiat} realisable={realisable} onPick={setPicked} />
+              <HoldingsTable rows={holdings} events={folio.events} waxUsd={waxUsd} cur={cur} fiat={fiat} realisable={realisable} onPick={setPicked} portfolioAction={(row) => <PortfolioTokenPicker tokenKey={row.key} portfolios={folio.portfolios} onSave={folio.savePortfolios} disabled={folio.syncing} />} />
             </div>
 
             <div className="w-full space-y-2">
@@ -346,7 +356,7 @@ const Folio = () => {
 
             <div className="w-full space-y-2">
               <h2 className="text-lg font-semibold">Activity</h2>
-              <ActivityList events={folio.events} value={usd ? folio.ledger.valueUsdByEvent : folio.ledger.valueByEvent} realized={usd ? folio.ledger.realizedUsdByEvent : folio.ledger.realizedByEvent} cur={cur} />
+              <ActivityList key={currentPortfolio?.id ?? 'all'} events={scoped.events} value={usd ? scoped.ledger.valueUsdByEvent : scoped.ledger.valueByEvent} realized={usd ? scoped.ledger.realizedUsdByEvent : scoped.ledger.realizedByEvent} cur={cur} />
             </div>
 
             <TokenDialog

@@ -12,6 +12,7 @@ import { WAX_KEY } from '@/lib/folio/types';
 import { fetchFxHistory } from '@/lib/folio/fx';
 import { combineWaxFiat, fxLookup, isCrypto, type DisplayCode } from '@/lib/folio/fxCore';
 import { downloadFolioFile, exportFolio, mergeFolio, parseFolioFile, PortableError, type MergeResult } from '@/lib/folio/portable';
+import { validPortfolios, type FolioPortfolio } from '@/lib/folio/portfolios';
 
 const emptyRecord = (account: string): StoredFolio => ({
   account, schema: FOLIO_SCHEMA, transfers: [], cursors: {}, syncedAt: null,
@@ -90,10 +91,11 @@ export function useFolio(account: string | null, fiat: DisplayCode = 'USD') {
     abortRef.current?.abort();
     await clearFolio(account).catch(() => undefined);
     const fresh = emptyRecord(account);
+    fresh.portfolios = rec?.portfolios ?? [];
     setRec(fresh);
     setProgress(null);
     void runSync(fresh);
-  }, [account, runSync]);
+  }, [account, rec, runSync]);
 
   const stop = useCallback(() => {
     const ctrl = abortRef.current;
@@ -121,6 +123,16 @@ export function useFolio(account: string | null, fiat: DisplayCode = 'USD') {
     if (!rec) return;
     downloadFolioFile(await exportFolio(rec));
   }, [rec]);
+
+  const savePortfolios = useCallback(async (portfolios: FolioPortfolio[]) => {
+    if (syncing) throw new PortableError('Stop the scan before editing portfolios.');
+    if (!rec || !validPortfolios(portfolios)) throw new PortableError('Invalid portfolio.');
+    // The scanner mutates this same record; keep definitions on its active record too.
+    const previous = rec.portfolios;
+    rec.portfolios = portfolios;
+    try { await saveFolio(rec); } catch (e) { rec.portfolios = previous; throw e; }
+    setRec({ ...rec });
+  }, [rec, syncing]);
 
   /** Merges a saved file into this browser's history; throws a readable error. */
   const importFile = useCallback(async (file: File): Promise<MergeResult> => {
@@ -165,7 +177,7 @@ export function useFolio(account: string | null, fiat: DisplayCode = 'USD') {
   const firstDay = events.length ? Math.floor(Math.min(...events.map((e) => e.ts)) / 86_400_000) : null;
   const { data: waxUsdDaily } = useQuery({
     queryKey: ['folio-wax-usd', firstDay],
-    queryFn: () => fetchWaxUsdDaily(firstDay! * 86_400_000),
+    queryFn: () => firstDay == null ? Promise.resolve(new Map<string, number>()) : fetchWaxUsdDaily(firstDay * 86_400_000),
     enabled: !syncing && loaded && firstDay != null,
     staleTime: 6 * 60 * 60 * 1000,
   });
@@ -233,5 +245,7 @@ export function useFolio(account: string | null, fiat: DisplayCode = 'USD') {
     clear,
     exportFile,
     importFile,
+    portfolios: rec?.portfolios ?? [],
+    savePortfolios,
   };
 }

@@ -24,4 +24,4 @@
 - CHEESECrypt shares one vault folder per device; `friends/` files load into every account (nicknames/removals per account); only explicit saves replace friend files.
 - Both NFT players normalize media via nftMedia (case-insensitive audio/clip/video, reference-only sound/mp3/sfx aliases); version music caches on detection changes to avoid stale classifications.
 - CHEESEFolio fiat/BTC/ETH figures are WAX→USD→currency per day (fx-usd-history.json, units per USD); unknown rates stay unknown.
-- CHEESEFolio save files are versioned, sectioned JSON (unknown sections ignored) carrying raw transfers with a checksum; loading validates strictly and merges by global sequence, so imports never lose local history.
+- Folio JSON validates/checksums raw history, merges by sequence and portfolios by ID/newest edit; IndexedDB stores both per account. Views filter the full ledger with per-token disposal P/L, never replay subsets.

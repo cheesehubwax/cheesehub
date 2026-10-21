@@ -17,6 +17,22 @@ const text = async (r: StoredFolio, mutate?: (f: any) => void) => {
 };
 
 describe('CHEESEFolio portable history file', () => {
+  it('restores portfolios and history from one JSON without losing local portfolios', async () => {
+    const meme = { id: 'meme', name: 'Meme coins', tokenKeys: ['cheeseburger:CHEESE'], createdAt: 1, updatedAt: 2 };
+    const defi = { id: 'defi', name: 'DeFi coins', tokenKeys: ['eosio.token:WAX'], createdAt: 1, updatedAt: 3 };
+    const imported = await parseFolioFile(await text(rec([tx(1)], { portfolios: [meme] })), 'alice');
+    const merged = mergeFolio(rec([tx(2)], { portfolios: [defi] }), imported);
+    expect(merged.rec.portfolios).toEqual([defi, meme]);
+    expect(merged.rec.transfers.map((t) => t.gs)).toEqual([1, 2]);
+  });
+  it('old history-only files leave local portfolios intact', async () => {
+    const portfolio = { id: 'meme', name: 'Meme coins', tokenKeys: [], createdAt: 1, updatedAt: 2 };
+    const imported = await parseFolioFile(await text(rec([tx(1)]), (f) => { delete f.sections.portfolios; }), 'alice');
+    expect(mergeFolio(rec([], { portfolios: [portfolio] }), imported).rec.portfolios).toEqual([portfolio]);
+  });
+  it('rejects malformed portfolio definitions before merging history', async () => {
+    await expect(parseFolioFile(await text(rec([tx(1)]), (f) => { f.sections.portfolios.items = [{ id: 'x', name: 'Meme', tokenKeys: ['bad'], createdAt: 1, updatedAt: 2 }]; }), 'alice')).rejects.toThrow(/portfolio/);
+  });
   it('round-trips export → import unchanged', async () => {
     const r = rec([tx(2), tx(1)], { syncedAt: 5, coverageFrom: 1000, cursors: { 'https://h': { after: '2024-01-01T00:00:00.000Z', caughtUp: true } } });
     const h = await parseFolioFile(await text(r), 'alice');

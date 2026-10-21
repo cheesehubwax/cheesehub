@@ -1,5 +1,5 @@
 // CHEESEFolio presentation pieces.
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -177,8 +177,9 @@ export function AmountList({ items }: { items: TokenAmount[] }) {
 
 type SortCol = 'token' | 'balance' | 'avg' | 'price' | 'paper' | 'realisable' | 'unrealised' | 'realised';
 
-export function HoldingsTable({ rows, events, waxUsd, cur, fiat = 'USD', realisable, onPick }: {
+export function HoldingsTable({ rows, events, waxUsd, cur, fiat = 'USD', realisable, onPick, portfolioAction }: {
   rows: HoldingRow[]; events: FolioEvent[]; waxUsd: number; cur: Currency; fiat?: DisplayCode; realisable?: Map<string, Realisable>; onPick: (r: HoldingRow) => void;
+  portfolioAction?: (row: HoldingRow) => ReactNode;
 }) {
   const usd = cur !== 'WAX';
   const fiatCode: DisplayCode = cur === 'WAX' ? fiat : cur;
@@ -260,6 +261,7 @@ export function HoldingsTable({ rows, events, waxUsd, cur, fiat = 'USD', realisa
                   <TokenLogo contract={r.contract} symbol={r.symbol} size="sm" />
                     <span className="font-semibold">{r.symbol}</span>
                     <span className="text-[11px] text-muted-foreground">{r.contract}</span>
+                    {portfolioAction ? <span className="ml-auto" onClick={(e) => e.stopPropagation()}>{portfolioAction(r)}</span> : null}
                   </div>
                     <div className="flex flex-wrap gap-1 empty:hidden">
                   {r.closed ? (
