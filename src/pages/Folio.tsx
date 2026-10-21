@@ -1,6 +1,7 @@
 // CHEESEFolio — personal profit/loss for the signed-in WAX account.
 // Intentionally not linked from the header yet: reachable at /folio only.
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { toast } from '@/hooks/use-toast';
 import { Layout } from '@/components/Layout';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { Button } from '@/components/ui/button';
@@ -42,6 +43,22 @@ const Folio = () => {
   });
   const activeCode: DisplayCode = mode === 'CRYPTO' && chosenCrypto !== 'WAX' ? chosenCrypto : chosenFiat;
   const folio = useFolio(accountName, activeCode);
+  const importRef = useRef<HTMLInputElement>(null);
+  const pickImport = () => importRef.current?.click();
+  const onImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const r = await folio.importFile(file);
+      toast({
+        title: 'History loaded',
+        description: `Added ${r.added.toLocaleString()} new transfers (${r.alreadySaved.toLocaleString()} already saved). Press Sync to fetch anything newer.`,
+      });
+    } catch (err) {
+      toast({ title: 'Could not load this file', description: err instanceof Error ? err.message : 'Unknown error', variant: 'destructive' });
+    }
+  };
   const cryptoUnavailable = mode === 'CRYPTO' && chosenCrypto !== 'WAX' && folio.fxUnavailable;
   const fiat = folio.fiat;
   const cur: Currency = mode === 'CRYPTO' ? (chosenCrypto === 'WAX' || cryptoUnavailable ? 'WAX' : fiat) : fiat;
@@ -191,6 +208,8 @@ const Folio = () => {
                   realisableWax: h.key === 'eosio.token:WAX' ? h.balance : realisable?.get(h.key)?.wax ?? null,
                 })))}>Holdings CSV</Button>
                 <Button size="sm" variant="outline" disabled={!folio.events.length} onClick={() => downloadActivityCsv(accountName, folio.events, folio.ledger.valueByEvent, folio.ledger.realizedByEvent, folio.ledger.valueUsdByEvent, folio.ledger.realizedUsdByEvent, fiat)}>Activity CSV</Button>
+                <Button size="sm" variant="outline" disabled={!folio.hasHistory} onClick={() => void folio.exportFile()}>Save history (JSON)</Button>
+                <Button size="sm" variant="outline" disabled={!folio.loaded} onClick={pickImport}>Load history (JSON)</Button>
                 <Button size="sm" variant="outline" onClick={() => { if (confirm('Delete the saved history and scan again from the start?')) void folio.rescan(); }}>Rescan from scratch</Button>
                 <Button size="sm" variant="ghost" onClick={() => { if (confirm('Delete everything CHEESEFolio saved in this browser for this account?')) void folio.clear(); }}>Clear saved data</Button>
               </div>
@@ -218,7 +237,12 @@ const Folio = () => {
             ) : !folio.hasHistory && folio.loaded ? (
               <div className="w-full rounded-lg border border-cheese/20 bg-card/80 p-6 text-center space-y-3">
                 <p className="text-muted-foreground">Press <span className="text-foreground font-medium">Scan my history</span> to read your past trades from the blockchain. It only runs when you ask, and the result is saved in this browser.</p>
-                <Button onClick={folio.resync}>Scan my history</Button>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button onClick={folio.resync}>Scan my history</Button>
+                  <Button variant="outline" onClick={pickImport}>Load saved history (JSON)</Button>
+                </div>
+                <p className="text-xs text-muted-foreground">Saved a history file before? Load it to skip the full scan — Sync then fetches only newer transfers.</p>
+                <input ref={importRef} type="file" accept=".json,application/json" className="hidden" onChange={onImport} />
               </div>
             ) : null}
             {!folio.syncing && hasCoverageGap(folio.coverageFrom, folio.accountCreated) ? (
