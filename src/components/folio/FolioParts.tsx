@@ -200,6 +200,16 @@ export function AmountList({ items }: { items: TokenAmount[] }) {
 
 type SortCol = 'token' | 'balance' | 'avg' | 'price' | 'paper' | 'realisable' | 'unrealised' | 'realised';
 
+/** Mobile card/table switch; desktop always uses the table. */
+function ViewToggle({ view, setView }: { view: 'cards' | 'table'; setView: (v: 'cards' | 'table') => void }) {
+  return (
+    <div className="flex gap-1" role="group" aria-label="Layout">
+      <Button size="sm" variant={view === 'cards' ? 'default' : 'outline'} className="h-9 text-xs" aria-pressed={view === 'cards'} onClick={() => setView('cards')}>▦ Cards</Button>
+      <Button size="sm" variant={view === 'table' ? 'default' : 'outline'} className="h-9 text-xs" aria-pressed={view === 'table'} onClick={() => setView('table')}>☰ Table</Button>
+    </div>
+  );
+}
+
 export function HoldingsTable({ rows, events, waxUsd, cur, fiat = 'USD', realisable, onPick, portfolioAction }: {
   rows: HoldingRow[]; events: FolioEvent[]; waxUsd: number; cur: Currency; fiat?: DisplayCode; realisable?: Map<string, Realisable>; onPick: (r: HoldingRow) => void;
   portfolioAction?: (row: HoldingRow) => ReactNode;
