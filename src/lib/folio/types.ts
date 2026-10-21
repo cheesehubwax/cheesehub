@@ -110,6 +110,9 @@ export interface LedgerResult {
   /** Realized P&L per event id (WAX), for the activity feed. */
   realizedByEvent: Map<string, number>;
   realizedUsdByEvent: Map<string, number>;
+  /** Disposal attribution from the full ledger, never a filtered replay. */
+  realizedByEventToken: Map<string, Map<TokenKey, number>>;
+  realizedUsdByEventToken: Map<string, Map<TokenKey, number>>;
   /** WAX value used for each trade (when known). */
   valueByEvent: Map<string, number>;
   valueUsdByEvent: Map<string, number>;

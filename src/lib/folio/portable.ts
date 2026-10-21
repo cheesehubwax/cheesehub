@@ -2,6 +2,7 @@
 // load. Only raw transfers travel; everything else is re-derived on load.
 import { FOLIO_SCHEMA, type ProviderCursor, type ScanWindow, type StoredFolio } from './storage';
 import type { RawTransfer } from './types';
+import { mergePortfolios, validPortfolios, type FolioPortfolio } from './portfolios';
 
 export const PORTABLE_FORMAT = 'cheesefolio';
 export const PORTABLE_VERSION = 1;
@@ -14,6 +15,7 @@ export interface PortableHistory {
   coverageFrom?: number;
   accountCreated?: number;
   checksum: string;
+  portfolios?: FolioPortfolio[];
 }
 
 export interface PortableFile {
@@ -22,7 +24,7 @@ export interface PortableFile {
   exportedAt: string;
   account: string;
   /** Unknown sections are ignored so later additions stay loadable. */
-  sections: { history?: PortableHistory; [k: string]: unknown };
+  sections: { history?: PortableHistory; portfolios?: { version: 1; items: FolioPortfolio[] }; [k: string]: unknown };
 }
 
 export class PortableError extends Error {}
@@ -40,6 +42,7 @@ export async function exportFolio(rec: StoredFolio, now = new Date()): Promise<P
     exportedAt: now.toISOString(),
     account: rec.account,
     sections: {
+      portfolios: { version: 1, items: rec.portfolios ?? [] },
       history: {
         schema: rec.schema,
         transfers,
@@ -108,6 +111,10 @@ export async function parseFolioFile(text: string, account: string): Promise<Por
   if (data.account !== account) throw new PortableError(`This file is for ${String(data.account)}, but you are signed in as ${account}.`);
   if (!isObj(data.sections) || !isObj(data.sections.history)) throw new PortableError('This file has no saved history in it.');
   const h = data.sections.history;
+  const portfolios = data.sections.portfolios;
+  if (portfolios !== undefined && (!isObj(portfolios) || portfolios.version !== 1 || !validPortfolios(portfolios.items))) {
+    throw new PortableError('This file has invalid or unsupported portfolio definitions.');
+  }
   if (h.schema !== FOLIO_SCHEMA) {
     throw new PortableError(isNum(h.schema) && h.schema > FOLIO_SCHEMA
       ? 'This history was saved by a newer version of CHEESEFolio. Reload the page and try again.'
@@ -129,6 +136,7 @@ export async function parseFolioFile(text: string, account: string): Promise<Por
     ...(h.coverageFrom !== undefined ? { coverageFrom: h.coverageFrom as number } : {}),
     ...(h.accountCreated !== undefined ? { accountCreated: h.accountCreated as number } : {}),
     checksum: h.checksum,
+    ...(isObj(portfolios) ? { portfolios: portfolios.items as FolioPortfolio[] } : {}),
   };
 }
 
@@ -171,6 +179,7 @@ export function mergeFolio(local: StoredFolio, imported: PortableHistory): Merge
     transfers: [...byGs.values()].sort((a, b) => a.gs - b.gs),
     cursors,
     syncedAt,
+    portfolios: mergePortfolios(local.portfolios ?? [], imported.portfolios ?? []),
     ...(coverageFrom != null ? { coverageFrom } : {}),
     ...(accountCreated != null ? { accountCreated } : {}),
   };

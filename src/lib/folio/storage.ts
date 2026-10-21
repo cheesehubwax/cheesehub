@@ -1,5 +1,6 @@
 // Browser-only storage for CHEESEFolio (IndexedDB). Nothing is uploaded.
 import type { RawTransfer } from './types';
+import type { FolioPortfolio } from './portfolios';
 
 const DB_NAME = 'cheesefolio';
 const DB_VERSION = 1;
@@ -36,6 +37,8 @@ export interface StoredFolio {
   coverageFrom?: number;
   /** Account creation time from the chain (epoch ms). */
   accountCreated?: number;
+  /** Independent of the raw-history schema; older files simply have none. */
+  portfolios?: FolioPortfolio[];
 }
 
 function open(): Promise<IDBDatabase> {
