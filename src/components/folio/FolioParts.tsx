@@ -175,7 +175,7 @@ export function totalHoldingCost(rows: HoldingRow[]) {
 
 export function SummaryBox({ label, value, sub, tone, subTone }: { label: string; value: string; sub?: string; tone?: number | null; subTone?: number | null }) {
   return (
-    <div className="min-w-0 rounded-lg border border-cheese/20 bg-cheese/5 px-4 py-3 text-center">
+    <div className="flex-1 min-w-0 rounded-lg border border-cheese/20 bg-cheese/5 px-4 py-3 text-center">
       <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className={`text-xl font-bold break-words ${tone === undefined ? 'text-foreground' : plClass(tone)}`}>{value}</div>
       {sub ? <div className={`text-xs ${subTone == null ? 'text-muted-foreground' : plClass(subTone)}`}>{sub}</div> : null}
