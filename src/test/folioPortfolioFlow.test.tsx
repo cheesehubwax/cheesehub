@@ -66,6 +66,16 @@ describe('portfolio creation and combined JSON restoration', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Scan my history' })[0]);
     await waitFor(() => expect(state.records.get('alice')?.syncedAt).toBeTypeOf('number'));
     expect(state.records.get('alice')?.portfolios?.[0].name).toBe('Meme coins');
+    fireEvent.click(screen.getByRole('button', { name: /Edit portfolio/ }));
+    fireEvent.change(screen.getByLabelText('Portfolio name'), { target: { value: 'My memes' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save portfolio' }));
+    await screen.findByRole('tab', { name: /My memes/ });
+    expect(state.records.get('alice')?.portfolios?.[0].name).toBe('My memes');
+    fireEvent.click(screen.getByRole('button', { name: 'Delete portfolio' }));
+    await waitFor(() => expect(screen.queryByRole('tab', { name: /My memes/ })).toBeNull());
+    expect(state.records.get('alice')?.portfolios).toEqual([]);
+    fireEvent.change(input, { target: { files: [file] } });
+    await screen.findByRole('tab', { name: /Meme coins/ });
     fireEvent.click(screen.getByRole('tab', { name: /All Holdings/ }));
     expect(within(screen.getByRole('table', { name: 'Holdings' })).getByText('eosio.token')).toBeTruthy();
     state.account = 'bob'; view.rerender(<QueryClientProvider client={q}><Folio /></QueryClientProvider>);

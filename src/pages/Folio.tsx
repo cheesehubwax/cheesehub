@@ -323,9 +323,9 @@ const Folio = () => {
             </p>
 
             <div className="w-full space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-lg font-semibold break-words">{currentPortfolio?.name ?? 'Holdings'}</h2>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex min-w-0 max-w-full flex-wrap items-center gap-3">
+                  <h2 className="max-w-full text-lg font-semibold break-words">{currentPortfolio?.name ?? 'Holdings'}</h2>
                   <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
                     <input type="checkbox" className="accent-primary" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} />
                     Show closed positions

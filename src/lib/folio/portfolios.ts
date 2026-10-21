@@ -35,7 +35,8 @@ export function mergePortfolios(local: FolioPortfolio[], imported: FolioPortfoli
 /** Filter only after the complete account ledger has been costed. Keep both trade legs. */
 export function scopePortfolio(ledger: LedgerResult, events: FolioEvent[], keys: Set<string> | null) {
   if (!keys) return { ledger, events };
-  const scopedEvents = events.filter((e) => [...e.in, ...e.out, ...(e.fillGave ? [e.fillGave] : [])].some((a) => keys.has(a.key)));
+  const scopedEvents = events.filter((e) => [...e.in, ...e.out, ...(e.fillGave ? [e.fillGave] : [])].some((a) => keys.has(a.key))
+    || [...(ledger.realizedByEventToken.get(e.id)?.keys() ?? [])].some((key) => keys.has(key)));
   const sum = (source: Map<string, Map<string, number>>) => {
     const result = new Map<string, number>();
     for (const [id, tokens] of source) {
