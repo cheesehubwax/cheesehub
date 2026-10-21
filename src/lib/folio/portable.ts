@@ -122,10 +122,10 @@ export async function parseFolioFile(text: string, account: string): Promise<Por
   if (h.coverageFrom !== undefined && !isNum(h.coverageFrom)) throw new PortableError('This file is damaged (coverage is invalid).');
   if (h.accountCreated !== undefined && !isNum(h.accountCreated)) throw new PortableError('This file is damaged (creation time is invalid).');
   return {
-    schema: h.schema,
+    schema: FOLIO_SCHEMA,
     transfers: h.transfers as RawTransfer[],
     cursors: h.cursors as Record<string, ProviderCursor>,
-    syncedAt: h.syncedAt,
+    syncedAt: h.syncedAt as number | null,
     ...(h.coverageFrom !== undefined ? { coverageFrom: h.coverageFrom as number } : {}),
     ...(h.accountCreated !== undefined ? { accountCreated: h.accountCreated as number } : {}),
     checksum: h.checksum,
