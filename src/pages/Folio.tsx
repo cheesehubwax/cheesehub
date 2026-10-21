@@ -17,7 +17,7 @@ import { usePooledTokens } from '@/hooks/usePooledTokens';
 import { hasCoverageGap } from '@/lib/folio/scanner';
 import { buildHoldings, type HoldingRow } from '@/lib/folio/holdings';
 import { downloadActivityCsv, downloadHoldingsCsv } from '@/lib/folio/csv';
-import { ActivityList, HoldingsTable, money, PlChart, SummaryBox, TokenDialog, usdFmt, waxFmt, type Currency } from '@/components/folio/FolioParts';
+import { ActivityList, HoldingsTable, money, PlChart, SummaryBox, TokenDialog, totalHoldingCost, usdFmt, waxFmt, type Currency } from '@/components/folio/FolioParts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CRYPTO_CURRENCIES, FIAT_CURRENCIES, isCrypto, isFiat, type CryptoCode, type DisplayCode, type FiatCode } from '@/lib/folio/fxCore';
 import { useRealisableValues } from '@/hooks/useRealisableValues';
@@ -111,6 +111,7 @@ const Folio = () => {
   const holdings = useMemo(() => allHoldings.filter((h) => (showClosed || !h.closed) && (!portfolioKeys || portfolioKeys.has(h.key))), [allHoldings, showClosed, portfolioKeys]);
   const venueName: Record<string, string> = { alcor: 'Alcor', taco: 'Taco', defibox: 'Defibox' };
   const { data: realisable } = useRealisableValues(holdings, accountName);
+  const totalCost = useMemo(() => totalHoldingCost(holdings), [holdings]);
 
   const totals = useMemo(() => {
     let value = 0, unrealized = 0, realized = 0, valueUsd = 0, unrealizedUsd = 0, realizedUsd = 0, realisableWax = 0, realisableKnown = true;
@@ -299,16 +300,23 @@ const Folio = () => {
             ) : folio.fxUnavailable ? (
               <div className="w-full text-xs text-destructive text-center">Exchange rates for {chosenFiat} couldn't be loaded right now, so figures are shown in USD. Refresh to try again.</div>
             ) : null}
-            <div className="w-full flex flex-wrap gap-3">
+            <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               <SummaryBox label="Paper value" value={usd ? money(totals.valueUsd, cur) : waxFmt(totals.value)} sub={usd ? waxFmt(totals.value) : usdFmt(totals.value, waxUsd, fiat)} />
+              <SummaryBox
+                label="Total cost"
+                value={usd ? money(totalCost.usd, cur) : waxFmt(totalCost.wax)}
+                sub={(usd ? totalCost.partialUsd : totalCost.partialWax)
+                  ? (usd ? totalCost.usd : totalCost.wax) == null ? 'Cost unavailable' : 'Partial · known costs only'
+                  : usd ? waxFmt(totalCost.wax) : usdFmt(totalCost.wax, waxUsd, fiat)}
+              />
+              <SummaryBox label="Unrealised P/L" value={usd ? money(totals.unrealizedUsd, cur) : waxFmt(totals.unrealized)} sub={usd ? undefined : usdFmt(totals.unrealized, waxUsd, fiat)} tone={usd ? totals.unrealizedUsd : totals.unrealized} />
+              <SummaryBox label="Realised P/L" value={usd ? money(totals.realizedUsd, cur) : waxFmt(totals.realized)} sub={usd ? undefined : usdFmt(totals.realized, waxUsd, fiat)} tone={usd ? totals.realizedUsd : totals.realized} />
               <SummaryBox
                 label="Realisable now"
                 value={totals.realisableWax == null ? '…' : usd ? money(waxUsd ? totals.realisableWax * waxUsd : null, cur) : waxFmt(totals.realisableWax)}
                 sub={totals.realisableWax != null && totals.value > 0 ? `${totals.realisableWax >= totals.value ? '+' : ''}${(((totals.realisableWax - totals.value) / totals.value) * 100).toFixed(2)}% vs paper` : 'selling everything on Alcor now'}
                 subTone={totals.realisableWax != null && totals.value > 0 ? ((totals.realisableWax - totals.value) / totals.value) * 100 : null}
               />
-              <SummaryBox label="Unrealised P/L" value={usd ? money(totals.unrealizedUsd, cur) : waxFmt(totals.unrealized)} sub={usd ? undefined : usdFmt(totals.unrealized, waxUsd, fiat)} tone={usd ? totals.unrealizedUsd : totals.unrealized} />
-              <SummaryBox label="Realised P/L" value={usd ? money(totals.realizedUsd, cur) : waxFmt(totals.realized)} sub={usd ? undefined : usdFmt(totals.realized, waxUsd, fiat)} tone={usd ? totals.realizedUsd : totals.realized} />
             </div>
             <p className="w-full text-xs text-muted-foreground text-center">
               {usd

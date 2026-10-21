@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { TokenLogo } from '@/components/TokenLogo';
 import type { FolioEvent, FolioEventType, TokenAmount } from '@/lib/folio/types';
+import { WAX_KEY } from '@/lib/folio/types';
 import type { HoldingRow } from '@/lib/folio/holdings';
 import type { Realisable } from '@/hooks/useRealisableValues';
 
@@ -151,11 +152,32 @@ export function GiftListDialog({ row, events, onClose }: { row: HoldingRow | nul
   );
 }
 
+/** Remaining cost of visible live holdings; never replay or reprice the ledger. */
+export function totalHoldingCost(rows: HoldingRow[]) {
+  let wax = 0, usd = 0, knownWax = 0, knownUsd = 0, missingWax = false, missingUsd = false;
+  for (const row of rows) {
+    if (row.closed || row.balance <= 0) continue;
+    // WAX is the accounting unit in WAX mode, not a token with WAX P/L.
+    const costWax = row.key === WAX_KEY ? row.balance : row.avgCostWax == null ? null : row.avgCostWax * row.balance;
+    const costUsd = row.avgCostUsd == null ? null : row.avgCostUsd * row.balance;
+    if (costWax == null) missingWax = true;
+    else { wax += costWax; knownWax++; }
+    if (costUsd == null) missingUsd = true;
+    else { usd += costUsd; knownUsd++; }
+  }
+  return {
+    wax: missingWax && !knownWax ? null : wax,
+    usd: missingUsd && !knownUsd ? null : usd,
+    partialWax: missingWax,
+    partialUsd: missingUsd,
+  };
+}
+
 export function SummaryBox({ label, value, sub, tone, subTone }: { label: string; value: string; sub?: string; tone?: number | null; subTone?: number | null }) {
   return (
-    <div className="flex-1 min-w-[160px] rounded-lg border border-cheese/20 bg-cheese/5 px-4 py-3 text-center">
+    <div className="min-w-0 rounded-lg border border-cheese/20 bg-cheese/5 px-4 py-3 text-center">
       <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className={`text-xl font-bold ${tone === undefined ? 'text-foreground' : plClass(tone)}`}>{value}</div>
+      <div className={`text-xl font-bold break-words ${tone === undefined ? 'text-foreground' : plClass(tone)}`}>{value}</div>
       {sub ? <div className={`text-xs ${subTone == null ? 'text-muted-foreground' : plClass(subTone)}`}>{sub}</div> : null}
     </div>
   );
