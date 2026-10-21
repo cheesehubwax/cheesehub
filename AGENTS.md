@@ -6,7 +6,7 @@
 - CHEESEAir suffix unions use timestamp cursors, bounded reads and complete-only cache; stalled providers flag partial results because indexes differ and skip stops at 10,000 rows.
 - CHEESEFolio is client-only (IndexedDB per account), re-derived from saved raw transfers so classifier changes need no rescan; live balances are truth, history supplies cost.
 - CHEESEFolio's acquisition breakdown uses cumulative trade receipts and ledger free receipts, explicitly separate from current holdings; it never alters cost basis or infers which source remains after disposals.
-- CHEESEFolio scans always include the history provider reaching furthest back (probed per browser) and mark a sync complete only when that deepest provider was read to the end (shallower ones are cover, caught up next sync); big-page providers are read sequentially and only small-page ones are windowed, with capped concurrency — bursts make Hyperion nodes drop connections and stall the scan.
+- CHEESEFolio scans always include the history provider reaching furthest back and complete a sync only when it was read to the end; big-page providers read sequentially, only small-page ones windowed, capped concurrency — bursts make Hyperion drop connections.
 - CHEESEFolio de-duplicates by global sequence and drops inline copies with identical transfer creator actions; Hyperion receiver notifications otherwise double-count movements.
 - CHEESEFolio explains order-book fills from Alcor's per-account deal list (read in one large-limit request — its skip paging is gappy) and only looks up leftovers on Hyperion, routed by each provider's history start; per-transaction lookups alone take minutes on heavy accounts.
 - CHEESEFolio holdings roll live pool positions (Alcor positions read per pool scope on chain, Taco/Defibox share tokens × reserves) into each token row; a venue that can't be read hides P/L for tokens history says are pooled, never counts as zero.
@@ -24,3 +24,4 @@
 - CHEESECrypt shares one vault folder per device; `friends/` files load into every account (nicknames/removals per account); only explicit saves replace friend files.
 - Both NFT players normalize media via nftMedia (case-insensitive audio/clip/video, reference-only sound/mp3/sfx aliases); version music caches on detection changes to avoid stale classifications.
 - CHEESEFolio fiat/BTC/ETH figures are WAX→USD→currency per day (fx-usd-history.json, units per USD); unknown rates stay unknown.
+- CHEESEFolio save files are versioned, sectioned JSON (unknown sections ignored) carrying raw transfers with a checksum; loading validates strictly and merges by global sequence, so imports never lose local history.
