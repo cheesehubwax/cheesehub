@@ -11,6 +11,7 @@ import { clearFolio, FOLIO_SCHEMA, loadFolio, saveFolio, type StoredFolio } from
 import { WAX_KEY } from '@/lib/folio/types';
 import { fetchFxHistory } from '@/lib/folio/fx';
 import { combineWaxFiat, fxLookup, isCrypto, type DisplayCode } from '@/lib/folio/fxCore';
+import { downloadFolioFile, exportFolio, mergeFolio, parseFolioFile, PortableError, type MergeResult } from '@/lib/folio/portable';
 
 const emptyRecord = (account: string): StoredFolio => ({
   account, schema: FOLIO_SCHEMA, transfers: [], cursors: {}, syncedAt: null,
@@ -116,6 +117,26 @@ export function useFolio(account: string | null, fiat: DisplayCode = 'USD') {
     setSyncing(false);
   }, [account]);
 
+  const exportFile = useCallback(async () => {
+    if (!rec) return;
+    downloadFolioFile(await exportFolio(rec));
+  }, [rec]);
+
+  /** Merges a saved file into this browser's history; throws a readable error. */
+  const importFile = useCallback(async (file: File): Promise<MergeResult> => {
+    if (!account || !rec) throw new PortableError('Sign in first.');
+    const imported = await parseFolioFile(await file.text(), account);
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setSyncing(false);
+    const result = mergeFolio(rec, imported);
+    await saveFolio(result.rec);
+    setRec(result.rec);
+    setProgress(null);
+    setError(null);
+    return result;
+  }, [account, rec]);
+
   // `version` changes as pages arrive mid-scan; the record is mutated in place.
   const transferCount = rec?.transfers.length ?? 0;
   const events = useMemo(
@@ -210,5 +231,7 @@ export function useFolio(account: string | null, fiat: DisplayCode = 'USD') {
     stop,
     rescan,
     clear,
+    exportFile,
+    importFile,
   };
 }
