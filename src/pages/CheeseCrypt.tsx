@@ -144,7 +144,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const { toast } = useToast();
   const { executeTransaction } = useWaxTransaction(session);
   const permission = session.permissionLevel;
-  const [key, setKey] = useState<MessagingKey | null>(() => loadKey(account));
+  // TEMPORARY screenshot unlock: throwaway in-memory key (never saved) when no key exists. Remove after screenshots.
+  const [key, setKey] = useState<MessagingKey | null>(() => loadKey(account) ?? generateKey(account));
   const [contacts, setContacts] = useState<Record<string, string>>(() => loadContacts(account));
   const [removedContacts, setRemovedContacts] = useState(() => loadRemovedContacts(account));
   const [avatars, setAvatars] = useState(() => loadContactAvatars(account));
