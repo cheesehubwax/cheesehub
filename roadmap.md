@@ -21,7 +21,8 @@
 - [x] CHEESECrypt: ad-hoc groups, encrypted recipient copies, automatic discovery, participant display and compatibility tests (29 tests passed).
 - [x] CHEESECrypt WAXCrypt port step 1: device-only block list (Blocked tile, Block in chat, memos dropped before decryption); flow test passes.
 - [x] CHEESECrypt WAXCrypt port step 2: encrypted profile notes after edits (shared 80/20 fee, batches of 15), newest note applied; tests pass. Real send unverified.
-- [ ] CHEESECrypt WAXCrypt port steps 3–8 (NFT tiles, read-state/vault, group invites, public inbox, public rooms, wallet key lock) — one per request.
+- [x] CHEESECrypt WAXCrypt port step 3: borderless click-to-play sound-effect tiles; other NFTs open a larger view with ID and Tx link; tests pass.
+- [ ] CHEESECrypt WAXCrypt port steps 4–8 (read-state/vault, group invites, public inbox, public rooms, wallet key lock) — one per request.
 - [ ] CHEESECrypt: verify group send/reply and recipient read-back on WAX — requires connected wallets and signing approval; local creation/signing gate and encrypted fanout round-trips tested.
 
 - [x] CHEESECrypt: correct Desktop folder-selection guidance and permission-error recovery; actual OS folder picker requires user verification.

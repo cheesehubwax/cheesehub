@@ -32,41 +32,72 @@ function TrackControl({ trackKey, url, label, hiddenUntilHover }: { trackKey: st
 /** Message keys whose sound effect already autoplayed this session (never replay on re-render or poll). */
 const autoplayed = new Set<string>();
 
-/** `autoplayKey` is set only for messages that arrived while the chat was open; sound-effect NFTs then play once. */
-export function CryptNftCard({ assetId, autoplayKey }: { assetId: string; autoplayKey?: string }) {
+function TxLink({ txId }: { txId: string }) {
+  return <a href={`https://waxblock.io/transaction/${encodeURIComponent(txId)}`} target="_blank" rel="noreferrer"
+    className="font-semibold text-cheese underline underline-offset-2 hover:text-cheese/80">Transaction {txId.slice(0, 8)}…</a>;
+}
+
+/**
+ * Sound-effect NFTs: a borderless tile (25% smaller than other NFTs) — click the picture to play/stop,
+ * autoplays once when it arrives while the chat is open, no caption, no dialog.
+ * Every other NFT: a tile that opens a larger view with picture, name, collection, asset ID and transaction link.
+ * `autoplayKey` is set only for messages that arrived while the chat was open.
+ */
+export function CryptNftCard({ assetId, autoplayKey, txId }: { assetId: string; autoplayKey?: string; txId?: string }) {
   const [open, setOpen] = useState(false);
   const { data, isLoading } = useQuery({ queryKey: ['crypt-nft', assetId], queryFn: () => fetchAssetById(assetId), staleTime: 3600_000 });
+  const audioState = useSyncExternalStore(cryptAudio.subscribe, cryptAudio.getState);
   const tracks = data?.tracks ?? [];
+  const sfxKey = `${assetId}:0`;
   useEffect(() => {
     if (!autoplayKey || !data?.isSfx || !tracks.length || autoplayed.has(autoplayKey)) return;
     autoplayed.add(autoplayKey);
-    cryptAudio.toggle(`${assetId}:0`, tracks[0].url);
-  }, [autoplayKey, data, tracks, assetId]);
+    cryptAudio.toggle(sfxKey, tracks[0].url);
+  }, [autoplayKey, data, tracks, sfxKey]);
   const heading = data ? (data.title || data.name) : '';
-  const details = data
-    ? `${heading}${data.artist ? `\n${data.artist}` : ''}\n${data.collection}${data.mint ? ` · #${data.mint}` : ''}\nID ${assetId}`
-    : `${isLoading ? 'Loading NFT…' : 'NFT not found'}\nID ${assetId}`;
-  const meta = data ? `${data.artist ? `${data.artist} · ` : ''}${data.collection}${data.mint ? ` · #${data.mint}` : ''} · ID ${assetId}` : '';
   const hasImage = !!data?.image && data.image !== '/placeholder.svg';
+  const picture = (cls: string) => hasImage ? <IpfsImage src={data!.image} alt={data!.name} className={cls} />
+    : <div className="aspect-square w-full flex items-center justify-center text-2xl">{isLoading ? '⏳' : tracks.length ? '🎵' : '🖼️'}</div>;
+
+  if (!data) return <span className="block w-44 my-1 text-xs italic opacity-80">{isLoading ? '⏳ Loading NFT…' : `🖼️ NFT #${assetId} (unavailable)`}</span>;
+
+  if (data.isSfx) {
+    const playing = audioState.key === sfxKey && audioState.playing;
+    const failed = audioState.failedKeys.has(sfxKey);
+    return (
+      <span className="block w-36 my-1">
+        <button type="button" disabled={!tracks.length || failed} onClick={() => tracks[0] && cryptAudio.toggle(sfxKey, tracks[0].url)}
+          aria-label={`${playing ? 'Stop' : 'Play'} sound effect ${heading}`} aria-pressed={playing}
+          className={`block w-full cursor-pointer disabled:cursor-default transition-transform ${playing ? 'scale-95' : 'hover:scale-[1.03]'}`}>
+          {picture('w-full h-auto object-contain')}
+        </button>
+        {failed && <span className="text-xs italic opacity-80">🔇 Sound unavailable</span>}
+      </span>
+    );
+  }
+
   return <>
-    <span className={`group my-1 space-y-1 ${tracks.length ? (data?.isSfx ? 'block w-[10.5rem]' : 'block w-56') : 'contents'}`}>
-    <button type="button" onClick={() => setOpen(true)} disabled={!data}
-        title={details} aria-label={`View larger: ${details.replace(/\n/g, ' · ')}`}
-        className={`block ${tracks.length ? 'w-full' : 'w-44 my-1'} cursor-zoom-in disabled:cursor-default ${data?.isSfx ? '' : 'overflow-hidden rounded-md'}`}>
-        {hasImage ? <IpfsImage src={data!.image} alt={data!.name} className="w-full h-auto object-contain" />
-          : <div className="aspect-square w-full flex items-center justify-center text-2xl">{isLoading ? '⏳' : tracks.length ? '🎵' : '🖼️'}</div>}
+    <span className={`group my-1 space-y-1 block ${tracks.length ? 'w-56' : 'w-48'}`}>
+      <button type="button" onClick={() => setOpen(true)} aria-label={`View ${heading} larger`}
+        className="block w-full cursor-zoom-in overflow-hidden rounded-md">
+        {picture('w-full h-auto object-contain')}
       </button>
-      {tracks.length > 0 && <TrackControl trackKey={`${assetId}:0`} url={tracks[0].url} hiddenUntilHover={!!data?.isSfx} />}
+      {tracks.length > 0 && <TrackControl trackKey={sfxKey} url={tracks[0].url} />}
     </span>
-    {data && <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-3xl p-4 max-h-[90dvh] overflow-y-auto">
         <DialogTitle className="text-primary">{heading}</DialogTitle>
-        <DialogDescription>{meta}</DialogDescription>
+        <DialogDescription>
+          {[data.artist, data.collection, data.mint && `#${data.mint}`].filter(Boolean).join(' · ')}{' · '}
+          <a className="underline underline-offset-2" target="_blank" rel="noreferrer"
+            href={`https://atomichub.io/explorer/asset/wax-mainnet/${encodeURIComponent(assetId)}`}>ID {assetId}</a>
+        </DialogDescription>
         {hasImage && <IpfsImage src={data.image} alt={data.name} className="w-full max-h-[60vh] object-contain rounded-md" />}
         {tracks.length > 0 && <div className="space-y-1">
           {tracks.map((t, i) => <TrackControl key={i} trackKey={`${assetId}:${i}`} url={t.url} label={tracks.length > 1 ? (i === 0 ? 'Main' : t.label) : undefined} />)}
         </div>}
+        {txId && <p className="text-xs"><TxLink txId={txId} /></p>}
       </DialogContent>
-    </Dialog>}
+    </Dialog>
   </>;
 }
