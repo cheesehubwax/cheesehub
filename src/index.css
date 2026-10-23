@@ -35,6 +35,8 @@
     /* Positive profit/loss - green, deliberately separate from brand yellow. */
     --positive: 142 71% 30%;
     --positive-foreground: 0 0% 100%;
+    --reply: 190 90% 38%;
+    --reply-foreground: 0 0% 100%;
 
     --border: 40 25% 80%;
     --input: 40 25% 85%;
@@ -102,6 +104,8 @@
 
     --positive: 142 69% 55%;
     --positive-foreground: 30 20% 8%;
+    --reply: 190 90% 55%;
+    --reply-foreground: 30 20% 8%;
 
     --border: 30 15% 22%;
     --input: 30 15% 18%;

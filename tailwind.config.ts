@@ -31,6 +31,10 @@ export default {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
         },
+        reply: {
+          DEFAULT: "hsl(var(--reply))",
+          foreground: "hsl(var(--reply-foreground))",
+        },
         positive: {
           DEFAULT: "hsl(var(--positive))",
           foreground: "hsl(var(--positive-foreground))",

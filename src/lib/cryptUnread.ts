@@ -1,6 +1,7 @@
 /** Per-account read markers: conversation id ("group:<id>" or a WAX account) -> newest read message time. */
 export type ReadMarks = Record<string, number>;
-interface Msg { from: string; to: string; time: number; group: { id: string } | null; igroup?: string }
+import { repliesTo } from '@/lib/cryptReply';
+interface Msg { from: string; to: string; time: number; group: { id: string } | null; igroup?: string; text?: string | null }
 
 const storeKey = (account: string) => `cheesecrypt-read-${account}`;
 export const conversationId = (m: Msg, account: string) => m.group ? `group:${m.group.id}` : m.igroup ? `group:${m.igroup}` : (m.from === account ? m.to : m.from);
@@ -29,6 +30,17 @@ export function unreadCounts(messages: Msg[], account: string, marks: ReadMarks)
   const out: Record<string, number> = {};
   for (const m of messages) {
     if (m.from === account) continue;
+    const id = conversationId(m, account);
+    if (m.time > (marks[id] ?? 0)) out[id] = (out[id] ?? 0) + 1;
+  }
+  return out;
+}
+
+/** Unread incoming replies to this account's own messages, per conversation (shown in a different colour). */
+export function unreadReplies(messages: Msg[], account: string, marks: ReadMarks): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const m of messages) {
+    if (m.from === account || !repliesTo(m.text, account)) continue;
     const id = conversationId(m, account);
     if (m.time > (marks[id] ?? 0)) out[id] = (out[id] ?? 0) + 1;
   }
