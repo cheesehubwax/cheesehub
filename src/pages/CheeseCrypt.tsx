@@ -115,7 +115,7 @@ const CheeseCrypt = () => {
         <div className="container relative z-10">
           <div className="flex flex-col items-center gap-8">
             <div className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer" onClick={playRandomFart}>
-              <OpenMojiIcon emoji="🔐" size={72} />
+              <img src={cryptOrbAsset.url} alt="CHEESE" className="h-24 w-24 object-contain" />
             </div>
             <div className="w-full text-center space-y-4">
               <CryptAbout>
