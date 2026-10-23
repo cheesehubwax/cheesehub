@@ -1,27 +1,59 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
+import { AvatarEditor } from '@/components/crypt/AvatarEditor';
+import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
+import { MAX_INVITE_MEMBERS } from '@/lib/cryptInviteGroups';
+import { parseCryptName } from '@/lib/cryptNames';
 import type { CryptAvatar } from '@/lib/cryptAvatar';
 
-export function CreateGroupDialog({ contacts, avatars, nameFor = account => account, onClose, onCreate }: {
-  contacts: Record<string, string>; avatars: Record<string, CryptAvatar>; onClose: () => void; onCreate: (members: string[]) => void;
-  nameFor?: (account: string) => string;
+/** New invite group: name, 1–7 friends, optional picture; invites are paid encrypted messages. */
+export function CreateGroupDialog({ contacts, avatars, nameFor = account => account, onClose, onCreate, costFor, busy = false }: {
+  contacts: Record<string, string>; avatars: Record<string, CryptAvatar>; onClose: () => void;
+  onCreate: (name: string, members: string[], avatar?: CryptAvatar) => Promise<boolean> | void;
+  /** Total CHEESE for the invites, or '' when nothing is selected yet. */
+  costFor?: (name: string, members: string[], avatar?: CryptAvatar) => string;
+  nameFor?: (account: string) => string; busy?: boolean;
 }) {
   const [selected, setSelected] = useState<string[]>([]);
-  return <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
-    <DialogContent className="max-w-md">
-      <DialogHeader><DialogTitle>👥 New group</DialogTitle><DialogDescription>Select 2–5 friends. You are included automatically.</DialogDescription></DialogHeader>
-      <div className="max-h-72 overflow-y-auto space-y-2">
-        {Object.keys(contacts).sort().map(name => <label key={name} className="flex items-center gap-3 py-2 cursor-pointer">
-          <Checkbox aria-label={name} checked={selected.includes(name)} disabled={selected.length === 5 && !selected.includes(name)}
-            onCheckedChange={checked => setSelected(current => checked ? [...current, name] : current.filter(m => m !== name))} />
-          <PixelAvatar account={name} avatar={avatars[name]} /><span className="min-w-0 break-words text-sm">{nameFor(name)}{nameFor(name) !== name && <span className="block text-xs text-muted-foreground">{name}</span>}</span>
-        </label>)}
-        {!Object.keys(contacts).length && <p className="text-sm text-muted-foreground">Add friends’ public keys first.</p>}
-      </div>
-      <DialogFooter><Button variant="outline" onClick={onClose}>Cancel</Button><Button disabled={selected.length < 2} onClick={() => onCreate(selected)}>Create group</Button></DialogFooter>
-    </DialogContent>
-  </Dialog>;
+  const [name, setName] = useState('');
+  const [avatar, setAvatar] = useState<CryptAvatar | undefined>();
+  const [painting, setPainting] = useState(false);
+  const [agreed, setAgreed] = useState(false);
+  const max = MAX_INVITE_MEMBERS - 1;
+  const validName = parseCryptName(name);
+  const cost = validName && selected.length ? costFor?.(validName, selected, avatar) ?? '' : '';
+  return <>
+    <Dialog open={!painting} onOpenChange={open => { if (!open && !busy) onClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>👥 New group</DialogTitle>
+          <DialogDescription>Pick 1–{max} friends (up to {MAX_INVITE_MEMBERS} people with you). Each gets an encrypted invite and chooses to join.</DialogDescription></DialogHeader>
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={() => setPainting(true)} aria-label="Set group picture" title="Set group picture" className="shrink-0 rounded-md border border-border p-1 hover:border-cheese">
+            {avatar ? <PixelAvatar account="group" avatar={avatar} className="h-10 w-10" /> : <span className="flex h-10 w-10 items-center justify-center text-xl">👥</span>}
+          </button>
+          <Input value={name} onChange={e => setName(e.target.value)} placeholder="Group name" aria-label="Group name" maxLength={40} />
+        </div>
+        <div className="max-h-64 overflow-y-auto space-y-2">
+          {Object.keys(contacts).sort().map(n => <label key={n} className="flex items-center gap-3 py-2 cursor-pointer">
+            <Checkbox aria-label={n} checked={selected.includes(n)} disabled={selected.length === max && !selected.includes(n)}
+              onCheckedChange={checked => setSelected(current => checked ? [...current, n] : current.filter(m => m !== n))} />
+            <PixelAvatar account={n} avatar={avatars[n]} /><span className="min-w-0 break-words text-sm">{nameFor(n)}{nameFor(n) !== n && <span className="block text-xs text-muted-foreground">{n}</span>}</span>
+          </label>)}
+          {!Object.keys(contacts).length && <p className="text-sm text-muted-foreground">Add friends’ public keys first.</p>}
+        </div>
+        {cost && <p className="text-xs text-muted-foreground">Invites cost {cost}: 0.0100 CHEESE per part platform fee (80% eosio.null, 20% xcheeseliqst) plus 0.0010 CHEESE per part to each invited friend, in one transaction.</p>}
+        <TermsCheckbox id="crypt-group-terms" checked={agreed} onCheckedChange={setAgreed} />
+        <DialogFooter>
+          <Button variant="outline" disabled={busy} onClick={onClose}>Cancel</Button>
+          <Button disabled={busy || !agreed || !validName || selected.length < 1} onClick={() => void onCreate(validName!, selected, avatar)}>
+            {busy ? 'Sending invites…' : 'Create & send invites'}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    {painting && <AvatarEditor account="group" avatar={avatar} title="🎨 Group picture" onClose={() => setPainting(false)} onSave={a => { setAvatar(a); setPainting(false); }} />}
+  </>;
 }
