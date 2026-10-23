@@ -1,6 +1,6 @@
 import { assembleMessages, bytesToText, decryptMemoBytes, type ChainMemo, type MessagingKey } from '@/lib/cheeseCrypt';
 
-export const MAX_INBOX_KEY_LOOKUPS = 20;
+export const MAX_INBOX_KEY_LOOKUPS = 10;
 const ACCOUNT = /^[a-z1-5.]{1,12}$/;
 const setting = (account: string) => `cheesecrypt-public-inbox-${account}`;
 const gone = (account: string) => `cheesecrypt-request-declines-${account}`;

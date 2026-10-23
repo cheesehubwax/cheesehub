@@ -9,6 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { CardAction } from '@/components/crypt/CardAction';
 import { BlockedDialog } from '@/components/crypt/BlockedDialog';
+import { MessageRequests, PublicInboxDialog } from '@/components/crypt/PublicInbox';
+import { decodeInboxRequests, declineRequest, inboxCandidates, loadPublicInbox, loadRequestDeclines, savePublicInbox } from '@/lib/cryptPublicInbox';
 import { buildProfileNoteBatches, isProfileNote, latestProfiles, profileNoteCost, profileNoteParts, profileRecipients } from '@/lib/cryptProfileNotes';
 import { ProfileShareDialog } from '@/components/crypt/ProfileShareDialog';
 import { addBlocked, loadBlocked, removeBlocked, saveBlocked, withoutBlocked } from '@/lib/cryptBlocklist';
@@ -173,6 +175,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [hiddenGroups, setHiddenGroups] = useState(() => loadHiddenGroups(account));
   const [blocked, setBlockedState] = useState(() => loadBlocked(account));
   const [showBlocked, setShowBlocked] = useState(false);
+  const [publicInbox, setPublicInbox] = useState(() => loadPublicInbox(account));
+  const [requestDeclines, setRequestDeclines] = useState(() => loadRequestDeclines(account));
+  const acceptedRequestMessages = useRef(new Set<string>());
   const [sharingProfile, setSharingProfile] = useState(false);
   const [showHiddenGroups, setShowHiddenGroups] = useState(false);
   const [attachingNft, setAttachingNft] = useState(false);
@@ -326,17 +331,35 @@ export function Messenger({ account, session }: { account: string; session: NonN
   // Invite-group messages/voice show only when they come from a member with that member's invite key.
   const conversations = useMemo(() => decoded.filter(c => {
     if (isProfileNote(c.text)) return false;
-    if (!c.igroup) return true;
+    if (!c.igroup) return !!c.group || !!contacts[c.from === account ? c.to : c.from];
     if (c.control && c.control.kind !== 'msg') return false;
     if (!c.usedKey) return false;
     const view = inviteViews.find(v => v.invite.id === c.igroup);
     return !!view && view.status !== 'declined' && !!eventFromMember({ key: c.key, txId: c.txId, time: c.time, from: c.from, to: c.to, control: { kind: 'joined', id: c.igroup }, usedKey: c.usedKey }, invites, account);
-  }), [decoded, inviteViews, invites, account]);
+  }), [decoded, inviteViews, invites, account, contacts]);
   const partners = useMemo(() => {
     const s = new Set(Object.keys(contacts));
-    visibleMemos.forEach((m) => s.add(m.from === account ? m.to : m.from));
     return [...s].filter(name => !removedContacts.includes(name) && !blocked.includes(name) && !groupOnly.has(name)).sort();
   }, [contacts, visibleMemos, account, removedContacts, blocked, groupOnly]);
+  const requestCandidates = useMemo(() => inboxCandidates(visibleMemos, account,
+    new Set([...Object.keys(contacts), ...groupOnly, ...blocked, ...removedContacts, ...groups.flatMap(g => g.members)])),
+    [visibleMemos, account, contacts, groupOnly, blocked, removedContacts, groups]);
+  const { data: requestKeys = {} } = useQuery({
+    queryKey: ['crypt-inbox-keys', account, key?.publicKey, requestCandidates],
+    enabled: publicInbox && !!key && requestCandidates.length > 0,
+    queryFn: async () => {
+      const found: Record<string, string> = {};
+      // Sequential and bounded; history polls never trigger a new lookup for an unchanged candidate list.
+      for (const from of requestCandidates) {
+        try { const pub = await lookupPublishedKey(from); if (pub) found[from] = pub; } catch { /* next foreground retry */ }
+      }
+      return found;
+    },
+    staleTime: 60_000, refetchInterval: 60_000, retry: false,
+  });
+  const messageRequests = useMemo(() => publicInbox && key ? decodeInboxRequests(visibleMemos, key,
+    Object.fromEntries(requestCandidates.flatMap(from => requestKeys[from] ? [[from, requestKeys[from]]] : [])), requestDeclines) : [],
+    [publicInbox, key, visibleMemos, requestCandidates, requestKeys, requestDeclines]);
   // A member who accepted my friend request becomes a friend with the key their group introduced.
   useEffect(() => {
     let changed = false;
@@ -374,14 +397,15 @@ export function Messenger({ account, session }: { account: string; session: NonN
   }, [conversations, account]);
   useEffect(() => {
     let cancelled = false;
-    const names = new Set(memos.map(m => m.from === account ? m.to : m.from));
+    const names = new Set<string>();
+    // Only existing legacy groups may discover member keys automatically. Strangers require explicit acceptance.
     groups.forEach(g => g.members.forEach(m => { if (m !== account) names.add(m); }));
     const discover = async () => {
       for (const name of names) {
-        if (contacts[name] || groupOnly.has(name) || loadRemovedContacts(account).includes(name) || !ACCOUNT_RE.test(name) || cancelled) continue;
+        if (contacts[name] || groupOnly.has(name) || blocked.includes(name) || loadRemovedContacts(account).includes(name) || !ACCOUNT_RE.test(name) || cancelled) continue;
         try {
           const pub = await lookupPublishedKey(name);
-          if (pub && !cancelled && !loadContacts(account)[name] && !loadRemovedContacts(account).includes(name)) {
+          if (pub && !cancelled && !loadBlocked(account).includes(name) && !loadContacts(account)[name] && !loadRemovedContacts(account).includes(name)) {
             saveContact(account, name, pub); setContacts(loadContacts(account));
           }
         } catch { /* A friend’s public key file remains the fallback. */ }
@@ -389,7 +413,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     };
     discover();
     return () => { cancelled = true; };
-  }, [memos, groups, account, groupOnly]);
+  }, [groups, account, groupOnly, blocked, contacts]);
   const activeGroup = groups.find(g => `group:${g.id}` === active);
   const activeInvite: InviteGroupView | undefined = activeGroup ? undefined : inviteViews.find(v => `group:${v.invite.id}` === active);
   const inviteKeys = useMemo(() => activeInvite ? Object.fromEntries(activeInvite.invite.members.map(m => [m.account, m.publicKey])) : {}, [activeInvite]);
@@ -643,6 +667,19 @@ export function Messenger({ account, session }: { account: string; session: NonN
       if (active === n) { setActive(null); setText(''); }
       toast({ title: `${n} blocked`, description: 'Their messages are hidden on this device. Nothing changes on-chain.' });
     } catch (e) { toast({ title: (e as Error).message, variant: 'destructive' }); }
+  };
+  const acceptRequest = (from: string) => {
+    const request = messageRequests.find(r => r.from === from);
+    if (!request || blocked.includes(from)) return;
+    request.messages.forEach(m => acceptedRequestMessages.current.add(m.key));
+    saveContact(account, from, request.publicKey);
+    setContacts(loadContacts(account)); setRemovedContacts(loadRemovedContacts(account));
+    setActive(from); setText(''); setVoice(null);
+    toast({ title: `${from} added as a friend` });
+  };
+  const dismissRequest = (from: string) => {
+    const request = messageRequests.find(r => r.from === from);
+    if (request) setRequestDeclines(declineRequest(account, from, request.time));
   };
   const unblockAccount = (name: string) => {
     const next = removeBlocked(blocked, name);
@@ -948,9 +985,11 @@ export function Messenger({ account, session }: { account: string; session: NonN
             <CardAction icon={<Save className="h-4 w-4" />} label="Back up" aria-label="Back up private key" title="Download a backup of my private key — never share it" onClick={() => download(`${account}-cheesecrypt-key-PRIVATE.json`, key)} />
             <CardAction icon={<Ban className="h-4 w-4" />} label={blocked.length ? `Blocked (${blocked.length})` : 'Blocked'} aria-label="Blocked accounts" title="Accounts blocked on this device" onClick={() => setShowBlocked(true)} />
             <CardAction icon={<KeyRound className="h-4 w-4" />} label="New key" className="hover:text-destructive" aria-label="Create a new key" title="Create a new key (it cannot read messages sent to this one)" onClick={makeKey} />
+            <PublicInboxDialog enabled={publicInbox} onChange={enabled => { savePublicInbox(account, enabled); setPublicInbox(enabled); }} />
           </div>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-4">
+          <MessageRequests requests={messageRequests} onAccept={acceptRequest} onDecline={dismissRequest} onBlock={from => { dismissRequest(from); blockAccount(from); }} />
           <Collapsible open={groupsOpen} onOpenChange={setGroupsOpen}>
             <div className="flex items-center justify-between px-2">
               <CollapsibleTrigger className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-cheese">
@@ -1057,7 +1096,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
               onScroll={(e) => { const el = e.currentTarget; nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
               {thread.map((m) => (
                 <ChatMessageItem key={m.key} m={m} account={account} keyAvatar={key?.avatar} avatars={avatars}
-                  contacts={contacts} active={active} activeGroup={activeGroup} nameFor={nameFor} openedAt={openedAt} />
+                  contacts={contacts} active={active} activeGroup={activeGroup} nameFor={nameFor} openedAt={acceptedRequestMessages.current.has(m.key) ? { current: Infinity } : openedAt} />
               ))}
               {!thread.length && <li className="text-sm text-muted-foreground">{activeGroup || activeInvite ? 'No group messages yet.' : `No messages with ${nameFor(active)} yet.`}</li>}
               <li ref={endRef} aria-hidden />
