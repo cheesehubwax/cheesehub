@@ -1,5 +1,5 @@
 // CHEESECrypt profile notes: your name and avatar sent to friends/group members inside encrypted memos.
-// Notes never show as chat messages; for each sender the newest note (by chain time) wins.
+// Notes never show as chat messages or unread badges; for each sender the newest note (by chain time) wins.
 import { buildSendMessageActions, encryptMemo, MessagingKey, splitMessage, partCount } from '@/lib/cheeseCrypt';
 import { groupMessageCost } from '@/lib/cryptGroups';
 import { parseAvatar, type CryptAvatar } from '@/lib/cryptAvatar';
