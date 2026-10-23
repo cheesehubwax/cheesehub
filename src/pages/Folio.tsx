@@ -1,6 +1,9 @@
 // CHEESEFolio — personal profit/loss for the signed-in WAX account.
 // Intentionally not linked from the header yet: reachable at /folio only.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { RefreshCw } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from '@/hooks/use-toast';
 import { Layout } from '@/components/Layout';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
@@ -33,6 +36,7 @@ const RANGES = [
 
 const Folio = () => {
   const { accountName, isConnected, login } = useWax();
+  const queryClient = useQueryClient();
   // Two pickers: crypto (WAX/BTC/ETH) or fiat; only one is active. Stored as one code.
   type CryptoChoice = 'WAX' | CryptoCode;
   const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('cheesefolio-currency') ?? '' : '';
@@ -80,8 +84,23 @@ const Folio = () => {
     try { localStorage.setItem('cheesefolio-currency', f); localStorage.setItem('cheesefolio-fiat', f); } catch { /* private mode */ }
   };
   const { tokens: live, isLoading: liveLoading } = useAllTokenBalances(accountName ?? undefined);
-  const { data: priceMap } = useAlcorTokenPrices();
-  const { data: waxUsdLive = 0 } = useWaxPrice();
+  const { data: priceMap, isFetching: pricesFetching, pricesUpdatedAt } = useAlcorTokenPrices(isConnected);
+  const { data: waxUsdLive = 0, isFetching: waxPriceFetching } = useWaxPrice();
+  const [refreshingPrices, setRefreshingPrices] = useState(false);
+  const refreshPrices = async () => {
+    setRefreshingPrices(true);
+    try {
+      await Promise.all(['swap-tokens', 'wax-price', 'folio-crypto-live', 'folio-realisable'].map((key) =>
+        queryClient.invalidateQueries({ queryKey: [key] }),
+      ));
+    } finally { setRefreshingPrices(false); }
+  };
+  const syncNow = () => {
+    void refreshPrices();
+    void queryClient.invalidateQueries({ queryKey: ['all-token-balances', accountName] });
+    void queryClient.invalidateQueries({ queryKey: ['folio-pooled', accountName] });
+    folio.resync();
+  };
   // Fiat per WAX right now: today's WAX/USD × today's fiat/USD (0 while unknown).
   const waxUsd = waxUsdLive && folio.fxNow ? waxUsdLive * folio.fxNow : 0;
   const [picked, setPicked] = useState<HoldingRow | null>(null);
@@ -206,7 +225,7 @@ const Folio = () => {
                 {folio.syncing ? (
                   <Button size="sm" variant="outline" onClick={folio.stop}>Stop scan</Button>
                 ) : (
-                  <Button size="sm" disabled={!folio.loaded} onClick={folio.resync}>
+                  <Button size="sm" disabled={!folio.loaded} onClick={syncNow}>
                     {folio.error && folio.hasHistory ? 'Continue scan' : folio.syncedAt ? 'Sync now' : folio.hasHistory ? 'Continue scan' : 'Scan my history'}
                   </Button>
                 )}
@@ -248,7 +267,7 @@ const Folio = () => {
               <div className="w-full rounded-lg border border-cheese/20 bg-card/80 p-6 text-center space-y-3">
                 <p className="text-muted-foreground">Press <span className="text-foreground font-medium">Scan my history</span> to read your past trades from the blockchain. It only runs when you ask, and the result is saved in this browser.</p>
                 <div className="flex flex-wrap justify-center gap-2">
-                  <Button onClick={folio.resync}>Scan my history</Button>
+                  <Button onClick={syncNow}>Scan my history</Button>
                   <Button variant="outline" onClick={pickImport}>Load saved history (JSON)</Button>
                 </div>
                 <p className="text-xs text-muted-foreground">Saved a history file before? Load it to skip the full scan — Sync then fetches only newer transfers.</p>
@@ -264,7 +283,7 @@ const Folio = () => {
 
             <PortfolioControls key={accountName} portfolios={folio.portfolios} selected={currentPortfolio?.id ?? null} onSelect={(id) => { setSelectedPortfolio(id); setPicked(null); }} onSave={folio.savePortfolios} rows={allHoldings} disabled={!folio.loaded || folio.syncing} />
 
-            <div className="w-full flex justify-center gap-1">
+            <div className="w-full flex flex-wrap items-center justify-center gap-2">
               <Select value={chosenCrypto} onValueChange={(v) => (v === 'WAX' || isCrypto(v)) && showCrypto(v)}>
                 <SelectTrigger
                   aria-label="Show in crypto"
@@ -294,6 +313,20 @@ const Folio = () => {
                   ))}
                 </SelectContent>
               </Select>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground" role="status">
+                <span>{pricesFetching || waxPriceFetching || refreshingPrices ? 'Updating prices…'
+                  : pricesUpdatedAt ? `Prices updated ${new Date(pricesUpdatedAt).toLocaleTimeString()}`
+                  : priceMap?.size ? 'Cached prices · awaiting update' : 'Live prices unavailable'}</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-10 w-10" aria-label="Refresh prices"
+                      disabled={!!pricesFetching || !!waxPriceFetching || refreshingPrices} onClick={() => void refreshPrices()}>
+                      <RefreshCw className={`h-4 w-4 ${pricesFetching || waxPriceFetching || refreshingPrices ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Refresh prices</TooltipContent>
+                </Tooltip>
+              </div>
             </div>
             {cryptoUnavailable ? (
               <div className="w-full text-xs text-destructive text-center">{chosenCrypto} price history couldn't be loaded right now, so figures are shown in WAX. Refresh to try again.</div>
@@ -368,7 +401,7 @@ const Folio = () => {
             </div>
 
             <TokenDialog
-              row={picked}
+              row={picked ? allHoldings.find((h) => h.key === picked.key) ?? picked : null}
               events={folio.events}
               value={usd ? folio.ledger.valueUsdByEvent : folio.ledger.valueByEvent}
               realized={usd ? folio.ledger.realizedUsdByEvent : folio.ledger.realizedByEvent}

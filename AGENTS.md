@@ -4,7 +4,7 @@
 - CHEESEAir keeps context identity in Vite hot data so providers/cards share state.
 - CHEESEAir LP token columns aggregate current underlying quantities in normalized pair order, separate from USD payout weights so presentation never changes distribution.
 - CHEESEAir suffix unions use timestamp cursors, bounded reads and complete-only cache; stalled providers flag partial results because indexes differ and skip stops at 10,000 rows.
-- CHEESEFolio is client-only (IndexedDB per account), re-derived from saved raw transfers so classifier changes need no rescan; live balances are truth, history supplies cost.
+- CHEESEFolio is client-only (IndexedDB per account), re-derived from raw transfers; balances are truth, history supplies cost. Its mounted shared price observer polls foreground-only and refetches on focus; metadata/placeholder results never get a fresh-price timestamp.
 - CHEESEFolio's acquisition breakdown uses cumulative trade receipts and ledger free receipts, explicitly separate from current holdings; it never alters cost basis or infers which source remains after disposals.
 - CHEESEFolio scans always include the history provider reaching furthest back and complete a sync only when it was read to the end; big-page providers read sequentially, only small-page ones windowed, capped concurrency — bursts make Hyperion drop connections.
 - CHEESEFolio de-duplicates by global sequence and drops inline copies with identical transfer creator actions; Hyperion receiver notifications otherwise double-count movements.
