@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import Folio from '@/pages/Folio';
 import { parseFolioFile } from '@/lib/folio/portable';
 import type { StoredFolio } from '@/lib/folio/storage';
@@ -37,7 +38,7 @@ describe('portfolio creation and combined JSON restoration', () => {
   });
   it('creates from holdings, scopes value, saves one file, clears, loads and syncs without losing the grouping', async () => {
     const q = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const view = render(<QueryClientProvider client={q}><Folio /></QueryClientProvider>);
+    const view = render(<QueryClientProvider client={q}><TooltipProvider><Folio /></TooltipProvider></QueryClientProvider>);
     const create = await screen.findByRole('button', { name: /New portfolio/ });
     await waitFor(() => expect(create).not.toBeDisabled());
     fireEvent.click(create);
@@ -78,7 +79,7 @@ describe('portfolio creation and combined JSON restoration', () => {
     await screen.findByRole('tab', { name: /Meme coins/ });
     fireEvent.click(screen.getByRole('tab', { name: /All Holdings/ }));
     expect(within(screen.getByRole('table', { name: 'Holdings' })).getByText('eosio.token')).toBeTruthy();
-    state.account = 'bob'; view.rerender(<QueryClientProvider client={q}><Folio /></QueryClientProvider>);
+    state.account = 'bob'; view.rerender(<QueryClientProvider client={q}><TooltipProvider><Folio /></TooltipProvider></QueryClientProvider>);
     await waitFor(() => expect(screen.queryByRole('tab', { name: /Meme coins/ })).toBeNull());
     expect(state.records.get('alice')?.portfolios).toHaveLength(1);
   });

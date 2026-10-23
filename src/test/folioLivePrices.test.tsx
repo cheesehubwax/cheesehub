@@ -49,7 +49,7 @@ describe('CHEESEFolio live market prices', () => {
   });
 
   it('does not call metadata-only fallback a fresh price update', async () => {
-    mocks.fetchTokens.mockResolvedValue(token(0));
+    mocks.fetchTokens.mockResolvedValue([...token(0), { contract: 'eosio.token', ticker: 'WAX', precision: 8, system_price: 1 }]);
     const hook = setup();
     await waitFor(() => expect(hook.result.current.isLoading).toBe(false));
     expect(hook.result.current.data?.has('cheeseburger:CHEESE')).toBe(false);
