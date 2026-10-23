@@ -145,8 +145,7 @@ describe('profile-first key setup', () => {
     if (outcome === 'denied') calls.writable.mockResolvedValue(false);
     render(<Messenger {...props} />);
     await act(async () => {});
-    fireEvent.keyDown(screen.getByRole('button', { name: /Your key/ }), { key: 'Enter' });
-    fireEvent.click(await screen.findByRole('menuitem', { name: '🎨 Edit profile' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit profile' }));
     fireEvent.change(await screen.findByLabelText('CHEESECrypt name'), { target: { value: 'Updated Alice' } });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save profile' })); });
     const updated = loadKey('alice');
