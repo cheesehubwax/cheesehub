@@ -23,6 +23,8 @@ import { useWaxTransaction } from '@/hooks/useWaxTransaction';
 import { useToast } from '@/hooks/use-toast';
 import { playRandomFart } from '@/lib/fartSounds';
 import { cn } from '@/lib/utils';
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { encodeReply, parseReply, quoteOf, repliesTo, type ReplyRef } from '@/lib/cryptReply';
 import { AvatarEditor, WalletAvatarPicker } from '@/components/crypt/AvatarEditor';
 import { CryptNftCard } from '@/components/crypt/CryptNftCard';
 import { useQuery } from '@tanstack/react-query';
@@ -46,7 +48,7 @@ import { CryptAbout } from '@/components/crypt/CryptAbout';
 import { VoiceRecorder } from '@/components/crypt/VoiceRecorder';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { buildVoiceBatches, voiceNoteCost, voicePartCount, voiceTransactions, VOICE_PARTS_PER_TX, type VoiceClip } from '@/lib/cryptVoice';
-import { baselineMarks, firstVisitMarks, loadReadMarks, mergeMarks, sameMarks, saveReadMarks, unreadCounts, type ReadMarks } from '@/lib/cryptUnread';
+import { baselineMarks, firstVisitMarks, loadReadMarks, mergeMarks, sameMarks, saveReadMarks, unreadCounts, unreadReplies, type ReadMarks } from '@/lib/cryptUnread';
 import { readKeyFileJson } from '@/lib/cryptKeyFileText';
 import { buildGroupMessageActions, createGroup, decodeConversations, groupMessageCost, groupMessageSize, loadGroups, loadHiddenGroups, mergeGroups, saveGroups, setGroupHidden, type ConversationEntry, type CryptGroup } from '@/lib/cryptGroups';
 import {
@@ -73,19 +75,25 @@ function download(name: string, data: unknown) {
 }
 
 /** Pure sound-effect-NFT posts render without the bubble box — sender header, playback and timestamp stay. */
-function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt }: {
+function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote }: {
   m: ConversationEntry; account: string; keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>;
   contacts: Record<string, string>; active: string; activeGroup: CryptGroup | null;
   nameFor: (id: string) => string; openedAt: { current: number };
+  onReply: (m: ConversationEntry) => void; onOpenQuote: (ref: ReplyRef) => void;
 }) {
-  const segments = m.text != null ? parseNftMessage(m.text) : null;
+  const reply = parseReply(m.text);
+  const body = reply ? reply.body : m.text;
+  const segments = body != null ? parseNftMessage(body) : null;
   const soloAssetId = segments && segments.length === 1 && segments[0].type === 'nft' ? segments[0].assetId : null;
   const { data } = useQuery({
     queryKey: ['crypt-nft', soloAssetId], queryFn: () => fetchAssetById(soloAssetId!),
     enabled: !!soloAssetId, staleTime: 3600_000,
   });
   const bare = !!soloAssetId && !!data?.isSfx;
+  const canReply = !!m.voice || m.text != null;
   return (
+    <ContextMenu>
+    <ContextMenuTrigger asChild disabled={!canReply}>
     <li className={cn('w-fit max-w-[80%] text-sm',
       bare ? (m.from === account ? 'ml-auto py-1' : 'py-1') : m.from === account
         ? 'ml-auto rounded-lg px-3 py-2 bg-cheese/20 border border-cheese/30' : 'rounded-lg px-3 py-2 bg-muted')}>
@@ -93,8 +101,13 @@ function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, act
         <PixelAvatar account={m.from} avatar={m.from === account ? keyAvatar : avatars[m.from]} className="h-6 w-6" />
         <p className="text-[10px] font-semibold opacity-80 break-words">{m.from === account ? `you · ${nameFor(account)}` : nameFor(m.from)}{nameFor(m.from) !== m.from && <span className="block font-normal">{m.from}</span>}</p>
       </div>
+      {reply && <button type="button" onClick={() => onOpenQuote(reply)} aria-label={`Show the message from ${nameFor(reply.author)} this replies to`}
+        className="mb-1 block w-full max-w-full rounded border-l-2 border-reply bg-background/60 px-2 py-1 text-left text-xs hover:bg-background">
+        <span className="block font-semibold text-reply">↩️ {reply.author === account ? 'you' : nameFor(reply.author)}</span>
+        <span className="block truncate opacity-80">{reply.quote || '…'}</span>
+      </button>}
       <div className="whitespace-pre-wrap break-words">
-        {m.voice ? <VoiceNoteBubble note={m.voice} /> : m.text != null ? parseNftMessage(m.text).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} autoplayKey={m.time > openedAt.current ? `${m.key}:${i}` : undefined} txId={m.txId} /> : <span key={i} className="block">{seg.text}</span>) : <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
+        {m.voice ? <VoiceNoteBubble note={m.voice} /> : body != null ? parseNftMessage(body).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} autoplayKey={m.time > openedAt.current ? `${m.key}:${i}` : undefined} txId={m.txId} /> : <span key={i} className="block">{seg.text}</span>) : <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
       </div>
       <p className="text-[10px] opacity-70 mt-1">
         {new Date(m.time).toLocaleString()}{m.igroup ? null : ' · '}{m.igroup ? null : m.voice ? `${voiceNoteCost(m.parts, m.group ? m.group.members.length - 1 : 1)} at current rate` : m.group ? `${groupMessageCost(m.parts, m.group.members.length - 1, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))} at current rate` : messageCost(m.parts, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))}
@@ -104,6 +117,11 @@ function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, act
           className="font-semibold text-cheese underline underline-offset-2 hover:text-cheese/80">Tx</a></>}
       </p>
     </li>
+    </ContextMenuTrigger>
+    <ContextMenuContent>
+      <ContextMenuItem onSelect={() => onReply(m)}>↩️ Reply</ContextMenuItem>
+    </ContextMenuContent>
+    </ContextMenu>
   );
 }
 
@@ -200,6 +218,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [loaded, setLoaded] = useState(false);
   const [readMarks, setReadMarks] = useState<ReadMarks | null>(() => loadReadMarks(account));
   const [text, setText] = useState('');
+  const [replyingTo, setReplyingTo] = useState<ReplyRef | null>(null);
+  const [openQuote, setOpenQuote] = useState<ReplyRef | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const [voice, setVoice] = useState<VoiceClip | null>(null);
   /** History pages to read; grows only when a voice note touches the edge of the loaded window. */
   const [depth, setDepth] = useState(1);
@@ -457,8 +478,11 @@ export function Messenger({ account, session }: { account: string; session: NonN
     saveReadMarks(account, next); setReadMarks(next);
   }, [active, thread, readMarks, account]);
   const unread = useMemo(() => readMarks ? unreadCounts(conversations, account, readMarks) : {}, [conversations, account, readMarks]);
+  const replyUnread = useMemo(() => readMarks ? unreadReplies(conversations, account, readMarks) : {}, [conversations, account, readMarks]);
+  // Conversations with an unread reply to one of your messages get the reply colour instead of cheese yellow.
   const badge = (id: string) => unread[id] && active !== id
-    ? <span aria-label={`${unread[id]} unread`} className="ml-auto shrink-0 min-w-5 h-5 px-1.5 rounded-full bg-cheese text-primary-foreground text-[11px] font-bold leading-5 text-center">{unread[id] > 99 ? '99+' : unread[id]}</span>
+    ? <span aria-label={replyUnread[id] ? `${unread[id]} unread, ${replyUnread[id]} repl${replyUnread[id] > 1 ? 'ies' : 'y'} to you` : `${unread[id]} unread`} data-reply={replyUnread[id] ? 'true' : undefined}
+      className={cn('ml-auto shrink-0 min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold leading-5 text-center', replyUnread[id] ? 'bg-reply text-reply-foreground' : 'bg-cheese text-primary-foreground')}>{replyUnread[id] ? '↩ ' : ''}{unread[id] > 99 ? '99+' : unread[id]}</span>
     : null;
 
   const listRef = useRef<HTMLOListElement>(null);
@@ -725,11 +749,11 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if (!key || !active || missingKeys.length || !agreed || !text.trim() || tooLong) return;
     setBusy(true);
     try {
-      const actions = activeInvite ? buildCg2Actions(key, recipients, inviteKeys, encodeGroupText(activeInvite.invite.id, text), [permission], hasNft)
-        : activeGroup ? buildGroupMessageActions(key, activeGroup, text, contacts, [permission], hasNft)
-        : buildSendMessageActions(account, active, splitMessage(text).map(p => encryptMemo(p, contacts[active], key.secretKey)), [permission], hasNft);
+      const actions = activeInvite ? buildCg2Actions(key, recipients, inviteKeys, encodeGroupText(activeInvite.invite.id, outgoing), [permission], hasNft)
+        : activeGroup ? buildGroupMessageActions(key, activeGroup, outgoing, contacts, [permission], hasNft)
+        : buildSendMessageActions(account, active, splitMessage(outgoing).map(p => encryptMemo(p, contacts[active], key.secretKey)), [permission], hasNft);
       const r = await executeTransaction(actions, { successTitle: 'Message sent' });
-      if (r.success) { setText(''); nearBottom.current = true; [2000, 5000, 10000].forEach(ms => setTimeout(poll, ms)); }
+      if (r.success) { setText(''); setReplyingTo(null); nearBottom.current = true; [2000, 5000, 10000].forEach(ms => setTimeout(poll, ms)); }
     } catch (e) { toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' }); }
     finally { setBusy(false); }
   };
@@ -829,7 +853,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
   };
 
   const hasNft = parseNftMessage(text).some(seg => seg.type === 'nft');
-  const size = activeInvite ? inviteTextSize(activeInvite.invite.id, text) : activeGroup ? groupMessageSize(activeGroup, text) : { bytes: plaintextBytes(text), parts: partCount(text), maxBytes: MAX_MESSAGE_BYTES };
+  const outgoing = replyingTo && text.trim() ? encodeReply(replyingTo, text) : text;
+  const size = activeInvite ? inviteTextSize(activeInvite.invite.id, outgoing) : activeGroup ? groupMessageSize(activeGroup, outgoing) : { bytes: plaintextBytes(outgoing), parts: partCount(outgoing), maxBytes: MAX_MESSAGE_BYTES };
   const { bytes, parts, maxBytes } = size;
   const tooLong = bytes > maxBytes || parts > MAX_PARTS;
   const copies = activeGroup || activeInvite ? recipients.length : 1;
@@ -1098,7 +1123,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
               onScroll={(e) => { const el = e.currentTarget; nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
               {thread.map((m) => (
                 <ChatMessageItem key={m.key} m={m} account={account} keyAvatar={key?.avatar} avatars={avatars}
-                  contacts={contacts} active={active} activeGroup={activeGroup} nameFor={nameFor} openedAt={acceptedRequestMessages.current.has(m.key) ? { current: Infinity } : openedAt} />
+                  contacts={contacts} active={active} activeGroup={activeGroup} nameFor={nameFor}
+                  onReply={(x) => { setReplyingTo({ author: x.from, time: x.time, quote: quoteOf(x.text, !!x.voice) }); setVoice(null); setTimeout(() => composerRef.current?.focus(), 0); }}
+                  onOpenQuote={setOpenQuote} openedAt={acceptedRequestMessages.current.has(m.key) ? { current: Infinity } : openedAt} />
               ))}
               {!thread.length && <li className="text-sm text-muted-foreground">{activeGroup || activeInvite ? 'No group messages yet.' : `No messages with ${nameFor(active)} yet.`}</li>}
               <li ref={endRef} aria-hidden />
@@ -1121,7 +1148,11 @@ export function Messenger({ account, session }: { account: string; session: NonN
               <p className="text-sm text-muted-foreground p-4 border-t border-border">Public keys needed: {missingKeys.join(', ')}. Add them by name or load their public files.</p>
             ) : (
               <div className="space-y-2 p-4 border-t border-border">
-                <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} disabled={!!voice} placeholder={voice ? 'Sending a voice note — discard it to type a message' : activeGroup || activeInvite ? 'Message group' : `Message ${nameFor(active)}`} />
+                {replyingTo && <div className="flex items-start gap-2 rounded border-l-2 border-reply bg-muted px-2 py-1 text-xs">
+                  <span className="min-w-0 flex-1"><span className="block font-semibold text-reply">↩️ Replying to {replyingTo.author === account ? 'yourself' : nameFor(replyingTo.author)}</span><span className="block truncate opacity-80">{replyingTo.quote || '…'}</span></span>
+                  <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" aria-label="Cancel reply" onClick={() => setReplyingTo(null)}>✕</Button>
+                </div>}
+                <Textarea ref={composerRef} value={text} onChange={(e) => setText(e.target.value)} rows={3} disabled={!!voice} placeholder={voice ? 'Sending a voice note — discard it to type a message' : activeGroup || activeInvite ? 'Message group' : `Message ${nameFor(active)}`} />
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                   <span className={!voice && tooLong ? 'text-destructive' : 'text-muted-foreground'}>
                     {voice ? `${voiceParts} parts · ${voiceTxs} transaction${voiceTxs > 1 ? 's' : ''}` : `${bytes}/${maxBytes} · ${parts || 1} part${parts > 1 ? 's' : ''}`}{(activeGroup || activeInvite) && ` × ${copies} recipients`}
