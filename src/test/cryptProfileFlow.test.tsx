@@ -18,7 +18,7 @@ const mount = (ui: React.ReactElement) => render(<QueryClientProvider client={ne
 const avatar = { version: 1 as const, pixels: '2'.repeat(64) };
 
 describe('profile notes in the messenger', () => {
-  beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); Element.prototype.scrollIntoView = vi.fn(); calls.transact.mockResolvedValue({ success: false }); });
+  beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); URL.createObjectURL = vi.fn(() => 'blob:x'); URL.revokeObjectURL = vi.fn(); Element.prototype.scrollIntoView = vi.fn(); calls.transact.mockResolvedValue({ success: false }); });
 
   it('applies the newest received note to the friend and never shows it as a message', async () => {
     const alice = generateKey('alice'), bob = generateKey('bob');
