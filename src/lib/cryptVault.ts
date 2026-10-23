@@ -4,6 +4,8 @@
 // requests Desktop as its starting location) and the remembered handle is reused afterwards.
 // Select/create cheesecrypt there: Chromium can reject access to Desktop itself.
 import { parseKeyFile, type MessagingKey, type PublicKeyFile } from './cheeseCrypt';
+import { readKeyFileJson, skipFileName } from './cryptKeyFileText';
+import { parseReadStateFile, toReadStateFile, type ReadMarks } from './cryptUnread';
 
 export const VAULT_DIR = 'cheesecrypt';
 export const PRIVATE_DIR = 'my private key';
@@ -20,7 +22,7 @@ export class VaultFileExistsError extends Error {
 export interface DirHandle {
   name: string;
   getDirectoryHandle(name: string, o?: { create?: boolean }): Promise<DirHandle>;
-  getFileHandle(name: string, o?: { create?: boolean }): Promise<{ getFile?(): Promise<{ text(): Promise<string> }>; createWritable(): Promise<{ write(d: string): Promise<void>; close(): Promise<void>; abort?(): Promise<void> }> }>;
+  getFileHandle(name: string, o?: { create?: boolean }): Promise<{ getFile?(): Promise<{ size?: number; arrayBuffer?(): Promise<ArrayBuffer>; text(): Promise<string> }>; createWritable(): Promise<{ write(d: string): Promise<void>; close(): Promise<void>; abort?(): Promise<void> }> }>;
   values?(): AsyncIterable<{ kind: string; name: string }>;
   queryPermission?(o: { mode: 'readwrite' }): Promise<PermissionState>;
   requestPermission?(o: { mode: 'readwrite' }): Promise<PermissionState>;
@@ -99,22 +101,73 @@ export async function writeOwnPublicKey(root: DirHandle, file: PublicKeyFile) {
   catch (error) { await writable.abort?.().catch(() => {}); throw error; }
 }
 
+/** Exact name first, then any casing ("My Private Key", "FRIENDS"); null when missing. */
+async function findSubdir(root: DirHandle, name: string): Promise<DirHandle | null> {
+  try { return await root.getDirectoryHandle(name); } catch { /* try other casings */ }
+  if (!root.values) return null;
+  for await (const e of root.values()) {
+    if (e.kind === 'directory' && e.name.toLowerCase() === name.toLowerCase()) {
+      try { return await root.getDirectoryHandle(e.name); } catch { return null; }
+    }
+  }
+  return null;
+}
+
+/** Every file in a folder that parses as a CHEESECrypt key file, whatever its name, extension or text encoding. */
+async function keyFilesIn(dir: DirHandle): Promise<(MessagingKey | PublicKeyFile)[]> {
+  if (!dir.values) return [];
+  const names: string[] = [];
+  for await (const e of dir.values()) if (e.kind === 'file' && !skipFileName(e.name)) names.push(e.name);
+  names.sort();
+  const out: (MessagingKey | PublicKeyFile)[] = [];
+  for (const name of names) {
+    try {
+      const handle = await dir.getFileHandle(name);
+      if (!handle.getFile) continue;
+      const parsed = parseKeyFile(await readKeyFileJson(await handle.getFile()));
+      if (parsed) out.push(parsed);
+    } catch { /* skip unreadable files */ }
+  }
+  return out;
+}
+
 /** Reads every valid public key file in the shared friends folder (shared by all accounts on this device). */
 export async function readFriendKeys(root: DirHandle): Promise<PublicKeyFile[]> {
-  let dir: DirHandle;
-  try { dir = await root.getDirectoryHandle(FRIENDS_DIR); } catch { return []; }
-  if (!dir.values) return [];
+  const dir = await findSubdir(root, FRIENDS_DIR);
+  if (!dir) return [];
   const out = new Map<string, PublicKeyFile>();
-  for await (const entry of dir.values()) {
-    if (entry.kind !== 'file' || !entry.name.toLowerCase().endsWith('.json')) continue;
-    try {
-      const handle = await dir.getFileHandle(entry.name);
-      if (!handle.getFile) continue;
-      const parsed = parseKeyFile(JSON.parse(await (await handle.getFile()).text()));
-      if (parsed?.type === 'gpk-msg-pubkey') out.set(parsed.account, parsed);
-    } catch { /* skip unreadable or malformed files */ }
-  }
+  for (const f of await keyFilesIn(dir)) if (f.type === 'gpk-msg-pubkey') out.set(f.account, f);
   return [...out.values()];
+}
+
+/**
+ * Finds this account's private key in the vault by contents: the "my private key" folder (any casing) first,
+ * then the vault folder itself. File names never matter. Null when no file holds a valid key for the account.
+ */
+export async function findPrivateKey(root: DirHandle, account: string): Promise<MessagingKey | null> {
+  const dirs = [await findSubdir(root, PRIVATE_DIR), root].filter((d): d is DirHandle => !!d);
+  for (const dir of dirs) {
+    const hit = (await keyFilesIn(dir)).find((f): f is MessagingKey => f.type === 'gpk-msg-key' && f.account === account);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+export const readStateName = (account: string) => `${account}-cheesecrypt-reads.json`;
+
+/** This account's read markers saved in the vault; null when there is no valid file. */
+export async function readVaultMarks(root: DirHandle, account: string): Promise<ReadMarks | null> {
+  try {
+    const handle = await root.getFileHandle(readStateName(account));
+    return handle.getFile ? parseReadStateFile(await readKeyFileJson(await handle.getFile()), account) : null;
+  } catch { return null; }
+}
+
+/** Replaces the vault's read-state file (staged write; abort keeps the old copy). */
+export async function writeVaultMarks(root: DirHandle, account: string, marks: ReadMarks) {
+  const w = await (await root.getFileHandle(readStateName(account), { create: true })).createWritable();
+  try { await w.write(JSON.stringify(toReadStateFile(account, marks), null, 2)); await w.close(); }
+  catch (error) { await w.abort?.().catch(() => {}); throw error; }
 }
 
 /** Requests Desktop as the picker's starting location; users create/select cheesecrypt there. */
