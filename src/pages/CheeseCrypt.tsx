@@ -442,7 +442,15 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const switched = lastActive.current !== active;
     lastActive.current = active;
     // Follow new messages only when the reader is already at the bottom; never yank them out of history.
-    if (switched || nearBottom.current) endRef.current?.scrollIntoView({ block: 'end', behavior: switched ? 'auto' : 'smooth' });
+    // Scroll only the message list itself so the outer page never jumps.
+    if (switched || nearBottom.current) {
+      const el = listRef.current;
+      if (el) {
+        const top = el.scrollHeight;
+        if (typeof el.scrollTo === 'function') el.scrollTo({ top, behavior: switched ? 'auto' : 'smooth' });
+        else el.scrollTop = top;
+      }
+    }
   }, [thread.length, active]);
 
   const makeKey = () => {
