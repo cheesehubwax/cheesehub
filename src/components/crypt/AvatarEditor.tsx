@@ -93,7 +93,7 @@ export function WalletAvatarPicker({ account, busy, onPick }: { account: string;
   </div>;
 }
 
-export function AvatarEditor({ account, avatar, displayName, onSave, onSaveProfile, onClose, initialSetup = false }: { account: string; avatar?: CryptAvatar; displayName?: string; onSave: (avatar: CryptAvatar) => void; onSaveProfile?: (avatar: CryptAvatar, displayName?: string) => void; onClose: () => void; initialSetup?: boolean }) {
+export function AvatarEditor({ account, avatar, displayName, onSave, onSaveProfile, onClose, initialSetup = false, title }: { account: string; avatar?: CryptAvatar; displayName?: string; onSave: (avatar: CryptAvatar) => void; onSaveProfile?: (avatar: CryptAvatar, displayName?: string) => void; onClose: () => void; initialSetup?: boolean; title?: string }) {
   const [name, setName] = useState(displayName ?? '');
   const invalidName = !!name.trim() && !parseCryptName(name);
   const [pixels, setPixels] = useState(() => (avatar ?? accountAvatar(account)).pixels);
@@ -118,7 +118,7 @@ export function AvatarEditor({ account, avatar, displayName, onSave, onSaveProfi
   };
   return <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
     <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto" aria-describedby={undefined}>
-      <DialogHeader><DialogTitle>{onSaveProfile ? '🎨 Your profile' : '🎨 Your avatar'}</DialogTitle></DialogHeader>
+      <DialogHeader><DialogTitle>{title ?? (onSaveProfile ? '🎨 Your profile' : '🎨 Your avatar')}</DialogTitle></DialogHeader>
       {onSaveProfile && <div className="space-y-2">
         <label htmlFor="crypt-profile-name" className="text-sm font-medium">CHEESECrypt name</label>
         <Input id="crypt-profile-name" value={name} maxLength={MAX_CRYPT_NAME_LENGTH} onChange={e => setName(e.target.value)} placeholder={account} aria-invalid={invalidName} />
