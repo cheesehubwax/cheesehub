@@ -596,45 +596,57 @@ export function Messenger({ account, session }: { account: string; session: NonN
       {showSharePrompt && key && <ShareKeyDialog account={account} busy={busy} agreed={agreed} onAgreedChange={setAgreed} onClose={() => setShowSharePrompt(false)}
         onDownload={() => { void sharePublicKey(); setShowSharePrompt(false); }}
         onPublish={async () => { if (await publish()) setShowSharePrompt(false); }} />}
+      {addingFriend && <Dialog open onOpenChange={o => { if (!o) setAddingFriend(false); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>🤝 Add a friend</DialogTitle>
+            <DialogDescription>Find them by WAX account (if they published their key) or import their public key file.</DialogDescription>
+          </DialogHeader>
+          <form className="flex gap-2" onSubmit={e => { e.preventDefault(); void addContact(); }}>
+            <Input autoFocus value={newContact} maxLength={12} onChange={(e) => setNewContact(e.target.value)} placeholder="account.wam" aria-label="Friend's WAX account" />
+            <Button type="submit" disabled={busy} className="bg-cheese text-primary-foreground hover:bg-cheese/90">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Find'}</Button>
+          </form>
+          <Button variant="outline" onClick={() => { setAddingFriend(false); fileRef.current?.click(); }}><Upload className="h-4 w-4" /> Import public key file</Button>
+        </DialogContent>
+      </Dialog>}
       <aside className="border-b md:border-b-0 md:border-r border-border flex flex-col min-h-0">
-        <div className="p-3 space-y-2 border-b border-border">
-          <div className="flex gap-2">
-            <Input className="h-9" value={newContact} onChange={(e) => setNewContact(e.target.value)} placeholder="account.wam"
-              onKeyDown={(e) => e.key === 'Enter' && addContact()} />
-            <Button size="sm" disabled={busy} onClick={addContact} className="bg-cheese text-primary-foreground hover:bg-cheese/90">Add</Button>
-          </div>
-          <div className="flex gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline" className="flex-1 justify-between">
-                  <PixelAvatar account={account} avatar={key.avatar} className="h-6 w-6 shrink-0" /> <span className="truncate">{key.displayName ?? 'Your key'}</span> <ChevronDown className="h-4 w-4 opacity-70 shrink-0" />
+        <div className="flex flex-col gap-2 border-b border-border p-3">
+          <div className="flex items-center gap-3">
+            <PixelAvatar account={account} avatar={key.avatar} className="h-11 w-11 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 items-center gap-1">
+                <span className="truncate text-base font-bold text-cheese">{key.displayName || account}</span>
+                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-cheese" aria-label="Edit profile" title="Edit name and avatar" onClick={() => setEditingAvatar(true)}>
+                  <Pencil className="h-3.5 w-3.5" />
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-72">
-                <DropdownMenuLabel className="space-y-1">
-                  <span className="block text-xs text-cheese">✓ loaded for {account}</span>
-                  <span className="block text-[11px] font-normal text-muted-foreground break-all">{key.publicKey}</span>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => setEditingAvatar(true)}>🎨 Edit profile</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => void sharePublicKey()}>Share public key</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => download(`${account}-cheesecrypt-key-PRIVATE.json`, key)}>Back up private key</DropdownMenuItem>
-                <DropdownMenuItem disabled={busy} onSelect={publish}>Publish to chain ({MESSAGE_FEE_QUANTITY})</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => fileRef.current?.click()}>Load file (your key or a contact's)</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={makeKey}>New key</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button size="sm" variant="ghost" disabled={loading} onClick={refresh} aria-label="Refresh messages">
+              </div>
+              <div className="flex items-center gap-1 truncate font-mono text-xs text-muted-foreground">
+                {loading && <Loader2 className="h-3 w-3 shrink-0 animate-spin" />}
+                <span className="truncate">{account}</span>
+              </div>
+            </div>
+            <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" disabled={loading} onClick={refresh} aria-label="Refresh messages" title="Refresh messages">
               <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
             </Button>
           </div>
-          <Button size="sm" variant="outline" className="w-full" onClick={() => setCreatingGroup(true)}>👥 New group</Button>
+          <div className="grid grid-cols-3 gap-1">
+            <CardAction icon={<Upload className="h-4 w-4" />} label="Restore" aria-label="Load a key file (yours or a contact's)" title="Load a key file (yours or a contact's)" onClick={() => fileRef.current?.click()} />
+            <CardAction icon={<Download className="h-4 w-4" />} label="Public key" aria-label="Share my public key file" title="Save my public key file to share" onClick={() => void sharePublicKey()} />
+            <CardAction icon={<Radio className="h-4 w-4" />} label="Publish" disabled={busy} aria-label={`Publish my key on chain (${MESSAGE_FEE_QUANTITY})`} title={`Publish my key on chain (${MESSAGE_FEE_QUANTITY})`} onClick={() => void publish()} />
+            <CardAction icon={<Save className="h-4 w-4" />} label="Back up" aria-label="Back up private key" title="Download a backup of my private key — never share it" onClick={() => download(`${account}-cheesecrypt-key-PRIVATE.json`, key)} />
+            <CardAction icon={<KeyRound className="h-4 w-4" />} label="New key" className="hover:text-destructive" aria-label="Create a new key" title="Create a new key (it cannot read messages sent to this one)" onClick={makeKey} />
+          </div>
         </div>
-        <ul className="flex-1 overflow-y-auto p-2 space-y-1">
-          <li aria-hidden className="px-2 pt-1 pb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">👥 Groups</span>
-          </li>
+        <div className="flex-1 overflow-y-auto p-2 space-y-4">
+          <Collapsible open={groupsOpen} onOpenChange={setGroupsOpen}>
+            <div className="flex items-center justify-between px-2">
+              <CollapsibleTrigger className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-cheese">
+                <ChevronDown className={cn('h-3.5 w-3.5 transition', !groupsOpen && '-rotate-90')} /> 👥 Groups
+              </CollapsibleTrigger>
+              <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="New group" title="New group" onClick={() => setCreatingGroup(true)}><Users className="h-4 w-4" /></Button>
+            </div>
+            <CollapsibleContent>
+              <ul className="space-y-1 pt-1">
           {groups.filter(g => !hiddenGroups.includes(g.id)).map(g => groupRow(g, false))}
           {!groups.some(g => !hiddenGroups.includes(g.id)) && <li className="text-xs text-muted-foreground px-2 pb-1">No groups yet.</li>}
           {groups.some(g => hiddenGroups.includes(g.id)) && <li>
@@ -644,9 +656,18 @@ export function Messenger({ account, session }: { account: string; session: NonN
             </Button>
             {showHiddenGroups && <ul id="crypt-hidden-groups" className="space-y-1">{groups.filter(g => hiddenGroups.includes(g.id)).map(g => groupRow(g, true))}</ul>}
           </li>}
-          <li aria-hidden className="border-t border-border my-2" role="presentation">
-            <span className="block px-2 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">🤝 Friends</span>
-          </li>
+              </ul>
+            </CollapsibleContent>
+          </Collapsible>
+          <Collapsible open={friendsOpen} onOpenChange={setFriendsOpen}>
+            <div className="flex items-center justify-between px-2">
+              <CollapsibleTrigger className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-cheese">
+                <ChevronDown className={cn('h-3.5 w-3.5 transition', !friendsOpen && '-rotate-90')} /> 🤝 Friends
+              </CollapsibleTrigger>
+              <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Add friend" title="Add friend" onClick={() => setAddingFriend(true)}><UserPlus className="h-4 w-4" /></Button>
+            </div>
+            <CollapsibleContent>
+              <ul className="space-y-1 pt-1">
           {partners.map((p) => (
             <li key={p} className="group flex items-center gap-1">
               <Button variant="ghost" onClick={() => setActive(p)}
