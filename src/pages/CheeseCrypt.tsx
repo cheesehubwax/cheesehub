@@ -445,7 +445,11 @@ export function Messenger({ account, session }: { account: string; session: NonN
     // Scroll only the message list itself so the outer page never jumps.
     if (switched || nearBottom.current) {
       const el = listRef.current;
-      if (el) el.scrollTo({ top: el.scrollHeight, behavior: switched ? 'auto' : 'smooth' });
+      if (el) {
+        const top = el.scrollHeight;
+        if (typeof el.scrollTo === 'function') el.scrollTo({ top, behavior: switched ? 'auto' : 'smooth' });
+        else el.scrollTop = top;
+      }
     }
   }, [thread.length, active]);
 
