@@ -8,8 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { CardAction } from '@/components/crypt/CardAction';
+import { BlockedDialog } from '@/components/crypt/BlockedDialog';
+import { addBlocked, loadBlocked, removeBlocked, saveBlocked, withoutBlocked } from '@/lib/cryptBlocklist';
 import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
-import { ChevronDown, Download, Eye, EyeOff, KeyRound, Loader2, Pencil, Radio, RefreshCw, Save, Trash2, Upload, UserPlus, Users } from 'lucide-react';
+import { ChevronDown, Download, Eye, EyeOff, KeyRound, Loader2, Ban, Pencil, Radio, RefreshCw, Save, Trash2, Upload, UserPlus, Users } from 'lucide-react';
 import { useWax } from '@/context/WaxContext';
 import { useWaxTransaction } from '@/hooks/useWaxTransaction';
 import { useToast } from '@/hooks/use-toast';
@@ -614,6 +616,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
       {showSharePrompt && key && <ShareKeyDialog account={account} busy={busy} agreed={agreed} onAgreedChange={setAgreed} onClose={() => setShowSharePrompt(false)}
         onDownload={() => { void sharePublicKey(); setShowSharePrompt(false); }}
         onPublish={async () => { if (await publish()) setShowSharePrompt(false); }} />}
+      {showBlocked && <BlockedDialog blocked={blocked} onBlock={blockAccount} onUnblock={unblockAccount} onClose={() => setShowBlocked(false)} />}
       {addingFriend && <Dialog open onOpenChange={o => { if (!o) setAddingFriend(false); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -652,6 +655,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
             <CardAction icon={<Download className="h-4 w-4" />} label="Public key" aria-label="Share my public key file" title="Save my public key file to share" onClick={() => void sharePublicKey()} />
             <CardAction icon={<Radio className="h-4 w-4" />} label="Publish" disabled={busy} aria-label={`Publish my key on chain (${MESSAGE_FEE_QUANTITY})`} title={`Publish my key on chain (${MESSAGE_FEE_QUANTITY})`} onClick={() => void publish()} />
             <CardAction icon={<Save className="h-4 w-4" />} label="Back up" aria-label="Back up private key" title="Download a backup of my private key — never share it" onClick={() => download(`${account}-cheesecrypt-key-PRIVATE.json`, key)} />
+            <CardAction icon={<Ban className="h-4 w-4" />} label={blocked.length ? `Blocked (${blocked.length})` : 'Blocked'} aria-label="Blocked accounts" title="Accounts blocked on this device" onClick={() => setShowBlocked(true)} />
             <CardAction icon={<KeyRound className="h-4 w-4" />} label="New key" className="hover:text-destructive" aria-label="Create a new key" title="Create a new key (it cannot read messages sent to this one)" onClick={makeKey} />
           </div>
         </div>
@@ -721,7 +725,11 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 <PixelAvatar account={member} avatar={member === account ? key.avatar : avatars[member]} className="h-6 w-6 shrink-0" /><span className="break-words">{nameFor(member)}{member === account && ' (you)'}{nameFor(member) !== member && <span className="block text-[10px] text-muted-foreground">{member}</span>}</span>
                 {member !== account && <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" aria-label={`Edit nickname for ${member}`} title={`Edit nickname for ${member}`} onClick={() => setEditingFriend(member)}><Pencil className="h-3 w-3" /></Button>}
               </span>) : <><PixelAvatar account={active} avatar={avatars[active]} /><span className="min-w-0 break-words">{nameFor(active)}{nameFor(active) !== active && <span className="block text-xs text-muted-foreground">{active}</span>}</span><Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label={`Edit nickname for ${active}`} title={`Edit nickname for ${active}`} onClick={() => setEditingFriend(active)}><Pencil className="h-3 w-3" /></Button></>}
-              {!activeGroup && contacts[active] && <Button size="sm" variant="ghost" className="ml-auto h-7 text-xs font-normal" onClick={() => saveFriend(active, true)}>💾 Save to {FRIENDS_DIR}</Button>}</div>
+              {!activeGroup && <span className="ml-auto flex items-center gap-1">
+                {contacts[active] && <Button size="sm" variant="ghost" className="h-7 text-xs font-normal" onClick={() => saveFriend(active, true)}>💾 Save to {FRIENDS_DIR}</Button>}
+                <Button size="sm" variant="ghost" className="h-7 text-xs font-normal text-destructive hover:text-destructive" aria-label={`Block ${active}`}
+                  onClick={() => { if (window.confirm(`Block ${active}? Their messages will be hidden on this device.`)) blockAccount(active); }}><Ban className="h-3.5 w-3.5" /> Block</Button>
+              </span>}</div>
             <ol ref={listRef} className="flex-1 overflow-y-auto space-y-2 p-4"
               onScroll={(e) => { const el = e.currentTarget; nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
               {thread.map((m) => (
