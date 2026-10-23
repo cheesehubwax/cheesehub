@@ -160,6 +160,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [active, setActive] = useState<string | null>(null);
   const [groups, setGroups] = useState(() => loadGroups(account));
   const [hiddenGroups, setHiddenGroups] = useState(() => loadHiddenGroups(account));
+  const [blocked, setBlockedState] = useState(() => loadBlocked(account));
+  const [showBlocked, setShowBlocked] = useState(false);
   const [showHiddenGroups, setShowHiddenGroups] = useState(false);
   const [attachingNft, setAttachingNft] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
@@ -241,19 +243,21 @@ export function Messenger({ account, session }: { account: string; session: NonN
     return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVisible); window.removeEventListener('focus', onVisible); };
   }, [key, poll]);
 
+  // Blocked accounts are dropped before any decryption, so their DMs, group copies and voice parts never surface.
+  const visibleMemos = useMemo(() => withoutBlocked(memos, account, blocked), [memos, account, blocked]);
   const partners = useMemo(() => {
     const s = new Set(Object.keys(contacts));
-    memos.forEach((m) => s.add(m.from === account ? m.to : m.from));
-    return [...s].filter(name => !removedContacts.includes(name)).sort();
-  }, [contacts, memos, account, removedContacts]);
+    visibleMemos.forEach((m) => s.add(m.from === account ? m.to : m.from));
+    return [...s].filter(name => !removedContacts.includes(name) && !blocked.includes(name)).sort();
+  }, [contacts, visibleMemos, account, removedContacts, blocked]);
 
   const lastAt = useMemo(() => {
     const out: Record<string, number> = {};
-    memos.forEach((m) => { const p = m.from === account ? m.to : m.from; out[p] = Math.max(out[p] ?? 0, m.time); });
+    visibleMemos.forEach((m) => { const p = m.from === account ? m.to : m.from; out[p] = Math.max(out[p] ?? 0, m.time); });
     return out;
-  }, [memos, account]);
+  }, [visibleMemos, account]);
 
-  const conversations = useMemo(() => key ? decodeConversations(memos, key, contacts, clock) : [], [memos, key, contacts, clock]);
+  const conversations = useMemo(() => key ? decodeConversations(visibleMemos, key, contacts, clock) : [], [visibleMemos, key, contacts, clock]);
   // A voice note spans several transactions; if one is unfinished right at the oldest loaded memo,
   // its earlier parts are probably on the next history page, so read one page further (bounded).
   useEffect(() => {
