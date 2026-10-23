@@ -1,7 +1,8 @@
 import { Inbox } from 'lucide-react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CardAction } from '@/components/crypt/CardAction';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { parseNftMessage } from '@/lib/cryptNft';
@@ -9,8 +10,10 @@ import type { InboxRequest } from '@/lib/cryptPublicInbox';
 import { cn } from '@/lib/utils';
 
 export function PublicInboxDialog({ enabled, onChange }: { enabled: boolean; onChange: (enabled: boolean) => void }) {
-  return <Dialog>
-    <DialogTrigger asChild><CardAction icon={<Inbox className="h-4 w-4" />} label="Inbox" aria-label="Public inbox" title={`Public inbox is ${enabled ? 'on' : 'off'}`} className={cn(enabled && 'text-cheese')} /></DialogTrigger>
+  const [open, setOpen] = useState(false);
+  return <>
+    <CardAction icon={<Inbox className="h-4 w-4" />} label="Inbox" aria-label="Public inbox" title={`Public inbox is ${enabled ? 'on' : 'off'}`} className={cn(enabled && 'text-cheese')} onClick={() => setOpen(true)} />
+    <Dialog open={open} onOpenChange={setOpen}>
     <DialogContent className="max-w-md">
       <DialogHeader><DialogTitle>📥 Public inbox</DialogTitle><DialogDescription>Let people you haven’t added send you message requests.</DialogDescription></DialogHeader>
       <div className="flex items-center justify-between gap-3">
@@ -20,7 +23,8 @@ export function PublicInboxDialog({ enabled, onChange }: { enabled: boolean; onC
       <p className="text-sm text-muted-foreground">Off by default. When on, text and NFT messages from accounts with published keys appear as requests, not friend chats. Voice and group invites aren’t accepted from strangers.</p>
       <p className="text-sm text-muted-foreground">Publish your own public key so people can find you. This setting stays on this device; accepting, declining and blocking a request are free and send nothing on-chain.</p>
     </DialogContent>
-  </Dialog>;
+    </Dialog>
+  </>;
 }
 
 export function MessageRequests({ requests, onAccept, onDecline, onBlock }: { requests: InboxRequest[]; onAccept: (from: string) => void; onDecline: (from: string) => void; onBlock: (from: string) => void }) {
