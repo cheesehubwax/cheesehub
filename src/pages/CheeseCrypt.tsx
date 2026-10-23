@@ -1,6 +1,6 @@
 // CHEESECrypt — encrypted on-chain messages paid in CHEESE.
 // Intentionally not linked from the header or menus: reachable at /crypt only.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { Button } from '@/components/ui/button';
@@ -438,9 +438,18 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const listRef = useRef<HTMLOListElement>(null);
   const nearBottom = useRef(true);
   const lastActive = useRef<string | null>(null);
+  // Remember where the page itself was so switching chats never moves the outer page.
+  const pageY = useRef(typeof window === 'undefined' ? 0 : window.scrollY);
   useEffect(() => {
+    const onScroll = () => { pageY.current = window.scrollY; };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+  useLayoutEffect(() => {
     const switched = lastActive.current !== active;
     lastActive.current = active;
+    const keepY = pageY.current;
+    const pin = () => { if (Math.abs(window.scrollY - keepY) > 1) window.scrollTo({ top: keepY, behavior: 'auto' }); };
     // Follow new messages only when the reader is already at the bottom; never yank them out of history.
     // Scroll only the message list itself so the outer page never jumps.
     if (switched || nearBottom.current) {
@@ -451,6 +460,13 @@ export function Messenger({ account, session }: { account: string; session: NonN
         else el.scrollTop = top;
       }
     }
+    if (!switched || typeof window.requestAnimationFrame !== 'function') return;
+    pin();
+    // Late layout (images, avatars) can still nudge the page right after the switch; hold it for a few frames.
+    let frames = 0; let raf = 0;
+    const hold = () => { pin(); if (++frames < 10) raf = window.requestAnimationFrame(hold); };
+    raf = window.requestAnimationFrame(hold);
+    return () => window.cancelAnimationFrame(raf);
   }, [thread.length, active]);
 
   const makeKey = () => {
