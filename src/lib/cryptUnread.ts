@@ -1,9 +1,9 @@
 /** Per-account read markers: conversation id ("group:<id>" or a WAX account) -> newest read message time. */
 export type ReadMarks = Record<string, number>;
-interface Msg { from: string; to: string; time: number; group: { id: string } | null }
+interface Msg { from: string; to: string; time: number; group: { id: string } | null; igroup?: string }
 
 const storeKey = (account: string) => `cheesecrypt-read-${account}`;
-export const conversationId = (m: Msg, account: string) => m.group ? `group:${m.group.id}` : (m.from === account ? m.to : m.from);
+export const conversationId = (m: Msg, account: string) => m.group ? `group:${m.group.id}` : m.igroup ? `group:${m.igroup}` : (m.from === account ? m.to : m.from);
 
 /** Null when this account has never stored read markers on this device. */
 export function loadReadMarks(account: string): ReadMarks | null {

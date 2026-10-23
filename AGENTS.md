@@ -17,7 +17,7 @@
 - CHEESECrypt voice notes are 0x03-headed byte memos assembled by sender+recipient+id across 30-part transactions; play only when complete and digest-verified (batches can partly fail).
 - CHEESECrypt names: validated key-file/CP1-note data (newest note wins, never a chat row), apart from per-owner nicknames; WAX accounts stay identities. Friend removal clears contact metadata and blocks rediscovery until re-add, keeping history and groups.
 - Crypt About: DappAbout + a separate crypto dialog.
-- CHEESECrypt group envelopes use legacy pairwise encryption; discover immutable membership only after authenticated assembly, isolating transactions/recipients before deduplicating fanout. Per-owner hidden-group IDs affect visibility only, preserving definitions/history for restoration.
+- CHEESECrypt groups are pairwise copies, trusted only fully assembled. CG1 (legacy) members are fixed in-envelope; CG2 invites come from a friend creator, and group keys open only that group's notices. Hidden IDs only hide.
 - Crypt uses integer fee splits; fanout omits fees explicitly, not by indexes. Confirm payment before local key creation; imports stay free. History uses current rates.
 - CHEESECrypt avatars are validated palette-index data in optional key-file fields and separate per-account contact storage; imports rasterize locally, and on-chain key memos stay unchanged to preserve compatibility and avoid executable or remote avatar payloads.
 - CHEESECrypt folder pickers start at Desktop but request the vault subfolder; retry permission failures because Chromium protects Desktop-root access. Profile precedes keys; edits refresh only verified matching-key backups (staged writes), else download.
