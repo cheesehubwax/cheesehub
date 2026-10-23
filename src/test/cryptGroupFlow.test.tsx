@@ -125,7 +125,7 @@ describe('group creation and signing gate', () => {
   });
   it('saves the selected membership and submits both recipient copies only after terms acceptance', async () => {
     mount(<Messenger account="alice" session={{ permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} />);
-    fireEvent.click(screen.getByRole('button', { name: '👥 New group' }));
+    fireEvent.click(screen.getByRole('button', { name: 'New group' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'bob' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'carol' }));
     fireEvent.click(screen.getByRole('button', { name: 'Create group' }));

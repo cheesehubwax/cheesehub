@@ -6,11 +6,10 @@ import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { CardAction } from '@/components/crypt/CardAction';
 import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
-import { ChevronDown, Eye, EyeOff, Pencil, RefreshCw, Trash2 } from 'lucide-react';
+import { ChevronDown, Download, Eye, EyeOff, KeyRound, Loader2, Pencil, Radio, RefreshCw, Save, Trash2, Upload, UserPlus, Users } from 'lucide-react';
 import { useWax } from '@/context/WaxContext';
 import { useWaxTransaction } from '@/hooks/useWaxTransaction';
 import { useToast } from '@/hooks/use-toast';
@@ -686,8 +685,11 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 onClick={() => removeFriend(p)}><Trash2 className="h-3.5 w-3.5" /></Button>
             </li>
           ))}
-          {!partners.length && <li className="text-xs text-muted-foreground px-2 pb-2">{loading ? 'Loading…' : 'No conversations yet. Add a WAX account above.'}</li>}
-        </ul>
+          {!partners.length && <li className="text-xs text-muted-foreground px-2 pb-2">{loading ? 'Loading…' : 'Add a friend to start chatting.'}</li>}
+              </ul>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
       </aside>
 
       <section className="flex flex-col min-h-0">
