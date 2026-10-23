@@ -20,7 +20,7 @@ import { CryptNftCard } from '@/components/crypt/CryptNftCard';
 import { useQuery } from '@tanstack/react-query';
 import { fetchAssetById } from '@/services/atomicApi';
 import { nftToken, parseNftMessage } from '@/lib/cryptNft';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FriendNameDialog } from '@/components/crypt/FriendNameDialog';
 import { cryptDisplayName, loadCryptNames, saveCryptName } from '@/lib/cryptNames';
 import { accountAvatar, type CryptAvatar } from '@/lib/cryptAvatar';
