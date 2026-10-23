@@ -14,7 +14,7 @@ const makeRow = (): HoldingRow => ({
   key: token.key, contract: token.contract, symbol: token.symbol, precision: token.precision,
   balance: 50, walletBalance: 50, pooledBalance: 0, pooledParts: [], pooledUnknown: false,
   priceWax: 1, valueWax: 50, avgCostWax: 0, unrealizedWax: 50, unrealizedPct: null, realizedWax: 0,
-  valueUsd: null, avgCostUsd: null, unrealizedUsd: null, unrealizedPctUsd: null, realizedUsd: 0,
+  valueUsd: null, avgCostUsd: null, unrealizedUsd: null, unrealizedPctUsd: null, realizedUsd: 0, costWax: 0, costUsd: null,
   usdComplete: true, complete: true, closed: false,
   position: buildLedger(events).positions.get(token.key)!,
 });

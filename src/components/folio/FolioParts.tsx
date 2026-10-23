@@ -5,7 +5,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { TokenLogo } from '@/components/TokenLogo';
 import type { FolioEvent, FolioEventType, TokenAmount } from '@/lib/folio/types';
-import { WAX_KEY } from '@/lib/folio/types';
 import type { HoldingRow } from '@/lib/folio/holdings';
 import type { Realisable } from '@/hooks/useRealisableValues';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -154,13 +153,18 @@ export function GiftListDialog({ row, events, onClose }: { row: HoldingRow | nul
 }
 
 /** Remaining cost of visible live holdings; never replay or reprice the ledger. */
+/** Per-asset Total Cost: what was paid for the tokens still held; closed rows show nothing. */
+export function holdingCost(row: HoldingRow, usd: boolean): number | null {
+  if (row.closed || row.balance <= 0) return null;
+  return usd ? row.costUsd : row.costWax;
+}
+
 export function totalHoldingCost(rows: HoldingRow[]) {
   let wax = 0, usd = 0, knownWax = 0, knownUsd = 0, missingWax = false, missingUsd = false;
   for (const row of rows) {
     if (row.closed || row.balance <= 0) continue;
-    // WAX is the accounting unit in WAX mode, not a token with WAX P/L.
-    const costWax = row.key === WAX_KEY ? row.balance : row.avgCostWax == null ? null : row.avgCostWax * row.balance;
-    const costUsd = row.avgCostUsd == null ? null : row.avgCostUsd * row.balance;
+    const costWax = holdingCost(row, false);
+    const costUsd = holdingCost(row, true);
     if (costWax == null) missingWax = true;
     else { wax += costWax; knownWax++; }
     if (costUsd == null) missingUsd = true;
@@ -198,7 +202,7 @@ export function AmountList({ items }: { items: TokenAmount[] }) {
   );
 }
 
-type SortCol = 'token' | 'balance' | 'avg' | 'price' | 'paper' | 'realisable' | 'unrealised' | 'realised';
+type SortCol = 'token' | 'balance' | 'avg' | 'price' | 'cost' | 'paper' | 'realisable' | 'unrealised' | 'realised';
 
 /** Mobile card/table switch; desktop always uses the table. */
 function ViewToggle({ view, setView }: { view: 'cards' | 'table'; setView: (v: 'cards' | 'table') => void }) {
@@ -230,6 +234,7 @@ export function HoldingsTable({ rows, events, waxUsd, cur, fiat = 'USD', realisa
         case 'balance': return r.balance;
         case 'avg': return usd ? r.avgCostUsd : r.avgCostWax;
         case 'price': return r.priceWax;
+        case 'cost': return usd ? r.costUsd : r.costWax;
         case 'paper': return r.valueWax;
         case 'realisable': return r.key === 'eosio.token:WAX' ? r.balance : realisable?.get(r.key)?.wax ?? null;
         case 'unrealised': return usd ? r.unrealizedUsd : r.unrealizedWax;
@@ -264,6 +269,7 @@ export function HoldingsTable({ rows, events, waxUsd, cur, fiat = 'USD', realisa
           const unrealPct = usd ? r.unrealizedPctUsd : r.unrealizedPct;
           const realized = usd ? r.realizedUsd : r.realizedWax;
           const avg = usd ? r.avgCostUsd : r.avgCostWax;
+          const cost = holdingCost(r, usd);
           const usdMissing = usd && r.complete && !r.usdComplete;
           return (
             <div key={r.key} role="button" tabIndex={0} className="cursor-pointer rounded-lg border border-border/50 bg-card/60 p-3 space-y-2" onClick={() => onPick(r)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onPick(r); }}>
@@ -288,6 +294,7 @@ export function HoldingsTable({ rows, events, waxUsd, cur, fiat = 'USD', realisa
                 <div className="flex items-baseline justify-between gap-2"><dt className="text-muted-foreground">Balance</dt><dd className="text-right">{fmt(r.balance, r.precision)}{r.pooledBalance > 0 ? <span className="block text-xs text-muted-foreground">{fmt(r.pooledBalance, r.precision)} in pools</span> : null}</dd></div>
                 <div className="flex items-baseline justify-between gap-2"><dt className="text-muted-foreground">Avg cost</dt><dd className="text-right">{avg == null ? '—' : usd ? fiatFmt(avg, fiatCode, true) : fmt(avg, 6)}</dd></div>
                 <div className="flex items-baseline justify-between gap-2"><dt className="text-muted-foreground">Price</dt><dd className="text-right">{r.priceWax == null ? '—' : usd ? (waxUsd ? fiatFmt(r.priceWax * waxUsd, fiatCode, true) : '—') : fmt(r.priceWax, 6)}</dd></div>
+                <div className="flex items-baseline justify-between gap-2"><dt className="text-muted-foreground">Total cost</dt><dd className="text-right">{cost == null ? '—' : usd ? fiatFmt(cost, fiatCode, true) : fmt(cost, 6)}</dd></div>
                 <div className="flex items-baseline justify-between gap-2"><dt className="text-muted-foreground">Paper value</dt><dd className="text-right">{usd ? money(r.valueUsd, cur) : waxFmt(r.valueWax)}</dd></div>
                 <div className="flex items-baseline justify-between gap-2"><dt className="text-muted-foreground">Realisable</dt><dd className="text-right">{r.closed ? '—' : rzWax == null ? '—' : usd ? money(waxUsd ? rzWax * waxUsd : null, cur) : waxFmt(rzWax)}</dd></div>
                 <div className={`flex items-baseline justify-between gap-2 ${plClass(unreal)}`}><dt className="text-muted-foreground">Unrealised</dt><dd className="text-right">{unreal == null ? '—' : signedMoney(unreal, cur)}{unrealPct != null ? ` (${signed(unrealPct)}%)` : ''}</dd></div>
@@ -304,16 +311,17 @@ export function HoldingsTable({ rows, events, waxUsd, cur, fiat = 'USD', realisa
   return (
     <div className="w-full overflow-x-auto rounded-lg border border-border/50 bg-card/60">
       {isMobile ? <div className="border-b border-border/50 p-2"><ViewToggle view={view} setView={setView} /></div> : null}
-      <table aria-label="Holdings" className="w-full min-w-[1080px] table-fixed text-xs xl:text-sm [&_th]:px-2 [&_td]:px-2 [&_td]:py-2 [&_td]:break-words [&_th:first-child]:pl-3 [&_td:first-child]:pl-3 [&_th:last-child]:pr-6 [&_td:last-child]:pr-6">
+      <table aria-label="Holdings" className="w-full min-w-[1140px] table-fixed text-xs xl:text-sm [&_th]:px-2 [&_td]:px-2 [&_td]:py-2 [&_td]:break-words [&_th:first-child]:pl-3 [&_td:first-child]:pl-3 [&_th:last-child]:pr-6 [&_td:last-child]:pr-6">
         <colgroup>
-          <col className="w-[19%]" />
+          <col className="w-[16%]" />
+          <col className="w-[10%]" />
+          <col className="w-[10%]" />
+          <col className="w-[10%]" />
+          <col className="w-[10%]" />
+          <col className="w-[11%]" />
           <col className="w-[12%]" />
           <col className="w-[11%]" />
-          <col className="w-[11%]" />
-          <col className="w-[11%]" />
-          <col className="w-[12%]" />
-          <col className="w-[13%]" />
-          <col className="w-[11%]" />
+          <col className="w-[10%]" />
         </colgroup>
         <thead className="text-xs uppercase text-muted-foreground whitespace-normal">
           <tr className="border-b border-border/50">
@@ -321,6 +329,7 @@ export function HoldingsTable({ rows, events, waxUsd, cur, fiat = 'USD', realisa
             {head('balance', 'Balance')}
             {head('avg', 'Avg cost')}
             {head('price', 'Price')}
+            {head('cost', 'Total cost', false, "What you paid for the tokens you still hold, at each purchase day's rate")}
             {head('paper', 'Paper value', false, 'Amount × current price')}
             {head('realisable', 'Realisable', false, 'What selling the whole balance on Alcor would return right now')}
             {head('unrealised', 'Unrealised P/L')}
@@ -335,6 +344,7 @@ export function HoldingsTable({ rows, events, waxUsd, cur, fiat = 'USD', realisa
             const unrealPct = usd ? r.unrealizedPctUsd : r.unrealizedPct;
             const realized = usd ? r.realizedUsd : r.realizedWax;
             const avg = usd ? r.avgCostUsd : r.avgCostWax;
+            const cost = holdingCost(r, usd);
             const usdMissing = usd && r.complete && !r.usdComplete;
             const receipts = acquisitions.get(r.key);
             return (
@@ -385,6 +395,7 @@ export function HoldingsTable({ rows, events, waxUsd, cur, fiat = 'USD', realisa
               </td>
               <td className="px-3 py-2 text-right">{avg == null ? '—' : usd ? fiatFmt(avg, fiatCode, true) : fmt(avg, 6)}</td>
               <td className="px-3 py-2 text-right">{r.priceWax == null ? '—' : usd ? (waxUsd ? fiatFmt(r.priceWax * waxUsd, fiatCode, true) : '—') : fmt(r.priceWax, 6)}</td>
+              <td className="px-3 py-2 text-right">{cost == null ? '—' : usd ? fiatFmt(cost, fiatCode, true) : fmt(cost, 6)}</td>
               <td className="px-3 py-2 text-right">
                 <div>{usd ? money(r.valueUsd, cur) : waxFmt(r.valueWax)}</div>
                 {!usd ? <div className="text-xs text-muted-foreground">{usdFmt(r.valueWax, waxUsd, fiatCode)}</div> : null}
@@ -408,7 +419,7 @@ export function HoldingsTable({ rows, events, waxUsd, cur, fiat = 'USD', realisa
             );
           })}
           {rows.length === 0 ? (
-            <tr><td colSpan={8} className="px-3 py-6 text-center text-muted-foreground">No tokens with a balance.</td></tr>
+            <tr><td colSpan={9} className="px-3 py-6 text-center text-muted-foreground">No tokens with a balance.</td></tr>
           ) : null}
         </tbody>
       </table>
@@ -559,6 +570,7 @@ export function TokenDialog({
   const acquisitions = useMemo(() => row && p ? acquisitionBreakdown(row.key, events, p.freeQty) : null, [row, p, events]);
   const [showGifts, setShowGifts] = useState(false);
   const usd = cur !== 'WAX';
+  const cost = row ? holdingCost(row, usd) : null;
   const fiatCode: DisplayCode = cur === 'WAX' ? fiat : cur;
   return (
     <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
@@ -574,6 +586,7 @@ export function TokenDialog({
             <div className="flex flex-wrap gap-2">
               <SummaryBox label="Balance" value={fmt(row.balance, row.precision)} sub={usd ? money(row.valueUsd, cur) : usdFmt(row.valueWax, waxUsd, fiatCode)} />
               <SummaryBox label="Avg cost" value={usd ? (row.avgCostUsd == null ? '—' : fiatFmt(row.avgCostUsd, fiatCode, true)) : row.avgCostWax == null ? '—' : `${fmt(row.avgCostWax, 6)} WAX`} />
+              <SummaryBox label="Total cost" value={cost == null ? '—' : usd ? fiatFmt(cost, fiatCode, true) : `${fmt(cost, 6)} WAX`} />
               <SummaryBox
                 label="Realisable now"
                 value={realisable?.wax == null ? '—' : usd ? money(waxUsd ? realisable.wax * waxUsd : null, cur) : waxFmt(realisable.wax)}
