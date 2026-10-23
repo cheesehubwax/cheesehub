@@ -1,4 +1,5 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render as renderUi, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Session } from '@wharfkit/session';
 import { generateKey, loadKey, saveKey, toPublicFile } from '@/lib/cheeseCrypt';
@@ -14,6 +15,7 @@ vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import
 vi.mock('@/components/crypt/VaultPrompt', () => ({ VaultPrompt: ({ cryptKey, onSaved, onDownload }: { cryptKey: unknown; onSaved: (root: unknown) => void; onDownload: () => void }) => <div><button onClick={() => { calls.backup(cryptKey); onSaved({}); }}>Save backup</button><button onClick={() => { calls.backup(cryptKey); onDownload(); }}>Download backup</button></div> }));
 
 const props = { account: 'alice', session: { permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session };
+const render = (ui: React.ReactElement) => renderUi(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>);
 beforeEach(() => {
   localStorage.clear();
   vi.clearAllMocks();
