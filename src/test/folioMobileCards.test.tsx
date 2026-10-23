@@ -10,7 +10,7 @@ const row: HoldingRow = {
   balance: 100, walletBalance: 100, pooledBalance: 0, pooledParts: [], pooledUnknown: false,
   priceWax: 0.5, valueWax: 50, avgCostWax: 0.4, unrealizedWax: 10, unrealizedPct: 25,
   realizedWax: 5, valueUsd: 2, avgCostUsd: 0.016, unrealizedUsd: 0.4, unrealizedPctUsd: 25,
-  realizedUsd: 0.2, usdComplete: true, complete: true, position: null, closed: false,
+  realizedUsd: 0.2, usdComplete: true, complete: true, position: null, closed: false, costWax: 40, costUsd: 1.6,
 };
 
 const event = {

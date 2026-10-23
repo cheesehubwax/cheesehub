@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { totalHoldingCost } from '@/components/folio/FolioParts';
+import { holdingCost, totalHoldingCost } from '@/components/folio/FolioParts';
 import { buildHoldings, type HoldingRow } from '@/lib/folio/holdings';
 import type { TokenPosition } from '@/lib/folio/types';
 
@@ -33,12 +33,29 @@ describe('portfolio remaining total cost', () => {
     expect(totalHoldingCost([closed]).usd).toBe(0);
   });
   it('keeps missing history costs unknown, including when every cost is missing', () => {
-    const unknown = { ...rows()[0], avgCostWax: null, avgCostUsd: null };
+    const unknown = { ...rows()[0], avgCostWax: null, avgCostUsd: null, costWax: null, costUsd: null };
     expect(totalHoldingCost([unknown])).toEqual({ wax: null, usd: null, partialWax: true, partialUsd: true });
     expect(totalHoldingCost([rows()[0], unknown])).toEqual({ wax: 150, usd: 10, partialWax: true, partialUsd: true });
   });
   it('counts free holdings as a known zero cost and an empty portfolio as zero', () => {
     expect(totalHoldingCost([{ ...rows()[0], avgCostWax: 0, avgCostUsd: 0 }])).toEqual({ wax: 0, usd: 0, partialWax: false, partialUsd: false });
     expect(totalHoldingCost([])).toEqual({ wax: 0, usd: 0, partialWax: false, partialUsd: false });
+  });
+});
+
+describe('per-token total cost', () => {
+  it('matches the summary: wallet plus pool deposits, WAX at one per unit, closed rows unknown', () => {
+    const all = rows();
+    const cheese = all.find((r) => r.key === position.key)!;
+    const wax = all.find((r) => r.key === 'eosio.token:WAX')!;
+    expect(cheese.costWax).toBe(150);
+    expect(cheese.costUsd).toBe(10);
+    expect(holdingCost(cheese, false)).toBe(150);
+    expect(holdingCost(cheese, true)).toBe(10);
+    expect(wax.costWax).toBe(20);
+    expect(wax.costUsd).toBeNull();
+    expect(holdingCost(wax, false)).toBe(20);
+    expect(holdingCost({ ...cheese, closed: true, balance: 0 }, false)).toBeNull();
+    expect(holdingCost({ ...cheese, costWax: null, costUsd: null }, false)).toBeNull();
   });
 });
