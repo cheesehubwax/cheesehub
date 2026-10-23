@@ -48,6 +48,17 @@ describe('CHEESEFolio live market prices', () => {
     hook.client.clear();
   });
 
+  it('manual refresh updates the shared price and timestamp', async () => {
+    mocks.fetchTokens.mockResolvedValueOnce(token(2)).mockResolvedValue(token(1));
+    const hook = setup();
+    await waitFor(() => expect(hook.result.current.data?.get('cheeseburger:CHEESE')).toBe(2));
+    const previous = hook.result.current.pricesUpdatedAt;
+    await act(async () => { await hook.result.current.refetch(); });
+    await waitFor(() => expect(hook.result.current.data?.get('cheeseburger:CHEESE')).toBe(1));
+    expect(hook.result.current.pricesUpdatedAt).toBeGreaterThan(previous);
+    hook.client.clear();
+  });
+
   it('does not call metadata-only fallback a fresh price update', async () => {
     mocks.fetchTokens.mockResolvedValue([...token(0), { contract: 'eosio.token', ticker: 'WAX', precision: 8, system_price: 1 }]);
     const hook = setup();
