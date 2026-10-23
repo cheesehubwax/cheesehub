@@ -29,14 +29,18 @@ export function useRealisableValues(rows: HoldingRow[], account: string | null) 
     queryKey: ['folio-realisable', account, key],
     enabled: !!account && targets.length > 0,
     staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: 'always',
     retry: false,
     queryFn: async () => {
       const out = new Map<string, Realisable>();
+      if (!account) return out;
       await mapLimit(targets, 2, async (r) => {
         try {
           const route = await fetchSwapRoute(
             { contract: r.contract, ticker: r.symbol, precision: r.precision },
-            WAX_TOKEN, String(r.balance), 1, account!,
+            WAX_TOKEN, String(r.balance), 1, account,
           );
           const wax = route && Number.isFinite(route.output) ? route.output : null;
           out.set(r.key, { wax, gapPct: realisableGapPct(wax, r.valueWax) });

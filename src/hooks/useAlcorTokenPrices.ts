@@ -9,8 +9,8 @@ export type TokenPriceMap = Map<string, number>;
  * Derives token price data from the shared swap-tokens query
  * instead of making a separate fetch to the same Alcor /tokens endpoint.
  */
-export function useAlcorTokenPrices() {
-  const { tokens, isLoading, error } = useSwapTokens();
+export function useAlcorTokenPrices(livePrices = false) {
+  const { tokens, isLoading, error, isFetching, dataUpdatedAt, isPlaceholderData } = useSwapTokens(livePrices);
   const queryClient = useQueryClient();
 
   const data = useMemo(() => {
@@ -26,5 +26,8 @@ export function useAlcorTokenPrices() {
 
   const refetch = () => queryClient.invalidateQueries({ queryKey: ['swap-tokens'] });
 
-  return { data, isLoading, error, refetch };
+  // Metadata-only fallback and cached placeholders are not fresh prices.
+  const hasLivePrices = tokens.some((t) => `${t.contract}:${t.ticker}` !== 'eosio.token:WAX' && t.system_price > 0);
+  const pricesUpdatedAt = !isPlaceholderData && hasLivePrices ? dataUpdatedAt : 0;
+  return { data, isLoading, error, refetch, isFetching, pricesUpdatedAt };
 }

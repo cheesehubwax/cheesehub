@@ -7,10 +7,10 @@ import { cached, readStatCache } from "@/lib/statCache";
 
 const CACHE_KEY = "swap-tokens";
 
-export function useSwapTokens() {
+export function useSwapTokens(livePrices = false) {
   const [search, setSearch] = useState("");
 
-  const { data: tokens = [], isLoading, error, refetch, isFetching } = useQuery({
+  const { data: tokens = [], isLoading, error, refetch, isFetching, dataUpdatedAt, isPlaceholderData } = useQuery({
     queryKey: ["swap-tokens"],
     queryFn: ({ signal }) => cached(CACHE_KEY, () => fetchSwapTokenList(signal))(),
     // Prices show from the last good list while the fresh one loads.
@@ -20,11 +20,13 @@ export function useSwapTokens() {
       const snapshot = readTokenSnapshot();
       return snapshot ? snapshotSwapTokens(snapshot) : undefined;
     },
-    staleTime: 10 * 60 * 1000,
+    staleTime: livePrices ? 60_000 : 10 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    refetchOnReconnect: false,
+    refetchInterval: livePrices ? 60_000 : false,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: livePrices ? 'always' : false,
+    refetchOnMount: livePrices ? 'always' : false,
+    refetchOnReconnect: livePrices ? 'always' : false,
   });
 
   // Populate the global token logo cache from the shared query
@@ -49,5 +51,5 @@ export function useSwapTokens() {
     );
   }, [tokens, search]);
 
-  return { tokens, filteredTokens, popularTokens, isLoading, error, search, setSearch, refetch, isFetching };
+  return { tokens, filteredTokens, popularTokens, isLoading, error, search, setSearch, refetch, isFetching, dataUpdatedAt, isPlaceholderData };
 }
