@@ -165,6 +165,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [attachingNft, setAttachingNft] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [newContact, setNewContact] = useState('');
+  const [addingFriend, setAddingFriend] = useState(false);
+  const [groupsOpen, setGroupsOpen] = useState(true);
+  const [friendsOpen, setFriendsOpen] = useState(true);
   const [memos, setMemos] = useState<ChainMemo[]>([]);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -421,8 +424,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
     setBusy(true);
     try {
       const pub = await lookupPublishedKey(name);
-      if (!pub) { toast({ title: `${name} has not published a key`, description: 'Ask them for their public key file and load it here.' }); return; }
+      if (!pub) { toast({ title: `${name} has not published a key`, description: 'Ask them for their public key file and import it here.' }); return; }
       saveContact(account, name, pub); setContacts(loadContacts(account)); setRemovedContacts(loadRemovedContacts(account)); setActive(name); setNewContact(''); saveFriend(name, false);
+      setAddingFriend(false);
       toast({ title: `Found ${name}'s key` });
     } catch { toast({ title: 'Key lookup failed', variant: 'destructive' }); }
     finally { setBusy(false); }
