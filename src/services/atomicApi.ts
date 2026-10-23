@@ -1085,5 +1085,6 @@ export async function fetchAssetById(assetId: string): Promise<{ asset_id: strin
     artist: typeof all.artist === 'string' ? all.artist : undefined,
     tracks: nftMediaTracks(all, getImageUrl),
     isSfx: isSfxNft(all),
+    video: typeof videoField === 'string' && videoField ? getImageUrl(videoField) : undefined,
   };
 }
