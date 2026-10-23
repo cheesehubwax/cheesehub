@@ -38,7 +38,7 @@ describe('portfolio remaining total cost', () => {
     expect(totalHoldingCost([rows()[0], unknown])).toEqual({ wax: 150, usd: 10, partialWax: true, partialUsd: true });
   });
   it('counts free holdings as a known zero cost and an empty portfolio as zero', () => {
-    expect(totalHoldingCost([{ ...rows()[0], avgCostWax: 0, avgCostUsd: 0 }])).toEqual({ wax: 0, usd: 0, partialWax: false, partialUsd: false });
+    expect(totalHoldingCost([{ ...rows()[0], avgCostWax: 0, avgCostUsd: 0, costWax: 0, costUsd: 0 }])).toEqual({ wax: 0, usd: 0, partialWax: false, partialUsd: false });
     expect(totalHoldingCost([])).toEqual({ wax: 0, usd: 0, partialWax: false, partialUsd: false });
   });
 });
