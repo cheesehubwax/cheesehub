@@ -30,13 +30,13 @@ describe('invite format', () => {
   });
 
   it('allows up to 8 members and rejects 9, a missing creator, duplicates or bad keys', () => {
-    const m = (n: number) => Array.from({ length: n }, (_, i) => [`user${i + 1}`, alice.publicKey]);
-    const base = { i: ID, n: 'x', o: 'user1', c: 1 };
+    const m = (n: number) => Array.from({ length: n }, (_, i) => [`user${'abcdefghi'[i]}`, alice.publicKey]);
+    const base = { i: ID, n: 'x', o: 'usera', c: 1 };
     expect(validateInvite({ ...base, m: m(8) })).not.toBeNull();
     expect(validateInvite({ ...base, m: m(9) })).toBeNull();
     expect(validateInvite({ ...base, o: 'nobody', m: m(3) })).toBeNull();
-    expect(validateInvite({ ...base, m: [['user1', alice.publicKey], ['user1', bob.publicKey]] })).toBeNull();
-    expect(validateInvite({ ...base, m: [['user1', alice.publicKey], ['user2', 'short']] })).toBeNull();
+    expect(validateInvite({ ...base, m: [['usera', alice.publicKey], ['usera', bob.publicKey]] })).toBeNull();
+    expect(validateInvite({ ...base, m: [['usera', alice.publicKey], ['userb', 'short']] })).toBeNull();
   });
 });
 
