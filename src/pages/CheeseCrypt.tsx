@@ -9,6 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { CardAction } from '@/components/crypt/CardAction';
 import { BlockedDialog } from '@/components/crypt/BlockedDialog';
+import { buildProfileNoteBatches, isProfileNote, latestProfiles, profileNoteCost, profileNoteParts, profileRecipients } from '@/lib/cryptProfileNotes';
+import { ProfileShareDialog } from '@/components/crypt/ProfileShareDialog';
 import { addBlocked, loadBlocked, removeBlocked, saveBlocked, withoutBlocked } from '@/lib/cryptBlocklist';
 import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 import { ChevronDown, Download, Eye, EyeOff, KeyRound, Loader2, Ban, Pencil, Radio, RefreshCw, Save, Trash2, Upload, UserPlus, Users } from 'lucide-react';
@@ -164,6 +166,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [hiddenGroups, setHiddenGroups] = useState(() => loadHiddenGroups(account));
   const [blocked, setBlockedState] = useState(() => loadBlocked(account));
   const [showBlocked, setShowBlocked] = useState(false);
+  const [sharingProfile, setSharingProfile] = useState(false);
   const [showHiddenGroups, setShowHiddenGroups] = useState(false);
   const [attachingNft, setAttachingNft] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
@@ -259,7 +262,19 @@ export function Messenger({ account, session }: { account: string; session: NonN
     return out;
   }, [visibleMemos, account]);
 
-  const conversations = useMemo(() => key ? decodeConversations(visibleMemos, key, contacts, clock) : [], [visibleMemos, key, contacts, clock]);
+  const decoded = useMemo(() => key ? decodeConversations(visibleMemos, key, contacts, clock) : [], [visibleMemos, key, contacts, clock]);
+  // Profile notes update names/avatars and never appear as chat messages or unread badges.
+  const conversations = useMemo(() => decoded.filter(c => !isProfileNote(c.text)), [decoded]);
+  const profileNotes = useMemo(() => latestProfiles(decoded.filter(c => !c.group && !c.voice && !c.missing), account), [decoded, account]);
+  useEffect(() => {
+    let changed = false;
+    for (const [from, note] of Object.entries(profileNotes)) {
+      if (!contacts[from]) continue;
+      if ((names[from] ?? '') === (note.displayName ?? '') && avatars[from]?.pixels === note.avatar.pixels) continue;
+      saveContact(account, from, contacts[from], note.avatar, note.displayName ?? ''); changed = true;
+    }
+    if (changed) { setAvatars(loadContactAvatars(account)); setNames(loadCryptNames(account)); }
+  }, [profileNotes, contacts, names, avatars, account]);
   // A voice note spans several transactions; if one is unfinished right at the oldest loaded memo,
   // its earlier parts are probably on the next history page, so read one page further (bounded).
   useEffect(() => {
@@ -351,6 +366,26 @@ export function Messenger({ account, session }: { account: string; session: NonN
       download(privateKeyName(account), updated);
       toast({ title: 'Profile saved; refreshed backup downloaded', description: 'The existing disk file was not replaced. Keep this refreshed file safe; share only your public key.' });
     }
+    setSharingProfile(true);
+  };
+
+  /** Sends your current name/avatar to every friend and group member, one batch at a time. */
+  const sendProfileNote = async (to: string[]) => {
+    if (!key) return false;
+    setBusy(true);
+    let sent = 0, total = 0;
+    try {
+      const batches = buildProfileNoteBatches(key, to, contacts, [permission]);
+      total = batches.length;
+      for (let i = 0; i < batches.length; i++) {
+        const r = await executeTransaction(batches[i], { successTitle: total > 1 ? `Profile update ${i + 1} of ${total} sent` : 'Profile update sent' });
+        if (!r.success) break;
+        sent++;
+      }
+    } catch (e) { toast({ title: 'Could not send profile update', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+    if (sent && sent < total) toast({ title: 'Profile update partly sent', description: `${sent} of ${total} transactions went through. You can send it again.`, variant: 'destructive' });
+    return sent > 0 && sent === total;
   };
 
   const payAndCreateKey = async () => {
@@ -616,6 +651,12 @@ export function Messenger({ account, session }: { account: string; session: NonN
       {showSharePrompt && key && <ShareKeyDialog account={account} busy={busy} agreed={agreed} onAgreedChange={setAgreed} onClose={() => setShowSharePrompt(false)}
         onDownload={() => { void sharePublicKey(); setShowSharePrompt(false); }}
         onPublish={async () => { if (await publish()) setShowSharePrompt(false); }} />}
+      {sharingProfile && key && (() => {
+        const to = profileRecipients(account, contacts, groups.map(g => g.members), [...blocked, ...removedContacts]);
+        const parts = profileNoteParts(key);
+        return <ProfileShareDialog recipients={to.map(nameFor)} cost={to.length ? profileNoteCost(parts, to.length) : ''} busy={busy}
+          onClose={() => setSharingProfile(false)} onSend={async () => { if (await sendProfileNote(to)) setSharingProfile(false); }} />;
+      })()}
       {showBlocked && <BlockedDialog blocked={blocked} onBlock={blockAccount} onUnblock={unblockAccount} onClose={() => setShowBlocked(false)} />}
       {addingFriend && <Dialog open onOpenChange={o => { if (!o) setAddingFriend(false); }}>
         <DialogContent className="max-w-md">
