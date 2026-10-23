@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Session } from '@wharfkit/session';
@@ -35,5 +35,26 @@ describe('profile notes in the messenger', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Bobby New/ }));
     await screen.findByText('real hi');
     expect(screen.queryByText(/CP1/)).not.toBeInTheDocument();
+  });
+
+  it('offers to send an edited profile and pays only after terms are accepted', async () => {
+    const alice = generateKey('alice'), bob = generateKey('bob');
+    saveKey(alice); saveContact('alice', 'bob', bob.publicKey);
+    calls.fetch.mockResolvedValue([]);
+    calls.transact.mockResolvedValue({ success: true, txId: 'ok' });
+    mount(<Messenger account="alice" session={{ permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit profile' }));
+    fireEvent.change(await screen.findByLabelText('CHEESECrypt name'), { target: { value: 'Alice New' } });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save profile' })); });
+    const send = await screen.findByRole('button', { name: 'Send update' });
+    expect(send).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox'));
+    await act(async () => { fireEvent.click(send); });
+    expect(calls.transact).toHaveBeenCalledTimes(1);
+    const actions = calls.transact.mock.calls[0][0] as { data: { to: string } }[];
+    expect(actions.some(a => a.data.to === 'bob')).toBe(true);
+    expect(actions.some(a => a.data.to === 'eosio.null')).toBe(true);
+    expect(actions.some(a => a.data.to === 'xcheeseliqst')).toBe(true);
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Send update' })).not.toBeInTheDocument());
   });
 });
