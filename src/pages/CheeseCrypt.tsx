@@ -36,11 +36,12 @@ import { CryptAbout } from '@/components/crypt/CryptAbout';
 import { VoiceRecorder } from '@/components/crypt/VoiceRecorder';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { buildVoiceBatches, voiceNoteCost, voicePartCount, voiceTransactions, VOICE_PARTS_PER_TX, type VoiceClip } from '@/lib/cryptVoice';
-import { baselineMarks, loadReadMarks, saveReadMarks, unreadCounts, type ReadMarks } from '@/lib/cryptUnread';
+import { baselineMarks, firstVisitMarks, loadReadMarks, mergeMarks, sameMarks, saveReadMarks, unreadCounts, type ReadMarks } from '@/lib/cryptUnread';
+import { readKeyFileJson } from '@/lib/cryptKeyFileText';
 import { buildGroupMessageActions, createGroup, decodeConversations, groupMessageCost, groupMessageSize, loadGroups, loadHiddenGroups, mergeGroups, saveGroups, setGroupHidden, type ConversationEntry, type CryptGroup } from '@/lib/cryptGroups';
 import {
   DirHandle, FRIENDS_DIR, PRIVATE_DIR, VAULT_DIR, VaultFileExistsError, friendKeyName, pickVault, privateKeyName,
-  readFriendKeys, recallVault, rememberVault, updatePrivateKeyProfile, vaultSupported, vaultWritable, writeFriendKey, writeOwnPublicKey,
+  findPrivateKey, readFriendKeys, readVaultMarks, recallVault, writeVaultMarks, rememberVault, updatePrivateKeyProfile, vaultSupported, vaultWritable, writeFriendKey, writeOwnPublicKey,
 } from '@/lib/cryptVault';
 import type { PublicKeyFile } from '@/lib/cheeseCrypt';
 import {
@@ -195,6 +196,40 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [backupKey, setBackupKey] = useState<MessagingKey | null>(null);
   const [vault, setVault] = useState<DirHandle | null>(null);
   useEffect(() => { recallVault(account).then(setVault); }, [account]);
+  /** Read markers saved in the vault folder: undefined while checking, null when none or no access. */
+  const [folderMarks, setFolderMarks] = useState<ReadMarks | null | undefined>(undefined);
+  useEffect(() => {
+    let cancelled = false;
+    setFolderMarks(undefined);
+    (async () => {
+      const v = await recallVault(account).catch(() => null);
+      const ok = !!v && await vaultWritable(v, false).catch(() => false);
+      const marks = ok ? await readVaultMarks(v!, account) : null;
+      if (!cancelled) setFolderMarks(marks);
+    })();
+    return () => { cancelled = true; };
+  }, [account]);
+  // A key left in the vault folder is found by its contents (any file name) once folder access is already granted.
+  const [searchingVault, setSearchingVault] = useState(false);
+  const loadKeyFromVault = useCallback(async (root: DirHandle, ask: boolean) => {
+    if (!(await vaultWritable(root, ask).catch(() => false))) return false;
+    const found = await findPrivateKey(root, account).catch(() => null);
+    if (!found) return false;
+    saveKey(found); setKey(found);
+    toast({ title: 'Your messaging key was loaded', description: `Found in your ${VAULT_DIR} folder.` });
+    return true;
+  }, [account, toast]);
+  useEffect(() => { if (vault && !key) void loadKeyFromVault(vault, false); }, [vault, key, loadKeyFromVault]);
+  const findKeyInFolder = async () => {
+    setSearchingVault(true);
+    try {
+      let root = vault;
+      if (!root) { if (!vaultSupported()) { fileRef.current?.click(); return; } root = await pickVault(); setVault(root); rememberVault(account, root).catch(() => {}); }
+      if (!(await loadKeyFromVault(root, true))) toast({ title: `No private key for ${account} in that folder`, description: 'Use "Load my private key" to pick the file yourself.', variant: 'destructive' });
+    } catch (e) {
+      if ((e as DOMException)?.name !== 'AbortError') toast({ title: 'Could not open that folder', variant: 'destructive' });
+    } finally { setSearchingVault(false); }
+  };
   // Friends folder is shared by every account on this device; nicknames and removals stay per account.
   useEffect(() => {
     if (!vault) return;
@@ -317,10 +352,28 @@ export function Messenger({ account, session }: { account: string; session: NonN
 
   // Unread badges: first load on this device marks existing history read; afterwards only newer incoming messages count.
   useEffect(() => {
-    if (!loaded || !key || readMarks) return;
-    const base = baselineMarks(conversations, account);
+    if (!loaded || !key || readMarks || folderMarks === undefined) return;
+    const base = firstVisitMarks(baselineMarks(conversations, account), folderMarks);
     saveReadMarks(account, base); setReadMarks(base);
-  }, [loaded, key, readMarks, conversations, account]);
+  }, [loaded, key, readMarks, folderMarks, conversations, account]);
+  // Markers from the vault folder merge into this browser's (newest wins per chat).
+  useEffect(() => {
+    if (!readMarks || !folderMarks) return;
+    const merged = mergeMarks(readMarks, folderMarks);
+    if (!sameMarks(merged, readMarks)) { saveReadMarks(account, merged); setReadMarks(merged); }
+  }, [folderMarks, readMarks, account]);
+  // ...and this browser's markers are written back to the folder (re-read first so another device's newer marks survive).
+  useEffect(() => {
+    if (!vault || !readMarks || folderMarks === undefined) return;
+    const id = window.setTimeout(async () => {
+      if (!(await vaultWritable(vault, false).catch(() => false))) return;
+      const onDisk = await readVaultMarks(vault, account);
+      const next = mergeMarks(onDisk ?? {}, readMarks);
+      if (onDisk && sameMarks(next, onDisk)) return;
+      await writeVaultMarks(vault, account, next).catch(() => {});
+    }, 1500);
+    return () => clearTimeout(id);
+  }, [vault, readMarks, folderMarks, account]);
   useEffect(() => {
     if (!active || !readMarks) return;
     const newest = thread.reduce((t, m) => Math.max(t, m.time), 0);
@@ -514,7 +567,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
 
   const onFile = async (f: File) => {
     try {
-      const parsed = parseKeyFile(JSON.parse(await f.text()));
+      const parsed = parseKeyFile(await readKeyFileJson(f));
       if (!parsed) throw new Error();
       if (parsed.type === 'gpk-msg-key') {
         if (parsed.account !== account) { toast({ title: `That private key belongs to ${parsed.account}`, variant: 'destructive' }); return; }
@@ -580,7 +633,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     ? voiceNoteCost(voiceParts, copies)
     : activeGroup ? groupMessageCost(parts || 1, copies, hasNft) : messageCost(parts || 1, hasNft);
   const fileInput = (
-    <input ref={fileRef} type="file" accept="application/json,.json" className="hidden"
+    <input ref={fileRef} type="file" className="hidden"
       onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }} />
   );
   const profileEditor = editingAvatar && <AvatarEditor account={account} avatar={settingUpProfile ? undefined : key?.avatar}
@@ -615,6 +668,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
           <p className="font-semibold text-sm">I already have a key</p>
           <p className="text-xs text-muted-foreground">Look in your Downloads for a file ending in <span className="font-mono">-key-PRIVATE.json</span>. Keys from the GPK Collection Manager work too.</p>
           <Button className="w-full bg-cheese text-primary-foreground hover:bg-cheese/90" onClick={() => fileRef.current?.click()}>Load my private key</Button>
+          {vaultSupported() && <Button className="w-full" variant="outline" disabled={searchingVault} onClick={() => void findKeyInFolder()}>{searchingVault ? 'Looking…' : `📁 Find it in my ${VAULT_DIR} folder`}</Button>}
+          <p className="text-[11px] text-muted-foreground">Any file name works, including copies saved as .txt.</p>
         </div>
         <div className="rounded-lg border border-border bg-card/80 p-4 space-y-2 text-left">
           <p className="font-semibold text-sm">I'm new here</p>
