@@ -298,11 +298,6 @@ export function Messenger({ account, session }: { account: string; session: NonN
 
   // Blocked accounts are dropped before any decryption, so their DMs, group copies and voice parts never surface.
   const visibleMemos = useMemo(() => withoutBlocked(memos, account, blocked), [memos, account, blocked]);
-  const partners = useMemo(() => {
-    const s = new Set(Object.keys(contacts));
-    visibleMemos.forEach((m) => s.add(m.from === account ? m.to : m.from));
-    return [...s].filter(name => !removedContacts.includes(name) && !blocked.includes(name) && !groupOnly.has(name)).sort();
-  }, [contacts, visibleMemos, account, removedContacts, blocked, groupOnly]);
 
   const lastAt = useMemo(() => {
     const out: Record<string, number> = {};
@@ -337,6 +332,11 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const view = inviteViews.find(v => v.invite.id === c.igroup);
     return !!view && view.status !== 'declined' && !!eventFromMember({ key: c.key, txId: c.txId, time: c.time, from: c.from, to: c.to, control: { kind: 'joined', id: c.igroup }, usedKey: c.usedKey }, invites, account);
   }), [decoded, inviteViews, invites, account]);
+  const partners = useMemo(() => {
+    const s = new Set(Object.keys(contacts));
+    visibleMemos.forEach((m) => s.add(m.from === account ? m.to : m.from));
+    return [...s].filter(name => !removedContacts.includes(name) && !blocked.includes(name) && !groupOnly.has(name)).sort();
+  }, [contacts, visibleMemos, account, removedContacts, blocked, groupOnly]);
   // A member who accepted my friend request becomes a friend with the key their group introduced.
   useEffect(() => {
     let changed = false;
