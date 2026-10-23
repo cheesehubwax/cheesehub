@@ -34,6 +34,9 @@ export interface HoldingRow {
   /** USD figures: value at today's WAX/USD rate, cost at each purchase day's rate. */
   valueUsd: number | null;
   avgCostUsd: number | null;
+  /** Total remaining cost of the current balance: wallet average × wallet plus pool deposits. */
+  costWax: number | null;
+  costUsd: number | null;
   unrealizedUsd: number | null;
   unrealizedPctUsd: number | null;
   realizedUsd: number;
@@ -112,7 +115,7 @@ export function buildHoldings(
       unrealizedWax: unrealized,
       unrealizedPct: unrealized != null && cost && cost > 0 ? (unrealized / cost) * 100 : null,
       realizedWax: p?.realizedWax ?? 0,
-      valueUsd, avgCostUsd: avgUsd, unrealizedUsd,
+      valueUsd, avgCostUsd: avgUsd, unrealizedUsd, costWax: isWax ? balance : cost, costUsd,
       unrealizedPctUsd: unrealizedUsd != null && costUsd && costUsd > 0 ? (unrealizedUsd / costUsd) * 100 : null,
       realizedUsd: p?.realizedUsd ?? 0,
       usdComplete: usdOk,
@@ -131,7 +134,7 @@ export function buildHoldings(
         walletBalance: 0, pooledBalance: 0, pooledParts: [], pooledUnknown: false,
         priceWax: p.key === WAX_KEY ? 1 : priceWax(p.key), valueWax: null, avgCostWax: null,
         unrealizedWax: null, unrealizedPct: null, realizedWax: p.realizedWax,
-        valueUsd: null, avgCostUsd: null, unrealizedUsd: null, unrealizedPctUsd: null,
+        valueUsd: null, avgCostUsd: null, unrealizedUsd: null, unrealizedPctUsd: null, costWax: null, costUsd: null,
         realizedUsd: p.realizedUsd, usdComplete: !p.usdGap, complete: true, position: p, closed: true,
       });
     }
