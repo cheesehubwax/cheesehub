@@ -24,7 +24,8 @@
 - [x] CHEESECrypt WAXCrypt port step 3: borderless click-to-play sound-effect tiles; other NFTs open a larger view with ID and Tx link; tests pass.
 - [x] CHEESECrypt WAXCrypt port step 4: read markers merge with the vault folder; key files found by contents; tests pass.
 - [x] CHEESECrypt WAXCrypt port step 5: invite groups (≤8, Join/Decline/block, leave, creator edits, in-group friend requests); tests pass. Real wallet sends unverified.
-- [ ] CHEESECrypt WAXCrypt port steps 6–8 (public inbox, public rooms, wallet key lock) — one per request.
+- [ ] CHEESECrypt WAXCrypt port step 6: opt-in public inbox, bounded stranger-key discovery, text/NFT requests with Accept/Decline/Block.
+- [ ] CHEESECrypt WAXCrypt port steps 7–8 (public rooms, wallet key lock) — one per request.
 - [ ] CHEESECrypt: verify group send/reply and recipient read-back on WAX — requires connected wallets and signing approval; local creation/signing gate and encrypted fanout round-trips tested.
 
 - [x] CHEESECrypt: correct Desktop folder-selection guidance and permission-error recovery; actual OS folder picker requires user verification.
