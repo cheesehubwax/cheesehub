@@ -590,6 +590,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
       onClick={() => changeGroupVisibility(g.id, !hidden)}>{hidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}</Button>
   </li>;
 
+  /** Declined invites, and unanswered invites from accounts you've since blocked, never show. */
+  const inviteShown = (v: InviteGroupView) => v.status !== 'declined' && !(v.status === 'invited' && blocked.includes(v.invite.creator));
   const inviteRow = (v: InviteGroupView, hidden: boolean) => {
     const id = v.invite.id;
     const requests = v.friendRequests.filter(a => !contacts[a] && !blocked.includes(a) && !friendDeclines.includes(`${id}:${a}`)).length;
@@ -934,16 +936,16 @@ export function Messenger({ account, session }: { account: string; session: NonN
             </div>
             <CollapsibleContent>
               <ul className="space-y-1 pt-1">
-          {inviteViews.filter(v => v.status !== 'declined' && !hiddenGroups.includes(v.invite.id)).sort((a, b) => Number(b.status === 'invited') - Number(a.status === 'invited') || a.name.localeCompare(b.name)).map(v => inviteRow(v, false))}
+          {inviteViews.filter(v => inviteShown(v) && !hiddenGroups.includes(v.invite.id)).sort((a, b) => Number(b.status === 'invited') - Number(a.status === 'invited') || a.name.localeCompare(b.name)).map(v => inviteRow(v, false))}
           {groups.filter(g => !hiddenGroups.includes(g.id)).map(g => groupRow(g, false))}
-          {!groups.some(g => !hiddenGroups.includes(g.id)) && !inviteViews.some(v => v.status !== 'declined' && !hiddenGroups.includes(v.invite.id)) && <li className="text-xs text-muted-foreground px-2 pb-1">No groups yet.</li>}
-          {(groups.some(g => hiddenGroups.includes(g.id)) || inviteViews.some(v => v.status !== 'declined' && hiddenGroups.includes(v.invite.id))) && <li>
+          {!groups.some(g => !hiddenGroups.includes(g.id)) && !inviteViews.some(v => inviteShown(v) && !hiddenGroups.includes(v.invite.id)) && <li className="text-xs text-muted-foreground px-2 pb-1">No groups yet.</li>}
+          {(groups.some(g => hiddenGroups.includes(g.id)) || inviteViews.some(v => inviteShown(v) && hiddenGroups.includes(v.invite.id))) && <li>
             <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-muted-foreground" aria-expanded={showHiddenGroups} aria-controls="crypt-hidden-groups" onClick={() => setShowHiddenGroups(v => !v)}>
               <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', !showHiddenGroups && '-rotate-90')} />
-              Hidden groups ({groups.filter(g => hiddenGroups.includes(g.id)).length + inviteViews.filter(v => v.status !== 'declined' && hiddenGroups.includes(v.invite.id)).length})
+              Hidden groups ({groups.filter(g => hiddenGroups.includes(g.id)).length + inviteViews.filter(v => inviteShown(v) && hiddenGroups.includes(v.invite.id)).length})
             </Button>
             {showHiddenGroups && <ul id="crypt-hidden-groups" className="space-y-1">
-              {inviteViews.filter(v => v.status !== 'declined' && hiddenGroups.includes(v.invite.id)).map(v => inviteRow(v, true))}
+              {inviteViews.filter(v => inviteShown(v) && hiddenGroups.includes(v.invite.id)).map(v => inviteRow(v, true))}
               {groups.filter(g => hiddenGroups.includes(g.id)).map(g => groupRow(g, true))}</ul>}
           </li>}
               </ul>
@@ -1054,7 +1056,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
               <p className="text-sm text-muted-foreground p-4 border-t border-border">Public keys needed: {missingKeys.join(', ')}. Add them by name or load their public files.</p>
             ) : (
               <div className="space-y-2 p-4 border-t border-border">
-                <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} disabled={!!voice} placeholder={voice ? 'Sending a voice note — discard it to type a message' : activeGroup ? 'Message group' : `Message ${nameFor(active)}`} />
+                <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} disabled={!!voice} placeholder={voice ? 'Sending a voice note — discard it to type a message' : activeGroup || activeInvite ? 'Message group' : `Message ${nameFor(active)}`} />
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                   <span className={!voice && tooLong ? 'text-destructive' : 'text-muted-foreground'}>
                     {voice ? `${voiceParts} parts · ${voiceTxs} transaction${voiceTxs > 1 ? 's' : ''}` : `${bytes}/${maxBytes} · ${parts || 1} part${parts > 1 ? 's' : ''}`}{(activeGroup || activeInvite) && ` × ${copies} recipients`}
