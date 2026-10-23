@@ -451,6 +451,21 @@ export function Messenger({ account, session }: { account: string; session: NonN
       onClick={() => changeGroupVisibility(g.id, !hidden)}>{hidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}</Button>
   </li>;
 
+  const blockAccount = (name: string) => {
+    try {
+      const next = addBlocked(blocked, name, account);
+      saveBlocked(account, next); setBlockedState(next);
+      const n = name.trim().toLowerCase();
+      if (active === n) { setActive(null); setText(''); }
+      toast({ title: `${n} blocked`, description: 'Their messages are hidden on this device. Nothing changes on-chain.' });
+    } catch (e) { toast({ title: (e as Error).message, variant: 'destructive' }); }
+  };
+  const unblockAccount = (name: string) => {
+    const next = removeBlocked(blocked, name);
+    saveBlocked(account, next); setBlockedState(next);
+    toast({ title: `${name} unblocked` });
+  };
+
   const removeFriend = (name: string) => {
     removeContact(account, name);
     setContacts(loadContacts(account)); setRemovedContacts(loadRemovedContacts(account));
