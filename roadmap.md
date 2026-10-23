@@ -1,5 +1,6 @@
 # CHEESEHub roadmap
-- [ ] CHEESEFolio: foreground live prices, refresh on return, timestamp/manual refresh and Sync refreshing market data; verify price changes without reloading.
+- [x] CHEESEFolio: 60s foreground price updates, refresh on return, timestamp/manual refresh, Sync refreshing prices/balances/pools; 19 regression tests pass, signed-out page opens without errors.
+- [ ] CHEESEFolio: verify live price updates inside a real wallet portfolio — requires a connected WAX wallet; timed/focus/manual changes tested with controlled prices.
 - [x] CHEESEFolio: summary boxes in capital-first order Total Cost, Paper Value, Realisable Now, Unrealised P/L, Realised P/L.
 - [x] CHEESEFolio: named portfolios with scoped holdings/activity/P&L/CSVs and combined JSON restore; automated creation/save/clear/load/sync/account isolation verified.
 - [x] CHEESEFolio mobile layout: smaller hero/orb, 2-col summary boxes, card view with card/table toggle for holdings and activity, shorter chart, larger touch targets; signed-out phone-width view checked and card/table toggle tested.
