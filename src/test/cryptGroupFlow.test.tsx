@@ -5,7 +5,7 @@ import type { Session } from '@wharfkit/session';
 import { generateKey, saveContact, saveKey, encryptMemo, splitMessage, loadContacts, loadKey, loadContactAvatars, loadRemovedContacts } from '@/lib/cheeseCrypt';
 import { loadCryptNames, saveCryptName } from '@/lib/cryptNames';
 import { groupPayload, loadGroups, loadHiddenGroups, saveGroups } from '@/lib/cryptGroups';
-import { encodeNotice, loadInvites } from '@/lib/cryptInviteGroups';
+import { encodeInvite, encodeNotice, loadInvites } from '@/lib/cryptInviteGroups';
 import { Messenger } from '@/pages/CheeseCrypt';
 
 const calls = vi.hoisted(() => ({ transact: vi.fn(), fetch: vi.fn() }));
@@ -159,5 +159,28 @@ describe('group creation and signing gate', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Send$/ }));
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(2));
     expect((calls.transact.mock.calls[1][0] as { data: { to: string } }[]).map(a => a.data.to)).toEqual(['bob', 'eosio.null', 'xcheeseliqst']);
+  });
+  it('a received invite shows Join/Decline; joining is paid after terms; group-only members stay out of Friends', async () => {
+    const alice = generateKey('alice'), bob = generateKey('bob'), carol = generateKey('carol');
+    localStorage.clear(); saveKey(bob); saveContact('bob', 'alice', alice.publicKey);
+    const id = '0123456789abcdef';
+    const invite = { id, name: 'Cheese club', creator: 'alice', created: 5, members: [alice, bob, carol].map(k => ({ account: k.account, publicKey: k.publicKey })) };
+    calls.fetch.mockResolvedValue([
+      ...splitMessage(encodeInvite(invite)).map(p => ({ txId: 'inv', time: 10, from: 'alice', to: 'bob', quantity: '0.0010 CHEESE', memo: encryptMemo(p, bob.publicKey, alice.secretKey) })),
+      ...splitMessage(encodeNotice('joined', id)).map(p => ({ txId: 'cj', time: 11, from: 'carol', to: 'bob', quantity: '0.0010 CHEESE', memo: encryptMemo(p, bob.publicKey, carol.secretKey) })),
+    ]);
+    calls.transact.mockResolvedValue({ success: true, txId: 'tx2' });
+    mount(<Messenger account="bob" session={{ permissionLevel: { actor: 'bob', permission: 'active' } } as unknown as Session} />);
+    fireEvent.click(await screen.findByRole('button', { name: /Cheese club/ }));
+    expect(screen.queryByRole('button', { name: /^carol/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Join' }));
+    const pay = screen.getByRole('button', { name: 'Pay & join' });
+    expect(pay).toBeDisabled();
+    fireEvent.click(document.getElementById('crypt-paid-terms')!);
+    fireEvent.click(pay);
+    await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
+    expect((calls.transact.mock.calls[0][0] as { data: { to: string } }[]).map(a => a.data.to)).toEqual(['alice', 'eosio.null', 'xcheeseliqst', 'carol']);
+    expect(loadContacts('bob').carol).toBeUndefined();
+    await screen.findByPlaceholderText('Message group');
   });
 });
