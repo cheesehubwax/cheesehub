@@ -34,3 +34,36 @@ export function unreadCounts(messages: Msg[], account: string, marks: ReadMarks)
   }
   return out;
 }
+
+// ---- read markers shared with the vault folder (device-only; no message content or keys) ----
+const MARK_ID = /^(group:[a-f0-9]{16}|[a-z1-5.]{1,12})$/;
+export const READ_STATE_TYPE = 'cheesecrypt-read-state';
+
+export function normalizeMarks(value: unknown): ReadMarks {
+  const out: ReadMarks = {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return out;
+  for (const [id, t] of Object.entries(value)) if (MARK_ID.test(id) && typeof t === 'number' && Number.isSafeInteger(t) && t >= 0) out[id] = t;
+  return out;
+}
+
+/** Newest read time wins per conversation, so neither copy ever turns a read chat unread again. */
+export function mergeMarks(a: ReadMarks, b: ReadMarks): ReadMarks {
+  const out = { ...a };
+  for (const [id, t] of Object.entries(b)) out[id] = Math.max(out[id] ?? 0, t);
+  return out;
+}
+
+export const sameMarks = (a: ReadMarks, b: ReadMarks) =>
+  Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([k, v]) => b[k] === v);
+
+export const toReadStateFile = (account: string, marks: ReadMarks) => ({ type: READ_STATE_TYPE, version: 1, account, reads: normalizeMarks(marks) });
+
+/** Null unless the file is a v1 read-state file for exactly this account. */
+export function parseReadStateFile(value: unknown, account: string): ReadMarks | null {
+  const f = value as Record<string, unknown> | null;
+  if (!f || typeof f !== 'object' || f.type !== READ_STATE_TYPE || f.version !== 1 || f.account !== account) return null;
+  return normalizeMarks(f.reads);
+}
+
+/** First visit on this device: folder markers win for chats they cover; other existing chats start read. */
+export const firstVisitMarks = (baseline: ReadMarks, folder: ReadMarks | null): ReadMarks => folder ? { ...baseline, ...folder } : baseline;
