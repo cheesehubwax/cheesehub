@@ -2,12 +2,16 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const h = vi.hoisted(() => ({ fetch: vi.fn(), toggle: vi.fn() }));
+const h = vi.hoisted(() => ({ fetch: vi.fn(), toggle: vi.fn(), announce: vi.fn() }));
 vi.mock('@/services/atomicApi', () => ({ fetchAssetById: h.fetch }));
 vi.mock('@/components/shared/IpfsImage', () => ({ IpfsImage: ({ alt }: { alt: string }) => <img alt={alt} /> }));
 vi.mock('@/lib/cryptAudio', () => {
   const state = { key: null, playing: false, loading: false, time: 0, duration: 0, failedKeys: new Set() };
-  return { cryptAudio: { subscribe: () => () => {}, getState: () => state, toggle: h.toggle, seek: vi.fn() } };
+  return {
+    cryptAudio: { subscribe: () => () => {}, getState: () => state, toggle: h.toggle, seek: vi.fn() },
+    announcePlaying: h.announce,
+    mediaCandidates: (u: string) => [u, `${u}#gw2`],
+  };
 });
 import { CryptNftCard } from '@/components/crypt/CryptNftCard';
 
