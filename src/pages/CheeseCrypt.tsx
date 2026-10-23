@@ -672,6 +672,78 @@ export function Messenger({ account, session }: { account: string; session: NonN
     }
   };
 
+  // ---- invite groups (CG2): every notice is an ordinary paid encrypted message ----
+  const sendCg2 = async (to: string[], keys: Record<string, string>, payload: string, successTitle: string) => {
+    if (!key) return false;
+    setBusy(true);
+    try {
+      const r = await executeTransaction(buildCg2Actions(key, to, keys, payload, [permission]), { successTitle });
+      if (r.success) [2000, 5000, 10000].forEach(ms => setTimeout(poll, ms));
+      return r.success;
+    } catch (e) { toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' }); return false; }
+    finally { setBusy(false); }
+  };
+  const cg2Cost = (payload: string, recipientCount: number) => groupMessageCost(partCount(payload), recipientCount);
+  const draftInvite = (name: string, members: string[], avatar?: CryptAvatar, id = '0'.repeat(16), created = Date.now()): InviteGroup | null => key ? {
+    id, name, creator: account, created, members: [{ account, publicKey: key.publicKey }, ...members.map(m => ({ account: m, publicKey: contacts[m] }))], ...(avatar ? { avatar } : {}),
+  } : null;
+  const createInviteGroup = async (name: string, members: string[], avatar?: CryptAvatar) => {
+    const invite = draftInvite(name, members, avatar, newInviteGroupId());
+    if (!invite) return false;
+    let payload: string;
+    try { payload = encodeInvite(invite); } catch (e) { toast({ title: (e as Error).message, variant: 'destructive' }); return false; }
+    if (!(await sendCg2(members, contacts, payload, `Invites sent to ${members.length} friend${members.length > 1 ? 's' : ''}`))) return false;
+    const next = { ...inviteStore, [invite.id]: invite };
+    saveInvites(account, next); setInviteStore(next);
+    setActive(`group:${invite.id}`); setCreatingGroup(false); setText('');
+    return true;
+  };
+  const viewById = (id: string) => inviteViews.find(v => v.invite.id === id);
+  const keysOf = (g: InviteGroup) => Object.fromEntries(g.members.map(m => [m.account, m.publicKey]));
+  /** Who a notice goes to and what it costs. */
+  const noticePlan = (n: NonNullable<typeof pendingNotice>) => {
+    const v = viewById(n.id);
+    if (!v) return null;
+    const others = v.invite.members.map(m => m.account).filter(a => a !== account);
+    const to = n.kind === 'joined' ? others : n.kind === 'leave' ? v.joined.filter(a => a !== account) : n.to ? [n.to] : [];
+    const payload = encodeNotice(n.kind, n.id);
+    return { v, to, payload, cost: to.length ? cg2Cost(payload, to.length) : '0.0000 CHEESE' };
+  };
+  const confirmNotice = async () => {
+    if (!pendingNotice) return false;
+    const plan = noticePlan(pendingNotice);
+    if (!plan) return false;
+    const { v, to, payload } = plan;
+    const n = pendingNotice;
+    if (n.kind === 'leave' && !to.length) { setDecisions(saveDecision(account, n.id, 'left')); setPendingNotice(null); return true; }
+    const titles = { joined: `Joined ${v.name}`, leave: `Left ${v.name}`, friend: 'Friend request sent', 'friend-ok': 'Friend request accepted' } as const;
+    if (!(await sendCg2(to, keysOf(v.invite), payload, titles[n.kind]))) return false;
+    if (n.kind === 'joined' || n.kind === 'leave') setDecisions(saveDecision(account, n.id, n.kind === 'joined' ? 'joined' : 'left'));
+    if (n.kind === 'friend-ok' && n.to) {
+      saveContact(account, n.to, keysOf(v.invite)[n.to]); setContacts(loadContacts(account)); setRemovedContacts(loadRemovedContacts(account));
+    }
+    setPendingNotice(null);
+    return true;
+  };
+  const declineInvite = (id: string, block: boolean) => {
+    const v = viewById(id);
+    setDecisions(saveDecision(account, id, 'declined'));
+    if (active === `group:${id}`) { setActive(null); setText(''); }
+    if (block && v) blockAccount(v.invite.creator);
+    else toast({ title: 'Invite declined', description: 'Nothing was sent. The group is hidden on this device.' });
+  };
+  const confirmMeta = async () => {
+    if (!editingInvite) return false;
+    const v = viewById(editingInvite.id);
+    if (!v) return false;
+    let payload: string;
+    try { payload = encodeMeta(v.invite.id, editingInvite.name, editingInvite.avatar); } catch (e) { toast({ title: (e as Error).message, variant: 'destructive' }); return false; }
+    const to = v.invite.members.map(m => m.account).filter(a => a !== account);
+    if (!(await sendCg2(to, keysOf(v.invite), payload, 'Group updated'))) return false;
+    setEditingInvite(null);
+    return true;
+  };
+
   const hasNft = parseNftMessage(text).some(seg => seg.type === 'nft');
   const size = activeInvite ? inviteTextSize(activeInvite.invite.id, text) : activeGroup ? groupMessageSize(activeGroup, text) : { bytes: plaintextBytes(text), parts: partCount(text), maxBytes: MAX_MESSAGE_BYTES };
   const { bytes, parts, maxBytes } = size;
@@ -734,11 +806,39 @@ export function Messenger({ account, session }: { account: string; session: NonN
     <div className="w-full rounded-lg border border-cheese/20 bg-card/80 overflow-hidden grid md:grid-cols-[240px_1fr] h-[70dvh] min-h-[480px]">
       {fileInput}
       {backupKey && <VaultPrompt cryptKey={backupKey} onSaved={backupSaved} onDownload={backupDownloaded} />}
-      {creatingGroup && <CreateGroupDialog contacts={contacts} avatars={avatars} nameFor={nameFor} onClose={() => setCreatingGroup(false)} onCreate={members => {
-        const group = createGroup(account, members);
-        const updated = mergeGroups(groups, [group]); saveGroups(account, updated); setGroups(updated);
-        setActive(`group:${group.id}`); setCreatingGroup(false); setText('');
-      }} />}
+      {creatingGroup && <CreateGroupDialog contacts={contacts} avatars={avatars} nameFor={nameFor} busy={busy} onClose={() => setCreatingGroup(false)}
+        onCreate={createInviteGroup}
+        costFor={(name, members, avatar) => { try { const d = draftInvite(name, members, avatar); return d ? cg2Cost(encodeInvite(d), members.length) : ''; } catch { return ''; } }} />}
+      {pendingNotice && (() => {
+        const plan = noticePlan(pendingNotice);
+        if (!plan) return null;
+        const who = pendingNotice.to ? nameFor(pendingNotice.to) : '';
+        const copy = {
+          joined: { title: `👥 Join ${plan.v.name}`, description: `Tells the ${plan.to.length} other member${plan.to.length > 1 ? 's' : ''} you joined, in encrypted messages. You'll then get new group messages.`, label: 'Pay & join' },
+          leave: { title: `🚪 Leave ${plan.v.name}`, description: plan.to.length ? `Tells the ${plan.to.length} member${plan.to.length > 1 ? 's' : ''} still in the group that you left, so they stop sending you copies. Your history stays readable.` : 'Nobody else is in the group, so nothing is sent.', label: plan.to.length ? 'Pay & leave' : 'Leave' },
+          friend: { title: `🤝 Friend request to ${who}`, description: `Sent encrypted to ${who} only. If they accept, you become friends and can message each other directly.`, label: 'Pay & send request' },
+          'friend-ok': { title: `🤝 Accept ${who}`, description: `Adds ${who} as a friend using the key ${plan.v.name} introduced, and lets them know in an encrypted message.`, label: 'Pay & accept' },
+        }[pendingNotice.kind];
+        return <PaidActionDialog title={copy.title} description={copy.description} cost={plan.cost} confirmLabel={copy.label} busy={busy}
+          onConfirm={confirmNotice} onClose={() => setPendingNotice(null)} />;
+      })()}
+      {editingInvite && !paintingInvite && (() => {
+        const v = viewById(editingInvite.id);
+        if (!v) return null;
+        let cost = '';
+        try { cost = cg2Cost(encodeMeta(v.invite.id, editingInvite.name, editingInvite.avatar), v.invite.members.length - 1); } catch { cost = 'enter a name'; }
+        return <PaidActionDialog title="✏️ Edit group" description="Only you, the creator, can change the name and picture. Every member gets the update encrypted; the newest one wins." cost={cost}
+          confirmLabel="Pay & update" busy={busy} onConfirm={confirmMeta} onClose={() => setEditingInvite(null)}>
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={() => setPaintingInvite(true)} aria-label="Change group picture" className="shrink-0 rounded-md border border-border p-1 hover:border-cheese">
+              {editingInvite.avatar ? <PixelAvatar account="group" avatar={editingInvite.avatar} className="h-10 w-10" /> : <span className="flex h-10 w-10 items-center justify-center text-xl">👥</span>}
+            </button>
+            <Input value={editingInvite.name} maxLength={40} aria-label="Group name" onChange={e => setEditingInvite({ ...editingInvite, name: e.target.value })} />
+          </div>
+        </PaidActionDialog>;
+      })()}
+      {editingInvite && paintingInvite && <AvatarEditor account="group" avatar={editingInvite.avatar} title="🎨 Group picture"
+        onClose={() => setPaintingInvite(false)} onSave={a => { setEditingInvite({ ...editingInvite, avatar: a }); setPaintingInvite(false); }} />}
       {editingFriend && <FriendNameDialog account={editingFriend} nickname={nicknames[editingFriend]} sharedName={names[editingFriend]} onClose={() => setEditingFriend(null)} onSave={name => {
         saveCryptName(account, editingFriend, name, 'nicknames'); setNicknames(loadCryptNames(account, 'nicknames')); setEditingFriend(null);
       }} />}
