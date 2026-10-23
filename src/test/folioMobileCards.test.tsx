@@ -30,8 +30,10 @@ describe('CHEESEFolio mobile layout', () => {
     expect(screen.queryByRole('table')).toBeNull();
     expect(screen.getByText('Balance')).toBeInTheDocument();
     expect(screen.getByText('CHEESE')).toBeInTheDocument();
+    expect(screen.getByText('Total cost')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /table/i }));
     expect(screen.getByRole('table')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /total cost/i })).toBeInTheDocument();
   });
 
   it('shows activity as cards without the wide table', () => {
