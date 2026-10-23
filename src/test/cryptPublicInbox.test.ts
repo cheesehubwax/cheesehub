@@ -16,7 +16,7 @@ describe('public inbox rules', () => {
     expect(loadPublicInbox('alice')).toBe(false);
   });
   it('bounds discovery to 10 newest incoming unexcluded accounts', () => {
-    const memos = Array.from({ length: 20 }, (_, i) => ({ ...rows('hi')[0], from: `user${'abcde'[Math.floor(i / 5)]}${i % 5 + 1}`, time: i + 1 }));
+    const memos = Array.from({ length: 25 }, (_, i) => ({ ...rows('hi')[0], from: `user${'abcde'[Math.floor(i / 5)]}${i % 5 + 1}`, time: i + 1 }));
     memos.push({ ...rows('sent')[0], from: 'alice', to: 'outgoing', time: 100 });
     const candidates = inboxCandidates(memos, 'alice', new Set(['usere5']));
     expect(candidates).toHaveLength(10);
