@@ -24,7 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { playRandomFart } from '@/lib/fartSounds';
 import { cn } from '@/lib/utils';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
-import { encodeReply, parseReply, quoteOf, repliesTo, type ReplyRef } from '@/lib/cryptReply';
+import { encodeReply, parseReply, quoteOf, type ReplyRef } from '@/lib/cryptReply';
 import { AvatarEditor, WalletAvatarPicker } from '@/components/crypt/AvatarEditor';
 import { CryptNftCard } from '@/components/crypt/CryptNftCard';
 import { useQuery } from '@tanstack/react-query';
@@ -442,6 +442,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const inviteKeys = useMemo(() => activeInvite ? Object.fromEntries(activeInvite.invite.members.map(m => [m.account, m.publicKey])) : {}, [activeInvite]);
   const recipients = activeInvite ? activeInvite.joined.filter(m => m !== account) : activeGroup ? activeGroup.members.filter(m => m !== account) : active ? [active] : [];
   const missingKeys = activeInvite ? [] : recipients.filter(m => !contacts[m]);
+  useEffect(() => { setReplyingTo(null); }, [active]);
   const thread = activeInvite ? conversations.filter(m => m.igroup === activeInvite.invite.id) : conversations.filter(m => activeGroup
     ? m.group?.id === activeGroup.id && m.group.members.join(',') === activeGroup.members.join(',')
     : !m.group && ((m.from === account && m.to === active) || (m.from === active && m.to === account)));
@@ -1119,6 +1120,25 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 <Button size="sm" variant="ghost" className="h-7 text-xs font-normal text-destructive hover:text-destructive" aria-label={`Block ${active}`}
                   onClick={() => { if (window.confirm(`Block ${active}? Their messages will be hidden on this device.`)) blockAccount(active); }}><Ban className="h-3.5 w-3.5" /> Block</Button>
               </span>}</div>
+            <Dialog open={!!openQuote} onOpenChange={(o) => { if (!o) setOpenQuote(null); }}>
+              <DialogContent className="max-w-lg">
+                {openQuote && (() => {
+                  const original = thread.find(x => x.from === openQuote.author && x.time === openQuote.time);
+                  const full = original ? (parseReply(original.text)?.body ?? original.text) : null;
+                  return <>
+                    <DialogHeader>
+                      <DialogTitle>↩️ {openQuote.author === account ? 'Your message' : nameFor(openQuote.author)}</DialogTitle>
+                      <DialogDescription>{new Date(openQuote.time).toLocaleString()}{original?.txId && <> · <a href={`https://waxblock.io/transaction/${encodeURIComponent(original.txId)}`} target="_blank" rel="noreferrer" className="font-semibold text-cheese underline underline-offset-2">Tx</a></>}</DialogDescription>
+                    </DialogHeader>
+                    <div className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words text-sm">
+                      {original?.voice ? <VoiceNoteBubble note={original.voice} />
+                        : full != null ? parseNftMessage(full).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} txId={original!.txId} /> : <span key={i} className="block">{seg.text}</span>)
+                        : <><span className="block">{openQuote.quote || '…'}</span><span className="mt-2 block text-xs text-muted-foreground">The original message isn't loaded here, so this is the quoted snippet.</span></>}
+                    </div>
+                  </>;
+                })()}
+              </DialogContent>
+            </Dialog>
             <ol ref={listRef} className="flex-1 overflow-y-auto space-y-2 p-4"
               onScroll={(e) => { const el = e.currentTarget; nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
               {thread.map((m) => (
