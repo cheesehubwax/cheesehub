@@ -31,6 +31,12 @@ import { accountAvatar, type CryptAvatar } from '@/lib/cryptAvatar';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { VaultPrompt } from '@/components/crypt/VaultPrompt';
 import { CreateGroupDialog } from '@/components/crypt/CreateGroupDialog';
+import { PaidActionDialog } from '@/components/crypt/PaidActionDialog';
+import {
+  buildCg2Actions, collectInvites, declineFriendRequest, deriveInviteGroups, encodeGroupText, encodeInvite, encodeMeta, encodeNotice, inviteTextSize,
+  loadDecisions, loadFriendDecisions, loadInvites, newInviteGroupId, saveDecision, saveInvites, scopedKeys, eventFromMember, VOICE_REF_PREFIX,
+  type Cg2Event, type InviteGroup, type InviteGroupView,
+} from '@/lib/cryptInviteGroups';
 import { ShareKeyDialog } from '@/components/crypt/ShareKeyDialog';
 import { CryptAbout } from '@/components/crypt/CryptAbout';
 import { VoiceRecorder } from '@/components/crypt/VoiceRecorder';
@@ -87,7 +93,7 @@ function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, act
         {m.voice ? <VoiceNoteBubble note={m.voice} /> : m.text != null ? parseNftMessage(m.text).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} autoplayKey={m.time > openedAt.current ? `${m.key}:${i}` : undefined} txId={m.txId} /> : <span key={i} className="block">{seg.text}</span>) : <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
       </div>
       <p className="text-[10px] opacity-70 mt-1">
-        {new Date(m.time).toLocaleString()} · {m.voice ? `${voiceNoteCost(m.parts, m.group ? m.group.members.length - 1 : 1)} at current rate` : m.group ? `${groupMessageCost(m.parts, m.group.members.length - 1, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))} at current rate` : messageCost(m.parts, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))}
+        {new Date(m.time).toLocaleString()}{m.igroup ? null : ' · '}{m.igroup ? null : m.voice ? `${voiceNoteCost(m.parts, m.group ? m.group.members.length - 1 : 1)} at current rate` : m.group ? `${groupMessageCost(m.parts, m.group.members.length - 1, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))} at current rate` : messageCost(m.parts, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))}
         {m.parts > 1 && ` · ${m.parts} parts`}
         {m.missing > 0 && !m.voice && <span className="text-destructive"> · {m.missing} part{m.missing > 1 ? 's' : ''} not loaded</span>}
         {m.txId && <> · <a href={`https://waxblock.io/transaction/${encodeURIComponent(m.txId)}`} target="_blank" rel="noreferrer"
@@ -171,6 +177,13 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [showHiddenGroups, setShowHiddenGroups] = useState(false);
   const [attachingNft, setAttachingNft] = useState(false);
   const [creatingGroup, setCreatingGroup] = useState(false);
+  const [inviteStore, setInviteStore] = useState(() => loadInvites(account));
+  const [decisions, setDecisions] = useState(() => loadDecisions(account));
+  const [friendDeclines, setFriendDeclines] = useState(() => loadFriendDecisions(account));
+  /** A paid group notice waiting for Terms + confirmation. */
+  const [pendingNotice, setPendingNotice] = useState<null | { kind: 'joined' | 'leave' | 'friend' | 'friend-ok'; id: string; to?: string }>(null);
+  const [editingInvite, setEditingInvite] = useState<null | { id: string; name: string; avatar?: CryptAvatar }>(null);
+  const [paintingInvite, setPaintingInvite] = useState(false);
   const [newContact, setNewContact] = useState('');
   const [addingFriend, setAddingFriend] = useState(false);
   const [groupsOpen, setGroupsOpen] = useState(true);
@@ -288,8 +301,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const partners = useMemo(() => {
     const s = new Set(Object.keys(contacts));
     visibleMemos.forEach((m) => s.add(m.from === account ? m.to : m.from));
-    return [...s].filter(name => !removedContacts.includes(name) && !blocked.includes(name)).sort();
-  }, [contacts, visibleMemos, account, removedContacts, blocked]);
+    return [...s].filter(name => !removedContacts.includes(name) && !blocked.includes(name) && !groupOnly.has(name)).sort();
+  }, [contacts, visibleMemos, account, removedContacts, blocked, groupOnly]);
 
   const lastAt = useMemo(() => {
     const out: Record<string, number> = {};
@@ -297,9 +310,43 @@ export function Messenger({ account, session }: { account: string; session: NonN
     return out;
   }, [visibleMemos, account]);
 
-  const decoded = useMemo(() => key ? decodeConversations(visibleMemos, key, contacts, clock) : [], [visibleMemos, key, contacts, clock]);
-  // Profile notes update names/avatars and never appear as chat messages or unread badges.
-  const conversations = useMemo(() => decoded.filter(c => !isProfileNote(c.text)), [decoded]);
+  // Keys introduced by invite groups decrypt only that group's traffic (never DMs, never the Friends list).
+  const scoped = useMemo(() => scopedKeys(inviteStore, account), [inviteStore, account]);
+  const decoded = useMemo(() => key ? decodeConversations(visibleMemos, key, contacts, clock, scoped) : [], [visibleMemos, key, contacts, clock, scoped]);
+  const cg2Events = useMemo<Cg2Event[]>(() => decoded.flatMap(c => c.control && c.usedKey && !c.voice
+    ? [{ key: c.key, txId: c.txId, time: c.time, from: c.from, to: c.to, control: c.control, usedKey: c.usedKey }] : []), [decoded]);
+  const invites = useMemo(() => key ? collectInvites(cg2Events, account, key.publicKey, contacts, inviteStore) : inviteStore, [cg2Events, account, key, contacts, inviteStore]);
+  useEffect(() => {
+    if (Object.keys(invites).length === Object.keys(inviteStore).length) return;
+    saveInvites(account, invites); setInviteStore(invites);
+  }, [invites, inviteStore, account]);
+  const inviteViews = useMemo(() => deriveInviteGroups(cg2Events, invites, account, decisions), [cg2Events, invites, account, decisions]);
+  /** Accounts known only through an invite group; they stay out of Friends and key discovery until a friend request is accepted. */
+  const groupOnly = useMemo(() => {
+    const s = new Set<string>();
+    Object.values(invites).forEach(g => g.members.forEach(m => { if (m.account !== account && !contacts[m.account]) s.add(m.account); }));
+    return s;
+  }, [invites, account, contacts]);
+  // Profile notes and group notices update state and never appear as chat messages or unread badges.
+  // Invite-group messages/voice show only when they come from a member with that member's invite key.
+  const conversations = useMemo(() => decoded.filter(c => {
+    if (isProfileNote(c.text)) return false;
+    if (!c.igroup) return true;
+    if (c.control && c.control.kind !== 'msg') return false;
+    if (!c.usedKey) return false;
+    const view = inviteViews.find(v => v.invite.id === c.igroup);
+    return !!view && view.status !== 'declined' && !!eventFromMember({ key: c.key, txId: c.txId, time: c.time, from: c.from, to: c.to, control: { kind: 'joined', id: c.igroup }, usedKey: c.usedKey }, invites, account);
+  }), [decoded, inviteViews, invites, account]);
+  // A member who accepted my friend request becomes a friend with the key their group introduced.
+  useEffect(() => {
+    let changed = false;
+    for (const v of inviteViews) for (const a of v.accepted) {
+      const pub = v.invite.members.find(m => m.account === a)?.publicKey;
+      if (!pub || contacts[a] || removedContacts.includes(a) || blocked.includes(a)) continue;
+      saveContact(account, a, pub); changed = true;
+    }
+    if (changed) setContacts(loadContacts(account));
+  }, [inviteViews, contacts, removedContacts, blocked, account]);
   const profileNotes = useMemo(() => latestProfiles(decoded.filter(c => !c.group && !c.voice && !c.missing), account), [decoded, account]);
   useEffect(() => {
     let changed = false;
@@ -331,7 +378,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     groups.forEach(g => g.members.forEach(m => { if (m !== account) names.add(m); }));
     const discover = async () => {
       for (const name of names) {
-        if (contacts[name] || loadRemovedContacts(account).includes(name) || !ACCOUNT_RE.test(name) || cancelled) continue;
+        if (contacts[name] || groupOnly.has(name) || loadRemovedContacts(account).includes(name) || !ACCOUNT_RE.test(name) || cancelled) continue;
         try {
           const pub = await lookupPublishedKey(name);
           if (pub && !cancelled && !loadContacts(account)[name] && !loadRemovedContacts(account).includes(name)) {
@@ -342,11 +389,13 @@ export function Messenger({ account, session }: { account: string; session: NonN
     };
     discover();
     return () => { cancelled = true; };
-  }, [memos, groups, account]);
+  }, [memos, groups, account, groupOnly]);
   const activeGroup = groups.find(g => `group:${g.id}` === active);
-  const recipients = activeGroup ? activeGroup.members.filter(m => m !== account) : active ? [active] : [];
-  const missingKeys = recipients.filter(m => !contacts[m]);
-  const thread = conversations.filter(m => activeGroup
+  const activeInvite: InviteGroupView | undefined = activeGroup ? undefined : inviteViews.find(v => `group:${v.invite.id}` === active);
+  const inviteKeys = useMemo(() => activeInvite ? Object.fromEntries(activeInvite.invite.members.map(m => [m.account, m.publicKey])) : {}, [activeInvite]);
+  const recipients = activeInvite ? activeInvite.joined.filter(m => m !== account) : activeGroup ? activeGroup.members.filter(m => m !== account) : active ? [active] : [];
+  const missingKeys = activeInvite ? [] : recipients.filter(m => !contacts[m]);
+  const thread = activeInvite ? conversations.filter(m => m.igroup === activeInvite.invite.id) : conversations.filter(m => activeGroup
     ? m.group?.id === activeGroup.id && m.group.members.join(',') === activeGroup.members.join(',')
     : !m.group && ((m.from === account && m.to === active) || (m.from === active && m.to === account)));
 
@@ -592,7 +641,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if (!key || !active || missingKeys.length || !agreed || !text.trim() || tooLong) return;
     setBusy(true);
     try {
-      const actions = activeGroup ? buildGroupMessageActions(key, activeGroup, text, contacts, [permission], hasNft)
+      const actions = activeInvite ? buildCg2Actions(key, recipients, inviteKeys, encodeGroupText(activeInvite.invite.id, text), [permission], hasNft)
+        : activeGroup ? buildGroupMessageActions(key, activeGroup, text, contacts, [permission], hasNft)
         : buildSendMessageActions(account, active, splitMessage(text).map(p => encryptMemo(p, contacts[active], key.secretKey)), [permission], hasNft);
       const r = await executeTransaction(actions, { successTitle: 'Message sent' });
       if (r.success) { setText(''); nearBottom.current = true; [2000, 5000, 10000].forEach(ms => setTimeout(poll, ms)); }
@@ -606,7 +656,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     setBusy(true);
     let sent = 0, total = 0;
     try {
-      const batches = buildVoiceBatches(key, recipients, activeGroup ?? null, voice, contacts, [permission]);
+      const batches = buildVoiceBatches(key, recipients, activeInvite ? { id: `${VOICE_REF_PREFIX}${activeInvite.invite.id}`, members: ['-'] } : activeGroup ?? null, voice, activeInvite ? inviteKeys : contacts, [permission]);
       total = batches.length;
       for (let i = 0; i < batches.length; i++) {
         const r = await executeTransaction(batches[i], { successTitle: total > 1 ? `Voice note: transaction ${i + 1} of ${total} sent` : 'Voice note sent' });
@@ -623,15 +673,15 @@ export function Messenger({ account, session }: { account: string; session: NonN
   };
 
   const hasNft = parseNftMessage(text).some(seg => seg.type === 'nft');
-  const size = activeGroup ? groupMessageSize(activeGroup, text) : { bytes: plaintextBytes(text), parts: partCount(text), maxBytes: MAX_MESSAGE_BYTES };
+  const size = activeInvite ? inviteTextSize(activeInvite.invite.id, text) : activeGroup ? groupMessageSize(activeGroup, text) : { bytes: plaintextBytes(text), parts: partCount(text), maxBytes: MAX_MESSAGE_BYTES };
   const { bytes, parts, maxBytes } = size;
   const tooLong = bytes > maxBytes || parts > MAX_PARTS;
-  const copies = activeGroup ? recipients.length : 1;
+  const copies = activeGroup || activeInvite ? recipients.length : 1;
   const voiceParts = voice ? voicePartCount(voice) : 0;
   const voiceTxs = voiceTransactions(voiceParts);
   const totalCost = voice
     ? voiceNoteCost(voiceParts, copies)
-    : activeGroup ? groupMessageCost(parts || 1, copies, hasNft) : messageCost(parts || 1, hasNft);
+    : activeGroup || activeInvite ? groupMessageCost(parts || 1, copies, hasNft) : messageCost(parts || 1, hasNft);
   const fileInput = (
     <input ref={fileRef} type="file" className="hidden"
       onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }} />
