@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+import cryptOrbAsset from '@/assets/cheese-pyramid.png.asset.json';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
