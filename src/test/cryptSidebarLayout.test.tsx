@@ -44,7 +44,7 @@ describe('compact sidebar', () => {
     // The collapsed strip shows bob's avatar with his unread count and opens his chat.
     const strip = screen.getByRole('navigation', { name: 'Chats' });
     const railBob = strip.querySelector('button[title="bob"]') as HTMLElement;
-    expect(railBob).toHaveAttribute('aria-label', 'bob, 1 unread');
+    await waitFor(() => expect(railBob).toHaveAttribute("aria-label", "bob, 1 unread"));
     fireEvent.click(railBob);
     expect(railBob).toHaveAttribute('aria-current', 'true');
     expect(localStorage.getItem('cheesecrypt-sidebar-collapsed-alice')).toBe('1');
