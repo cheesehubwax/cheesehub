@@ -464,6 +464,12 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const roomBanned = activeModeration?.bans[account] !== undefined;
   const roomMutedUntil = mutedUntil(activeModeration, account, clock);
   const roomRestricted = roomBanned || !!roomMutedUntil;
+  const myRoomRole = !activeInvite || activeInvite.status !== 'joined' ? 'member' : activeInvite.isCreator ? (listedIds.has(activeInvite.invite.id) ? 'owner' : 'member') : roomRole(activeModeration, activeInvite.invite, account, clock);
+  const collapseTarget = (m: ConversationEntry) => {
+    const target = edited.targets.get(m.key);
+    if (!activeInvite || myRoomRole === 'member' || !target || !m.txId || m.missing || busy) return null;
+    return myRoomRole === 'owner' || canCollapseAuthor(activeModeration, activeInvite.invite, account, m.from, clock) ? target : null;
+  };
   const inviteKeys = useMemo(() => activeInvite ? Object.fromEntries(activeInvite.invite.members.map(m => [m.account, m.publicKey])) : {}, [activeInvite]);
   const currentRecipients = activeInvite ? activeInvite.joined.filter(m => m !== account) : activeGroup ? activeGroup.members.filter(m => m !== account) : active ? [active] : [];
   // Edits go to the original recipients, not newly joined members who never received the original.
@@ -1261,6 +1267,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         avatars={avatars} contacts={contacts} blocked={blocked} friendDeclines={friendDeclines} setFriendDeclines={setFriendDeclines}
         nameFor={nameFor} membersOpen={membersOpen} setMembersOpen={setMembersOpen} setPendingNotice={setPendingNotice}
         setEditingInvite={setEditingInvite} setEditingFriend={setEditingFriend} saveFriend={saveFriend} blockAccount={blockAccount}
+        admins={activeModeration?.admins ?? []} onModerate={myRoomRole === 'admin' && activeInvite ? () => setModeratingRoom(activeInvite.invite.id) : undefined}
         />
 
       <section className={cn('flex flex-1 flex-col min-h-0 md:row-start-2', listHidden ? 'md:col-start-1 md:col-span-2' : 'md:col-start-2')}>
@@ -1272,7 +1279,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
               <DialogContent className="max-w-lg">
                 {openQuote && (() => {
                   const original = thread.find(x => x.from === openQuote.author && x.time === openQuote.time);
-                  const quoteHidden = restrictedAt(activeModeration, openQuote.author, openQuote.time);
+                  const quoteHidden = restrictedAt(activeModeration, openQuote.author, openQuote.time) || (!!original?.collapsed && myRoomRole === 'member');
                   const full = original ? (parseReply(original.text)?.body ?? original.text) : null;
                   return <>
                     <DialogHeader>
@@ -1305,6 +1312,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
                     highlighted={replyNavigation.highlighted.has(m.key)}
                     editable={canEdit(m, account, clock) && !busy && !roomRestricted && (!activeInvite || activeInvite.status === 'joined')} onEdit={beginEdit}
                     onReply={(x) => { setEditingMessage(null); setReplyingTo({ author: x.from, time: x.time, quote: quoteOf(x.text, !!x.voice) }); setVoice(null); setTimeout(() => composerRef.current?.focus(), 0); }}
+                    canReveal={myRoomRole !== 'member'} revealed={revealed.has(m.key)} onReveal={() => setRevealed(s => new Set(s).add(m.key))}
+                    onCollapse={collapseTarget(m) && activeInvite ? () => setPendingModeration({ id: activeInvite.invite.id, member: m.from, action: 'collapse', target: collapseTarget(m)! }) : undefined}
                     onOpenQuote={setOpenQuote} openedAt={acceptedRequestMessages.current.has(m.key) ? { current: Infinity } : openedAt} />
                 </Fragment>
               ))}

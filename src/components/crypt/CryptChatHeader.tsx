@@ -14,7 +14,7 @@ type Notice = { kind: 'joined' | 'leave' | 'friend' | 'friend-ok'; id: string; t
 /** Chat title bar: friend or group title, Members dropdown and per-chat actions. State lives in Messenger. */
 export function CryptChatHeader({
   account, active, activeGroup, activeInvite, keyAvatar, avatars, contacts, blocked, friendDeclines, setFriendDeclines,
-  nameFor, membersOpen, setMembersOpen, setPendingNotice, setEditingInvite, setEditingFriend, saveFriend, blockAccount,
+  nameFor, membersOpen, setMembersOpen, setPendingNotice, setEditingInvite, setEditingFriend, saveFriend, blockAccount, admins = [], onModerate,
 }: {
   account: string; active: string | null; activeGroup: CryptGroup | undefined; activeInvite: InviteGroupView | undefined;
   keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>; contacts: Record<string, string>; blocked: string[];
@@ -22,6 +22,8 @@ export function CryptChatHeader({
   membersOpen: boolean; setMembersOpen: (v: boolean) => void; setPendingNotice: (n: Notice) => void;
   setEditingInvite: (v: { id: string; name: string; avatar?: CryptAvatar }) => void; setEditingFriend: (v: string) => void;
   saveFriend: (name: string, ask: boolean) => Promise<unknown>; blockAccount: (name: string) => void;
+  /** Current public-room admins (badge only) and, for an admin viewer, the moderation entry point. */
+  admins?: string[]; onModerate?: () => void;
 }) {
   const memberLine = (member: string, status?: string, action?: ReactNode) => (
     <li key={member} className="flex items-center gap-2 min-w-0">
@@ -59,7 +61,7 @@ export function CryptChatHeader({
                 </span>
                 <span className="ml-auto flex items-center gap-1">
                   {membersDropdown(activeInvite.invite.members.map(({ account: member }) => member),
-                    member => (activeInvite.joined.includes(member) ? 'joined' : 'invited'),
+                    member => `${member === activeInvite.invite.creator ? '👑 ' : admins.includes(member) ? '🛡️ ' : ''}${activeInvite.joined.includes(member) ? 'joined' : 'invited'}`,
                     member => {
                       if (member !== account && activeInvite.status === 'joined' && !contacts[member] && !blocked.includes(member) && !activeInvite.requested.includes(member) && !activeInvite.friendRequests.includes(member))
                         return <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px]" aria-label={`Send friend request to ${member}`} onClick={() => setPendingNotice({ kind: 'friend', id: activeInvite.invite.id, to: member })}><UserPlus className="h-3 w-3" /> Friend request</Button>;
@@ -67,6 +69,7 @@ export function CryptChatHeader({
                       return undefined;
                     })}
                   {activeInvite.isCreator && activeInvite.status === 'joined' && <Button size="sm" variant="ghost" className="h-7 text-xs font-normal" onClick={() => setEditingInvite({ id: activeInvite.invite.id, name: activeInvite.name, avatar: activeInvite.avatar })}><Pencil className="h-3 w-3" /> Edit group</Button>}
+                  {onModerate && <Button size="sm" variant="ghost" className="h-7 text-xs font-normal" onClick={onModerate}>🛡️ Moderate</Button>}
                   {activeInvite.status === 'joined' && <Button size="sm" variant="ghost" className="h-7 text-xs font-normal text-destructive hover:text-destructive" onClick={() => setPendingNotice({ kind: 'leave', id: activeInvite.invite.id })}>🚪 Leave group</Button>}
                 </span>
               </div>
