@@ -44,7 +44,7 @@ describe('room fee', () => {
       ['eosio.null', '0.0080 CHEESE', memo], ['xcheeseliqst', '0.0020 CHEESE', memo],
     ]);
   });
-  it('a join request is one part: 0.0001 CHEESE to the creator plus the 0.0100 CHEESE platform fee', () => {
+  it('a join request pays the creator 0.0001 + 0.1000 CHEESE plus the 0.0100 CHEESE platform fee (0.1101 total)', () => {
     const payload = encodeNotice('join', ID);
     expect(partsOf(payload)).toBe(1);
     expect(groupMessageCost(1, 1)).toBe('0.0101 CHEESE');
@@ -107,7 +107,7 @@ describe('asking to join and being added', () => {
     const ev = decodeRoomEvents([{ txId: 'j', time: 15, from: 'carol', to: 'alice', quantity: '0.0001 CHEESE', memo }], alice, {});
     expect(collectJoinRequests(ev, 'alice', new Set([ID]), { [ID]: ['alice', 'bob'] }, [], {})).toEqual([{ groupId: ID, from: 'carol', publicKey: carol.publicKey, time: 15 }]);
     const actions = buildJoinRequestActions(carol, 'alice', alice.publicKey, ID, []) as { data: { to: string; quantity: string } }[];
-    expect(actions.map(a => [a.data.to, a.data.quantity])).toEqual([['alice', '0.0001 CHEESE'], ['eosio.null', '0.0080 CHEESE'], ['xcheeseliqst', '0.0020 CHEESE']]);
+    expect(actions.map(a => [a.data.to, a.data.quantity])).toEqual([['alice', '0.0001 CHEESE'], ['alice', '0.1000 CHEESE'], ['eosio.null', '0.0080 CHEESE'], ['xcheeseliqst', '0.0020 CHEESE']]);
   });
 
   it('a key inside a memo never opens anything but a join request', () => {
