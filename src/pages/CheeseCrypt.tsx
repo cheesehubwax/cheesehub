@@ -1,7 +1,7 @@
 // CHEESECrypt — encrypted on-chain messages paid in CHEESE.
 // Intentionally not linked from the header or menus: reachable at /crypt only.
 // The orb uses a bundled public copy on GitHub Pages, which cannot serve Lovable's asset paths.
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Layout } from '@/components/Layout';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import cryptOrbAsset from '@/assets/cheesecrypt-relic.png.asset.json';
@@ -220,6 +220,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [menuOpen, setMenuOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
   const [feeInfoOpen, setFeeInfoOpen] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
   const [listHidden, setListHidden] = useState(() => { try { return localStorage.getItem(`cheesecrypt-sidebar-collapsed-${account}`) === '1'; } catch { return false; } });
   const toggleList = () => setListHidden(v => {
     try { localStorage.setItem(`cheesecrypt-sidebar-collapsed-${account}`, v ? '0' : '1'); } catch { /* storage unavailable */ }
@@ -943,6 +944,31 @@ export function Messenger({ account, session }: { account: string; session: NonN
       </div>
     );
   }
+
+  // Group member lists live behind one dropdown so the chat header stays a single compact line.
+  const memberLine = (member: string, status?: string, action?: ReactNode) => (
+    <li key={member} className="flex items-center gap-2 min-w-0">
+      <PixelAvatar account={member} avatar={member === account ? key.avatar : avatars[member]} className="h-9 w-9 shrink-0" />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-xs font-semibold">{nameFor(member)}{member === account && ' (you)'}</span>
+        <span className="block truncate font-mono text-[10px] text-muted-foreground">{member}</span>
+      </span>
+      {status && <span className={cn('shrink-0 text-[10px]', status === 'joined' ? 'text-cheese' : 'text-muted-foreground')}>{status}</span>}
+      {action}
+    </li>
+  );
+  const membersDropdown = (members: string[], status?: (member: string) => string | undefined, action?: (member: string) => ReactNode) => (
+    <Popover open={membersOpen} onOpenChange={setMembersOpen}>
+      <PopoverTrigger asChild>
+        <Button size="sm" variant="outline" className="h-7 shrink-0 gap-1 text-xs font-normal" aria-expanded={membersOpen}>
+          👥 Members ({members.length}) <ChevronDown className={cn('h-3 w-3 transition', !membersOpen && '-rotate-90')} />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="crypt-members-pop w-72 p-2">
+        <ul className="max-h-60 space-y-1 overflow-y-auto">{members.map(member => memberLine(member, status?.(member), action?.(member)))}</ul>
+      </PopoverContent>
+    </Popover>
+  );
 
   return (
     <div className="w-full rounded-lg border border-cheese/20 bg-card/80 overflow-hidden flex flex-col md:grid h-[80dvh] min-h-[480px] md:grid-cols-[240px_1fr] md:grid-rows-[auto_1fr]">
