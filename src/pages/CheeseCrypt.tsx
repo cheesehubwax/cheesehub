@@ -1347,21 +1347,6 @@ export function Messenger({ account, session }: { account: string; session: NonN
         onConfirm={confirmDecline} onClose={() => setDecliningJoin(null)}>
         <JoinNoteField value={joinNote} onChange={setJoinNote} disabled={busy} placeholder="e.g. Sorry mate" />
       </PaidActionDialog>}
-      {listingRoom && (() => {
-        const v = viewById(listingRoom);
-        if (!v || !v.isCreator) return null;
-        const isListed = listedIds.has(v.invite.id);
-        const policyCost = parseFloat(cg2Cost(encodeRoomPolicy(v.invite.id, !isListed, moderation[v.invite.id]?.protected ?? v.invite.members.map(m => m.account)), v.invite.members.length - 1));
-        const current = listings.find(l => l.creator === account && l.id === v.invite.id);
-        const saved = loadRoomInfo(account)[v.invite.id];
-        return <RoomListingDialog groupId={v.invite.id} groupName={v.name} members={Math.max(1, v.joined.length)} publicKey={key.publicKey} creatorName={key.displayName} listed={isListed} busy={busy}
-          cost={`${(parseFloat(isListed ? ROOM_FEE_QUANTITY : LISTING_STAKE_QUANTITY) + policyCost).toFixed(4)} CHEESE`}
-          unlistCost={`${(parseFloat(ROOM_FEE_QUANTITY) + policyCost).toFixed(4)} CHEESE`}
-          initialName={current?.name ?? v.name}
-          initialTopic={(current ?? saved)?.topic ?? ''}
-          initialTags={(current ?? saved)?.tags ?? []}
-          onList={info => listRoom(v.invite.id, info)} onUnlist={() => unlistRoom(v.invite.id)} onClose={() => setListingRoom(null)} />;
-      })()}
       <PublicInboxDialog enabled={publicInbox} onChange={enabled => { savePublicInbox(account, enabled); setPublicInbox(enabled); }} open={inboxOpen} onOpenChange={setInboxOpen} />
       <CryptSidebar account={account} cryptKey={key} loading={loading} refresh={refresh} setEditingAvatar={setEditingAvatar}
         menuOpen={menuOpen} setMenuOpen={setMenuOpen} fileRef={fileRef} sharePublicKey={sharePublicKey} busy={busy} publish={async () => { setPublishAgreed(false); setShowPublishPrompt(true); }}
