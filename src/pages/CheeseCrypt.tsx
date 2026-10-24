@@ -1,7 +1,7 @@
 // CHEESECrypt — encrypted on-chain messages paid in CHEESE.
 // Intentionally not linked from the header or menus: reachable at /crypt only.
 // The hero orb shows the glitched cheese pyramid (CDN asset pointer below).
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import cryptOrbAsset from '@/assets/cheese-pyramid.png.asset.json';
@@ -48,7 +48,7 @@ import { CryptAbout } from '@/components/crypt/CryptAbout';
 import { VoiceRecorder } from '@/components/crypt/VoiceRecorder';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { buildVoiceBatches, voiceNoteCost, voicePartCount, voiceTransactions, VOICE_PARTS_PER_TX, type VoiceClip } from '@/lib/cryptVoice';
-import { baselineMarks, firstVisitMarks, loadReadMarks, mergeMarks, sameMarks, saveReadMarks, unreadCounts, unreadReplies, type ReadMarks } from '@/lib/cryptUnread';
+import { baselineMarks, firstUnreadIndex, firstVisitMarks, loadReadMarks, mergeMarks, sameMarks, saveReadMarks, unreadCounts, unreadReplies, type ReadMarks } from '@/lib/cryptUnread';
 import { readKeyFileJson } from '@/lib/cryptKeyFileText';
 import { buildGroupMessageActions, createGroup, decodeConversations, groupMessageCost, groupMessageSize, loadGroups, loadHiddenGroups, mergeGroups, saveGroups, setGroupHidden, type ConversationEntry, type CryptGroup } from '@/lib/cryptGroups';
 import {
@@ -489,6 +489,16 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const listRef = useRef<HTMLOListElement>(null);
   const nearBottom = useRef(true);
   const lastActive = useRef<string | null>(null);
+  const newMarkerRef = useRef<HTMLLIElement | null>(null);
+  // Snapshot of the chat's read marker at the moment it is opened, before it is marked read — the resume point.
+  const readMarksRef = useRef<ReadMarks | null>(null);
+  readMarksRef.current = readMarks;
+  const resumeRef = useRef<{ id: string | null; at: number | null }>({ id: null, at: null });
+  if (resumeRef.current.id !== active) {
+    resumeRef.current = { id: active, at: active ? (readMarksRef.current?.[active] ?? null) : null };
+  }
+  const resumeAt = resumeRef.current.id === active ? resumeRef.current.at : null;
+  const firstNew = firstUnreadIndex(thread, resumeAt);
   // Remember where the page itself was so switching chats never moves the outer page.
   const pageY = useRef(typeof window === 'undefined' ? 0 : window.scrollY);
   useEffect(() => {
@@ -506,9 +516,17 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if (switched || nearBottom.current) {
       const el = listRef.current;
       if (el) {
-        const top = el.scrollHeight;
-        if (typeof el.scrollTo === 'function') el.scrollTo({ top, behavior: switched ? 'auto' : 'smooth' });
-        else el.scrollTop = top;
+        const marker = switched ? newMarkerRef.current : null;
+        if (marker) {
+          // Re-opening a chat lands on the first unread message (just under the divider), not the bottom.
+          const top = el.scrollTop + marker.getBoundingClientRect().top - el.getBoundingClientRect().top - 12;
+          if (typeof el.scrollTo === 'function') el.scrollTo({ top, behavior: 'auto' });
+          else el.scrollTop = top;
+        } else {
+          const top = el.scrollHeight;
+          if (typeof el.scrollTo === 'function') el.scrollTo({ top, behavior: switched ? 'auto' : 'smooth' });
+          else el.scrollTop = top;
+        }
       }
     }
     if (!switched || typeof window.requestAnimationFrame !== 'function') return;
@@ -1141,11 +1159,20 @@ export function Messenger({ account, session }: { account: string; session: NonN
             </Dialog>
             <ol ref={listRef} className="flex-1 overflow-y-auto space-y-2 p-4"
               onScroll={(e) => { const el = e.currentTarget; nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
-              {thread.map((m) => (
-                <ChatMessageItem key={m.key} m={m} account={account} keyAvatar={key?.avatar} avatars={avatars}
-                  contacts={contacts} active={active} activeGroup={activeGroup} nameFor={nameFor}
-                  onReply={(x) => { setReplyingTo({ author: x.from, time: x.time, quote: quoteOf(x.text, !!x.voice) }); setVoice(null); setTimeout(() => composerRef.current?.focus(), 0); }}
-                  onOpenQuote={setOpenQuote} openedAt={acceptedRequestMessages.current.has(m.key) ? { current: Infinity } : openedAt} />
+              {thread.map((m, i) => (
+                <Fragment key={m.key}>
+                  {i === firstNew && firstNew > 0 && (
+                    <li ref={newMarkerRef} aria-hidden className="flex items-center gap-2 py-1">
+                      <span className="h-px flex-1 bg-border" />
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">New messages</span>
+                      <span className="h-px flex-1 bg-border" />
+                    </li>
+                  )}
+                  <ChatMessageItem m={m} account={account} keyAvatar={key?.avatar} avatars={avatars}
+                    contacts={contacts} active={active} activeGroup={activeGroup} nameFor={nameFor}
+                    onReply={(x) => { setReplyingTo({ author: x.from, time: x.time, quote: quoteOf(x.text, !!x.voice) }); setVoice(null); setTimeout(() => composerRef.current?.focus(), 0); }}
+                    onOpenQuote={setOpenQuote} openedAt={acceptedRequestMessages.current.has(m.key) ? { current: Infinity } : openedAt} />
+                </Fragment>
               ))}
               {!thread.length && <li className="text-sm text-muted-foreground">{activeGroup || activeInvite ? 'No group messages yet.' : `No messages with ${nameFor(active)} yet.`}</li>}
               <li ref={endRef} aria-hidden />

@@ -47,6 +47,12 @@ export function unreadReplies(messages: Msg[], account: string, marks: ReadMarks
   return out;
 }
 
+/** Index of the first message newer than the resume point, or -1 when nothing is newer (or there is no resume point). */
+export function firstUnreadIndex<T extends { time: number }>(messages: T[], resumeAt: number | null): number {
+  if (resumeAt == null) return -1;
+  return messages.findIndex(m => m.time > resumeAt);
+}
+
 // ---- read markers shared with the vault folder (device-only; no message content or keys) ----
 const MARK_ID = /^(group:[a-f0-9]{16}|[a-z1-5.]{1,12})$/;
 export const READ_STATE_TYPE = 'cheesecrypt-read-state';
