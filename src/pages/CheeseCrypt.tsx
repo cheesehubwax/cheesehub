@@ -60,7 +60,7 @@ import { CryptComposer } from '@/components/crypt/CryptComposer';
 import { DiscoverRoomsDialog, JoinRequests, RoomListingDialog } from '@/components/crypt/PublicRooms';
 import { fetchRoomMemos } from '@/lib/cheeseCrypt';
 import {
-  buildJoinRequestActions, buildRoomActions, collectJoinRequests, collectListings, decodeRoomEvents, declineJoin, removeRoomRequest, roomRequestOutcomes, encodeListing, encodeUnlist, listedRoomIds, loadJoinDeclines,
+  JOIN_REQUEST_COST, buildJoinRequestActions, buildRoomActions, collectJoinRequests, collectListings, decodeRoomEvents, declineJoin, removeRoomRequest, roomRequestOutcomes, encodeListing, encodeUnlist, listedRoomIds, loadJoinDeclines,
   loadLocalListings, loadRoomRequests, ROOM_PREFIX, saveLocalListing, saveRoomRequest, type JoinRequest, type RoomListing,
 } from '@/lib/cryptRooms';
 
@@ -1035,7 +1035,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   };
 
   // ---- public rooms ----
-  const roomJoinCost = cg2Cost(encodeNotice('join', '0'.repeat(16)), 1);
+  const roomJoinCost = JOIN_REQUEST_COST;
   const roomStatus = (l: RoomListing) => {
     if (l.creator === account) return 'own' as const;
     const v = viewById(l.id);
@@ -1323,7 +1323,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
       <DiscoverRoomsDialog open={roomsOpen} onOpenChange={o => { setRoomsOpen(o); if (o) void refetchRooms(); }} listings={listings} loading={roomsLoading}
         refresh={() => void refetchRooms()} account={account} roomStatus={roomStatus} joinCost={roomJoinCost} onAsk={l => { setRoomsOpen(false); setAskingRoom(l); }} />
       {askingRoom && <PaidActionDialog title={`🌐 Ask to join ${askingRoom.name}`} cost={roomJoinCost} confirmLabel="Pay & ask" busy={busy}
-        description={`Sends ${askingRoom.creator} an encrypted request naming only this room. If they accept, an invite appears in your Groups and you choose Join or Decline.`}
+        description={`Sends ${askingRoom.creator} an encrypted request naming only this room, plus a 0.1000 CHEESE join fee paid to them (kept whether they accept or decline). If they accept, an invite appears in your Groups and you choose Join or Decline.`}
         onConfirm={() => askToJoin(askingRoom)} onClose={() => setAskingRoom(null)} />}
       {acceptingJoin && (() => {
         const plan = joinPlan(acceptingJoin);
