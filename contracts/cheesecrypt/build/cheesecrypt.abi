@@ -1,0 +1,754 @@
+{
+    "____comment": "This file was generated with eosio-abigen. DO NOT EDIT ",
+    "version": "eosio::abi/1.2",
+    "types": [],
+    "structs": [
+        {
+            "name": "addmember",
+            "base": "",
+            "fields": [
+                {
+                    "name": "owner",
+                    "type": "name"
+                },
+                {
+                    "name": "room_id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "account",
+                    "type": "name"
+                }
+            ]
+        },
+        {
+            "name": "balance",
+            "base": "",
+            "fields": [
+                {
+                    "name": "owner",
+                    "type": "name"
+                },
+                {
+                    "name": "funds",
+                    "type": "asset"
+                }
+            ]
+        },
+        {
+            "name": "ban",
+            "base": "",
+            "fields": [
+                {
+                    "name": "account",
+                    "type": "name"
+                },
+                {
+                    "name": "banned_by",
+                    "type": "name"
+                },
+                {
+                    "name": "banned_at",
+                    "type": "time_point_sec"
+                }
+            ]
+        },
+        {
+            "name": "banuser",
+            "base": "",
+            "fields": [
+                {
+                    "name": "owner",
+                    "type": "name"
+                },
+                {
+                    "name": "room_id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "account",
+                    "type": "name"
+                }
+            ]
+        },
+        {
+            "name": "collapsed",
+            "base": "",
+            "fields": [
+                {
+                    "name": "id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "digest",
+                    "type": "checksum256"
+                },
+                {
+                    "name": "author",
+                    "type": "name"
+                },
+                {
+                    "name": "collapsed_by",
+                    "type": "name"
+                },
+                {
+                    "name": "collapsed_at",
+                    "type": "time_point_sec"
+                }
+            ]
+        },
+        {
+            "name": "collapsemsg",
+            "base": "",
+            "fields": [
+                {
+                    "name": "actor",
+                    "type": "name"
+                },
+                {
+                    "name": "room_id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "digest",
+                    "type": "checksum256"
+                },
+                {
+                    "name": "author",
+                    "type": "name"
+                }
+            ]
+        },
+        {
+            "name": "config",
+            "base": "",
+            "fields": [
+                {
+                    "name": "token_contract",
+                    "type": "name"
+                },
+                {
+                    "name": "token_symbol",
+                    "type": "symbol"
+                },
+                {
+                    "name": "null_account",
+                    "type": "name"
+                },
+                {
+                    "name": "liquidity_account",
+                    "type": "name"
+                },
+                {
+                    "name": "text_fee",
+                    "type": "asset"
+                },
+                {
+                    "name": "nft_fee",
+                    "type": "asset"
+                },
+                {
+                    "name": "voice_fee",
+                    "type": "asset"
+                },
+                {
+                    "name": "recipient_fee",
+                    "type": "asset"
+                },
+                {
+                    "name": "null_percent",
+                    "type": "uint8"
+                },
+                {
+                    "name": "private_cap",
+                    "type": "uint32"
+                },
+                {
+                    "name": "public_cap",
+                    "type": "uint32"
+                },
+                {
+                    "name": "max_parts",
+                    "type": "uint16"
+                },
+                {
+                    "name": "edit_window_sec",
+                    "type": "uint32"
+                },
+                {
+                    "name": "receipt_keep_sec",
+                    "type": "uint32"
+                },
+                {
+                    "name": "paused",
+                    "type": "bool"
+                }
+            ]
+        },
+        {
+            "name": "copy_t",
+            "base": "",
+            "fields": [
+                {
+                    "name": "to",
+                    "type": "name"
+                },
+                {
+                    "name": "memo",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "createroom",
+            "base": "",
+            "fields": [
+                {
+                    "name": "owner",
+                    "type": "name"
+                },
+                {
+                    "name": "group_id",
+                    "type": "string"
+                },
+                {
+                    "name": "title",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "editmsg",
+            "base": "",
+            "fields": [
+                {
+                    "name": "sender",
+                    "type": "name"
+                },
+                {
+                    "name": "receipt_id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "parts",
+                    "type": "uint16"
+                },
+                {
+                    "name": "copies",
+                    "type": "copy_t[]"
+                }
+            ]
+        },
+        {
+            "name": "leave",
+            "base": "",
+            "fields": [
+                {
+                    "name": "account",
+                    "type": "name"
+                },
+                {
+                    "name": "room_id",
+                    "type": "uint64"
+                }
+            ]
+        },
+        {
+            "name": "member",
+            "base": "",
+            "fields": [
+                {
+                    "name": "account",
+                    "type": "name"
+                },
+                {
+                    "name": "role",
+                    "type": "uint8"
+                },
+                {
+                    "name": "founder",
+                    "type": "bool"
+                },
+                {
+                    "name": "joined_at",
+                    "type": "time_point_sec"
+                }
+            ]
+        },
+        {
+            "name": "msgreceipt",
+            "base": "",
+            "fields": [
+                {
+                    "name": "sender",
+                    "type": "name"
+                },
+                {
+                    "name": "receipt_id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "room_id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "edits",
+                    "type": "uint64"
+                }
+            ]
+        },
+        {
+            "name": "mute",
+            "base": "",
+            "fields": [
+                {
+                    "name": "account",
+                    "type": "name"
+                },
+                {
+                    "name": "muted_by",
+                    "type": "name"
+                },
+                {
+                    "name": "muted_at",
+                    "type": "time_point_sec"
+                },
+                {
+                    "name": "muted_until",
+                    "type": "time_point_sec"
+                }
+            ]
+        },
+        {
+            "name": "muteuser",
+            "base": "",
+            "fields": [
+                {
+                    "name": "actor",
+                    "type": "name"
+                },
+                {
+                    "name": "room_id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "account",
+                    "type": "name"
+                },
+                {
+                    "name": "duration_sec",
+                    "type": "uint32"
+                }
+            ]
+        },
+        {
+            "name": "prunercpts",
+            "base": "",
+            "fields": [
+                {
+                    "name": "sender",
+                    "type": "name"
+                },
+                {
+                    "name": "max_rows",
+                    "type": "uint32"
+                }
+            ]
+        },
+        {
+            "name": "receipt",
+            "base": "",
+            "fields": [
+                {
+                    "name": "id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "room_id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "kind",
+                    "type": "uint8"
+                },
+                {
+                    "name": "sent_at",
+                    "type": "time_point_sec"
+                }
+            ]
+        },
+        {
+            "name": "room",
+            "base": "",
+            "fields": [
+                {
+                    "name": "id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "group_hash",
+                    "type": "checksum256"
+                },
+                {
+                    "name": "group_id",
+                    "type": "string"
+                },
+                {
+                    "name": "owner",
+                    "type": "name"
+                },
+                {
+                    "name": "title",
+                    "type": "string"
+                },
+                {
+                    "name": "description",
+                    "type": "string"
+                },
+                {
+                    "name": "pub_key",
+                    "type": "string"
+                },
+                {
+                    "name": "is_public",
+                    "type": "bool"
+                },
+                {
+                    "name": "ever_public",
+                    "type": "bool"
+                },
+                {
+                    "name": "member_count",
+                    "type": "uint32"
+                },
+                {
+                    "name": "created_at",
+                    "type": "time_point_sec"
+                },
+                {
+                    "name": "first_public_at",
+                    "type": "time_point_sec"
+                }
+            ]
+        },
+        {
+            "name": "sendmsg",
+            "base": "",
+            "fields": [
+                {
+                    "name": "sender",
+                    "type": "name"
+                },
+                {
+                    "name": "room_id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "kind",
+                    "type": "uint8"
+                },
+                {
+                    "name": "parts",
+                    "type": "uint16"
+                },
+                {
+                    "name": "copies",
+                    "type": "copy_t[]"
+                }
+            ]
+        },
+        {
+            "name": "setadmin",
+            "base": "",
+            "fields": [
+                {
+                    "name": "owner",
+                    "type": "name"
+                },
+                {
+                    "name": "room_id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "account",
+                    "type": "name"
+                },
+                {
+                    "name": "on",
+                    "type": "bool"
+                }
+            ]
+        },
+        {
+            "name": "setconfig",
+            "base": "",
+            "fields": [
+                {
+                    "name": "cfg",
+                    "type": "config"
+                }
+            ]
+        },
+        {
+            "name": "setpaused",
+            "base": "",
+            "fields": [
+                {
+                    "name": "paused",
+                    "type": "bool"
+                }
+            ]
+        },
+        {
+            "name": "setpublic",
+            "base": "",
+            "fields": [
+                {
+                    "name": "owner",
+                    "type": "name"
+                },
+                {
+                    "name": "room_id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "is_public",
+                    "type": "bool"
+                },
+                {
+                    "name": "title",
+                    "type": "string"
+                },
+                {
+                    "name": "description",
+                    "type": "string"
+                },
+                {
+                    "name": "pub_key",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "unbanuser",
+            "base": "",
+            "fields": [
+                {
+                    "name": "owner",
+                    "type": "name"
+                },
+                {
+                    "name": "room_id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "account",
+                    "type": "name"
+                }
+            ]
+        },
+        {
+            "name": "uncollapse",
+            "base": "",
+            "fields": [
+                {
+                    "name": "actor",
+                    "type": "name"
+                },
+                {
+                    "name": "room_id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "digest",
+                    "type": "checksum256"
+                }
+            ]
+        },
+        {
+            "name": "unmuteuser",
+            "base": "",
+            "fields": [
+                {
+                    "name": "actor",
+                    "type": "name"
+                },
+                {
+                    "name": "room_id",
+                    "type": "uint64"
+                },
+                {
+                    "name": "account",
+                    "type": "name"
+                }
+            ]
+        },
+        {
+            "name": "withdraw",
+            "base": "",
+            "fields": [
+                {
+                    "name": "owner",
+                    "type": "name"
+                },
+                {
+                    "name": "quantity",
+                    "type": "asset"
+                }
+            ]
+        }
+    ],
+    "actions": [
+        {
+            "name": "addmember",
+            "type": "addmember",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "banuser",
+            "type": "banuser",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "collapsemsg",
+            "type": "collapsemsg",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "createroom",
+            "type": "createroom",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "editmsg",
+            "type": "editmsg",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "leave",
+            "type": "leave",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "msgreceipt",
+            "type": "msgreceipt",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "muteuser",
+            "type": "muteuser",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "prunercpts",
+            "type": "prunercpts",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "sendmsg",
+            "type": "sendmsg",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "setadmin",
+            "type": "setadmin",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "setconfig",
+            "type": "setconfig",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "setpaused",
+            "type": "setpaused",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "setpublic",
+            "type": "setpublic",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "unbanuser",
+            "type": "unbanuser",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "uncollapse",
+            "type": "uncollapse",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "unmuteuser",
+            "type": "unmuteuser",
+            "ricardian_contract": ""
+        },
+        {
+            "name": "withdraw",
+            "type": "withdraw",
+            "ricardian_contract": ""
+        }
+    ],
+    "tables": [
+        {
+            "name": "balances",
+            "type": "balance",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
+        {
+            "name": "bans",
+            "type": "ban",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
+        {
+            "name": "collapsed",
+            "type": "collapsed",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
+        {
+            "name": "config",
+            "type": "config",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
+        {
+            "name": "members",
+            "type": "member",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
+        {
+            "name": "mutes",
+            "type": "mute",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
+        {
+            "name": "receipts",
+            "type": "receipt",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
+        {
+            "name": "rooms",
+            "type": "room",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        }
+    ],
+    "ricardian_clauses": [],
+    "variants": [],
+    "action_results": []
+}
