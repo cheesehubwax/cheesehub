@@ -360,7 +360,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center text-2xl">{outcome === 'declined' ? '❌' : '⏳'}</span>
         <span className="min-w-0"><span className="block text-sm break-words">{r.name ?? 'Public room'}</span>
           <span className={cn('block text-[10px]', outcome === 'declined' ? 'text-destructive' : 'text-cheese')}>
-            {outcome === 'declined' ? `Request declined by ${nameFor(r.creator)}` : `Request pending · waiting for ${nameFor(r.creator)}`}
+            {outcome === 'declined' ? `Request declined by ${roomOwnerName(r.creator, id)}` : `Request pending · waiting for ${roomOwnerName(r.creator, id)}`}
           </span>
           {outcome === 'declined' && requestNotes[id] && <span className="block text-[11px] italic text-muted-foreground break-words">“{requestNotes[id]}”</span>}</span>
       </div>
@@ -373,6 +373,11 @@ export function Messenger({ account, session }: { account: string; session: NonN
     staleTime: 60_000, refetchInterval: () => (document.visibilityState === 'visible' ? 60_000 : false), retry: false,
   });
   const listings = useMemo(() => collectListings(roomMemos ?? []).filter(l => !blocked.includes(l.creator)), [roomMemos, blocked]);
+  /** The room owner's public username from their listing (display only), else their known name or account. */
+  function roomOwnerName(creator: string, roomId: string) {
+    const l = listings.find(x => x.id === roomId && x.creator === creator);
+    return l?.creatorName || nameFor(creator);
+  }
   const myRoomIds = useMemo(() => inviteViews.filter(v => v.isCreator && v.status === 'joined').map(v => v.invite.id), [inviteViews]);
   const listedIds = useMemo(() => listedRoomIds(account, listings, myRoomIds, localListings), [account, listings, myRoomIds, localListings]);
   /** Accounts known only through an invite group; they stay out of Friends and key discovery until a friend request is accepted. */
@@ -1058,7 +1063,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     } catch (e) { toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' }); return false; }
     finally { setBusy(false); }
     setRoomRequests(saveRoomRequest(account, l));
-    toast({ title: '⏳ Request pending', description: `It stays in your Groups until ${l.creator} accepts or declines.` });
+    toast({ title: '⏳ Request pending', description: `It stays in your Groups until ${l.creatorName || nameFor(l.creator)} accepts or declines.` });
     setAskingRoom(null);
     return true;
   };
@@ -1328,7 +1333,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
       <DiscoverRoomsDialog open={roomsOpen} onOpenChange={o => { setRoomsOpen(o); if (o) void refetchRooms(); }} listings={listings} loading={roomsLoading}
         refresh={() => void refetchRooms()} account={account} nameFor={nameFor} roomStatus={roomStatus} joinCost={roomJoinCost} onAsk={l => { setRoomsOpen(false); setJoinNote(''); setAskingRoom(l); }} />
       {askingRoom && <PaidActionDialog title={`🌐 Ask to join ${askingRoom.name}`} cost={roomJoinCost} confirmLabel="Pay & ask" busy={busy}
-        description={`Sends ${askingRoom.creator} an encrypted request naming only this room, plus a 0.1000 CHEESE join fee paid to them (kept whether they accept or decline). If they accept, an invite appears in your Groups and you choose Join or Decline.`}
+        description={`Sends ${askingRoom.creatorName || nameFor(askingRoom.creator)} an encrypted request naming only this room, plus a 0.1000 CHEESE join fee paid to them (kept whether they accept or decline). If they accept, an invite appears in your Groups and you choose Join or Decline.`}
         onConfirm={() => askToJoin(askingRoom)} onClose={() => setAskingRoom(null)}>
         <JoinNoteField value={joinNote} onChange={setJoinNote} disabled={busy} placeholder="e.g. Hey, it's John from work" />
       </PaidActionDialog>}
