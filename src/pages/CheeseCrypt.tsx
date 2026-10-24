@@ -426,7 +426,13 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const inviteKeys = useMemo(() => activeInvite ? Object.fromEntries(activeInvite.invite.members.map(m => [m.account, m.publicKey])) : {}, [activeInvite]);
   const currentRecipients = activeInvite ? activeInvite.joined.filter(m => m !== account) : activeGroup ? activeGroup.members.filter(m => m !== account) : active ? [active] : [];
   // Edits go to the original recipients, not newly joined members who never received the original.
-  const recipients = editingMessage ? [...new Set(editableConversations.filter(m => m.from === account && m.txId === editingMessage.txId && m.igroup === editingMessage.igroup && m.group?.id === editingMessage.group?.id && editTarget(m) === editTarget(editingMessage)).map(m => m.to))] : currentRecipients;
+  const originalRecipients = useMemo(() => {
+    if (!editingMessage || !key) return [];
+    const candidates = [...new Set(visibleMemos.filter(m => m.from === account && m.txId === editingMessage.txId).map(m => m.to))];
+    return candidates.filter(to => decodeConversations(visibleMemos.filter(m => m.from === account && m.to === to), key, contacts, clock, scoped)
+      .some(m => m.igroup === editingMessage.igroup && m.group?.id === editingMessage.group?.id && editTarget(m) === editTarget(editingMessage)));
+  }, [editingMessage, key, visibleMemos, account, contacts, clock, scoped]);
+  const recipients = editingMessage ? originalRecipients : currentRecipients;
   const missingKeys = activeInvite ? [] : recipients.filter(m => !contacts[m]);
   useEffect(() => { setReplyingTo(null); }, [active]);
   const thread = activeInvite ? conversations.filter(m => m.igroup === activeInvite.invite.id) : conversations.filter(m => activeGroup
@@ -975,7 +981,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const { bytes, parts, maxBytes } = size;
   const tooLong = bytes > maxBytes || parts > MAX_PARTS;
   const copies = activeGroup || activeInvite ? recipients.length : 1;
-  const voiceParts = voice ? voicePartCount(voice) : 0;
+  const voiceParts = voice ? voicePartCount(voice) + (editingMessage ? 1 : 0) : 0;
   const voiceTxs = voiceTransactions(voiceParts);
   const totalCost = voice
     ? voiceNoteCost(voiceParts, copies)
