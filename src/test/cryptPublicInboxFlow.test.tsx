@@ -16,7 +16,7 @@ const alice = generateKey('alice'), bob = generateKey('bob');
 const history = [{ txId: 'request', time: 100, from: 'bob', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo('hello support', alice.publicKey, bob.secretKey) }];
 const mount = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="alice" session={{ permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
 async function enable() {
-  fireEvent.click(screen.getByRole('button', { name: 'Public inbox' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Menu' })); fireEvent.click(await screen.findByRole('button', { name: 'Public inbox' }));
   fireEvent.click(screen.getByRole('switch', { name: 'Accept message requests' }));
   fireEvent.click(screen.getByRole('button', { name: 'Close' }));
   await screen.findByRole('button', { name: 'Accept request from bob' });
