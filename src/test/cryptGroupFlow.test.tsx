@@ -7,6 +7,8 @@ import { loadCryptNames, saveCryptName } from '@/lib/cryptNames';
 import { groupPayload, loadGroups, loadHiddenGroups, saveGroups } from '@/lib/cryptGroups';
 import { encodeInvite, encodeNotice, loadInvites } from '@/lib/cryptInviteGroups';
 import { Messenger } from '@/pages/CheeseCrypt';
+import { encodeReply } from '@/lib/cryptReply';
+import { saveReadMarks } from '@/lib/cryptUnread';
 
 const calls = vi.hoisted(() => ({ transact: vi.fn(), fetch: vi.fn() }));
 vi.mock('@/context/WaxContext', () => ({ useWax: vi.fn() }));
@@ -32,6 +34,28 @@ const mount = (ui: React.ReactElement) => {
 };
 
 describe('group creation and signing gate', () => {
+  it.each(['private', 'group'])('keeps six in-room replies independent of the %s sidebar read marker', async kind => {
+    const alice = generateKey('alice'), bob = generateKey('bob');
+    saveKey(alice); saveContact('alice', 'bob', bob.publicKey);
+    const group = { id: '0123456789abcdef', members: ['alice', 'bob', 'carol'] };
+    if (kind === 'group') saveGroups('alice', [group]);
+    const id = kind === 'group' ? `group:${group.id}` : 'bob';
+    saveReadMarks('alice', { [id]: 1 });
+    calls.fetch.mockResolvedValue(Array.from({ length: 6 }, (_, i) => ({ txId: `r${i}`, time: i + 10,
+      from: 'bob', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo(kind === 'group'
+        ? groupPayload(group, encodeReply({ author: 'alice', time: 1, quote: 'hello' }, `reply ${i}`))
+        : encodeReply({ author: 'alice', time: 1, quote: 'hello' }, `reply ${i}`), alice.publicKey, bob.secretKey) })));
+    mount(<Messenger account="alice" session={{ permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} />);
+    await waitFor(() => expect(screen.getByLabelText('6 unread, 6 replies to you')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: kind === 'group' ? /Group · 3 people/ : /^bob/ }));
+    const jump = await screen.findByRole('button', { name: 'Jump to earliest unseen reply (6 remaining)' });
+    fireEvent.click(jump);
+    expect(screen.getByRole('button', { name: 'Jump to earliest unseen reply (5 remaining)' })).toBeInTheDocument();
+    expect(screen.getByText('reply 0').closest('li')?.dataset.replyHighlighted).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: /^carol/ }));
+    fireEvent.click(screen.getByRole('button', { name: kind === 'group' ? /Group · 3 people/ : /^bob/ }));
+    expect(screen.getByRole('button', { name: 'Jump to earliest unseen reply (5 remaining)' })).toBeInTheDocument();
+  });
   it('hides a group persistently while preserving its history and permits restoration', async () => {
     const alice = generateKey('alice'), bob = generateKey('bob');
     saveKey(alice); saveContact('alice', 'bob', bob.publicKey);

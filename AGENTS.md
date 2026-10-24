@@ -5,13 +5,13 @@
 - CHEESEAir LP token columns aggregate current underlying quantities in normalized pair order, separate from USD payout weights so presentation never changes distribution.
 - CHEESEAir suffix unions use timestamp cursors, bounded reads and complete-only cache; stalled providers flag partial results because indexes differ and skip stops at 10,000 rows.
 - CHEESEFolio re-derives raw IndexedDB history per account; live balances are truth. Shared prices poll foreground-only/refetch on focus; metadata/placeholders never get live timestamps.
-- CHEESEFolio's acquisition breakdown uses cumulative trade receipts and ledger free receipts, explicitly separate from current holdings; it never alters cost basis or infers which source remains after disposals.
+- Folio acquisitions use cumulative trade/free receipts, separate from holdings; never alter basis or infer sources after disposals.
 - CHEESEFolio scans always include the history provider reaching furthest back and complete a sync only when it was read to the end; big-page providers read sequentially, only small-page ones windowed, capped concurrency — bursts make Hyperion drop connections.
 - CHEESEFolio de-duplicates by global sequence and drops inline copies with identical transfer creator actions; Hyperion receiver notifications otherwise double-count movements.
 - CHEESEFolio explains order-book fills from Alcor's per-account deal list (read in one large-limit request — its skip paging is gappy) and only looks up leftovers on Hyperion, routed by each provider's history start; per-transaction lookups alone take minutes on heavy accounts.
 - CHEESEFolio holdings roll live pool positions (Alcor positions read per pool scope on chain, Taco/Defibox share tokens × reserves) into each token row; a venue that can't be read hides P/L for tokens history says are pooled, never counts as zero.
 - Alcor's on-chain `positions` table is scoped per pool and indexed by owner (index 3); the farm manager's API fallback finds the account's pools from its `swap.alcor:addliquid` history, then sizes each position from the pool's current price.
-- CHEESEFolio's history-gap warning trusts the deepest provider when its get_creator answer includes the creation transaction (first transfers can lag creation).
+- Folio gaps trust the deepest provider's get_creator creation transaction; first transfers can lag creation.
 - CHEESERam history before live sampling is rebuilt from Hyperion `eosio::rammarket` table deltas (exact Bancor state, EOSDAC nodes) into 12h slots; backfill never alters existing samples, CHEESE fields stay null before CHEESE history, then use that UTC day's close; live samples are never re-priced.
 - Crypt writes CRYPT1:/CRYPTKEY1:, reads legacy GPKM1:/GPKMKEY1: and keeps gpk-msg-key files for compatibility.
 - CHEESECrypt voice notes are 0x03-headed byte memos assembled by sender+recipient+id across 30-part transactions; play only when complete and digest-verified (batches can partly fail).
@@ -22,7 +22,7 @@
 - CHEESECrypt folder pickers start at Desktop but request the vault subfolder; retry permission failures because Chromium protects Desktop-root access. Profile precedes keys; edits refresh only verified matching-key backups (staged writes), else download.
 - CHEESECrypt: one vault/device; friends/ loads into all accounts (per-account edits), only explicit saves replace; blocked memos drop undecrypted. Keys match by content; reads merge newest.
 - Crypt inbox: bounded discovery; strangers quarantined until accepted.
-- Crypt reply views use separate per-message receipts, not timestamp watermarks, so jumps cannot consume skipped replies; scroll only the inner list.
+- Crypt reply views use per-message receipts so jumps preserve skipped replies; scroll only the inner list.
 - Crypt About: DappAbout + crypto dialog.
 - Both NFT players normalize media via nftMedia (case-insensitive audio/clip/video, reference-only sound/mp3/sfx aliases); version music caches on detection changes to avoid stale classifications.
 - CHEESEFolio fiat/BTC/ETH figures are WAX→USD→currency per day (fx-usd-history.json, units per USD); unknown rates stay unknown.

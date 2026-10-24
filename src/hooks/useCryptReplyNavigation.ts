@@ -22,7 +22,7 @@ function load(account: string): ReplyStore {
 }
 
 /** Separate per-message receipts: jumping past a reply never marks that skipped reply viewed. */
-export function useCryptReplyNavigation(account: string, active: string | null, thread: ReplyMessage[], resumeAt: number | null, list: RefObject<HTMLOListElement>) {
+export function useCryptReplyNavigation(account: string, active: string | null, thread: ReplyMessage[], resumeAt: number | null, list: RefObject<HTMLOListElement>, onRead?: (time: number) => void) {
   const [store, setStore] = useState<ReplyStore>(() => load(account));
   const [highlighted, setHighlighted] = useState<{ id: string | null; keys: Set<string> }>({ id: active, keys: new Set() });
   const state = active ? store[active] : undefined;
@@ -63,6 +63,8 @@ export function useCryptReplyNavigation(account: string, active: string | null, 
         if (key) keys.push(key);
       }
     }
+    const newestVisible = thread.filter(m => keys.includes(m.key)).reduce((time, m) => Math.max(time, m.time), 0);
+    if (newestVisible > 0) onRead?.(newestVisible);
     consume(keys);
   };
   // Save the queue before a conversation's timestamp marker advances; unseen replies survive switching/reloading.
