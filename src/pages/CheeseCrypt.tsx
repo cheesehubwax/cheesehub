@@ -1159,11 +1159,20 @@ export function Messenger({ account, session }: { account: string; session: NonN
             </Dialog>
             <ol ref={listRef} className="flex-1 overflow-y-auto space-y-2 p-4"
               onScroll={(e) => { const el = e.currentTarget; nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
-              {thread.map((m) => (
-                <ChatMessageItem key={m.key} m={m} account={account} keyAvatar={key?.avatar} avatars={avatars}
-                  contacts={contacts} active={active} activeGroup={activeGroup} nameFor={nameFor}
-                  onReply={(x) => { setReplyingTo({ author: x.from, time: x.time, quote: quoteOf(x.text, !!x.voice) }); setVoice(null); setTimeout(() => composerRef.current?.focus(), 0); }}
-                  onOpenQuote={setOpenQuote} openedAt={acceptedRequestMessages.current.has(m.key) ? { current: Infinity } : openedAt} />
+              {thread.map((m, i) => (
+                <Fragment key={m.key}>
+                  {i === firstNew && firstNew > 0 && (
+                    <li ref={newMarkerRef} aria-hidden className="flex items-center gap-2 py-1">
+                      <span className="h-px flex-1 bg-border" />
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">New messages</span>
+                      <span className="h-px flex-1 bg-border" />
+                    </li>
+                  )}
+                  <ChatMessageItem m={m} account={account} keyAvatar={key?.avatar} avatars={avatars}
+                    contacts={contacts} active={active} activeGroup={activeGroup} nameFor={nameFor}
+                    onReply={(x) => { setReplyingTo({ author: x.from, time: x.time, quote: quoteOf(x.text, !!x.voice) }); setVoice(null); setTimeout(() => composerRef.current?.focus(), 0); }}
+                    onOpenQuote={setOpenQuote} openedAt={acceptedRequestMessages.current.has(m.key) ? { current: Infinity } : openedAt} />
+                </Fragment>
               ))}
               {!thread.length && <li className="text-sm text-muted-foreground">{activeGroup || activeInvite ? 'No group messages yet.' : `No messages with ${nameFor(active)} yet.`}</li>}
               <li ref={endRef} aria-hidden />
