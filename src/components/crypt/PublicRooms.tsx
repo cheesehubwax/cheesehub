@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
-import { MAX_INVITE_MEMBERS } from '@/lib/cryptInviteGroups';
+import { MAX_PUBLIC_ROOM_MEMBERS } from '@/lib/cryptInviteGroups';
+import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import {
   cleanRoomName, cleanRoomTopic, cleanTags, encodeListing, MAX_ROOM_NAME, MAX_ROOM_TOPIC, ROOM_FEE_QUANTITY, searchListings,
   type JoinRequest, type RoomListing,
@@ -33,14 +34,17 @@ export function DiscoverRoomsDialog({ open, onOpenChange, listings, loading, ref
         {!shown.length && <li className="py-4 text-center text-sm text-muted-foreground">{loading ? 'Looking for rooms…' : 'No rooms found.'}</li>}
         {shown.map(l => {
           const status = roomStatus(l);
-          const full = l.members >= MAX_INVITE_MEMBERS;
+          const full = l.members >= MAX_PUBLIC_ROOM_MEMBERS;
           return <li key={`${l.creator}:${l.id}`} className="space-y-1.5 rounded-md border border-border bg-background/50 p-3">
             <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="break-words font-semibold text-cheese">{l.name}</div>
-                <div className="truncate font-mono text-[11px] text-muted-foreground">by {l.creator === account ? 'you' : l.creator}</div>
+              <div className="flex min-w-0 items-center gap-2">
+                <PixelAvatar account={l.id} avatar={l.avatar ? { version: 1, pixels: l.avatar } : undefined} className="h-10 w-10 shrink-0" />
+                <div className="min-w-0">
+                  <div className="break-words font-semibold text-cheese">{l.name}</div>
+                  <div className="truncate font-mono text-[11px] text-muted-foreground">by {l.creator === account ? 'you' : l.creator}</div>
+                </div>
               </div>
-              <span className="shrink-0 text-[11px] text-muted-foreground">{l.members}/{MAX_INVITE_MEMBERS}</span>
+              <span className="shrink-0 text-[11px] text-muted-foreground">{l.members}/{MAX_PUBLIC_ROOM_MEMBERS} members</span>
             </div>
             {l.topic && <p className="break-words text-sm">{l.topic}</p>}
             {l.tags.length > 0 && <div className="flex flex-wrap gap-1">{l.tags.map(t => <span key={t} className="rounded bg-cheese/10 px-1.5 py-0.5 text-[11px] text-cheese">#{t}</span>)}</div>}
@@ -55,7 +59,6 @@ export function DiscoverRoomsDialog({ open, onOpenChange, listings, loading, ref
           </li>;
         })}
       </ul>
-      <p className="text-[11px] text-muted-foreground">No need to publish your key: your request includes your public key so the creator can read it and invite you. That key is visible in the request transaction, but you are not added to the public directory. Only recently listed rooms appear; creators can list again to stay visible.</p>
     </DialogContent>
   </Dialog>;
 }
