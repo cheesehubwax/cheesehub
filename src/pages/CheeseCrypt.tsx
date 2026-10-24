@@ -48,7 +48,7 @@ import { download } from '@/components/crypt/cryptDownload';
 import { ChatMessageItem } from '@/components/crypt/ChatMessageItem';
 import { EditedMessagesDialog } from '@/components/crypt/EditedMessagesDialog';
 import { RoomModerationDialog } from '@/components/crypt/RoomModerationDialog';
-import { encodeModeration, encodeRoomPolicy, type MuteMinutes } from '@/lib/cryptInviteGroups';
+import { encodeModeration, encodePolicySnapshot, encodeRoomPolicy, type MuteMinutes } from '@/lib/cryptInviteGroups';
 import { deriveModeration, loadModerationMemos, mergeModerationMemos, moderateMessages, mutedUntil, restrictedAt, saveModerationMemos } from '@/lib/cryptModeration';
 import { applyEdits, canEdit, editTarget, encodeEdit, publicEditLog } from '@/lib/cryptEdits';
 import type { ConversationEntry } from '@/lib/cryptGroups';
@@ -311,7 +311,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   }, [invites, inviteStore, account]);
   const moderation = useMemo(() => deriveModeration(cg2Events, invites, account), [cg2Events, invites, account]);
   useEffect(() => {
-    const controlTxs = new Set(cg2Events.filter(e => e.control.kind === 'invite' || e.control.kind === 'room' || e.control.kind === 'mute' || e.control.kind === 'ban').filter(e => {
+    const controlTxs = new Set(cg2Events.filter(e => e.control.kind === 'invite' || e.control.kind === 'room' || e.control.kind === 'mute' || e.control.kind === 'ban' || e.control.kind === 'policy').filter(e => {
       if (e.control.kind === 'invite') return invites[e.control.invite.id]?.creator === e.from;
       return !!eventFromMember(e, invites, account);
     }).map(e => e.txId));
@@ -1030,15 +1030,17 @@ export function Messenger({ account, session }: { account: string; session: NonN
     let payload: string;
     try { payload = encodeInvite(updated); } catch { return null; }
     const to = updated.members.map(m => m.account).filter(a => a !== account && moderation[v.invite.id]?.bans[a] === undefined);
-    const policy = encodeRoomPolicy(updated.id, true, moderation[updated.id]?.protected ?? v.invite.members.map(m => m.account));
-    return { v, updated, payload, policy, to, cost: `${(parseFloat(cg2Cost(payload, to.length)) + parseFloat(cg2Cost(policy, to.length))).toFixed(4)} CHEESE` };
+    const state = moderation[updated.id];
+    const policy = encodeRoomPolicy(updated.id, true, state?.protected ?? v.invite.members.map(m => m.account));
+    const snapshot = encodePolicySnapshot(updated.id, state?.protected ?? v.invite.members.map(m => m.account), Object.keys(state?.bans ?? {}), Object.entries(state?.mutes ?? {}).flatMap(([a, intervals]) => intervals.filter(m => m.until > Date.now()).map(m => [a, m.from, m.until] as [string, number, number])).slice(-8));
+    return { v, updated, payload, policy, snapshot, to, cost: `${(parseFloat(cg2Cost(payload, to.length)) + parseFloat(cg2Cost(policy, to.length)) + parseFloat(cg2Cost(snapshot, 1))).toFixed(4)} CHEESE` };
   };
   const confirmJoin = async () => {
     if (!acceptingJoin) return false;
     const plan = joinPlan(acceptingJoin);
     if (!plan) { toast({ title: 'This room is full or the request is out of date', variant: 'destructive' }); setAcceptingJoin(null); return false; }
     if (!key) return false;
-    const actions = [...buildCg2Actions(key, plan.to, keysOf(plan.updated), plan.payload, [permission]), ...buildCg2Actions(key, plan.to, keysOf(plan.updated), plan.policy, [permission])];
+    const actions = [...buildCg2Actions(key, plan.to, keysOf(plan.updated), plan.payload, [permission]), ...buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.snapshot, [permission]), ...buildCg2Actions(key, plan.to, keysOf(plan.updated), plan.policy, [permission])];
     setBusy(true);
     let r;
     try { r = await executeTransaction(actions, { successTitle: `${acceptingJoin.from} invited to ${plan.v.name}` }); }
@@ -1237,6 +1239,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
               <DialogContent className="max-w-lg">
                 {openQuote && (() => {
                   const original = thread.find(x => x.from === openQuote.author && x.time === openQuote.time);
+                  const quoteHidden = restrictedAt(activeModeration, openQuote.author, openQuote.time);
                   const full = original ? (parseReply(original.text)?.body ?? original.text) : null;
                   return <>
                     <DialogHeader>
@@ -1244,7 +1247,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                       <DialogDescription>{new Date(openQuote.time).toLocaleString()}{original?.txId && <> · <a href={`https://waxblock.io/transaction/${encodeURIComponent(original.txId)}`} target="_blank" rel="noreferrer" className="font-semibold text-cheese underline underline-offset-2">Tx</a></>}</DialogDescription>
                     </DialogHeader>
                     <div className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words text-sm">
-                      {original?.voice ? <VoiceNoteBubble note={original.voice} />
+                      {quoteHidden ? null : original?.voice ? <VoiceNoteBubble note={original.voice} />
                         : full != null ? parseNftMessage(full).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} txId={original!.txId} /> : <span key={i} className="block">{seg.text}</span>)
                         : <><span className="block">{openQuote.quote || '…'}</span><span className="mt-2 block text-xs text-muted-foreground">The original message isn't loaded here, so this is the quoted snippet.</span></>}
                     </div>

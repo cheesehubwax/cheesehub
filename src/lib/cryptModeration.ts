@@ -17,11 +17,21 @@ export function deriveModeration(events: Cg2Event[], invites: Record<string, Inv
     const g = eventFromMember(e, invites, me);
     if (!g || e.from !== g.creator) continue;
     const c = e.control;
-    if (c.kind !== 'room' && c.kind !== 'mute' && c.kind !== 'ban') continue;
+    if (c.kind !== 'room' && c.kind !== 'mute' && c.kind !== 'ban' && c.kind !== 'policy') continue;
     const fingerprint = `${g.id}:${e.txId}:${JSON.stringify(c)}`;
     if (seen.has(fingerprint)) continue;
     seen.add(fingerprint);
     let state = out[g.id];
+    if (c.kind === 'policy') {
+      // A bootstrap snapshot is only for a recipient whose first invite is in this transaction.
+      // Existing members always retain their own original event history and ignore the snapshot.
+      const myInvites = events.filter(x => x.control.kind === 'invite' && x.control.invite.id === g.id && x.from === g.creator && x.to === me);
+      if (state || !myInvites.some(x => x.txId === e.txId) || myInvites.some(x => x.time < e.time) || !c.protected.includes(g.creator) || c.protected.some(a => !g.members.some(m => m.account === a)) || c.bans.some(a => !g.members.some(m => m.account === a)) || c.mutes.some(([a, start]) => a === g.creator || start > e.time || !g.members.some(m => m.account === a))) continue;
+      state = { listed: true, protected: [...c.protected], bans: Object.fromEntries(c.bans.map(a => [a, e.time])), mutes: {} };
+      for (const [a, from, until] of c.mutes) state.mutes[a] = [...(state.mutes[a] ?? []), { from, until }];
+      out[g.id] = state;
+      continue;
+    }
     if (c.kind === 'room') {
       if (!c.protected.includes(g.creator) || c.protected.some(a => !g.members.some(m => m.account === a))) continue;
       if (state && (state.protected.length !== c.protected.length || state.protected.some(a => !c.protected.includes(a)))) continue;
