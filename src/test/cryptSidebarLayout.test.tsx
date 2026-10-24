@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Session } from '@wharfkit/session';
 import { generateKey, saveContact, saveKey, encryptMemo } from '@/lib/cheeseCrypt';
+import { encodeReply } from '@/lib/cryptReply';
 import { Messenger } from '@/pages/CheeseCrypt';
 
 const calls = vi.hoisted(() => ({ transact: vi.fn(), fetch: vi.fn() }));
@@ -63,5 +64,31 @@ describe('compact sidebar', () => {
     expect(line?.querySelector('.ml-auto')).not.toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Hide groups and friends' }));
     expect(screen.getByRole('checkbox', { name: /I have read and agree/ }).closest('.order-last')).toBeNull();
+  });
+
+  it('shows separate yellow unread and blue reply badges that stay on the open room and count down with the read marker', async () => {
+    const alice = generateKey('alice'), bob = generateKey('bob');
+    const msg = (time: number, text: string) => ({ txId: `t${time}`, time, from: 'bob', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo(text, alice.publicKey, bob.secretKey) });
+    calls.fetch.mockResolvedValue([
+      msg(1, 'one'), msg(2, 'two'),
+      msg(3, encodeReply({ author: 'alice', time: 1, quote: 'q' }, 'reply one')),
+      msg(4, encodeReply({ author: 'alice', time: 2, quote: 'q' }, 'reply two')),
+    ]);
+    localStorage.setItem('cheesecrypt-read-alice', JSON.stringify({ bob: 0 }));
+    const { unmount } = mount();
+    const room = await screen.findByRole('button', { name: /^bob/ });
+    expect(room.querySelector('[aria-label="4 unread"]')).not.toBeNull();
+    expect(room.querySelector('[aria-label="2 replies to you"]')).not.toBeNull();
+    fireEvent.click(room);
+    // Opening the room keeps both badges; they count down as messages are read.
+    expect(room.querySelector('[aria-label="4 unread"]')).not.toBeNull();
+    expect(room.querySelector('[aria-label="2 replies to you"]')).not.toBeNull();
+    unmount();
+    localStorage.setItem('cheesecrypt-read-alice', JSON.stringify({ bob: 3 }));
+    mount();
+    const roomAgain = await screen.findByRole('button', { name: /^bob/ });
+    expect(roomAgain.querySelector('[aria-label="1 unread"]')).not.toBeNull();
+    expect(roomAgain.querySelector('[aria-label="1 reply to you"]')).not.toBeNull();
+    expect(roomAgain.querySelector('[aria-label="4 unread"]')).toBeNull();
   });
 });
