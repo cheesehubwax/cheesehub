@@ -54,6 +54,7 @@ import type { ConversationEntry } from '@/lib/cryptGroups';
 import { CryptHero } from '@/components/crypt/CryptHero';
 import { CryptKeySetup } from '@/components/crypt/CryptKeySetup';
 import { CryptSidebar } from '@/components/crypt/CryptSidebar';
+import { CryptAvatarRail } from '@/components/crypt/CryptAvatarRail';
 import { CryptChatHeader } from '@/components/crypt/CryptChatHeader';
 import { CryptComposer } from '@/components/crypt/CryptComposer';
 import { DiscoverRoomsDialog, JoinRequests, RoomListingDialog } from '@/components/crypt/PublicRooms';
@@ -778,7 +779,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const requests = v.friendRequests.filter(a => !contacts[a] && !blocked.includes(a) && !friendDeclines.includes(`${id}:${a}`)).length;
     return <li key={id} className="group flex items-center gap-1">
       <Button variant="ghost" onClick={() => setActive(`group:${id}`)} className={cn('flex-1 min-w-0 h-auto justify-start gap-2 text-left px-3 py-2', active === `group:${id}` && 'bg-cheese/15 text-cheese')}>
-        {v.avatar ? <PixelAvatar account={id} avatar={v.avatar} className="h-6 w-6 shrink-0" /> : <span className="shrink-0">👥</span>}
+        {v.avatar ? <PixelAvatar account={id} avatar={v.avatar} className="h-12 w-12 shrink-0" /> : <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center text-2xl">👥</span>}
         <span className="min-w-0"><span className="block text-sm break-words whitespace-normal">{v.name}</span>
           <span className="block text-[10px] text-muted-foreground whitespace-normal break-words">
             {v.status === 'invited' ? `✉️ Invited by ${nameFor(v.invite.creator)}` : v.status === 'left' ? 'You left' : `${v.joined.length} of ${v.invite.members.length} joined`}
@@ -1311,7 +1312,13 @@ export function Messenger({ account, session }: { account: string; session: NonN
         admins={activeModeration?.admins ?? []}
         />
 
-      <section className={cn('flex flex-1 flex-col min-h-0 md:row-start-2', listHidden ? 'md:col-start-1 md:col-span-2' : 'md:col-start-2')}>
+      <div className={cn('flex flex-1 min-h-0 md:row-start-2', listHidden ? 'md:col-start-1 md:col-span-2' : 'md:col-start-2')}>
+      {listHidden && <CryptAvatarRail active={active} setActive={setActive} items={[
+        ...inviteViews.filter(v => inviteShown(v) && !hiddenGroups.includes(v.invite.id)).map(v => ({ id: `group:${v.invite.id}`, label: v.name, avatarAccount: v.invite.id, avatar: v.avatar, emoji: v.avatar ? undefined : '👥' })),
+        ...groups.filter(g => !hiddenGroups.includes(g.id)).map(g => ({ id: `group:${g.id}`, label: `Group · ${g.members.length} people`, avatarAccount: g.id, emoji: '👥' })),
+        ...partners.map(p => ({ id: p, label: nameFor(p), avatarAccount: p, avatar: avatars[p] })),
+      ].map(it => ({ ...it, unread: unread[it.id] ?? 0, replies: replyUnread[it.id] ?? 0 }))} />}
+      <section className="flex flex-1 flex-col min-h-0 min-w-0">
         {!active ? (
           <p className="text-sm text-muted-foreground m-auto">💬 Pick or add a contact.</p>
         ) : (
@@ -1402,6 +1409,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
           </>
         )}
       </section>
+      </div>
     </div>
   );
 }
