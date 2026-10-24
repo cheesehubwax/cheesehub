@@ -51,7 +51,7 @@ describe('message edit flow', () => {
     const raw = history('old public text', 'root', sentAt, true);
     const root = decodeConversations(raw, alice, { bob: bob.publicKey })[0];
     calls.fetch.mockResolvedValue([...raw, ...history(encodeEdit(editTarget(root), 'new public text'), 'edit', sentAt + 1000, true)]);
-    if (listed) calls.rooms.mockResolvedValue([{ from: 'alice', to: 'eosio.null', txId: 'list', time: sentAt - 500, quantity: '0.0080 CHEESE', memo: encodeListing({ id: ID, name: 'Test room', topic: '', tags: [], publicKey: alice.publicKey, members: 1 }) }]);
+    if (listed) calls.rooms.mockResolvedValue([{ from: 'alice', to: 'eosio.null', txId: 'list', time: sentAt - 500, quantity: '8.0000 CHEESE', memo: encodeListing({ id: ID, name: 'Test room', topic: '', tags: [], publicKey: alice.publicKey, members: 1 }) }]);
     mount(); fireEvent.click(await screen.findByRole('button', { name: /Test room/ }));
     await screen.findByText('new public text');
     fireEvent.click(screen.getByRole('button', { name: 'Edit group' }));

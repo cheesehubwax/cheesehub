@@ -1,7 +1,9 @@
 // CHEESECrypt public rooms. A creator may publish a plaintext listing for one of their invite (CG2) groups so
 // others can find it and ask to join in an encrypted message. Only the room's name, topic, tags, member count,
 // creator account and the creator's public key are public — never the member list or any message.
-// Listing and unlisting pay the normal platform fee (80% eosio.null / 20% xcheeseliqst); both fee legs carry the memo.
+// Making a room public pays a 10.0000 CHEESE listing stake (80% eosio.null / 20% xcheeseliqst) so spammers cannot
+// farm join-request fees with throwaway rooms; updating a staked listing's details and unlisting pay the normal
+// 0.0100 CHEESE platform fee. Both fee legs carry the memo.
 import { decodeBase64 } from 'tweetnacl-util';
 import {
   assembleMessages, bytesToText, buildCryptFeeActions, buildSendMessageActions, decryptMemoBytes, encryptMemo, KEY_PUBLISH_TO, MEMO_MAX_BYTES, MESSAGE_FEE_QUANTITY,
@@ -11,9 +13,14 @@ import { encodeNotice, JOIN_NOTE_MAX, isCg2, MAX_PUBLIC_ROOM_MEMBERS, parseCg2, 
 
 export const ROOM_PREFIX = 'CRYPTROOM1:';
 export const UNLIST_PREFIX = `${ROOM_PREFIX}unlist:`;
+/** Anti-spam stake for making a room public (or re-listing after an unlist): 10.0000 CHEESE, split 80/20. */
+export const LISTING_STAKE_QUANTITY = '10.0000 CHEESE';
+/** Fee for updating a staked listing's details and for unlisting. */
 export const ROOM_FEE_QUANTITY = MESSAGE_FEE_QUANTITY;
 /** The eosio.null leg of a listing fee (80% of the room fee, in 0.0001 CHEESE units). */
 export const ROOM_NULL_UNITS = Math.round(parseFloat(ROOM_FEE_QUANTITY) * 10000) * 4 / 5;
+/** The eosio.null leg of the listing stake (80% of 10.0000 CHEESE, in 0.0001 CHEESE units). */
+export const LISTING_STAKE_NULL_UNITS = Math.round(parseFloat(LISTING_STAKE_QUANTITY) * 10000) * 4 / 5;
 export const MAX_ROOM_NAME = 32;
 export const MAX_ROOM_TOPIC = 56;
 export const MAX_ROOM_TAGS = 3;
@@ -107,29 +114,36 @@ export function parseRoomMemo(memo: string): RoomMemo | null {
   return listing ? { kind: 'list', listing } : null;
 }
 
-/** Both legs of the room fee carry the memo: 0.0080 CHEESE to eosio.null and 0.0020 CHEESE to xcheeseliqst. */
-export const buildRoomActions = (from: string, memo: string, auth: unknown[]) => buildCryptFeeActions(from, ROOM_FEE_QUANTITY, auth, memo);
+/** Both legs of the room fee carry the memo, split 80% to eosio.null and 20% to xcheeseliqst.
+ *  `quantity` is the 10.0000 CHEESE stake for a new listing or the 0.0100 CHEESE fee for an update/unlist. */
+export const buildRoomActions = (from: string, memo: string, auth: unknown[], quantity = ROOM_FEE_QUANTITY) => buildCryptFeeActions(from, quantity, auth, memo);
 
-const paidNullLeg = (quantity: string) => {
+const paidUnits = (quantity: string) => {
   const m = /^(\d+)\.(\d{4}) CHEESE$/.exec(quantity.trim());
-  return !!m && Number(m[1]) * 10000 + Number(m[2]) >= ROOM_NULL_UNITS;
+  return m ? Number(m[1]) * 10000 + Number(m[2]) : 0;
 };
 
-/** Latest memo per (creator, room) wins; an unlist hides the room. Only paid eosio.null CHEESE legs count. Newest first. */
+/**
+ * Active public listings, newest first. Only paid eosio.null CHEESE legs count. A room becomes listed only with
+ * the 10.0000 CHEESE stake; a cheaper 0.0100 CHEESE listing memo counts only as an update while a stake is active,
+ * so old pre-stake listings and unpaid lookalikes never appear. An unlist (0.0100 CHEESE) hides the room and clears
+ * the stake, so re-listing pays the stake again. Same-time ties keep the unlist, so a room is never shown by mistake.
+ */
 export function collectListings(transfers: ChainMemo[]): RoomListing[] {
-  const latest = new Map<string, { time: number; listing: RoomListing | null }>();
-  for (const t of transfers) {
-    if (t.to !== KEY_PUBLISH_TO || !ACCOUNT.test(t.from) || !paidNullLeg(t.quantity)) continue;
-    const r = parseRoomMemo(t.memo);
-    if (!r) continue;
+  const events = transfers
+    .map(t => ({ t, r: t.to === KEY_PUBLISH_TO && ACCOUNT.test(t.from) ? parseRoomMemo(t.memo) : null, units: paidUnits(t.quantity) }))
+    .filter((x): x is { t: ChainMemo; r: RoomMemo; units: number } => !!x.r && x.units >= ROOM_NULL_UNITS)
+    .sort((a, b) => a.t.time - b.t.time || (a.r.kind === 'unlist' ? 1 : 0) - (b.r.kind === 'unlist' ? 1 : 0));
+  const state = new Map<string, { staked: boolean; listing: RoomListing | null }>();
+  for (const { t, r, units } of events) {
     const id = r.kind === 'list' ? r.listing.id : r.id;
     const k = `${t.from}:${id}`;
-    const cur = latest.get(k);
-    // Same-time ties keep the unlist, so a room is never shown by mistake.
-    if (cur && (cur.time > t.time || (cur.time === t.time && (r.kind === 'list' || !cur.listing)))) continue;
-    latest.set(k, { time: t.time, listing: r.kind === 'list' ? { ...r.listing, creator: t.from, time: t.time, txId: t.txId } : null });
+    if (r.kind === 'unlist') { state.set(k, { staked: false, listing: null }); continue; }
+    const cur = state.get(k);
+    if (units >= LISTING_STAKE_NULL_UNITS || cur?.staked)
+      state.set(k, { staked: true, listing: { ...r.listing, creator: t.from, time: t.time, txId: t.txId } });
   }
-  return [...latest.values()].flatMap(x => x.listing ? [x.listing] : []).sort((a, b) => b.time - a.time);
+  return [...state.values()].flatMap(x => x.listing ? [x.listing] : []).sort((a, b) => b.time - a.time);
 }
 
 export function searchListings(listings: RoomListing[], query: string): RoomListing[] {
