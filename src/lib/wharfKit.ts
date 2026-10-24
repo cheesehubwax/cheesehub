@@ -3,6 +3,7 @@ import { WebRenderer } from '@wharfkit/web-renderer';
 import { WalletPluginAnchor } from '@wharfkit/wallet-plugin-anchor';
 import { WalletPluginCloudWallet } from '@wharfkit/wallet-plugin-cloudwallet';
 import { TransactPluginResourceProvider } from '@wharfkit/transact-plugin-resource-provider';
+import { patchAnchorForLockSigning } from './anchorLockSigning';
 
 // Initialize the WebRenderer for wallet selection UI
 const webRenderer = new WebRenderer();
@@ -23,7 +24,7 @@ export const sessionKit = new SessionKit({
   chains: [waxChain],
   ui: webRenderer,
   walletPlugins: [
-    new WalletPluginAnchor(),
+    patchAnchorForLockSigning(new WalletPluginAnchor()),
     new WalletPluginCloudWallet(),
   ],
 });
