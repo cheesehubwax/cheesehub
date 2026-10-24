@@ -17,4 +17,4 @@ Whenever a CHEESECrypt app feature changes, check this table and update the cont
 | Memo ≤ 256 bytes (eosio.token) | `deliver` |
 
 Not in the contract (stay client-side): encryption, key files/locking, profiles/avatars, block list,
-public inbox, mute *hiding* of traffic sent during a mute, reply metadata.
+public inbox, message reports (encrypted CG2 `report` notices: members → owner + admins, admins → owner; ordinary messages with the normal per-copy fee), mute *hiding* of traffic sent during a mute, reply metadata.
