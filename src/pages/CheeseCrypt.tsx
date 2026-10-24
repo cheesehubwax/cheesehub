@@ -1035,7 +1035,6 @@ export function Messenger({ account, session }: { account: string; session: NonN
     try { payload = encodeMeta(v.invite.id, editingInvite.name, editingInvite.avatar); } catch (e) { toast({ title: (e as Error).message, variant: 'destructive' }); return false; }
     const to = v.invite.members.map(m => m.account).filter(a => a !== account && moderation[v.invite.id]?.bans[a] === undefined);
     if (!(await sendCg2(to, keysOf(v.invite), payload, 'Group updated'))) return false;
-    setEditingInvite(null);
     return true;
   };
 
