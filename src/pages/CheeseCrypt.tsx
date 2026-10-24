@@ -37,7 +37,7 @@ import { buildVoiceBatches, voiceNoteCost, voicePartCount, voiceTransactions, ty
 import { baselineMarks, firstUnreadIndex, firstVisitMarks, loadReadMarks, mergeMarks, sameMarks, saveReadMarks, unreadCounts, unreadReplies, type ReadMarks } from '@/lib/cryptUnread';
 import { readKeyFileJson } from '@/lib/cryptKeyFileText';
 import { clearLockedEnvelope, isAnchorSession, loadLockedEnvelope, openLockedKey, parseLockedKeyFile, saveLockedEnvelope, sealKey, signLock, withProfile, ANCHOR_REQUIRED, type LockedKeyFile } from '@/lib/cryptKeyLock';
-import { buildGroupMessageActions, decodeConversations, groupMessageCost, groupMessageSize, loadGroups, loadHiddenGroups, mergeGroups, saveGroups, setGroupHidden, type CryptGroup } from '@/lib/cryptGroups';
+import { buildGroupMessageActions, decodeConversations, groupMessageCost, groupMessageSize, isDirectMessage, loadGroups, loadHiddenGroups, mergeGroups, saveGroups, setGroupHidden, type CryptGroup } from '@/lib/cryptGroups';
 import {
   DirHandle, FRIENDS_DIR, PRIVATE_DIR, VAULT_DIR, VaultFileExistsError, friendKeyName, pickVault, privateKeyName,
   findPrivateKey, readFriendKeys, readVaultMarks, recallVault, writeVaultMarks, rememberVault, updatePrivateKeyProfile, replaceWithLocked, vaultSupported, vaultWritable, writeFriendKey, writeOwnPublicKey,
@@ -504,7 +504,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   useEffect(() => { setReplyingTo(null); }, [active]);
   const thread = activeInvite ? conversations.filter(m => m.igroup === activeInvite.invite.id) : conversations.filter(m => activeGroup
     ? m.group?.id === activeGroup.id && m.group.members.join(',') === activeGroup.members.join(',')
-    : !m.group && ((m.from === account && m.to === active) || (m.from === active && m.to === account)));
+    : isDirectMessage(m, account, active));
 
   // Unread badges: first load on this device marks existing history read; afterwards only newer incoming messages count.
   useEffect(() => {
