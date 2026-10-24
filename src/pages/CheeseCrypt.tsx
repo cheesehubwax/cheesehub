@@ -11,13 +11,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { CardAction } from '@/components/crypt/CardAction';
 import { BlockedDialog } from '@/components/crypt/BlockedDialog';
-import { MessageRequests, PublicInboxDialog } from '@/components/crypt/PublicInbox';
+import { MessageRequests, PublicInboxButton, PublicInboxDialog } from '@/components/crypt/PublicInbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { decodeInboxRequests, declineRequest, inboxCandidates, loadPublicInbox, loadRequestDeclines, savePublicInbox } from '@/lib/cryptPublicInbox';
 import { buildProfileNoteBatches, isProfileNote, latestProfiles, profileNoteCost, profileNoteParts, profileRecipients } from '@/lib/cryptProfileNotes';
 import { ProfileShareDialog } from '@/components/crypt/ProfileShareDialog';
 import { addBlocked, loadBlocked, removeBlocked, saveBlocked, withoutBlocked } from '@/lib/cryptBlocklist';
 import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
-import { ChevronDown, Download, Eye, EyeOff, KeyRound, Loader2, Ban, Pencil, Radio, RefreshCw, Save, Trash2, Upload, UserPlus, Users } from 'lucide-react';
+import { ChevronDown, Download, Eye, EyeOff, KeyRound, Loader2, Ban, Menu, PanelLeftClose, PanelLeftOpen, Pencil, Radio, RefreshCw, Save, Trash2, Upload, UserPlus, Users } from 'lucide-react';
 import { useWax } from '@/context/WaxContext';
 import { useWaxTransaction } from '@/hooks/useWaxTransaction';
 import { useToast } from '@/hooks/use-toast';
@@ -216,6 +217,14 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [addingFriend, setAddingFriend] = useState(false);
   const [groupsOpen, setGroupsOpen] = useState(true);
   const [friendsOpen, setFriendsOpen] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const [feeInfoOpen, setFeeInfoOpen] = useState(false);
+  const [listHidden, setListHidden] = useState(() => { try { return localStorage.getItem(`cheesecrypt-sidebar-collapsed-${account}`) === '1'; } catch { return false; } });
+  const toggleList = () => setListHidden(v => {
+    try { localStorage.setItem(`cheesecrypt-sidebar-collapsed-${account}`, v ? '0' : '1'); } catch { /* storage unavailable */ }
+    return !v;
+  });
   const [memos, setMemos] = useState<ChainMemo[]>([]);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -481,6 +490,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
     ? <span aria-label={replyUnread[id] ? `${unread[id]} unread, ${replyUnread[id]} repl${replyUnread[id] > 1 ? 'ies' : 'y'} to you` : `${unread[id]} unread`} data-reply={replyUnread[id] ? 'true' : undefined}
       className={cn('ml-auto shrink-0 min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold leading-5 text-center', replyUnread[id] ? 'bg-reply text-reply-foreground' : 'bg-cheese text-primary-foreground')}>{replyUnread[id] ? '↩ ' : ''}{unread[id] > 99 ? '99+' : unread[id]}</span>
     : null;
+  /** Totals for chats other than the open one, shown on the show-sidebar arrow while the list is hidden. */
+  const hiddenUnread = Object.entries(unread).reduce((n, [id, c]) => id === active ? n : n + c, 0);
+  const hiddenReplies = Object.entries(replyUnread).reduce((n, [id, c]) => id === active ? n : n + c, 0);
+
 
   const listRef = useRef<HTMLOListElement>(null);
   const nearBottom = useRef(true);
