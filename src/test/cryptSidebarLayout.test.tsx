@@ -58,10 +58,10 @@ describe('compact sidebar', () => {
     fireEvent.click(await screen.findByRole('button', { name: /^bob/ }));
     const line = screen.getByRole('button', { name: /Fee info/ }).closest('.order-last');
     expect(line).not.toBeNull();
-    expect(screen.getByLabelText(/I have read and agree/).closest('.order-last')).toBe(line);
+    expect(screen.getByRole('checkbox', { name: /I have read and agree/ }).closest('.order-last')).toBe(line);
     expect(line?.querySelector('button.bg-cheese')).not.toBeNull();
     expect(line?.querySelector('.ml-auto')).not.toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Hide groups and friends' }));
-    expect(screen.getByLabelText(/I have read and agree/).closest('.order-last')).toBeNull();
+    expect(screen.getByRole('checkbox', { name: /I have read and agree/ }).closest('.order-last')).toBeNull();
   });
 });
