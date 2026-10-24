@@ -1063,7 +1063,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     } catch (e) { toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' }); return false; }
     finally { setBusy(false); }
     setRoomRequests(saveRoomRequest(account, l));
-    toast({ title: '⏳ Request pending', description: `It stays in your Groups until ${l.creator} accepts or declines.` });
+    toast({ title: '⏳ Request pending', description: `It stays in your Groups until ${l.creatorName || nameFor(l.creator)} accepts or declines.` });
     setAskingRoom(null);
     return true;
   };
@@ -1333,7 +1333,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
       <DiscoverRoomsDialog open={roomsOpen} onOpenChange={o => { setRoomsOpen(o); if (o) void refetchRooms(); }} listings={listings} loading={roomsLoading}
         refresh={() => void refetchRooms()} account={account} nameFor={nameFor} roomStatus={roomStatus} joinCost={roomJoinCost} onAsk={l => { setRoomsOpen(false); setJoinNote(''); setAskingRoom(l); }} />
       {askingRoom && <PaidActionDialog title={`🌐 Ask to join ${askingRoom.name}`} cost={roomJoinCost} confirmLabel="Pay & ask" busy={busy}
-        description={`Sends ${askingRoom.creator} an encrypted request naming only this room, plus a 0.1000 CHEESE join fee paid to them (kept whether they accept or decline). If they accept, an invite appears in your Groups and you choose Join or Decline.`}
+        description={`Sends ${askingRoom.creatorName || nameFor(askingRoom.creator)} an encrypted request naming only this room, plus a 0.1000 CHEESE join fee paid to them (kept whether they accept or decline). If they accept, an invite appears in your Groups and you choose Join or Decline.`}
         onConfirm={() => askToJoin(askingRoom)} onClose={() => setAskingRoom(null)}>
         <JoinNoteField value={joinNote} onChange={setJoinNote} disabled={busy} placeholder="e.g. Hey, it's John from work" />
       </PaidActionDialog>}
