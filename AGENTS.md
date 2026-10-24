@@ -1,5 +1,7 @@
 # Agent rules
 
+- CHEESECrypt's orb has an intentionally source-controlled public image copy for external production hosting; preview uses its asset pointer because GitHub Pages cannot serve Lovable-relative asset paths.
+
 - Token metadata snapshots share one versioned schema and public data URL across recorder and app; precisions are chain-verified, cached metadata contains no prices, and unknown live prices remain unknown so API outages cannot fabricate portfolio valuations.
 - CHEESEAir keeps context identity in Vite hot data so providers/cards share state.
 - CHEESEAir LP token columns aggregate current underlying quantities in normalized pair order, separate from USD payout weights so presentation never changes distribution.
