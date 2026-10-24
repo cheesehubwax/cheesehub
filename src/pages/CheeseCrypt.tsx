@@ -1018,8 +1018,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
           <Button variant="outline" onClick={() => { setAddingFriend(false); fileRef.current?.click(); }}><Upload className="h-4 w-4" /> Import public key file</Button>
         </DialogContent>
       </Dialog>}
-      <aside className="border-b md:border-b-0 md:border-r border-border flex flex-col min-h-0">
-        <div className="flex flex-col gap-2 border-b border-border p-3">
+      <PublicInboxDialog enabled={publicInbox} onChange={enabled => { savePublicInbox(account, enabled); setPublicInbox(enabled); }} open={inboxOpen} onOpenChange={setInboxOpen} />
+      <aside className={cn('border-b border-border flex flex-col min-h-0', !listHidden && 'md:border-b-0 md:border-r')}>
+        <div className={cn('flex flex-col gap-2 p-3', !listHidden && 'border-b border-border')}>
           <div className="flex items-center gap-3">
             <PixelAvatar account={account} avatar={key.avatar} className="h-11 w-11 shrink-0" />
             <div className="min-w-0 flex-1">
@@ -1038,17 +1039,35 @@ export function Messenger({ account, session }: { account: string; session: NonN
               <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
             </Button>
           </div>
-          <div className="grid grid-cols-3 gap-1">
-            <CardAction icon={<Upload className="h-4 w-4" />} label="Restore" aria-label="Load a key file (yours or a contact's)" title="Load a key file (yours or a contact's)" onClick={() => fileRef.current?.click()} />
-            <CardAction icon={<Download className="h-4 w-4" />} label="Public key" aria-label="Share my public key file" title="Save my public key file to share" onClick={() => void sharePublicKey()} />
-            <CardAction icon={<Radio className="h-4 w-4" />} label="Publish" disabled={busy} aria-label={`Publish my key on chain (${MESSAGE_FEE_QUANTITY})`} title={`Publish my key on chain (${MESSAGE_FEE_QUANTITY})`} onClick={() => void publish()} />
-            <CardAction icon={<Save className="h-4 w-4" />} label="Back up" aria-label="Back up private key" title="Download a backup of my private key — never share it" onClick={() => download(`${account}-cheesecrypt-key-PRIVATE.json`, key)} />
-            <CardAction icon={<Ban className="h-4 w-4" />} label={blocked.length ? `Blocked (${blocked.length})` : 'Blocked'} aria-label="Blocked accounts" title="Accounts blocked on this device" onClick={() => setShowBlocked(true)} />
-            <CardAction icon={<KeyRound className="h-4 w-4" />} label="New key" className="hover:text-destructive" aria-label="Create a new key" title="Create a new key (it cannot read messages sent to this one)" onClick={makeKey} />
-            <PublicInboxDialog enabled={publicInbox} onChange={enabled => { savePublicInbox(account, enabled); setPublicInbox(enabled); }} />
+          <div className="flex items-center gap-1">
+            <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+              <PopoverTrigger asChild>
+                <Button size="sm" variant="outline" className="h-8 flex-1 gap-2 text-xs" aria-label="Menu" aria-expanded={menuOpen}>
+                  <Menu className="h-4 w-4" /> Menu <ChevronDown className={cn('h-3.5 w-3.5 transition', menuOpen && 'rotate-180')} />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-64 p-2">
+                {/* Every action closes the menu first; dialogs live outside so they survive it unmounting. */}
+                <div className="grid grid-cols-3 gap-1" onClickCapture={() => setMenuOpen(false)}>
+                  <CardAction icon={<Upload className="h-4 w-4" />} label="Restore" aria-label="Load a key file (yours or a contact's)" title="Load a key file (yours or a contact's)" onClick={() => fileRef.current?.click()} />
+                  <CardAction icon={<Download className="h-4 w-4" />} label="Public key" aria-label="Share my public key file" title="Save my public key file to share" onClick={() => void sharePublicKey()} />
+                  <CardAction icon={<Radio className="h-4 w-4" />} label="Publish" disabled={busy} aria-label={`Publish my key on chain (${MESSAGE_FEE_QUANTITY})`} title={`Publish my key on chain (${MESSAGE_FEE_QUANTITY})`} onClick={() => void publish()} />
+                  <CardAction icon={<Save className="h-4 w-4" />} label="Back up" aria-label="Back up private key" title="Download a backup of my private key — never share it" onClick={() => download(`${account}-cheesecrypt-key-PRIVATE.json`, key)} />
+                  <CardAction icon={<Ban className="h-4 w-4" />} label={blocked.length ? `Blocked (${blocked.length})` : 'Blocked'} aria-label="Blocked accounts" title="Accounts blocked on this device" onClick={() => setShowBlocked(true)} />
+                  <CardAction icon={<KeyRound className="h-4 w-4" />} label="New key" className="hover:text-destructive" aria-label="Create a new key" title="Create a new key (it cannot read messages sent to this one)" onClick={makeKey} />
+                  <PublicInboxButton enabled={publicInbox} onClick={() => setInboxOpen(true)} />
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Button size="icon" variant="ghost" className="relative h-8 w-8 shrink-0" onClick={toggleList} aria-expanded={!listHidden}
+              aria-label={listHidden ? 'Show groups and friends' : 'Hide groups and friends'} title={listHidden ? 'Show groups and friends' : 'Hide groups and friends'}>
+              {listHidden ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+              {listHidden && hiddenUnread > 0 && <span data-reply={hiddenReplies ? 'true' : undefined} aria-label={hiddenReplies ? `${hiddenUnread} unread, ${hiddenReplies} repl${hiddenReplies > 1 ? 'ies' : 'y'} to you` : `${hiddenUnread} unread`}
+                className={cn('absolute -right-1 -top-1 min-w-4 h-4 px-1 rounded-full text-[9px] font-bold leading-4 text-center', hiddenReplies ? 'bg-reply text-reply-foreground' : 'bg-cheese text-primary-foreground')}>{hiddenUnread > 99 ? '99+' : hiddenUnread}</span>}
+            </Button>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-2 space-y-4">
+        <div className={cn('flex-1 overflow-y-auto p-2 space-y-4', listHidden && 'hidden')}>
           <MessageRequests requests={messageRequests} onAccept={acceptRequest} onDecline={dismissRequest} onBlock={from => { dismissRequest(from); blockAccount(from); }} />
           <Collapsible open={groupsOpen} onOpenChange={setGroupsOpen}>
             <div className="flex items-center justify-between px-2">
