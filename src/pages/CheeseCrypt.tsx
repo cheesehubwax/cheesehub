@@ -48,7 +48,7 @@ import { CryptAbout } from '@/components/crypt/CryptAbout';
 import { VoiceRecorder } from '@/components/crypt/VoiceRecorder';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { buildVoiceBatches, voiceNoteCost, voicePartCount, voiceTransactions, VOICE_PARTS_PER_TX, type VoiceClip } from '@/lib/cryptVoice';
-import { baselineMarks, firstVisitMarks, loadReadMarks, mergeMarks, sameMarks, saveReadMarks, unreadCounts, unreadReplies, type ReadMarks } from '@/lib/cryptUnread';
+import { baselineMarks, firstUnreadIndex, firstVisitMarks, loadReadMarks, mergeMarks, sameMarks, saveReadMarks, unreadCounts, unreadReplies, type ReadMarks } from '@/lib/cryptUnread';
 import { readKeyFileJson } from '@/lib/cryptKeyFileText';
 import { buildGroupMessageActions, createGroup, decodeConversations, groupMessageCost, groupMessageSize, loadGroups, loadHiddenGroups, mergeGroups, saveGroups, setGroupHidden, type ConversationEntry, type CryptGroup } from '@/lib/cryptGroups';
 import {
