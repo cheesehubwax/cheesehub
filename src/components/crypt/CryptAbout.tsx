@@ -66,7 +66,7 @@ function Heading({ children }: { children: ReactNode }) {
 function Grid({ label, head, rows }: { label: string; head: string[]; rows: ReactNode[][] }) {
   return (
     <div className="ml-3.5 overflow-x-auto rounded-md border border-cheese/20">
-      <table className="w-full min-w-[520px] border-collapse text-xs" aria-label={label}>
+      <table className="w-full min-w-[640px] border-collapse text-xs" aria-label={label}>
         <thead className="bg-cheese/10">
           <tr>{head.map((h) => <th key={h} scope="col" className="px-2 py-2 text-left font-semibold text-cheese">{h}</th>)}</tr>
         </thead>
