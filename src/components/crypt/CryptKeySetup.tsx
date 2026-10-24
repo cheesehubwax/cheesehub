@@ -24,7 +24,7 @@ export function CryptKeySetup({ account, fileInput, profileEditor, creationDialo
         <p className="text-xs text-muted-foreground">Look in your Downloads for a file ending in <span className="font-mono">-key-PRIVATE.json</span>. Keys from the GPK Collection Manager work too.</p>
         <Button className="w-full bg-cheese text-primary-foreground hover:bg-cheese/90" onClick={() => fileRef.current?.click()}>Load my private key</Button>
         {vaultSupported() && <Button className="w-full" variant="outline" disabled={searchingVault} onClick={() => void findKeyInFolder()}>{searchingVault ? 'Looking…' : `📁 Find it in my ${VAULT_DIR} folder`}</Button>}
-        <p className="text-[11px] text-muted-foreground">Any file name works, including copies saved as .txt.</p>
+        <p className="text-[11px] text-muted-foreground">Any file name works, including copies saved as .txt. Wallet-locked keys ask Anchor for one free signature that is never sent to the chain.</p>
       </div>
       <div className="rounded-lg border border-border bg-card/80 p-4 space-y-2 text-left">
         <p className="font-semibold text-sm">I'm new here</p>
