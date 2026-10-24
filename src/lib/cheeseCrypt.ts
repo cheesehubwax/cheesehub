@@ -223,11 +223,11 @@ export function partCount(text: string): number {
 }
 
 /** Plaintext payloads to encrypt, one per memo. */
-export function splitMessage(text: string, id = randomId()): string[] {
+export function splitMessage(text: string, id = randomId(), maxParts = MAX_PARTS): string[] {
   if (!text) throw new Error('Message is empty');
   if (utf8Len(text) <= MAX_PLAINTEXT_BYTES) return [text];
   const bodies = splitBytes(text, PART_BODY_BYTES);
-  if (bodies.length > MAX_PARTS) throw new Error(`Message is longer than ${MAX_PARTS} parts`);
+  if (bodies.length > maxParts || maxParts > 35) throw new Error(`Message is longer than ${maxParts} parts`);
   return bodies.map((b, i) => `${PART_MARK}${id}${i.toString(36)}${bodies.length.toString(36)}${b}`);
 }
 

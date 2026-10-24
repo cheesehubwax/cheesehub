@@ -13,18 +13,22 @@ import { parseCryptName } from '@/lib/cryptNames';
 export const CG2_PREFIX = '\u0002CG2:';
 export const MIN_INVITE_MEMBERS = 2;
 export const MAX_INVITE_MEMBERS = 8; // including the creator
+export const MAX_PUBLIC_ROOM_MEMBERS = 50;
+export const MAX_MEMBERSHIP_PARTS = 35;
 const ID = /^[a-f0-9]{16}$/;
 const ACCOUNT = /^[a-z1-5.]{1,12}$/;
 /** Voice notes name an invite group as `i<id>`; that never parses as a legacy group id. */
 export const VOICE_REF_PREFIX = 'i';
 
 export interface InviteMember { account: string; publicKey: string }
-export interface InviteGroup { id: string; name: string; creator: string; created: number; members: InviteMember[]; avatar?: CryptAvatar }
+export interface InviteGroup { id: string; name: string; creator: string; created: number; members: InviteMember[]; avatar?: CryptAvatar; publicRoom?: boolean }
 export const MUTE_MINUTES = [15, 60, 360, 1440] as const;
 export type MuteMinutes = typeof MUTE_MINUTES[number];
-export type Cg2Kind = 'invite' | 'msg' | 'joined' | 'leave' | 'meta' | 'friend' | 'friend-ok' | 'join' | 'room' | 'mute' | 'ban' | 'policy';
+export type Cg2Kind = 'invite' | 'admission' | 'add' | 'msg' | 'joined' | 'leave' | 'meta' | 'friend' | 'friend-ok' | 'join' | 'room' | 'mute' | 'ban' | 'policy';
 export type Cg2 =
   | { kind: 'invite'; invite: InviteGroup }
+  | { kind: 'admission'; invite: InviteGroup }
+  | { kind: 'add'; id: string; previous: string; count: number; member: InviteMember }
   | { kind: 'msg'; id: string; text: string }
   | { kind: 'room'; id: string; listed: boolean; protected: string[] }
   | { kind: 'mute'; id: string; member: string; minutes: MuteMinutes }
@@ -42,7 +46,7 @@ const validPublicKey = (k: unknown): k is string => {
 export const newInviteGroupId = (random: (n: number) => Uint8Array = nacl.randomBytes) =>
   Array.from(random(8), b => b.toString(16).padStart(2, '0')).join('');
 
-export function validateInvite(raw: unknown): InviteGroup | null {
+export function validateInvite(raw: unknown, publicRoom = false): InviteGroup | null {
   const o = raw as { i?: unknown; n?: unknown; o?: unknown; c?: unknown; m?: unknown; a?: unknown } | null;
   if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
   if (typeof o.i !== 'string' || !ID.test(o.i)) return null;
@@ -50,7 +54,7 @@ export function validateInvite(raw: unknown): InviteGroup | null {
   if (!name || name !== o.n) return null;
   if (typeof o.o !== 'string' || !ACCOUNT.test(o.o)) return null;
   if (typeof o.c !== 'number' || !Number.isSafeInteger(o.c) || o.c <= 0) return null;
-  if (!Array.isArray(o.m) || o.m.length < MIN_INVITE_MEMBERS || o.m.length > MAX_INVITE_MEMBERS) return null;
+  if (!Array.isArray(o.m) || o.m.length < MIN_INVITE_MEMBERS || o.m.length > (publicRoom ? MAX_PUBLIC_ROOM_MEMBERS : MAX_INVITE_MEMBERS)) return null;
   const seen = new Set<string>();
   const members: InviteMember[] = [];
   for (const entry of o.m) {
@@ -62,7 +66,7 @@ export function validateInvite(raw: unknown): InviteGroup | null {
   if (!seen.has(o.o)) return null;
   let avatar: CryptAvatar | undefined;
   if (o.a !== undefined) { avatar = parseAvatar({ version: 1, pixels: o.a }); if (!avatar) return null; }
-  return { id: o.i, name, creator: o.o, created: o.c, members, ...(avatar ? { avatar } : {}) };
+  return { id: o.i, name, creator: o.o, created: o.c, members, ...(avatar ? { avatar } : {}), ...(publicRoom ? { publicRoom: true } : {}) };
 }
 
 const wire = (kind: Cg2Kind, body: unknown) => `${CG2_PREFIX}${kind}:${JSON.stringify(body)}`;
@@ -72,6 +76,17 @@ export function encodeInvite(g: InviteGroup): string {
   const body = { i: g.id, n: g.name, o: g.creator, c: g.created, m: g.members.map(m => [m.account, m.publicKey]), ...(g.avatar ? { a: g.avatar.pixels } : {}) };
   if (!validateInvite(body)) throw new Error('Invalid group');
   return wire('invite', body);
+}
+export const rosterDigest = (g: InviteGroup) => Array.from(nacl.hash(new TextEncoder().encode(JSON.stringify([g.id, g.creator, g.created, g.members.map(m => [m.account, m.publicKey])]))).slice(0, 32), b => b.toString(16).padStart(2, '0')).join('');
+export function encodeAdmission(g: InviteGroup) {
+  const body = { i: g.id, n: g.name, o: g.creator, c: g.created, m: g.members.map(m => [m.account, m.publicKey]), ...(g.avatar ? { a: g.avatar.pixels } : {}) };
+  if (!validateInvite(body, true)) throw new Error('Invalid public room');
+  return wire('admission', body);
+}
+export function encodeMemberAdd(g: InviteGroup, member: InviteMember) {
+  const payload = wire('add', { i: g.id, h: rosterDigest(g), c: g.members.length, m: [member.account, member.publicKey] });
+  if (!parseCg2(payload)) throw new Error('Invalid member');
+  return payload;
 }
 export const encodeGroupText = (id: string, text: string) => wire('msg', { i: checkId(id), t: text });
 export const encodeNotice = (kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'join', id: string) => wire(kind, { i: checkId(id) });
@@ -106,11 +121,11 @@ export function parseCg2(text: string | null | undefined): Cg2 | null {
   let body: Record<string, unknown>;
   try { body = JSON.parse(rest.slice(colon + 1)); } catch { return null; }
   if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
-  if (kind === 'invite') { const invite = validateInvite(body); return invite ? { kind, invite } : null; }
+  if (kind === 'invite' || kind === 'admission') { const invite = validateInvite(body, kind === 'admission'); return invite ? { kind, invite } : null; }
   if (typeof body.i !== 'string' || !ID.test(body.i)) return null;
   const id = body.i;
   if (kind === 'policy') {
-    const accounts = (a: unknown): a is string[] => Array.isArray(a) && a.length <= MAX_INVITE_MEMBERS && new Set(a).size === a.length && a.every(v => typeof v === 'string' && ACCOUNT.test(v));
+    const accounts = (a: unknown): a is string[] => Array.isArray(a) && a.length <= MAX_PUBLIC_ROOM_MEMBERS && new Set(a).size === a.length && a.every(v => typeof v === 'string' && ACCOUNT.test(v));
     if (!accounts(body.p) || !body.p.length || !accounts(body.b) || body.b.some(a => (body.p as string[]).includes(a)) || !Array.isArray(body.u) || body.u.length > 8 || body.u.some(u => !Array.isArray(u) || u.length !== 3 || typeof u[0] !== 'string' || !ACCOUNT.test(u[0]) || !Number.isSafeInteger(u[1]) || !Number.isSafeInteger(u[2]) || u[1] < 0 || !MUTE_MINUTES.some(d => u[2] - u[1] === d * 60_000))) return null;
     return { kind, id, protected: body.p, bans: body.b, mutes: body.u as [string, number, number][] };
   }
