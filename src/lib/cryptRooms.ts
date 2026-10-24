@@ -1,7 +1,9 @@
 // CHEESECrypt public rooms. A creator may publish a plaintext listing for one of their invite (CG2) groups so
 // others can find it and ask to join in an encrypted message. Only the room's name, topic, tags, member count,
 // creator account and the creator's public key are public — never the member list or any message.
-// Listing and unlisting pay the normal platform fee (80% eosio.null / 20% xcheeseliqst); both fee legs carry the memo.
+// Making a room public pays a 10.0000 CHEESE listing stake (80% eosio.null / 20% xcheeseliqst) so spammers cannot
+// farm join-request fees with throwaway rooms; updating a staked listing's details and unlisting pay the normal
+// 0.0100 CHEESE platform fee. Both fee legs carry the memo.
 import { decodeBase64 } from 'tweetnacl-util';
 import {
   assembleMessages, bytesToText, buildCryptFeeActions, buildSendMessageActions, decryptMemoBytes, encryptMemo, KEY_PUBLISH_TO, MEMO_MAX_BYTES, MESSAGE_FEE_QUANTITY,
@@ -11,9 +13,14 @@ import { encodeNotice, JOIN_NOTE_MAX, isCg2, MAX_PUBLIC_ROOM_MEMBERS, parseCg2, 
 
 export const ROOM_PREFIX = 'CRYPTROOM1:';
 export const UNLIST_PREFIX = `${ROOM_PREFIX}unlist:`;
+/** Anti-spam stake for making a room public (or re-listing after an unlist): 10.0000 CHEESE, split 80/20. */
+export const LISTING_STAKE_QUANTITY = '10.0000 CHEESE';
+/** Fee for updating a staked listing's details and for unlisting. */
 export const ROOM_FEE_QUANTITY = MESSAGE_FEE_QUANTITY;
 /** The eosio.null leg of a listing fee (80% of the room fee, in 0.0001 CHEESE units). */
 export const ROOM_NULL_UNITS = Math.round(parseFloat(ROOM_FEE_QUANTITY) * 10000) * 4 / 5;
+/** The eosio.null leg of the listing stake (80% of 10.0000 CHEESE, in 0.0001 CHEESE units). */
+export const LISTING_STAKE_NULL_UNITS = Math.round(parseFloat(LISTING_STAKE_QUANTITY) * 10000) * 4 / 5;
 export const MAX_ROOM_NAME = 32;
 export const MAX_ROOM_TOPIC = 56;
 export const MAX_ROOM_TAGS = 3;
