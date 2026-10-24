@@ -57,7 +57,7 @@ import { CryptSidebar } from '@/components/crypt/CryptSidebar';
 import { CryptAvatarRail } from '@/components/crypt/CryptAvatarRail';
 import { CryptChatHeader } from '@/components/crypt/CryptChatHeader';
 import { CryptComposer } from '@/components/crypt/CryptComposer';
-import { DiscoverRoomsDialog, JoinRequests, RoomListingDialog } from '@/components/crypt/PublicRooms';
+import { DiscoverRoomsDialog, JoinRequests, RoomSettingsDialog } from '@/components/crypt/PublicRooms';
 import { fetchRoomMemos } from '@/lib/cheeseCrypt';
 import {
   JOIN_REQUEST_COST, LISTING_STAKE_QUANTITY, ROOM_FEE_QUANTITY, buildJoinRequestActions, buildRoomActions, collectJoinRequests, collectListings, decodeRoomEvents, declineJoin, removeRoomRequest, roomRequestOutcomes, roomRequestNotes, encodeListing, encodeUnlist, listedRoomIds, loadJoinDeclines,
@@ -148,7 +148,6 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [inboxOpen, setInboxOpen] = useState(false);
   // Public rooms: listings are public; my requests, local list actions and join declines stay on this device.
   const [roomsOpen, setRoomsOpen] = useState(false);
-  const [listingRoom, setListingRoom] = useState<string | null>(null);
   const [askingRoom, setAskingRoom] = useState<RoomListing | null>(null);
   const [acceptingJoin, setAcceptingJoin] = useState<JoinRequest | null>(null);
   const [decliningJoin, setDecliningJoin] = useState<JoinRequest | null>(null);
