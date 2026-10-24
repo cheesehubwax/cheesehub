@@ -108,29 +108,29 @@ function ChatTypesAndRoles() {
 
       <section className="space-y-2">
         <Heading>Public room roles</Heading>
-        <p className="pl-3.5 text-sm leading-relaxed text-muted-foreground">👑 Owner (room creator) → 🛡️ Admin (appointed by the owner) → Members. <span className="font-semibold text-cheese">Founder</span> is an extra badge, not a rank: the owner, admins and members can all be founders. Commands appear when you right-click (or long-press) a message, and badges show beside names in the chat.</p>
+        <p className="pl-3.5 text-sm leading-relaxed text-muted-foreground">👑 Owner (room creator) → 🛡️ Admin (appointed by the owner) → 👤 Member. <span className="font-semibold text-cheese">⭐ Founder</span> is an extra badge, not a rank: the owner, admins and members can all be founders, and a founder who also holds the owner or admin rank uses that rank's commands. Commands appear when you right-click (or long-press) a message, and badges show beside names in the chat.</p>
         <Grid
           label="What each role can do"
-          head={['Action', '👑 Owner', '🛡️ Admin', 'Member']}
+          head={['Action', '👑 Owner', '🛡️ Admin', '⭐ Founder', '👤 Member']}
           rows={[
-            ['List, unlist and admit members', Y, N, N],
-            ['Make or remove admins', Y, N, N],
-            ['Mute (15m, 1h, 6h, 24h)', 'Anyone', 'Anyone except the owner', N],
-            ['Collapse a message', 'Anyone’s', 'Not the owner’s or a founder’s', N],
-            ['Ban', 'Anyone except founders', N, N],
-            ['🚩 Report a message', 'Not needed — can act directly', 'Reports go to the owner', 'Reports go to the owner and admins'],
-            ['See reports (orange 🚩 button)', Y, Y, N],
-            ['See the 72-hour edit log', Y, N, N],
-            ['Edit own messages (24 hours)', Y, Y, Y],
+            ['List, unlist and admit members', Y, N, N, N],
+            ['Make or remove admins', Y, N, N, N],
+            ['Mute (15m, 1h, 6h, 24h)', 'Anyone', 'Anyone except the owner', N, N],
+            ['Collapse a message', 'Anyone’s', 'Not the owner’s or a founder’s', N, N],
+            ['Ban', 'Anyone except founders', N, N, N],
+            ['🚩 Report a message', 'Not needed — can act directly', 'Reports go to the owner', 'Reports go to the owner and admins', 'Reports go to the owner and admins'],
+            ['See reports (orange 🚩 button)', Y, Y, N, N],
+            ['See the 72-hour edit log', Y, N, N, N],
+            ['Edit own messages (24 hours)', Y, Y, Y, Y],
           ]}
         />
         <Grid
           label="Who is protected from what"
-          head={['Protection', '👑 Owner', 'Founder', 'Other members']}
+          head={['Protection', '👑 Owner', '🛡️ Admin', '⭐ Founder', '👤 Member']}
           rows={[
-            ['Can be muted', N, 'Yes, by owner or admins', 'Yes, by owner or admins'],
-            ['Messages can be collapsed', N, 'Only by the owner', 'By owner or admins'],
-            ['Can be banned', N, N, 'Only by the owner'],
+            ['Can be muted', N, 'Yes, by the owner or another admin', 'Yes, by the owner or admins', 'Yes, by the owner or admins'],
+            ['Messages can be collapsed', N, 'By the owner only', 'Only by the owner', 'By the owner or admins'],
+            ['Can be banned', N, 'Yes, by the owner', N, 'Only by the owner'],
           ]}
         />
         <p className="pl-3.5 text-sm leading-relaxed text-muted-foreground">A muted person’s messages from that time stay hidden for everyone, even after the mute ends. Collapsed messages are hidden behind a notice that moderators can open. A ban stops future messages reaching that person; it cannot take back messages they already received. Muted or banned admins lose their powers while it applies. Every app checks these rules itself against the signed WAX sender, so no one can give themselves powers by changing their own app.</p>
