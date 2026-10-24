@@ -1,6 +1,5 @@
 // CHEESECrypt — encrypted on-chain messages paid in CHEESE.
 // Intentionally not linked from the header or menus: reachable at /crypt only.
-// The orb uses a bundled public copy on GitHub Pages, which cannot serve Lovable's asset paths.
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Layout } from '@/components/Layout';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
@@ -64,15 +63,13 @@ import {
   buildCreateKeyActions, KEY_CREATION_QUANTITY, buildPublishKeyActions, buildSendMessageActions, encryptMemo, fetchMessages, generateKey,
   loadContacts, loadContactAvatars, loadKey, loadRemovedContacts, removeContact, lookupPublishedKey, parseKeyFile, plaintextBytes, saveContact, saveKey, toPublicFile,
 } from '@/lib/cheeseCrypt';
-
-const ACCOUNT_RE = /^[a-z1-5.]{1,12}$/;
-/** How often an open, visible messenger checks history for new messages. */
-const LIVE_POLL_MS = 6000;
-
 import { download } from '@/components/crypt/cryptDownload';
 import { ChatMessageItem } from '@/components/crypt/ChatMessageItem';
 import { CryptHero } from '@/components/crypt/CryptHero';
 
+const ACCOUNT_RE = /^[a-z1-5.]{1,12}$/;
+/** How often an open, visible messenger checks history for new messages. */
+const LIVE_POLL_MS = 6000;
 
 const CheeseCrypt = () => {
   const { accountName, isConnected, login, session } = useWax();
