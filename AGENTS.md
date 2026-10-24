@@ -9,7 +9,7 @@
 - CHEESECrypt's orb has an intentionally source-controlled public image copy for external production hosting; preview uses its asset pointer because GitHub Pages cannot serve Lovable-relative asset paths.
 
 - Token metadata snapshots share one versioned schema and public data URL across recorder and app; precisions are chain-verified, cached metadata contains no prices, and unknown live prices remain unknown so API outages cannot fabricate portfolio valuations.
-- CHEESEAir keeps context identity in Vite hot data so providers/cards share state.
+- CHEESEAir keeps context identity in Vite hot data (shared provider/card state).
 - CHEESEAir LP token columns aggregate current underlying quantities in normalized pair order, separate from USD payout weights so presentation never changes distribution.
 - CHEESEAir suffix unions use timestamp cursors, bounded reads and complete-only cache; stalled providers flag partial results because indexes differ and skip stops at 10,000 rows.
 - CHEESEFolio re-derives raw IndexedDB history per account; live balances are truth. Shared prices poll foreground-only/refetch on focus; metadata/placeholders never get live timestamps.
@@ -29,7 +29,7 @@
 - CHEESECrypt avatars are validated palette-index data in optional key-file fields and separate per-account contact storage; imports rasterize locally, and on-chain key memos stay unchanged to preserve compatibility and avoid executable or remote avatar payloads.
 - Crypt folder pickers start at Desktop, request the vault subfolder and retry permission failures (Chromium protects Desktop root). Profile precedes keys; edits refresh only verified matching-key backups (staged writes), else download.
 - CHEESECrypt: one vault/device; friends/ loads into all accounts (per-account edits), only explicit saves replace; blocked memos drop undecrypted. Keys match by content; reads merge newest.
-- Crypt inbox: bounded discovery; strangers quarantined until accepted.
+- Crypt inbox: bounded discovery; strangers held until accepted.
 - Crypt reply views use per-message receipts (jumps keep skipped replies); scroll only the inner list. About: DappAbout + crypto dialog.
 - CHEESECrypt page sections (hero, key setup, sidebar, chat header, composer, message bubble) are presentational components in components/crypt; all state, effects and handlers stay in Messenger so one owner keeps chat state consistent.
 - OpenMojiIcon's optional tint paints a glyph as a solid silhouette in a given color; use it when an OpenMoji artwork's own palette is too dark for the always-dark background.
