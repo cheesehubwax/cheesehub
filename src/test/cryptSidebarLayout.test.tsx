@@ -6,6 +6,7 @@ import { generateKey, saveContact, saveKey, encryptMemo } from '@/lib/cheeseCryp
 import { encodeReply } from '@/lib/cryptReply';
 import { createGroup, saveGroups } from '@/lib/cryptGroups';
 import { Messenger } from '@/pages/CheeseCrypt';
+import { CryptAvatarRail } from '@/components/crypt/CryptAvatarRail';
 
 const calls = vi.hoisted(() => ({ transact: vi.fn(), fetch: vi.fn() }));
 vi.mock('@/context/WaxContext', () => ({ useWax: vi.fn() }));
@@ -130,5 +131,12 @@ describe('compact sidebar', () => {
     expect(roomAgain.querySelector('[aria-label="1 unread"]')).not.toBeNull();
     expect(roomAgain.querySelector('[aria-label="1 reply to you"]')).not.toBeNull();
     expect(roomAgain.querySelector('[aria-label="4 unread"]')).toBeNull();
+  });
+
+  it('renders an empty strip instead of crashing when sections is missing or stale', () => {
+    render(<CryptAvatarRail active={null} setActive={() => {}} />);
+    render(<CryptAvatarRail active={null} setActive={() => {}} {...({ items: [] } as object)} />);
+    expect(screen.getAllByRole('navigation', { name: 'Chats' })).toHaveLength(2);
+    for (const nav of screen.getAllByRole('navigation', { name: 'Chats' })) expect(nav).toBeEmptyDOMElement();
   });
 });
