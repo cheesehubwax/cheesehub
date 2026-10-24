@@ -27,7 +27,7 @@
 - CHEESECrypt groups are pairwise copies, trusted only fully assembled. CG1 (legacy) members are fixed in-envelope; CG2 invites come from a friend creator (or the creator of a public room you asked, with that listing's key); later copies only grow membership (all existing member keys unchanged); group keys open only that group's notices and invites. Hidden IDs only hide.
 - Crypt uses integer fee splits; fanout omits fees explicitly, not by indexes. Confirm payment before local key creation; imports stay free. History uses current rates.
 - CHEESECrypt avatars are validated palette-index data in optional key-file fields and separate per-account contact storage; imports rasterize locally, and on-chain key memos stay unchanged to preserve compatibility and avoid executable or remote avatar payloads.
-- CHEESECrypt folder pickers start at Desktop but request the vault subfolder; retry permission failures because Chromium protects Desktop-root access. Profile precedes keys; edits refresh only verified matching-key backups (staged writes), else download.
+- Crypt folder pickers start at Desktop, request the vault subfolder and retry permission failures (Chromium protects Desktop root). Profile precedes keys; edits refresh only verified matching-key backups (staged writes), else download.
 - CHEESECrypt: one vault/device; friends/ loads into all accounts (per-account edits), only explicit saves replace; blocked memos drop undecrypted. Keys match by content; reads merge newest.
 - Crypt inbox: bounded discovery; strangers quarantined until accepted.
 - Crypt reply views use per-message receipts (jumps keep skipped replies); scroll only the inner list. About: DappAbout + crypto dialog.
