@@ -1074,14 +1074,16 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const protectedMembers = moderation[id]?.protected ?? v.invite.members.map(m => m.account);
     const payload = encodeRoomPolicy(id, true, protectedMembers);
     const to = v.invite.members.map(m => m.account).filter(a => a !== account);
-    return sendRoomPolicy(v, memo, payload, to, true);
+    // A room that is already listed pays the cheap update fee; a fresh (or re-)listing pays the 10 CHEESE stake.
+    const isUpdate = listedIds.has(id);
+    return sendRoomPolicy(v, memo, payload, to, true, isUpdate ? ROOM_FEE_QUANTITY : LISTING_STAKE_QUANTITY);
   };
-  const sendRoomPolicy = async (v: InviteGroupView, memo: string, payload: string, to: string[], listed: boolean) => {
+  const sendRoomPolicy = async (v: InviteGroupView, memo: string, payload: string, to: string[], listed: boolean, feeQuantity = ROOM_FEE_QUANTITY) => {
     if (!key || busy) return false;
     setBusy(true);
     try {
-      const actions = [...buildRoomActions(account, memo, [permission]), ...buildCg2Actions(key, to, keysOf(v.invite), payload, [permission])];
-      const r = await executeTransaction(actions, { successTitle: listed ? 'Room listed' : 'Room unlisted' });
+      const actions = [...buildRoomActions(account, memo, [permission], feeQuantity), ...buildCg2Actions(key, to, keysOf(v.invite), payload, [permission])];
+      const r = await executeTransaction(actions, { successTitle: listed ? (feeQuantity === LISTING_STAKE_QUANTITY ? 'Room listed' : 'Listing updated') : 'Room unlisted' });
       if (!r.success || !r.txId) return false;
       setLocalListings(saveLocalListing(account, v.invite.id, listed));
       await refresh(); void refetchRooms();
