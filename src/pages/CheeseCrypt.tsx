@@ -30,7 +30,7 @@ import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { VaultPrompt } from '@/components/crypt/VaultPrompt';
 import { CreateGroupDialog } from '@/components/crypt/CreateGroupDialog';
 import { PaidActionDialog } from '@/components/crypt/PaidActionDialog';
-import { buildCg2Actions, encodeAdmission, encodeMemberAdd, MAX_PUBLIC_ROOM_MEMBERS, collectInvites, deriveInviteGroups, encodeGroupText, encodeInvite, encodeMeta, encodeNotice, inviteTextSize, invitesSignature, loadDecisions, MAX_INVITE_MEMBERS, loadFriendDecisions, loadInvites, newInviteGroupId, saveDecision, saveInvites, scopedKeys, eventFromMember, VOICE_REF_PREFIX, type Cg2Event, type InviteGroup, type InviteGroupView } from '@/lib/cryptInviteGroups';
+import { buildCg2Actions, JOIN_NOTE_MAX, encodeAdmission, encodeMemberAdd, MAX_PUBLIC_ROOM_MEMBERS, collectInvites, deriveInviteGroups, encodeGroupText, encodeInvite, encodeMeta, encodeNotice, inviteTextSize, invitesSignature, loadDecisions, MAX_INVITE_MEMBERS, loadFriendDecisions, loadInvites, newInviteGroupId, saveDecision, saveInvites, scopedKeys, eventFromMember, VOICE_REF_PREFIX, type Cg2Event, type InviteGroup, type InviteGroupView } from '@/lib/cryptInviteGroups';
 import { ShareKeyDialog } from '@/components/crypt/ShareKeyDialog';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { buildVoiceBatches, voiceNoteCost, voicePartCount, voiceTransactions, type VoiceClip } from '@/lib/cryptVoice';
@@ -60,7 +60,7 @@ import { CryptComposer } from '@/components/crypt/CryptComposer';
 import { DiscoverRoomsDialog, JoinRequests, RoomListingDialog } from '@/components/crypt/PublicRooms';
 import { fetchRoomMemos } from '@/lib/cheeseCrypt';
 import {
-  JOIN_REQUEST_COST, buildJoinRequestActions, buildRoomActions, collectJoinRequests, collectListings, decodeRoomEvents, declineJoin, removeRoomRequest, roomRequestOutcomes, encodeListing, encodeUnlist, listedRoomIds, loadJoinDeclines,
+  JOIN_REQUEST_COST, buildJoinRequestActions, buildRoomActions, collectJoinRequests, collectListings, decodeRoomEvents, declineJoin, removeRoomRequest, roomRequestOutcomes, roomRequestNotes, encodeListing, encodeUnlist, listedRoomIds, loadJoinDeclines,
   loadLocalListings, loadRoomRequests, ROOM_PREFIX, saveLocalListing, saveRoomRequest, type JoinRequest, type RoomListing,
 } from '@/lib/cryptRooms';
 
@@ -152,6 +152,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [askingRoom, setAskingRoom] = useState<RoomListing | null>(null);
   const [acceptingJoin, setAcceptingJoin] = useState<JoinRequest | null>(null);
   const [decliningJoin, setDecliningJoin] = useState<JoinRequest | null>(null);
+  // Optional short note typed into the ask / accept / decline dialog (only one is open at a time).
+  const [joinNote, setJoinNote] = useState('');
   const [localListings, setLocalListings] = useState(() => loadLocalListings(account));
   const [roomRequests, setRoomRequests] = useState(() => loadRoomRequests(account));
   const [joinDeclines, setJoinDeclines] = useState(() => loadJoinDeclines(account));
@@ -332,6 +334,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   // My own join requests: pending until the creator's invite arrives (accepted) or a decline notice does.
   const requestOutcomes = useMemo(() => roomRequestOutcomes(roomRequests, roomInviteEvents, account,
     new Set(inviteViews.filter(v => !v.isCreator).map(v => v.invite.id))), [roomRequests, roomInviteEvents, account, inviteViews]);
+  const requestNotes = useMemo(() => roomRequestNotes(roomRequests, roomInviteEvents, account, requestOutcomes), [roomRequests, roomInviteEvents, account, requestOutcomes]);
   useEffect(() => {
     const storeKey = `cheesecrypt-room-outcomes-${account}`;
     let seen: Record<string, string> = {};
@@ -341,14 +344,15 @@ export function Messenger({ account, session }: { account: string; session: NonN
       const tag = `${outcome}:${roomRequests[id]?.time ?? 0}`;
       if (outcome === 'pending' || seen[id] === tag) continue;
       const name = roomRequests[id]?.name ?? viewById(id)?.name ?? 'the room';
+      const said = requestNotes[id] ? ` They said: “${requestNotes[id]}”` : '';
       toast(outcome === 'accepted'
-        ? { title: `✅ Request accepted: ${name}`, description: 'An invite is waiting in your Groups. Open it to Join or Decline.' }
-        : { title: `❌ Request declined: ${name}`, description: 'The room owner declined your request to join.', variant: 'destructive' });
+        ? { title: `✅ Request accepted: ${name}`, description: `An invite is waiting in your Groups. Open it to Join or Decline.${said}` }
+        : { title: `❌ Request declined: ${name}`, description: `The room owner declined your request to join.${said}`, variant: 'destructive' });
       seen[id] = tag; changed = true;
     }
     if (changed) try { localStorage.setItem(storeKey, JSON.stringify(seen)); } catch { /* storage unavailable */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestOutcomes, account]);
+  }, [requestOutcomes, requestNotes, account]);
   const requestRow = (id: string) => {
     const r = roomRequests[id], outcome = requestOutcomes[id];
     if (!r || outcome === 'accepted') return null;
@@ -358,7 +362,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
         <span className="min-w-0"><span className="block text-sm break-words">{r.name ?? 'Public room'}</span>
           <span className={cn('block text-[10px]', outcome === 'declined' ? 'text-destructive' : 'text-cheese')}>
             {outcome === 'declined' ? `Request declined by ${nameFor(r.creator)}` : `Request pending · waiting for ${nameFor(r.creator)}`}
-          </span></span>
+          </span>
+          {outcome === 'declined' && requestNotes[id] && <span className="block text-[11px] italic text-muted-foreground break-words">“{requestNotes[id]}”</span>}</span>
       </div>
       {outcome === 'declined' && <Button variant="ghost" size="icon" aria-label="Dismiss declined request" title="Dismiss"
         className="h-7 w-7 shrink-0 text-muted-foreground" onClick={() => setRoomRequests(removeRoomRequest(account, id))}><X className="h-3.5 w-3.5" /></Button>}
@@ -1048,7 +1053,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     // The request carries my public key, so no published key is needed; only the creator can read the request.
     setBusy(true);
     try {
-      const r = await executeTransaction(buildJoinRequestActions(key, l.creator, l.publicKey, l.id, [permission]), { successTitle: `Request sent to ${l.creator}` });
+      const r = await executeTransaction(buildJoinRequestActions(key, l.creator, l.publicKey, l.id, [permission], joinNote), { successTitle: `Request sent to ${l.creator}` });
       if (!r.success) return false;
       [2000, 5000, 10000].forEach(ms => setTimeout(poll, ms));
     } catch (e) { toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' }); return false; }
@@ -1129,13 +1134,13 @@ export function Messenger({ account, session }: { account: string; session: NonN
     finally { setBusy(false); }
   };
   /** The creator adds the requester by sending the grown invite to every member (old members keep their keys). */
-  const joinPlan = (r: JoinRequest) => {
+  const joinPlan = (r: JoinRequest, note = joinNote) => {
     const v = viewById(r.groupId);
     if (!v || !v.isCreator || !listedIds.has(r.groupId) || v.invite.members.length >= MAX_PUBLIC_ROOM_MEMBERS || v.invite.members.some(m => m.account === r.from) || moderation[r.groupId]?.bans[r.from] !== undefined) return null;
     if (v.invite.members.length > MAX_INVITE_MEMBERS && !moderation[r.groupId]?.listed) return null;
     const updated: InviteGroup = { ...v.invite, publicRoom: true, members: [...v.invite.members, { account: r.from, publicKey: r.publicKey }] };
     let payload: string;
-    try { payload = encodeAdmission(updated); } catch { return null; }
+    try { payload = encodeAdmission(updated, note); } catch { return null; }
     const to = v.invite.members.map(m => m.account).filter(a => a !== account && moderation[v.invite.id]?.bans[a] === undefined);
     const delta = encodeMemberAdd(v.invite, { account: r.from, publicKey: r.publicKey });
     const state = moderation[updated.id];
@@ -1165,7 +1170,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     return true;
   };
 
-  const declinePayload = (r: JoinRequest) => encodeNotice('join-no', r.groupId);
+  const declinePayload = (r: JoinRequest) => { try { return encodeNotice('join-no', r.groupId, joinNote); } catch { return encodeNotice('join-no', r.groupId); } };
   const confirmDecline = async () => {
     const r = decliningJoin;
     if (!r || !key || busy) return false;
@@ -1321,20 +1326,26 @@ export function Messenger({ account, session }: { account: string; session: NonN
         </DialogContent>
       </Dialog>}
       <DiscoverRoomsDialog open={roomsOpen} onOpenChange={o => { setRoomsOpen(o); if (o) void refetchRooms(); }} listings={listings} loading={roomsLoading}
-        refresh={() => void refetchRooms()} account={account} roomStatus={roomStatus} joinCost={roomJoinCost} onAsk={l => { setRoomsOpen(false); setAskingRoom(l); }} />
+        refresh={() => void refetchRooms()} account={account} roomStatus={roomStatus} joinCost={roomJoinCost} onAsk={l => { setRoomsOpen(false); setJoinNote(''); setAskingRoom(l); }} />
       {askingRoom && <PaidActionDialog title={`🌐 Ask to join ${askingRoom.name}`} cost={roomJoinCost} confirmLabel="Pay & ask" busy={busy}
         description={`Sends ${askingRoom.creator} an encrypted request naming only this room, plus a 0.1000 CHEESE join fee paid to them (kept whether they accept or decline). If they accept, an invite appears in your Groups and you choose Join or Decline.`}
-        onConfirm={() => askToJoin(askingRoom)} onClose={() => setAskingRoom(null)} />}
+        onConfirm={() => askToJoin(askingRoom)} onClose={() => setAskingRoom(null)}>
+        <JoinNoteField value={joinNote} onChange={setJoinNote} disabled={busy} placeholder="e.g. Hey, it's John from work" />
+      </PaidActionDialog>}
       {acceptingJoin && (() => {
         const plan = joinPlan(acceptingJoin);
         if (!plan) return null;
         return <PaidActionDialog title={`🌐 Add ${nameFor(acceptingJoin.from)} to ${plan.v.name}`} cost={plan.cost} confirmLabel="Pay & invite" busy={busy}
           description={`Sends ${acceptingJoin.from} a complete encrypted invite and notifies ${plan.to.length} existing members of the addition. ${acceptingJoin.from} then chooses Join or Decline. Existing members and their keys stay the same.`}
-          onConfirm={confirmJoin} onClose={() => setAcceptingJoin(null)} />;
+          onConfirm={confirmJoin} onClose={() => setAcceptingJoin(null)}>
+        <JoinNoteField value={joinNote} onChange={setJoinNote} disabled={busy} placeholder="e.g. You're in!" />
+      </PaidActionDialog>;
       })()}
       {decliningJoin && <PaidActionDialog title={`🌐 Decline ${nameFor(decliningJoin.from)}`} cost={cg2Cost(declinePayload(decliningJoin), 1)} confirmLabel="Pay & decline" busy={busy}
         description={`Sends ${decliningJoin.from} an encrypted note saying their request to join ${viewById(decliningJoin.groupId)?.name ?? 'your room'} was declined, so it stops showing as pending for them.`}
-        onConfirm={confirmDecline} onClose={() => setDecliningJoin(null)} />}
+        onConfirm={confirmDecline} onClose={() => setDecliningJoin(null)}>
+        <JoinNoteField value={joinNote} onChange={setJoinNote} disabled={busy} placeholder="e.g. Sorry mate" />
+      </PaidActionDialog>}
       {listingRoom && (() => {
         const v = viewById(listingRoom);
         if (!v || !v.isCreator) return null;
@@ -1356,8 +1367,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
         backupFile={keyLocked ? lockedFile : key} keyLocked={keyLocked} canLock={canLock} lockKey={() => void lockKey()}
         pendingRequests={Object.keys(roomRequests).map(requestRow).filter(Boolean)}
         joinRequestsPanel={<JoinRequests requests={joinRequests} nameFor={nameFor} roomName={id => viewById(id)?.name ?? 'a room'}
-          roomFull={id => (invites[id]?.members.length ?? MAX_PUBLIC_ROOM_MEMBERS) >= MAX_PUBLIC_ROOM_MEMBERS} onAccept={setAcceptingJoin}
-          onDecline={setDecliningJoin}
+          roomFull={id => (invites[id]?.members.length ?? MAX_PUBLIC_ROOM_MEMBERS) >= MAX_PUBLIC_ROOM_MEMBERS} onAccept={r => { setJoinNote(''); setAcceptingJoin(r); }}
+          onDecline={r => { setJoinNote(''); setDecliningJoin(r); }}
           onBlock={r => { setJoinDeclines(declineJoin(account, r.groupId, r.from, r.time)); blockAccount(r.from); }} />} />
 
       <CryptChatHeader account={account} active={active} activeGroup={activeGroup} activeInvite={activeInvite} keyAvatar={key.avatar}
@@ -1442,6 +1453,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
             {roomRestricted ? <p className="text-sm text-muted-foreground p-4 border-t border-border">{roomBanned ? 'You were removed from this room. Your earlier history stays readable.' : `Muted until ${new Date(roomMutedUntil).toLocaleString()}. Messages sent during the mute remain hidden.`}</p> : activeInvite?.status === 'invited' ? (
               <div className="space-y-2 p-4 border-t border-border text-sm">
                 <p>✉️ <span className="font-semibold">{nameFor(activeInvite.invite.creator)}</span> invited you to <span className="font-semibold">{activeInvite.name}</span> with {activeInvite.invite.members.length - 1} other{activeInvite.invite.members.length > 2 ? 's' : ''}.</p>
+                {requestNotes[activeInvite.invite.id] && <p className="italic break-words">“{requestNotes[activeInvite.invite.id]}”</p>}
                 <p className="text-xs text-muted-foreground">Joining tells the other members in encrypted messages. Declining sends nothing.</p>
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" className="bg-cheese text-primary-foreground hover:bg-cheese/90" onClick={() => setPendingNotice({ kind: 'joined', id: activeInvite.invite.id })}>Join</Button>
@@ -1472,3 +1484,13 @@ export function Messenger({ account, session }: { account: string; session: NonN
 }
 
 export default CheeseCrypt;
+
+/** Optional one-line note sent encrypted with a join request, acceptance or decline. */
+function JoinNoteField({ value, onChange, disabled, placeholder }: { value: string; onChange: (v: string) => void; disabled: boolean; placeholder: string }) {
+  return <div className="space-y-1">
+    <label htmlFor="crypt-join-note" className="text-xs font-medium">Note (optional)</label>
+    <Input id="crypt-join-note" value={value} maxLength={JOIN_NOTE_MAX} disabled={disabled} placeholder={placeholder}
+      onChange={e => onChange(e.target.value.replace(/\p{Cc}+/gu, ' '))} />
+    <p className="text-[10px] text-muted-foreground">Encrypted, only they can read it · {[...value.trim()].length}/{JOIN_NOTE_MAX}</p>
+  </div>;
+}

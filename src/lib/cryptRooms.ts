@@ -7,7 +7,7 @@ import {
   assembleMessages, bytesToText, buildCryptFeeActions, buildSendMessageActions, decryptMemoBytes, encryptMemo, KEY_PUBLISH_TO, MEMO_MAX_BYTES, MESSAGE_FEE_QUANTITY,
   messageCost, msgPrefixOf, type ChainMemo, type MessagingKey,
 } from '@/lib/cheeseCrypt';
-import { encodeNotice, isCg2, MAX_PUBLIC_ROOM_MEMBERS, parseCg2, type Cg2Event, type RoomInviter } from '@/lib/cryptInviteGroups';
+import { encodeNotice, JOIN_NOTE_MAX, isCg2, MAX_PUBLIC_ROOM_MEMBERS, parseCg2, type Cg2Event, type RoomInviter } from '@/lib/cryptInviteGroups';
 
 export const ROOM_PREFIX = 'CRYPTROOM1:';
 export const UNLIST_PREFIX = `${ROOM_PREFIX}unlist:`;
@@ -184,9 +184,9 @@ export function joinMemoKey(memo: string): string | null {
   try { return decodeBase64(fields[2]).length === 32 ? fields[2] : null; } catch { return null; }
 }
 
-export function encodeJoinMemo(key: MessagingKey, roomId: string, creatorPublicKey: string): string {
-  const memo = `${encryptMemo(encodeNotice('join', roomId), creatorPublicKey, key.secretKey)}:${key.publicKey}`;
-  if (new TextEncoder().encode(memo).length > MEMO_MAX_BYTES) throw new Error('Join request is too long');
+export function encodeJoinMemo(key: MessagingKey, roomId: string, creatorPublicKey: string, note?: string): string {
+  const memo = `${encryptMemo(encodeNotice('join', roomId, note), creatorPublicKey, key.secretKey)}:${key.publicKey}`;
+  if (new TextEncoder().encode(memo).length > MEMO_MAX_BYTES) throw new Error(`Join request note is too long — shorten it (up to ${JOIN_NOTE_MAX} plain characters; emoji take more room)`);
   return memo;
 }
 
@@ -197,13 +197,13 @@ export const JOIN_OWNER_FEE_MEMO = 'CHEESECrypt join request fee';
 export const JOIN_REQUEST_COST = `${((Math.round(parseFloat(messageCost(1)) * 10000) + Math.round(parseFloat(JOIN_OWNER_FEE_QUANTITY) * 10000)) / 10000).toFixed(4)} CHEESE`;
 
 /** The 0.0001 CHEESE encrypted request to the creator, a separate plain 0.1000 CHEESE owner fee to the creator, then the normal platform fee. */
-export const buildJoinRequestActions = (key: MessagingKey, creator: string, creatorPublicKey: string, roomId: string, auth: unknown[]) => {
-  const [request, ...platform] = buildSendMessageActions(key.account, creator, [encodeJoinMemo(key, roomId, creatorPublicKey)], auth, false, true);
+export const buildJoinRequestActions = (key: MessagingKey, creator: string, creatorPublicKey: string, roomId: string, auth: unknown[], note?: string) => {
+  const [request, ...platform] = buildSendMessageActions(key.account, creator, [encodeJoinMemo(key, roomId, creatorPublicKey, note)], auth, false, true);
   const ownerFee = { account: 'cheeseburger', name: 'transfer', authorization: auth, data: { from: key.account, to: creator, quantity: JOIN_OWNER_FEE_QUANTITY, memo: JOIN_OWNER_FEE_MEMO } };
   return [request, ownerFee, ...platform];
 };
 
-export interface JoinRequest { groupId: string; from: string; publicKey: string; time: number }
+export interface JoinRequest { groupId: string; from: string; publicKey: string; time: number; note?: string }
 /** Join requests to my listed rooms from non-members, newest per (room, requester), after any decline. */
 export function collectJoinRequests(events: Cg2Event[], me: string, listed: Set<string>, members: Record<string, string[]>, blocked: string[], declines: Record<string, number>): JoinRequest[] {
   const latest = new Map<string, JoinRequest>();
@@ -213,7 +213,7 @@ export function collectJoinRequests(events: Cg2Event[], me: string, listed: Set<
     if (!members[id] || members[id].includes(e.from) || blocked.includes(e.from)) continue;
     const k = `${id}:${e.from}`;
     if (e.time <= (declines[k] ?? 0) || (latest.get(k)?.time ?? 0) > e.time) continue;
-    latest.set(k, { groupId: id, from: e.from, publicKey: e.usedKey, time: e.time });
+    latest.set(k, { groupId: id, from: e.from, publicKey: e.usedKey, time: e.time, ...(e.control.note ? { note: e.control.note } : {}) });
   }
   return [...latest.values()].sort((a, b) => b.time - a.time);
 }
@@ -289,6 +289,21 @@ export function roomRequestOutcomes(requests: Record<string, RoomRequest>, event
     if (invited.has(r.id)) { out[r.id] = 'accepted'; continue; }
     const declined = events.some(e => e.control.kind === 'join-no' && e.control.id === r.id && e.from === r.creator && e.to === me && e.time >= r.time - SKEW);
     out[r.id] = declined ? 'declined' : 'pending';
+  }
+  return out;
+}
+
+/** The owner's note on the answer to each of my join requests (from the admission or the newest decline after the request). */
+export function roomRequestNotes(requests: Record<string, RoomRequest>, events: Cg2Event[], me: string, outcomes: Record<string, RoomRequestOutcome>): Record<string, string> {
+  const out: Record<string, string> = {};
+  const SKEW = 120_000;
+  for (const r of Object.values(requests)) {
+    const want = outcomes[r.id] === 'accepted' ? 'admission' : outcomes[r.id] === 'declined' ? 'join-no' : null;
+    if (!want) continue;
+    const latest = events.filter(e => e.from === r.creator && e.to === me && e.time >= r.time - SKEW && e.control.kind === want
+      && (e.control.kind === 'admission' ? e.control.invite.id : (e.control as { id: string }).id) === r.id).sort((a, b) => b.time - a.time)[0];
+    const note = latest && (latest.control as { note?: string }).note;
+    if (note) out[r.id] = note;
   }
   return out;
 }

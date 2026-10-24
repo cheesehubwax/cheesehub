@@ -27,7 +27,8 @@ export type MuteMinutes = typeof MUTE_MINUTES[number];
 export type Cg2Kind = 'invite' | 'admission' | 'add' | 'msg' | 'joined' | 'leave' | 'meta' | 'friend' | 'friend-ok' | 'join' | 'join-no' | 'room' | 'mute' | 'ban' | 'policy' | 'admin' | 'collapse' | 'report';
 export type Cg2 =
   | { kind: 'invite'; invite: InviteGroup }
-  | { kind: 'admission'; invite: InviteGroup }
+  /** `note`: optional short text from the creator when accepting a join request. */
+  | { kind: 'admission'; invite: InviteGroup; note?: string }
   | { kind: 'add'; id: string; previous: string; count: number; member: InviteMember }
   | { kind: 'msg'; id: string; text: string }
   | { kind: 'room'; id: string; listed: boolean; protected: string[] }
@@ -42,7 +43,8 @@ export type Cg2 =
   | { kind: 'report'; id: string; member: string; target: string; level: 'admin' | 'owner' }
   /** `join`: a request to a public room's creator (cryptRooms.ts); never a membership change by itself. */
   /** `join-no`: the creator tells a requester their join request was declined (notification only). */
-  | { kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'join' | 'join-no'; id: string }
+  /** `note`: optional short text on `join` and `join-no` only. */
+  | { kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'join' | 'join-no'; id: string; note?: string }
   | { kind: 'meta'; id: string; name: string; avatar?: CryptAvatar };
 
 const validPublicKey = (k: unknown): k is string => {
@@ -85,8 +87,21 @@ export function encodeInvite(g: InviteGroup): string {
   return wire('invite', body);
 }
 export const rosterDigest = (g: InviteGroup) => Array.from(nacl.hash(decodeUTF8(JSON.stringify([g.id, g.creator, g.created, g.members.map(m => [m.account, m.publicKey])]))).slice(0, 32), b => b.toString(16).padStart(2, '0')).join('');
-export function encodeAdmission(g: InviteGroup) {
-  const body = { i: g.id, n: g.name, o: g.creator, c: g.created, m: g.members.map(m => [m.account, m.publicKey]), ...(g.avatar ? { a: g.avatar.pixels } : {}) };
+/** Longest note (in characters) on a join request, acceptance or decline; a join request must still fit one memo. */
+export const JOIN_NOTE_MAX = 60;
+/** A valid note is plain text of 1–JOIN_NOTE_MAX characters with no control characters and no outer spaces. */
+export const validJoinNote = (n: unknown): n is string =>
+  typeof n === 'string' && n.length > 0 && n === n.trim() && [...n].length <= JOIN_NOTE_MAX && !/\p{Cc}/u.test(n);
+/** Trimmed note, or undefined when blank; throws when it cannot be sent. */
+export function cleanJoinNote(n: string | undefined): string | undefined {
+  const t = (n ?? '').trim();
+  if (!t) return undefined;
+  if (!validJoinNote(t)) throw new Error(`Keep the note to ${JOIN_NOTE_MAX} characters on one line`);
+  return t;
+}
+export function encodeAdmission(g: InviteGroup, note?: string) {
+  const t = cleanJoinNote(note);
+  const body = { i: g.id, n: g.name, o: g.creator, c: g.created, m: g.members.map(m => [m.account, m.publicKey]), ...(g.avatar ? { a: g.avatar.pixels } : {}), ...(t ? { t } : {}) };
   if (!validateInvite(body, true)) throw new Error('Invalid public room');
   return wire('admission', body);
 }
@@ -96,7 +111,10 @@ export function encodeMemberAdd(g: InviteGroup, member: InviteMember) {
   return payload;
 }
 export const encodeGroupText = (id: string, text: string) => wire('msg', { i: checkId(id), t: text });
-export const encodeNotice = (kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'join' | 'join-no', id: string) => wire(kind, { i: checkId(id) });
+export function encodeNotice(kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'join' | 'join-no', id: string, note?: string) {
+  const t = kind === 'join' || kind === 'join-no' ? cleanJoinNote(note) : undefined;
+  return wire(kind, { i: checkId(id), ...(t ? { t } : {}) });
+}
 export function encodeRoomPolicy(id: string, listed: boolean, protectedMembers: string[]) {
   if (!protectedMembers.length || protectedMembers.length > MAX_INVITE_MEMBERS || new Set(protectedMembers).size !== protectedMembers.length || protectedMembers.some(a => !ACCOUNT.test(a))) throw new Error('Invalid protected members');
   return wire('room', { i: checkId(id), l: listed, p: protectedMembers });
@@ -140,7 +158,13 @@ export function parseCg2(text: string | null | undefined): Cg2 | null {
   let body: Record<string, unknown>;
   try { body = JSON.parse(rest.slice(colon + 1)); } catch { return null; }
   if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
-  if (kind === 'invite' || kind === 'admission') { const invite = validateInvite(body, kind === 'admission'); return invite ? { kind, invite } : null; }
+  if (kind === 'invite' || kind === 'admission') {
+    const invite = validateInvite(body, kind === 'admission');
+    if (!invite) return null;
+    if (kind === 'invite') return { kind, invite };
+    // An admission's optional note is shown only; an invalid note drops the note, never the admission.
+    return validJoinNote(body.t) ? { kind, invite, note: body.t } : { kind, invite };
+  }
   if (typeof body.i !== 'string' || !ID.test(body.i)) return null;
   const id = body.i;
   if (kind === 'add') {
@@ -168,7 +192,11 @@ export function parseCg2(text: string | null | undefined): Cg2 | null {
     return { kind, id, member: body.a, minutes: body.d as MuteMinutes };
   }
   if (kind === 'msg') return typeof body.t === 'string' && body.t.trim() ? { kind, id, text: body.t } : null;
-  if (kind === 'joined' || kind === 'leave' || kind === 'friend' || kind === 'friend-ok' || kind === 'join' || kind === 'join-no') return { kind, id };
+  if (kind === 'join' || kind === 'join-no') {
+    if (body.t === undefined) return { kind, id };
+    return validJoinNote(body.t) ? { kind, id, note: body.t } : null;
+  }
+  if (kind === 'joined' || kind === 'leave' || kind === 'friend' || kind === 'friend-ok') return { kind, id };
   if (kind === 'meta') {
     const name = parseCryptName(body.n);
     if (!name || name !== body.n) return null;

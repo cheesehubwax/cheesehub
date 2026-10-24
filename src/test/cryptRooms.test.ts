@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { encryptMemo, generateKey, splitMessage, type ChainMemo, type MessagingKey } from '@/lib/cheeseCrypt';
 import { decodeConversations, groupMessageCost } from '@/lib/cryptGroups';
-import { buildCg2Actions, collectInvites, encodeInvite, encodeNotice, parseCg2, partsOf, scopedKeys, type Cg2Event, type InviteGroup } from '@/lib/cryptInviteGroups';
+import { buildCg2Actions, JOIN_NOTE_MAX, encodeAdmission, collectInvites, encodeInvite, encodeNotice, parseCg2, partsOf, scopedKeys, type Cg2Event, type InviteGroup } from '@/lib/cryptInviteGroups';
 import {
-  JOIN_REQUEST_COST, buildJoinRequestActions, buildRoomActions, collectJoinRequests, encodeJoinMemo, joinMemoKey, collectListings, decodeRoomEvents, encodeListing, encodeUnlist, listedRoomIds, parseRoomMemo, searchListings,
+  JOIN_REQUEST_COST, roomRequestNotes, buildJoinRequestActions, buildRoomActions, collectJoinRequests, encodeJoinMemo, joinMemoKey, collectListings, decodeRoomEvents, encodeListing, encodeUnlist, listedRoomIds, parseRoomMemo, searchListings,
 } from '@/lib/cryptRooms';
 
 const alice = generateKey('alice'), bob = generateKey('bob'), carol = generateKey('carol'), dave = generateKey('dave');
@@ -155,5 +155,32 @@ describe('asking to join and being added', () => {
     const entries = decodeConversations(memos(encodeInvite(other), alice, bob, 40), bob, {}, 0, scopedKeys({ [ID]: invite }, 'bob'));
     expect(entries.some(e => e.control)).toBe(false);
     expect(parseCg2(encodeInvite(other))?.kind).toBe('invite');
+  });
+});
+
+describe('join notes', () => {
+  it('a 60-character note rides inside the single 256-byte join request and reaches the owner', () => {
+    const note = 'x'.repeat(JOIN_NOTE_MAX);
+    expect(JOIN_NOTE_MAX).toBe(60);
+    const memo = encodeJoinMemo(carol, ID, alice.publicKey, `  ${note} `);
+    expect(new TextEncoder().encode(memo).length).toBeLessThanOrEqual(256);
+    const ev = decodeRoomEvents([{ txId: 'n', time: 20, from: 'carol', to: 'alice', quantity: '0.0001 CHEESE', memo }], alice, {});
+    expect(collectJoinRequests(ev, 'alice', new Set([ID]), { [ID]: ['alice', 'bob'] }, [], {})[0].note).toBe(note);
+  });
+  it('rejects notes over 60 characters, multi-line notes, and keeps blank notes off the wire', () => {
+    expect(() => encodeNotice('join', ID, 'x'.repeat(61))).toThrow();
+    expect(() => encodeNotice('join-no', ID, 'a\nb')).toThrow();
+    expect(encodeNotice('join', ID, '   ')).toBe(encodeNotice('join', ID));
+    expect(parseCg2(encodeNotice('join-no', ID, 'Sorry mate'))).toEqual({ kind: 'join-no', id: ID, note: 'Sorry mate' });
+  });
+  it('the requester sees the owner note on a decline and on an acceptance', () => {
+    const g: InviteGroup = { id: ID, name: 'Cheese club', creator: 'alice', created: 1, members: [pk(alice), pk(carol)], publicRoom: true };
+    const adm = parseCg2(encodeAdmission(g, "You're in!"));
+    expect(adm).toMatchObject({ kind: 'admission', note: "You're in!" });
+    const req = { [ID]: { id: ID, creator: 'alice', publicKey: alice.publicKey, time: 100 } };
+    const ev = (control: Cg2Event['control'], time: number): Cg2Event => ({ key: `k${time}`, txId: `t${time}`, time, from: 'alice', to: 'carol', control, usedKey: alice.publicKey });
+    expect(roomRequestNotes(req, [ev(adm!, 200)], 'carol', { [ID]: 'accepted' })).toEqual({ [ID]: "You're in!" });
+    expect(roomRequestNotes(req, [ev(parseCg2(encodeNotice('join-no', ID, 'Sorry mate'))!, 200)], 'carol', { [ID]: 'declined' })).toEqual({ [ID]: 'Sorry mate' });
+    expect(roomRequestNotes(req, [ev(parseCg2(encodeNotice('join-no', ID))!, 200)], 'carol', { [ID]: 'declined' })).toEqual({});
   });
 });

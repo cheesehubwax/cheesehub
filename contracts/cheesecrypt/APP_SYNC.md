@@ -42,3 +42,4 @@ Only tables: `config`, `balances`. Only explicit actions: `setconfig`, `setpause
 
 Native shared-rule tests cover pricing/splits/hard bounds; they are not an audit or chain tests.
 Privacy is reduced explicit metadata, not hidden senders/recipients or guaranteed secret roles.
+- Join notes: optional encrypted ≤60-char note on join/admission/join-no; client-only, no contract change.

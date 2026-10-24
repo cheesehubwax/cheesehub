@@ -116,6 +116,7 @@ export function JoinRequests({ requests, roomName, roomFull, nameFor, onAccept, 
       const full = roomFull(r.groupId);
       return <div key={`${r.groupId}:${r.from}`} className="space-y-1.5 px-1">
         <p className="text-xs break-words"><span className="font-semibold">{nameFor(r.from)}</span>{nameFor(r.from) !== r.from && <span className="font-mono text-muted-foreground"> ({r.from})</span>} wants to join <span className="font-semibold">{roomName(r.groupId)}</span></p>
+        {r.note && <p className="text-xs italic text-muted-foreground break-words">“{r.note}”</p>}
         <div className="flex gap-1">
           <Button size="sm" className="h-7 flex-1 bg-cheese text-primary-foreground hover:bg-cheese/90" disabled={full} title={full ? 'This room is full' : 'Sends the updated invite to everyone in the room'} onClick={() => onAccept(r)}>{full ? 'Full' : 'Accept'}</Button>
           <Button size="sm" variant="outline" className="h-7 flex-1" onClick={() => onDecline(r)}>Decline</Button>
