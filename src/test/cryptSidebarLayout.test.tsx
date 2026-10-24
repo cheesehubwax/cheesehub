@@ -34,6 +34,7 @@ describe('compact sidebar', () => {
   });
 
   it('hides groups and friends, remembers it after remount, and shows them again', async () => {
+    localStorage.setItem('cheesecrypt-read-alice', JSON.stringify({ bob: 0 }));
     const { unmount } = mount();
     await screen.findByRole('button', { name: /^bob/ });
     fireEvent.click(screen.getByRole('button', { name: 'Hide groups and friends' }));
