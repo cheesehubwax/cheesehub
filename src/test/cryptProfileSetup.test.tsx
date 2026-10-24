@@ -59,7 +59,7 @@ describe('profile-first key setup', () => {
       { from: 'alice', to: 'eosio.null', quantity: '0.0080 CHEESE', memo: `CRYPTKEY1:${key.publicKey}` },
       { from: 'alice', to: 'xcheeseliqst', quantity: '0.0020 CHEESE', memo: `CRYPTKEY1:${key.publicKey}` },
     ]);
-    expect(localStorage.getItem('cheesecrypt-public-inbox-alice')).not.toBe('1');
+    expect(localStorage.getItem('cheesecrypt-public-inbox-alice')).not.toBe('true');
     calls.transact.mockResolvedValueOnce({ success: true, txId: 'confirmed-publish' });
     await act(async () => { fireEvent.click(dialog.getByRole('button', { name: 'Publish my key on chain' })); });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
