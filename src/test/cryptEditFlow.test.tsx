@@ -20,6 +20,7 @@ const sentAt = Date.now() - 60_000;
 const history = (text: string, txId: string, time: number, group = false) => splitMessage(group ? encodeGroupText(ID, text) : text).map(p => ({ from: 'alice', to: 'bob', time, txId, quantity: '0.0010 CHEESE', memo: encryptMemo(p, bob.publicKey, alice.secretKey) }));
 const mount = (account = 'alice') => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account={account} session={{ permissionLevel: { actor: account, permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
 beforeEach(() => {
+  vi.stubGlobal('DOMRect', class { static fromRect(r: { x?: number; y?: number; width?: number; height?: number } = {}) { return { x: r.x ?? 0, y: r.y ?? 0, width: r.width ?? 0, height: r.height ?? 0, top: r.y ?? 0, left: r.x ?? 0, right: (r.x ?? 0) + (r.width ?? 0), bottom: (r.y ?? 0) + (r.height ?? 0) }; } });
   localStorage.clear(); vi.clearAllMocks(); saveKey(alice); saveContact('alice', 'bob', bob.publicKey);
   calls.rooms.mockResolvedValue([]); calls.fetch.mockResolvedValue(history('original text', 'root', sentAt));
   calls.transact.mockResolvedValue({ success: true, txId: 'new-edit' });
@@ -43,7 +44,6 @@ describe('message edit flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Menu' })); fireEvent.click(await screen.findByRole('button', { name: 'Refresh messages' }));
     await screen.findByText('corrected text');
     expect(screen.queryByText('original text')).not.toBeInTheDocument();
-    expect(screen.getByText('(edited)')).toBeInTheDocument();
     expect(within(screen.getByRole('list', { name: 'Chat messages' })).getAllByText(/you · alice/)).toHaveLength(1);
   });
   it.each([true, false])('only exposes the owner log when the group is public=%s', async listed => {

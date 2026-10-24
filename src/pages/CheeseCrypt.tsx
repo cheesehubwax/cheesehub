@@ -328,6 +328,12 @@ export function Messenger({ account, session }: { account: string; session: NonN
     return !!view && view.status !== 'declined' && !!eventFromMember({ key: c.key, txId: c.txId, time: c.time, from: c.from, to: c.to, control: { kind: 'joined', id: c.igroup }, usedKey: c.usedKey }, invites, account);
   }), [decoded, inviteViews, invites, account, contacts]);
   const edited = useMemo(() => applyEdits(editableConversations), [editableConversations]);
+  // Older originals may fall behind a recent edit; read further before resolving them.
+  useEffect(() => {
+    if (!memos.length || depth >= MAX_HISTORY_PAGES) return;
+    const oldest = Math.min(...memos.map(m => m.time));
+    if ((listedIds.size > 0 && clock - oldest < 72 * 60 * 60 * 1000) || editableConversations.some(m => (m.text?.startsWith('\u0005E1:') || m.voice?.editTarget) && !edited.log.some(e => e.replacement.editTxId === m.txId))) setDepth(d => Math.min(MAX_HISTORY_PAGES, d + 1));
+  }, [memos, depth, listedIds, clock, editableConversations, edited]);
   const conversations = edited.messages;
   const cancelEdit = () => { setEditingMessage(null); setText(''); setVoice(null); setReplyingTo(null); };
   useEffect(() => { setEditingMessage(null); setText(''); }, [active]);
