@@ -47,8 +47,8 @@ import { ChainMemo, MessagingKey, MAX_MESSAGE_BYTES, MAX_HISTORY_PAGES, MAX_PART
 import { download } from '@/components/crypt/cryptDownload';
 import { ChatMessageItem } from '@/components/crypt/ChatMessageItem';
 import { EditedMessagesDialog } from '@/components/crypt/EditedMessagesDialog';
-import { encodeAdmin, encodeCollapse, encodeModeration, encodePolicySnapshot, encodeRoomPolicy, type MuteMinutes } from '@/lib/cryptInviteGroups';
-import { applyCollapses, canCollapseAuthor, canMuteMember, collapsedKeys, deriveModeration, founderBadges, loadModerationMemos, mergeModerationMemos, moderateMessages, mutedUntil, restrictedAt, roomRole, saveModerationMemos } from '@/lib/cryptModeration';
+import { encodeAdmin, encodeCollapse, encodeReport, encodeModeration, encodePolicySnapshot, encodeRoomPolicy, type MuteMinutes } from '@/lib/cryptInviteGroups';
+import { applyCollapses, canCollapseAuthor, canMuteMember, collapsedKeys, collectReports, loadSeenReports, reportKey, saveSeenReports, deriveModeration, founderBadges, loadModerationMemos, mergeModerationMemos, moderateMessages, mutedUntil, restrictedAt, roomRole, saveModerationMemos } from '@/lib/cryptModeration';
 import { applyEdits, canEdit, editTarget, encodeEdit, publicEditLog } from '@/lib/cryptEdits';
 import type { ConversationEntry } from '@/lib/cryptGroups';
 import { CryptHero } from '@/components/crypt/CryptHero';
@@ -165,7 +165,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [text, setText] = useState('');
   const [editingMessage, setEditingMessage] = useState<ConversationEntry | null>(null);
   const [editLogRoom, setEditLogRoom] = useState<string | null>(null);
-  const [pendingModeration, setPendingModeration] = useState<{ id: string; member: string; action: 'mute' | 'ban' | 'admin' | 'unadmin' | 'collapse'; minutes?: MuteMinutes; target?: string } | null>(null);
+  const [pendingModeration, setPendingModeration] = useState<{ id: string; member: string; action: 'mute' | 'ban' | 'admin' | 'unadmin' | 'collapse' | 'report'; minutes?: MuteMinutes; target?: string } | null>(null);
+  const [seenReports, setSeenReports] = useState<string[]>(() => loadSeenReports(account));
+  const [reportFocus, setReportFocus] = useState<string | null>(null);
   const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
   const [savedControls, setSavedControls] = useState(() => loadModerationMemos(account));
   const [replyingTo, setReplyingTo] = useState<ReplyRef | null>(null);
@@ -311,7 +313,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   }, [invites, inviteStore, account]);
   const moderation = useMemo(() => deriveModeration(allGroupEvents, invites, account), [allGroupEvents, invites, account]);
   useEffect(() => {
-    const controlTxs = new Set(allGroupEvents.filter(e => (e.control.kind === 'invite' || e.control.kind === 'admission') || e.control.kind === 'add' || e.control.kind === 'room' || e.control.kind === 'mute' || e.control.kind === 'ban' || e.control.kind === 'policy' || e.control.kind === 'admin' || e.control.kind === 'collapse').filter(e => {
+    const controlTxs = new Set(allGroupEvents.filter(e => (e.control.kind === 'invite' || e.control.kind === 'admission') || e.control.kind === 'add' || e.control.kind === 'room' || e.control.kind === 'mute' || e.control.kind === 'ban' || e.control.kind === 'policy' || e.control.kind === 'admin' || e.control.kind === 'collapse' || e.control.kind === 'report').filter(e => {
       if ((e.control.kind === 'invite' || e.control.kind === 'admission')) return invites[e.control.invite.id]?.creator === e.from;
       return !!eventFromMember(e, invites, account);
     }).map(e => e.txId));
@@ -467,6 +469,29 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const target = edited.targets.get(m.key);
     if (!activeInvite || myRoomRole === 'member' || !target || !m.txId || m.missing || busy) return null;
     return myRoomRole === 'owner' || canCollapseAuthor(activeModeration, activeInvite.invite, account, m.from, clock) ? target : null;
+  };
+  // Reports addressed to me in the open room, matched to their message row by author + pre-edit digest.
+  const reportedRows = useMemo(() => {
+    if (!activeInvite || activeInvite.status !== 'joined') return [] as { report: string; key: string }[];
+    const rows = new Map<string, string>();
+    for (const [k, t] of edited.targets) { const m = editableConversations.find(x => x.key === k); if (m && m.igroup === activeInvite.invite.id) rows.set(`${m.from}:${t}`, k); }
+    const shown = new Set(thread.map(m => m.key));
+    return collectReports(allGroupEvents, invites, moderation, account).filter(r => r.id === activeInvite.invite.id)
+      .flatMap(r => { const key = rows.get(`${r.author}:${r.target}`); return key && shown.has(key) ? [{ report: reportKey(r), key }] : []; });
+  }, [activeInvite, edited.targets, editableConversations, thread, allGroupEvents, invites, moderation, account]);
+  const pendingReports = reportedRows.filter(r => !seenReports.includes(r.report));
+  const jumpToReport = () => {
+    const next = pendingReports[0];
+    if (!next) return;
+    const viewed = pendingReports.filter(r => r.key === next.key).map(r => r.report);
+    const keys = [...new Set([...seenReports, ...viewed])];
+    saveSeenReports(account, keys); setSeenReports(keys); setReportFocus(next.key);
+    listRef.current?.querySelector<HTMLElement>(`[data-reply-key="${CSS.escape(next.key)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  };
+  const reportAction = (m: ConversationEntry) => {
+    const target = edited.targets.get(m.key);
+    if (!activeInvite || activeInvite.status !== 'joined' || myRoomRole === 'owner' || busy || roomRestricted || !target || !m.txId || m.missing || m.from === account || m.from === activeInvite.invite.creator || !listedIds.has(activeInvite.invite.id) || !activeModeration?.listed) return undefined;
+    return { toOwner: myRoomRole === 'admin', onReport: () => setPendingModeration({ id: activeInvite.invite.id, member: m.from, action: 'report', target }) };
   };
   // Right-click moderation of a message's author; mirrors what moderationPlan accepts.
   const authorModeration = (m: ConversationEntry) => {
@@ -1030,6 +1055,14 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const v = viewById(n.id), state = moderation[n.id];
     if (!v || v.status !== 'joined' || !v.invite.members.some(m => m.account === n.member) || state?.bans[n.member] !== undefined) return null;
     const now = Date.now(), owner = v.isCreator;
+    if (n.action === 'report') {
+      // Members report to the owner and current admins; admins escalate to the owner only. Owners ban directly.
+      const role = roomRole(state, v.invite, account, now);
+      if (owner || !listedIds.has(n.id) || !state?.listed || !n.target || n.member === account || n.member === v.invite.creator || restrictedAt(state, account, now)) return null;
+      const to = role === 'admin' ? [v.invite.creator] : [v.invite.creator, ...state.admins.filter(a => a !== account && !restrictedAt(state, a, now) && v.invite.members.some(m => m.account === a))];
+      const payload = encodeReport(n.id, n.member, n.target, role === 'admin' ? 'owner' : 'admin');
+      return { v, to, payload, policy: null, cost: `${parseFloat(cg2Cost(payload, to.length)).toFixed(4)} CHEESE` };
+    }
     // Owners act on their own listing; admins only inside a verified public-room policy.
     if (owner ? !listedIds.has(n.id) : roomRole(state, v.invite, account, now) !== 'admin') return null;
     let payload: string;
@@ -1042,7 +1075,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if (!to.length) return null;
     return { v, to, payload, policy, cost: `${(parseFloat(cg2Cost(payload, to.length)) + (policy ? parseFloat(cg2Cost(policy, to.length)) : 0)).toFixed(4)} CHEESE` };
   };
-  const moderationTitles = { mute: 'Member muted', ban: 'Member removed', admin: 'Admin appointed', unadmin: 'Admin removed', collapse: 'Message collapsed' } as const;
+  const moderationTitles = { mute: 'Member muted', ban: 'Member removed', admin: 'Admin appointed', unadmin: 'Admin removed', collapse: 'Message collapsed', report: 'Report sent' } as const;
   const confirmModeration = async () => {
     if (!key || !pendingModeration || busy) return false;
     const plan = moderationPlan(pendingModeration);
@@ -1182,6 +1215,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
           ban: { title: `🚫 Remove ${who}`, description: 'Exclude this member from future room messages. Existing blockchain copies and keys cannot be revoked.', confirm: 'Pay & remove' },
           admin: { title: `🛡️ Make ${who} an admin`, description: 'Admins can mute anyone except you and collapse messages from members who joined after the room went public. They cannot remove members or appoint admins.', confirm: 'Pay & appoint' },
           unadmin: { title: `🛡️ Remove ${who} as admin`, description: `${who} goes back to being a regular member. Their earlier mutes and collapses stay in place.`, confirm: 'Pay & remove admin' },
+          report: myRoomRole === 'admin'
+            ? { title: `🚩 Report ${who} to the owner`, description: `Only the room owner is notified, so they can review ${who} for a ban.`, confirm: 'Pay & report' }
+            : { title: `🚩 Report ${who}'s message`, description: 'The room owner and admins are notified privately and can jump to this message.', confirm: 'Pay & report' },
           collapse: { title: `🙈 Collapse ${who}'s message`, description: 'Every member sees this message collapsed. Room moderators can still open it. The blockchain copy cannot be deleted.', confirm: 'Pay & collapse' },
         }[pendingModeration.action];
         return <PaidActionDialog title={copy.title} description={copy.description} cost={plan.cost} confirmLabel={copy.confirm} busy={busy} onConfirm={confirmModeration} onClose={() => setPendingModeration(null)} />;
@@ -1312,7 +1348,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                   )}
                   <ChatMessageItem m={m} account={account} keyAvatar={key?.avatar} avatars={avatars}
                     contacts={contacts} active={active} activeGroup={activeGroup} nameFor={nameFor}
-                    highlighted={replyNavigation.highlighted.has(m.key)}
+                    highlighted={replyNavigation.highlighted.has(m.key)} reportHighlighted={reportFocus === m.key} report={reportAction(m)}
                     editable={canEdit(m, account, clock) && !busy && !roomRestricted && (!activeInvite || activeInvite.status === 'joined')} onEdit={beginEdit}
                     onReply={(x) => { setEditingMessage(null); setReplyingTo({ author: x.from, time: x.time, quote: quoteOf(x.text, !!x.voice) }); setVoice(null); setTimeout(() => composerRef.current?.focus(), 0); }}
                     canReveal={myRoomRole !== 'member'} revealed={revealed.has(m.key)} onReveal={() => setRevealed(s => new Set(s).add(m.key))}
@@ -1324,6 +1360,12 @@ export function Messenger({ account, session }: { account: string; session: NonN
               {!thread.length && <li className="text-sm text-muted-foreground">{activeGroup || activeInvite ? 'No group messages yet.' : `No messages with ${nameFor(active)} yet.`}</li>}
               <li ref={endRef} aria-hidden />
             </ol>
+            {pendingReports.length > 0 && <Button size="icon" title="Jump to the earliest reported message"
+              aria-label={`Jump to reported message (${pendingReports.length} remaining)`}
+              onClick={jumpToReport}
+              className={cn('absolute right-4 h-12 w-12 rounded-full bg-report text-report-foreground hover:bg-report/90 font-bold text-sm ring-2 ring-background', replyNavigation.pending.length > 0 ? 'bottom-[4.5rem]' : 'bottom-3')}>
+              🚩{pendingReports.length > 99 ? '99+' : pendingReports.length}
+            </Button>}
             {replyNavigation.pending.length > 0 && <Button size="icon" title="Jump to your earliest unseen reply"
               aria-label={`Jump to earliest unseen reply (${replyNavigation.pending.length} remaining)`}
               onClick={replyNavigation.jump}
