@@ -1,6 +1,6 @@
 import type { ChainMemo } from '@/lib/cheeseCrypt';
 import type { ConversationEntry } from '@/lib/cryptGroups';
-import { eventFromMember, type Cg2Event, type InviteGroup } from '@/lib/cryptInviteGroups';
+import { eventFromMember, policySnapshotValid, roomPolicyValid, type Cg2Event, type InviteGroup } from '@/lib/cryptInviteGroups';
 import { encodeReply, parseReply } from '@/lib/cryptReply';
 
 export interface RoomModeration {
@@ -27,7 +27,7 @@ export function deriveModeration(events: Cg2Event[], invites: Record<string, Inv
       // A bootstrap snapshot is only for a recipient whose first invite is in this transaction.
       // Existing members always retain their own original event history and ignore the snapshot.
       const myInvites = events.filter(x => (x.control.kind === 'invite' || x.control.kind === 'admission') && x.control.invite.id === g.id && x.from === g.creator && x.to === me);
-      if (state || !myInvites.some(x => x.txId === e.txId) || myInvites.some(x => x.time < e.time) || !c.protected.includes(g.creator) || c.protected.some(a => !g.members.some(m => m.account === a)) || c.bans.some(a => !g.members.some(m => m.account === a)) || c.mutes.some(([a, start]) => a === g.creator || start > e.time || !g.members.some(m => m.account === a))) continue;
+      if (state || !myInvites.some(x => x.txId === e.txId) || myInvites.some(x => x.time < e.time) || !policySnapshotValid(c, g, e.time)) continue;
       state = { listed: true, protected: [...c.protected], bans: Object.fromEntries(c.bans.map(a => [a, e.time])), mutes: {} };
       for (const [a, from, until] of c.mutes) state.mutes[a] = [...(state.mutes[a] ?? []), { from, until }];
       out[g.id] = state;
@@ -37,7 +37,7 @@ export function deriveModeration(events: Cg2Event[], invites: Record<string, Inv
       if (!c.protected.includes(g.creator) || c.protected.some(a => !g.members.some(m => m.account === a))) continue;
       // Without a verified newcomer bootstrap, never let a first policy strip my own immunity.
       if (!state && !c.protected.includes(me)) continue;
-      if (state && (state.protected.length !== c.protected.length || state.protected.some(a => !c.protected.includes(a)))) continue;
+      if (state && !roomPolicyValid(c, g, state.protected)) continue;
       // Any pre-policy roster received on chain must be included, even if the creator tries omitting it.
       const before = events.filter(x => (x.control.kind === 'invite' || x.control.kind === 'admission') && x.control.invite.id === g.id && x.from === g.creator && x.time <= e.time && x.txId !== e.txId && eventInviteTrusted(x, g, me));
       if (!state && before.some(x => (x.control.kind === 'invite' || x.control.kind === 'admission') && x.control.invite.members.some(m => !c.protected.includes(m.account)))) continue;

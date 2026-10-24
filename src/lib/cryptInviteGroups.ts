@@ -163,6 +163,14 @@ export const memberKey = (g: InviteGroup, account: string) => g.members.find(m =
 /** A public room I asked to join: only its listing creator, with the listing key, may invite me to it. */
 export interface RoomInviter { creator: string; publicKey: string }
 
+/** Semantic bootstrap validation is shared by membership and moderation replay. */
+export function policySnapshotValid(c: Extract<Cg2, { kind: 'policy' }>, g: InviteGroup, at: number) {
+  return c.protected.length <= MAX_INVITE_MEMBERS && c.protected.includes(g.creator) && c.protected.every(a => !!memberKey(g, a)) && c.bans.every(a => !!memberKey(g, a)) && c.mutes.every(([a, start]) => a !== g.creator && start <= at && !!memberKey(g, a));
+}
+export function roomPolicyValid(c: Extract<Cg2, { kind: 'room' }>, g: InviteGroup, protectedMembers: string[]) {
+  return c.protected.includes(g.creator) && c.protected.length === protectedMembers.length && protectedMembers.every(a => c.protected.includes(a)) && c.protected.every(a => !!memberKey(g, a));
+}
+
 /**
  * Invite acceptance. The invite must come from its creator and name both sides with the keys in use.
  * Received: the creator must be my contact with the same key that opened it (or the creator of a public room
@@ -212,6 +220,12 @@ export function eventFromMember(e: Cg2Event, invites: Record<string, InviteGroup
  */
 export function collectInvites(events: Cg2Event[], me: string, myPublicKey: string, contacts: Record<string, string>, stored: Record<string, InviteGroup>, rooms: Record<string, RoomInviter> = {}): Record<string, InviteGroup> {
   const out: Record<string, InviteGroup> = { ...stored };
+  const protectedRosters: Record<string, string[]> = {};
+  for (const e of [...events].sort((a, b) => a.time - b.time)) {
+    const g = e.control.kind === 'invite' || e.control.kind === 'admission' ? e.control.invite : out[e.control.id];
+    if (!g || e.from !== g.creator || !eventFromMember(e, { [g.id]: g }, me)) continue;
+    if (e.control.kind === 'room' && e.control.protected.includes(me) && !protectedRosters[g.id]) protectedRosters[g.id] = e.control.protected;
+  }
   const pending = [...events].sort((a, b) => a.time - b.time || a.txId.localeCompare(b.txId));
   // Replay until every predecessor available in this window has been applied.
   for (let pass = 0; pass < MAX_PUBLIC_ROOM_MEMBERS; pass++) {
@@ -221,15 +235,21 @@ export function collectInvites(events: Cg2Event[], me: string, myPublicKey: stri
       if (c.kind === 'add') {
         const g = out[c.id];
         if (!g || e.from !== g.creator || !eventFromMember(e, out, me) || c.count !== g.members.length || c.previous !== rosterDigest(g) || g.members.some(m => m.account === c.member.account)) continue;
-        const policies = events.filter(p => p.txId === e.txId && p.from === g.creator && p.control.kind === 'room' && p.control.id === g.id && p.control.listed && eventFromMember(p, out, me));
+        const original = protectedRosters[g.id] ?? (!g.publicRoom && g.members.length <= MAX_INVITE_MEMBERS ? g.members.map(m => m.account) : undefined);
+        const policies = events.filter(p => original && p.txId === e.txId && p.from === g.creator && p.control.kind === 'room' && p.control.id === g.id && p.control.listed && roomPolicyValid(p.control, g, original) && eventFromMember(p, out, me));
         if (!policies.length) continue;
+        if (original) protectedRosters[g.id] = original;
         const forks = pending.filter(p => p.control.kind === 'add' && p.control.id === c.id && p.control.previous === c.previous && p.from === g.creator && eventFromMember(p, out, me));
         if (new Set(forks.map(p => p.control.kind === 'add' ? JSON.stringify(p.control.member) : '')).size !== 1) continue;
         out[g.id] = { ...g, publicRoom: true, members: [...g.members, c.member] }; changed = true;
       } else if (c.kind === 'invite' || c.kind === 'admission') {
         const id = c.invite.id, current = out[id];
         // Public bootstraps only establish the requested room, never replace an existing roster.
-        if (c.kind === 'admission' && (current || !rooms[id] || !events.some(p => p.txId === e.txId && p.from === e.from && p.to === me && p.usedKey === e.usedKey && p.control.kind === 'policy' && p.control.id === id))) continue;
+        if (c.kind === 'admission' && (current || !rooms[id] || !events.some(p => p.txId === e.txId && p.from === e.from && p.to === me && p.usedKey === e.usedKey && p.control.kind === 'policy' && p.control.id === id && policySnapshotValid(p.control, c.invite, e.time)))) continue;
+        if (c.kind === 'admission') {
+          const bootstrap = events.find(p => p.txId === e.txId && p.from === e.from && p.to === me && p.control.kind === 'policy' && p.control.id === id);
+          if (bootstrap?.control.kind === 'policy') protectedRosters[id] = bootstrap.control.protected;
+        }
         if (!current) { if (inviteAcceptable(e, me, myPublicKey, contacts, rooms)) { out[id] = c.invite; changed = true; } continue; }
         if (c.kind === 'invite' && inviteUpdateAcceptable(e, current, me, myPublicKey)) { out[id] = { ...current, members: c.invite.members }; changed = true; }
       }

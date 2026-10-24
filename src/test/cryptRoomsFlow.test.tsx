@@ -84,7 +84,7 @@ describe('public rooms', () => {
     render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="carol" session={{ permissionLevel: { actor: 'carol', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
     await waitFor(() => expect(loadInvites('carol')[ID]?.members).toHaveLength(9));
     fireEvent.click(await screen.findByRole('button', { name: /Invited by alice/ }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Join group' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Join', exact: true }));
     const pay = await screen.findByRole('button', { name: 'Pay & join' });
     expect(pay).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox'));
