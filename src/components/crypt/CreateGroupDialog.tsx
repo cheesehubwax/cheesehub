@@ -9,6 +9,7 @@ import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 import { MAX_INVITE_MEMBERS } from '@/lib/cryptInviteGroups';
 import { parseCryptName } from '@/lib/cryptNames';
 import type { CryptAvatar } from '@/lib/cryptAvatar';
+import { cleanRoomTopic, cleanTags, MAX_ROOM_TOPIC } from '@/lib/cryptRooms';
 
 /** New invite group: name, 1–7 friends, optional picture; invites are paid encrypted messages. */
 export function CreateGroupDialog({ contacts, avatars, nameFor = account => account, onClose, onCreate, costFor, busy = false }: {
@@ -55,7 +56,7 @@ export function CreateGroupDialog({ contacts, avatars, nameFor = account => acco
         <TermsCheckbox id="crypt-group-terms" checked={agreed} onCheckedChange={setAgreed} />
         <DialogFooter>
           <Button variant="outline" disabled={busy} onClick={onClose}>Cancel</Button>
-          <Button disabled={busy || !agreed || !validName || selected.length < 1} onClick={() => { if (validName) void onCreate(validName, selected, avatar); }}>
+          <Button disabled={busy || !agreed || !validName || selected.length < 1} onClick={() => { if (validName) void onCreate(validName, selected, avatar, info); }}>
             {busy ? 'Sending invites…' : 'Create & send invites'}</Button>
         </DialogFooter>
       </DialogContent>
