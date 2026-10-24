@@ -52,9 +52,11 @@ export function CryptChatHeader({
       {active && <>
             {activeInvite ? <div className="w-full space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                {activeInvite.avatar ? <PixelAvatar account={activeInvite.invite.id} avatar={activeInvite.avatar} className="h-7 w-7" /> : <span>👥</span>}
-                <span className="break-words">{activeInvite.name}</span>
-                <span className="text-[10px] font-normal text-muted-foreground">created by {nameFor(activeInvite.invite.creator)}</span>
+                {activeInvite.avatar ? <PixelAvatar account={activeInvite.invite.id} avatar={activeInvite.avatar} className="h-14 w-14" /> : <span aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center text-3xl">👥</span>}
+                <span className="min-w-0">
+                  <span className="block break-words">{activeInvite.name}</span>
+                  <span className="block text-[10px] font-normal text-muted-foreground">created by {nameFor(activeInvite.invite.creator)}</span>
+                </span>
                 <span className="ml-auto flex items-center gap-1">
                   {membersDropdown(activeInvite.invite.members.map(({ account: member }) => member),
                     member => (activeInvite.joined.includes(member) ? 'joined' : 'invited'),
