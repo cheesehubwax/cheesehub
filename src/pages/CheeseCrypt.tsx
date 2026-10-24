@@ -11,7 +11,7 @@ import { buildProfileNoteBatches, isProfileNote, latestProfiles, profileNoteCost
 import { ProfileShareDialog } from '@/components/crypt/ProfileShareDialog';
 import { addBlocked, loadBlocked, removeBlocked, saveBlocked, withoutBlocked } from '@/lib/cryptBlocklist';
 import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
-import { Eye, EyeOff, Loader2, Upload } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Upload, X } from 'lucide-react';
 import { useWax } from '@/context/WaxContext';
 import { useWaxTransaction } from '@/hooks/useWaxTransaction';
 import { useToast } from '@/hooks/use-toast';
@@ -60,7 +60,7 @@ import { CryptComposer } from '@/components/crypt/CryptComposer';
 import { DiscoverRoomsDialog, JoinRequests, RoomListingDialog } from '@/components/crypt/PublicRooms';
 import { fetchRoomMemos } from '@/lib/cheeseCrypt';
 import {
-  buildJoinRequestActions, buildRoomActions, collectJoinRequests, collectListings, decodeRoomEvents, declineJoin, encodeListing, encodeUnlist, listedRoomIds, loadJoinDeclines,
+  buildJoinRequestActions, buildRoomActions, collectJoinRequests, collectListings, decodeRoomEvents, declineJoin, removeRoomRequest, roomRequestOutcomes, encodeListing, encodeUnlist, listedRoomIds, loadJoinDeclines,
   loadLocalListings, loadRoomRequests, ROOM_PREFIX, saveLocalListing, saveRoomRequest, type JoinRequest, type RoomListing,
 } from '@/lib/cryptRooms';
 
@@ -151,6 +151,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [listingRoom, setListingRoom] = useState<string | null>(null);
   const [askingRoom, setAskingRoom] = useState<RoomListing | null>(null);
   const [acceptingJoin, setAcceptingJoin] = useState<JoinRequest | null>(null);
+  const [decliningJoin, setDecliningJoin] = useState<JoinRequest | null>(null);
   const [localListings, setLocalListings] = useState(() => loadLocalListings(account));
   const [roomRequests, setRoomRequests] = useState(() => loadRoomRequests(account));
   const [joinDeclines, setJoinDeclines] = useState(() => loadJoinDeclines(account));
@@ -305,7 +306,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const roomInviters = useMemo(() => Object.fromEntries(Object.values(roomRequests)
     .filter(r => contacts[r.creator] !== r.publicKey && !blocked.includes(r.creator)).map(r => [r.creator, r.publicKey])), [roomRequests, contacts, blocked]);
   const roomInviteEvents = useMemo(() => key && Object.keys(roomInviters).length ? decodeRoomEvents(visibleMemos, key, roomInviters)
-    .filter(e => e.to === account && roomRequests[(e.control.kind === 'invite' || e.control.kind === 'admission') ? e.control.invite.id : e.control.id]?.creator === e.from && (e.control.kind === 'invite' || e.control.kind === 'admission' || e.control.kind === 'policy' || e.control.kind === 'room' || e.control.kind === 'add')) : [], [visibleMemos, key, roomInviters, roomRequests, account]);
+    .filter(e => e.to === account && roomRequests[(e.control.kind === 'invite' || e.control.kind === 'admission') ? e.control.invite.id : e.control.id]?.creator === e.from && (e.control.kind === 'invite' || e.control.kind === 'admission' || e.control.kind === 'policy' || e.control.kind === 'room' || e.control.kind === 'add' || e.control.kind === 'join-no')) : [], [visibleMemos, key, roomInviters, roomRequests, account]);
   const allGroupEvents = useMemo(() => [...new Map([...cg2Events, ...roomInviteEvents].map(e => [e.key, e])).values()], [cg2Events, roomInviteEvents]);
   const invites = useMemo(() => key ? collectInvites(allGroupEvents, account, key.publicKey, contacts, inviteStore, roomRequests) : inviteStore,
     [allGroupEvents, account, key, contacts, inviteStore, roomRequests]);
@@ -328,6 +329,41 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const banned = moderation[v.invite.id]?.bans ?? {};
     return { ...v, joined: v.joined.filter(a => banned[a] === undefined) };
   }), [cg2Events, invites, account, decisions, moderation]);
+  // My own join requests: pending until the creator's invite arrives (accepted) or a decline notice does.
+  const requestOutcomes = useMemo(() => roomRequestOutcomes(roomRequests, roomInviteEvents, account,
+    new Set(inviteViews.filter(v => !v.isCreator).map(v => v.invite.id))), [roomRequests, roomInviteEvents, account, inviteViews]);
+  useEffect(() => {
+    const storeKey = `cheesecrypt-room-outcomes-${account}`;
+    let seen: Record<string, string> = {};
+    try { const raw: unknown = JSON.parse(localStorage.getItem(storeKey) || '{}'); if (raw && typeof raw === 'object' && !Array.isArray(raw)) seen = raw as Record<string, string>; } catch { /* reset */ }
+    let changed = false;
+    for (const [id, outcome] of Object.entries(requestOutcomes)) {
+      const tag = `${outcome}:${roomRequests[id]?.time ?? 0}`;
+      if (outcome === 'pending' || seen[id] === tag) continue;
+      const name = roomRequests[id]?.name ?? viewById(id)?.name ?? 'the room';
+      toast(outcome === 'accepted'
+        ? { title: `✅ Request accepted: ${name}`, description: 'An invite is waiting in your Groups. Open it to Join or Decline.' }
+        : { title: `❌ Request declined: ${name}`, description: 'The room owner declined your request to join.', variant: 'destructive' });
+      seen[id] = tag; changed = true;
+    }
+    if (changed) try { localStorage.setItem(storeKey, JSON.stringify(seen)); } catch { /* storage unavailable */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestOutcomes, account]);
+  const requestRow = (id: string) => {
+    const r = roomRequests[id], outcome = requestOutcomes[id];
+    if (!r || outcome === 'accepted') return null;
+    return <li key={`request:${id}`} className="flex items-center gap-1" aria-label={`Join request ${outcome}`}>
+      <div className="flex flex-1 min-w-0 items-center gap-2 px-3 py-2">
+        <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center text-2xl">{outcome === 'declined' ? '❌' : '⏳'}</span>
+        <span className="min-w-0"><span className="block text-sm break-words">{r.name ?? 'Public room'}</span>
+          <span className={cn('block text-[10px]', outcome === 'declined' ? 'text-destructive' : 'text-cheese')}>
+            {outcome === 'declined' ? `Request declined by ${nameFor(r.creator)}` : `Request pending · waiting for ${nameFor(r.creator)}`}
+          </span></span>
+      </div>
+      {outcome === 'declined' && <Button variant="ghost" size="icon" aria-label="Dismiss declined request" title="Dismiss"
+        className="h-7 w-7 shrink-0 text-muted-foreground" onClick={() => setRoomRequests(removeRoomRequest(account, id))}><X className="h-3.5 w-3.5" /></Button>}
+    </li>;
+  };
   const { data: roomMemos, isFetching: roomsLoading, refetch: refetchRooms } = useQuery({
     queryKey: ['crypt-rooms'], enabled: !!key, queryFn: () => fetchRoomMemos(ROOM_PREFIX),
     staleTime: 60_000, refetchInterval: () => (document.visibilityState === 'visible' ? 60_000 : false), retry: false,
@@ -1018,6 +1054,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     } catch (e) { toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' }); return false; }
     finally { setBusy(false); }
     setRoomRequests(saveRoomRequest(account, l));
+    toast({ title: '⏳ Request pending', description: `It stays in your Groups until ${l.creator} accepts or declines.` });
     setAskingRoom(null);
     return true;
   };
@@ -1125,6 +1162,22 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const next = { ...inviteStore, [plan.updated.id]: plan.updated };
     saveInvites(account, next); setInviteStore(next);
     setAcceptingJoin(null);
+    return true;
+  };
+
+  const declinePayload = (r: JoinRequest) => encodeNotice('join-no', r.groupId);
+  const confirmDecline = async () => {
+    const r = decliningJoin;
+    if (!r || !key || busy) return false;
+    setBusy(true);
+    try {
+      // Encrypted to the key carried in the request, so a requester who never published can still read it.
+      const res = await executeTransaction(buildCg2Actions(key, [r.from], { [r.from]: r.publicKey }, declinePayload(r), [permission]), { successTitle: `Declined ${r.from}` });
+      if (!res.success) return false;
+    } catch (e) { toast({ title: 'Could not decline', description: (e as Error).message, variant: 'destructive' }); return false; }
+    finally { setBusy(false); }
+    setJoinDeclines(declineJoin(account, r.groupId, r.from, r.time));
+    setDecliningJoin(null);
     return true;
   };
 
@@ -1279,6 +1332,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
           description={`Sends ${acceptingJoin.from} a complete encrypted invite and notifies ${plan.to.length} existing members of the addition. ${acceptingJoin.from} then chooses Join or Decline. Existing members and their keys stay the same.`}
           onConfirm={confirmJoin} onClose={() => setAcceptingJoin(null)} />;
       })()}
+      {decliningJoin && <PaidActionDialog title={`🌐 Decline ${nameFor(decliningJoin.from)}`} cost={cg2Cost(declinePayload(decliningJoin), 1)} confirmLabel="Pay & decline" busy={busy}
+        description={`Sends ${decliningJoin.from} an encrypted note saying their request to join ${viewById(decliningJoin.groupId)?.name ?? 'your room'} was declined, so it stops showing as pending for them.`}
+        onConfirm={confirmDecline} onClose={() => setDecliningJoin(null)} />}
       {listingRoom && (() => {
         const v = viewById(listingRoom);
         if (!v || !v.isCreator) return null;
@@ -1298,9 +1354,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
         setAddingFriend={setAddingFriend} partners={partners} active={active} setActive={setActive} avatars={avatars} nameFor={nameFor}
         contacts={contacts} lastAt={lastAt} badge={badge} removeFriend={removeFriend} setRoomsOpen={setRoomsOpen}
         backupFile={keyLocked ? lockedFile : key} keyLocked={keyLocked} canLock={canLock} lockKey={() => void lockKey()}
+        pendingRequests={Object.keys(roomRequests).map(requestRow).filter(Boolean)}
         joinRequestsPanel={<JoinRequests requests={joinRequests} nameFor={nameFor} roomName={id => viewById(id)?.name ?? 'a room'}
           roomFull={id => (invites[id]?.members.length ?? MAX_PUBLIC_ROOM_MEMBERS) >= MAX_PUBLIC_ROOM_MEMBERS} onAccept={setAcceptingJoin}
-          onDecline={r => setJoinDeclines(declineJoin(account, r.groupId, r.from, r.time))}
+          onDecline={setDecliningJoin}
           onBlock={r => { setJoinDeclines(declineJoin(account, r.groupId, r.from, r.time)); blockAccount(r.from); }} />} />
 
       <CryptChatHeader account={account} active={active} activeGroup={activeGroup} activeInvite={activeInvite} keyAvatar={key.avatar}

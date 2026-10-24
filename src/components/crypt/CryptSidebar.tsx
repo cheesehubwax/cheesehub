@@ -19,14 +19,14 @@ export function CryptSidebar({
   makeKey, publicInbox, setInboxOpen, toggleList, listHidden, hiddenUnread, hiddenReplies, messageRequests, acceptRequest, dismissRequest,
   blockAccount, groupsOpen, setGroupsOpen, setCreatingGroup, inviteViews, inviteShown, hiddenGroups, inviteRow, groups, groupRow,
   showHiddenGroups, setShowHiddenGroups, friendsOpen, setFriendsOpen, setAddingFriend, partners, active, setActive, avatars, nameFor,
-  contacts, lastAt, badge, removeFriend, setRoomsOpen, joinRequestsPanel, backupFile, keyLocked, canLock, lockKey,
+  contacts, lastAt, badge, removeFriend, setRoomsOpen, joinRequestsPanel, pendingRequests = [], backupFile, keyLocked, canLock, lockKey,
 }: {
   account: string; cryptKey: MessagingKey; loading: boolean; refresh: () => void; setEditingAvatar: (v: boolean) => void;
   menuOpen: boolean; setMenuOpen: (v: boolean) => void; fileRef: { current: HTMLInputElement | null };
   sharePublicKey: () => Promise<unknown>; busy: boolean; publish: () => Promise<unknown>; blocked: string[]; setShowBlocked: (v: boolean) => void;
   makeKey: () => void; publicInbox: boolean; setInboxOpen: (v: boolean) => void; toggleList: () => void; listHidden: boolean;
   hiddenUnread: number; hiddenReplies: number; messageRequests: ComponentProps<typeof MessageRequests>['requests'];
-  setRoomsOpen: (v: boolean) => void; joinRequestsPanel?: ReactNode;
+  setRoomsOpen: (v: boolean) => void; joinRequestsPanel?: ReactNode; pendingRequests?: ReactNode[];
   /** What Back up downloads: the wallet-locked file when one exists, else the plain key. */
   backupFile?: unknown; keyLocked?: boolean; canLock?: boolean; lockKey?: () => void;
   acceptRequest: (from: string) => void; dismissRequest: (from: string) => void; blockAccount: (name: string) => void;
@@ -109,9 +109,10 @@ export function CryptSidebar({
           </div>
           <CollapsibleContent>
             <ul className="space-y-1 pt-1">
+        {pendingRequests}
         {inviteViews.filter(v => inviteShown(v) && !hiddenGroups.includes(v.invite.id)).sort((a, b) => Number(b.status === 'invited') - Number(a.status === 'invited') || a.name.localeCompare(b.name)).map(v => inviteRow(v, false))}
         {groups.filter(g => !hiddenGroups.includes(g.id)).map(g => groupRow(g, false))}
-        {!groups.some(g => !hiddenGroups.includes(g.id)) && !inviteViews.some(v => inviteShown(v) && !hiddenGroups.includes(v.invite.id)) && <li className="text-xs text-muted-foreground px-2 pb-1">No groups yet.</li>}
+        {!pendingRequests.length && !groups.some(g => !hiddenGroups.includes(g.id)) && !inviteViews.some(v => inviteShown(v) && !hiddenGroups.includes(v.invite.id)) && <li className="text-xs text-muted-foreground px-2 pb-1">No groups yet.</li>}
         {(groups.some(g => hiddenGroups.includes(g.id)) || inviteViews.some(v => inviteShown(v) && hiddenGroups.includes(v.invite.id))) && <li>
           <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-muted-foreground" aria-expanded={showHiddenGroups} aria-controls="crypt-hidden-groups" onClick={() => setShowHiddenGroups(v => !v)}>
             <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', !showHiddenGroups && '-rotate-90')} />
