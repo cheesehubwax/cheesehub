@@ -54,19 +54,115 @@ function CryptographyDetails() {
   );
 }
 
+function Heading({ children }: { children: ReactNode }) {
+  return (
+    <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-cheese" />
+      {children}
+    </h3>
+  );
+}
+
+function Grid({ label, head, rows }: { label: string; head: string[]; rows: ReactNode[][] }) {
+  return (
+    <div className="ml-3.5 overflow-x-auto rounded-md border border-cheese/20">
+      <table className="w-full min-w-[520px] border-collapse text-xs" aria-label={label}>
+        <thead className="bg-cheese/10">
+          <tr>{head.map((h) => <th key={h} scope="col" className="px-2 py-2 text-left font-semibold text-cheese">{h}</th>)}</tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i} className="border-t border-cheese/10">
+              {row.map((cell, j) => j === 0
+                ? <th key={j} scope="row" className="px-2 py-2 text-left font-medium text-foreground">{cell}</th>
+                : <td key={j} className="px-2 py-2 text-muted-foreground">{cell}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+const Y = <span aria-label="Yes">✅</span>;
+const N = <span aria-label="No">❌</span>;
+
+function ChatTypesAndRoles() {
+  return (
+    <>
+      <section className="space-y-2">
+        <Heading>Private chat, private group or public room?</Heading>
+        <Grid
+          label="Chat types compared"
+          head={['', '💬 Private chat', '🔒 Private group', '📣 Public room']}
+          rows={[
+            ['Who', 'You and one friend', 'Up to 8 people, including the creator', 'Up to 50 people'],
+            ['How people join', 'Add each other as friends', 'Invitation from the creator; Join or Decline', 'Ask to join from the public listing; the owner admits you'],
+            ['Visible to outsiders', 'Only that two accounts traded transactions', 'Nothing is listed; transactions to members are still public', 'Room name and owner are listed on chain; members, admins, mutes and bans are never listed'],
+            ['Moderation', 'Block the person', 'Leave, or block a member', 'Owner and admins: mute, collapse, ban, reports'],
+            ['Earlier messages', 'Whole conversation', 'Newcomers do not see earlier messages', 'Newcomers do not see earlier messages'],
+          ]}
+        />
+        <p className="pl-3.5 text-sm leading-relaxed text-muted-foreground">Messages stay in the chat they were sent to: group and room messages never appear in private chats, and private chats never appear in groups. A private group must be listed publicly to grow past 8. Everyone who was a member when the room was first listed becomes a permanent Founder.</p>
+      </section>
+
+      <section className="space-y-2">
+        <Heading>Public room roles</Heading>
+        <p className="pl-3.5 text-sm leading-relaxed text-muted-foreground">👑 Owner (room creator) → 🛡️ Admin (appointed by the owner) → Members. <span className="font-semibold text-cheese">Founder</span> is an extra badge, not a rank: the owner, admins and members can all be founders. Commands appear when you right-click (or long-press) a message, and badges show beside names in the chat.</p>
+        <Grid
+          label="What each role can do"
+          head={['Action', '👑 Owner', '🛡️ Admin', 'Member']}
+          rows={[
+            ['List, unlist and admit members', Y, N, N],
+            ['Make or remove admins', Y, N, N],
+            ['Mute (15m, 1h, 6h, 24h)', 'Anyone', 'Anyone except the owner', N],
+            ['Collapse a message', 'Anyone’s', 'Not the owner’s or a founder’s', N],
+            ['Ban', 'Anyone except founders', N, N],
+            ['🚩 Report a message', 'Not needed — can act directly', 'Reports go to the owner', 'Reports go to the owner and admins'],
+            ['See reports (orange 🚩 button)', Y, Y, N],
+            ['See the 72-hour edit log', Y, N, N],
+            ['Edit own messages (24 hours)', Y, Y, Y],
+          ]}
+        />
+        <Grid
+          label="Who is protected from what"
+          head={['Protection', '👑 Owner', 'Founder', 'Other members']}
+          rows={[
+            ['Can be muted', N, 'Yes, by owner or admins', 'Yes, by owner or admins'],
+            ['Messages can be collapsed', N, 'Only by the owner', 'By owner or admins'],
+            ['Can be banned', N, N, 'Only by the owner'],
+          ]}
+        />
+        <p className="pl-3.5 text-sm leading-relaxed text-muted-foreground">A muted person’s messages from that time stay hidden for everyone, even after the mute ends. Collapsed messages are hidden behind a notice that moderators can open. A ban stops future messages reaching that person; it cannot take back messages they already received. Muted or banned admins lose their powers while it applies. Every app checks these rules itself against the signed WAX sender, so no one can give themselves powers by changing their own app.</p>
+      </section>
+    </>
+  );
+}
+
 export function CryptAbout({ children }: { children: ReactNode }) {
   return (
     <DappAbout
       title="CHEESECrypt"
-      introduction={<>Send private messages to friends or groups on WAX, paid in CHEESE. Message text is protected with <CryptographyDetails />, while the transaction activity remains public.</>}
+      introduction={<>Send private messages to friends, private groups or public rooms on WAX, paid in CHEESE. Message text is protected with <CryptographyDetails />, while the transaction activity remains public.</>}
       sections={[
-        { title: 'Get started', body: 'Connect your WAX wallet, choose your profile and create a messaging key for 100 CHEESE (80 to eosio.null, 20 to xcheeseliqst), or load your existing private key file for free, and keep a safe backup. Add a friend using their published public key or load their public key file. Share only your public key, never your private key.' },
-        { title: 'Direct messages and groups', body: 'Choose a friend, write your message, review its cost, accept the Terms of Use and sign. Longer messages are split and shown as one conversation message. Private invite groups hold up to eight people, including the creator. List your room publicly to grow to 50. Each member gets their own encrypted copy; newcomers do not receive earlier messages. Legacy groups keep their fixed membership.' },
-        { title: 'Costs and records', body: 'Each part costs 0.0001 CHEESE to each recipient plus a 0.0100 CHEESE platform fee once, shared across the whole group. A three-person group costs 0.0102 CHEESE per part; direct messages remain 0.0101 CHEESE per part. All platform fees split 80% to eosio.null and 20% to xcheeseliqst; recipient payments stay separate. Public-key publishing costs 0.0100 CHEESE; attaching an NFT raises the first part’s platform fee to 0.0200 CHEESE. Review the full total before signing. Group history shows the current rate, not proof of the fee paid on older transactions. The Tx link opens the public WAX transaction, not your readable message text.' },
-        { title: 'Voice notes', body: 'Record up to 10 seconds, listen back, then send. The audio is encrypted in your browser and stored only as encrypted messages on WAX, never uploaded anywhere. Any voice note costs a flat 1 CHEESE platform fee (0.8000 nulled, 0.2000 to xcheeseliqst), paid once in the first transaction, plus 0.0001 CHEESE per part to each recipient. A note is split into about 60–90 parts, sent in up to 30 parts per transaction, so you sign 2–4 times and need enough CPU/NET. If a later transaction fails, the note shows as incomplete and never plays. Safari and iPhone may not support recording or playback; the button says so. The accounts and time are public, the audio is not.' },
-        { title: 'Music NFTs', body: 'Use 🖼️ Attach NFT to share an NFT from your wallet that has a song, clip, sound effect or video. Everyone in the chat can press play; videos show a ▶ on the picture and play in the larger view. Only the NFT ID travels inside your encrypted message; the media and artwork are public on WAX, so anyone can find them by that ID. It costs the same as sharing a picture NFT. Only one sound plays at a time.' },
-        { title: 'Keep your key safe', body: 'Your private key unlocks messages and stays in this browser unless you export it. Back it up in your cheesecrypt folder or keep the downloaded file somewhere safe. A new key cannot read messages encrypted for an older key. Participants can share what they read, so only send content you trust them with.' },
+        { title: 'Get started', body: 'Connect your WAX wallet, choose your profile and create a messaging key for 100 CHEESE (80 to eosio.null, 20 to xcheeseliqst), or load your existing private key file for free, and keep a safe backup. You can lock the backup with your wallet so the file alone cannot open it. Add a friend using their published public key or load their public key file. Share only your public key, never your private key.' },
+        { title: 'Publishing and the Public Inbox', body: 'Publishing (Menu → Publish) puts your account and public key permanently on chain so others can find you; it costs 0.0100 CHEESE. Public Inbox is off by default. When on, strangers can send text or NFT message requests that you Accept, Decline or Block for free. Blocked accounts are ignored on this device.' },
+        { title: 'Messaging features', body: 'Longer messages are split and shown as one message. Reply to a message to quote it; the blue @ button jumps to replies you have not seen. You can edit your own messages for 24 hours; edited messages are marked (edited). Set a name and pixel avatar in your profile and give friends private nicknames. When the side panel is collapsed, a thin strip keeps every room and friend with their unread counts in view.' },
       ]}
+      extra={<>
+        <ChatTypesAndRoles />
+        {[
+          { title: 'Costs and records', body: 'Each part costs 0.0001 CHEESE to each recipient plus a 0.0100 CHEESE platform fee once, shared across the whole group. A three-person group costs 0.0102 CHEESE per part; direct messages remain 0.0101 CHEESE per part. Room actions such as mutes, bans, admin changes and reports are sent as messages and cost the same. All platform fees split 80% to eosio.null and 20% to xcheeseliqst; recipient payments stay separate. Attaching an NFT raises the first part’s platform fee to 0.0200 CHEESE. Review the full total before signing. History shows the current rate, not proof of the fee paid on older transactions. The Tx link opens the public WAX transaction, not your readable message text.' },
+          { title: 'Voice notes', body: 'Record up to 10 seconds, listen back, then send. The audio is encrypted in your browser and stored only as encrypted messages on WAX. Any voice note costs a flat 1 CHEESE platform fee (0.8000 nulled, 0.2000 to xcheeseliqst) plus 0.0001 CHEESE per part to each recipient. A note is sent in up to 30 parts per transaction, so you sign 2–4 times and need enough CPU/NET. If a later transaction fails, the note shows as incomplete and never plays. Safari and iPhone may not support recording or playback.' },
+          { title: 'Music NFTs', body: 'Use 🖼️ Attach NFT to share an NFT from your wallet, including songs, clips, sound effects or video. Only the NFT ID travels inside your encrypted message; the media is public on WAX. Only one sound plays at a time.' },
+          { title: 'Keep your key safe', body: 'Your private key unlocks messages and stays in this browser unless you export it. Back it up in your cheesecrypt folder or keep the downloaded file somewhere safe. A new key cannot read messages encrypted for an older key. Participants can share what they read, so only send content you trust them with.' },
+        ].map((s) => (
+          <section key={s.title} className="space-y-2">
+            <Heading>{s.title}</Heading>
+            <p className="pl-3.5 text-sm leading-relaxed text-muted-foreground">{s.body}</p>
+          </section>
+        ))}
+      </>}
     >
       {children}
     </DappAbout>

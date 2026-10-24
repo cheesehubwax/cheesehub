@@ -13,9 +13,10 @@ interface DappAboutProps {
   title: string;
   introduction: ReactNode;
   sections: AboutSection[];
+  extra?: ReactNode;
 }
 
-export const DappAbout = ({ children, title, introduction, sections }: DappAboutProps) => {
+export const DappAbout = ({ children, title, introduction, sections, extra }: DappAboutProps) => {
   const [open, setOpen] = useState(false);
 
   return (
@@ -53,6 +54,7 @@ export const DappAbout = ({ children, title, introduction, sections }: DappAbout
                 ))}
               </section>
             ))}
+            {extra}
           </div>
         </div>
       </CollapsibleContent>
