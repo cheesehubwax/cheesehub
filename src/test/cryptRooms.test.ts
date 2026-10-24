@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { encryptMemo, generateKey, splitMessage, type ChainMemo, type MessagingKey } from '@/lib/cheeseCrypt';
-import { decodeConversations } from '@/lib/cryptGroups';
-import { groupMessageCost } from '@/lib/cryptGroups';
+import { decodeConversations, groupMessageCost } from '@/lib/cryptGroups';
 import { buildCg2Actions, collectInvites, encodeInvite, encodeNotice, parseCg2, partsOf, scopedKeys, type Cg2Event, type InviteGroup } from '@/lib/cryptInviteGroups';
 import {
   buildRoomActions, collectJoinRequests, collectListings, decodeRoomEvents, encodeListing, encodeUnlist, listedRoomIds, parseRoomMemo, searchListings,
@@ -119,7 +118,7 @@ describe('asking to join and being added', () => {
     const scoped = scopedKeys(stored, 'bob');
     const ev = (g: InviteGroup, from = alice, time = 30) => events(decodeConversations(memos(encodeInvite(g), from, bob, time), bob, {}, 0, scoped));
     expect(collectInvites(ev(grown), 'bob', bob.publicKey, {}, stored)[ID].members.map(m => m.account)).toEqual(['alice', 'bob', 'carol']);
-    const swapped: InviteGroup = { ...invite, members: [pk(alice), { account: 'bob', publicKey: bob.publicKey }, pk(carol)].map(m => m.account === 'alice' ? { account: 'alice', publicKey: dave.publicKey } : m) };
+    const swapped: InviteGroup = { ...invite, members: [{ account: 'alice', publicKey: dave.publicKey }, pk(bob), pk(carol)] };
     expect(collectInvites(ev(swapped), 'bob', bob.publicKey, {}, stored)[ID]).toEqual(invite);
     const renamed: InviteGroup = { ...grown, name: 'Other' };
     expect(collectInvites(ev(renamed), 'bob', bob.publicKey, {}, stored)[ID]).toEqual(invite);
