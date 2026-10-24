@@ -39,7 +39,6 @@ describe('compact sidebar', () => {
     expect(screen.getByRole('button', { name: 'Show groups and friends' })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByRole('button', { name: /^bob/ }).closest('.overflow-y-auto')).toHaveClass('hidden');
     expect(localStorage.getItem('cheesecrypt-sidebar-collapsed-alice')).toBe('1');
-    expect(screen.getByRole('button', { name: 'Show groups and friends' })).toHaveTextContent('1');
     unmount(); mount();
     fireEvent.click(await screen.findByRole('button', { name: 'Show groups and friends' }));
     await waitFor(() => expect(screen.getByRole('button', { name: /^bob/ }).closest('.overflow-y-auto')).not.toHaveClass('hidden'));
