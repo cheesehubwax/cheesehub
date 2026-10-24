@@ -11,6 +11,7 @@ describe('room listing picture', () => {
   it('drops the picture instead of failing when text fills the memo', () => {
     const memo = encodeListing({ id: 'a'.repeat(16), name: 'n'.repeat(32), topic: 't'.repeat(56), tags: ['aaaaaaaaaa', 'bbbbbbbbbb', 'cccccccccc'], publicKey: key, members: 50, avatar: pic });
     const r = parseRoomMemo(memo);
-    expect(r?.kind === 'list' && r.listing.avatar).toBe(false);
+    expect(r?.kind).toBe('list');
+    expect(r?.kind === 'list' ? r.listing.avatar : 'x').toBeUndefined();
   });
 });
