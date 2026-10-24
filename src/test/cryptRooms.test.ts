@@ -3,7 +3,7 @@ import { encryptMemo, generateKey, splitMessage, type ChainMemo, type MessagingK
 import { decodeConversations, groupMessageCost } from '@/lib/cryptGroups';
 import { buildCg2Actions, collectInvites, encodeInvite, encodeNotice, parseCg2, partsOf, scopedKeys, type Cg2Event, type InviteGroup } from '@/lib/cryptInviteGroups';
 import {
-  buildRoomActions, collectJoinRequests, collectListings, decodeRoomEvents, encodeListing, encodeUnlist, listedRoomIds, parseRoomMemo, searchListings,
+  buildJoinRequestActions, buildRoomActions, collectJoinRequests, encodeJoinMemo, joinMemoKey, collectListings, decodeRoomEvents, encodeListing, encodeUnlist, listedRoomIds, parseRoomMemo, searchListings,
 } from '@/lib/cryptRooms';
 
 const alice = generateKey('alice'), bob = generateKey('bob'), carol = generateKey('carol'), dave = generateKey('dave');
@@ -97,6 +97,26 @@ describe('asking to join and being added', () => {
     expect(collectJoinRequests(ev, 'alice', new Set([ID]), { [ID]: ['alice', 'bob'] }, ['carol'], {})).toEqual([]);
     expect(collectJoinRequests(ev, 'alice', new Set([ID]), { [ID]: ['alice', 'bob'] }, [], { [`${ID}:carol`]: 12 })).toEqual([]);
     expect(collectJoinRequests(ev, 'alice', new Set([ID]), { [ID]: ['alice', 'bob', 'carol'] }, [], {})).toEqual([]);
+  });
+
+  it('an unpublished requester is read from the key inside their join request', () => {
+    const memo = encodeJoinMemo(carol, ID, alice.publicKey);
+    expect(new TextEncoder().encode(memo).length).toBeLessThanOrEqual(256);
+    expect(joinMemoKey(memo)).toBe(carol.publicKey);
+    const ev = decodeRoomEvents([{ txId: 'j', time: 15, from: 'carol', to: 'alice', quantity: '0.0001 CHEESE', memo }], alice, {});
+    expect(collectJoinRequests(ev, 'alice', new Set([ID]), { [ID]: ['alice', 'bob'] }, [], {})).toEqual([{ groupId: ID, from: 'carol', publicKey: carol.publicKey, time: 15 }]);
+    const actions = buildJoinRequestActions(carol, 'alice', alice.publicKey, ID, []) as { data: { to: string; quantity: string } }[];
+    expect(actions.map(a => [a.data.to, a.data.quantity])).toEqual([['alice', '0.0001 CHEESE'], ['eosio.null', '0.0080 CHEESE'], ['xcheeseliqst', '0.0020 CHEESE']]);
+  });
+
+  it('a key inside a memo never opens anything but a join request', () => {
+    const asJoin = (text: string) => ({ txId: 'x', time: 16, from: 'carol', to: 'alice', quantity: '0.0001 CHEESE', memo: `${encryptMemo(text, alice.publicKey, carol.secretKey)}:${carol.publicKey}` });
+    expect(decodeRoomEvents([asJoin('hello stranger')], alice, {})).toEqual([]);
+    expect(decodeRoomEvents([asJoin(encodeNotice('friend', ID))], alice, {})).toEqual([]);
+    expect(decodeRoomEvents([asJoin(encodeInvite(invite))], alice, {})).toEqual([]);
+    // A claimed key the sender does not own cannot open the request.
+    const forged = { ...asJoin(encodeNotice('join', ID)), memo: `${encryptMemo(encodeNotice('join', ID), alice.publicKey, carol.secretKey)}:${dave.publicKey}` };
+    expect(decodeRoomEvents([forged], alice, {})).toEqual([]);
   });
 
   it('plain text from a requester never comes out of the room decoding path', () => {

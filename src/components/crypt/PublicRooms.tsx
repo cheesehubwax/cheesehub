@@ -55,7 +55,7 @@ export function DiscoverRoomsDialog({ open, onOpenChange, listings, loading, ref
           </li>;
         })}
       </ul>
-      <p className="text-[11px] text-muted-foreground">Your request privately includes your public key so only the room creator can read it; you do not need to publish your key. Only recently listed rooms appear; creators can list again to stay visible.</p>
+      <p className="text-[11px] text-muted-foreground">No need to publish your key: your request includes your public key so the creator can read it and invite you. That key is visible in the request transaction, but you are not added to the public directory. Only recently listed rooms appear; creators can list again to stay visible.</p>
     </DialogContent>
   </Dialog>;
 }
