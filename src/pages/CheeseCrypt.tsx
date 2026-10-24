@@ -301,24 +301,25 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const roomInviters = useMemo(() => Object.fromEntries(Object.values(roomRequests)
     .filter(r => contacts[r.creator] !== r.publicKey && !blocked.includes(r.creator)).map(r => [r.creator, r.publicKey])), [roomRequests, contacts, blocked]);
   const roomInviteEvents = useMemo(() => key && Object.keys(roomInviters).length ? decodeRoomEvents(visibleMemos, key, roomInviters)
-    .filter(e => e.to === account && roomRequests[(e.control.kind === 'invite' || e.control.kind === 'admission') ? e.control.invite.id : e.control.id]?.creator === e.from && (e.control.kind === 'invite' || e.control.kind === 'admission' || e.control.kind === 'policy' || e.control.kind === 'room')) : [], [visibleMemos, key, roomInviters, roomRequests, account]);
-  const invites = useMemo(() => key ? collectInvites([...cg2Events, ...roomInviteEvents], account, key.publicKey, contacts, inviteStore, roomRequests) : inviteStore,
-    [cg2Events, roomInviteEvents, account, key, contacts, inviteStore, roomRequests]);
+    .filter(e => e.to === account && roomRequests[(e.control.kind === 'invite' || e.control.kind === 'admission') ? e.control.invite.id : e.control.id]?.creator === e.from && (e.control.kind === 'invite' || e.control.kind === 'admission' || e.control.kind === 'policy' || e.control.kind === 'room' || e.control.kind === 'add')) : [], [visibleMemos, key, roomInviters, roomRequests, account]);
+  const allGroupEvents = useMemo(() => [...new Map([...cg2Events, ...roomInviteEvents].map(e => [e.key, e])).values()], [cg2Events, roomInviteEvents]);
+  const invites = useMemo(() => key ? collectInvites(allGroupEvents, account, key.publicKey, contacts, inviteStore, roomRequests) : inviteStore,
+    [allGroupEvents, account, key, contacts, inviteStore, roomRequests]);
   useEffect(() => {
     // Compares member keys too, so a creator adding members to a known group is saved.
     if (invitesSignature(invites) === invitesSignature(inviteStore)) return;
     saveInvites(account, invites); setInviteStore(invites);
   }, [invites, inviteStore, account]);
-  const moderation = useMemo(() => deriveModeration(cg2Events, invites, account), [cg2Events, invites, account]);
+  const moderation = useMemo(() => deriveModeration(allGroupEvents, invites, account), [allGroupEvents, invites, account]);
   useEffect(() => {
-    const controlTxs = new Set(cg2Events.filter(e => (e.control.kind === 'invite' || e.control.kind === 'admission') || e.control.kind === 'add' || e.control.kind === 'room' || e.control.kind === 'mute' || e.control.kind === 'ban' || e.control.kind === 'policy').filter(e => {
+    const controlTxs = new Set(allGroupEvents.filter(e => (e.control.kind === 'invite' || e.control.kind === 'admission') || e.control.kind === 'add' || e.control.kind === 'room' || e.control.kind === 'mute' || e.control.kind === 'ban' || e.control.kind === 'policy').filter(e => {
       if ((e.control.kind === 'invite' || e.control.kind === 'admission')) return invites[e.control.invite.id]?.creator === e.from;
       return !!eventFromMember(e, invites, account);
     }).map(e => e.txId));
     const next = mergeModerationMemos(savedControls, memos.filter(m => controlTxs.has(m.txId)));
     if (next.length === savedControls.length) return;
     saveModerationMemos(account, next); setSavedControls(next);
-  }, [cg2Events, invites, account, memos, savedControls]);
+  }, [allGroupEvents, invites, account, memos, savedControls]);
   const inviteViews = useMemo(() => deriveInviteGroups(cg2Events.filter(e => e.control.kind !== 'msg' || !restrictedAt(moderation[e.control.id], e.from, e.time)), invites, account, decisions).map(v => {
     const banned = moderation[v.invite.id]?.bans ?? {};
     return { ...v, joined: v.joined.filter(a => banned[a] === undefined) };

@@ -224,7 +224,13 @@ export function collectInvites(events: Cg2Event[], me: string, myPublicKey: stri
   for (const e of [...events].sort((a, b) => a.time - b.time)) {
     const g = e.control.kind === 'invite' || e.control.kind === 'admission' ? e.control.invite : out[e.control.id];
     if (!g || e.from !== g.creator || !eventFromMember(e, { [g.id]: g }, me)) continue;
-    if (e.control.kind === 'room' && e.control.protected.includes(me) && !protectedRosters[g.id]) protectedRosters[g.id] = e.control.protected;
+    if (e.control.kind === 'policy' && policySnapshotValid(e.control, g, e.time) && events.some(i => i.txId === e.txId && i.to === me && i.from === g.creator && i.control.kind === 'admission' && i.control.invite.id === g.id)) protectedRosters[g.id] ??= e.control.protected;
+    if (e.control.kind === 'room' && e.control.protected.includes(me) && !protectedRosters[g.id]) {
+      const earlier = events.filter(i => i.time <= e.time && i.txId !== e.txId && i.from === g.creator && i.control.kind === 'invite' && i.control.invite.id === g.id);
+      const before = earlier.flatMap(i => i.control.kind === 'invite' ? i.control.invite.members.map(m => m.account) : []);
+      const original = before.length ? [...new Set(before)] : !g.publicRoom ? g.members.map(m => m.account) : undefined;
+      if (original && roomPolicyValid(e.control, g, original)) protectedRosters[g.id] = e.control.protected;
+    }
   }
   const pending = [...events].sort((a, b) => a.time - b.time || a.txId.localeCompare(b.txId));
   // Replay until every predecessor available in this window has been applied.
