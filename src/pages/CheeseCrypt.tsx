@@ -25,6 +25,7 @@ import { playRandomFart } from '@/lib/fartSounds';
 import { cn } from '@/lib/utils';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { encodeReply, parseReply, quoteOf, type ReplyRef } from '@/lib/cryptReply';
+import { useCryptReplyNavigation } from '@/hooks/useCryptReplyNavigation';
 import { AvatarEditor, WalletAvatarPicker } from '@/components/crypt/AvatarEditor';
 import { CryptNftCard } from '@/components/crypt/CryptNftCard';
 import { useQuery } from '@tanstack/react-query';
@@ -75,11 +76,12 @@ function download(name: string, data: unknown) {
 }
 
 /** Pure sound-effect-NFT posts render without the bubble box — sender header, playback and timestamp stay. */
-function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote }: {
+function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted }: {
   m: ConversationEntry; account: string; keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>;
   contacts: Record<string, string>; active: string; activeGroup: CryptGroup | null;
   nameFor: (id: string) => string; openedAt: { current: number };
   onReply: (m: ConversationEntry) => void; onOpenQuote: (ref: ReplyRef) => void;
+  highlighted: boolean;
 }) {
   const reply = parseReply(m.text);
   const body = reply ? reply.body : m.text;
@@ -94,9 +96,10 @@ function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, act
   return (
     <ContextMenu>
     <ContextMenuTrigger asChild disabled={!canReply}>
-    <li className={cn('w-fit max-w-[80%] text-sm',
+    <li data-reply-key={m.key} data-reply-highlighted={highlighted || undefined} className={cn('w-fit max-w-[80%] text-sm',
       bare ? (m.from === account ? 'ml-auto py-1' : 'py-1') : m.from === account
-        ? 'ml-auto rounded-lg px-3 py-2 bg-cheese/20 border border-cheese/30' : 'rounded-lg px-3 py-2 bg-muted')}>
+        ? 'ml-auto rounded-lg px-3 py-2 bg-cheese/20 border border-cheese/30' : 'rounded-lg px-3 py-2 bg-muted',
+      highlighted && 'ring-2 ring-reply bg-reply/10')}>
       <div className="flex items-center gap-2 mb-1">
         <PixelAvatar account={m.from} avatar={m.from === account ? keyAvatar : avatars[m.from]} className="h-6 w-6" />
         <p className="text-[10px] font-semibold opacity-80 break-words">{m.from === account ? `you · ${nameFor(account)}` : nameFor(m.from)}{nameFor(m.from) !== m.from && <span className="block font-normal">{m.from}</span>}</p>
@@ -499,6 +502,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   }
   const resumeAt = resumeRef.current.id === active ? resumeRef.current.at : null;
   const firstNew = firstUnreadIndex(thread, resumeAt);
+  const replyNavigation = useCryptReplyNavigation(account, active, thread, resumeAt, listRef);
   // Remember where the page itself was so switching chats never moves the outer page.
   const pageY = useRef(typeof window === 'undefined' ? 0 : window.scrollY);
   useEffect(() => {
@@ -1157,11 +1161,12 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 })()}
               </DialogContent>
             </Dialog>
-            <ol ref={listRef} className="flex-1 overflow-y-auto space-y-2 p-4"
-              onScroll={(e) => { const el = e.currentTarget; nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
+            <div className="relative flex min-h-0 flex-1">
+            <ol ref={listRef} aria-label="Chat messages" className="min-h-0 flex-1 overflow-y-auto space-y-2 p-4"
+              onScroll={(e) => { const el = e.currentTarget; nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; replyNavigation.inspectVisible(); }}>
               {thread.map((m, i) => (
                 <Fragment key={m.key}>
-                  {i === firstNew && firstNew > 0 && (
+                  {i === firstNew && firstNew >= 0 && (
                     <li ref={newMarkerRef} aria-hidden className="flex items-center gap-2 py-1">
                       <span className="h-px flex-1 bg-border" />
                       <span className="text-[10px] uppercase tracking-wide text-muted-foreground">New messages</span>
@@ -1170,6 +1175,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                   )}
                   <ChatMessageItem m={m} account={account} keyAvatar={key?.avatar} avatars={avatars}
                     contacts={contacts} active={active} activeGroup={activeGroup} nameFor={nameFor}
+                    highlighted={replyNavigation.highlighted.has(m.key)}
                     onReply={(x) => { setReplyingTo({ author: x.from, time: x.time, quote: quoteOf(x.text, !!x.voice) }); setVoice(null); setTimeout(() => composerRef.current?.focus(), 0); }}
                     onOpenQuote={setOpenQuote} openedAt={acceptedRequestMessages.current.has(m.key) ? { current: Infinity } : openedAt} />
                 </Fragment>
@@ -1177,6 +1183,13 @@ export function Messenger({ account, session }: { account: string; session: NonN
               {!thread.length && <li className="text-sm text-muted-foreground">{activeGroup || activeInvite ? 'No group messages yet.' : `No messages with ${nameFor(active)} yet.`}</li>}
               <li ref={endRef} aria-hidden />
             </ol>
+            {replyNavigation.pending.length > 0 && <Button size="icon" title="Jump to your earliest unseen reply"
+              aria-label={`Jump to earliest unseen reply (${replyNavigation.pending.length} remaining)`}
+              onClick={replyNavigation.jump}
+              className="absolute bottom-3 right-4 h-12 w-12 rounded-full bg-reply text-reply-foreground hover:bg-reply/90 font-bold text-sm ring-2 ring-background">
+              @{replyNavigation.pending.length > 99 ? '99+' : replyNavigation.pending.length}
+            </Button>}
+            </div>
             {activeInvite?.status === 'invited' ? (
               <div className="space-y-2 p-4 border-t border-border text-sm">
                 <p>✉️ <span className="font-semibold">{nameFor(activeInvite.invite.creator)}</span> invited you to <span className="font-semibold">{activeInvite.name}</span> with {activeInvite.invite.members.length - 1} other{activeInvite.invite.members.length > 2 ? 's' : ''}.</p>
