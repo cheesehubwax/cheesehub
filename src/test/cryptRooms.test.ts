@@ -3,7 +3,7 @@ import { encryptMemo, generateKey, splitMessage, type ChainMemo, type MessagingK
 import { decodeConversations, groupMessageCost } from '@/lib/cryptGroups';
 import { buildCg2Actions, JOIN_NOTE_MAX, encodeAdmission, collectInvites, encodeInvite, encodeNotice, parseCg2, partsOf, scopedKeys, type Cg2Event, type InviteGroup } from '@/lib/cryptInviteGroups';
 import {
-  JOIN_REQUEST_COST, roomRequestNotes, buildJoinRequestActions, buildRoomActions, collectJoinRequests, encodeJoinMemo, joinMemoKey, collectListings, decodeRoomEvents, encodeListing, encodeUnlist, listedRoomIds, parseRoomMemo, searchListings,
+  JOIN_REQUEST_COST, LISTING_STAKE_QUANTITY, roomRequestNotes, buildJoinRequestActions, buildRoomActions, collectJoinRequests, encodeJoinMemo, joinMemoKey, collectListings, decodeRoomEvents, encodeListing, encodeUnlist, listedRoomIds, parseRoomMemo, searchListings,
 } from '@/lib/cryptRooms';
 
 const alice = generateKey('alice'), bob = generateKey('bob'), carol = generateKey('carol'), dave = generateKey('dave');
@@ -11,6 +11,7 @@ const ID = '00112233445566ff';
 const pk = (k: MessagingKey) => ({ account: k.account, publicKey: k.publicKey });
 const room = { id: ID, name: 'Cheese club', topic: 'All things cheese', tags: ['cheese', 'wax'], publicKey: alice.publicKey, members: 2 };
 const nullLeg = (from: string, memo: string, time: number, quantity = '0.0080 CHEESE'): ChainMemo => ({ txId: `t${time}`, time, from, to: 'eosio.null', memo, quantity });
+const stakeLeg = (from: string, memo: string, time: number): ChainMemo => nullLeg(from, memo, time, '8.0000 CHEESE');
 
 let tx = 0;
 const memos = (text: string, from: MessagingKey, to: MessagingKey, time: number): ChainMemo[] => {
@@ -37,11 +38,19 @@ describe('room listing memos', () => {
 });
 
 describe('room fee', () => {
-  it('pays 0.0080 CHEESE to eosio.null and 0.0020 CHEESE to xcheeseliqst, both carrying the listing', () => {
+  it('updates and unlists pay 0.0080 CHEESE to eosio.null and 0.0020 CHEESE to xcheeseliqst, both carrying the memo', () => {
     const memo = encodeListing(room);
     const actions = buildRoomActions('alice', memo, []);
     expect(actions.map(a => [a.data.to, a.data.quantity, a.data.memo])).toEqual([
       ['eosio.null', '0.0080 CHEESE', memo], ['xcheeseliqst', '0.0020 CHEESE', memo],
+    ]);
+  });
+  it('a new public listing pays the 10.0000 CHEESE stake: 8.0000 to eosio.null and 2.0000 to xcheeseliqst', () => {
+    expect(LISTING_STAKE_QUANTITY).toBe('10.0000 CHEESE');
+    const memo = encodeListing(room);
+    const actions = buildRoomActions('alice', memo, [], LISTING_STAKE_QUANTITY);
+    expect(actions.map(a => [a.data.to, a.data.quantity, a.data.memo])).toEqual([
+      ['eosio.null', '8.0000 CHEESE', memo], ['xcheeseliqst', '2.0000 CHEESE', memo],
     ]);
   });
   it('a join request pays the creator 0.0001 + 0.1000 CHEESE plus the 0.0100 CHEESE platform fee (0.1101 total)', () => {
@@ -59,25 +68,43 @@ describe('collecting listings', () => {
   it('newest memo per creator and room wins, unlist hides it, unpaid or spoofed legs are ignored', () => {
     const other = { ...room, id: 'ffeeddccbbaa0011', name: 'Wax art' };
     const rows = [
-      nullLeg('alice', encodeListing(room), 10),
+      stakeLeg('alice', encodeListing(room), 10),
       nullLeg('alice', encodeUnlist(ID), 20),
-      nullLeg('carol', encodeListing({ ...other, publicKey: carol.publicKey }), 30),
+      stakeLeg('carol', encodeListing({ ...other, publicKey: carol.publicKey }), 30),
       nullLeg('dave', encodeListing({ ...room, publicKey: dave.publicKey }), 40, '0.0001 CHEESE'),
       { ...nullLeg('dave', encodeListing({ ...room, publicKey: dave.publicKey }), 41), to: 'xcheeseliqst' },
       nullLeg('dave', encodeListing({ ...room, publicKey: dave.publicKey }), 42, '0.0080 WAX'),
     ];
     const out = collectListings(rows);
     expect(out.map(l => [l.creator, l.name])).toEqual([['carol', 'Wax art']]);
-    expect(collectListings([...rows, nullLeg('alice', encodeListing(room), 50)]).map(l => l.creator)).toEqual(['alice', 'carol']);
+    expect(collectListings([...rows, stakeLeg('alice', encodeListing(room), 50)]).map(l => l.creator)).toEqual(['alice', 'carol']);
+  });
+  it('a listing without the 10 CHEESE stake never appears; a 0.01 memo only updates a staked listing', () => {
+    // Old-style cheap listing on its own: ignored.
+    expect(collectListings([nullLeg('alice', encodeListing(room), 10)])).toEqual([]);
+    // Stake, then a cheap update refreshes the details and bumps the time.
+    const out = collectListings([
+      stakeLeg('alice', encodeListing(room), 10),
+      nullLeg('alice', encodeListing({ ...room, topic: 'New topic', members: 3 }), 20),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].topic).toBe('New topic');
+    expect(out[0].time).toBe(20);
+    // Unlisting clears the stake, so a later cheap listing no longer counts.
+    expect(collectListings([
+      stakeLeg('alice', encodeListing(room), 10),
+      nullLeg('alice', encodeUnlist(ID), 30),
+      nullLeg('alice', encodeListing(room), 40),
+    ])).toEqual([]);
   });
   it('searches name, topic, #tags and creator', () => {
-    const l = collectListings([nullLeg('alice', encodeListing(room), 10)]);
+    const l = collectListings([stakeLeg('alice', encodeListing(room), 10)]);
     expect(searchListings(l, '#wax')).toHaveLength(1);
     expect(searchListings(l, 'cheese alice')).toHaveLength(1);
     expect(searchListings(l, 'nfts')).toHaveLength(0);
   });
   it('a local list/unlist action wins until a newer chain memo arrives', () => {
-    const l = collectListings([nullLeg('alice', encodeListing(room), 10)]);
+    const l = collectListings([stakeLeg('alice', encodeListing(room), 10)]);
     expect([...listedRoomIds('alice', l, [ID], {})]).toEqual([ID]);
     expect([...listedRoomIds('alice', l, [ID], { [ID]: { listed: false, at: 11 } })]).toEqual([]);
     expect([...listedRoomIds('alice', l, [ID], { [ID]: { listed: false, at: 9 } })]).toEqual([ID]);

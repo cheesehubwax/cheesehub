@@ -16,7 +16,7 @@ vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import
 const alice = generateKey('alice'), bob = generateKey('bob'), carol = generateKey('carol');
 const ID = '00112233445566ff';
 const invite: InviteGroup = { id: ID, name: 'Cheese club', creator: 'alice', created: 1000, members: [alice, bob].map(k => ({ account: k.account, publicKey: k.publicKey })) };
-const listing = { txId: 'list', time: 50, from: 'alice', to: 'eosio.null', quantity: '0.0080 CHEESE', memo: encodeListing({ id: ID, name: 'Cheese club', topic: 'All cheese', tags: ['cheese'], publicKey: alice.publicKey, members: 1 }) };
+const listing = { txId: 'list', time: 50, from: 'alice', to: 'eosio.null', quantity: '8.0000 CHEESE', memo: encodeListing({ id: ID, name: 'Cheese club', topic: 'All cheese', tags: ['cheese'], publicKey: alice.publicKey, members: 1 }) };
 const joinMemo = { txId: 'join', time: 100, from: 'carol', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo(encodeNotice('join', ID), alice.publicKey, carol.secretKey) };
 const mount = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="alice" session={{ permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
 
@@ -139,8 +139,8 @@ describe('public rooms', () => {
     fireEvent.click(pay);
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
     const actions = calls.transact.mock.calls[0][0] as { data: { to: string; quantity: string; memo?: string } }[];
-    expect(actions.filter(a => a.data.to === 'eosio.null').map(a => a.data.quantity)).toEqual(['0.0080 CHEESE', '0.0080 CHEESE']);
-    expect(actions.filter(a => a.data.to === 'xcheeseliqst').map(a => a.data.quantity)).toEqual(['0.0020 CHEESE', '0.0020 CHEESE']);
+    expect(actions.filter(a => a.data.to === 'eosio.null').map(a => a.data.quantity)).toEqual(['8.0000 CHEESE', '0.0080 CHEESE']);
+    expect(actions.filter(a => a.data.to === 'xcheeseliqst').map(a => a.data.quantity)).toEqual(['2.0000 CHEESE', '0.0020 CHEESE']);
     expect(actions.find(a => a.data.to === 'eosio.null')?.data.memo?.startsWith('CRYPTROOM1:')).toBe(true);
     await waitFor(() => expect(within(edit).getByText('🌐 This room is listed publicly, so anyone can find it and ask to join.')).toBeInTheDocument());
   });
