@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Session } from '@wharfkit/session';
 import { encryptMemo, generateKey, partCount, saveContact, saveKey } from '@/lib/cheeseCrypt';
 import { encodeNotice, encodeAdmission, encodeMemberAdd, loadInvites, saveInvites, type InviteGroup } from '@/lib/cryptInviteGroups';
-import { encodeListing } from '@/lib/cryptRooms';
+import { encodeListing, saveRoomRequest } from '@/lib/cryptRooms';
 import { Messenger } from '@/pages/CheeseCrypt';
 
 const calls = vi.hoisted(() => ({ fetch: vi.fn(), lookup: vi.fn(), transact: vi.fn(), rooms: vi.fn() }));
@@ -65,6 +65,32 @@ describe('public rooms', () => {
     await waitFor(() => expect(calls.fetch.mock.calls.length).toBeGreaterThan(fetchedBeforeRemount));
     expect(screen.queryByRole('region', { name: 'Room join requests' })).not.toBeInTheDocument();
     expect(calls.transact).not.toHaveBeenCalled();
+  });
+
+  it('delivers the ninth-member bootstrap through the stranger path and lets the newcomer join', async () => {
+    const members = [alice, bob, ...Array.from({ length: 6 }, (_, i) => generateKey(`peer${String.fromCharCode(97 + i)}`))];
+    saveInvites('alice', { [ID]: { ...invite, members: members.map(k => ({ account: k.account, publicKey: k.publicKey })) } });
+    const ownerView = mount();
+    const panel = await screen.findByRole('region', { name: 'Room join requests' });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Accept' }));
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Pay & invite' }));
+    await waitFor(() => expect(loadInvites('alice')[ID].members).toHaveLength(9));
+    const actions = calls.transact.mock.calls[0][0] as { data: { from: string; to: string; quantity: string; memo: string } }[];
+    ownerView.unmount();
+    saveKey(carol);
+    saveRoomRequest('carol', { id: ID, creator: 'alice', publicKey: alice.publicKey });
+    calls.fetch.mockResolvedValue(actions.filter(a => a.data.to === 'carol').map(a => ({ ...a.data, txId: 'admission', time: Date.now() })));
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="carol" session={{ permissionLevel: { actor: 'carol', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
+    await waitFor(() => expect(loadInvites('carol')[ID]?.members).toHaveLength(9));
+    fireEvent.click(await screen.findByRole('button', { name: /Invited by alice/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Join group' }));
+    const pay = await screen.findByRole('button', { name: 'Pay & join' });
+    expect(pay).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(pay);
+    await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(2));
+    expect(await screen.findByPlaceholderText('Message group')).toBeInTheDocument();
   });
 
   it('lists a room from the Edit group dialog, warning that the public key becomes visible', async () => {
