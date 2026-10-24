@@ -16,6 +16,7 @@ const id = '0123456789abcdef', at = Date.now() - 10000;
 const memos = (payload: string, time: number, from = alice, to = bob, txId = `t${time}`) => splitMessage(payload).map(p => ({ from: from.account, to: to.account, time, txId, quantity: '0.0010 CHEESE', memo: encryptMemo(p, to.publicKey, from.secretKey) }));
 beforeEach(() => {
   localStorage.clear(); vi.clearAllMocks(); saveKey(alice);
+  vi.stubGlobal('DOMRect', class { static fromRect(r: { x?: number; y?: number; width?: number; height?: number } = {}) { return { x: r.x ?? 0, y: r.y ?? 0, width: r.width ?? 0, height: r.height ?? 0, top: r.y ?? 0, left: r.x ?? 0, right: (r.x ?? 0) + (r.width ?? 0), bottom: (r.y ?? 0) + (r.height ?? 0) }; } });
   saveInvites('alice', { [id]: { id, name: 'Moderated room', creator: 'alice', created: at - 1000, members: [alice, bob, carol].map(k => ({ account: k.account, publicKey: k.publicKey })) } });
   calls.rooms.mockResolvedValue([{ from: 'alice', to: 'eosio.null', txId: 'listed', time: at, quantity: '0.0080 CHEESE', memo: encodeListing({ id, name: 'Moderated room', topic: '', tags: [], publicKey: alice.publicKey, members: 2 }) }]);
   calls.fetch.mockResolvedValue(memos(encodeRoomPolicy(id, true, ['alice', 'bob']), at));
