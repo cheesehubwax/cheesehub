@@ -301,7 +301,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const roomInviters = useMemo(() => Object.fromEntries(Object.values(roomRequests)
     .filter(r => contacts[r.creator] !== r.publicKey && !blocked.includes(r.creator)).map(r => [r.creator, r.publicKey])), [roomRequests, contacts, blocked]);
   const roomInviteEvents = useMemo(() => key && Object.keys(roomInviters).length ? decodeRoomEvents(visibleMemos, key, roomInviters)
-    .filter(e => (e.control.kind === 'invite' || e.control.kind === 'admission') && e.to === account && roomRequests[e.control.invite.id]?.creator === e.from) : [], [visibleMemos, key, roomInviters, roomRequests, account]);
+    .filter(e => e.to === account && roomRequests[(e.control.kind === 'invite' || e.control.kind === 'admission') ? e.control.invite.id : e.control.id]?.creator === e.from && (e.control.kind === 'invite' || e.control.kind === 'admission' || e.control.kind === 'policy' || e.control.kind === 'room')) : [], [visibleMemos, key, roomInviters, roomRequests, account]);
   const invites = useMemo(() => key ? collectInvites([...cg2Events, ...roomInviteEvents], account, key.publicKey, contacts, inviteStore, roomRequests) : inviteStore,
     [cg2Events, roomInviteEvents, account, key, contacts, inviteStore, roomRequests]);
   useEffect(() => {

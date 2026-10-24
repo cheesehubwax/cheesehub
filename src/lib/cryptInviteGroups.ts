@@ -3,7 +3,7 @@
 // Membership is fixed by the creator's invite; joined/left status comes only from authenticated notices.
 // Legacy ad-hoc groups (CG1, cryptGroups.ts) are untouched and keep working side by side.
 import nacl from 'tweetnacl';
-import { decodeBase64 } from 'tweetnacl-util';
+import { decodeBase64, decodeUTF8 } from 'tweetnacl-util';
 import {
   buildSendMessageActions, encryptMemo, MAX_MESSAGE_BYTES, MAX_PARTS, partCount, plaintextBytes, splitMessage, type MessagingKey,
 } from '@/lib/cheeseCrypt';
@@ -77,7 +77,7 @@ export function encodeInvite(g: InviteGroup): string {
   if (!validateInvite(body)) throw new Error('Invalid group');
   return wire('invite', body);
 }
-export const rosterDigest = (g: InviteGroup) => Array.from(nacl.hash(new TextEncoder().encode(JSON.stringify([g.id, g.creator, g.created, g.members.map(m => [m.account, m.publicKey])]))).slice(0, 32), b => b.toString(16).padStart(2, '0')).join('');
+export const rosterDigest = (g: InviteGroup) => Array.from(nacl.hash(decodeUTF8(JSON.stringify([g.id, g.creator, g.created, g.members.map(m => [m.account, m.publicKey])]))).slice(0, 32), b => b.toString(16).padStart(2, '0')).join('');
 export function encodeAdmission(g: InviteGroup) {
   const body = { i: g.id, n: g.name, o: g.creator, c: g.created, m: g.members.map(m => [m.account, m.publicKey]), ...(g.avatar ? { a: g.avatar.pixels } : {}) };
   if (!validateInvite(body, true)) throw new Error('Invalid public room');

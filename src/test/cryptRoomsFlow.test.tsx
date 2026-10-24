@@ -2,8 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Session } from '@wharfkit/session';
-import { encryptMemo, generateKey, saveContact, saveKey } from '@/lib/cheeseCrypt';
-import { encodeNotice, loadInvites, saveInvites, type InviteGroup } from '@/lib/cryptInviteGroups';
+import { encryptMemo, generateKey, partCount, saveContact, saveKey } from '@/lib/cheeseCrypt';
+import { encodeNotice, encodeAdmission, encodeMemberAdd, loadInvites, saveInvites, type InviteGroup } from '@/lib/cryptInviteGroups';
 import { encodeListing } from '@/lib/cryptRooms';
 import { Messenger } from '@/pages/CheeseCrypt';
 
@@ -45,10 +45,12 @@ describe('public rooms', () => {
     const actions = calls.transact.mock.calls[0][0] as { data: { to: string; quantity: string } }[];
     const to = actions.map(a => a.data.to);
     expect(new Set(to.filter(t => t !== 'eosio.null' && t !== 'xcheeseliqst'))).toEqual(new Set(['bob', 'carol']));
-    const parts = to.filter(t => t === 'bob').length;
-    // The newcomer also receives the current ban/mute bootstrap snapshot.
-    expect(to.filter(t => t === 'carol').length).toBe(parts + 1);
-    expect(to.filter(t => t === 'eosio.null').length).toBe(parts + 1);
+    const bootstrapParts = partCount(encodeAdmission({ ...invite, members: [...invite.members, { account: 'carol', publicKey: carol.publicKey }] }));
+    const deltaParts = partCount(encodeMemberAdd(invite, { account: 'carol', publicKey: carol.publicKey }));
+    expect(to.filter(t => t === 'bob').length).toBe(deltaParts + 1);
+    expect(to.filter(t => t === 'carol').length).toBe(bootstrapParts + 2);
+    expect(to.filter(t => t === 'eosio.null').length).toBe(bootstrapParts + deltaParts + 2);
+    expect(actions.filter(a => a.data.to === 'bob' || a.data.to === 'carol').every(a => a.data.quantity === '0.0001 CHEESE')).toBe(true);
     expect(actions.filter(a => a.data.to === 'eosio.null').every(a => a.data.quantity === '0.0080 CHEESE')).toBe(true);
     await waitFor(() => expect(loadInvites('alice')[ID].members.map(m => m.account)).toEqual(['alice', 'bob', 'carol']));
   });
