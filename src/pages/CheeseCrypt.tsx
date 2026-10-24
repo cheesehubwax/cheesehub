@@ -60,6 +60,10 @@ import {
 import { download } from '@/components/crypt/cryptDownload';
 import { ChatMessageItem } from '@/components/crypt/ChatMessageItem';
 import { CryptHero } from '@/components/crypt/CryptHero';
+import { CryptKeySetup } from '@/components/crypt/CryptKeySetup';
+import { CryptSidebar } from '@/components/crypt/CryptSidebar';
+import { CryptChatHeader } from '@/components/crypt/CryptChatHeader';
+import { CryptComposer } from '@/components/crypt/CryptComposer';
 
 const ACCOUNT_RE = /^[a-z1-5.]{1,12}$/;
 /** How often an open, visible messenger checks history for new messages. */
@@ -833,57 +837,11 @@ export function Messenger({ account, session }: { account: string; session: NonN
 
   if (!key) {
     return (
-      <div className="w-full max-w-md space-y-5 text-center">
-        {fileInput}
-      {profileEditor}
-      {creationDialog}
-        <div className="space-y-2">
-          <p className="text-lg font-semibold">🔑 Unlock your messages</p>
-          <p className="text-sm text-muted-foreground">
-            Messages for <span className="font-semibold text-cheese">{account}</span> are encrypted. Load your private key file first —
-            it stays on this device and is never sent anywhere.
-          </p>
-        </div>
-        <div className="rounded-lg border border-cheese/40 bg-card/80 p-4 space-y-2 text-left">
-          <p className="font-semibold text-sm">I already have a key</p>
-          <p className="text-xs text-muted-foreground">Look in your Downloads for a file ending in <span className="font-mono">-key-PRIVATE.json</span>. Keys from the GPK Collection Manager work too.</p>
-          <Button className="w-full bg-cheese text-primary-foreground hover:bg-cheese/90" onClick={() => fileRef.current?.click()}>Load my private key</Button>
-          {vaultSupported() && <Button className="w-full" variant="outline" disabled={searchingVault} onClick={() => void findKeyInFolder()}>{searchingVault ? 'Looking…' : `📁 Find it in my ${VAULT_DIR} folder`}</Button>}
-          <p className="text-[11px] text-muted-foreground">Any file name works, including copies saved as .txt.</p>
-        </div>
-        <div className="rounded-lg border border-border bg-card/80 p-4 space-y-2 text-left">
-          <p className="font-semibold text-sm">I'm new here</p>
-          <p className="text-xs text-muted-foreground">Choose your name and avatar first, then pay 100 CHEESE and save your new private key. Restoring an existing key is free. A new key cannot read messages sent to an older one.</p>
-          <Button className="w-full" variant="outline" onClick={makeKey}>Create a new key</Button>
-        </div>
-      </div>
+      <CryptKeySetup account={account} fileInput={fileInput} profileEditor={profileEditor} creationDialog={creationDialog}
+        fileRef={fileRef} searchingVault={searchingVault} findKeyInFolder={findKeyInFolder} makeKey={makeKey} />
     );
   }
 
-  // Group member lists live behind one dropdown so the chat header stays a single compact line.
-  const memberLine = (member: string, status?: string, action?: ReactNode) => (
-    <li key={member} className="flex items-center gap-2 min-w-0">
-      <PixelAvatar account={member} avatar={member === account ? key.avatar : avatars[member]} className="h-9 w-9 shrink-0" />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-xs font-semibold">{nameFor(member)}{member === account && ' (you)'}</span>
-        <span className="block truncate font-mono text-[10px] text-muted-foreground">{member}</span>
-      </span>
-      {status && <span className={cn('shrink-0 text-[10px]', status === 'joined' ? 'text-cheese' : 'text-muted-foreground')}>{status}</span>}
-      {action}
-    </li>
-  );
-  const membersDropdown = (members: string[], status?: (member: string) => string | undefined, action?: (member: string) => ReactNode) => (
-    <Popover open={membersOpen} onOpenChange={setMembersOpen}>
-      <PopoverTrigger asChild>
-        <Button size="sm" variant="outline" className="h-7 shrink-0 gap-1 text-xs font-normal" aria-expanded={membersOpen}>
-          👥 Members ({members.length}) <ChevronDown className={cn('h-3 w-3 transition', !membersOpen && '-rotate-90')} />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="crypt-members-pop w-72 p-2">
-        <ul className="max-h-60 space-y-1 overflow-y-auto">{members.map(member => memberLine(member, status?.(member), action?.(member)))}</ul>
-      </PopoverContent>
-    </Popover>
-  );
 
   return (
     <div className="w-full rounded-lg border border-cheese/20 bg-card/80 overflow-hidden flex flex-col md:grid h-[80dvh] min-h-[480px] md:grid-cols-[240px_1fr] md:grid-rows-[auto_1fr]">
@@ -960,150 +918,21 @@ export function Messenger({ account, session }: { account: string; session: NonN
         </DialogContent>
       </Dialog>}
       <PublicInboxDialog enabled={publicInbox} onChange={enabled => { savePublicInbox(account, enabled); setPublicInbox(enabled); }} open={inboxOpen} onOpenChange={setInboxOpen} />
-        <div className="flex flex-col justify-center gap-2 p-3 border-b border-border md:border-r md:col-start-1 md:row-start-1">
-          <div className="flex items-center gap-3">
-            <PixelAvatar account={account} avatar={key.avatar} className="h-11 w-11 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <div className="flex min-w-0 items-center gap-1">
-                <span className="truncate text-base font-bold text-cheese">{key.displayName || account}</span>
-                <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-cheese" aria-label="Edit profile" title="Edit name and avatar" onClick={() => setEditingAvatar(true)}>
-                  <Pencil className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-              <div className="flex items-center gap-1 truncate font-mono text-xs text-muted-foreground">
-                {loading && <Loader2 className="h-3 w-3 shrink-0 animate-spin" />}
-                <span className="truncate">{account}</span>
-              </div>
-            </div>
-            <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" disabled={loading} onClick={refresh} aria-label="Refresh messages" title="Refresh messages">
-              <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-            </Button>
-          </div>
-          <div className="flex items-center gap-1">
-            <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-              <PopoverTrigger asChild>
-                <Button size="sm" variant="outline" className="h-8 flex-1 gap-2 text-xs" aria-label="Menu" aria-expanded={menuOpen}>
-                  <Menu className="h-4 w-4" /> Menu <ChevronDown className={cn('h-3.5 w-3.5 transition', menuOpen && 'rotate-180')} />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="w-64 p-2">
-                {/* Every action closes the menu first; dialogs live outside so they survive it unmounting. */}
-                <div className="grid grid-cols-3 gap-1" onClickCapture={() => setMenuOpen(false)}>
-                  <CardAction icon={<Upload className="h-4 w-4" />} label="Restore" aria-label="Load a key file (yours or a contact's)" title="Load a key file (yours or a contact's)" onClick={() => fileRef.current?.click()} />
-                  <CardAction icon={<Download className="h-4 w-4" />} label="Public key" aria-label="Share my public key file" title="Save my public key file to share" onClick={() => void sharePublicKey()} />
-                  <CardAction icon={<Radio className="h-4 w-4" />} label="Publish" disabled={busy} aria-label={`Publish my key on chain (${MESSAGE_FEE_QUANTITY})`} title={`Publish my key on chain (${MESSAGE_FEE_QUANTITY})`} onClick={() => void publish()} />
-                  <CardAction icon={<Save className="h-4 w-4" />} label="Back up" aria-label="Back up private key" title="Download a backup of my private key — never share it" onClick={() => download(`${account}-cheesecrypt-key-PRIVATE.json`, key)} />
-                  <CardAction icon={<Ban className="h-4 w-4" />} label={blocked.length ? `Blocked (${blocked.length})` : 'Blocked'} aria-label="Blocked accounts" title="Accounts blocked on this device" onClick={() => setShowBlocked(true)} />
-                  <CardAction icon={<KeyRound className="h-4 w-4" />} label="New key" className="hover:text-destructive" aria-label="Create a new key" title="Create a new key (it cannot read messages sent to this one)" onClick={makeKey} />
-                  <PublicInboxButton enabled={publicInbox} onClick={() => setInboxOpen(true)} />
-                </div>
-              </PopoverContent>
-            </Popover>
-            <Button size="icon" variant="ghost" className="relative h-8 w-8 shrink-0" onClick={toggleList} aria-expanded={!listHidden}
-              aria-label={listHidden ? 'Show groups and friends' : 'Hide groups and friends'} title={listHidden ? 'Show groups and friends' : 'Hide groups and friends'}>
-              {listHidden ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-              {listHidden && hiddenUnread > 0 && <span data-reply={hiddenReplies ? 'true' : undefined} aria-label={hiddenReplies ? `${hiddenUnread} unread, ${hiddenReplies} repl${hiddenReplies > 1 ? 'ies' : 'y'} to you` : `${hiddenUnread} unread`}
-                className={cn('absolute -right-1 -top-1 min-w-4 h-4 px-1 rounded-full text-[9px] font-bold leading-4 text-center', hiddenReplies ? 'bg-reply text-reply-foreground' : 'bg-cheese text-primary-foreground')}>{hiddenUnread > 99 ? '99+' : hiddenUnread}</span>}
-            </Button>
-          </div>
-        </div>
-        <div className={cn('min-h-0 max-h-[30dvh] md:max-h-none overflow-y-auto p-2 space-y-4 border-b border-border md:border-b-0 md:border-r md:col-start-1 md:row-start-2', listHidden && 'hidden')}>
-          <MessageRequests requests={messageRequests} onAccept={acceptRequest} onDecline={dismissRequest} onBlock={from => { dismissRequest(from); blockAccount(from); }} />
-          <Collapsible open={groupsOpen} onOpenChange={setGroupsOpen}>
-            <div className="flex items-center justify-between px-2">
-              <CollapsibleTrigger className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-cheese">
-                <ChevronDown className={cn('h-3.5 w-3.5 transition', !groupsOpen && '-rotate-90')} /> 👥 Groups
-              </CollapsibleTrigger>
-              <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="New group" title="New group" onClick={() => setCreatingGroup(true)}><Users className="h-4 w-4" /></Button>
-            </div>
-            <CollapsibleContent>
-              <ul className="space-y-1 pt-1">
-          {inviteViews.filter(v => inviteShown(v) && !hiddenGroups.includes(v.invite.id)).sort((a, b) => Number(b.status === 'invited') - Number(a.status === 'invited') || a.name.localeCompare(b.name)).map(v => inviteRow(v, false))}
-          {groups.filter(g => !hiddenGroups.includes(g.id)).map(g => groupRow(g, false))}
-          {!groups.some(g => !hiddenGroups.includes(g.id)) && !inviteViews.some(v => inviteShown(v) && !hiddenGroups.includes(v.invite.id)) && <li className="text-xs text-muted-foreground px-2 pb-1">No groups yet.</li>}
-          {(groups.some(g => hiddenGroups.includes(g.id)) || inviteViews.some(v => inviteShown(v) && hiddenGroups.includes(v.invite.id))) && <li>
-            <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-muted-foreground" aria-expanded={showHiddenGroups} aria-controls="crypt-hidden-groups" onClick={() => setShowHiddenGroups(v => !v)}>
-              <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', !showHiddenGroups && '-rotate-90')} />
-              Hidden groups ({groups.filter(g => hiddenGroups.includes(g.id)).length + inviteViews.filter(v => inviteShown(v) && hiddenGroups.includes(v.invite.id)).length})
-            </Button>
-            {showHiddenGroups && <ul id="crypt-hidden-groups" className="space-y-1">
-              {inviteViews.filter(v => inviteShown(v) && hiddenGroups.includes(v.invite.id)).map(v => inviteRow(v, true))}
-              {groups.filter(g => hiddenGroups.includes(g.id)).map(g => groupRow(g, true))}</ul>}
-          </li>}
-              </ul>
-            </CollapsibleContent>
-          </Collapsible>
-          <Collapsible open={friendsOpen} onOpenChange={setFriendsOpen}>
-            <div className="flex items-center justify-between px-2">
-              <CollapsibleTrigger className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-cheese">
-                <ChevronDown className={cn('h-3.5 w-3.5 transition', !friendsOpen && '-rotate-90')} /> 🤝 Friends
-              </CollapsibleTrigger>
-              <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Add friend" title="Add friend" onClick={() => setAddingFriend(true)}><UserPlus className="h-4 w-4" /></Button>
-            </div>
-            <CollapsibleContent>
-              <ul className="space-y-1 pt-1">
-          {partners.map((p) => (
-            <li key={p} className="group flex items-center gap-1">
-              <Button variant="ghost" onClick={() => setActive(p)}
-                className={cn('flex-1 min-w-0 h-auto justify-start gap-2 text-left rounded-md px-3 py-2 text-sm transition-colors',
-                  active === p ? 'bg-cheese/15 text-cheese font-semibold' : 'hover:bg-muted')}>
-                <PixelAvatar account={p} avatar={avatars[p]} />
-                <span className="min-w-0 flex-1"><span className="block truncate">{nameFor(p)}</span>
-                {nameFor(p) !== p && <span className="block text-[10px] text-muted-foreground truncate">{p}</span>}
-                <span className="block text-[10px] text-muted-foreground">
-                  {!contacts[p] ? 'no key yet' : lastAt[p] ? new Date(lastAt[p]).toLocaleDateString() : 'no messages'}
-                </span></span>
-                {badge(p)}
-              </Button>
-              <Button variant="ghost" size="icon" aria-label={`Remove friend ${p}`} title={`Remove friend ${p}`}
-                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 focus-visible:opacity-100 transition-opacity"
-                onClick={() => removeFriend(p)}><Trash2 className="h-3.5 w-3.5" /></Button>
-            </li>
-          ))}
-          {!partners.length && <li className="text-xs text-muted-foreground px-2 pb-2">{loading ? 'Loading…' : 'Add a friend to start chatting.'}</li>}
-              </ul>
-            </CollapsibleContent>
-          </Collapsible>
-        </div>
+      <CryptSidebar account={account} cryptKey={key} loading={loading} refresh={refresh} setEditingAvatar={setEditingAvatar}
+        menuOpen={menuOpen} setMenuOpen={setMenuOpen} fileRef={fileRef} sharePublicKey={sharePublicKey} busy={busy} publish={publish}
+        blocked={blocked} setShowBlocked={setShowBlocked} makeKey={makeKey} publicInbox={publicInbox} setInboxOpen={setInboxOpen}
+        toggleList={toggleList} listHidden={listHidden} hiddenUnread={hiddenUnread} hiddenReplies={hiddenReplies}
+        messageRequests={messageRequests} acceptRequest={acceptRequest} dismissRequest={dismissRequest} blockAccount={blockAccount}
+        groupsOpen={groupsOpen} setGroupsOpen={setGroupsOpen} setCreatingGroup={setCreatingGroup} inviteViews={inviteViews}
+        inviteShown={inviteShown} hiddenGroups={hiddenGroups} inviteRow={inviteRow} groups={groups} groupRow={groupRow}
+        showHiddenGroups={showHiddenGroups} setShowHiddenGroups={setShowHiddenGroups} friendsOpen={friendsOpen} setFriendsOpen={setFriendsOpen}
+        setAddingFriend={setAddingFriend} partners={partners} active={active} setActive={setActive} avatars={avatars} nameFor={nameFor}
+        contacts={contacts} lastAt={lastAt} badge={badge} removeFriend={removeFriend} />
 
-      {/* Chat header shares the top row with the profile box so both bottom borders form one line. */}
-      <div className={cn('min-w-0 px-4 py-3 border-b border-border font-semibold flex flex-wrap items-center gap-2 md:col-start-2 md:row-start-1', !active && 'hidden md:flex')}>
-        {active && <>
-              {activeInvite ? <div className="w-full space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  {activeInvite.avatar ? <PixelAvatar account={activeInvite.invite.id} avatar={activeInvite.avatar} className="h-7 w-7" /> : <span>👥</span>}
-                  <span className="break-words">{activeInvite.name}</span>
-                  <span className="text-[10px] font-normal text-muted-foreground">created by {nameFor(activeInvite.invite.creator)}</span>
-                  <span className="ml-auto flex items-center gap-1">
-                    {membersDropdown(activeInvite.invite.members.map(({ account: member }) => member),
-                      member => (activeInvite.joined.includes(member) ? 'joined' : 'invited'),
-                      member => {
-                        if (member !== account && activeInvite.status === 'joined' && !contacts[member] && !blocked.includes(member) && !activeInvite.requested.includes(member) && !activeInvite.friendRequests.includes(member))
-                          return <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px]" aria-label={`Send friend request to ${member}`} onClick={() => setPendingNotice({ kind: 'friend', id: activeInvite.invite.id, to: member })}><UserPlus className="h-3 w-3" /> Friend request</Button>;
-                        if (member !== account && activeInvite.requested.includes(member) && !contacts[member]) return <span className="shrink-0 text-[10px] text-muted-foreground">request sent</span>;
-                        return undefined;
-                      })}
-                    {activeInvite.isCreator && activeInvite.status === 'joined' && <Button size="sm" variant="ghost" className="h-7 text-xs font-normal" onClick={() => setEditingInvite({ id: activeInvite.invite.id, name: activeInvite.name, avatar: activeInvite.avatar })}><Pencil className="h-3 w-3" /> Edit group</Button>}
-                    {activeInvite.status === 'joined' && <Button size="sm" variant="ghost" className="h-7 text-xs font-normal text-destructive hover:text-destructive" onClick={() => setPendingNotice({ kind: 'leave', id: activeInvite.invite.id })}>🚪 Leave group</Button>}
-                  </span>
-                </div>
-                {activeInvite.friendRequests.filter(a => !contacts[a] && !blocked.includes(a) && !friendDeclines.includes(`${activeInvite.invite.id}:${a}`)).map(a =>
-                  <div key={a} className="flex flex-wrap items-center gap-2 rounded-md border border-cheese/30 bg-cheese/10 px-2 py-1 text-xs font-normal">
-                    🤝 {nameFor(a)} sent you a friend request.
-                    <Button size="sm" className="h-6 text-[11px] bg-cheese text-primary-foreground hover:bg-cheese/90" onClick={() => setPendingNotice({ kind: 'friend-ok', id: activeInvite.invite.id, to: a })}>Accept</Button>
-                    <Button size="sm" variant="outline" className="h-6 text-[11px]" onClick={() => setFriendDeclines(declineFriendRequest(account, activeInvite.invite.id, a))}>Decline</Button>
-                  </div>)}
-              </div> : activeGroup ? <span className="flex min-w-0 items-center gap-2">
-                <span aria-hidden>👥</span>
-                <span className="break-words">Group</span>
-                {membersDropdown(activeGroup.members, undefined, member => member !== account && <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" aria-label={`Edit nickname for ${member}`} title={`Edit nickname for ${member}`} onClick={() => setEditingFriend(member)}><Pencil className="h-3 w-3" /></Button>)}
-              </span> : <><PixelAvatar account={active} avatar={avatars[active]} /><span className="min-w-0 break-words">{nameFor(active)}{nameFor(active) !== active && <span className="block text-xs text-muted-foreground">{active}</span>}</span><Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label={`Edit nickname for ${active}`} title={`Edit nickname for ${active}`} onClick={() => setEditingFriend(active)}><Pencil className="h-3 w-3" /></Button></>}
-              {!activeGroup && !activeInvite && <span className="ml-auto flex items-center gap-1">
-                {contacts[active] && <Button size="sm" variant="ghost" className="h-7 text-xs font-normal" onClick={() => saveFriend(active, true)}>💾 Save to {FRIENDS_DIR}</Button>}
-                <Button size="sm" variant="ghost" className="h-7 text-xs font-normal text-destructive hover:text-destructive" aria-label={`Block ${active}`}
-                  onClick={() => { if (window.confirm(`Block ${active}? Their messages will be hidden on this device.`)) blockAccount(active); }}><Ban className="h-3.5 w-3.5" /> Block</Button>
-              </span>}</>}
-      </div>
+      <CryptChatHeader account={account} active={active} activeGroup={activeGroup} activeInvite={activeInvite} keyAvatar={key.avatar}
+        avatars={avatars} contacts={contacts} blocked={blocked} friendDeclines={friendDeclines} setFriendDeclines={setFriendDeclines}
+        nameFor={nameFor} membersOpen={membersOpen} setMembersOpen={setMembersOpen} setPendingNotice={setPendingNotice}
+        setEditingInvite={setEditingInvite} setEditingFriend={setEditingFriend} saveFriend={saveFriend} blockAccount={blockAccount} />
 
       <section className={cn('flex flex-1 flex-col min-h-0 md:row-start-2', listHidden ? 'md:col-start-1 md:col-span-2' : 'md:col-start-2')}>
         {!active ? (
@@ -1175,43 +1004,11 @@ export function Messenger({ account, session }: { account: string; session: NonN
             ) : missingKeys.length ? (
               <p className="text-sm text-muted-foreground p-4 border-t border-border">Public keys needed: {missingKeys.join(', ')}. Add them by name or load their public files.</p>
             ) : (
-              <div className="space-y-2 p-4 border-t border-border">
-                {replyingTo && <div className="flex items-start gap-2 rounded border-l-2 border-reply bg-muted px-2 py-1 text-xs">
-                  <span className="min-w-0 flex-1"><span className="block font-semibold text-reply">↩️ Replying to {replyingTo.author === account ? 'yourself' : nameFor(replyingTo.author)}</span><span className="block truncate opacity-80">{replyingTo.quote || '…'}</span></span>
-                  <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" aria-label="Cancel reply" onClick={() => setReplyingTo(null)}>✕</Button>
-                </div>}
-                <Textarea ref={composerRef} value={text} onChange={(e) => setText(e.target.value)} rows={3} disabled={!!voice} placeholder={voice ? 'Sending a voice note — discard it to type a message' : activeGroup || activeInvite ? 'Message group' : `Message ${nameFor(active)}`} />
-                <div className="flex flex-wrap items-center gap-2 gap-y-1 text-xs">
-                  <span className={!voice && tooLong ? 'text-destructive' : 'text-muted-foreground'}>
-                    {voice ? `${voiceParts} parts · ${voiceTxs} transaction${voiceTxs > 1 ? 's' : ''}` : `${bytes}/${maxBytes} · ${parts || 1} part${parts > 1 ? 's' : ''}`}{(activeGroup || activeInvite) && ` × ${copies} recipients`}
-                  </span>
-                  {!voice && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setAttachingNft(true); }}>🖼️ Attach NFT</Button>}
-                  {!text.trim() && <VoiceRecorder clip={voice} onChange={setVoice} disabled={busy} />}
-                  {listHidden && <TermsCheckbox checked={agreed} onCheckedChange={setAgreed} className="ml-2" />}
-                  {/* Expanded chat: Terms, fee info, price and Send share one line. Compressed chat: they form the bottom line, Terms first, price and Send pushed to the right edge. */}
-                  <div className={cn('flex flex-wrap items-center gap-2 gap-y-1', !listHidden && 'order-last w-full')}>
-                    {!listHidden && <TermsCheckbox checked={agreed} onCheckedChange={setAgreed} />}
-                    <Collapsible open={feeInfoOpen} onOpenChange={setFeeInfoOpen}>
-                      <CollapsibleTrigger className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-cheese">
-                        ℹ️ Fee info <ChevronDown className={cn('h-3 w-3 transition', !feeInfoOpen && '-rotate-90')} />
-                      </CollapsibleTrigger>
-                    </Collapsible>
-                    <span className="ml-auto text-muted-foreground">{totalCost}</span>
-                    {voice
-                      ? <Button size="sm" disabled={busy || !agreed} onClick={sendVoice} className="bg-cheese text-primary-foreground hover:bg-cheese/90">Send voice{voiceTxs > 1 ? ` (${voiceTxs} signatures)` : ''}</Button>
-                      : <Button size="sm" disabled={busy || !agreed || !text.trim() || tooLong} onClick={send}
-                        className="bg-cheese text-primary-foreground hover:bg-cheese/90">Send</Button>}
-                  </div>
-                  {feeInfoOpen && (
-                    <div className="order-last w-full basis-full space-y-1 pt-1">
-                {voice && <p className="text-[11px] text-muted-foreground">🎙️ Voice note: {voiceParts} encrypted parts, up to {VOICE_PARTS_PER_TX} per transaction, signed one after another. A flat 1 CHEESE fee is paid once in the first transaction (0.8000 nulled, 0.2000 to xcheeseliqst), plus 0.0010 CHEESE per part to each recipient. If a later transaction fails, the parts already sent stay on chain and the note shows as incomplete.</p>}
-                <p className="text-[11px] text-muted-foreground">
-                  {activeInvite ? `Each part: ${MESSAGE_FEE_QUANTITY} shared platform fee for the group + ${MESSAGE_RECIPIENT_QUANTITY} to each of the ${copies} members who joined. Members who haven't joined don't get a copy.` : activeGroup ? `Each part: ${MESSAGE_FEE_QUANTITY} shared platform fee for the group + ${MESSAGE_RECIPIENT_QUANTITY} to each of ${copies} recipients. Group delivery uses ${copies} encrypted copies in one transaction. Membership is fixed; start a new group to change participants.` : `Each part: ${MESSAGE_RECIPIENT_QUANTITY} to ${active} + ${MESSAGE_FEE_QUANTITY} platform fee (${MESSAGE_TOTAL_QUANTITY}). Long messages split into up to ${MAX_PARTS} parts (${MAX_PLAINTEXT_BYTES} bytes for one, ${PART_BODY_BYTES} per part after that), all in one transaction.`}
-                  {` Attaching an NFT raises the first part's platform fee to ${NFT_FEE_QUANTITY}. Platform fees split 80% to eosio.null and 20% to xcheeseliqst; recipient payments are unchanged.`}
-                </p>
-                    </div>
-                  )}
-                </div>
+              <CryptComposer account={account} active={active} activeGroup={activeGroup} activeInvite={activeInvite} nameFor={nameFor}
+                replyingTo={replyingTo} setReplyingTo={setReplyingTo} composerRef={composerRef} text={text} setText={setText} voice={voice} setVoice={setVoice}
+                tooLong={tooLong} bytes={bytes} maxBytes={maxBytes} parts={parts} copies={copies} voiceParts={voiceParts} voiceTxs={voiceTxs}
+                setAttachingNft={setAttachingNft} busy={busy} listHidden={listHidden} agreed={agreed} setAgreed={setAgreed}
+                feeInfoOpen={feeInfoOpen} setFeeInfoOpen={setFeeInfoOpen} totalCost={totalCost} send={send} sendVoice={sendVoice} />
               </div>
             )}
           </>
