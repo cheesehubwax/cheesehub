@@ -963,6 +963,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
             </button>
             <Input value={editingInvite.name} maxLength={40} aria-label="Group name" onChange={e => setEditingInvite({ ...editingInvite, name: e.target.value })} />
           </div>
+          <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-background/50 px-2 py-1.5">
+            <span className="min-w-0 text-[11px] text-muted-foreground">{listedIds.has(editingInvite.id) ? '🌐 This room is listed publicly, so anyone can find it and ask to join.' : '🌐 Not listed. Only people you invite can find this room.'}</span>
+            <Button size="sm" variant="outline" className="h-7 shrink-0 text-xs" aria-label={listedIds.has(editingInvite.id) ? 'Manage public room listing' : 'List room publicly'} onClick={() => setListingRoom(editingInvite.id)}>🌐 {listedIds.has(editingInvite.id) ? 'Manage listing' : 'List room'}</Button>
+          </div>
         </PaidActionDialog>;
       })()}
       {editingInvite && paintingInvite && <AvatarEditor account="group" avatar={editingInvite.avatar} title="🎨 Group picture"
@@ -1042,7 +1046,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         avatars={avatars} contacts={contacts} blocked={blocked} friendDeclines={friendDeclines} setFriendDeclines={setFriendDeclines}
         nameFor={nameFor} membersOpen={membersOpen} setMembersOpen={setMembersOpen} setPendingNotice={setPendingNotice}
         setEditingInvite={setEditingInvite} setEditingFriend={setEditingFriend} saveFriend={saveFriend} blockAccount={blockAccount}
-        roomListed={activeInvite ? listedIds.has(activeInvite.invite.id) : false} onRoomListing={activeInvite ? () => setListingRoom(activeInvite.invite.id) : undefined} />
+        />
 
       <section className={cn('flex flex-1 flex-col min-h-0 md:row-start-2', listHidden ? 'md:col-start-1 md:col-span-2' : 'md:col-start-2')}>
         {!active ? (

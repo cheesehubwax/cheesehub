@@ -90,6 +90,7 @@ export function RoomListingDialog({ groupId, groupName, members, publicKey, list
         {info.tags.length > 0 && <p className="text-[11px] text-muted-foreground">{info.tags.map(t => `#${t}`).join(' ')}</p>}
         {error && <p className="text-xs text-destructive">{error}</p>}
       </div>}
+      {!listed && <p className="rounded-md border border-cheese/30 bg-cheese/5 p-2 text-xs text-muted-foreground">⚠️ <span className="font-semibold text-cheese">Your account and public messaging key are published on chain</span> with this listing, so anyone can read them. That only lets people send join requests for this room: regular messages from accounts you have not added stay hidden unless you turn on the Public Inbox, and you can block anyone at any time.</p>}
       <p className="text-xs text-muted-foreground">Cost: {ROOM_FEE_QUANTITY}, split 80% to eosio.null and 20% to xcheeseliqst.</p>
       <TermsCheckbox id="crypt-room-terms" checked={agreed} onCheckedChange={setAgreed} />
       <DialogFooter>
