@@ -489,6 +489,16 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const listRef = useRef<HTMLOListElement>(null);
   const nearBottom = useRef(true);
   const lastActive = useRef<string | null>(null);
+  const newMarkerRef = useRef<HTMLLIElement | null>(null);
+  // Snapshot of the chat's read marker at the moment it is opened, before it is marked read — the resume point.
+  const readMarksRef = useRef<ReadMarks | null>(null);
+  readMarksRef.current = readMarks;
+  const resumeRef = useRef<{ id: string | null; at: number | null }>({ id: null, at: null });
+  if (resumeRef.current.id !== active) {
+    resumeRef.current = { id: active, at: active ? (readMarksRef.current?.[active] ?? null) : null };
+  }
+  const resumeAt = resumeRef.current.id === active ? resumeRef.current.at : null;
+  const firstNew = firstUnreadIndex(thread, resumeAt);
   // Remember where the page itself was so switching chats never moves the outer page.
   const pageY = useRef(typeof window === 'undefined' ? 0 : window.scrollY);
   useEffect(() => {
