@@ -23,7 +23,7 @@ function RailButton({ item, active, setActive }: { item: RailItem; active: strin
 }
 
 /** Thin edge strip shown while the side panel is collapsed: rooms and friends in their own labelled sections, one avatar each with its unread and reply counters. */
-export function CryptAvatarRail({ sections, active, setActive }: { sections: RailSection[]; active: string | null; setActive: (id: string) => void }) {
+export function CryptAvatarRail({ sections = [], active, setActive }: { sections?: RailSection[]; active: string | null; setActive: (id: string) => void }) {
   const shown = sections.filter(s => s.items.length);
   return (
     <nav aria-label="Chats" className="hidden md:flex w-16 shrink-0 flex-col items-center gap-2 overflow-y-auto border-r border-border py-3">
