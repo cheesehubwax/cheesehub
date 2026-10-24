@@ -47,7 +47,6 @@ import { ChainMemo, MessagingKey, MAX_MESSAGE_BYTES, MAX_HISTORY_PAGES, MAX_PART
 import { download } from '@/components/crypt/cryptDownload';
 import { ChatMessageItem } from '@/components/crypt/ChatMessageItem';
 import { EditedMessagesDialog } from '@/components/crypt/EditedMessagesDialog';
-import { RoomModerationDialog } from '@/components/crypt/RoomModerationDialog';
 import { encodeAdmin, encodeCollapse, encodeModeration, encodePolicySnapshot, encodeRoomPolicy, type MuteMinutes } from '@/lib/cryptInviteGroups';
 import { applyCollapses, canCollapseAuthor, canMuteMember, collapsedKeys, deriveModeration, founderBadges, loadModerationMemos, mergeModerationMemos, moderateMessages, mutedUntil, restrictedAt, roomRole, saveModerationMemos } from '@/lib/cryptModeration';
 import { applyEdits, canEdit, editTarget, encodeEdit, publicEditLog } from '@/lib/cryptEdits';
@@ -166,7 +165,6 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [text, setText] = useState('');
   const [editingMessage, setEditingMessage] = useState<ConversationEntry | null>(null);
   const [editLogRoom, setEditLogRoom] = useState<string | null>(null);
-  const [moderatingRoom, setModeratingRoom] = useState<string | null>(null);
   const [pendingModeration, setPendingModeration] = useState<{ id: string; member: string; action: 'mute' | 'ban' | 'admin' | 'unadmin' | 'collapse'; minutes?: MuteMinutes; target?: string } | null>(null);
   const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
   const [savedControls, setSavedControls] = useState(() => loadModerationMemos(account));
@@ -469,6 +467,19 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const target = edited.targets.get(m.key);
     if (!activeInvite || myRoomRole === 'member' || !target || !m.txId || m.missing || busy) return null;
     return myRoomRole === 'owner' || canCollapseAuthor(activeModeration, activeInvite.invite, account, m.from, clock) ? target : null;
+  };
+  // Right-click moderation of a message's author; mirrors what moderationPlan accepts.
+  const authorModeration = (m: ConversationEntry) => {
+    if (!activeInvite || myRoomRole === 'member' || busy || m.from === account || m.from === activeInvite.invite.creator) return {};
+    const id = activeInvite.invite.id, g = activeInvite.invite, state = activeModeration;
+    if (!g.members.some(x => x.account === m.from) || state?.bans[m.from] !== undefined) return {};
+    const owner = myRoomRole === 'owner';
+    const muteState = state ?? { listed: true, protected: [], bans: {}, mutes: {}, admins: [], collapses: {} };
+    return {
+      onMute: canMuteMember(muteState, g, account, m.from, clock) ? (minutes: MuteMinutes) => setPendingModeration({ id, member: m.from, action: 'mute', minutes }) : undefined,
+      ban: owner ? { disabled: founderBadges(state, g, true).includes(m.from), onBan: () => setPendingModeration({ id, member: m.from, action: 'ban' }) } : undefined,
+      adminToggle: owner ? { isAdmin: !!state?.admins.includes(m.from), onToggle: () => setPendingModeration({ id, member: m.from, action: state?.admins.includes(m.from) ? 'unadmin' : 'admin' }) } : undefined,
+    };
   };
   const inviteKeys = useMemo(() => activeInvite ? Object.fromEntries(activeInvite.invite.members.map(m => [m.account, m.publicKey])) : {}, [activeInvite]);
   const currentRecipients = activeInvite ? activeInvite.joined.filter(m => m !== account) : activeGroup ? activeGroup.members.filter(m => m !== account) : active ? [active] : [];
@@ -1160,15 +1171,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
             <Button size="sm" variant="outline" className="h-7 shrink-0 text-xs" aria-label={listedIds.has(editingInvite.id) ? 'Manage public room listing' : 'List room publicly'} onClick={() => setListingRoom(editingInvite.id)}>🌐 {listedIds.has(editingInvite.id) ? 'Manage listing' : 'List room'}</Button>
           </div>
           {v.isCreator && listedIds.has(v.invite.id) && <Button variant="outline" size="sm" onClick={() => setEditLogRoom(v.invite.id)}>✏️ Edited messages</Button>}
-          {v.isCreator && listedIds.has(v.invite.id) && <Button variant="outline" size="sm" onClick={() => setModeratingRoom(v.invite.id)}>🔇 Moderate members</Button>}
         </PaidActionDialog>;
-      })()}
-      {moderatingRoom && (() => {
-        const v = viewById(moderatingRoom);
-        if (!v) return null;
-        const role = v.isCreator ? (listedIds.has(moderatingRoom) ? 'owner' : null) : roomRole(moderation[moderatingRoom], v.invite, account, clock) === 'admin' ? 'admin' : null;
-        if (!role) return null;
-        return <RoomModerationDialog view={v} state={moderation[moderatingRoom]} role={role} account={account} now={clock} busy={busy} nameFor={nameFor} onAction={(member, action, minutes) => setPendingModeration({ id: v.invite.id, member, action, minutes })} onClose={() => setModeratingRoom(null)} />;
       })()}
       {pendingModeration && (() => {
         const plan = moderationPlan(pendingModeration);
@@ -1267,7 +1270,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         avatars={avatars} contacts={contacts} blocked={blocked} friendDeclines={friendDeclines} setFriendDeclines={setFriendDeclines}
         nameFor={nameFor} membersOpen={membersOpen} setMembersOpen={setMembersOpen} setPendingNotice={setPendingNotice}
         setEditingInvite={setEditingInvite} setEditingFriend={setEditingFriend} saveFriend={saveFriend} blockAccount={blockAccount}
-        admins={activeModeration?.admins ?? []} onModerate={myRoomRole === 'admin' && activeInvite ? () => setModeratingRoom(activeInvite.invite.id) : undefined}
+        admins={activeModeration?.admins ?? []}
         />
 
       <section className={cn('flex flex-1 flex-col min-h-0 md:row-start-2', listHidden ? 'md:col-start-1 md:col-span-2' : 'md:col-start-2')}>
@@ -1315,7 +1318,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                     canReveal={myRoomRole !== 'member'} revealed={revealed.has(m.key)} onReveal={() => setRevealed(s => new Set(s).add(m.key))}
                     onCollapse={collapseTarget(m) && activeInvite ? () => setPendingModeration({ id: activeInvite.invite.id, member: m.from, action: 'collapse', target: collapseTarget(m)! }) : undefined}
                     badges={activeInvite ? { owner: m.from === activeInvite.invite.creator, admin: m.from !== activeInvite.invite.creator && !!moderation[activeInvite.invite.id]?.admins.includes(m.from), founder: founderBadges(moderation[activeInvite.invite.id], activeInvite.invite, listedIds.has(activeInvite.invite.id)).includes(m.from) } : undefined}
-                    onOpenQuote={setOpenQuote} openedAt={acceptedRequestMessages.current.has(m.key) ? { current: Infinity } : openedAt} />
+                    {...authorModeration(m)} onOpenQuote={setOpenQuote} openedAt={acceptedRequestMessages.current.has(m.key) ? { current: Infinity } : openedAt} />
                 </Fragment>
               ))}
               {!thread.length && <li className="text-sm text-muted-foreground">{activeGroup || activeInvite ? 'No group messages yet.' : `No messages with ${nameFor(active)} yet.`}</li>}

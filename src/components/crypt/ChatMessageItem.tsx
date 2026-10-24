@@ -1,6 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { MUTE_MINUTES, type MuteMinutes } from '@/lib/cryptInviteGroups';
+
+const MUTE_LABELS: Record<MuteMinutes, string> = { 15: '15 minutes', 60: '1 hour', 360: '6 hours', 1440: '24 hours' };
 import { parseReply, type ReplyRef } from '@/lib/cryptReply';
 import { CryptNftCard } from '@/components/crypt/CryptNftCard';
 import { fetchAssetById } from '@/services/atomicApi';
@@ -14,7 +17,7 @@ import { messageCost } from '@/lib/cheeseCrypt';
 import type { EditedMessage } from '@/lib/cryptEdits';
 
 /** Pure sound-effect-NFT posts render without the bubble box — sender header, playback and timestamp stay. */
-export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, editable, onEdit, onCollapse, canReveal, revealed, onReveal, badges }: {
+export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, editable, onEdit, onCollapse, canReveal, revealed, onReveal, badges, onMute, ban, adminToggle }: {
   m: EditedMessage; account: string; keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>;
   contacts: Record<string, string>; active: string; activeGroup: CryptGroup | null;
   nameFor: (id: string) => string; openedAt: { current: number };
@@ -25,6 +28,10 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
   onCollapse?: () => void; canReveal?: boolean; revealed?: boolean; onReveal?: () => void;
   /** Room role badges shown right of the sender's name: owner, admin, founder. */
   badges?: { owner?: boolean; admin?: boolean; founder?: boolean };
+  /** Public-room moderation of the author, shown only when allowed (mute: owner/admin; ban and admin: owner). */
+  onMute?: (minutes: MuteMinutes) => void;
+  ban?: { disabled: boolean; onBan: () => void };
+  adminToggle?: { isAdmin: boolean; onToggle: () => void };
 }) {
   const hidden = !!m.collapsed && !revealed;
   const reply = parseReply(m.text);
@@ -39,7 +46,7 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
   const canReply = (!!m.voice || m.text != null) && !hidden;
   return (
     <ContextMenu>
-    <ContextMenuTrigger asChild disabled={!canReply && !onCollapse}>
+    <ContextMenuTrigger asChild disabled={!canReply && !onCollapse && !onMute && !ban && !adminToggle}>
     <li data-reply-key={m.key} data-reply-highlighted={highlighted || undefined} className={cn('w-fit max-w-[80%] text-sm',
       bare ? (m.from === account ? 'ml-auto py-1' : 'py-1') : m.from === account
         ? 'ml-auto rounded-lg px-3 py-2 bg-cheese/20 border border-cheese/30' : 'rounded-lg px-3 py-2 bg-muted',
@@ -76,6 +83,18 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
       {canReply && <ContextMenuItem onSelect={() => onReply(m)}>↩️ Reply</ContextMenuItem>}
       {editable && onEdit && !hidden && <ContextMenuItem onSelect={() => onEdit(m)}>✏️ Edit</ContextMenuItem>}
       {onCollapse && !m.collapsed && <ContextMenuItem onSelect={onCollapse}>🙈 Collapse message</ContextMenuItem>}
+      {(onMute || ban || adminToggle) && (canReply || onCollapse) && <ContextMenuSeparator />}
+      {onMute && <ContextMenuSub>
+        <ContextMenuSubTrigger>🔇 Mute user</ContextMenuSubTrigger>
+        <ContextMenuSubContent>
+          {MUTE_MINUTES.map(d => <ContextMenuItem key={d} onSelect={() => onMute(d)}>{MUTE_LABELS[d]}</ContextMenuItem>)}
+        </ContextMenuSubContent>
+      </ContextMenuSub>}
+      {ban && <ContextMenuItem disabled={ban.disabled} onSelect={ban.onBan} className="flex-col items-start">
+        <span>🚫 Ban user</span>
+        {ban.disabled && <span className="text-[10px] text-muted-foreground">Founding member — can't be banned</span>}
+      </ContextMenuItem>}
+      {adminToggle && <ContextMenuItem onSelect={adminToggle.onToggle}>🛡️ {adminToggle.isAdmin ? 'Remove admin' : 'Make admin'}</ContextMenuItem>}
     </ContextMenuContent>
     </ContextMenu>
   );

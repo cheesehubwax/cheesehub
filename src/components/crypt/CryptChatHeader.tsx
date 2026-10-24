@@ -14,7 +14,7 @@ type Notice = { kind: 'joined' | 'leave' | 'friend' | 'friend-ok'; id: string; t
 /** Chat title bar: friend or group title, Members dropdown and per-chat actions. State lives in Messenger. */
 export function CryptChatHeader({
   account, active, activeGroup, activeInvite, keyAvatar, avatars, contacts, blocked, friendDeclines, setFriendDeclines,
-  nameFor, membersOpen, setMembersOpen, setPendingNotice, setEditingInvite, setEditingFriend, saveFriend, blockAccount, admins = [], onModerate,
+  nameFor, membersOpen, setMembersOpen, setPendingNotice, setEditingInvite, setEditingFriend, saveFriend, blockAccount, admins = [],
 }: {
   account: string; active: string | null; activeGroup: CryptGroup | undefined; activeInvite: InviteGroupView | undefined;
   keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>; contacts: Record<string, string>; blocked: string[];
@@ -22,8 +22,8 @@ export function CryptChatHeader({
   membersOpen: boolean; setMembersOpen: (v: boolean) => void; setPendingNotice: (n: Notice) => void;
   setEditingInvite: (v: { id: string; name: string; avatar?: CryptAvatar }) => void; setEditingFriend: (v: string) => void;
   saveFriend: (name: string, ask: boolean) => Promise<unknown>; blockAccount: (name: string) => void;
-  /** Current public-room admins (badge only) and, for an admin viewer, the moderation entry point. */
-  admins?: string[]; onModerate?: () => void;
+  /** Current public-room admins (badge only). */
+  admins?: string[];
 }) {
   const memberLine = (member: string, status?: string, action?: ReactNode) => (
     <li key={member} className="flex items-center gap-2 min-w-0">
@@ -69,7 +69,6 @@ export function CryptChatHeader({
                       return undefined;
                     })}
                   {activeInvite.isCreator && activeInvite.status === 'joined' && <Button size="sm" variant="ghost" className="h-7 text-xs font-normal" onClick={() => setEditingInvite({ id: activeInvite.invite.id, name: activeInvite.name, avatar: activeInvite.avatar })}><Pencil className="h-3 w-3" /> Edit group</Button>}
-                  {onModerate && <Button size="sm" variant="ghost" className="h-7 text-xs font-normal" onClick={onModerate}>🛡️ Moderate</Button>}
                   {activeInvite.status === 'joined' && <Button size="sm" variant="ghost" className="h-7 text-xs font-normal text-destructive hover:text-destructive" onClick={() => setPendingNotice({ kind: 'leave', id: activeInvite.invite.id })}>🚪 Leave group</Button>}
                 </span>
               </div>
