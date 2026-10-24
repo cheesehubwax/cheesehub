@@ -2,11 +2,11 @@
 
 - CHEESECrypt private invites retain their original wire cap; public admissions use bounded complete multipart bootstraps for newcomers and owner-authenticated roster-digest predecessor deltas for existing members in one atomic transaction, preserving pairwise keys and first-public protection.
 
-- CHEESECrypt public-room moderation uses authenticated encrypted CG2 controls (owner, plus owner-appointed admins for mutes/collapses, authority replayed in chain order) and an immutable first-public protected roster; encrypted controls are retained per account and re-derived before edits/unread/rendering. Bans exclude future recipient copies, never revoke held keys, while mute intervals permanently suppress traffic and quotes sent within them. Collapses target the pre-edit message digest and only mark rows, since chain copies cannot be deleted. Moderation remains client-validated after deployment because the contract is a blind fee router, avoiding explicit role/roster disclosure.
+- Crypt moderation: authenticated encrypted CG2 controls, owner-appointed admins for mute/collapse, chain-ordered authority, immutable first-public roster. Retain controls per account; re-derive before edits/unread/rendering. Bans omit future copies, never revoke keys. Mute intervals permanently hide their traffic/quotes. Collapse marks pre-edit digests, never deletes chain copies. Client validation continues after blind-router deployment to avoid explicit role/roster disclosure.
 
 - CHEESECrypt edits resolve authenticated followups against an unambiguous content-and-transaction digest within the same sender/conversation; preserve original row identity/time and apply only complete in-window replacements. Voice edits use a flagged extra target part; owner logs derive from decrypted history only for currently public owned rooms, never central storage.
 
-- CHEESECrypt's orb has an intentionally source-controlled public image copy for external production hosting; preview uses its asset pointer because GitHub Pages cannot serve Lovable-relative asset paths.
+- Crypt orb: source-controlled public image for external hosting; preview uses its asset pointer since GitHub Pages cannot serve Lovable-relative paths.
 
 - Token metadata snapshots share one versioned schema and public data URL across recorder and app; precisions are chain-verified, cached metadata contains no prices, and unknown live prices remain unknown so API outages cannot fabricate portfolio valuations.
 - CHEESEAir keeps context identity in Vite hot data (shared provider/card state).
@@ -16,7 +16,7 @@
 - Folio acquisitions use cumulative trade/free receipts, separate from holdings; never alter basis or infer sources after disposals.
 - CHEESEFolio scans always include the history provider reaching furthest back and complete a sync only when it was read to the end; big-page providers read sequentially, only small-page ones windowed, capped concurrency — bursts make Hyperion drop connections.
 - CHEESEFolio de-duplicates by global sequence and drops inline copies with identical transfer creator actions; Hyperion receiver notifications otherwise double-count movements.
-- CHEESEFolio explains order-book fills from Alcor's per-account deal list (read in one large-limit request — its skip paging is gappy) and only looks up leftovers on Hyperion, routed by each provider's history start; per-transaction lookups alone take minutes on heavy accounts.
+- Folio order-book fills: one large-limit Alcor per-account deal request (skip paging is gappy); only leftovers use Hyperion, routed by provider history start, avoiding slow per-transaction-only lookups.
 - CHEESEFolio holdings roll live pool positions (Alcor positions read per pool scope on chain, Taco/Defibox share tokens × reserves) into each token row; a venue that can't be read hides P/L for tokens history says are pooled, never counts as zero.
 - Alcor's on-chain `positions` table is scoped per pool and indexed by owner (index 3); the farm manager's API fallback finds the account's pools from its `swap.alcor:addliquid` history, then sizes each position from the pool's current price.
 - Folio gaps trust the deepest provider's get_creator creation transaction; first transfers can lag creation.
@@ -31,7 +31,7 @@
 - CHEESECrypt: one vault/device; friends/ loads into all accounts (per-account edits), only explicit saves replace; blocked memos drop undecrypted. Keys match by content; reads merge newest.
 - Crypt inbox: bounded discovery; strangers held until accepted
 - Crypt reply views use per-message receipts (jumps keep skipped replies), inner-list scroll only. About: DappAbout + crypto dialog.
-- CHEESECrypt page sections (hero, key setup, sidebar, chat header, composer, message bubble) are presentational components in components/crypt; all state, effects and handlers stay in Messenger so one owner keeps chat state consistent.
+- Crypt sections (hero, keys, sidebar, header, composer, bubbles) are presentational in components/crypt; Messenger owns state/effects/handlers for consistent chat state.
 - OpenMojiIcon's optional tint paints a glyph as a solid silhouette in a given color; use it when an OpenMoji artwork's own palette is too dark for the always-dark background.
 - Both NFT players normalize media via nftMedia (case-insensitive audio/clip/video, reference-only sound/mp3/sfx aliases); version music caches on detection changes to avoid stale classifications.
 - CHEESEFolio fiat/BTC/ETH figures are WAX→USD→currency per day (fx-usd-history.json, units per USD); unknown rates stay unknown.
