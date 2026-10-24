@@ -27,7 +27,8 @@ export type MuteMinutes = typeof MUTE_MINUTES[number];
 export type Cg2Kind = 'invite' | 'admission' | 'add' | 'msg' | 'joined' | 'leave' | 'meta' | 'friend' | 'friend-ok' | 'join' | 'join-no' | 'room' | 'mute' | 'ban' | 'policy' | 'admin' | 'collapse' | 'report';
 export type Cg2 =
   | { kind: 'invite'; invite: InviteGroup }
-  | { kind: 'admission'; invite: InviteGroup }
+  /** `note`: optional short text from the creator when accepting a join request. */
+  | { kind: 'admission'; invite: InviteGroup; note?: string }
   | { kind: 'add'; id: string; previous: string; count: number; member: InviteMember }
   | { kind: 'msg'; id: string; text: string }
   | { kind: 'room'; id: string; listed: boolean; protected: string[] }
@@ -42,7 +43,8 @@ export type Cg2 =
   | { kind: 'report'; id: string; member: string; target: string; level: 'admin' | 'owner' }
   /** `join`: a request to a public room's creator (cryptRooms.ts); never a membership change by itself. */
   /** `join-no`: the creator tells a requester their join request was declined (notification only). */
-  | { kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'join' | 'join-no'; id: string }
+  /** `note`: optional short text on `join` and `join-no` only. */
+  | { kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'join' | 'join-no'; id: string; note?: string }
   | { kind: 'meta'; id: string; name: string; avatar?: CryptAvatar };
 
 const validPublicKey = (k: unknown): k is string => {
