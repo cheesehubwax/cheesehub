@@ -46,8 +46,9 @@ describe('public rooms', () => {
     const to = actions.map(a => a.data.to);
     expect(new Set(to.filter(t => t !== 'eosio.null' && t !== 'xcheeseliqst'))).toEqual(new Set(['bob', 'carol']));
     const parts = to.filter(t => t === 'bob').length;
-    expect(to.filter(t => t === 'carol').length).toBe(parts);
-    expect(to.filter(t => t === 'eosio.null').length).toBe(parts);
+    // The newcomer also receives the current ban/mute bootstrap snapshot.
+    expect(to.filter(t => t === 'carol').length).toBe(parts + 1);
+    expect(to.filter(t => t === 'eosio.null').length).toBe(parts + 1);
     expect(actions.filter(a => a.data.to === 'eosio.null').every(a => a.data.quantity === '0.0080 CHEESE')).toBe(true);
     await waitFor(() => expect(loadInvites('alice')[ID].members.map(m => m.account)).toEqual(['alice', 'bob', 'carol']));
   });
@@ -57,8 +58,9 @@ describe('public rooms', () => {
     const panel = await screen.findByRole('region', { name: 'Room join requests' });
     fireEvent.click(within(panel).getByRole('button', { name: 'Decline' }));
     expect(screen.queryByRole('region', { name: 'Room join requests' })).not.toBeInTheDocument();
+    const fetchedBeforeRemount = calls.fetch.mock.calls.length;
     view.unmount(); mount();
-    await waitFor(() => expect(calls.fetch).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(calls.fetch.mock.calls.length).toBeGreaterThan(fetchedBeforeRemount));
     expect(screen.queryByRole('region', { name: 'Room join requests' })).not.toBeInTheDocument();
     expect(calls.transact).not.toHaveBeenCalled();
   });
@@ -79,9 +81,9 @@ describe('public rooms', () => {
     fireEvent.click(pay);
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
     const actions = calls.transact.mock.calls[0][0] as { data: { to: string; quantity: string; memo?: string } }[];
-    expect(actions.filter(a => a.data.to === 'eosio.null').map(a => a.data.quantity)).toEqual(['0.0080 CHEESE']);
-    expect(actions.filter(a => a.data.to === 'xcheeseliqst').map(a => a.data.quantity)).toEqual(['0.0020 CHEESE']);
-    expect(actions.find(a => a.data.to === 'eosio.null')!.data.memo?.startsWith('CRYPTROOM1:')).toBe(true);
+    expect(actions.filter(a => a.data.to === 'eosio.null').map(a => a.data.quantity)).toEqual(['0.0080 CHEESE', '0.0080 CHEESE']);
+    expect(actions.filter(a => a.data.to === 'xcheeseliqst').map(a => a.data.quantity)).toEqual(['0.0020 CHEESE', '0.0020 CHEESE']);
+    expect(actions.find(a => a.data.to === 'eosio.null')?.data.memo?.startsWith('CRYPTROOM1:')).toBe(true);
     await waitFor(() => expect(within(edit).getByText('🌐 This room is listed publicly, so anyone can find it and ask to join.')).toBeInTheDocument());
   });
 });

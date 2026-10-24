@@ -47,6 +47,9 @@ import { ChainMemo, MessagingKey, MAX_MESSAGE_BYTES, MAX_HISTORY_PAGES, MAX_PART
 import { download } from '@/components/crypt/cryptDownload';
 import { ChatMessageItem } from '@/components/crypt/ChatMessageItem';
 import { EditedMessagesDialog } from '@/components/crypt/EditedMessagesDialog';
+import { RoomModerationDialog } from '@/components/crypt/RoomModerationDialog';
+import { encodeModeration, encodePolicySnapshot, encodeRoomPolicy, type MuteMinutes } from '@/lib/cryptInviteGroups';
+import { deriveModeration, loadModerationMemos, mergeModerationMemos, moderateMessages, mutedUntil, restrictedAt, saveModerationMemos } from '@/lib/cryptModeration';
 import { applyEdits, canEdit, editTarget, encodeEdit, publicEditLog } from '@/lib/cryptEdits';
 import type { ConversationEntry } from '@/lib/cryptGroups';
 import { CryptHero } from '@/components/crypt/CryptHero';
@@ -163,6 +166,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [text, setText] = useState('');
   const [editingMessage, setEditingMessage] = useState<ConversationEntry | null>(null);
   const [editLogRoom, setEditLogRoom] = useState<string | null>(null);
+  const [moderatingRoom, setModeratingRoom] = useState<string | null>(null);
+  const [pendingModeration, setPendingModeration] = useState<{ id: string; member: string; minutes?: MuteMinutes } | null>(null);
+  const [savedControls, setSavedControls] = useState(() => loadModerationMemos(account));
   const [replyingTo, setReplyingTo] = useState<ReplyRef | null>(null);
   const [openQuote, setOpenQuote] = useState<ReplyRef | null>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -278,7 +284,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   }, [key, poll]);
 
   // Blocked accounts are dropped before any decryption, so their DMs, group copies and voice parts never surface.
-  const visibleMemos = useMemo(() => withoutBlocked(memos, account, blocked), [memos, account, blocked]);
+  const visibleMemos = useMemo(() => withoutBlocked(mergeModerationMemos(savedControls, memos), account, blocked), [memos, savedControls, account, blocked]);
 
   const lastAt = useMemo(() => {
     const out: Record<string, number> = {};
@@ -303,7 +309,20 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if (invitesSignature(invites) === invitesSignature(inviteStore)) return;
     saveInvites(account, invites); setInviteStore(invites);
   }, [invites, inviteStore, account]);
-  const inviteViews = useMemo(() => deriveInviteGroups(cg2Events, invites, account, decisions), [cg2Events, invites, account, decisions]);
+  const moderation = useMemo(() => deriveModeration(cg2Events, invites, account), [cg2Events, invites, account]);
+  useEffect(() => {
+    const controlTxs = new Set(cg2Events.filter(e => e.control.kind === 'invite' || e.control.kind === 'room' || e.control.kind === 'mute' || e.control.kind === 'ban' || e.control.kind === 'policy').filter(e => {
+      if (e.control.kind === 'invite') return invites[e.control.invite.id]?.creator === e.from;
+      return !!eventFromMember(e, invites, account);
+    }).map(e => e.txId));
+    const next = mergeModerationMemos(savedControls, memos.filter(m => controlTxs.has(m.txId)));
+    if (next.length === savedControls.length) return;
+    saveModerationMemos(account, next); setSavedControls(next);
+  }, [cg2Events, invites, account, memos, savedControls]);
+  const inviteViews = useMemo(() => deriveInviteGroups(cg2Events.filter(e => e.control.kind !== 'msg' || !restrictedAt(moderation[e.control.id], e.from, e.time)), invites, account, decisions).map(v => {
+    const banned = moderation[v.invite.id]?.bans ?? {};
+    return { ...v, joined: v.joined.filter(a => banned[a] === undefined) };
+  }), [cg2Events, invites, account, decisions, moderation]);
   const { data: roomMemos, isFetching: roomsLoading, refetch: refetchRooms } = useQuery({
     queryKey: ['crypt-rooms'], enabled: !!key, queryFn: () => fetchRoomMemos(ROOM_PREFIX),
     staleTime: 60_000, refetchInterval: () => (document.visibilityState === 'visible' ? 60_000 : false), retry: false,
@@ -327,7 +346,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const view = inviteViews.find(v => v.invite.id === c.igroup);
     return !!view && view.status !== 'declined' && !!eventFromMember({ key: c.key, txId: c.txId, time: c.time, from: c.from, to: c.to, control: { kind: 'joined', id: c.igroup }, usedKey: c.usedKey }, invites, account);
   }), [decoded, inviteViews, invites, account, contacts]);
-  const edited = useMemo(() => applyEdits(editableConversations), [editableConversations]);
+  const edited = useMemo(() => {
+    const result = applyEdits(moderateMessages(editableConversations, moderation));
+    return { ...result, messages: moderateMessages(result.messages, moderation), log: result.log.filter(e => !e.original.igroup || !restrictedAt(moderation[e.original.igroup], e.original.from, e.original.time) && !restrictedAt(moderation[e.original.igroup], e.original.from, e.at)) };
+  }, [editableConversations, moderation]);
   // Older originals may fall behind a recent edit; read further before resolving them.
   useEffect(() => {
     if (!memos.length || depth >= MAX_HISTORY_PAGES) return;
@@ -335,6 +357,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if ((listedIds.size > 0 && clock - oldest < 72 * 60 * 60 * 1000) || editableConversations.some(m => (m.text?.startsWith('\u0005E1:') || m.voice?.editTarget) && !edited.log.some(e => e.replacement.editTxId === m.txId))) setDepth(d => Math.min(MAX_HISTORY_PAGES, d + 1));
   }, [memos, depth, listedIds, clock, editableConversations, edited]);
   const conversations = edited.messages;
+  useEffect(() => {
+    // Restore retained policies on another device by reading the bounded history window in full.
+    if (Object.keys(invites).length && loaded && depth < MAX_HISTORY_PAGES) setDepth(d => d + 1);
+  }, [invites, loaded, depth]);
   const cancelEdit = () => { setEditingMessage(null); setText(''); setVoice(null); setReplyingTo(null); };
   useEffect(() => { setEditingMessage(null); setText(''); }, [active]);
   const beginEdit = (m: ConversationEntry) => {
@@ -429,6 +455,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
   }, [groups, account, groupOnly, blocked, contacts]);
   const activeGroup = groups.find(g => `group:${g.id}` === active);
   const activeInvite: InviteGroupView | undefined = activeGroup ? undefined : inviteViews.find(v => `group:${v.invite.id}` === active);
+  const activeModeration = activeInvite ? moderation[activeInvite.invite.id] : undefined;
+  const roomBanned = activeModeration?.bans[account] !== undefined;
+  const roomMutedUntil = mutedUntil(activeModeration, account, clock);
+  const roomRestricted = roomBanned || !!roomMutedUntil;
   const inviteKeys = useMemo(() => activeInvite ? Object.fromEntries(activeInvite.invite.members.map(m => [m.account, m.publicKey])) : {}, [activeInvite]);
   const currentRecipients = activeInvite ? activeInvite.joined.filter(m => m !== account) : activeGroup ? activeGroup.members.filter(m => m !== account) : active ? [active] : [];
   // Edits go to the original recipients, not newly joined members who never received the original.
@@ -438,7 +468,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     return candidates.filter(to => decodeConversations(visibleMemos.filter(m => m.from === account && m.to === to), key, contacts, clock, scoped)
       .some(m => m.igroup === editingMessage.igroup && m.group?.id === editingMessage.group?.id && editTarget(m) === editTarget(editingMessage)));
   }, [editingMessage, key, visibleMemos, account, contacts, clock, scoped]);
-  const recipients = editingMessage ? originalRecipients : currentRecipients;
+  const recipients = (editingMessage ? originalRecipients : currentRecipients).filter(a => activeModeration?.bans[a] === undefined);
   const missingKeys = activeInvite ? [] : recipients.filter(m => !contacts[m]);
   useEffect(() => { setReplyingTo(null); }, [active]);
   const thread = activeInvite ? conversations.filter(m => m.igroup === activeInvite.invite.id) : conversations.filter(m => activeGroup
@@ -806,6 +836,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
 
   const send = async () => {
     if (!key || !active || missingKeys.length || !agreed || !text.trim() || tooLong) return;
+    if (activeInvite && (activeInvite.status !== 'joined' || restrictedAt(activeModeration, account, Date.now()))) return;
     if (editingMessage && !canEdit(editingMessage, account)) { toast({ title: 'The 24-hour editing window has ended', variant: 'destructive' }); return; }
     setBusy(true);
     try {
@@ -821,6 +852,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   /** Signs each batch of up to 30 parts in turn; parts already sent stay on chain if a later one fails. */
   const sendVoice = async () => {
     if (!key || !active || !voice || missingKeys.length || !agreed) return;
+    if (activeInvite && (activeInvite.status !== 'joined' || restrictedAt(activeModeration, account, Date.now()))) return;
     if (editingMessage && !canEdit(editingMessage, account)) { toast({ title: 'The 24-hour editing window has ended', variant: 'destructive' }); return; }
     setBusy(true);
     let sent = 0, total = 0;
@@ -828,6 +860,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
       const batches = buildVoiceBatches(key, recipients, activeInvite ? { id: `${VOICE_REF_PREFIX}${activeInvite.invite.id}`, members: ['-'] } : activeGroup ?? null, voice, activeInvite ? inviteKeys : contacts, [permission], undefined, editingMessage ? editTarget(editingMessage) : undefined);
       total = batches.length;
       for (let i = 0; i < batches.length; i++) {
+        if (activeInvite && restrictedAt(activeModeration, account, Date.now())) throw new Error('You are muted or removed from this room.');
         if (editingMessage && !canEdit(editingMessage, account)) throw new Error('The 24-hour editing window has ended.');
         const r = await executeTransaction(batches[i], { successTitle: total > 1 ? `Voice note: transaction ${i + 1} of ${total} sent` : 'Voice note sent' });
         if (!r.success || !r.txId) break;
@@ -874,7 +907,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const noticePlan = (n: NonNullable<typeof pendingNotice>) => {
     const v = viewById(n.id);
     if (!v) return null;
-    const others = v.invite.members.map(m => m.account).filter(a => a !== account);
+    if (n.kind === 'joined' && moderation[n.id]?.bans[account] !== undefined) return null;
+    const others = v.invite.members.map(m => m.account).filter(a => a !== account && moderation[n.id]?.bans[a] === undefined);
     const to = n.kind === 'joined' ? others : n.kind === 'leave' ? v.joined.filter(a => a !== account) : n.to ? [n.to] : [];
     const payload = encodeNotice(n.kind, n.id);
     return { v, to, payload, cost: to.length ? cg2Cost(payload, to.length) : '0.0000 CHEESE' };
@@ -908,7 +942,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if (!v) return false;
     let payload: string;
     try { payload = encodeMeta(v.invite.id, editingInvite.name, editingInvite.avatar); } catch (e) { toast({ title: (e as Error).message, variant: 'destructive' }); return false; }
-    const to = v.invite.members.map(m => m.account).filter(a => a !== account);
+    const to = v.invite.members.map(m => m.account).filter(a => a !== account && moderation[v.invite.id]?.bans[a] === undefined);
     if (!(await sendCg2(to, keysOf(v.invite), payload, 'Group updated'))) return false;
     setEditingInvite(null);
     return true;
@@ -939,41 +973,88 @@ export function Messenger({ account, session }: { account: string; session: NonN
     setAskingRoom(null);
     return true;
   };
-  const sendRoomMemo = async (id: string, memo: string, listed: boolean) => {
-    setBusy(true);
-    try {
-      const r = await executeTransaction(buildRoomActions(account, memo, [permission]), { successTitle: listed ? 'Room listed' : 'Room unlisted' });
-      if (!r.success) return false;
-      setLocalListings(saveLocalListing(account, id, listed));
-      setTimeout(() => void refetchRooms(), 3000);
-      return true;
-    } catch (e) { toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' }); return false; }
-    finally { setBusy(false); }
-  };
   const listRoom = async (id: string, info: { name: string; topic: string; tags: string[] }) => {
     const v = viewById(id);
     if (!key || !v || !v.isCreator) return false;
     let memo: string;
     try { memo = encodeListing({ id, ...info, publicKey: key.publicKey, members: Math.max(1, v.joined.length) }); }
     catch (e) { toast({ title: (e as Error).message, variant: 'destructive' }); return false; }
-    return sendRoomMemo(id, memo, true);
+    // Publish the immutable protected roster privately to every member in the same paid transaction.
+    const protectedMembers = moderation[id]?.protected ?? v.invite.members.map(m => m.account);
+    const payload = encodeRoomPolicy(id, true, protectedMembers);
+    const to = v.invite.members.map(m => m.account).filter(a => a !== account);
+    return sendRoomPolicy(v, memo, payload, to, true);
   };
-  const unlistRoom = (id: string) => sendRoomMemo(id, encodeUnlist(id), false);
+  const sendRoomPolicy = async (v: InviteGroupView, memo: string, payload: string, to: string[], listed: boolean) => {
+    if (!key || busy) return false;
+    setBusy(true);
+    try {
+      const actions = [...buildRoomActions(account, memo, [permission]), ...buildCg2Actions(key, to, keysOf(v.invite), payload, [permission])];
+      const r = await executeTransaction(actions, { successTitle: listed ? 'Room listed' : 'Room unlisted' });
+      if (!r.success || !r.txId) return false;
+      setLocalListings(saveLocalListing(account, v.invite.id, listed));
+      await refresh(); void refetchRooms();
+      return true;
+    } catch (e) { toast({ title: 'Room update failed', description: (e as Error).message, variant: 'destructive' }); return false; }
+    finally { setBusy(false); }
+  };
+  const unlistRoom = (id: string) => {
+    const v = viewById(id);
+    if (!v?.isCreator) return Promise.resolve(false);
+    return sendRoomPolicy(v, encodeUnlist(id), encodeRoomPolicy(id, false, moderation[id]?.protected ?? v.invite.members.map(m => m.account)), v.invite.members.map(m => m.account).filter(a => a !== account), false);
+  };
+  const moderationPlan = (n: NonNullable<typeof pendingModeration>) => {
+    const v = viewById(n.id), state = moderation[n.id];
+    if (!v?.isCreator || !listedIds.has(n.id) || n.member === account || !v.invite.members.some(m => m.account === n.member) || state?.bans[n.member] !== undefined) return null;
+    if (n.minutes === undefined && (!state || state.protected.includes(n.member))) return null;
+    const policy = !state ? encodeRoomPolicy(n.id, true, v.invite.members.map(m => m.account)) : null;
+    const payload = encodeModeration(n.id, n.member, n.minutes);
+    const to = v.invite.members.map(m => m.account).filter(a => a !== account);
+    return { v, to, payload, policy, cost: `${(parseFloat(cg2Cost(payload, to.length)) + (policy ? parseFloat(cg2Cost(policy, to.length)) : 0)).toFixed(4)} CHEESE` };
+  };
+  const confirmModeration = async () => {
+    if (!key || !pendingModeration || busy) return false;
+    const plan = moderationPlan(pendingModeration);
+    if (!plan) return false;
+    setBusy(true);
+    try {
+      const actions = [...(plan.policy ? buildCg2Actions(key, plan.to, keysOf(plan.v.invite), plan.policy, [permission]) : []), ...buildCg2Actions(key, plan.to, keysOf(plan.v.invite), plan.payload, [permission])];
+      const r = await executeTransaction(actions, { successTitle: pendingModeration.minutes ? 'Member muted' : 'Member removed' });
+      if (!r.success || !r.txId) return false;
+      setPendingModeration(null); await refresh();
+      return true;
+    } catch (e) { toast({ title: 'Moderation failed', description: (e as Error).message, variant: 'destructive' }); return false; }
+    finally { setBusy(false); }
+  };
   /** The creator adds the requester by sending the grown invite to every member (old members keep their keys). */
   const joinPlan = (r: JoinRequest) => {
     const v = viewById(r.groupId);
-    if (!v || !v.isCreator || v.invite.members.length >= MAX_INVITE_MEMBERS || v.invite.members.some(m => m.account === r.from)) return null;
+    if (!v || !v.isCreator || !listedIds.has(r.groupId) || v.invite.members.length >= MAX_INVITE_MEMBERS || v.invite.members.some(m => m.account === r.from) || moderation[r.groupId]?.bans[r.from] !== undefined) return null;
     const updated: InviteGroup = { ...v.invite, members: [...v.invite.members, { account: r.from, publicKey: r.publicKey }] };
     let payload: string;
     try { payload = encodeInvite(updated); } catch { return null; }
-    const to = updated.members.map(m => m.account).filter(a => a !== account);
-    return { v, updated, payload, to, cost: cg2Cost(payload, to.length) };
+    const to = updated.members.map(m => m.account).filter(a => a !== account && moderation[v.invite.id]?.bans[a] === undefined);
+    const state = moderation[updated.id];
+    const policy = encodeRoomPolicy(updated.id, true, state?.protected ?? v.invite.members.map(m => m.account));
+    const snapshot = encodePolicySnapshot(updated.id, state?.protected ?? v.invite.members.map(m => m.account), Object.keys(state?.bans ?? {}), Object.entries(state?.mutes ?? {}).flatMap(([a, intervals]) => {
+      const longest = intervals.filter(m => m.until > Date.now()).sort((a, b) => b.until - a.until)[0];
+      return longest ? [[a, longest.from, longest.until] as [string, number, number]] : [];
+    }));
+    return { v, updated, payload, policy, snapshot, to, cost: `${(parseFloat(cg2Cost(payload, to.length)) + parseFloat(cg2Cost(policy, to.length)) + parseFloat(cg2Cost(snapshot, 1))).toFixed(4)} CHEESE` };
   };
   const confirmJoin = async () => {
     if (!acceptingJoin) return false;
     const plan = joinPlan(acceptingJoin);
     if (!plan) { toast({ title: 'This room is full or the request is out of date', variant: 'destructive' }); setAcceptingJoin(null); return false; }
-    if (!(await sendCg2(plan.to, keysOf(plan.updated), plan.payload, `${acceptingJoin.from} invited to ${plan.v.name}`))) return false;
+    if (!key) return false;
+    const actions = [...buildCg2Actions(key, plan.to, keysOf(plan.updated), plan.payload, [permission]), ...buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.snapshot, [permission]), ...buildCg2Actions(key, plan.to, keysOf(plan.updated), plan.policy, [permission])];
+    setBusy(true);
+    let r;
+    try { r = await executeTransaction(actions, { successTitle: `${acceptingJoin.from} invited to ${plan.v.name}` }); }
+    catch (e) { toast({ title: 'Invite failed', description: (e as Error).message, variant: 'destructive' }); return false; }
+    finally { setBusy(false); }
+    if (!r.success || !r.txId) return false;
+    await refresh();
     const next = { ...inviteStore, [plan.updated.id]: plan.updated };
     saveInvites(account, next); setInviteStore(next);
     setAcceptingJoin(null);
@@ -1057,7 +1138,18 @@ export function Messenger({ account, session }: { account: string; session: NonN
             <Button size="sm" variant="outline" className="h-7 shrink-0 text-xs" aria-label={listedIds.has(editingInvite.id) ? 'Manage public room listing' : 'List room publicly'} onClick={() => setListingRoom(editingInvite.id)}>🌐 {listedIds.has(editingInvite.id) ? 'Manage listing' : 'List room'}</Button>
           </div>
           {v.isCreator && listedIds.has(v.invite.id) && <Button variant="outline" size="sm" onClick={() => setEditLogRoom(v.invite.id)}>✏️ Edited messages</Button>}
+          {v.isCreator && listedIds.has(v.invite.id) && <Button variant="outline" size="sm" onClick={() => setModeratingRoom(v.invite.id)}>🔇 Moderate members</Button>}
         </PaidActionDialog>;
+      })()}
+      {moderatingRoom && (() => {
+        const v = viewById(moderatingRoom);
+        if (!v?.isCreator || !listedIds.has(moderatingRoom)) return null;
+        return <RoomModerationDialog view={v} state={moderation[moderatingRoom]} now={clock} busy={busy} nameFor={nameFor} onAction={(member, minutes) => setPendingModeration({ id: v.invite.id, member, minutes })} onClose={() => setModeratingRoom(null)} />;
+      })()}
+      {pendingModeration && (() => {
+        const plan = moderationPlan(pendingModeration);
+        if (!plan) return null;
+        return <PaidActionDialog title={pendingModeration.minutes ? `🔇 Mute ${nameFor(pendingModeration.member)}` : `🚫 Remove ${nameFor(pendingModeration.member)}`} description={pendingModeration.minutes ? `Mute for ${pendingModeration.minutes} minutes. Messages sent during the mute stay hidden after it ends.` : 'Exclude this member from future room messages. Existing blockchain copies and keys cannot be revoked.'} cost={plan.cost} confirmLabel={pendingModeration.minutes ? 'Pay & mute' : 'Pay & remove'} busy={busy} onConfirm={confirmModeration} onClose={() => setPendingModeration(null)} />;
       })()}
       {editLogRoom && (() => {
         const v = viewById(editLogRoom);
@@ -1119,6 +1211,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         const v = viewById(listingRoom);
         if (!v || !v.isCreator) return null;
         return <RoomListingDialog groupId={v.invite.id} groupName={v.name} members={Math.max(1, v.joined.length)} publicKey={key.publicKey} listed={listedIds.has(v.invite.id)} busy={busy}
+          cost={`${(0.0100 + parseFloat(cg2Cost(encodeRoomPolicy(v.invite.id, !listedIds.has(v.invite.id), moderation[v.invite.id]?.protected ?? v.invite.members.map(m => m.account)), v.invite.members.length - 1))).toFixed(4)} CHEESE`}
           onList={info => listRoom(v.invite.id, info)} onUnlist={() => unlistRoom(v.invite.id)} onClose={() => setListingRoom(null)} />;
       })()}
       <PublicInboxDialog enabled={publicInbox} onChange={enabled => { savePublicInbox(account, enabled); setPublicInbox(enabled); }} open={inboxOpen} onOpenChange={setInboxOpen} />
@@ -1153,6 +1246,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
               <DialogContent className="max-w-lg">
                 {openQuote && (() => {
                   const original = thread.find(x => x.from === openQuote.author && x.time === openQuote.time);
+                  const quoteHidden = restrictedAt(activeModeration, openQuote.author, openQuote.time);
                   const full = original ? (parseReply(original.text)?.body ?? original.text) : null;
                   return <>
                     <DialogHeader>
@@ -1160,7 +1254,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                       <DialogDescription>{new Date(openQuote.time).toLocaleString()}{original?.txId && <> · <a href={`https://waxblock.io/transaction/${encodeURIComponent(original.txId)}`} target="_blank" rel="noreferrer" className="font-semibold text-cheese underline underline-offset-2">Tx</a></>}</DialogDescription>
                     </DialogHeader>
                     <div className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words text-sm">
-                      {original?.voice ? <VoiceNoteBubble note={original.voice} />
+                      {quoteHidden ? null : original?.voice ? <VoiceNoteBubble note={original.voice} />
                         : full != null ? parseNftMessage(full).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} txId={original!.txId} /> : <span key={i} className="block">{seg.text}</span>)
                         : <><span className="block">{openQuote.quote || '…'}</span><span className="mt-2 block text-xs text-muted-foreground">The original message isn't loaded here, so this is the quoted snippet.</span></>}
                     </div>
@@ -1183,7 +1277,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                   <ChatMessageItem m={m} account={account} keyAvatar={key?.avatar} avatars={avatars}
                     contacts={contacts} active={active} activeGroup={activeGroup} nameFor={nameFor}
                     highlighted={replyNavigation.highlighted.has(m.key)}
-                    editable={canEdit(m, account, clock) && !busy && (!activeInvite || activeInvite.status === 'joined')} onEdit={beginEdit}
+                    editable={canEdit(m, account, clock) && !busy && !roomRestricted && (!activeInvite || activeInvite.status === 'joined')} onEdit={beginEdit}
                     onReply={(x) => { setEditingMessage(null); setReplyingTo({ author: x.from, time: x.time, quote: quoteOf(x.text, !!x.voice) }); setVoice(null); setTimeout(() => composerRef.current?.focus(), 0); }}
                     onOpenQuote={setOpenQuote} openedAt={acceptedRequestMessages.current.has(m.key) ? { current: Infinity } : openedAt} />
                 </Fragment>
@@ -1198,7 +1292,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
               @{replyNavigation.pending.length > 99 ? '99+' : replyNavigation.pending.length}
             </Button>}
             </div>
-            {activeInvite?.status === 'invited' ? (
+            {roomRestricted ? <p className="text-sm text-muted-foreground p-4 border-t border-border">{roomBanned ? 'You were removed from this room. Your earlier history stays readable.' : `Muted until ${new Date(roomMutedUntil).toLocaleString()}. Messages sent during the mute remain hidden.`}</p> : activeInvite?.status === 'invited' ? (
               <div className="space-y-2 p-4 border-t border-border text-sm">
                 <p>✉️ <span className="font-semibold">{nameFor(activeInvite.invite.creator)}</span> invited you to <span className="font-semibold">{activeInvite.name}</span> with {activeInvite.invite.members.length - 1} other{activeInvite.invite.members.length > 2 ? 's' : ''}.</p>
                 <p className="text-xs text-muted-foreground">Joining tells the other members in encrypted messages. Declining sends nothing.</p>

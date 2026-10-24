@@ -20,10 +20,16 @@ export const VOICE_REF_PREFIX = 'i';
 
 export interface InviteMember { account: string; publicKey: string }
 export interface InviteGroup { id: string; name: string; creator: string; created: number; members: InviteMember[]; avatar?: CryptAvatar }
-export type Cg2Kind = 'invite' | 'msg' | 'joined' | 'leave' | 'meta' | 'friend' | 'friend-ok' | 'join';
+export const MUTE_MINUTES = [15, 60, 360, 1440] as const;
+export type MuteMinutes = typeof MUTE_MINUTES[number];
+export type Cg2Kind = 'invite' | 'msg' | 'joined' | 'leave' | 'meta' | 'friend' | 'friend-ok' | 'join' | 'room' | 'mute' | 'ban' | 'policy';
 export type Cg2 =
   | { kind: 'invite'; invite: InviteGroup }
   | { kind: 'msg'; id: string; text: string }
+  | { kind: 'room'; id: string; listed: boolean; protected: string[] }
+  | { kind: 'mute'; id: string; member: string; minutes: MuteMinutes }
+  | { kind: 'ban'; id: string; member: string }
+  | { kind: 'policy'; id: string; protected: string[]; bans: string[]; mutes: [string, number, number][] }
   /** `join`: a request to a public room's creator (cryptRooms.ts); never a membership change by itself. */
   | { kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'join'; id: string }
   | { kind: 'meta'; id: string; name: string; avatar?: CryptAvatar };
@@ -69,6 +75,19 @@ export function encodeInvite(g: InviteGroup): string {
 }
 export const encodeGroupText = (id: string, text: string) => wire('msg', { i: checkId(id), t: text });
 export const encodeNotice = (kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'join', id: string) => wire(kind, { i: checkId(id) });
+export function encodeRoomPolicy(id: string, listed: boolean, protectedMembers: string[]) {
+  if (!protectedMembers.length || protectedMembers.length > MAX_INVITE_MEMBERS || new Set(protectedMembers).size !== protectedMembers.length || protectedMembers.some(a => !ACCOUNT.test(a))) throw new Error('Invalid protected members');
+  return wire('room', { i: checkId(id), l: listed, p: protectedMembers });
+}
+export function encodeModeration(id: string, member: string, minutes?: MuteMinutes) {
+  if (!ACCOUNT.test(member) || (minutes !== undefined && !MUTE_MINUTES.includes(minutes))) throw new Error('Invalid moderation action');
+  return minutes === undefined ? wire('ban', { i: checkId(id), a: member }) : wire('mute', { i: checkId(id), a: member, d: minutes });
+}
+export function encodePolicySnapshot(id: string, protectedMembers: string[], bans: string[], mutes: [string, number, number][]) {
+  const payload = wire('policy', { i: checkId(id), p: protectedMembers, b: bans, u: mutes });
+  if (!parseCg2(payload)) throw new Error('Invalid room policy');
+  return payload;
+}
 export function encodeMeta(id: string, name: string, avatar?: CryptAvatar): string {
   const n = parseCryptName(name);
   if (!n) throw new Error('Give the group a name');
@@ -79,8 +98,8 @@ export const isCg2 = (text: string | null | undefined) => !!text && text.startsW
 
 /** Strict decode; anything malformed is null (and, being CG2-prefixed, never shown as chat text). */
 export function parseCg2(text: string | null | undefined): Cg2 | null {
-  if (!isCg2(text)) return null;
-  const rest = text!.slice(CG2_PREFIX.length);
+  if (!text || !isCg2(text)) return null;
+  const rest = text.slice(CG2_PREFIX.length);
   const colon = rest.indexOf(':');
   if (colon < 0) return null;
   const kind = rest.slice(0, colon);
@@ -90,6 +109,21 @@ export function parseCg2(text: string | null | undefined): Cg2 | null {
   if (kind === 'invite') { const invite = validateInvite(body); return invite ? { kind, invite } : null; }
   if (typeof body.i !== 'string' || !ID.test(body.i)) return null;
   const id = body.i;
+  if (kind === 'policy') {
+    const accounts = (a: unknown): a is string[] => Array.isArray(a) && a.length <= MAX_INVITE_MEMBERS && new Set(a).size === a.length && a.every(v => typeof v === 'string' && ACCOUNT.test(v));
+    if (!accounts(body.p) || !body.p.length || !accounts(body.b) || body.b.some(a => (body.p as string[]).includes(a)) || !Array.isArray(body.u) || body.u.length > 8 || body.u.some(u => !Array.isArray(u) || u.length !== 3 || typeof u[0] !== 'string' || !ACCOUNT.test(u[0]) || !Number.isSafeInteger(u[1]) || !Number.isSafeInteger(u[2]) || u[1] < 0 || !MUTE_MINUTES.some(d => u[2] - u[1] === d * 60_000))) return null;
+    return { kind, id, protected: body.p, bans: body.b, mutes: body.u as [string, number, number][] };
+  }
+  if (kind === 'room') {
+    if (typeof body.l !== 'boolean' || !Array.isArray(body.p) || !body.p.length || body.p.length > MAX_INVITE_MEMBERS || new Set(body.p).size !== body.p.length || body.p.some(a => typeof a !== 'string' || !ACCOUNT.test(a))) return null;
+    return { kind, id, listed: body.l, protected: body.p as string[] };
+  }
+  if (kind === 'ban' || kind === 'mute') {
+    if (typeof body.a !== 'string' || !ACCOUNT.test(body.a)) return null;
+    if (kind === 'ban') return { kind, id, member: body.a };
+    if (typeof body.d !== 'number' || !MUTE_MINUTES.some(d => d === body.d)) return null;
+    return { kind, id, member: body.a, minutes: body.d as MuteMinutes };
+  }
   if (kind === 'msg') return typeof body.t === 'string' && body.t.trim() ? { kind, id, text: body.t } : null;
   if (kind === 'joined' || kind === 'leave' || kind === 'friend' || kind === 'friend-ok' || kind === 'join') return { kind, id };
   if (kind === 'meta') {

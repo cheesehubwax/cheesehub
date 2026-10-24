@@ -1,0 +1,43 @@
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { beforeEach, expect, it, vi } from 'vitest';
+import type { Session } from '@wharfkit/session';
+import { encryptMemo, generateKey, saveKey, splitMessage } from '@/lib/cheeseCrypt';
+import { encodeGroupText, encodeRoomPolicy, saveInvites } from '@/lib/cryptInviteGroups';
+import { encodeListing } from '@/lib/cryptRooms';
+import { Messenger } from '@/pages/CheeseCrypt';
+const calls = vi.hoisted(() => ({ fetch: vi.fn(), rooms: vi.fn(), transact: vi.fn() }));
+vi.mock('@/context/WaxContext', () => ({ useWax: vi.fn() }));
+vi.mock('@/hooks/useWaxTransaction', () => ({ useWaxTransaction: () => ({ executeTransaction: calls.transact }) }));
+vi.mock('@/lib/cheeseCrypt', async original => ({ ...await original<typeof import('@/lib/cheeseCrypt')>(), fetchMessages: calls.fetch, fetchRoomMemos: calls.rooms, lookupPublishedKey: async () => null }));
+vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import('@/lib/cryptVault')>(), recallVault: async () => null }));
+const alice = generateKey('alice'), bob = generateKey('bob'), carol = generateKey('carol');
+const id = '0123456789abcdef', at = Date.now() - 10000;
+const memos = (payload: string, time: number, from = alice, to = bob, txId = `t${time}`) => splitMessage(payload).map(p => ({ from: from.account, to: to.account, time, txId, quantity: '0.0010 CHEESE', memo: encryptMemo(p, to.publicKey, from.secretKey) }));
+beforeEach(() => {
+  localStorage.clear(); vi.clearAllMocks(); saveKey(alice);
+  saveInvites('alice', { [id]: { id, name: 'Moderated room', creator: 'alice', created: at - 1000, members: [alice, bob, carol].map(k => ({ account: k.account, publicKey: k.publicKey })) } });
+  calls.rooms.mockResolvedValue([{ from: 'alice', to: 'eosio.null', txId: 'listed', time: at, quantity: '0.0080 CHEESE', memo: encodeListing({ id, name: 'Moderated room', topic: '', tags: [], publicKey: alice.publicKey, members: 2 }) }]);
+  calls.fetch.mockResolvedValue(memos(encodeRoomPolicy(id, true, ['alice', 'bob']), at));
+});
+it('owner pays a 15m mute and confirmed muted messages disappear after refresh', async () => {
+  const history = memos(encodeRoomPolicy(id, true, ['alice', 'bob']), at);
+  calls.transact.mockImplementation(async (actions: { data: { from: string; to: string; memo: string; quantity: string } }[]) => {
+    calls.fetch.mockResolvedValue([...history, ...actions.filter(a => a.data.to === 'bob' || a.data.to === 'carol').map(a => ({ ...a.data, txId: 'mute', time: at + 1000 })), ...memos(encodeGroupText(id, 'muted content'), at + 2000, carol, alice)]);
+    return { success: true, txId: 'mute' };
+  });
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="alice" session={{ permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
+  fireEvent.click(await screen.findByRole('button', { name: /Moderated room/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Edit group' }));
+  fireEvent.click(await screen.findByRole('button', { name: '🔇 Moderate members' }));
+  const dialog = await screen.findByRole('dialog', { name: '🔇 Moderate Moderated room' });
+  expect(within(dialog).getByRole('button', { name: 'Remove bob' })).toBeDisabled();
+  expect(within(dialog).getByRole('button', { name: 'Remove carol' })).toBeEnabled();
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Mute carol for 15m' }));
+  const payDialog = await screen.findByRole('dialog', { name: '🔇 Mute carol' });
+  const pay = within(payDialog).getByRole('button', { name: 'Pay & mute' });
+  expect(pay).toBeDisabled(); fireEvent.click(within(payDialog).getByRole('checkbox')); fireEvent.click(pay);
+  await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(calls.fetch.mock.calls.length).toBeGreaterThan(1));
+  expect(within(screen.getByRole('list', { name: 'Chat messages', hidden: true })).queryByText('muted content')).not.toBeInTheDocument();
+});

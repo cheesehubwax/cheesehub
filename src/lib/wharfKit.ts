@@ -367,7 +367,7 @@ if (typeof window !== 'undefined') {
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
-          if (node instanceof HTMLElement) {
+          if (typeof HTMLElement !== 'undefined' && node instanceof HTMLElement) {
             if (node.id === 'wharfkit-web-ui' || node.id?.startsWith('wharfkit')) {
               // Ensure high z-index and full interactivity
               node.style.setProperty('z-index', '999999', 'important');
@@ -401,7 +401,7 @@ if (typeof window !== 'undefined') {
 
         // Cleanup when modal is removed
         for (const node of mutation.removedNodes) {
-          if (node instanceof HTMLElement && (node.id === 'wharfkit-web-ui' || node.id?.startsWith('wharfkit'))) {
+          if (typeof HTMLElement !== 'undefined' && node instanceof HTMLElement && (node.id === 'wharfkit-web-ui' || node.id?.startsWith('wharfkit'))) {
             document.querySelectorAll('[data-radix-portal]').forEach(el => {
               (el as HTMLElement).style.pointerEvents = '';
             });
