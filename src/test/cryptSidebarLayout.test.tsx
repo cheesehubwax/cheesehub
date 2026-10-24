@@ -38,11 +38,19 @@ describe('compact sidebar', () => {
     await screen.findByRole('button', { name: /^bob/ });
     fireEvent.click(screen.getByRole('button', { name: 'Hide groups and friends' }));
     expect(screen.getByRole('button', { name: 'Show groups and friends' })).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByRole('button', { name: /^bob/ }).closest('.overflow-y-auto')).toHaveClass('hidden');
+    const listBob = () => screen.getAllByRole('button', { name: /^bob/ }).find(b => !b.closest('nav'))!;
+    expect(listBob().closest('.overflow-y-auto')).toHaveClass('hidden');
+    // The collapsed strip shows bob's avatar with his unread count and opens his chat.
+    const strip = screen.getByRole('navigation', { name: 'Chats' });
+    const railBob = strip.querySelector('button[title="bob"]') as HTMLElement;
+    expect(railBob).toHaveAttribute('aria-label', 'bob, 1 unread');
+    fireEvent.click(railBob);
+    expect(railBob).toHaveAttribute('aria-current', 'true');
     expect(localStorage.getItem('cheesecrypt-sidebar-collapsed-alice')).toBe('1');
     unmount(); mount();
     fireEvent.click(await screen.findByRole('button', { name: 'Show groups and friends' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: /^bob/ }).closest('.overflow-y-auto')).not.toHaveClass('hidden'));
+    expect(screen.queryByRole('navigation', { name: 'Chats' })).toBeNull();
+    await waitFor(() => expect(listBob().closest('.overflow-y-auto')).not.toHaveClass('hidden'));
     expect(localStorage.getItem('cheesecrypt-sidebar-collapsed-alice')).toBe('0');
   });
 
