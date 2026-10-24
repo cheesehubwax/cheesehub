@@ -51,7 +51,7 @@ export function CryptChatHeader({
     <div className={cn('min-w-0 px-4 py-3 border-b border-border font-semibold flex flex-wrap items-center gap-2 md:col-start-2 md:row-start-1', !active && 'hidden md:flex')}>
       {active && <>
             {activeInvite ? <div className="w-full space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                 {activeInvite.avatar ? <PixelAvatar account={activeInvite.invite.id} avatar={activeInvite.avatar} className="h-14 w-14" /> : <span aria-hidden className="flex h-14 w-14 shrink-0 items-center justify-center text-3xl">👥</span>}
                 <span className="min-w-0">
                   <span className="block break-words">{activeInvite.name}</span>
