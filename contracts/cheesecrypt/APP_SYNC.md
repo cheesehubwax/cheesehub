@@ -19,6 +19,7 @@ checklist with every CHEESECrypt change, but do not reintroduce plaintext roles 
 | Admin cannot ban; founders ban/admin-collapse immune | Client-only; do not infer role from fee kind, balance owner or recipient array |
 | Mutes permanently suppress send-time traffic/quotes | Client-only presentation/filtering; malicious clients can ignore it |
 | Reports member→owner+admins, admin→owner | Encrypted ordinary text controls; notifications only; no report table |
+| Join requests 0.1000 CHEESE owner fee + 0.0001 copy + 0.0100 platform = 0.1101 (`cryptRooms.ts`) | Separate plain direct transfer to the creator; not routed, no router fee kind |
 | Join-request declines (`join-no`) creator→requester | One encrypted part with the normal message fee; notification only; no request table |
 | Edits 24h, owner log 72h (`cryptEdits.ts`) | Client-only same-sender/conversation digest resolution; no edit receipts/table/action |
 | Memo ≤256 bytes | Router checks memo byte length, not plaintext semantics |

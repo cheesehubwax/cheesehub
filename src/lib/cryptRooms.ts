@@ -5,7 +5,7 @@
 import { decodeBase64 } from 'tweetnacl-util';
 import {
   assembleMessages, bytesToText, buildCryptFeeActions, buildSendMessageActions, decryptMemoBytes, encryptMemo, KEY_PUBLISH_TO, MEMO_MAX_BYTES, MESSAGE_FEE_QUANTITY,
-  msgPrefixOf, type ChainMemo, type MessagingKey,
+  messageCost, msgPrefixOf, type ChainMemo, type MessagingKey,
 } from '@/lib/cheeseCrypt';
 import { encodeNotice, isCg2, MAX_PUBLIC_ROOM_MEMBERS, parseCg2, type Cg2Event, type RoomInviter } from '@/lib/cryptInviteGroups';
 
@@ -190,9 +190,18 @@ export function encodeJoinMemo(key: MessagingKey, roomId: string, creatorPublicK
   return memo;
 }
 
-/** One 0.0001 CHEESE transfer to the creator plus the normal platform fee, as for any one-part room notice. */
-export const buildJoinRequestActions = (key: MessagingKey, creator: string, creatorPublicKey: string, roomId: string, auth: unknown[]) =>
-  buildSendMessageActions(key.account, creator, [encodeJoinMemo(key, roomId, creatorPublicKey)], auth, false, true);
+/** Paid straight to the room creator on every join request: rewards owners and deters repeat requests after a decline. */
+export const JOIN_OWNER_FEE_QUANTITY = '0.1000 CHEESE';
+export const JOIN_OWNER_FEE_MEMO = 'CHEESECrypt join request fee';
+/** Total of one join request: 0.0001 CHEESE message copy + 0.1000 CHEESE owner fee + 0.0100 CHEESE platform fee. */
+export const JOIN_REQUEST_COST = `${((Math.round(parseFloat(messageCost(1)) * 10000) + Math.round(parseFloat(JOIN_OWNER_FEE_QUANTITY) * 10000)) / 10000).toFixed(4)} CHEESE`;
+
+/** The 0.0001 CHEESE encrypted request to the creator, a separate plain 0.1000 CHEESE owner fee to the creator, then the normal platform fee. */
+export const buildJoinRequestActions = (key: MessagingKey, creator: string, creatorPublicKey: string, roomId: string, auth: unknown[]) => {
+  const [request, ...platform] = buildSendMessageActions(key.account, creator, [encodeJoinMemo(key, roomId, creatorPublicKey)], auth, false, true);
+  const ownerFee = { account: 'cheeseburger', name: 'transfer', authorization: auth, data: { from: key.account, to: creator, quantity: JOIN_OWNER_FEE_QUANTITY, memo: JOIN_OWNER_FEE_MEMO } };
+  return [request, ownerFee, ...platform];
+};
 
 export interface JoinRequest { groupId: string; from: string; publicKey: string; time: number }
 /** Join requests to my listed rooms from non-members, newest per (room, requester), after any decline. */

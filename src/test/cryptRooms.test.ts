@@ -3,7 +3,7 @@ import { encryptMemo, generateKey, splitMessage, type ChainMemo, type MessagingK
 import { decodeConversations, groupMessageCost } from '@/lib/cryptGroups';
 import { buildCg2Actions, collectInvites, encodeInvite, encodeNotice, parseCg2, partsOf, scopedKeys, type Cg2Event, type InviteGroup } from '@/lib/cryptInviteGroups';
 import {
-  buildJoinRequestActions, buildRoomActions, collectJoinRequests, encodeJoinMemo, joinMemoKey, collectListings, decodeRoomEvents, encodeListing, encodeUnlist, listedRoomIds, parseRoomMemo, searchListings,
+  JOIN_REQUEST_COST, buildJoinRequestActions, buildRoomActions, collectJoinRequests, encodeJoinMemo, joinMemoKey, collectListings, decodeRoomEvents, encodeListing, encodeUnlist, listedRoomIds, parseRoomMemo, searchListings,
 } from '@/lib/cryptRooms';
 
 const alice = generateKey('alice'), bob = generateKey('bob'), carol = generateKey('carol'), dave = generateKey('dave');
@@ -49,7 +49,8 @@ describe('room fee', () => {
     expect(partsOf(payload)).toBe(1);
     expect(groupMessageCost(1, 1)).toBe('0.0101 CHEESE');
     const actions = buildCg2Actions(bob, ['alice'], { alice: alice.publicKey }, payload, []);
-    expect(actions.map(a => [a.data.to, a.data.quantity])).toEqual([['alice', '0.0001 CHEESE'], ['eosio.null', '0.0080 CHEESE'], ['xcheeseliqst', '0.0020 CHEESE']]);
+    expect(actions.map(a => [a.data.to, a.data.quantity])).toEqual([['alice', '0.0001 CHEESE'], ['alice', '0.1000 CHEESE'], ['eosio.null', '0.0080 CHEESE'], ['xcheeseliqst', '0.0020 CHEESE']]);
+    expect(JOIN_REQUEST_COST).toBe('0.1101 CHEESE');
   });
 });
 
