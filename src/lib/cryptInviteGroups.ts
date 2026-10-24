@@ -24,7 +24,7 @@ export interface InviteMember { account: string; publicKey: string }
 export interface InviteGroup { id: string; name: string; creator: string; created: number; members: InviteMember[]; avatar?: CryptAvatar; publicRoom?: boolean }
 export const MUTE_MINUTES = [15, 60, 360, 1440] as const;
 export type MuteMinutes = typeof MUTE_MINUTES[number];
-export type Cg2Kind = 'invite' | 'admission' | 'add' | 'msg' | 'joined' | 'leave' | 'meta' | 'friend' | 'friend-ok' | 'join' | 'room' | 'mute' | 'ban' | 'policy';
+export type Cg2Kind = 'invite' | 'admission' | 'add' | 'msg' | 'joined' | 'leave' | 'meta' | 'friend' | 'friend-ok' | 'join' | 'room' | 'mute' | 'ban' | 'policy' | 'admin' | 'collapse';
 export type Cg2 =
   | { kind: 'invite'; invite: InviteGroup }
   | { kind: 'admission'; invite: InviteGroup }
@@ -33,7 +33,11 @@ export type Cg2 =
   | { kind: 'room'; id: string; listed: boolean; protected: string[] }
   | { kind: 'mute'; id: string; member: string; minutes: MuteMinutes }
   | { kind: 'ban'; id: string; member: string }
-  | { kind: 'policy'; id: string; protected: string[]; bans: string[]; mutes: [string, number, number][] }
+  | { kind: 'policy'; id: string; protected: string[]; bans: string[]; mutes: [string, number, number][]; admins: string[] }
+  /** Owner-only: appoint (`on`) or dismiss a public-room admin. */
+  | { kind: 'admin'; id: string; member: string; on: boolean }
+  /** Owner/admin: collapse the message by `member` whose edit digest (cryptEdits.editTarget) is `target`. */
+  | { kind: 'collapse'; id: string; member: string; target: string }
   /** `join`: a request to a public room's creator (cryptRooms.ts); never a membership change by itself. */
   | { kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'join'; id: string }
   | { kind: 'meta'; id: string; name: string; avatar?: CryptAvatar };
@@ -98,10 +102,18 @@ export function encodeModeration(id: string, member: string, minutes?: MuteMinut
   if (!ACCOUNT.test(member) || (minutes !== undefined && !MUTE_MINUTES.includes(minutes))) throw new Error('Invalid moderation action');
   return minutes === undefined ? wire('ban', { i: checkId(id), a: member }) : wire('mute', { i: checkId(id), a: member, d: minutes });
 }
-export function encodePolicySnapshot(id: string, protectedMembers: string[], bans: string[], mutes: [string, number, number][]) {
-  const payload = wire('policy', { i: checkId(id), p: protectedMembers, b: bans, u: mutes });
+export function encodePolicySnapshot(id: string, protectedMembers: string[], bans: string[], mutes: [string, number, number][], admins: string[] = []) {
+  const payload = wire('policy', { i: checkId(id), p: protectedMembers, b: bans, u: mutes, ...(admins.length ? { d: admins } : {}) });
   if (!parseCg2(payload)) throw new Error('Invalid room policy');
   return payload;
+}
+export function encodeAdmin(id: string, member: string, on: boolean) {
+  if (!ACCOUNT.test(member)) throw new Error('Invalid admin');
+  return wire('admin', { i: checkId(id), a: member, e: on });
+}
+export function encodeCollapse(id: string, author: string, target: string) {
+  if (!ACCOUNT.test(author) || !/^[a-f0-9]{64}$/.test(target)) throw new Error('Invalid collapse');
+  return wire('collapse', { i: checkId(id), a: author, h: target });
 }
 export function encodeMeta(id: string, name: string, avatar?: CryptAvatar): string {
   const n = parseCryptName(name);
@@ -131,12 +143,16 @@ export function parseCg2(text: string | null | undefined): Cg2 | null {
   if (kind === 'policy') {
     const accounts = (a: unknown): a is string[] => Array.isArray(a) && a.length <= MAX_PUBLIC_ROOM_MEMBERS && new Set(a).size === a.length && a.every(v => typeof v === 'string' && ACCOUNT.test(v));
     if (!accounts(body.p) || !body.p.length || !accounts(body.b) || body.b.some(a => (body.p as string[]).includes(a)) || !Array.isArray(body.u) || body.u.length > MAX_PUBLIC_ROOM_MEMBERS || body.u.some(u => !Array.isArray(u) || u.length !== 3 || typeof u[0] !== 'string' || !ACCOUNT.test(u[0]) || !Number.isSafeInteger(u[1]) || !Number.isSafeInteger(u[2]) || u[1] < 0 || !MUTE_MINUTES.some(d => u[2] - u[1] === d * 60_000))) return null;
-    return { kind, id, protected: body.p, bans: body.b, mutes: body.u as [string, number, number][] };
+    const admins = body.d === undefined ? [] : body.d;
+    if (!accounts(admins) || admins.some(a => (body.b as string[]).includes(a))) return null;
+    return { kind, id, protected: body.p, bans: body.b, mutes: body.u as [string, number, number][], admins };
   }
   if (kind === 'room') {
     if (typeof body.l !== 'boolean' || !Array.isArray(body.p) || !body.p.length || body.p.length > MAX_INVITE_MEMBERS || new Set(body.p).size !== body.p.length || body.p.some(a => typeof a !== 'string' || !ACCOUNT.test(a))) return null;
     return { kind, id, listed: body.l, protected: body.p as string[] };
   }
+  if (kind === 'admin') return typeof body.a === 'string' && ACCOUNT.test(body.a) && typeof body.e === 'boolean' ? { kind, id, member: body.a, on: body.e } : null;
+  if (kind === 'collapse') return typeof body.a === 'string' && ACCOUNT.test(body.a) && typeof body.h === 'string' && /^[a-f0-9]{64}$/.test(body.h) ? { kind, id, member: body.a, target: body.h } : null;
   if (kind === 'ban' || kind === 'mute') {
     if (typeof body.a !== 'string' || !ACCOUNT.test(body.a)) return null;
     if (kind === 'ban') return { kind, id, member: body.a };
@@ -165,7 +181,7 @@ export interface RoomInviter { creator: string; publicKey: string }
 
 /** Semantic bootstrap validation is shared by membership and moderation replay. */
 export function policySnapshotValid(c: Extract<Cg2, { kind: 'policy' }>, g: InviteGroup, at: number) {
-  return c.protected.length <= MAX_INVITE_MEMBERS && c.protected.includes(g.creator) && c.protected.every(a => !!memberKey(g, a)) && c.bans.every(a => !!memberKey(g, a)) && c.mutes.every(([a, start]) => a !== g.creator && start <= at && !!memberKey(g, a));
+  return c.protected.length <= MAX_INVITE_MEMBERS && c.protected.includes(g.creator) && c.protected.every(a => !!memberKey(g, a)) && c.bans.every(a => !!memberKey(g, a)) && c.mutes.every(([a, start]) => a !== g.creator && start <= at && !!memberKey(g, a)) && c.admins.every(a => a !== g.creator && !!memberKey(g, a));
 }
 export function roomPolicyValid(c: Extract<Cg2, { kind: 'room' }>, g: InviteGroup, protectedMembers: string[]) {
   return c.protected.includes(g.creator) && c.protected.length === protectedMembers.length && protectedMembers.every(a => c.protected.includes(a)) && c.protected.every(a => !!memberKey(g, a));
