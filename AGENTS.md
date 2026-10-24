@@ -18,7 +18,7 @@
 - Crypt writes CRYPT1:/CRYPTKEY1:, reads legacy GPKM1:/GPKMKEY1: and keeps gpk-msg-key files for compatibility.
 - CHEESECrypt voice notes are 0x03-headed byte memos assembled by sender+recipient+id across 30-part transactions; play only when complete and digest-verified (batches can partly fail).
 - CHEESECrypt names: validated key-file/CP1-note data (newest note wins, never a chat row), apart from per-owner nicknames; WAX accounts stay identities. Friend removal clears contact metadata and blocks rediscovery until re-add, keeping history and groups.
-- CHEESECrypt groups are pairwise copies, trusted only fully assembled. CG1 (legacy) members are fixed in-envelope; CG2 invites come from a friend creator, and group keys open only that group's notices. Hidden IDs only hide.
+- CHEESECrypt groups are pairwise copies, trusted only fully assembled. CG1 (legacy) members are fixed in-envelope; CG2 invites come from a friend creator (or the creator of a public room you asked, with that listing's key); later copies only grow membership (all existing member keys unchanged); group keys open only that group's notices and invites. Hidden IDs only hide.
 - Crypt uses integer fee splits; fanout omits fees explicitly, not by indexes. Confirm payment before local key creation; imports stay free. History uses current rates.
 - CHEESECrypt avatars are validated palette-index data in optional key-file fields and separate per-account contact storage; imports rasterize locally, and on-chain key memos stay unchanged to preserve compatibility and avoid executable or remote avatar payloads.
 - CHEESECrypt folder pickers start at Desktop but request the vault subfolder; retry permission failures because Chromium protects Desktop-root access. Profile precedes keys; edits refresh only verified matching-key backups (staged writes), else download.
@@ -31,3 +31,5 @@
 - Both NFT players normalize media via nftMedia (case-insensitive audio/clip/video, reference-only sound/mp3/sfx aliases); version music caches on detection changes to avoid stale classifications.
 - CHEESEFolio fiat/BTC/ETH figures are WAX→USD→currency per day (fx-usd-history.json, units per USD); unknown rates stay unknown.
 - Folio JSON validates/checksums raw history, merges by sequence and portfolios by ID/newest edit; IndexedDB stores both per account. Views filter the full ledger with per-token disposal P/L, never replay subsets.
+
+- CHEESECrypt public rooms are plaintext CRYPTROOM1: listings on paid eosio.null CHEESE fee legs (newest per creator+room wins, unlist hides); join requests are encrypted CG2 notices, read from strangers only through a separate decode path; member lists never go on-chain.

@@ -30,7 +30,7 @@ import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { VaultPrompt } from '@/components/crypt/VaultPrompt';
 import { CreateGroupDialog } from '@/components/crypt/CreateGroupDialog';
 import { PaidActionDialog } from '@/components/crypt/PaidActionDialog';
-import { buildCg2Actions, collectInvites, deriveInviteGroups, encodeGroupText, encodeInvite, encodeMeta, encodeNotice, inviteTextSize, loadDecisions, loadFriendDecisions, loadInvites, newInviteGroupId, saveDecision, saveInvites, scopedKeys, eventFromMember, VOICE_REF_PREFIX, type Cg2Event, type InviteGroup, type InviteGroupView } from '@/lib/cryptInviteGroups';
+import { buildCg2Actions, collectInvites, deriveInviteGroups, encodeGroupText, encodeInvite, encodeMeta, encodeNotice, inviteTextSize, invitesSignature, loadDecisions, MAX_INVITE_MEMBERS, loadFriendDecisions, loadInvites, newInviteGroupId, saveDecision, saveInvites, scopedKeys, eventFromMember, VOICE_REF_PREFIX, type Cg2Event, type InviteGroup, type InviteGroupView } from '@/lib/cryptInviteGroups';
 import { ShareKeyDialog } from '@/components/crypt/ShareKeyDialog';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { buildVoiceBatches, voiceNoteCost, voicePartCount, voiceTransactions, type VoiceClip } from '@/lib/cryptVoice';
@@ -50,6 +50,12 @@ import { CryptKeySetup } from '@/components/crypt/CryptKeySetup';
 import { CryptSidebar } from '@/components/crypt/CryptSidebar';
 import { CryptChatHeader } from '@/components/crypt/CryptChatHeader';
 import { CryptComposer } from '@/components/crypt/CryptComposer';
+import { DiscoverRoomsDialog, JoinRequests, RoomListingDialog } from '@/components/crypt/PublicRooms';
+import { fetchRoomMemos } from '@/lib/cheeseCrypt';
+import {
+  buildRoomActions, collectJoinRequests, collectListings, decodeRoomEvents, declineJoin, encodeListing, encodeUnlist, listedRoomIds, loadJoinDeclines,
+  loadLocalListings, loadRoomRequests, ROOM_PREFIX, saveLocalListing, saveRoomRequest, type JoinRequest, type RoomListing,
+} from '@/lib/cryptRooms';
 
 const ACCOUNT_RE = /^[a-z1-5.]{1,12}$/;
 /** How often an open, visible messenger checks history for new messages. */
@@ -119,6 +125,14 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [friendsOpen, setFriendsOpen] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
+  // Public rooms: listings are public; my requests, local list actions and join declines stay on this device.
+  const [roomsOpen, setRoomsOpen] = useState(false);
+  const [listingRoom, setListingRoom] = useState<string | null>(null);
+  const [askingRoom, setAskingRoom] = useState<RoomListing | null>(null);
+  const [acceptingJoin, setAcceptingJoin] = useState<JoinRequest | null>(null);
+  const [localListings, setLocalListings] = useState(() => loadLocalListings(account));
+  const [roomRequests, setRoomRequests] = useState(() => loadRoomRequests(account));
+  const [joinDeclines, setJoinDeclines] = useState(() => loadJoinDeclines(account));
   const [feeInfoOpen, setFeeInfoOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   const [listHidden, setListHidden] = useState(() => { try { return localStorage.getItem(`cheesecrypt-sidebar-collapsed-${account}`) === '1'; } catch { return false; } });
@@ -251,12 +265,26 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const decoded = useMemo(() => key ? decodeConversations(visibleMemos, key, contacts, clock, scoped) : [], [visibleMemos, key, contacts, clock, scoped]);
   const cg2Events = useMemo<Cg2Event[]>(() => decoded.flatMap(c => c.control && c.usedKey && !c.voice
     ? [{ key: c.key, txId: c.txId, time: c.time, from: c.from, to: c.to, control: c.control, usedKey: c.usedKey }] : []), [decoded]);
-  const invites = useMemo(() => key ? collectInvites(cg2Events, account, key.publicKey, contacts, inviteStore) : inviteStore, [cg2Events, account, key, contacts, inviteStore]);
+  // Creators of public rooms I asked to join: their listing key reads only their invite to that room.
+  const roomInviters = useMemo(() => Object.fromEntries(Object.values(roomRequests)
+    .filter(r => contacts[r.creator] !== r.publicKey && !blocked.includes(r.creator)).map(r => [r.creator, r.publicKey])), [roomRequests, contacts, blocked]);
+  const roomInviteEvents = useMemo(() => key && Object.keys(roomInviters).length ? decodeRoomEvents(visibleMemos, key, roomInviters)
+    .filter(e => e.control.kind === 'invite' && e.to === account && roomRequests[e.control.invite.id]?.creator === e.from) : [], [visibleMemos, key, roomInviters, roomRequests, account]);
+  const invites = useMemo(() => key ? collectInvites([...cg2Events, ...roomInviteEvents], account, key.publicKey, contacts, inviteStore, roomRequests) : inviteStore,
+    [cg2Events, roomInviteEvents, account, key, contacts, inviteStore, roomRequests]);
   useEffect(() => {
-    if (Object.keys(invites).length === Object.keys(inviteStore).length) return;
+    // Compares member keys too, so a creator adding members to a known group is saved.
+    if (invitesSignature(invites) === invitesSignature(inviteStore)) return;
     saveInvites(account, invites); setInviteStore(invites);
   }, [invites, inviteStore, account]);
   const inviteViews = useMemo(() => deriveInviteGroups(cg2Events, invites, account, decisions), [cg2Events, invites, account, decisions]);
+  const { data: roomMemos, isFetching: roomsLoading, refetch: refetchRooms } = useQuery({
+    queryKey: ['crypt-rooms'], enabled: !!key, queryFn: () => fetchRoomMemos(ROOM_PREFIX),
+    staleTime: 60_000, refetchInterval: () => (document.visibilityState === 'visible' ? 60_000 : false), retry: false,
+  });
+  const listings = useMemo(() => collectListings(roomMemos ?? []).filter(l => !blocked.includes(l.creator)), [roomMemos, blocked]);
+  const myRoomIds = useMemo(() => inviteViews.filter(v => v.isCreator && v.status === 'joined').map(v => v.invite.id), [inviteViews]);
+  const listedIds = useMemo(() => listedRoomIds(account, listings, myRoomIds, localListings), [account, listings, myRoomIds, localListings]);
   /** Accounts known only through an invite group; they stay out of Friends and key discovery until a friend request is accepted. */
   const groupOnly = useMemo(() => {
     const s = new Set<string>();
@@ -282,7 +310,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
     [visibleMemos, account, contacts, groupOnly, blocked, removedContacts, groups]);
   const { data: requestKeys = {} } = useQuery({
     queryKey: ['crypt-inbox-keys', account, key?.publicKey, requestCandidates],
-    enabled: publicInbox && !!key && requestCandidates.length > 0,
+    // Also looked up while I list a room, but then only used to read join requests (never message requests).
+    enabled: (publicInbox || listedIds.size > 0) && !!key && requestCandidates.length > 0,
     queryFn: async () => {
       const found: Record<string, string> = {};
       // Sequential and bounded; history polls never trigger a new lookup for an unchanged candidate list.
@@ -296,6 +325,12 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const messageRequests = useMemo(() => publicInbox && key ? decodeInboxRequests(visibleMemos, key,
     Object.fromEntries(requestCandidates.flatMap(from => requestKeys[from] ? [[from, requestKeys[from]]] : [])), requestDeclines) : [],
     [publicInbox, key, visibleMemos, requestCandidates, requestKeys, requestDeclines]);
+  const strangerJoinEvents = useMemo(() => key && listedIds.size ? decodeRoomEvents(visibleMemos, key,
+    Object.fromEntries(requestCandidates.flatMap(from => requestKeys[from] ? [[from, requestKeys[from]]] : []))) : [],
+    [key, listedIds, visibleMemos, requestCandidates, requestKeys]);
+  const joinRequests = useMemo(() => collectJoinRequests([...cg2Events, ...strangerJoinEvents], account, listedIds,
+    Object.fromEntries(Object.values(invites).map(g => [g.id, g.members.map(m => m.account)])), blocked, joinDeclines),
+    [cg2Events, strangerJoinEvents, account, listedIds, invites, blocked, joinDeclines]);
   // A member who accepted my friend request becomes a friend with the key their group introduced.
   useEffect(() => {
     let changed = false;
@@ -791,6 +826,72 @@ export function Messenger({ account, session }: { account: string; session: NonN
     return true;
   };
 
+  // ---- public rooms ----
+  const roomJoinCost = cg2Cost(encodeNotice('join', '0'.repeat(16)), 1);
+  const roomStatus = (l: RoomListing) => {
+    if (l.creator === account) return 'own' as const;
+    const v = viewById(l.id);
+    if (v && v.status === 'invited') return 'invited' as const;
+    if (v && v.status !== 'declined') return 'member' as const;
+    return roomRequests[l.id] ? 'requested' as const : null;
+  };
+  const askToJoin = async (l: RoomListing) => {
+    if (!key || l.creator === account || blocked.includes(l.creator)) return false;
+    setBusy(true);
+    let mine: string | null = null;
+    try { mine = await lookupPublishedKey(account); }
+    catch { toast({ title: 'Key lookup failed', description: 'History servers did not answer. Try again shortly.', variant: 'destructive' }); return false; }
+    finally { setBusy(false); }
+    if (mine !== key.publicKey) {
+      toast({ title: 'Publish your public key first', description: 'Use Menu → Publish so the room creator can read your request.', variant: 'destructive' });
+      return false;
+    }
+    if (!(await sendCg2([l.creator], { [l.creator]: l.publicKey }, encodeNotice('join', l.id), `Request sent to ${l.creator}`))) return false;
+    setRoomRequests(saveRoomRequest(account, l));
+    setAskingRoom(null);
+    return true;
+  };
+  const sendRoomMemo = async (id: string, memo: string, listed: boolean) => {
+    setBusy(true);
+    try {
+      const r = await executeTransaction(buildRoomActions(account, memo, [permission]), { successTitle: listed ? 'Room listed' : 'Room unlisted' });
+      if (!r.success) return false;
+      setLocalListings(saveLocalListing(account, id, listed));
+      setTimeout(() => void refetchRooms(), 3000);
+      return true;
+    } catch (e) { toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' }); return false; }
+    finally { setBusy(false); }
+  };
+  const listRoom = async (id: string, info: { name: string; topic: string; tags: string[] }) => {
+    const v = viewById(id);
+    if (!key || !v || !v.isCreator) return false;
+    let memo: string;
+    try { memo = encodeListing({ id, ...info, publicKey: key.publicKey, members: Math.max(1, v.joined.length) }); }
+    catch (e) { toast({ title: (e as Error).message, variant: 'destructive' }); return false; }
+    return sendRoomMemo(id, memo, true);
+  };
+  const unlistRoom = (id: string) => sendRoomMemo(id, encodeUnlist(id), false);
+  /** The creator adds the requester by sending the grown invite to every member (old members keep their keys). */
+  const joinPlan = (r: JoinRequest) => {
+    const v = viewById(r.groupId);
+    if (!v || !v.isCreator || v.invite.members.length >= MAX_INVITE_MEMBERS || v.invite.members.some(m => m.account === r.from)) return null;
+    const updated: InviteGroup = { ...v.invite, members: [...v.invite.members, { account: r.from, publicKey: r.publicKey }] };
+    let payload: string;
+    try { payload = encodeInvite(updated); } catch { return null; }
+    const to = updated.members.map(m => m.account).filter(a => a !== account);
+    return { v, updated, payload, to, cost: cg2Cost(payload, to.length) };
+  };
+  const confirmJoin = async () => {
+    if (!acceptingJoin) return false;
+    const plan = joinPlan(acceptingJoin);
+    if (!plan) { toast({ title: 'This room is full or the request is out of date', variant: 'destructive' }); setAcceptingJoin(null); return false; }
+    if (!(await sendCg2(plan.to, keysOf(plan.updated), plan.payload, `${acceptingJoin.from} invited to ${plan.v.name}`))) return false;
+    const next = { ...inviteStore, [plan.updated.id]: plan.updated };
+    saveInvites(account, next); setInviteStore(next);
+    setAcceptingJoin(null);
+    return true;
+  };
+
   const hasNft = parseNftMessage(text).some(seg => seg.type === 'nft');
   const outgoing = replyingTo && text.trim() ? encodeReply(replyingTo, text) : text;
   const size = activeInvite ? inviteTextSize(activeInvite.invite.id, outgoing) : activeGroup ? groupMessageSize(activeGroup, outgoing) : { bytes: plaintextBytes(outgoing), parts: partCount(outgoing), maxBytes: MAX_MESSAGE_BYTES };
@@ -903,6 +1004,24 @@ export function Messenger({ account, session }: { account: string; session: NonN
           <Button variant="outline" onClick={() => { setAddingFriend(false); fileRef.current?.click(); }}><Upload className="h-4 w-4" /> Import public key file</Button>
         </DialogContent>
       </Dialog>}
+      <DiscoverRoomsDialog open={roomsOpen} onOpenChange={o => { setRoomsOpen(o); if (o) void refetchRooms(); }} listings={listings} loading={roomsLoading}
+        refresh={() => void refetchRooms()} account={account} roomStatus={roomStatus} joinCost={roomJoinCost} onAsk={l => { setRoomsOpen(false); setAskingRoom(l); }} />
+      {askingRoom && <PaidActionDialog title={`🌐 Ask to join ${askingRoom.name}`} cost={roomJoinCost} confirmLabel="Pay & ask" busy={busy}
+        description={`Sends ${askingRoom.creator} an encrypted request naming only this room. If they accept, an invite appears in your Groups and you choose Join or Decline.`}
+        onConfirm={() => askToJoin(askingRoom)} onClose={() => setAskingRoom(null)} />}
+      {acceptingJoin && (() => {
+        const plan = joinPlan(acceptingJoin);
+        if (!plan) return null;
+        return <PaidActionDialog title={`🌐 Add ${nameFor(acceptingJoin.from)} to ${plan.v.name}`} cost={plan.cost} confirmLabel="Pay & invite" busy={busy}
+          description={`Sends the updated invite, encrypted, to all ${plan.to.length} other members. ${acceptingJoin.from} then chooses Join or Decline. Existing members and their keys stay the same.`}
+          onConfirm={confirmJoin} onClose={() => setAcceptingJoin(null)} />;
+      })()}
+      {listingRoom && (() => {
+        const v = viewById(listingRoom);
+        if (!v || !v.isCreator) return null;
+        return <RoomListingDialog groupId={v.invite.id} groupName={v.name} members={Math.max(1, v.joined.length)} publicKey={key.publicKey} listed={listedIds.has(v.invite.id)} busy={busy}
+          onList={info => listRoom(v.invite.id, info)} onUnlist={() => unlistRoom(v.invite.id)} onClose={() => setListingRoom(null)} />;
+      })()}
       <PublicInboxDialog enabled={publicInbox} onChange={enabled => { savePublicInbox(account, enabled); setPublicInbox(enabled); }} open={inboxOpen} onOpenChange={setInboxOpen} />
       <CryptSidebar account={account} cryptKey={key} loading={loading} refresh={refresh} setEditingAvatar={setEditingAvatar}
         menuOpen={menuOpen} setMenuOpen={setMenuOpen} fileRef={fileRef} sharePublicKey={sharePublicKey} busy={busy} publish={publish}
@@ -913,12 +1032,17 @@ export function Messenger({ account, session }: { account: string; session: NonN
         inviteShown={inviteShown} hiddenGroups={hiddenGroups} inviteRow={inviteRow} groups={groups} groupRow={groupRow}
         showHiddenGroups={showHiddenGroups} setShowHiddenGroups={setShowHiddenGroups} friendsOpen={friendsOpen} setFriendsOpen={setFriendsOpen}
         setAddingFriend={setAddingFriend} partners={partners} active={active} setActive={setActive} avatars={avatars} nameFor={nameFor}
-        contacts={contacts} lastAt={lastAt} badge={badge} removeFriend={removeFriend} />
+        contacts={contacts} lastAt={lastAt} badge={badge} removeFriend={removeFriend} setRoomsOpen={setRoomsOpen}
+        joinRequestsPanel={<JoinRequests requests={joinRequests} nameFor={nameFor} roomName={id => viewById(id)?.name ?? 'a room'}
+          roomFull={id => (invites[id]?.members.length ?? MAX_INVITE_MEMBERS) >= MAX_INVITE_MEMBERS} onAccept={setAcceptingJoin}
+          onDecline={r => setJoinDeclines(declineJoin(account, r.groupId, r.from, r.time))}
+          onBlock={r => { setJoinDeclines(declineJoin(account, r.groupId, r.from, r.time)); blockAccount(r.from); }} />} />
 
       <CryptChatHeader account={account} active={active} activeGroup={activeGroup} activeInvite={activeInvite} keyAvatar={key.avatar}
         avatars={avatars} contacts={contacts} blocked={blocked} friendDeclines={friendDeclines} setFriendDeclines={setFriendDeclines}
         nameFor={nameFor} membersOpen={membersOpen} setMembersOpen={setMembersOpen} setPendingNotice={setPendingNotice}
-        setEditingInvite={setEditingInvite} setEditingFriend={setEditingFriend} saveFriend={saveFriend} blockAccount={blockAccount} />
+        setEditingInvite={setEditingInvite} setEditingFriend={setEditingFriend} saveFriend={saveFriend} blockAccount={blockAccount}
+        roomListed={activeInvite ? listedIds.has(activeInvite.invite.id) : false} onRoomListing={activeInvite ? () => setListingRoom(activeInvite.invite.id) : undefined} />
 
       <section className={cn('flex flex-1 flex-col min-h-0 md:row-start-2', listHidden ? 'md:col-start-1 md:col-span-2' : 'md:col-start-2')}>
         {!active ? (

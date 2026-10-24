@@ -382,3 +382,26 @@ export async function fetchMessages(account: string, pages = 1): Promise<ChainMe
     return true;
   });
 }
+
+export const ROOM_SCAN_PAGES = 4;
+/** Recent CHEESE transfers to eosio.null whose memo starts with `prefix` (bounded, newest first, deduped). */
+export async function fetchRoomMemos(prefix: string, pages = ROOM_SCAN_PAGES): Promise<ChainMemo[]> {
+  let rows: ChainMemo[] = [];
+  let before: string | null = null;
+  for (let p = 0; p < Math.max(1, pages); p++) {
+    const page = await hyperionTransfers(`account=${KEY_PUBLISH_TO}&filter=cheeseburger:transfer&transfer.to=${KEY_PUBLISH_TO}&sort=desc&limit=${HISTORY_PAGE}${before ? `&before=${encodeURIComponent(before)}` : ''}`);
+    rows = rows.concat(page);
+    if (page.length < HISTORY_PAGE) break;
+    const oldest = Math.min(...page.map(r => r.time).filter(Number.isFinite));
+    if (!Number.isFinite(oldest)) break;
+    before = new Date(oldest).toISOString();
+  }
+  const seen = new Set<string>();
+  return rows.filter(r => {
+    if (r.to !== KEY_PUBLISH_TO || !r.memo.startsWith(prefix)) return false;
+    const id = `${r.txId}:${r.from}:${r.memo}`;
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}

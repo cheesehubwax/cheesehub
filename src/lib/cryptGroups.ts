@@ -125,7 +125,8 @@ export function decodeConversations(memos: ChainMemo[], key: MessagingKey, conta
         const control = parseCg2(m.text);
         if (!control) continue;
         const id = control.kind === 'invite' ? control.invite.id : control.id;
-        if (b.groupId && (control.kind === 'invite' || id !== b.groupId)) continue; // a group key only opens its own group's notices
+        // A group key only opens its own group's notices (including that group's member updates from its creator).
+        if (b.groupId && id !== b.groupId) continue;
         if (control.kind === 'msg') {
           const fanoutId = m.parts > 1 ? `cg2:${m.txId}:${m.from}:${id}:${m.key.split(':')[2]}` : `cg2:${m.txId}:${m.from}:${id}:${control.text}`;
           if (seen.has(fanoutId)) continue;

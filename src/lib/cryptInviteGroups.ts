@@ -20,11 +20,12 @@ export const VOICE_REF_PREFIX = 'i';
 
 export interface InviteMember { account: string; publicKey: string }
 export interface InviteGroup { id: string; name: string; creator: string; created: number; members: InviteMember[]; avatar?: CryptAvatar }
-export type Cg2Kind = 'invite' | 'msg' | 'joined' | 'leave' | 'meta' | 'friend' | 'friend-ok';
+export type Cg2Kind = 'invite' | 'msg' | 'joined' | 'leave' | 'meta' | 'friend' | 'friend-ok' | 'join';
 export type Cg2 =
   | { kind: 'invite'; invite: InviteGroup }
   | { kind: 'msg'; id: string; text: string }
-  | { kind: 'joined' | 'leave' | 'friend' | 'friend-ok'; id: string }
+  /** `join`: a request to a public room's creator (cryptRooms.ts); never a membership change by itself. */
+  | { kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'join'; id: string }
   | { kind: 'meta'; id: string; name: string; avatar?: CryptAvatar };
 
 const validPublicKey = (k: unknown): k is string => {
@@ -67,7 +68,7 @@ export function encodeInvite(g: InviteGroup): string {
   return wire('invite', body);
 }
 export const encodeGroupText = (id: string, text: string) => wire('msg', { i: checkId(id), t: text });
-export const encodeNotice = (kind: 'joined' | 'leave' | 'friend' | 'friend-ok', id: string) => wire(kind, { i: checkId(id) });
+export const encodeNotice = (kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'join', id: string) => wire(kind, { i: checkId(id) });
 export function encodeMeta(id: string, name: string, avatar?: CryptAvatar): string {
   const n = parseCryptName(name);
   if (!n) throw new Error('Give the group a name');
@@ -90,7 +91,7 @@ export function parseCg2(text: string | null | undefined): Cg2 | null {
   if (typeof body.i !== 'string' || !ID.test(body.i)) return null;
   const id = body.i;
   if (kind === 'msg') return typeof body.t === 'string' && body.t.trim() ? { kind, id, text: body.t } : null;
-  if (kind === 'joined' || kind === 'leave' || kind === 'friend' || kind === 'friend-ok') return { kind, id };
+  if (kind === 'joined' || kind === 'leave' || kind === 'friend' || kind === 'friend-ok' || kind === 'join') return { kind, id };
   if (kind === 'meta') {
     const name = parseCryptName(body.n);
     if (!name || name !== body.n) return null;
@@ -106,16 +107,40 @@ export interface Cg2Event { key: string; txId: string; time: number; from: strin
 
 export const memberKey = (g: InviteGroup, account: string) => g.members.find(m => m.account === account)?.publicKey;
 
+/** A public room I asked to join: only its listing creator, with the listing key, may invite me to it. */
+export interface RoomInviter { creator: string; publicKey: string }
+
 /**
  * Invite acceptance. The invite must come from its creator and name both sides with the keys in use.
- * Received: the creator must be my contact with the same key that opened it, and list my real key.
+ * Received: the creator must be my contact with the same key that opened it (or the creator of a public room
+ * I asked to join, with that listing's key), and list my real key.
  * Sent (I'm the creator): it must list my real key and the recipient.
  */
-export function inviteAcceptable(e: Cg2Event, me: string, myPublicKey: string, contacts: Record<string, string>): boolean {
+export function inviteAcceptable(e: Cg2Event, me: string, myPublicKey: string, contacts: Record<string, string>, rooms: Record<string, RoomInviter> = {}): boolean {
   if (e.control.kind !== 'invite') return false;
   const g = e.control.invite;
   if (e.from !== g.creator || memberKey(g, me) !== myPublicKey || !memberKey(g, e.to)) return false;
-  if (e.to === me) return !!contacts[e.from] && contacts[e.from] === e.usedKey && memberKey(g, e.from) === e.usedKey;
+  if (e.to === me) {
+    if (memberKey(g, e.from) !== e.usedKey) return false;
+    if (!!contacts[e.from] && contacts[e.from] === e.usedKey) return true;
+    const room = rooms[g.id];
+    return !!room && room.creator === e.from && room.publicKey === e.usedKey;
+  }
+  return e.from === me && memberKey(g, e.to) === e.usedKey;
+}
+
+/**
+ * A creator may only grow a known group: same id, creator, creation time and name, every existing member kept
+ * with the same key, and the copy opened with the creator's key from the group I already hold (or, for my own
+ * sent copies, the recipient's key in the update). Nobody can be removed or have their key swapped.
+ */
+export function inviteUpdateAcceptable(e: Cg2Event, current: InviteGroup, me: string, myPublicKey: string): boolean {
+  if (e.control.kind !== 'invite') return false;
+  const g = e.control.invite;
+  if (g.id !== current.id || g.creator !== current.creator || g.created !== current.created || g.name !== current.name || e.from !== current.creator) return false;
+  if (g.members.length <= current.members.length || memberKey(g, me) !== myPublicKey || !memberKey(g, e.to)) return false;
+  if (current.members.some(m => memberKey(g, m.account) !== m.publicKey)) return false;
+  if (e.to === me) return memberKey(current, e.from) === e.usedKey;
   return e.from === me && memberKey(g, e.to) === e.usedKey;
 }
 
@@ -128,15 +153,24 @@ export function eventFromMember(e: Cg2Event, invites: Record<string, InviteGroup
   return memberKey(g, partner) === e.usedKey ? g : null;
 }
 
-/** First valid invite per id wins (earliest chain time); later conflicting copies are ignored. */
-export function collectInvites(events: Cg2Event[], me: string, myPublicKey: string, contacts: Record<string, string>, stored: Record<string, InviteGroup>): Record<string, InviteGroup> {
+/**
+ * First valid invite per id wins (earliest chain time). A later copy only counts when it is the creator adding
+ * members (inviteUpdateAcceptable); any other conflicting copy is ignored. Updates keep the stored name/picture.
+ */
+export function collectInvites(events: Cg2Event[], me: string, myPublicKey: string, contacts: Record<string, string>, stored: Record<string, InviteGroup>, rooms: Record<string, RoomInviter> = {}): Record<string, InviteGroup> {
   const out: Record<string, InviteGroup> = { ...stored };
   for (const e of [...events].sort((a, b) => a.time - b.time)) {
-    if (e.control.kind !== 'invite' || out[e.control.invite.id] || !inviteAcceptable(e, me, myPublicKey, contacts)) continue;
-    out[e.control.invite.id] = e.control.invite;
+    if (e.control.kind !== 'invite') continue;
+    const id = e.control.invite.id, current = out[id];
+    if (!current) { if (inviteAcceptable(e, me, myPublicKey, contacts, rooms)) out[id] = e.control.invite; continue; }
+    if (inviteUpdateAcceptable(e, current, me, myPublicKey)) out[id] = { ...current, members: e.control.invite.members };
   }
   return out;
 }
+
+/** Stable comparison of two invite stores (ids and member keys), so membership growth gets saved. */
+export const invitesSignature = (invites: Record<string, InviteGroup>) =>
+  Object.values(invites).map(g => `${g.id}=${g.members.map(m => `${m.account}:${m.publicKey}`).join(',')}`).sort().join('|');
 
 export type MyStatus = 'invited' | 'joined' | 'declined' | 'left';
 export interface LocalDecision { status: 'joined' | 'declined' | 'left'; at: number }
