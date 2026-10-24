@@ -1068,7 +1068,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const v = viewById(id);
     if (!key || !v || !v.isCreator) return false;
     let memo: string;
-    try { memo = encodeListing({ id, ...info, publicKey: key.publicKey, members: Math.max(1, v.joined.length), ...(v.avatar ? { avatar: v.avatar.pixels } : {}) }); saveRoomInfo(account, id, info); }
+    try { memo = encodeListing({ id, ...info, publicKey: key.publicKey, creatorName: key.displayName, members: Math.max(1, v.joined.length), ...(v.avatar ? { avatar: v.avatar.pixels } : {}) }); saveRoomInfo(account, id, info); }
     catch (e) { toast({ title: (e as Error).message, variant: 'destructive' }); return false; }
     // Publish the immutable protected roster privately to every member in the same paid transaction.
     const protectedMembers = moderation[id]?.protected ?? v.invite.members.map(m => m.account);
@@ -1329,7 +1329,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         </DialogContent>
       </Dialog>}
       <DiscoverRoomsDialog open={roomsOpen} onOpenChange={o => { setRoomsOpen(o); if (o) void refetchRooms(); }} listings={listings} loading={roomsLoading}
-        refresh={() => void refetchRooms()} account={account} roomStatus={roomStatus} joinCost={roomJoinCost} onAsk={l => { setRoomsOpen(false); setJoinNote(''); setAskingRoom(l); }} />
+        refresh={() => void refetchRooms()} account={account} nameFor={nameFor} roomStatus={roomStatus} joinCost={roomJoinCost} onAsk={l => { setRoomsOpen(false); setJoinNote(''); setAskingRoom(l); }} />
       {askingRoom && <PaidActionDialog title={`🌐 Ask to join ${askingRoom.name}`} cost={roomJoinCost} confirmLabel="Pay & ask" busy={busy}
         description={`Sends ${askingRoom.creator} an encrypted request naming only this room, plus a 0.1000 CHEESE join fee paid to them (kept whether they accept or decline). If they accept, an invite appears in your Groups and you choose Join or Decline.`}
         onConfirm={() => askToJoin(askingRoom)} onClose={() => setAskingRoom(null)}>
@@ -1356,7 +1356,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         const policyCost = parseFloat(cg2Cost(encodeRoomPolicy(v.invite.id, !isListed, moderation[v.invite.id]?.protected ?? v.invite.members.map(m => m.account)), v.invite.members.length - 1));
         const current = listings.find(l => l.creator === account && l.id === v.invite.id);
         const saved = loadRoomInfo(account)[v.invite.id];
-        return <RoomListingDialog groupId={v.invite.id} groupName={v.name} members={Math.max(1, v.joined.length)} publicKey={key.publicKey} listed={isListed} busy={busy}
+        return <RoomListingDialog groupId={v.invite.id} groupName={v.name} members={Math.max(1, v.joined.length)} publicKey={key.publicKey} creatorName={key.displayName} listed={isListed} busy={busy}
           cost={`${(parseFloat(isListed ? ROOM_FEE_QUANTITY : LISTING_STAKE_QUANTITY) + policyCost).toFixed(4)} CHEESE`}
           unlistCost={`${(parseFloat(ROOM_FEE_QUANTITY) + policyCost).toFixed(4)} CHEESE`}
           initialName={current?.name ?? v.name}
