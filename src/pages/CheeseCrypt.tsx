@@ -523,7 +523,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   };
   const reportAction = (m: ConversationEntry) => {
     const target = edited.targets.get(m.key);
-    if (!activeInvite || activeInvite.status !== 'joined' || myRoomRole === 'owner' || busy || roomRestricted || !target || !m.txId || m.missing || m.from === account || m.from === activeInvite.invite.creator || !listedIds.has(activeInvite.invite.id) || !activeModeration?.listed) return undefined;
+    if (!activeInvite || activeInvite.status !== 'joined' || myRoomRole === 'owner' || busy || roomRestricted || !target || !m.txId || m.missing || m.from === account || m.from === activeInvite.invite.creator || !activeModeration?.listed) return undefined;
     return { toOwner: myRoomRole === 'admin', onReport: () => setPendingModeration({ id: activeInvite.invite.id, member: m.from, action: 'report', target }) };
   };
   // Right-click moderation of a message's author; mirrors what moderationPlan accepts.
@@ -1110,7 +1110,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if (n.action === 'report') {
       // Members report to the owner and current admins; admins escalate to the owner only. Owners ban directly.
       const role = roomRole(state, v.invite, account, now);
-      if (owner || !listedIds.has(n.id) || !state?.listed || !n.target || n.member === account || n.member === v.invite.creator || restrictedAt(state, account, now)) return null;
+      if (owner || !state?.listed || !n.target || n.member === account || n.member === v.invite.creator || restrictedAt(state, account, now)) return null;
       const to = role === 'admin' ? [v.invite.creator] : [v.invite.creator, ...state.admins.filter(a => a !== account && !restrictedAt(state, a, now) && v.invite.members.some(m => m.account === a))];
       const payload = encodeReport(n.id, n.member, n.target, role === 'admin' ? 'owner' : 'admin');
       return { v, to, payload, policy: null, cost: `${parseFloat(cg2Cost(payload, to.length)).toFixed(4)} CHEESE` };
