@@ -14,7 +14,7 @@ import { messageCost } from '@/lib/cheeseCrypt';
 import type { EditedMessage } from '@/lib/cryptEdits';
 
 /** Pure sound-effect-NFT posts render without the bubble box — sender header, playback and timestamp stay. */
-export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, editable, onEdit, onCollapse, canReveal, revealed, onReveal }: {
+export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, editable, onEdit, onCollapse, canReveal, revealed, onReveal, badges }: {
   m: EditedMessage; account: string; keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>;
   contacts: Record<string, string>; active: string; activeGroup: CryptGroup | null;
   nameFor: (id: string) => string; openedAt: { current: number };
@@ -23,6 +23,8 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
   editable?: boolean; onEdit?: (m: ConversationEntry) => void;
   /** Public-room moderation: collapse action (when allowed) and moderator-only reveal of collapsed rows. */
   onCollapse?: () => void; canReveal?: boolean; revealed?: boolean; onReveal?: () => void;
+  /** Room role badges shown right of the sender's name: owner, admin, founder. */
+  badges?: { owner?: boolean; admin?: boolean; founder?: boolean };
 }) {
   const hidden = !!m.collapsed && !revealed;
   const reply = parseReply(m.text);
@@ -44,7 +46,11 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
       highlighted && 'ring-2 ring-reply bg-reply/10')}>
       <div className="flex items-center gap-2 mb-1">
         <PixelAvatar account={m.from} avatar={m.from === account ? keyAvatar : avatars[m.from]} className="h-6 w-6" />
-        <p className="text-[10px] font-semibold opacity-80 break-words">{m.from === account ? `you · ${nameFor(account)}` : nameFor(m.from)}{nameFor(m.from) !== m.from && <span className="block font-normal">{m.from}</span>}</p>
+        <p className="text-[10px] font-semibold opacity-80 break-words">{m.from === account ? `you · ${nameFor(account)}` : nameFor(m.from)}{badges && (badges.owner || badges.admin || badges.founder) && <span className="ml-1 inline-flex items-center gap-1 align-middle">
+          {badges.owner && <span title="Room owner" aria-label="Room owner">👑</span>}
+          {badges.admin && <span title="Room admin" aria-label="Room admin">🛡️</span>}
+          {badges.founder && <span title="Founding member" className="rounded border border-cheese/40 px-1 text-[9px] font-semibold text-cheese">Founder</span>}
+        </span>}{nameFor(m.from) !== m.from && <span className="block font-normal">{m.from}</span>}</p>
       </div>
       {hidden ? <p className="italic opacity-70">🙈 Message collapsed by a moderator{canReveal && onReveal && <> · <button type="button" className="not-italic font-semibold text-cheese underline underline-offset-2" onClick={onReveal}>Show</button></>}</p> : <>
       {m.collapsed && <p className="mb-1 text-[10px] text-muted-foreground">🙈 Collapsed by {nameFor(m.collapsed.by)} · visible to moderators</p>}

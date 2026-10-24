@@ -1314,6 +1314,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                     onReply={(x) => { setEditingMessage(null); setReplyingTo({ author: x.from, time: x.time, quote: quoteOf(x.text, !!x.voice) }); setVoice(null); setTimeout(() => composerRef.current?.focus(), 0); }}
                     canReveal={myRoomRole !== 'member'} revealed={revealed.has(m.key)} onReveal={() => setRevealed(s => new Set(s).add(m.key))}
                     onCollapse={collapseTarget(m) && activeInvite ? () => setPendingModeration({ id: activeInvite.invite.id, member: m.from, action: 'collapse', target: collapseTarget(m)! }) : undefined}
+                    badges={activeInvite ? { owner: m.from === activeInvite.invite.creator, admin: m.from !== activeInvite.invite.creator && !!moderation[activeInvite.invite.id]?.admins.includes(m.from), founder: m.from !== activeInvite.invite.creator && !!moderation[activeInvite.invite.id]?.protected.includes(m.from) } : undefined}
                     onOpenQuote={setOpenQuote} openedAt={acceptedRequestMessages.current.has(m.key) ? { current: Infinity } : openedAt} />
                 </Fragment>
               ))}
