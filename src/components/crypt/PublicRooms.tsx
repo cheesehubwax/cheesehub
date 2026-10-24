@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 import { MAX_PUBLIC_ROOM_MEMBERS } from '@/lib/cryptInviteGroups';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
+import type { CryptAvatar } from '@/lib/cryptAvatar';
 import {
   cleanRoomName, cleanRoomTopic, cleanTags, encodeListing, LISTING_STAKE_QUANTITY, MAX_ROOM_NAME, MAX_ROOM_TOPIC, ROOM_FEE_QUANTITY, searchListings,
   type JoinRequest, type RoomListing,
