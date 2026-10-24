@@ -61,7 +61,7 @@ import { DiscoverRoomsDialog, JoinRequests, RoomListingDialog } from '@/componen
 import { fetchRoomMemos } from '@/lib/cheeseCrypt';
 import {
   JOIN_REQUEST_COST, buildJoinRequestActions, buildRoomActions, collectJoinRequests, collectListings, decodeRoomEvents, declineJoin, removeRoomRequest, roomRequestOutcomes, roomRequestNotes, encodeListing, encodeUnlist, listedRoomIds, loadJoinDeclines,
-  loadLocalListings, loadRoomRequests, ROOM_PREFIX, saveLocalListing, saveRoomRequest, type JoinRequest, type RoomListing,
+  loadLocalListings, loadRoomInfo, loadRoomRequests, ROOM_PREFIX, saveLocalListing, saveRoomInfo, saveRoomRequest, type JoinRequest, type RoomListing,
 } from '@/lib/cryptRooms';
 
 const ACCOUNT_RE = /^[a-z1-5.]{1,12}$/;
