@@ -62,4 +62,26 @@ describe('public rooms', () => {
     expect(screen.queryByRole('region', { name: 'Room join requests' })).not.toBeInTheDocument();
     expect(calls.transact).not.toHaveBeenCalled();
   });
+
+  it('lists a room from the Edit group dialog, warning that the public key becomes visible', async () => {
+    calls.rooms.mockResolvedValue([]);
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: /1 of 2 joined/ }));
+    expect(screen.queryByRole('button', { name: 'List room publicly' })).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit group' }));
+    const edit = await screen.findByRole('dialog', { name: '✏️ Edit group' });
+    fireEvent.click(within(edit).getByRole('button', { name: 'List room publicly' }));
+    const listing = await screen.findByRole('dialog', { name: '🌐 Make room public' });
+    expect(within(listing).getByText(/public messaging key are published on chain/)).toBeInTheDocument();
+    const pay = within(listing).getByRole('button', { name: 'Pay & list room' });
+    expect(pay).toBeDisabled();
+    fireEvent.click(within(listing).getByRole('checkbox'));
+    fireEvent.click(pay);
+    await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
+    const actions = calls.transact.mock.calls[0][0] as { data: { to: string; quantity: string; memo?: string } }[];
+    expect(actions.filter(a => a.data.to === 'eosio.null').map(a => a.data.quantity)).toEqual(['0.0080 CHEESE']);
+    expect(actions.filter(a => a.data.to === 'xcheeseliqst').map(a => a.data.quantity)).toEqual(['0.0020 CHEESE']);
+    expect(actions.find(a => a.data.to === 'eosio.null')!.data.memo?.startsWith('CRYPTROOM1:')).toBe(true);
+    await waitFor(() => expect(within(edit).getByText('🌐 This room is listed publicly, so anyone can find it and ask to join.')).toBeInTheDocument());
+  });
 });
