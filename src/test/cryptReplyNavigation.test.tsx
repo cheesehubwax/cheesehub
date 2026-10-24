@@ -6,9 +6,9 @@ import { encodeReply } from '@/lib/cryptReply';
 
 const messages = Array.from({ length: 6 }, (_, i) => ({ key: `reply-${i}`, from: 'bob', time: i + 10,
   text: encodeReply({ author: 'alice', time: 1, quote: 'hello' }, `answer ${i}`), missing: 0 }));
-function Room({ active = 'bob', thread = messages, resumeAt = 5 }: { active?: string; thread?: typeof messages; resumeAt?: number }) {
+function Room({ active = 'bob', thread = messages, resumeAt = 5, onRead }: { active?: string; thread?: typeof messages; resumeAt?: number; onRead?: (time: number) => void }) {
   const list = useRef<HTMLOListElement>(null);
-  const nav = useCryptReplyNavigation('alice', active, thread, resumeAt, list);
+  const nav = useCryptReplyNavigation('alice', active, thread, resumeAt, list, onRead);
   return <><button onClick={nav.jump}>@{nav.pending.length}</button><ol ref={list} onScroll={nav.inspectVisible}>
     {thread.map(m => <li key={m.key} data-reply-key={m.key} data-highlighted={nav.highlighted.has(m.key)}>{m.key}</li>)}
   </ol></>;
@@ -33,13 +33,16 @@ describe('in-room reply navigation', () => {
     expect(screen.getByText('reply-1').dataset.highlighted).toBe('false');
   });
   it('ordinary scrolling consumes visible replies but not replies above or below the room', () => {
-    render(<Room />);
+    const onRead = vi.fn();
+    render(<Room onRead={onRead} />);
     const list = screen.getByRole('list');
     vi.spyOn(list, 'getBoundingClientRect').mockReturnValue(bounds(100, 500));
     messages.forEach((m, i) => vi.spyOn(screen.getByText(m.key), 'getBoundingClientRect').mockReturnValue(bounds(i === 2 ? 200 : 800, i === 2 ? 260 : 860)));
     fireEvent.scroll(list);
     expect(screen.getByRole('button').textContent).toBe('@5');
     expect(screen.getByText('reply-2').dataset.highlighted).toBe('true');
+    expect(onRead).toHaveBeenCalledWith(12);
+    expect(onRead).not.toHaveBeenCalledWith(15);
     fireEvent.scroll(list);
     expect(screen.getByRole('button').textContent).toBe('@5');
   });

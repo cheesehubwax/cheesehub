@@ -474,13 +474,6 @@ export function Messenger({ account, session }: { account: string; session: NonN
     }, 1500);
     return () => clearTimeout(id);
   }, [vault, readMarks, folderMarks, account]);
-  useEffect(() => {
-    if (!active || !readMarks) return;
-    const newest = thread.reduce((t, m) => Math.max(t, m.time), 0);
-    if (newest <= (readMarks[active] ?? 0)) return;
-    const next = { ...readMarks, [active]: newest };
-    saveReadMarks(account, next); setReadMarks(next);
-  }, [active, thread, readMarks, account]);
   const unread = useMemo(() => readMarks ? unreadCounts(conversations, account, readMarks) : {}, [conversations, account, readMarks]);
   const replyUnread = useMemo(() => readMarks ? unreadReplies(conversations, account, readMarks) : {}, [conversations, account, readMarks]);
   // Conversations with an unread reply to one of your messages get the reply colour instead of cheese yellow.
@@ -502,7 +495,11 @@ export function Messenger({ account, session }: { account: string; session: NonN
   }
   const resumeAt = resumeRef.current.id === active ? resumeRef.current.at : null;
   const firstNew = firstUnreadIndex(thread, resumeAt);
-  const replyNavigation = useCryptReplyNavigation(account, active, thread, resumeAt, listRef);
+  const replyNavigation = useCryptReplyNavigation(account, active, thread, resumeAt, listRef, (time) => {
+    if (!active || !readMarks || time <= (readMarks[active] ?? 0)) return;
+    const next = { ...readMarks, [active]: time };
+    saveReadMarks(account, next); setReadMarks(next);
+  });
   // Remember where the page itself was so switching chats never moves the outer page.
   const pageY = useRef(typeof window === 'undefined' ? 0 : window.scrollY);
   useEffect(() => {
