@@ -113,7 +113,7 @@ describe('asking to join and being added', () => {
     const asJoin = (text: string) => ({ txId: 'x', time: 16, from: 'carol', to: 'alice', quantity: '0.0001 CHEESE', memo: `${encryptMemo(text, alice.publicKey, carol.secretKey)}:${carol.publicKey}` });
     expect(decodeRoomEvents([asJoin('hello stranger')], alice, {})).toEqual([]);
     expect(decodeRoomEvents([asJoin(encodeNotice('friend', ID))], alice, {})).toEqual([]);
-    expect(decodeRoomEvents([asJoin(encodeInvite(invite))], alice, {})).toEqual([]);
+    expect(decodeRoomEvents([asJoin(encodeNotice('joined', ID))], alice, {})).toEqual([]);
     // A claimed key the sender does not own cannot open the request.
     const forged = { ...asJoin(encodeNotice('join', ID)), memo: `${encryptMemo(encodeNotice('join', ID), alice.publicKey, carol.secretKey)}:${dave.publicKey}` };
     expect(decodeRoomEvents([forged], alice, {})).toEqual([]);
