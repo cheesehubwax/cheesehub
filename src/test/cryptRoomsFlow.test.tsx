@@ -46,8 +46,9 @@ describe('public rooms', () => {
     const to = actions.map(a => a.data.to);
     expect(new Set(to.filter(t => t !== 'eosio.null' && t !== 'xcheeseliqst'))).toEqual(new Set(['bob', 'carol']));
     const parts = to.filter(t => t === 'bob').length;
-    expect(to.filter(t => t === 'carol').length).toBe(parts);
-    expect(to.filter(t => t === 'eosio.null').length).toBe(parts);
+    // The newcomer also receives the current ban/mute bootstrap snapshot.
+    expect(to.filter(t => t === 'carol').length).toBe(parts + 1);
+    expect(to.filter(t => t === 'eosio.null').length).toBe(parts + 1);
     expect(actions.filter(a => a.data.to === 'eosio.null').every(a => a.data.quantity === '0.0080 CHEESE')).toBe(true);
     await waitFor(() => expect(loadInvites('alice')[ID].members.map(m => m.account)).toEqual(['alice', 'bob', 'carol']));
   });
