@@ -63,45 +63,45 @@ export function DiscoverRoomsDialog({ open, onOpenChange, listings, loading, ref
   </Dialog>;
 }
 
-/** Creator-only listing controls for an invite group. Listing and unlisting each cost the room fee and need the Terms box. */
-export function RoomListingDialog({ groupId, groupName, members, publicKey, listed, busy, onList, onUnlist, onClose, cost = ROOM_FEE_QUANTITY, initialTopic = '', initialTags = [] }: {
+/** Creator-only listing controls for an invite group. A fresh listing pays the 10.0000 CHEESE anti-spam stake;
+ *  updating a listed room's details and unlisting pay the normal room fee. All need the Terms box. */
+export function RoomListingDialog({ groupId, groupName, members, publicKey, listed, busy, onList, onUnlist, onClose, cost = LISTING_STAKE_QUANTITY, unlistCost = ROOM_FEE_QUANTITY, initialName, initialTopic = '', initialTags = [] }: {
   groupId: string; groupName: string; members: number; publicKey: string; listed: boolean; busy: boolean;
   onList: (info: { name: string; topic: string; tags: string[] }) => Promise<boolean>; onUnlist: () => Promise<boolean>; onClose: () => void;
-  cost?: string; initialTopic?: string; initialTags?: string[];
+  cost?: string; unlistCost?: string; initialName?: string; initialTopic?: string; initialTags?: string[];
 }) {
-  const [name, setName] = useState(cleanRoomName(groupName));
+  const [name, setName] = useState(cleanRoomName(initialName ?? groupName));
   const [topic, setTopic] = useState(initialTopic);
   const [tags, setTags] = useState(initialTags.join(' '));
   const [agreed, setAgreed] = useState(false);
   const info = { name: cleanRoomName(name), topic: cleanRoomTopic(topic), tags: cleanTags(tags) };
   let error = '';
-  if (!listed) {
-    if (!info.name) error = 'Give the room a name';
-    else try { encodeListing({ id: groupId, ...info, publicKey, members }); } catch (e) { error = (e as Error).message; }
-  }
+  if (!info.name) error = 'Give the room a name';
+  else try { encodeListing({ id: groupId, ...info, publicKey, members }); } catch (e) { error = (e as Error).message; }
   return <Dialog open onOpenChange={o => { if (!o && !busy) onClose(); }}>
     <DialogContent className="max-w-md">
       <DialogHeader>
         <DialogTitle>🌐 {listed ? 'Listed publicly' : 'Make room public'}</DialogTitle>
         <DialogDescription>{listed
-          ? 'People can find this room and ask you to join. Requests appear at the top of your sidebar. Unlisting hides it from search.'
+          ? 'People can find this room and ask you to join. Requests appear at the top of your sidebar. Update the details any time for the normal fee, or unlist to hide it from search.'
           : 'Publishes the room name, topic, tags, member count and your public key on chain so others can ask to join. The member list and messages are never published.'}</DialogDescription>
       </DialogHeader>
-      {!listed && <div className="space-y-2">
+      <div className="space-y-2">
         <Input maxLength={MAX_ROOM_NAME} aria-label="Room name" placeholder="Room name" value={name} onChange={e => setName(e.target.value)} />
         <Input maxLength={MAX_ROOM_TOPIC} aria-label="Room topic" placeholder="Short topic, e.g. Cheese lovers of Brisbane" value={topic} onChange={e => setTopic(e.target.value)} />
         <Input aria-label="Room tags" placeholder="Up to 3 tags, e.g. cheese wax nfts" value={tags} onChange={e => setTags(e.target.value)} />
         {info.tags.length > 0 && <p className="text-[11px] text-muted-foreground">{info.tags.map(t => `#${t}`).join(' ')}</p>}
         {error && <p className="text-xs text-destructive">{error}</p>}
-      </div>}
-      {!listed && <p className="rounded-md border border-cheese/30 bg-cheese/5 p-2 text-xs text-muted-foreground">⚠️ <span className="font-semibold text-cheese">Your account and public messaging key are published on chain</span> with this listing, so anyone can read them. That only lets people send join requests for this room: regular messages from accounts you have not added stay hidden unless you turn on the Public Inbox, and you can block anyone at any time.</p>}
-      <p className="text-xs text-muted-foreground">Cost: {cost}. Platform fees split 80% to eosio.null and 20% to xcheeseliqst; includes encrypted room-policy copies for members.</p>
+      </div>
+      <p className="rounded-md border border-cheese/30 bg-cheese/5 p-2 text-xs text-muted-foreground">⚠️ <span className="font-semibold text-cheese">Your account and public messaging key are published on chain</span> with this listing, so anyone can read them. That only lets people send join requests for this room: regular messages from accounts you have not added stay hidden unless you turn on the Public Inbox, and you can block anyone at any time.</p>
+      <p className="text-xs text-muted-foreground">{listed
+        ? `Updating details costs ${unlistCost}; unlisting costs ${unlistCost}. Platform fees split 80% to eosio.null and 20% to xcheeseliqst; includes encrypted room-policy copies for members.`
+        : `Cost: ${cost}. Making a room public pays a 10.0000 CHEESE stake (split 80% to eosio.null and 20% to xcheeseliqst) so spam rooms cannot farm join-request fees; updating details later costs only the normal fee. Includes encrypted room-policy copies for members.`}</p>
       <TermsCheckbox id="crypt-room-terms" checked={agreed} onCheckedChange={setAgreed} />
       <DialogFooter>
         <Button variant="outline" disabled={busy} onClick={onClose}>Cancel</Button>
-        {listed
-          ? <Button disabled={busy || !agreed} onClick={() => void onUnlist().then(ok => { if (ok) onClose(); })}>{busy ? 'Sending…' : 'Pay & unlist'}</Button>
-          : <Button disabled={busy || !agreed || !!error} onClick={() => void onList(info).then(ok => { if (ok) onClose(); })}>{busy ? 'Sending…' : 'Pay & list room'}</Button>}
+        {listed && <Button variant="outline" disabled={busy || !agreed} onClick={() => void onUnlist().then(ok => { if (ok) onClose(); })}>{busy ? 'Sending…' : 'Pay & unlist'}</Button>}
+        <Button disabled={busy || !agreed || !!error} onClick={() => void onList(info).then(ok => { if (ok) onClose(); })}>{busy ? 'Sending…' : listed ? 'Update details' : 'Pay & list room'}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>;
