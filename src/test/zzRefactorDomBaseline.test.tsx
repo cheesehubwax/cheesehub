@@ -30,7 +30,7 @@ const key = (account: string, seed: number): MessagingKey => {
 };
 const alice = key('alice', 1), bob = key('bob', 2), carol = key('carol', 3);
 const dump = (name: string) => writeFileSync(`${OUT}/${name}.html`, document.body.innerHTML
-  .replace(/radix-[^"\s]+/g, 'radix-X').replace(/:r[0-9a-z]+:/g, ':rX:').replace(/«r[0-9a-z]+»/g, '«rX»'));
+  .replace(/CRYPT1:[A-Za-z0-9+/=:]+/g, 'CRYPT1:X').replace(/radix-[^"\s]+/g, 'radix-X').replace(/:r[0-9a-z]+:/g, ':rX:').replace(/«r[0-9a-z]+»/g, '«rX»'));
 const flush = () => act(async () => { await new Promise(r => setTimeout(r, 50)); });
 const qc = () => new QueryClient({ defaultOptions: { queries: { retry: false } } });
 const mount = (who = 'alice') => render(<MemoryRouter><QueryClientProvider client={qc()}><Messenger account={who} session={{ permissionLevel: { actor: who, permission: 'active' } } as unknown as Session} /></QueryClientProvider></MemoryRouter>);
@@ -48,7 +48,7 @@ describe('dom baseline', () => {
     await flush(); dump('01-page-signed-out');
   });
   it('page signed in locked', async () => {
-    vi.mocked(useWax).mockReturnValue({ session: { permissionLevel: { actor: 'alice', permission: 'active' } }, accountName: 'alice', login: vi.fn(), logout: vi.fn() } as never);
+    vi.mocked(useWax).mockReturnValue({ session: { permissionLevel: { actor: 'alice', permission: 'active' } }, accountName: 'alice', isConnected: true, login: vi.fn(), logout: vi.fn() } as never);
     render(<MemoryRouter><QueryClientProvider client={qc()}><CheeseCrypt /></QueryClientProvider></MemoryRouter>);
     await flush(); dump('02-page-locked');
   });
@@ -61,7 +61,7 @@ describe('dom baseline', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Menu' })); await flush(); dump('05-menu');
     fireEvent.keyDown(document.activeElement || document.body, { key: 'Escape' }); await flush();
     fireEvent.click(screen.getByRole('button', { name: /Fee info/ })); await flush(); dump('06-feeinfo');
-    fireEvent.contextMenu(screen.getByText('two')); await flush(); dump('07-context');
+    fireEvent.contextMenu(screen.getByText('two'), { clientX: 10, clientY: 10 }); await flush(); dump('07-context');
     const reply = screen.queryByRole('menuitem', { name: /Reply/ }); if (reply) fireEvent.click(reply); await flush(); dump('08-replying');
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'hello there' } }); await flush(); dump('09-typed');
     fireEvent.click(screen.getByRole('button', { name: 'Hide groups and friends' })); await flush(); dump('10-hidden');
@@ -70,7 +70,7 @@ describe('dom baseline', () => {
     saveKey(alice); saveContact('alice', 'bob', bob.publicKey);
     const group = { id: '0123456789abcdef', members: ['alice', 'bob', 'carol'] };
     saveGroups('alice', [group]);
-    calls.fetch.mockResolvedValue([{ ...msg(1, ''), memo: encryptMemo(groupPayload(group, 'original history'), alice.publicKey, bob.secretKey) }]);
+    calls.fetch.mockResolvedValue([{ ...msg(1, 'x'), memo: encryptMemo(groupPayload(group, 'original history'), alice.publicKey, bob.secretKey) }]);
     mount(); fireEvent.click(await screen.findByRole('button', { name: /Group · 3 people/ })); await screen.findByText('original history'); await flush(); dump('11-legacy');
     fireEvent.click(screen.getByRole('button', { name: /Members \(3\)/ })); await flush(); dump('12-legacy-members');
   });
