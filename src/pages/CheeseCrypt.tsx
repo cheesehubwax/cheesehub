@@ -60,7 +60,7 @@ import { CryptComposer } from '@/components/crypt/CryptComposer';
 import { DiscoverRoomsDialog, JoinRequests, RoomListingDialog } from '@/components/crypt/PublicRooms';
 import { fetchRoomMemos } from '@/lib/cheeseCrypt';
 import {
-  buildRoomActions, collectJoinRequests, collectListings, decodeRoomEvents, declineJoin, encodeListing, encodeUnlist, listedRoomIds, loadJoinDeclines,
+  buildJoinRequestActions, buildRoomActions, collectJoinRequests, collectListings, decodeRoomEvents, declineJoin, encodeListing, encodeUnlist, listedRoomIds, loadJoinDeclines,
   loadLocalListings, loadRoomRequests, ROOM_PREFIX, saveLocalListing, saveRoomRequest, type JoinRequest, type RoomListing,
 } from '@/lib/cryptRooms';
 
@@ -1008,17 +1008,15 @@ export function Messenger({ account, session }: { account: string; session: NonN
     return roomRequests[l.id] ? 'requested' as const : null;
   };
   const askToJoin = async (l: RoomListing) => {
-    if (!key || l.creator === account || blocked.includes(l.creator)) return false;
+    if (!key || busy || l.creator === account || blocked.includes(l.creator)) return false;
+    // The request carries my public key, so no published key is needed; only the creator can read the request.
     setBusy(true);
-    let mine: string | null = null;
-    try { mine = await lookupPublishedKey(account); }
-    catch { toast({ title: 'Key lookup failed', description: 'History servers did not answer. Try again shortly.', variant: 'destructive' }); return false; }
+    try {
+      const r = await executeTransaction(buildJoinRequestActions(key, l.creator, l.publicKey, l.id, [permission]), { successTitle: `Request sent to ${l.creator}` });
+      if (!r.success) return false;
+      [2000, 5000, 10000].forEach(ms => setTimeout(poll, ms));
+    } catch (e) { toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' }); return false; }
     finally { setBusy(false); }
-    if (mine !== key.publicKey) {
-      toast({ title: 'Publish your public key first', description: 'Use Menu → Publish so the room creator can read your request.', variant: 'destructive' });
-      return false;
-    }
-    if (!(await sendCg2([l.creator], { [l.creator]: l.publicKey }, encodeNotice('join', l.id), `Request sent to ${l.creator}`))) return false;
     setRoomRequests(saveRoomRequest(account, l));
     setAskingRoom(null);
     return true;
