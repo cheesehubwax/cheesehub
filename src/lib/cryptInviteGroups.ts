@@ -345,6 +345,11 @@ export function deriveInviteGroups(events: Cg2Event[], invites: Record<string, I
     let meta: { name: string; avatar?: CryptAvatar; at: number } | null = null;
     const requestsIn = new Set<string>(), requested = new Set<string>(), accepted = new Set<string>();
     for (const e of sorted) {
+      // The owner's admission to me lists the members already in the room; their earlier joins went to others.
+      if (e.control.kind === 'admission' && e.control.invite.id === g.id && e.from === g.creator && e.to === me) {
+        for (const m of e.control.invite.members) if (m.account !== me && !state.has(m.account)) state.set(m.account, { joined: true, at: e.time });
+        continue;
+      }
       if ((e.control.kind === 'invite' || e.control.kind === 'admission') || e.control.id !== g.id || !eventFromMember(e, invites, me)) continue;
       const c = e.control;
       if (c.kind === 'joined' || c.kind === 'msg') {
