@@ -211,7 +211,7 @@ export function collectJoinRequests(events: Cg2Event[], me: string, listed: Set<
 
 // ---- per-account device storage ----
 export interface LocalListing { listed: boolean; at: number }
-export interface RoomRequest extends RoomInviter { id: string; time: number }
+export interface RoomRequest extends RoomInviter { id: string; time: number; name?: string }
 const listedStore = (a: string) => `cheesecrypt-listed-rooms-${a}`;
 const requestStore = (a: string) => `cheesecrypt-room-requests-${a}`;
 const declineStore = (a: string) => `cheesecrypt-join-declines-${a}`;
@@ -238,12 +238,12 @@ export function loadRoomRequests(account: string): Record<string, RoomRequest> {
   for (const [id, v] of Object.entries(readObject(requestStore(account)))) {
     const o = v as Partial<RoomRequest>;
     if (ID.test(id) && o?.id === id && typeof o.creator === 'string' && ACCOUNT.test(o.creator) && o.creator !== account && validKey(o.publicKey) && finite(o.time))
-      out[id] = { id, creator: o.creator, publicKey: o.publicKey, time: o.time };
+      out[id] = { id, creator: o.creator, publicKey: o.publicKey, time: o.time, ...(typeof o.name === 'string' && o.name.length <= 64 ? { name: o.name } : {}) };
   }
   return out;
 }
-export function saveRoomRequest(account: string, l: Pick<RoomListing, 'id' | 'creator' | 'publicKey'>, time = Date.now()) {
-  const next = { ...loadRoomRequests(account), [l.id]: { id: l.id, creator: l.creator, publicKey: l.publicKey, time } };
+export function saveRoomRequest(account: string, l: Pick<RoomListing, 'id' | 'creator' | 'publicKey'> & { name?: string }, time = Date.now()) {
+  const next = { ...loadRoomRequests(account), [l.id]: { id: l.id, creator: l.creator, publicKey: l.publicKey, time, ...(l.name ? { name: l.name.slice(0, 64) } : {}) } };
   localStorage.setItem(requestStore(account), JSON.stringify(next));
   return next;
 }
@@ -257,4 +257,29 @@ export function declineJoin(account: string, id: string, from: string, time: num
   const next = { ...all, [k]: Math.max(all[k] ?? 0, time) };
   localStorage.setItem(declineStore(account), JSON.stringify(next));
   return next;
+}
+
+/** Forget my request to a room (after I've seen its decline), so it leaves the Groups list. */
+export function removeRoomRequest(account: string, id: string) {
+  const next = { ...loadRoomRequests(account) };
+  delete next[id];
+  localStorage.setItem(requestStore(account), JSON.stringify(next));
+  return next;
+}
+
+export type RoomRequestOutcome = 'pending' | 'accepted' | 'declined';
+/**
+ * The state of each of my own join requests: accepted once the creator's invite exists, declined when the creator
+ * sent a `join-no` notice after the request (a newer request after a decline is pending again).
+ */
+export function roomRequestOutcomes(requests: Record<string, RoomRequest>, events: Cg2Event[], me: string, invited: Set<string>): Record<string, RoomRequestOutcome> {
+  const out: Record<string, RoomRequestOutcome> = {};
+  // Chain block time can trail the local clock slightly; a decline must still come after the request.
+  const SKEW = 120_000;
+  for (const r of Object.values(requests)) {
+    if (invited.has(r.id)) { out[r.id] = 'accepted'; continue; }
+    const declined = events.some(e => e.control.kind === 'join-no' && e.control.id === r.id && e.from === r.creator && e.to === me && e.time >= r.time - SKEW);
+    out[r.id] = declined ? 'declined' : 'pending';
+  }
+  return out;
 }

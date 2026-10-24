@@ -24,7 +24,7 @@ export interface InviteMember { account: string; publicKey: string }
 export interface InviteGroup { id: string; name: string; creator: string; created: number; members: InviteMember[]; avatar?: CryptAvatar; publicRoom?: boolean }
 export const MUTE_MINUTES = [15, 60, 360, 1440] as const;
 export type MuteMinutes = typeof MUTE_MINUTES[number];
-export type Cg2Kind = 'invite' | 'admission' | 'add' | 'msg' | 'joined' | 'leave' | 'meta' | 'friend' | 'friend-ok' | 'join' | 'room' | 'mute' | 'ban' | 'policy' | 'admin' | 'collapse' | 'report';
+export type Cg2Kind = 'invite' | 'admission' | 'add' | 'msg' | 'joined' | 'leave' | 'meta' | 'friend' | 'friend-ok' | 'join' | 'join-no' | 'room' | 'mute' | 'ban' | 'policy' | 'admin' | 'collapse' | 'report';
 export type Cg2 =
   | { kind: 'invite'; invite: InviteGroup }
   | { kind: 'admission'; invite: InviteGroup }
@@ -41,7 +41,8 @@ export type Cg2 =
   /** Notification only: a member reports to moderators (`admin`), an admin escalates to the owner for a ban (`owner`). */
   | { kind: 'report'; id: string; member: string; target: string; level: 'admin' | 'owner' }
   /** `join`: a request to a public room's creator (cryptRooms.ts); never a membership change by itself. */
-  | { kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'join'; id: string }
+  /** `join-no`: the creator tells a requester their join request was declined (notification only). */
+  | { kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'join' | 'join-no'; id: string }
   | { kind: 'meta'; id: string; name: string; avatar?: CryptAvatar };
 
 const validPublicKey = (k: unknown): k is string => {
@@ -95,7 +96,7 @@ export function encodeMemberAdd(g: InviteGroup, member: InviteMember) {
   return payload;
 }
 export const encodeGroupText = (id: string, text: string) => wire('msg', { i: checkId(id), t: text });
-export const encodeNotice = (kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'join', id: string) => wire(kind, { i: checkId(id) });
+export const encodeNotice = (kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'join' | 'join-no', id: string) => wire(kind, { i: checkId(id) });
 export function encodeRoomPolicy(id: string, listed: boolean, protectedMembers: string[]) {
   if (!protectedMembers.length || protectedMembers.length > MAX_INVITE_MEMBERS || new Set(protectedMembers).size !== protectedMembers.length || protectedMembers.some(a => !ACCOUNT.test(a))) throw new Error('Invalid protected members');
   return wire('room', { i: checkId(id), l: listed, p: protectedMembers });
@@ -167,7 +168,7 @@ export function parseCg2(text: string | null | undefined): Cg2 | null {
     return { kind, id, member: body.a, minutes: body.d as MuteMinutes };
   }
   if (kind === 'msg') return typeof body.t === 'string' && body.t.trim() ? { kind, id, text: body.t } : null;
-  if (kind === 'joined' || kind === 'leave' || kind === 'friend' || kind === 'friend-ok' || kind === 'join') return { kind, id };
+  if (kind === 'joined' || kind === 'leave' || kind === 'friend' || kind === 'friend-ok' || kind === 'join' || kind === 'join-no') return { kind, id };
   if (kind === 'meta') {
     const name = parseCryptName(body.n);
     if (!name || name !== body.n) return null;
