@@ -42,7 +42,7 @@ describe('blocking on this device', () => {
     fireEvent.click(screen.getByRole('button', { name: /Group · 3 people/ }));
     await screen.findByText('carol in group');
     expect(screen.queryByText('bob in group')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Blocked accounts' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' })); fireEvent.click(await screen.findByRole('button', { name: 'Blocked accounts' }));
     fireEvent.click(screen.getByRole('button', { name: 'Unblock bob' }));
     expect(loadBlocked('alice')).toEqual([]);
     await waitFor(() => expect(screen.getByText('bob in group')).toBeInTheDocument());
