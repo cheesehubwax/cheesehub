@@ -470,24 +470,6 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if (!activeInvite || myRoomRole === 'member' || !target || !m.txId || m.missing || busy) return null;
     return myRoomRole === 'owner' || canCollapseAuthor(activeModeration, activeInvite.invite, account, m.from, clock) ? target : null;
   };
-  // Reports addressed to me in the open room, matched to their message row by author + pre-edit digest.
-  const reportedRows = useMemo(() => {
-    if (!activeInvite || activeInvite.status !== 'joined') return [] as { report: string; key: string }[];
-    const rows = new Map<string, string>();
-    for (const [k, t] of edited.targets) { const m = editableConversations.find(x => x.key === k); if (m && m.igroup === activeInvite.invite.id) rows.set(`${m.from}:${t}`, k); }
-    const shown = new Set(thread.map(m => m.key));
-    return collectReports(allGroupEvents, invites, moderation, account).filter(r => r.id === activeInvite.invite.id)
-      .flatMap(r => { const key = rows.get(`${r.author}:${r.target}`); return key && shown.has(key) ? [{ report: reportKey(r), key }] : []; });
-  }, [activeInvite, edited.targets, editableConversations, thread, allGroupEvents, invites, moderation, account]);
-  const pendingReports = reportedRows.filter(r => !seenReports.includes(r.report));
-  const jumpToReport = () => {
-    const next = pendingReports[0];
-    if (!next) return;
-    const viewed = pendingReports.filter(r => r.key === next.key).map(r => r.report);
-    const keys = [...new Set([...seenReports, ...viewed])];
-    saveSeenReports(account, keys); setSeenReports(keys); setReportFocus(next.key);
-    listRef.current?.querySelector<HTMLElement>(`[data-reply-key="${CSS.escape(next.key)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  };
   const reportAction = (m: ConversationEntry) => {
     const target = edited.targets.get(m.key);
     if (!activeInvite || activeInvite.status !== 'joined' || myRoomRole === 'owner' || busy || roomRestricted || !target || !m.txId || m.missing || m.from === account || m.from === activeInvite.invite.creator || !listedIds.has(activeInvite.invite.id) || !activeModeration?.listed) return undefined;
@@ -581,6 +563,24 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const next = { ...readMarks, [active]: time };
     saveReadMarks(account, next); setReadMarks(next);
   });
+  // Reports addressed to me in the open room, matched to their message row by author + pre-edit digest.
+  const reportedRows = useMemo(() => {
+    if (!activeInvite || activeInvite.status !== 'joined') return [] as { report: string; key: string }[];
+    const rows = new Map<string, string>();
+    for (const [k, t] of edited.targets) { const m = editableConversations.find(x => x.key === k); if (m && m.igroup === activeInvite.invite.id) rows.set(`${m.from}:${t}`, k); }
+    const shown = new Set(thread.map(m => m.key));
+    return collectReports(allGroupEvents, invites, moderation, account).filter(r => r.id === activeInvite.invite.id)
+      .flatMap(r => { const key = rows.get(`${r.author}:${r.target}`); return key && shown.has(key) ? [{ report: reportKey(r), key }] : []; });
+  }, [activeInvite, edited.targets, editableConversations, thread, allGroupEvents, invites, moderation, account]);
+  const pendingReports = reportedRows.filter(r => !seenReports.includes(r.report));
+  const jumpToReport = () => {
+    const next = pendingReports[0];
+    if (!next) return;
+    const viewed = pendingReports.filter(r => r.key === next.key).map(r => r.report);
+    const keys = [...new Set([...seenReports, ...viewed])];
+    saveSeenReports(account, keys); setSeenReports(keys); setReportFocus(next.key);
+    listRef.current?.querySelector<HTMLElement>(`[data-reply-key="${CSS.escape(next.key)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  };
   // Remember where the page itself was so switching chats never moves the outer page.
   const pageY = useRef(typeof window === 'undefined' ? 0 : window.scrollY);
   useEffect(() => {
