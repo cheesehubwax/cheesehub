@@ -207,4 +207,31 @@ describe('group creation and signing gate', () => {
     expect(loadContacts('bob').carol).toBeUndefined();
     await screen.findByPlaceholderText('Message group');
   });
+  it('hides invite-group members behind a Members dropdown listing names, WAX accounts and avatars', async () => {
+    const alice = generateKey('alice'), bob = generateKey('bob'), carol = generateKey('carol');
+    localStorage.clear(); saveKey(bob); saveContact('bob', 'alice', alice.publicKey);
+    const id = '0123456789abcdef';
+    const invite = { id, name: 'Cheese club', creator: 'alice', created: 5, members: [alice, bob, carol].map(k => ({ account: k.account, publicKey: k.publicKey })) };
+    calls.fetch.mockResolvedValue(splitMessage(encodeInvite(invite)).map(p => ({ txId: 'inv', time: 10, from: 'alice', to: 'bob', quantity: '0.0010 CHEESE', memo: encryptMemo(p, bob.publicKey, alice.secretKey) })));
+    mount(<Messenger account="bob" session={{ permissionLevel: { actor: 'bob', permission: 'active' } } as unknown as Session} />);
+    fireEvent.click(await screen.findByRole('button', { name: /Cheese club/ }));
+    expect(screen.queryByText('carol')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Members \(3\)/ }));
+    expect(screen.getAllByText('carol').length).toBe(2);
+    expect(screen.getByRole('img', { name: "carol's avatar" })).toBeInTheDocument();
+  });
+  it('hides legacy group members behind the same dropdown', async () => {
+    const alice = generateKey('alice'), bob = generateKey('bob');
+    localStorage.clear(); saveKey(alice); saveContact('alice', 'bob', bob.publicKey);
+    const group = { id: '0123456789abcdef', members: ['alice', 'bob', 'carol'] };
+    saveGroups('alice', [group]);
+    calls.fetch.mockResolvedValue([{ txId: 'old', time: 1, from: 'bob', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo(groupPayload(group, 'original history'), alice.publicKey, bob.secretKey) }]);
+    mount(<Messenger account="alice" session={{ permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} />);
+    fireEvent.click(screen.getByRole('button', { name: /Group · 3 people/ }));
+    await screen.findByText('original history');
+    expect(screen.queryByText('carol')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Members \(3\)/ }));
+    expect(screen.getAllByText('carol').length).toBe(2);
+    expect(screen.getByRole('img', { name: "carol's avatar" })).toBeInTheDocument();
+  });
 });
