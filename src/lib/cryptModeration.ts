@@ -8,12 +8,12 @@ export interface RoomModeration {
   mutes: Record<string, { from: number; until: number }[]>;
 }
 /** Owner controls are authenticated pairwise copies. The first public roster is immutable across relistings.
- * A room policy must share its transaction with a paid listing; a membership update carries that original
- * policy to new members. Missing policy means no bans, never an inferred unprotected roster. */
+ * A membership update carries the original policy to new members. Missing policy means no bans,
+ * never an inferred unprotected roster. Controls use blockchain time, not device-time claims. */
 export function deriveModeration(events: Cg2Event[], invites: Record<string, InviteGroup>, me: string): Record<string, RoomModeration> {
   const out: Record<string, RoomModeration> = {};
   const seen = new Set<string>();
-  for (const e of [...events].sort((a, b) => a.time - b.time || a.txId.localeCompare(b.txId))) {
+  for (const e of [...events].sort((a, b) => a.time - b.time || a.txId.localeCompare(b.txId) || (a.control.kind === 'room' ? -1 : b.control.kind === 'room' ? 1 : 0))) {
     const g = eventFromMember(e, invites, me);
     if (!g || e.from !== g.creator) continue;
     const c = e.control;
@@ -26,7 +26,7 @@ export function deriveModeration(events: Cg2Event[], invites: Record<string, Inv
       if (!c.protected.includes(g.creator) || c.protected.some(a => !g.members.some(m => m.account === a))) continue;
       if (state && (state.protected.length !== c.protected.length || state.protected.some(a => !c.protected.includes(a)))) continue;
       // Any pre-policy roster received on chain must be included, even if the creator tries omitting it.
-      const before = events.filter(x => x.control.kind === 'invite' && x.control.invite.id === g.id && x.from === g.creator && x.time <= e.time && x.txId !== e.txId);
+      const before = events.filter(x => x.control.kind === 'invite' && x.control.invite.id === g.id && x.from === g.creator && x.time <= e.time && x.txId !== e.txId && eventInviteTrusted(x, g, me));
       if (!state && before.some(x => x.control.kind === 'invite' && x.control.invite.members.some(m => !c.protected.includes(m.account)))) continue;
       if (!state) { state = { listed: c.listed, protected: [...c.protected], bans: {}, mutes: {} }; out[g.id] = state; }
       else state.listed = c.listed;
@@ -46,12 +46,19 @@ export function deriveModeration(events: Cg2Event[], invites: Record<string, Inv
 export function restrictedAt(state: RoomModeration | undefined, member: string, at: number) {
   return !!state && ((state.bans[member] !== undefined && at >= state.bans[member]) || !!state.mutes[member]?.some(m => at >= m.from && at < m.until));
 }
+function eventInviteTrusted(e: Cg2Event, g: InviteGroup, me: string) {
+  const partner = e.from === me ? e.to : e.from;
+  return (e.from === me || e.to === me) && g.members.find(m => m.account === partner)?.publicKey === e.usedKey;
+}
+function restrictedSpan(state: RoomModeration | undefined, member: string, start: number, end: number) {
+  return restrictedAt(state, member, start) || restrictedAt(state, member, end) || !!state?.mutes[member]?.some(m => start < m.until && end >= m.from);
+}
 export function mutedUntil(state: RoomModeration | undefined, member: string, now: number) {
   return Math.max(0, ...(state?.mutes[member] ?? []).filter(m => now >= m.from && now < m.until).map(m => m.until));
 }
 /** Filter before edits and again after them; stripped reply quotes cannot expose hidden originals. */
 export function moderateMessages<T extends ConversationEntry>(entries: T[], states: Record<string, RoomModeration>): T[] {
-  return entries.filter(m => !m.igroup || !restrictedAt(states[m.igroup], m.from, m.time) && !restrictedAt(states[m.igroup], m.from, m.voice?.completedAt ?? m.time)).map(m => {
+  return entries.filter(m => !m.igroup || !restrictedSpan(states[m.igroup], m.from, m.time, m.voice?.completedAt ?? m.time)).map(m => {
     const reply = parseReply(m.text);
     if (!m.igroup || !reply || !restrictedAt(states[m.igroup], reply.author, reply.time)) return m;
     return { ...m, text: encodeReply({ ...reply, quote: '' }, reply.body) };

@@ -938,7 +938,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if (!v) return false;
     let payload: string;
     try { payload = encodeMeta(v.invite.id, editingInvite.name, editingInvite.avatar); } catch (e) { toast({ title: (e as Error).message, variant: 'destructive' }); return false; }
-    const to = v.invite.members.map(m => m.account).filter(a => a !== account);
+    const to = v.invite.members.map(m => m.account).filter(a => a !== account && moderation[v.invite.id]?.bans[a] === undefined);
     if (!(await sendCg2(to, keysOf(v.invite), payload, 'Group updated'))) return false;
     setEditingInvite(null);
     return true;
@@ -969,17 +969,6 @@ export function Messenger({ account, session }: { account: string; session: NonN
     setAskingRoom(null);
     return true;
   };
-  const sendRoomMemo = async (id: string, memo: string, listed: boolean) => {
-    setBusy(true);
-    try {
-      const r = await executeTransaction(buildRoomActions(account, memo, [permission]), { successTitle: listed ? 'Room listed' : 'Room unlisted' });
-      if (!r.success) return false;
-      setLocalListings(saveLocalListing(account, id, listed));
-      setTimeout(() => void refetchRooms(), 3000);
-      return true;
-    } catch (e) { toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' }); return false; }
-    finally { setBusy(false); }
-  };
   const listRoom = async (id: string, info: { name: string; topic: string; tags: string[] }) => {
     const v = viewById(id);
     if (!key || !v || !v.isCreator) return false;
@@ -1002,7 +991,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
       setLocalListings(saveLocalListing(account, v.invite.id, listed));
       await refresh(); void refetchRooms();
       return true;
-    } finally { setBusy(false); }
+    } catch (e) { toast({ title: 'Room update failed', description: (e as Error).message, variant: 'destructive' }); return false; }
+    finally { setBusy(false); }
   };
   const unlistRoom = (id: string) => {
     const v = viewById(id);
@@ -1016,7 +1006,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const policy = !state ? encodeRoomPolicy(n.id, true, v.invite.members.map(m => m.account)) : null;
     const payload = encodeModeration(n.id, n.member, n.minutes);
     const to = v.invite.members.map(m => m.account).filter(a => a !== account);
-    return { v, to, payload, policy, cost: cg2Cost(payload, to.length) };
+    return { v, to, payload, policy, cost: `${(parseFloat(cg2Cost(payload, to.length)) + (policy ? parseFloat(cg2Cost(policy, to.length)) : 0)).toFixed(4)} CHEESE` };
   };
   const confirmModeration = async () => {
     if (!key || !pendingModeration || busy) return false;
@@ -1029,7 +1019,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
       if (!r.success || !r.txId) return false;
       setPendingModeration(null); await refresh();
       return true;
-    } finally { setBusy(false); }
+    } catch (e) { toast({ title: 'Moderation failed', description: (e as Error).message, variant: 'destructive' }); return false; }
+    finally { setBusy(false); }
   };
   /** The creator adds the requester by sending the grown invite to every member (old members keep their keys). */
   const joinPlan = (r: JoinRequest) => {
@@ -1038,21 +1029,21 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const updated: InviteGroup = { ...v.invite, members: [...v.invite.members, { account: r.from, publicKey: r.publicKey }] };
     let payload: string;
     try { payload = encodeInvite(updated); } catch { return null; }
-    const to = updated.members.map(m => m.account).filter(a => a !== account);
-    return { v, updated, payload, to, cost: cg2Cost(payload, to.length) };
+    const to = updated.members.map(m => m.account).filter(a => a !== account && moderation[v.invite.id]?.bans[a] === undefined);
+    const policy = encodeRoomPolicy(updated.id, true, moderation[updated.id]?.protected ?? v.invite.members.map(m => m.account));
+    return { v, updated, payload, policy, to, cost: `${(parseFloat(cg2Cost(payload, to.length)) + parseFloat(cg2Cost(policy, to.length))).toFixed(4)} CHEESE` };
   };
   const confirmJoin = async () => {
     if (!acceptingJoin) return false;
     const plan = joinPlan(acceptingJoin);
     if (!plan) { toast({ title: 'This room is full or the request is out of date', variant: 'destructive' }); setAcceptingJoin(null); return false; }
     if (!key) return false;
-    const state = moderation[plan.updated.id];
-    // Older rooms without a policy conservatively protect everyone currently in the roster.
-    const policy = encodeRoomPolicy(plan.updated.id, true, state?.protected ?? plan.v.invite.members.map(m => m.account));
-    const actions = [...buildCg2Actions(key, plan.to, keysOf(plan.updated), plan.payload, [permission]), ...buildCg2Actions(key, plan.to, keysOf(plan.updated), policy, [permission])];
+    const actions = [...buildCg2Actions(key, plan.to, keysOf(plan.updated), plan.payload, [permission]), ...buildCg2Actions(key, plan.to, keysOf(plan.updated), plan.policy, [permission])];
     setBusy(true);
     let r;
-    try { r = await executeTransaction(actions, { successTitle: `${acceptingJoin.from} invited to ${plan.v.name}` }); } finally { setBusy(false); }
+    try { r = await executeTransaction(actions, { successTitle: `${acceptingJoin.from} invited to ${plan.v.name}` }); }
+    catch (e) { toast({ title: 'Invite failed', description: (e as Error).message, variant: 'destructive' }); return false; }
+    finally { setBusy(false); }
     if (!r.success || !r.txId) return false;
     await refresh();
     const next = { ...inviteStore, [plan.updated.id]: plan.updated };
@@ -1211,6 +1202,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         const v = viewById(listingRoom);
         if (!v || !v.isCreator) return null;
         return <RoomListingDialog groupId={v.invite.id} groupName={v.name} members={Math.max(1, v.joined.length)} publicKey={key.publicKey} listed={listedIds.has(v.invite.id)} busy={busy}
+          cost={`${(0.0100 + parseFloat(cg2Cost(encodeRoomPolicy(v.invite.id, !listedIds.has(v.invite.id), moderation[v.invite.id]?.protected ?? v.invite.members.map(m => m.account)), v.invite.members.length - 1))).toFixed(4)} CHEESE`}
           onList={info => listRoom(v.invite.id, info)} onUnlist={() => unlistRoom(v.invite.id)} onClose={() => setListingRoom(null)} />;
       })()}
       <PublicInboxDialog enabled={publicInbox} onChange={enabled => { savePublicInbox(account, enabled); setPublicInbox(enabled); }} open={inboxOpen} onOpenChange={setInboxOpen} />

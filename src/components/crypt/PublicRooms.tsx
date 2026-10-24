@@ -61,9 +61,10 @@ export function DiscoverRoomsDialog({ open, onOpenChange, listings, loading, ref
 }
 
 /** Creator-only listing controls for an invite group. Listing and unlisting each cost the room fee and need the Terms box. */
-export function RoomListingDialog({ groupId, groupName, members, publicKey, listed, busy, onList, onUnlist, onClose }: {
+export function RoomListingDialog({ groupId, groupName, members, publicKey, listed, busy, onList, onUnlist, onClose, cost = ROOM_FEE_QUANTITY }: {
   groupId: string; groupName: string; members: number; publicKey: string; listed: boolean; busy: boolean;
   onList: (info: { name: string; topic: string; tags: string[] }) => Promise<boolean>; onUnlist: () => Promise<boolean>; onClose: () => void;
+  cost?: string;
 }) {
   const [name, setName] = useState(cleanRoomName(groupName));
   const [topic, setTopic] = useState('');
@@ -91,7 +92,7 @@ export function RoomListingDialog({ groupId, groupName, members, publicKey, list
         {error && <p className="text-xs text-destructive">{error}</p>}
       </div>}
       {!listed && <p className="rounded-md border border-cheese/30 bg-cheese/5 p-2 text-xs text-muted-foreground">⚠️ <span className="font-semibold text-cheese">Your account and public messaging key are published on chain</span> with this listing, so anyone can read them. That only lets people send join requests for this room: regular messages from accounts you have not added stay hidden unless you turn on the Public Inbox, and you can block anyone at any time.</p>}
-      <p className="text-xs text-muted-foreground">Cost: {ROOM_FEE_QUANTITY}, split 80% to eosio.null and 20% to xcheeseliqst.</p>
+      <p className="text-xs text-muted-foreground">Cost: {cost}. Platform fees split 80% to eosio.null and 20% to xcheeseliqst; includes encrypted room-policy copies for members.</p>
       <TermsCheckbox id="crypt-room-terms" checked={agreed} onCheckedChange={setAgreed} />
       <DialogFooter>
         <Button variant="outline" disabled={busy} onClick={onClose}>Cancel</Button>
