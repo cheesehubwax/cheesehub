@@ -1244,31 +1244,36 @@ export function Messenger({ account, session }: { account: string; session: NonN
                   <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" aria-label="Cancel reply" onClick={() => setReplyingTo(null)}>✕</Button>
                 </div>}
                 <Textarea ref={composerRef} value={text} onChange={(e) => setText(e.target.value)} rows={3} disabled={!!voice} placeholder={voice ? 'Sending a voice note — discard it to type a message' : activeGroup || activeInvite ? 'Message group' : `Message ${nameFor(active)}`} />
-                <div className="flex flex-wrap items-center gap-2 text-xs">
+                <div className="flex flex-wrap items-center gap-2 gap-y-1 text-xs">
                   <span className={!voice && tooLong ? 'text-destructive' : 'text-muted-foreground'}>
                     {voice ? `${voiceParts} parts · ${voiceTxs} transaction${voiceTxs > 1 ? 's' : ''}` : `${bytes}/${maxBytes} · ${parts || 1} part${parts > 1 ? 's' : ''}`}{(activeGroup || activeInvite) && ` × ${copies} recipients`}
                   </span>
                   {!voice && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setAttachingNft(true); }}>🖼️ Attach NFT</Button>}
                   {!text.trim() && <VoiceRecorder clip={voice} onChange={setVoice} disabled={busy} />}
                   <TermsCheckbox checked={agreed} onCheckedChange={setAgreed} className="ml-2" />
-                  <span className="ml-auto text-muted-foreground">{totalCost}</span>
-                  {voice
-                    ? <Button size="sm" disabled={busy || !agreed} onClick={sendVoice} className="bg-cheese text-primary-foreground hover:bg-cheese/90">Send voice{voiceTxs > 1 ? ` (${voiceTxs} signatures)` : ''}</Button>
-                    : <Button size="sm" disabled={busy || !agreed || !text.trim() || tooLong} onClick={send}
-                      className="bg-cheese text-primary-foreground hover:bg-cheese/90">Send</Button>}
-                </div>
-                <Collapsible open={feeInfoOpen} onOpenChange={setFeeInfoOpen}>
-                  <CollapsibleTrigger className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-cheese">
-                    ℹ️ Fee info <ChevronDown className={cn('h-3 w-3 transition', !feeInfoOpen && '-rotate-90')} />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-1 pt-1">
+                  {/* Fee info button, price and Send share one line in the expanded chat; in the compressed chat they drop to a second line after Terms. */}
+                  <div className={cn('flex flex-wrap items-center gap-2 gap-y-1', !listHidden && 'order-last w-full')}>
+                    <Collapsible open={feeInfoOpen} onOpenChange={setFeeInfoOpen}>
+                      <CollapsibleTrigger className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-cheese">
+                        ℹ️ Fee info <ChevronDown className={cn('h-3 w-3 transition', !feeInfoOpen && '-rotate-90')} />
+                      </CollapsibleTrigger>
+                    </Collapsible>
+                    <span className={cn('text-muted-foreground', listHidden && 'ml-auto')}>{totalCost}</span>
+                    {voice
+                      ? <Button size="sm" disabled={busy || !agreed} onClick={sendVoice} className="bg-cheese text-primary-foreground hover:bg-cheese/90">Send voice{voiceTxs > 1 ? ` (${voiceTxs} signatures)` : ''}</Button>
+                      : <Button size="sm" disabled={busy || !agreed || !text.trim() || tooLong} onClick={send}
+                        className="bg-cheese text-primary-foreground hover:bg-cheese/90">Send</Button>}
+                  </div>
+                  {feeInfoOpen && (
+                    <div className="order-last w-full basis-full space-y-1 pt-1">
                 {voice && <p className="text-[11px] text-muted-foreground">🎙️ Voice note: {voiceParts} encrypted parts, up to {VOICE_PARTS_PER_TX} per transaction, signed one after another. A flat 1 CHEESE fee is paid once in the first transaction (0.8000 nulled, 0.2000 to xcheeseliqst), plus 0.0010 CHEESE per part to each recipient. If a later transaction fails, the parts already sent stay on chain and the note shows as incomplete.</p>}
                 <p className="text-[11px] text-muted-foreground">
                   {activeInvite ? `Each part: ${MESSAGE_FEE_QUANTITY} shared platform fee for the group + ${MESSAGE_RECIPIENT_QUANTITY} to each of the ${copies} members who joined. Members who haven't joined don't get a copy.` : activeGroup ? `Each part: ${MESSAGE_FEE_QUANTITY} shared platform fee for the group + ${MESSAGE_RECIPIENT_QUANTITY} to each of ${copies} recipients. Group delivery uses ${copies} encrypted copies in one transaction. Membership is fixed; start a new group to change participants.` : `Each part: ${MESSAGE_RECIPIENT_QUANTITY} to ${active} + ${MESSAGE_FEE_QUANTITY} platform fee (${MESSAGE_TOTAL_QUANTITY}). Long messages split into up to ${MAX_PARTS} parts (${MAX_PLAINTEXT_BYTES} bytes for one, ${PART_BODY_BYTES} per part after that), all in one transaction.`}
                   {` Attaching an NFT raises the first part's platform fee to ${NFT_FEE_QUANTITY}. Platform fees split 80% to eosio.null and 20% to xcheeseliqst; recipient payments are unchanged.`}
                 </p>
-                  </CollapsibleContent>
-                </Collapsible>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </>
