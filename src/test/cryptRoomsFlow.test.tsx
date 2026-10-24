@@ -78,10 +78,10 @@ describe('public rooms', () => {
     fireEvent.click(within(listing).getByRole('checkbox'));
     fireEvent.click(pay);
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
-    const actions = calls.transact.mock.calls[0][0] as { data: { to: string; quantity: string } }[];
+    const actions = calls.transact.mock.calls[0][0] as { data: { to: string; quantity: string; memo?: string } }[];
     expect(actions.filter(a => a.data.to === 'eosio.null').map(a => a.data.quantity)).toEqual(['0.0080 CHEESE']);
     expect(actions.filter(a => a.data.to === 'xcheeseliqst').map(a => a.data.quantity)).toEqual(['0.0020 CHEESE']);
-    expect((actions.find(a => a.data.to === 'eosio.null')!.data as { memo: string }).memo.startsWith('CRYPTROOM1:')).toBe(true);
+    expect(actions.find(a => a.data.to === 'eosio.null')!.data.memo?.startsWith('CRYPTROOM1:')).toBe(true);
     await waitFor(() => expect(within(edit).getByText('🌐 This room is listed publicly, so anyone can find it and ask to join.')).toBeInTheDocument());
   });
 });
