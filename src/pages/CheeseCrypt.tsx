@@ -357,6 +357,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if ((listedIds.size > 0 && clock - oldest < 72 * 60 * 60 * 1000) || editableConversations.some(m => (m.text?.startsWith('\u0005E1:') || m.voice?.editTarget) && !edited.log.some(e => e.replacement.editTxId === m.txId))) setDepth(d => Math.min(MAX_HISTORY_PAGES, d + 1));
   }, [memos, depth, listedIds, clock, editableConversations, edited]);
   const conversations = edited.messages;
+  useEffect(() => {
+    // Restore retained policies on another device by reading the bounded history window in full.
+    if (Object.keys(invites).length && loaded && depth < MAX_HISTORY_PAGES) setDepth(d => d + 1);
+  }, [invites, loaded, depth]);
   const cancelEdit = () => { setEditingMessage(null); setText(''); setVoice(null); setReplyingTo(null); };
   useEffect(() => { setEditingMessage(null); setText(''); }, [active]);
   const beginEdit = (m: ConversationEntry) => {
@@ -1032,7 +1036,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const to = updated.members.map(m => m.account).filter(a => a !== account && moderation[v.invite.id]?.bans[a] === undefined);
     const state = moderation[updated.id];
     const policy = encodeRoomPolicy(updated.id, true, state?.protected ?? v.invite.members.map(m => m.account));
-    const snapshot = encodePolicySnapshot(updated.id, state?.protected ?? v.invite.members.map(m => m.account), Object.keys(state?.bans ?? {}), Object.entries(state?.mutes ?? {}).flatMap(([a, intervals]) => intervals.filter(m => m.until > Date.now()).map(m => [a, m.from, m.until] as [string, number, number])).slice(-8));
+    const snapshot = encodePolicySnapshot(updated.id, state?.protected ?? v.invite.members.map(m => m.account), Object.keys(state?.bans ?? {}), Object.entries(state?.mutes ?? {}).flatMap(([a, intervals]) => {
+      const longest = intervals.filter(m => m.until > Date.now()).sort((a, b) => b.until - a.until)[0];
+      return longest ? [[a, longest.from, longest.until] as [string, number, number]] : [];
+    }));
     return { v, updated, payload, policy, snapshot, to, cost: `${(parseFloat(cg2Cost(payload, to.length)) + parseFloat(cg2Cost(policy, to.length)) + parseFloat(cg2Cost(snapshot, 1))).toFixed(4)} CHEESE` };
   };
   const confirmJoin = async () => {

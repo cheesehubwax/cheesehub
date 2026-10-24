@@ -65,6 +65,11 @@ describe('public-room moderation rules', () => {
     expect(parseReply(moderateMessages([reply], states)[0].text)?.quote).toBe('');
     expect(moderateMessages([{ ...row(2500), igroup: undefined }], states)).toHaveLength(1);
   });
+  it('hides a voice note spanning a mute even when first and last batches are outside it', () => {
+    const states = deriveModeration([policy, event(encodeModeration(id, 'carol', 15), 2000)], { [id]: g }, 'bob');
+    const note = { ...row(1500), voice: { completedAt: 1000000 } } as ConversationEntry;
+    expect(moderateMessages([note], states)).toEqual([]);
+  });
   it('retains encrypted controls separately for each account', () => {
     const memos = [{ from: 'alice', to: 'bob', txId: 'control', time: 2000, memo: 'CRYPT1:ciphertext', quantity: '0.0010 CHEESE' }];
     saveModerationMemos('bob', memos);
