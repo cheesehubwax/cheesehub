@@ -516,9 +516,17 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if (switched || nearBottom.current) {
       const el = listRef.current;
       if (el) {
-        const top = el.scrollHeight;
-        if (typeof el.scrollTo === 'function') el.scrollTo({ top, behavior: switched ? 'auto' : 'smooth' });
-        else el.scrollTop = top;
+        const marker = switched ? newMarkerRef.current : null;
+        if (marker) {
+          // Re-opening a chat lands on the first unread message (just under the divider), not the bottom.
+          const top = el.scrollTop + marker.getBoundingClientRect().top - el.getBoundingClientRect().top - 12;
+          if (typeof el.scrollTo === 'function') el.scrollTo({ top, behavior: 'auto' });
+          else el.scrollTop = top;
+        } else {
+          const top = el.scrollHeight;
+          if (typeof el.scrollTo === 'function') el.scrollTo({ top, behavior: switched ? 'auto' : 'smooth' });
+          else el.scrollTop = top;
+        }
       }
     }
     if (!switched || typeof window.requestAnimationFrame !== 'function') return;
