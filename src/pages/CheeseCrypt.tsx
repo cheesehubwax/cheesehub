@@ -1313,11 +1313,13 @@ export function Messenger({ account, session }: { account: string; session: NonN
         />
 
       <div className={cn('flex flex-1 min-h-0 md:row-start-2', listHidden ? 'md:col-start-1 md:col-span-2' : 'md:col-start-2')}>
-      {listHidden && <CryptAvatarRail active={active} setActive={setActive} items={[
-        ...inviteViews.filter(v => inviteShown(v) && !hiddenGroups.includes(v.invite.id)).map(v => ({ id: `group:${v.invite.id}`, label: v.name, avatarAccount: v.invite.id, avatar: v.avatar, emoji: v.avatar ? undefined : '👥' })),
-        ...groups.filter(g => !hiddenGroups.includes(g.id)).map(g => ({ id: `group:${g.id}`, label: `Group · ${g.members.length} people`, avatarAccount: g.id, emoji: '👥' })),
-        ...partners.map(p => ({ id: p, label: nameFor(p), avatarAccount: p, avatar: avatars[p] })),
-      ].map(it => ({ ...it, unread: unread[it.id] ?? 0, replies: replyUnread[it.id] ?? 0 }))} />}
+      {listHidden && <CryptAvatarRail active={active} setActive={setActive} sections={[
+        { id: 'groups', label: 'Groups', emoji: '👥', items: [
+          ...inviteViews.filter(v => inviteShown(v) && !hiddenGroups.includes(v.invite.id)).map(v => ({ id: `group:${v.invite.id}`, label: v.name, avatarAccount: v.invite.id, avatar: v.avatar, emoji: v.avatar ? undefined : '👥' })),
+          ...groups.filter(g => !hiddenGroups.includes(g.id)).map(g => ({ id: `group:${g.id}`, label: `Group · ${g.members.length} people`, avatarAccount: g.id, emoji: '👥' })),
+        ] },
+        { id: 'friends', label: 'Friends', emoji: '🤝', items: partners.map(p => ({ id: p, label: nameFor(p), avatarAccount: p, avatar: avatars[p] })) },
+      ].map(s => ({ ...s, items: s.items.map(it => ({ ...it, unread: unread[it.id] ?? 0, replies: replyUnread[it.id] ?? 0 })) }))} />}
       <section className="flex flex-1 flex-col min-h-0 min-w-0">
         {!active ? (
           <p className="text-sm text-muted-foreground m-auto">💬 Pick or add a contact.</p>
