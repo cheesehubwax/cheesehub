@@ -6,15 +6,15 @@ export const EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 export const EDIT_LOG_MS = 72 * 60 * 60 * 1000;
 export const EDIT_PREFIX = '\u0005E1:';
 const TARGET = /^[a-f0-9]{64}$/;
-export interface EditLogEntry { original: ConversationEntry; previous: ConversationEntry; replacement: ConversationEntry; at: number }
+export interface EditLogEntry { original: ConversationEntry; previous: ConversationEntry; replacement: EditedMessage; at: number }
 export type EditedMessage = ConversationEntry & { editedAt?: number; editTxId?: string };
 
 /** Ciphertext and fanout keys differ per recipient; authenticated content and transaction do not. */
 export function editTarget(m: ConversationEntry): string {
   const content = m.voice ? Array.from(m.voice.audio ?? [], b => b.toString(16).padStart(2, '0')).join('') : m.text;
-  return Array.from(nacl.hash(new TextEncoder().encode(JSON.stringify([m.txId, m.from, content]))).slice(0, 32), b => b.toString(16).padStart(2, '0')).join('');
+  return Array.from(nacl.hash(new Uint8Array(new TextEncoder().encode(JSON.stringify([m.txId, m.from, content])))).slice(0, 32), b => b.toString(16).padStart(2, '0')).join('');
 }
-export const canEdit = (m: ConversationEntry, account: string, now = Date.now()) => m.from === account && !m.missing && !m.control?.kind?.match(/^(?!msg$)/) && (m.voice ? m.voice.status === 'ready' : m.text != null) && now >= m.time && now - m.time <= EDIT_WINDOW_MS;
+export const canEdit = (m: ConversationEntry, account: string, now = Date.now()) => m.from === account && !m.missing && (!m.control || m.control.kind === 'msg') && (m.voice ? m.voice.status === 'ready' : m.text != null) && now >= m.time && now - m.time <= EDIT_WINDOW_MS;
 export function encodeEdit(target: string, text: string): string {
   if (!TARGET.test(target) || !text.trim() || isProfileNote(text) || text.startsWith(EDIT_PREFIX)) throw new Error('Invalid message edit');
   return `${EDIT_PREFIX}${target}\n${text}`;
