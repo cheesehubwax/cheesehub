@@ -13,7 +13,8 @@ export interface RoomModeration {
 export function deriveModeration(events: Cg2Event[], invites: Record<string, InviteGroup>, me: string): Record<string, RoomModeration> {
   const out: Record<string, RoomModeration> = {};
   const seen = new Set<string>();
-  for (const e of [...events].sort((a, b) => a.time - b.time || a.txId.localeCompare(b.txId) || (a.control.kind === 'room' ? -1 : b.control.kind === 'room' ? 1 : 0))) {
+  const priority = (e: Cg2Event) => e.control.kind === 'policy' ? 0 : e.control.kind === 'room' ? 1 : 2;
+  for (const e of [...events].sort((a, b) => a.time - b.time || a.txId.localeCompare(b.txId) || priority(a) - priority(b))) {
     const g = eventFromMember(e, invites, me);
     if (!g || e.from !== g.creator) continue;
     const c = e.control;

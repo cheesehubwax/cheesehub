@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { generateKey } from '@/lib/cheeseCrypt';
-import { encodeModeration, encodeRoomPolicy, MUTE_MINUTES, parseCg2, type Cg2Event, type InviteGroup } from '@/lib/cryptInviteGroups';
+import { encodeModeration, encodePolicySnapshot, encodeRoomPolicy, MUTE_MINUTES, parseCg2, type Cg2Event, type InviteGroup } from '@/lib/cryptInviteGroups';
 import { deriveModeration, loadModerationMemos, moderateMessages, mutedUntil, restrictedAt, saveModerationMemos } from '@/lib/cryptModeration';
 import type { ConversationEntry } from '@/lib/cryptGroups';
 import { applyEdits, editTarget, encodeEdit } from '@/lib/cryptEdits';
@@ -66,5 +66,13 @@ describe('public-room moderation rules', () => {
     saveModerationMemos('bob', memos);
     expect(loadModerationMemos('bob')).toEqual(memos);
     expect(loadModerationMemos('carol')).toEqual([]);
+  });
+  it('bootstraps existing bans and active mutes only with a new recipient’s first invite', () => {
+    const invite: Cg2Event = { ...policy, time: 10000, txId: 'join', to: 'carol', usedKey: alice.publicKey, control: { kind: 'invite', invite: g } };
+    const snapshot = { ...event(encodePolicySnapshot(id, ['alice'], ['bob'], [['carol', 9000, 909000]]), 10000), to: 'carol', txId: 'join' };
+    const states = deriveModeration([invite, snapshot], { [id]: g }, 'carol');
+    expect(restrictedAt(states[id], 'bob', 10001)).toBe(true);
+    expect(restrictedAt(states[id], 'carol', 10001)).toBe(true);
+    expect(deriveModeration([snapshot], { [id]: g }, 'carol')).toEqual({});
   });
 });
