@@ -5,6 +5,7 @@
 // farm join-request fees with throwaway rooms; updating a staked listing's details and unlisting pay the normal
 // 0.0100 CHEESE platform fee. Both fee legs carry the memo.
 import { decodeBase64 } from 'tweetnacl-util';
+import { parseCryptName } from '@/lib/cryptNames';
 import {
   assembleMessages, bytesToText, buildCryptFeeActions, buildSendMessageActions, decryptMemoBytes, encryptMemo, KEY_PUBLISH_TO, MEMO_MAX_BYTES, MESSAGE_FEE_QUANTITY,
   messageCost, msgPrefixOf, type ChainMemo, type MessagingKey,
@@ -29,7 +30,7 @@ const ID = /^[a-f0-9]{16}$/;
 const ACCOUNT = /^[a-z1-5.]{1,12}$/;
 const utf8Len = (s: string) => new TextEncoder().encode(s).length;
 
-export interface RoomListingInput { id: string; name: string; topic: string; tags: string[]; publicKey: string; members: number; avatar?: string }
+export interface RoomListingInput { id: string; name: string; topic: string; tags: string[]; publicKey: string; members: number; avatar?: string; creatorName?: string }
 
 /** Description and tags typed when a room is created, kept on this device so listing can prefill them. */
 const infoKey = (account: string) => `cheesecrypt-room-info-${account}`;
@@ -76,14 +77,15 @@ function validFields(o: Record<string, unknown>): RoomListingInput | null {
   if (typeof o.m !== 'number' || !Number.isInteger(o.m) || o.m < 1 || o.m > MAX_PUBLIC_ROOM_MEMBERS) return null;
   // Optional palette-index room picture (64 hex digits, data only).
   if (o.a !== undefined && (typeof o.a !== 'string' || !AVATAR_RE.test(o.a))) return null;
-  return { id: o.i, name: o.n, topic: o.t, tags, publicKey: o.k, members: o.m, ...(typeof o.a === 'string' ? { avatar: o.a } : {}) };
+  if (o.u !== undefined && (!parseCryptName(o.u) || parseCryptName(o.u) !== o.u)) return null;
+  return { id: o.i, name: o.n, topic: o.t, tags, publicKey: o.k, members: o.m, ...(typeof o.a === 'string' ? { avatar: o.a } : {}), ...(typeof o.u === 'string' ? { creatorName: o.u } : {}) };
 }
 const AVATAR_RE = /^[0-9a-f]{64}$/;
 
 /** Plaintext listing memo; throws when a field is invalid or the memo would not fit one 256-byte memo.
  *  The room picture is optional and dropped when it would not fit alongside the text fields. */
 export function encodeListing(l: RoomListingInput): string {
-  const base = { i: l.id, n: l.name, t: l.topic, g: l.tags, k: l.publicKey, m: l.members };
+  const base = { i: l.id, n: l.name, t: l.topic, g: l.tags, k: l.publicKey, m: l.members, ...(l.creatorName !== undefined ? { u: l.creatorName } : {}) };
   if (!validFields(base)) throw new Error('Invalid room listing');
   if (l.avatar) {
     const withPic = { ...base, a: l.avatar };
@@ -150,7 +152,7 @@ export function searchListings(listings: RoomListing[], query: string): RoomList
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (!words.length) return listings;
   return listings.filter(l => {
-    const hay = `${l.name} ${l.topic} ${l.tags.join(' ')} ${l.creator}`.toLowerCase();
+    const hay = `${l.name} ${l.topic} ${l.tags.join(' ')} ${l.creator} ${l.creatorName ?? ''}`.toLowerCase();
     return words.every(w => hay.includes(w.replace(/^#/, '')));
   });
 }

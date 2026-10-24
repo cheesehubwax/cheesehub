@@ -12,9 +12,10 @@ import {
 } from '@/lib/cryptRooms';
 
 /** Search listed rooms; asking to join is confirmed (and paid) by the Messenger. Presentational only. */
-export function DiscoverRoomsDialog({ open, onOpenChange, listings, loading, refresh, account, roomStatus, joinCost, onAsk }: {
+export function DiscoverRoomsDialog({ open, onOpenChange, listings, loading, refresh, account, nameFor, roomStatus, joinCost, onAsk }: {
   open: boolean; onOpenChange: (open: boolean) => void; listings: RoomListing[]; loading: boolean; refresh: () => void; account: string;
   roomStatus: (l: RoomListing) => 'own' | 'member' | 'invited' | 'requested' | null; joinCost: string; onAsk: (l: RoomListing) => void;
+  nameFor?: (account: string) => string;
 }) {
   const [q, setQ] = useState('');
   const shown = useMemo(() => searchListings(listings, q), [listings, q]);
@@ -41,7 +42,7 @@ export function DiscoverRoomsDialog({ open, onOpenChange, listings, loading, ref
                 <PixelAvatar account={l.id} avatar={l.avatar ? { version: 1, pixels: l.avatar } : undefined} className="h-10 w-10 shrink-0" />
                 <div className="min-w-0">
                   <div className="break-words font-semibold text-cheese">{l.name}</div>
-                  <div className="truncate font-mono text-[11px] text-muted-foreground">by {l.creator === account ? 'you' : l.creator}</div>
+                  <div className="truncate text-[11px] text-muted-foreground" title={l.creator}>by {l.creatorName || nameFor?.(l.creator) || (l.creator === account ? 'you' : l.creator)}</div>
                 </div>
               </div>
               <span className="shrink-0 text-[11px] text-muted-foreground">{l.members}/{MAX_PUBLIC_ROOM_MEMBERS} members</span>
@@ -65,10 +66,11 @@ export function DiscoverRoomsDialog({ open, onOpenChange, listings, loading, ref
 
 /** Creator-only listing controls for an invite group. A fresh listing pays the 10.0000 CHEESE anti-spam stake;
  *  updating a listed room's details and unlisting pay the normal room fee. All need the Terms box. */
-export function RoomListingDialog({ groupId, groupName, members, publicKey, listed, busy, onList, onUnlist, onClose, cost = LISTING_STAKE_QUANTITY, unlistCost = ROOM_FEE_QUANTITY, initialName, initialTopic = '', initialTags = [] }: {
+export function RoomListingDialog({ groupId, groupName, members, publicKey, creatorName, listed, busy, onList, onUnlist, onClose, cost = LISTING_STAKE_QUANTITY, unlistCost = ROOM_FEE_QUANTITY, initialName, initialTopic = '', initialTags = [] }: {
   groupId: string; groupName: string; members: number; publicKey: string; listed: boolean; busy: boolean;
   onList: (info: { name: string; topic: string; tags: string[] }) => Promise<boolean>; onUnlist: () => Promise<boolean>; onClose: () => void;
   cost?: string; unlistCost?: string; initialName?: string; initialTopic?: string; initialTags?: string[];
+  creatorName?: string;
 }) {
   const [name, setName] = useState(cleanRoomName(initialName ?? groupName));
   const [topic, setTopic] = useState(initialTopic);
@@ -77,14 +79,14 @@ export function RoomListingDialog({ groupId, groupName, members, publicKey, list
   const info = { name: cleanRoomName(name), topic: cleanRoomTopic(topic), tags: cleanTags(tags) };
   let error = '';
   if (!info.name) error = 'Give the room a name';
-  else try { encodeListing({ id: groupId, ...info, publicKey, members }); } catch (e) { error = (e as Error).message; }
+  else try { encodeListing({ id: groupId, ...info, publicKey, members, creatorName }); } catch (e) { error = (e as Error).message; }
   return <Dialog open onOpenChange={o => { if (!o && !busy) onClose(); }}>
     <DialogContent className="max-w-md">
       <DialogHeader>
         <DialogTitle>🌐 {listed ? 'Listed publicly' : 'Make room public'}</DialogTitle>
         <DialogDescription>{listed
           ? 'People can find this room and ask you to join. Requests appear at the top of your sidebar. Update the details any time for the normal fee, or unlist to hide it from search.'
-          : 'Publishes the room name, topic, tags, member count and your public key on chain so others can ask to join. The member list and messages are never published.'}</DialogDescription>
+          : 'Publishes the room name, topic, tags, member count, your username and public key on chain so others can ask to join. The member list and messages are never published.'}</DialogDescription>
       </DialogHeader>
       <div className="space-y-2">
         <Input maxLength={MAX_ROOM_NAME} aria-label="Room name" placeholder="Room name" value={name} onChange={e => setName(e.target.value)} />
