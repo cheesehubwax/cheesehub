@@ -11,7 +11,7 @@ import { buildProfileNoteBatches, isProfileNote, latestProfiles, profileNoteCost
 import { ProfileShareDialog } from '@/components/crypt/ProfileShareDialog';
 import { addBlocked, loadBlocked, removeBlocked, saveBlocked, withoutBlocked } from '@/lib/cryptBlocklist';
 import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
-import { Eye, EyeOff, Loader2, Upload } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Upload, X } from 'lucide-react';
 import { useWax } from '@/context/WaxContext';
 import { useWaxTransaction } from '@/hooks/useWaxTransaction';
 import { useToast } from '@/hooks/use-toast';
@@ -1354,6 +1354,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         setAddingFriend={setAddingFriend} partners={partners} active={active} setActive={setActive} avatars={avatars} nameFor={nameFor}
         contacts={contacts} lastAt={lastAt} badge={badge} removeFriend={removeFriend} setRoomsOpen={setRoomsOpen}
         backupFile={keyLocked ? lockedFile : key} keyLocked={keyLocked} canLock={canLock} lockKey={() => void lockKey()}
+        pendingRequests={Object.keys(roomRequests).map(requestRow).filter(Boolean)}
         joinRequestsPanel={<JoinRequests requests={joinRequests} nameFor={nameFor} roomName={id => viewById(id)?.name ?? 'a room'}
           roomFull={id => (invites[id]?.members.length ?? MAX_PUBLIC_ROOM_MEMBERS) >= MAX_PUBLIC_ROOM_MEMBERS} onAccept={setAcceptingJoin}
           onDecline={setDecliningJoin}
