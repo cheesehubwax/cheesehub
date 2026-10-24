@@ -945,7 +945,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   }
 
   return (
-    <div className="w-full rounded-lg border border-cheese/20 bg-card/80 overflow-hidden grid h-[80dvh] min-h-[480px] grid-cols-1 auto-rows-auto md:grid-cols-[240px_1fr] md:grid-rows-[auto_1fr]">
+    <div className="w-full rounded-lg border border-cheese/20 bg-card/80 overflow-hidden flex flex-col md:grid h-[80dvh] min-h-[480px] md:grid-cols-[240px_1fr] md:grid-rows-[auto_1fr]">
       {fileInput}
       {backupKey && <VaultPrompt cryptKey={backupKey} onSaved={backupSaved} onDownload={backupDownloaded} />}
       {creatingGroup && <CreateGroupDialog contacts={contacts} avatars={avatars} nameFor={nameFor} busy={busy} onClose={() => setCreatingGroup(false)}
@@ -1168,7 +1168,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
               </span>}</>}
       </div>
 
-      <section className={cn('flex flex-col min-h-0 md:row-start-2', listHidden ? 'md:col-start-1 md:col-span-2' : 'md:col-start-2')}>
+      <section className={cn('flex flex-1 flex-col min-h-0 md:row-start-2', listHidden ? 'md:col-start-1 md:col-span-2' : 'md:col-start-2')}>
         {!active ? (
           <p className="text-sm text-muted-foreground m-auto">💬 Pick or add a contact.</p>
         ) : (
