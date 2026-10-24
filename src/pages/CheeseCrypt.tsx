@@ -118,6 +118,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [creationAgreed, setCreationAgreed] = useState(false);
   const creatingKey = useRef(false);
   const [showSharePrompt, setShowSharePrompt] = useState(false);
+  const [showPublishPrompt, setShowPublishPrompt] = useState(false);
+  const [publishAgreed, setPublishAgreed] = useState(false);
   const [active, setActive] = useState<string | null>(null);
   const [groups, setGroups] = useState(() => loadGroups(account));
   const [hiddenGroups, setHiddenGroups] = useState(() => loadHiddenGroups(account));
@@ -874,8 +876,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
   };
 
   const publish = async () => {
-    if (!key) return false;
-    if (!agreed) { toast({ title: 'Please agree to the Terms of Use first', variant: 'destructive' }); return false; }
+    if (!key || busy) return false;
+    if (!publishAgreed) { toast({ title: 'Please agree to the Terms of Use first', variant: 'destructive' }); return false; }
     setBusy(true);
     try { const result = await executeTransaction(buildPublishKeyActions(account, key.publicKey, [permission]), { successTitle: 'Public key published' }); return result.success; }
     finally { setBusy(false); }
@@ -1243,9 +1245,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
       </Dialog>}
       {profileEditor}
       {creationDialog}
-      {showSharePrompt && key && <ShareKeyDialog account={account} busy={busy} agreed={agreed} onAgreedChange={setAgreed} onClose={() => setShowSharePrompt(false)}
+      {(showSharePrompt || showPublishPrompt) && key && <ShareKeyDialog account={account} publishOnly={showPublishPrompt} busy={busy} agreed={publishAgreed} onAgreedChange={setPublishAgreed} onClose={() => { setShowSharePrompt(false); setShowPublishPrompt(false); setPublishAgreed(false); }}
         onDownload={() => { void sharePublicKey(); setShowSharePrompt(false); }}
-        onPublish={async () => { if (await publish()) setShowSharePrompt(false); }} />}
+        onPublish={async () => { if (await publish()) { setShowSharePrompt(false); setShowPublishPrompt(false); setPublishAgreed(false); } }} />}
       {sharingProfile && key && (() => {
         const to = profileRecipients(account, contacts, groups.map(g => g.members), [...blocked, ...removedContacts]);
         const parts = profileNoteParts(key);
@@ -1287,7 +1289,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
       })()}
       <PublicInboxDialog enabled={publicInbox} onChange={enabled => { savePublicInbox(account, enabled); setPublicInbox(enabled); }} open={inboxOpen} onOpenChange={setInboxOpen} />
       <CryptSidebar account={account} cryptKey={key} loading={loading} refresh={refresh} setEditingAvatar={setEditingAvatar}
-        menuOpen={menuOpen} setMenuOpen={setMenuOpen} fileRef={fileRef} sharePublicKey={sharePublicKey} busy={busy} publish={publish}
+        menuOpen={menuOpen} setMenuOpen={setMenuOpen} fileRef={fileRef} sharePublicKey={sharePublicKey} busy={busy} publish={async () => { setPublishAgreed(false); setShowPublishPrompt(true); }}
         blocked={blocked} setShowBlocked={setShowBlocked} makeKey={makeKey} publicInbox={publicInbox} setInboxOpen={setInboxOpen}
         toggleList={toggleList} listHidden={listHidden} hiddenUnread={hiddenUnread} hiddenReplies={hiddenReplies}
         messageRequests={messageRequests} acceptRequest={acceptRequest} dismissRequest={dismissRequest} blockAccount={blockAccount}
