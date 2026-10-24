@@ -126,7 +126,7 @@ export function decodeConversations(memos: ChainMemo[], key: MessagingKey, conta
         if (!control) continue;
         const id = (control.kind === 'invite' || control.kind === 'admission') ? control.invite.id : control.id;
         // A group key only opens its own group's notices (including that group's member updates from its creator).
-        if (b.groupId && id !== b.groupId) continue;
+        if (b.groupId && !scoped.some(s => s.groupId === id && s.account === (m.from === key.account ? m.to : m.from) && s.publicKey === b.usedKey)) continue;
         if (control.kind === 'msg') {
           const fanoutId = m.parts > 1 ? `cg2:${m.txId}:${m.from}:${id}:${m.key.split(':')[2]}` : `cg2:${m.txId}:${m.from}:${id}:${control.text}`;
           if (seen.has(fanoutId)) continue;
@@ -157,7 +157,7 @@ export function decodeConversations(memos: ChainMemo[], key: MessagingKey, conta
       const ref = n.group?.id ?? '';
       if (n.isGroup && ref.startsWith(VOICE_REF_PREFIX)) {
         igroup = ref.slice(VOICE_REF_PREFIX.length);
-        if (!/^[a-f0-9]{16}$/.test(igroup) || !b.usedKey || (b.groupId && b.groupId !== igroup)) continue;
+        if (!/^[a-f0-9]{16}$/.test(igroup) || !b.usedKey || (b.groupId && !scoped.some(s => s.groupId === igroup && s.account === (n.from === key.account ? n.to : n.from) && s.publicKey === b.usedKey))) continue;
       } else {
         if (b.groupId) continue;
         if (n.isGroup) {
