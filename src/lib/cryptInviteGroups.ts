@@ -24,7 +24,7 @@ export interface InviteMember { account: string; publicKey: string }
 export interface InviteGroup { id: string; name: string; creator: string; created: number; members: InviteMember[]; avatar?: CryptAvatar; publicRoom?: boolean }
 export const MUTE_MINUTES = [15, 60, 360, 1440] as const;
 export type MuteMinutes = typeof MUTE_MINUTES[number];
-export type Cg2Kind = 'invite' | 'admission' | 'add' | 'msg' | 'joined' | 'leave' | 'meta' | 'friend' | 'friend-ok' | 'join' | 'room' | 'mute' | 'ban' | 'policy' | 'admin' | 'collapse';
+export type Cg2Kind = 'invite' | 'admission' | 'add' | 'msg' | 'joined' | 'leave' | 'meta' | 'friend' | 'friend-ok' | 'join' | 'room' | 'mute' | 'ban' | 'policy' | 'admin' | 'collapse' | 'report';
 export type Cg2 =
   | { kind: 'invite'; invite: InviteGroup }
   | { kind: 'admission'; invite: InviteGroup }
@@ -38,6 +38,8 @@ export type Cg2 =
   | { kind: 'admin'; id: string; member: string; on: boolean }
   /** Owner/admin: collapse the message by `member` whose edit digest (cryptEdits.editTarget) is `target`. */
   | { kind: 'collapse'; id: string; member: string; target: string }
+  /** Notification only: a member reports to moderators (`admin`), an admin escalates to the owner for a ban (`owner`). */
+  | { kind: 'report'; id: string; member: string; target: string; level: 'admin' | 'owner' }
   /** `join`: a request to a public room's creator (cryptRooms.ts); never a membership change by itself. */
   | { kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'join'; id: string }
   | { kind: 'meta'; id: string; name: string; avatar?: CryptAvatar };
@@ -115,6 +117,10 @@ export function encodeCollapse(id: string, author: string, target: string) {
   if (!ACCOUNT.test(author) || !/^[a-f0-9]{64}$/.test(target)) throw new Error('Invalid collapse');
   return wire('collapse', { i: checkId(id), a: author, h: target });
 }
+export function encodeReport(id: string, author: string, target: string, level: 'admin' | 'owner') {
+  if (!ACCOUNT.test(author) || !/^[a-f0-9]{64}$/.test(target)) throw new Error('Invalid report');
+  return wire('report', { i: checkId(id), a: author, h: target, l: level });
+}
 export function encodeMeta(id: string, name: string, avatar?: CryptAvatar): string {
   const n = parseCryptName(name);
   if (!n) throw new Error('Give the group a name');
@@ -153,6 +159,7 @@ export function parseCg2(text: string | null | undefined): Cg2 | null {
   }
   if (kind === 'admin') return typeof body.a === 'string' && ACCOUNT.test(body.a) && typeof body.e === 'boolean' ? { kind, id, member: body.a, on: body.e } : null;
   if (kind === 'collapse') return typeof body.a === 'string' && ACCOUNT.test(body.a) && typeof body.h === 'string' && /^[a-f0-9]{64}$/.test(body.h) ? { kind, id, member: body.a, target: body.h } : null;
+  if (kind === 'report') return typeof body.a === 'string' && ACCOUNT.test(body.a) && typeof body.h === 'string' && /^[a-f0-9]{64}$/.test(body.h) && (body.l === 'admin' || body.l === 'owner') ? { kind, id, member: body.a, target: body.h, level: body.l } : null;
   if (kind === 'ban' || kind === 'mute') {
     if (typeof body.a !== 'string' || !ACCOUNT.test(body.a)) return null;
     if (kind === 'ban') return { kind, id, member: body.a };

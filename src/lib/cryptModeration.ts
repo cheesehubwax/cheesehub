@@ -97,6 +97,31 @@ export function founderBadges(state: RoomModeration | undefined, g: InviteGroup,
   const roster = state ? state.protected : listed ? g.members.map(m => m.account) : [];
   return roster.includes(g.creator) || !roster.length ? roster : [g.creator, ...roster];
 }
+export interface RoomReport { id: string; author: string; target: string; reporter: string; level: 'admin' | 'owner'; time: number; txId: string }
+/** Reports addressed to me that my role lets me act on: owners read both levels, admins (at report time) read member reports.
+ * Admin escalations count only when the sender was an admin when sending. Reports never change moderation state. */
+export function collectReports(events: Cg2Event[], invites: Record<string, InviteGroup>, moderation: Record<string, RoomModeration>, me: string): RoomReport[] {
+  const out = new Map<string, RoomReport>();
+  for (const e of events) {
+    const c = e.control;
+    if (c.kind !== 'report' || e.to !== me || e.from === me) continue;
+    const g = eventFromMember(e, invites, me);
+    const state = moderation[c.id];
+    if (!g || !state?.listed || c.member === g.creator || c.member === e.from || !g.members.some(m => m.account === c.member)) continue;
+    if (restrictedAt(state, e.from, e.time)) continue;
+    const senderRole = roomRole(state, g, e.from, e.time);
+    if (c.level === 'owner' ? me !== g.creator || senderRole !== 'admin' : senderRole !== 'member' || (me !== g.creator && roomRole(state, g, me, e.time) !== 'admin')) continue;
+    const k = `${c.id}:${e.from}:${c.member}:${c.target}`;
+    if (!out.has(k)) out.set(k, { id: c.id, author: c.member, target: c.target, reporter: e.from, level: c.level, time: e.time, txId: e.txId });
+  }
+  return [...out.values()].sort((a, b) => a.time - b.time);
+}
+const reportStore = (account: string) => `cheesecrypt-report-views-${account}`;
+export const reportKey = (r: Pick<RoomReport, 'id' | 'reporter' | 'author' | 'target'>) => `${r.id}:${r.reporter}:${r.author}:${r.target}`;
+export function loadSeenReports(account: string): string[] {
+  try { const raw: unknown = JSON.parse(localStorage.getItem(reportStore(account)) || '[]'); return Array.isArray(raw) ? raw.filter((k): k is string => typeof k === 'string') : []; } catch { return []; }
+}
+export function saveSeenReports(account: string, keys: string[]) { localStorage.setItem(reportStore(account), JSON.stringify(keys)); }
 export function restrictedAt(state: RoomModeration | undefined, member: string, at: number) {
   return !!state && ((state.bans[member] !== undefined && at >= state.bans[member]) || !!state.mutes[member]?.some(m => at >= m.from && at < m.until));
 }
