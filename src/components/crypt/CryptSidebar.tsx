@@ -19,13 +19,14 @@ export function CryptSidebar({
   makeKey, publicInbox, setInboxOpen, toggleList, listHidden, hiddenUnread, hiddenReplies, messageRequests, acceptRequest, dismissRequest,
   blockAccount, groupsOpen, setGroupsOpen, setCreatingGroup, inviteViews, inviteShown, hiddenGroups, inviteRow, groups, groupRow,
   showHiddenGroups, setShowHiddenGroups, friendsOpen, setFriendsOpen, setAddingFriend, partners, active, setActive, avatars, nameFor,
-  contacts, lastAt, badge, removeFriend,
+  contacts, lastAt, badge, removeFriend, setRoomsOpen, joinRequestsPanel,
 }: {
   account: string; cryptKey: MessagingKey; loading: boolean; refresh: () => void; setEditingAvatar: (v: boolean) => void;
   menuOpen: boolean; setMenuOpen: (v: boolean) => void; fileRef: { current: HTMLInputElement | null };
   sharePublicKey: () => Promise<unknown>; busy: boolean; publish: () => Promise<unknown>; blocked: string[]; setShowBlocked: (v: boolean) => void;
   makeKey: () => void; publicInbox: boolean; setInboxOpen: (v: boolean) => void; toggleList: () => void; listHidden: boolean;
   hiddenUnread: number; hiddenReplies: number; messageRequests: ComponentProps<typeof MessageRequests>['requests'];
+  setRoomsOpen: (v: boolean) => void; joinRequestsPanel?: ReactNode;
   acceptRequest: (from: string) => void; dismissRequest: (from: string) => void; blockAccount: (name: string) => void;
   groupsOpen: boolean; setGroupsOpen: (v: boolean) => void; setCreatingGroup: (v: boolean) => void;
   inviteViews: InviteGroupView[]; inviteShown: (v: InviteGroupView) => boolean; hiddenGroups: string[];
@@ -74,6 +75,7 @@ export function CryptSidebar({
                 <CardAction icon={<Ban className="h-4 w-4" />} label={blocked.length ? `Blocked (${blocked.length})` : 'Blocked'} aria-label="Blocked accounts" title="Accounts blocked on this device" onClick={() => setShowBlocked(true)} />
                 <CardAction icon={<KeyRound className="h-4 w-4" />} label="New key" className="hover:text-destructive" aria-label="Create a new key" title="Create a new key (it cannot read messages sent to this one)" onClick={makeKey} />
                 <PublicInboxButton enabled={publicInbox} onClick={() => setInboxOpen(true)} />
+                <CardAction icon={<Globe className="h-4 w-4" />} label="Rooms" aria-label="Find public rooms" title="Find public rooms and ask to join" onClick={() => setRoomsOpen(true)} />
               </div>
             </PopoverContent>
           </Popover>
@@ -86,13 +88,17 @@ export function CryptSidebar({
         </div>
       </div>
       <div className={cn('min-h-0 max-h-[30dvh] md:max-h-none overflow-y-auto p-2 space-y-4 border-b border-border md:border-b-0 md:border-r md:col-start-1 md:row-start-2', listHidden && 'hidden')}>
+        {joinRequestsPanel}
         <MessageRequests requests={messageRequests} onAccept={acceptRequest} onDecline={dismissRequest} onBlock={from => { dismissRequest(from); blockAccount(from); }} />
         <Collapsible open={groupsOpen} onOpenChange={setGroupsOpen}>
           <div className="flex items-center justify-between px-2">
             <CollapsibleTrigger className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-cheese">
               <ChevronDown className={cn('h-3.5 w-3.5 transition', !groupsOpen && '-rotate-90')} /> 👥 Groups
             </CollapsibleTrigger>
-            <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="New group" title="New group" onClick={() => setCreatingGroup(true)}><Users className="h-4 w-4" /></Button>
+            <span className="flex items-center">
+              <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Public rooms" title="Find public rooms" onClick={() => setRoomsOpen(true)}><Globe className="h-4 w-4" /></Button>
+              <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="New group" title="New group" onClick={() => setCreatingGroup(true)}><Users className="h-4 w-4" /></Button>
+            </span>
           </div>
           <CollapsibleContent>
             <ul className="space-y-1 pt-1">
