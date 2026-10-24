@@ -48,8 +48,9 @@ describe('room fee', () => {
     const payload = encodeNotice('join', ID);
     expect(partsOf(payload)).toBe(1);
     expect(groupMessageCost(1, 1)).toBe('0.0101 CHEESE');
-    const actions = buildCg2Actions(bob, ['alice'], { alice: alice.publicKey }, payload, []);
+    const actions = buildJoinRequestActions(bob, 'alice', alice.publicKey, ID, []) as { data: { to: string; quantity: string; memo: string } }[];
     expect(actions.map(a => [a.data.to, a.data.quantity])).toEqual([['alice', '0.0001 CHEESE'], ['alice', '0.1000 CHEESE'], ['eosio.null', '0.0080 CHEESE'], ['xcheeseliqst', '0.0020 CHEESE']]);
+    expect(actions[1].data.memo).toBe('CHEESECrypt join request fee');
     expect(JOIN_REQUEST_COST).toBe('0.1101 CHEESE');
   });
 });
