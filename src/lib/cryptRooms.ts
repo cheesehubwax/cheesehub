@@ -4,10 +4,10 @@
 // Listing and unlisting pay the normal platform fee (80% eosio.null / 20% xcheeseliqst); both fee legs carry the memo.
 import { decodeBase64 } from 'tweetnacl-util';
 import {
-  assembleMessages, bytesToText, buildCryptFeeActions, decryptMemoBytes, KEY_PUBLISH_TO, MEMO_MAX_BYTES, MESSAGE_FEE_QUANTITY,
-  type ChainMemo, type MessagingKey,
+  assembleMessages, bytesToText, buildCryptFeeActions, buildSendMessageActions, decryptMemoBytes, encryptMemo, KEY_PUBLISH_TO, MEMO_MAX_BYTES, MESSAGE_FEE_QUANTITY,
+  msgPrefixOf, type ChainMemo, type MessagingKey,
 } from '@/lib/cheeseCrypt';
-import { isCg2, MAX_PUBLIC_ROOM_MEMBERS, parseCg2, type Cg2Event, type RoomInviter } from '@/lib/cryptInviteGroups';
+import { encodeNotice, isCg2, MAX_PUBLIC_ROOM_MEMBERS, parseCg2, type Cg2Event, type RoomInviter } from '@/lib/cryptInviteGroups';
 
 export const ROOM_PREFIX = 'CRYPTROOM1:';
 export const UNLIST_PREFIX = `${ROOM_PREFIX}unlist:`;
@@ -137,23 +137,62 @@ export function listedRoomIds(account: string, listings: RoomListing[], myRoomId
  */
 export function decodeRoomEvents(memos: ChainMemo[], key: MessagingKey, peers: Record<string, string>): Cg2Event[] {
   const decoded = [];
+  // A key carried inside a join memo is trusted only for that memo, and only if it yields a single-part join.
+  const embedded = new Map<string, string>();
   for (const m of memos) {
     const partner = m.from === key.account ? m.to : m.from;
-    const pub = peers[partner];
-    if (!pub || (m.from !== key.account && m.to !== key.account) || partner === key.account) continue;
-    const bytes = decryptMemoBytes(m.memo, pub, key.secretKey);
-    if (!bytes || bytes[0] === 3) continue;
-    const text = bytesToText(bytes);
-    if (text !== null) decoded.push({ ...m, text });
+    if ((m.from !== key.account && m.to !== key.account) || partner === key.account) continue;
+    const carried = m.to === key.account ? joinMemoKey(m.memo) : null;
+    for (const pub of carried && carried !== peers[partner] ? [peers[partner], carried] : [peers[partner]]) {
+      if (!pub) continue;
+      const bytes = decryptMemoBytes(m.memo, pub, key.secretKey);
+      if (!bytes || bytes[0] === 3) continue;
+      const text = bytesToText(bytes);
+      if (text === null) continue;
+      if (pub !== peers[partner]) {
+        // Self-introduced key: accept only a complete join notice, never any other control or text.
+        if (!isCg2(text) || parseCg2(text)?.kind !== 'join') continue;
+        embedded.set(`${m.txId}:${m.from}:${m.memo}`, pub);
+      }
+      decoded.push({ ...m, text });
+      break;
+    }
   }
   const out: Cg2Event[] = [];
   for (const m of assembleMessages(decoded)) {
     if (m.missing || !isCg2(m.text)) continue;
     const control = parseCg2(m.text);
-    if (control) out.push({ key: m.key, txId: m.txId, time: m.time, from: m.from, to: m.to, control, usedKey: peers[m.from === key.account ? m.to : m.from] });
+    if (!control) continue;
+    const viaEmbedded = decoded.find(d => d.txId === m.txId && d.from === m.from && embedded.has(`${d.txId}:${d.from}:${d.memo}`));
+    const usedKey = viaEmbedded ? embedded.get(`${viaEmbedded.txId}:${viaEmbedded.from}:${viaEmbedded.memo}`)! : peers[m.from === key.account ? m.to : m.from];
+    if (viaEmbedded && (control.kind !== 'join' || m.parts !== 1)) continue;
+    out.push({ key: m.key, txId: m.txId, time: m.time, from: m.from, to: m.to, control, usedKey });
   }
   return out;
 }
+
+/**
+ * Join requests carry the requester's public key after the ciphertext (`CRYPT1:<nonce>:<box>:<publicKey>`), so
+ * people who never published a key can still ask to join. Older readers ignore the extra field. The key is only
+ * shown to the room creator and is used for nothing but reading that join request and sending the invite.
+ */
+export function joinMemoKey(memo: string): string | null {
+  const prefix = msgPrefixOf(memo);
+  if (!prefix) return null;
+  const fields = memo.slice(prefix.length).split(':');
+  if (fields.length !== 3) return null;
+  try { return decodeBase64(fields[2]).length === 32 ? fields[2] : null; } catch { return null; }
+}
+
+export function encodeJoinMemo(key: MessagingKey, roomId: string, creatorPublicKey: string): string {
+  const memo = `${encryptMemo(encodeNotice('join', roomId), creatorPublicKey, key.secretKey)}:${key.publicKey}`;
+  if (new TextEncoder().encode(memo).length > MEMO_MAX_BYTES) throw new Error('Join request is too long');
+  return memo;
+}
+
+/** One 0.0001 CHEESE transfer to the creator plus the normal platform fee, as for any one-part room notice. */
+export const buildJoinRequestActions = (key: MessagingKey, creator: string, creatorPublicKey: string, roomId: string, auth: unknown[]) =>
+  buildSendMessageActions(key.account, creator, [encodeJoinMemo(key, roomId, creatorPublicKey)], auth, false, true);
 
 export interface JoinRequest { groupId: string; from: string; publicKey: string; time: number }
 /** Join requests to my listed rooms from non-members, newest per (room, requester), after any decline. */
