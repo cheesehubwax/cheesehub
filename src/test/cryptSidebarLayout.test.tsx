@@ -1,10 +1,12 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Session } from '@wharfkit/session';
 import { generateKey, saveContact, saveKey, encryptMemo } from '@/lib/cheeseCrypt';
 import { encodeReply } from '@/lib/cryptReply';
+import { createGroup, saveGroups } from '@/lib/cryptGroups';
 import { Messenger } from '@/pages/CheeseCrypt';
+import { CryptAvatarRail } from '@/components/crypt/CryptAvatarRail';
 
 const calls = vi.hoisted(() => ({ transact: vi.fn(), fetch: vi.fn() }));
 vi.mock('@/context/WaxContext', () => ({ useWax: vi.fn() }));
@@ -55,6 +57,35 @@ describe('compact sidebar', () => {
     expect(localStorage.getItem('cheesecrypt-sidebar-collapsed-alice')).toBe('0');
   });
 
+  it('splits the collapsed strip into Groups and Friends sections', async () => {
+    const carol = generateKey('carol');
+    saveContact('alice', 'carol', carol.publicKey);
+    saveGroups('alice', [createGroup('alice', ['bob', 'carol'])]);
+    mount();
+    await screen.findByRole('button', { name: /^bob/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Hide groups and friends' }));
+    const strip = screen.getByRole('navigation', { name: 'Chats' });
+    const groups = within(strip).getByRole('group', { name: 'Groups' });
+    const friends = within(strip).getByRole('group', { name: 'Friends' });
+    expect(within(groups).getByText('Groups')).toBeInTheDocument();
+    expect(within(friends).getByText('Friends')).toBeInTheDocument();
+    expect(groups.querySelector('button[title="Group · 3 people"]')).not.toBeNull();
+    expect(friends.querySelector('button[title="bob"]')).not.toBeNull();
+    // Each avatar sits in its own section only, and Groups sits above Friends.
+    expect(within(groups).queryByRole('button', { name: /^bob/ })).toBeNull();
+    expect(within(friends).queryByRole('button', { name: /Group ·/ })).toBeNull();
+    expect(groups.compareDocumentPosition(friends) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('shows no Groups section in the strip while there are no groups', async () => {
+    mount();
+    await screen.findByRole('button', { name: /^bob/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Hide groups and friends' }));
+    const strip = screen.getByRole('navigation', { name: 'Chats' });
+    expect(within(strip).queryByRole('group', { name: 'Groups' })).toBeNull();
+    expect(within(strip).getByRole('group', { name: 'Friends' })).toBeInTheDocument();
+  });
+
   it('keeps the fee explanation closed until Fee info is clicked', async () => {
     mount();
     fireEvent.click(await screen.findByRole('button', { name: /^bob/ }));
@@ -100,5 +131,12 @@ describe('compact sidebar', () => {
     expect(roomAgain.querySelector('[aria-label="1 unread"]')).not.toBeNull();
     expect(roomAgain.querySelector('[aria-label="1 reply to you"]')).not.toBeNull();
     expect(roomAgain.querySelector('[aria-label="4 unread"]')).toBeNull();
+  });
+
+  it('renders an empty strip instead of crashing when sections is missing or stale', () => {
+    render(<CryptAvatarRail active={null} setActive={() => {}} />);
+    render(<CryptAvatarRail active={null} setActive={() => {}} {...({ items: [] } as object)} />);
+    expect(screen.getAllByRole('navigation', { name: 'Chats' })).toHaveLength(2);
+    for (const nav of screen.getAllByRole('navigation', { name: 'Chats' })) expect(nav).toBeEmptyDOMElement();
   });
 });
