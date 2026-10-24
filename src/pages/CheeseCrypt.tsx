@@ -981,12 +981,13 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const draftInvite = (name: string, members: string[], avatar?: CryptAvatar, id = '0'.repeat(16), created = Date.now()): InviteGroup | null => key ? {
     id, name, creator: account, created, members: [{ account, publicKey: key.publicKey }, ...members.map(m => ({ account: m, publicKey: contacts[m] }))], ...(avatar ? { avatar } : {}),
   } : null;
-  const createInviteGroup = async (name: string, members: string[], avatar?: CryptAvatar) => {
+  const createInviteGroup = async (name: string, members: string[], avatar?: CryptAvatar, info?: { topic: string; tags: string[] }) => {
     const invite = draftInvite(name, members, avatar, newInviteGroupId());
     if (!invite || invite.members.length > MAX_INVITE_MEMBERS) return false;
     let payload: string;
     try { payload = encodeInvite(invite); } catch (e) { toast({ title: (e as Error).message, variant: 'destructive' }); return false; }
     if (!(await sendCg2(members, contacts, payload, `Invites sent to ${members.length} friend${members.length > 1 ? 's' : ''}`))) return false;
+    if (info && (info.topic || info.tags.length)) saveRoomInfo(account, invite.id, info);
     const next = { ...inviteStore, [invite.id]: invite };
     saveInvites(account, next); setInviteStore(next);
     setActive(`group:${invite.id}`); setCreatingGroup(false); setText('');
@@ -1067,7 +1068,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const v = viewById(id);
     if (!key || !v || !v.isCreator) return false;
     let memo: string;
-    try { memo = encodeListing({ id, ...info, publicKey: key.publicKey, members: Math.max(1, v.joined.length) }); }
+    try { memo = encodeListing({ id, ...info, publicKey: key.publicKey, members: Math.max(1, v.joined.length), ...(v.avatar ? { avatar: v.avatar.pixels } : {}) }); saveRoomInfo(account, id, info); }
     catch (e) { toast({ title: (e as Error).message, variant: 'destructive' }); return false; }
     // Publish the immutable protected roster privately to every member in the same paid transaction.
     const protectedMembers = moderation[id]?.protected ?? v.invite.members.map(m => m.account);
@@ -1351,6 +1352,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
         if (!v || !v.isCreator) return null;
         return <RoomListingDialog groupId={v.invite.id} groupName={v.name} members={Math.max(1, v.joined.length)} publicKey={key.publicKey} listed={listedIds.has(v.invite.id)} busy={busy}
           cost={`${(0.0100 + parseFloat(cg2Cost(encodeRoomPolicy(v.invite.id, !listedIds.has(v.invite.id), moderation[v.invite.id]?.protected ?? v.invite.members.map(m => m.account)), v.invite.members.length - 1))).toFixed(4)} CHEESE`}
+          initialTopic={(listings.find(l => l.creator === account && l.id === v.invite.id) ?? loadRoomInfo(account)[v.invite.id])?.topic ?? ''}
+          initialTags={(listings.find(l => l.creator === account && l.id === v.invite.id) ?? loadRoomInfo(account)[v.invite.id])?.tags ?? []}
           onList={info => listRoom(v.invite.id, info)} onUnlist={() => unlistRoom(v.invite.id)} onClose={() => setListingRoom(null)} />;
       })()}
       <PublicInboxDialog enabled={publicInbox} onChange={enabled => { savePublicInbox(account, enabled); setPublicInbox(enabled); }} open={inboxOpen} onOpenChange={setInboxOpen} />
