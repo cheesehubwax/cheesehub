@@ -30,7 +30,7 @@
 - Crypt folder pickers start at Desktop, request the vault subfolder and retry permission failures (Chromium protects Desktop root). Profile precedes keys; edits refresh only verified matching-key backups (staged writes), else download.
 - CHEESECrypt: one vault/device; friends/ loads into all accounts (per-account edits), only explicit saves replace; blocked memos drop undecrypted. Keys match by content; reads merge newest.
 - Crypt inbox: bounded discovery; strangers held until accepted.
-- Crypt reply views use per-message receipts (jumps keep skipped replies); scroll only the inner list. About: DappAbout + crypto dialog.
+- Crypt reply views use per-message receipts (jumps keep skipped replies), inner-list scroll only. About: DappAbout + crypto dialog.
 - CHEESECrypt page sections (hero, key setup, sidebar, chat header, composer, message bubble) are presentational components in components/crypt; all state, effects and handlers stay in Messenger so one owner keeps chat state consistent.
 - OpenMojiIcon's optional tint paints a glyph as a solid silhouette in a given color; use it when an OpenMoji artwork's own palette is too dark for the always-dark background.
 - Both NFT players normalize media via nftMedia (case-insensitive audio/clip/video, reference-only sound/mp3/sfx aliases); version music caches on detection changes to avoid stale classifications.
