@@ -124,6 +124,10 @@ export function parseCg2(text: string | null | undefined): Cg2 | null {
   if (kind === 'invite' || kind === 'admission') { const invite = validateInvite(body, kind === 'admission'); return invite ? { kind, invite } : null; }
   if (typeof body.i !== 'string' || !ID.test(body.i)) return null;
   const id = body.i;
+  if (kind === 'add') {
+    if (typeof body.h !== 'string' || !/^[a-f0-9]{64}$/.test(body.h) || !Number.isInteger(body.c) || typeof body.c !== 'number' || body.c < 2 || body.c >= MAX_PUBLIC_ROOM_MEMBERS || !Array.isArray(body.m) || body.m.length !== 2 || typeof body.m[0] !== 'string' || !ACCOUNT.test(body.m[0]) || !validPublicKey(body.m[1])) return null;
+    return { kind, id, previous: body.h, count: body.c, member: { account: body.m[0], publicKey: body.m[1] } };
+  }
   if (kind === 'policy') {
     const accounts = (a: unknown): a is string[] => Array.isArray(a) && a.length <= MAX_PUBLIC_ROOM_MEMBERS && new Set(a).size === a.length && a.every(v => typeof v === 'string' && ACCOUNT.test(v));
     if (!accounts(body.p) || !body.p.length || !accounts(body.b) || body.b.some(a => (body.p as string[]).includes(a)) || !Array.isArray(body.u) || body.u.length > 8 || body.u.some(u => !Array.isArray(u) || u.length !== 3 || typeof u[0] !== 'string' || !ACCOUNT.test(u[0]) || !Number.isSafeInteger(u[1]) || !Number.isSafeInteger(u[2]) || u[1] < 0 || !MUTE_MINUTES.some(d => u[2] - u[1] === d * 60_000))) return null;
@@ -166,7 +170,7 @@ export interface RoomInviter { creator: string; publicKey: string }
  * Sent (I'm the creator): it must list my real key and the recipient.
  */
 export function inviteAcceptable(e: Cg2Event, me: string, myPublicKey: string, contacts: Record<string, string>, rooms: Record<string, RoomInviter> = {}): boolean {
-  if (e.control.kind !== 'invite') return false;
+  if (e.control.kind !== 'invite' && e.control.kind !== 'admission') return false;
   const g = e.control.invite;
   if (e.from !== g.creator || memberKey(g, me) !== myPublicKey || !memberKey(g, e.to)) return false;
   if (e.to === me) {
@@ -184,7 +188,7 @@ export function inviteAcceptable(e: Cg2Event, me: string, myPublicKey: string, c
  * sent copies, the recipient's key in the update). Nobody can be removed or have their key swapped.
  */
 export function inviteUpdateAcceptable(e: Cg2Event, current: InviteGroup, me: string, myPublicKey: string): boolean {
-  if (e.control.kind !== 'invite') return false;
+  if (e.control.kind !== 'invite' && e.control.kind !== 'admission') return false;
   const g = e.control.invite;
   if (g.id !== current.id || g.creator !== current.creator || g.created !== current.created || g.name !== current.name || e.from !== current.creator) return false;
   if (g.members.length <= current.members.length || memberKey(g, me) !== myPublicKey || !memberKey(g, e.to)) return false;
@@ -195,7 +199,7 @@ export function inviteUpdateAcceptable(e: Cg2Event, current: InviteGroup, me: st
 
 /** Non-invite events count only between two members of a known invite, opened with the partner's invite key. */
 export function eventFromMember(e: Cg2Event, invites: Record<string, InviteGroup>, me: string): InviteGroup | null {
-  if (e.control.kind === 'invite') return null;
+  if ((e.control.kind === 'invite' || e.control.kind === 'admission')) return null;
   const g = invites[e.control.id];
   if (!g || !memberKey(g, e.from) || !memberKey(g, e.to) || (e.from !== me && e.to !== me)) return null;
   const partner = e.from === me ? e.to : e.from;
@@ -208,18 +212,36 @@ export function eventFromMember(e: Cg2Event, invites: Record<string, InviteGroup
  */
 export function collectInvites(events: Cg2Event[], me: string, myPublicKey: string, contacts: Record<string, string>, stored: Record<string, InviteGroup>, rooms: Record<string, RoomInviter> = {}): Record<string, InviteGroup> {
   const out: Record<string, InviteGroup> = { ...stored };
-  for (const e of [...events].sort((a, b) => a.time - b.time)) {
-    if (e.control.kind !== 'invite') continue;
-    const id = e.control.invite.id, current = out[id];
-    if (!current) { if (inviteAcceptable(e, me, myPublicKey, contacts, rooms)) out[id] = e.control.invite; continue; }
-    if (inviteUpdateAcceptable(e, current, me, myPublicKey)) out[id] = { ...current, members: e.control.invite.members };
+  const pending = [...events].sort((a, b) => a.time - b.time || a.txId.localeCompare(b.txId));
+  // Replay until every predecessor available in this window has been applied.
+  for (let pass = 0; pass < MAX_PUBLIC_ROOM_MEMBERS; pass++) {
+    let changed = false;
+    for (const e of pending) {
+      const c = e.control;
+      if (c.kind === 'add') {
+        const g = out[c.id];
+        if (!g || e.from !== g.creator || !eventFromMember(e, out, me) || c.count !== g.members.length || c.previous !== rosterDigest(g) || g.members.some(m => m.account === c.member.account)) continue;
+        const policies = events.filter(p => p.txId === e.txId && p.from === g.creator && p.control.kind === 'room' && p.control.id === g.id && p.control.listed && eventFromMember(p, out, me));
+        if (!policies.length) continue;
+        const forks = pending.filter(p => p.control.kind === 'add' && p.control.id === c.id && p.control.previous === c.previous && p.from === g.creator && eventFromMember(p, out, me));
+        if (new Set(forks.map(p => p.control.kind === 'add' ? JSON.stringify(p.control.member) : '')).size !== 1) continue;
+        out[g.id] = { ...g, publicRoom: true, members: [...g.members, c.member] }; changed = true;
+      } else if (c.kind === 'invite' || c.kind === 'admission') {
+        const id = c.invite.id, current = out[id];
+        // Public bootstraps only establish the requested room, never replace an existing roster.
+        if (c.kind === 'admission' && (current || !rooms[id] || !events.some(p => p.txId === e.txId && p.from === e.from && p.to === me && p.usedKey === e.usedKey && p.control.kind === 'policy' && p.control.id === id))) continue;
+        if (!current) { if (inviteAcceptable(e, me, myPublicKey, contacts, rooms)) { out[id] = c.invite; changed = true; } continue; }
+        if (c.kind === 'invite' && inviteUpdateAcceptable(e, current, me, myPublicKey)) { out[id] = { ...current, members: c.invite.members }; changed = true; }
+      }
+    }
+    if (!changed) break;
   }
   return out;
 }
 
 /** Stable comparison of two invite stores (ids and member keys), so membership growth gets saved. */
 export const invitesSignature = (invites: Record<string, InviteGroup>) =>
-  Object.values(invites).map(g => `${g.id}=${g.members.map(m => `${m.account}:${m.publicKey}`).join(',')}`).sort().join('|');
+  Object.values(invites).map(g => `${g.id}:${!!g.publicRoom}=${g.members.map(m => `${m.account}:${m.publicKey}`).join(',')}`).sort().join('|');
 
 export type MyStatus = 'invited' | 'joined' | 'declined' | 'left';
 export interface LocalDecision { status: 'joined' | 'declined' | 'left'; at: number }
@@ -245,7 +267,7 @@ export function deriveInviteGroups(events: Cg2Event[], invites: Record<string, I
     let meta: { name: string; avatar?: CryptAvatar; at: number } | null = null;
     const requestsIn = new Set<string>(), requested = new Set<string>(), accepted = new Set<string>();
     for (const e of sorted) {
-      if (e.control.kind === 'invite' || e.control.id !== g.id || !eventFromMember(e, invites, me)) continue;
+      if ((e.control.kind === 'invite' || e.control.kind === 'admission') || e.control.id !== g.id || !eventFromMember(e, invites, me)) continue;
       const c = e.control;
       if (c.kind === 'joined' || c.kind === 'msg') {
         const prev = state.get(e.from);
@@ -297,8 +319,8 @@ export function buildCg2Actions(key: MessagingKey, recipients: string[], keys: R
   if (!recipients.length) throw new Error('Nobody to send to yet.');
   if (new Set(recipients).size !== recipients.length || recipients.includes(key.account)) throw new Error('Invalid recipients.');
   if (recipients.some(r => !keys[r])) throw new Error('A member key is missing.');
-  const parts = splitMessage(payload);
-  if (parts.length > MAX_PARTS) throw new Error('Too long.');
+  const parts = splitMessage(payload, undefined, parseCg2(payload)?.kind === 'admission' ? MAX_MEMBERSHIP_PARTS : MAX_PARTS);
+  if (parts.length > MAX_MEMBERSHIP_PARTS) throw new Error('Too long.');
   return recipients.flatMap((to, i) => buildSendMessageActions(key.account, to, parts.map(p => encryptMemo(p, keys[to], key.secretKey)), auth, hasNft, i === 0));
 }
 
@@ -314,7 +336,7 @@ export function loadInvites(account: string): Record<string, InviteGroup> {
     const raw: unknown = JSON.parse(localStorage.getItem(invitesStore(account)) || '{}');
     const out: Record<string, InviteGroup> = {};
     if (raw && typeof raw === 'object' && !Array.isArray(raw)) for (const v of Object.values(raw)) {
-      const g = validateInvite(v);
+      const g = validateInvite(v, !!(v && typeof v === 'object' && 'r' in v && v.r === true));
       if (g && memberKey(g, account)) out[g.id] = g;
     }
     return out;
@@ -322,7 +344,7 @@ export function loadInvites(account: string): Record<string, InviteGroup> {
 }
 export function saveInvites(account: string, invites: Record<string, InviteGroup>) {
   const out: Record<string, unknown> = {};
-  for (const g of Object.values(invites)) out[g.id] = { i: g.id, n: g.name, o: g.creator, c: g.created, m: g.members.map(m => [m.account, m.publicKey]), ...(g.avatar ? { a: g.avatar.pixels } : {}) };
+  for (const g of Object.values(invites)) out[g.id] = { i: g.id, n: g.name, o: g.creator, c: g.created, m: g.members.map(m => [m.account, m.publicKey]), ...(g.avatar ? { a: g.avatar.pixels } : {}), ...(g.publicRoom ? { r: true } : {}) };
   localStorage.setItem(invitesStore(account), JSON.stringify(out));
 }
 

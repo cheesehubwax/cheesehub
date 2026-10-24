@@ -124,7 +124,7 @@ export function decodeConversations(memos: ChainMemo[], key: MessagingKey, conta
         if (m.missing || !b.usedKey) continue; // partial or unauthenticated CG2 data is never used
         const control = parseCg2(m.text);
         if (!control) continue;
-        const id = control.kind === 'invite' ? control.invite.id : control.id;
+        const id = (control.kind === 'invite' || control.kind === 'admission') ? control.invite.id : control.id;
         // A group key only opens its own group's notices (including that group's member updates from its creator).
         if (b.groupId && id !== b.groupId) continue;
         if (control.kind === 'msg') {

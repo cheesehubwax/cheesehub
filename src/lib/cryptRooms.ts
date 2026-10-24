@@ -7,7 +7,7 @@ import {
   assembleMessages, bytesToText, buildCryptFeeActions, decryptMemoBytes, KEY_PUBLISH_TO, MEMO_MAX_BYTES, MESSAGE_FEE_QUANTITY,
   type ChainMemo, type MessagingKey,
 } from '@/lib/cheeseCrypt';
-import { isCg2, MAX_INVITE_MEMBERS, parseCg2, type Cg2Event, type RoomInviter } from '@/lib/cryptInviteGroups';
+import { isCg2, MAX_PUBLIC_ROOM_MEMBERS, parseCg2, type Cg2Event, type RoomInviter } from '@/lib/cryptInviteGroups';
 
 export const ROOM_PREFIX = 'CRYPTROOM1:';
 export const UNLIST_PREFIX = `${ROOM_PREFIX}unlist:`;
@@ -54,7 +54,7 @@ function validFields(o: Record<string, unknown>): RoomListingInput | null {
     tags.push(t);
   }
   if (!validKey(o.k)) return null;
-  if (typeof o.m !== 'number' || !Number.isInteger(o.m) || o.m < 1 || o.m > MAX_INVITE_MEMBERS) return null;
+  if (typeof o.m !== 'number' || !Number.isInteger(o.m) || o.m < 1 || o.m > MAX_PUBLIC_ROOM_MEMBERS) return null;
   return { id: o.i, name: o.n, topic: o.t, tags, publicKey: o.k, members: o.m };
 }
 
