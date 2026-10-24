@@ -57,7 +57,7 @@ import { CryptSidebar } from '@/components/crypt/CryptSidebar';
 import { CryptAvatarRail } from '@/components/crypt/CryptAvatarRail';
 import { CryptChatHeader } from '@/components/crypt/CryptChatHeader';
 import { CryptComposer } from '@/components/crypt/CryptComposer';
-import { DiscoverRoomsDialog, JoinRequests, RoomListingDialog } from '@/components/crypt/PublicRooms';
+import { DiscoverRoomsDialog, JoinRequests, RoomSettingsDialog } from '@/components/crypt/PublicRooms';
 import { fetchRoomMemos } from '@/lib/cheeseCrypt';
 import {
   JOIN_REQUEST_COST, LISTING_STAKE_QUANTITY, ROOM_FEE_QUANTITY, buildJoinRequestActions, buildRoomActions, collectJoinRequests, collectListings, decodeRoomEvents, declineJoin, removeRoomRequest, roomRequestOutcomes, roomRequestNotes, encodeListing, encodeUnlist, listedRoomIds, loadJoinDeclines,
@@ -148,7 +148,6 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [inboxOpen, setInboxOpen] = useState(false);
   // Public rooms: listings are public; my requests, local list actions and join declines stay on this device.
   const [roomsOpen, setRoomsOpen] = useState(false);
-  const [listingRoom, setListingRoom] = useState<string | null>(null);
   const [askingRoom, setAskingRoom] = useState<RoomListing | null>(null);
   const [acceptingJoin, setAcceptingJoin] = useState<JoinRequest | null>(null);
   const [decliningJoin, setDecliningJoin] = useState<JoinRequest | null>(null);
@@ -1036,7 +1035,6 @@ export function Messenger({ account, session }: { account: string; session: NonN
     try { payload = encodeMeta(v.invite.id, editingInvite.name, editingInvite.avatar); } catch (e) { toast({ title: (e as Error).message, variant: 'destructive' }); return false; }
     const to = v.invite.members.map(m => m.account).filter(a => a !== account && moderation[v.invite.id]?.bans[a] === undefined);
     if (!(await sendCg2(to, keysOf(v.invite), payload, 'Group updated'))) return false;
-    setEditingInvite(null);
     return true;
   };
 
@@ -1251,22 +1249,21 @@ export function Messenger({ account, session }: { account: string; session: NonN
       {editingInvite && !paintingInvite && (() => {
         const v = viewById(editingInvite.id);
         if (!v) return null;
-        let cost = '';
-        try { cost = cg2Cost(encodeMeta(v.invite.id, editingInvite.name, editingInvite.avatar), v.invite.members.length - 1); } catch { cost = 'enter a name'; }
-        return <PaidActionDialog title="✏️ Edit group" description="Only you, the creator, can change the name and picture. Every member gets the update encrypted; the newest one wins." cost={cost}
-          confirmLabel="Pay & update" busy={busy} onConfirm={confirmMeta} onClose={() => setEditingInvite(null)}>
-          <div className="flex items-center gap-3">
-            <button type="button" onClick={() => setPaintingInvite(true)} aria-label="Change group picture" className="shrink-0 rounded-md border border-border p-1 hover:border-cheese">
-              {editingInvite.avatar ? <PixelAvatar account="group" avatar={editingInvite.avatar} className="h-10 w-10" /> : <span className="flex h-10 w-10 items-center justify-center text-xl">👥</span>}
-            </button>
-            <Input value={editingInvite.name} maxLength={40} aria-label="Group name" onChange={e => setEditingInvite({ ...editingInvite, name: e.target.value })} />
-          </div>
-          <div className="flex items-center justify-between gap-2 rounded-md border border-border bg-background/50 px-2 py-1.5">
-            <span className="min-w-0 text-[11px] text-muted-foreground">{listedIds.has(editingInvite.id) ? '🌐 This room is listed publicly, so anyone can find it and ask to join.' : '🌐 Not listed. Only people you invite can find this room.'}</span>
-            <Button size="sm" variant="outline" className="h-7 shrink-0 text-xs" aria-label={listedIds.has(editingInvite.id) ? 'Manage public room listing' : 'List room publicly'} onClick={() => setListingRoom(editingInvite.id)}>🌐 {listedIds.has(editingInvite.id) ? 'Manage listing' : 'List room'}</Button>
-          </div>
-          {v.isCreator && listedIds.has(v.invite.id) && <Button variant="outline" size="sm" onClick={() => setEditLogRoom(v.invite.id)}>✏️ Edited messages</Button>}
-        </PaidActionDialog>;
+        let metaCost = '';
+        try { metaCost = cg2Cost(encodeMeta(v.invite.id, editingInvite.name, editingInvite.avatar), v.invite.members.length - 1); } catch { metaCost = ''; }
+        const isListed = listedIds.has(v.invite.id);
+        const policyCost = parseFloat(cg2Cost(encodeRoomPolicy(v.invite.id, !isListed, moderation[v.invite.id]?.protected ?? v.invite.members.map(m => m.account)), v.invite.members.length - 1));
+        const current = listings.find(l => l.creator === account && l.id === v.invite.id);
+        const saved = loadRoomInfo(account)[v.invite.id];
+        const fee = (q: string) => `${(parseFloat(q) + policyCost).toFixed(4)} CHEESE`;
+        return <RoomSettingsDialog groupId={v.invite.id} groupName={editingInvite.name} groupAvatar={editingInvite.avatar}
+          members={Math.max(1, v.joined.length)} publicKey={key.publicKey} creatorName={key.displayName} listed={isListed} busy={busy}
+          metaCost={metaCost} onNameChange={name => setEditingInvite({ ...editingInvite, name })} onPaint={() => setPaintingInvite(true)} onUpdateMeta={confirmMeta}
+          listCost={fee(LISTING_STAKE_QUANTITY)} updateCost={fee(ROOM_FEE_QUANTITY)} unlistCost={fee(ROOM_FEE_QUANTITY)}
+          initialName={current?.name ?? v.name} initialTopic={(current ?? saved)?.topic ?? ''} initialTags={(current ?? saved)?.tags ?? []}
+          onList={info => listRoom(v.invite.id, info)} onUnlist={() => unlistRoom(v.invite.id)}
+          onEditLog={v.isCreator && isListed ? () => setEditLogRoom(v.invite.id) : undefined}
+          onClose={() => setEditingInvite(null)} />;
       })()}
       {pendingModeration && (() => {
         const plan = moderationPlan(pendingModeration);
@@ -1349,21 +1346,6 @@ export function Messenger({ account, session }: { account: string; session: NonN
         onConfirm={confirmDecline} onClose={() => setDecliningJoin(null)}>
         <JoinNoteField value={joinNote} onChange={setJoinNote} disabled={busy} placeholder="e.g. Sorry mate" />
       </PaidActionDialog>}
-      {listingRoom && (() => {
-        const v = viewById(listingRoom);
-        if (!v || !v.isCreator) return null;
-        const isListed = listedIds.has(v.invite.id);
-        const policyCost = parseFloat(cg2Cost(encodeRoomPolicy(v.invite.id, !isListed, moderation[v.invite.id]?.protected ?? v.invite.members.map(m => m.account)), v.invite.members.length - 1));
-        const current = listings.find(l => l.creator === account && l.id === v.invite.id);
-        const saved = loadRoomInfo(account)[v.invite.id];
-        return <RoomListingDialog groupId={v.invite.id} groupName={v.name} members={Math.max(1, v.joined.length)} publicKey={key.publicKey} creatorName={key.displayName} listed={isListed} busy={busy}
-          cost={`${(parseFloat(isListed ? ROOM_FEE_QUANTITY : LISTING_STAKE_QUANTITY) + policyCost).toFixed(4)} CHEESE`}
-          unlistCost={`${(parseFloat(ROOM_FEE_QUANTITY) + policyCost).toFixed(4)} CHEESE`}
-          initialName={current?.name ?? v.name}
-          initialTopic={(current ?? saved)?.topic ?? ''}
-          initialTags={(current ?? saved)?.tags ?? []}
-          onList={info => listRoom(v.invite.id, info)} onUnlist={() => unlistRoom(v.invite.id)} onClose={() => setListingRoom(null)} />;
-      })()}
       <PublicInboxDialog enabled={publicInbox} onChange={enabled => { savePublicInbox(account, enabled); setPublicInbox(enabled); }} open={inboxOpen} onOpenChange={setInboxOpen} />
       <CryptSidebar account={account} cryptKey={key} loading={loading} refresh={refresh} setEditingAvatar={setEditingAvatar}
         menuOpen={menuOpen} setMenuOpen={setMenuOpen} fileRef={fileRef} sharePublicKey={sharePublicKey} busy={busy} publish={async () => { setPublishAgreed(false); setShowPublishPrompt(true); }}

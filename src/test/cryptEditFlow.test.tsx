@@ -55,7 +55,7 @@ describe('message edit flow', () => {
     mount(); fireEvent.click(await screen.findByRole('button', { name: /Test room/ }));
     await screen.findByText('new public text');
     fireEvent.click(screen.getByRole('button', { name: 'Edit group' }));
-    const dialog = await screen.findByRole('dialog', { name: '✏️ Edit group' });
+    const dialog = await screen.findByRole('dialog', { name: '✏️ Room settings' });
     const button = within(dialog).queryByRole('button', { name: '✏️ Edited messages' });
     if (!listed) { expect(button).toBeNull(); return; }
     expect(button).not.toBeNull(); if (!button) return;
