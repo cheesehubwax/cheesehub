@@ -6,11 +6,11 @@ const g = { id: 'r', creator: 'owner', members: [{ account: 'owner' }, { account
 const state = { listed: true, protected: ['owner', 'fren1', 'bum.gpk'], bans: {}, mutes: {}, admins: [], collapses: {} };
 
 describe('founder badges', () => {
-  it('uses the frozen roster and never tags the owner', () => {
-    expect(founderBadges(state, g, true)).toEqual(['fren1', 'bum.gpk']);
+  it('uses the frozen roster including the owner', () => {
+    expect(founderBadges(state, g, true)).toEqual(['owner', 'fren1', 'bum.gpk']);
   });
   it('treats all current members as founders when a listed room has no roster policy', () => {
-    expect(founderBadges(undefined, g, true)).toEqual(['fren1', 'bum.gpk', 'late']);
+    expect(founderBadges(undefined, g, true)).toEqual(['owner', 'fren1', 'bum.gpk', 'late']);
   });
   it('shows no founders for a room that was never public', () => {
     expect(founderBadges(undefined, g, false)).toEqual([]);

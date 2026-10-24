@@ -91,11 +91,11 @@ export function deriveModeration(events: Cg2Event[], invites: Record<string, Inv
   }
   return out;
 }
-/** Founding members excluding the owner. A listed room without a received roster policy (e.g. listed before
+/** Founding members, owner included (admins can be founders too). A listed room without a received roster policy (e.g. listed before
  * policies existed) treats every current member as protected, matching the ban rules. Unlisted rooms show none. */
 export function founderBadges(state: RoomModeration | undefined, g: InviteGroup, listed: boolean): string[] {
   const roster = state ? state.protected : listed ? g.members.map(m => m.account) : [];
-  return roster.filter(a => a !== g.creator);
+  return roster.includes(g.creator) || !roster.length ? roster : [g.creator, ...roster];
 }
 export function restrictedAt(state: RoomModeration | undefined, member: string, at: number) {
   return !!state && ((state.bans[member] !== undefined && at >= state.bans[member]) || !!state.mutes[member]?.some(m => at >= m.from && at < m.until));
