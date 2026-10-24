@@ -7,7 +7,7 @@ export const EDIT_LOG_MS = 72 * 60 * 60 * 1000;
 export const EDIT_PREFIX = '\u0005E1:';
 const TARGET = /^[a-f0-9]{64}$/;
 export interface EditLogEntry { original: ConversationEntry; previous: ConversationEntry; replacement: EditedMessage; at: number }
-export type EditedMessage = ConversationEntry & { editedAt?: number; editTxId?: string };
+export type EditedMessage = ConversationEntry & { editedAt?: number; editTxId?: string; collapsed?: { by: string; at: number } };
 
 /** Ciphertext and fanout keys differ per recipient; authenticated content and transaction do not. */
 export function editTarget(m: ConversationEntry): string {
