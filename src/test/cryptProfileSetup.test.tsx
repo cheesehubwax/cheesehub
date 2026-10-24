@@ -1,4 +1,4 @@
-import { act, fireEvent, render as renderUi, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render as renderUi, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Session } from '@wharfkit/session';
@@ -35,6 +35,35 @@ async function payCreation() {
   await act(async () => { fireEvent.click(pay); });
 }
 describe('profile-first key setup', () => {
+  it('menu publishing requires fresh consent, keeps rejected requests open and sends only the public key with the 80/20 fee', async () => {
+    const key = generateKey('alice'); saveKey(key);
+    render(<Messenger {...props} />);
+    const openPublish = async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Publish my key on chain (0.0100 CHEESE)' }));
+      return within(await screen.findByRole('dialog'));
+    };
+    let dialog = await openPublish();
+    expect(calls.transact).not.toHaveBeenCalled();
+    expect(dialog.getByRole('button', { name: 'Publish my key on chain' })).toBeDisabled();
+    fireEvent.click(dialog.getByRole('checkbox'));
+    fireEvent.click(dialog.getByRole('button', { name: 'Cancel' }));
+    dialog = await openPublish();
+    expect(dialog.getByRole('checkbox')).not.toBeChecked();
+    expect(dialog.getByRole('button', { name: 'Publish my key on chain' })).toBeDisabled();
+    fireEvent.click(dialog.getByRole('checkbox'));
+    await act(async () => { fireEvent.click(dialog.getByRole('button', { name: 'Publish my key on chain' })); });
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(calls.transact).toHaveBeenCalledTimes(1);
+    expect(calls.transact.mock.calls[0][0].map((a: { data: unknown }) => a.data)).toEqual([
+      { from: 'alice', to: 'eosio.null', quantity: '0.0080 CHEESE', memo: `CRYPTKEY1:${key.publicKey}` },
+      { from: 'alice', to: 'xcheeseliqst', quantity: '0.0020 CHEESE', memo: `CRYPTKEY1:${key.publicKey}` },
+    ]);
+    expect(localStorage.getItem('cheesecrypt-public-inbox-alice')).not.toBe('true');
+    calls.transact.mockResolvedValueOnce({ success: true, txId: 'confirmed-publish' });
+    await act(async () => { fireEvent.click(dialog.getByRole('button', { name: 'Publish my key on chain' })); });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
   it.each(['Save backup', 'Download backup'])('creates default-profile keys before %s, then offers sharing without repeating setup', async action => {
     const view = render(<Messenger {...props} />);
     fireEvent.click(screen.getByRole('button', { name: 'Create a new key' }));
