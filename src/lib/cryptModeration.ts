@@ -35,6 +35,8 @@ export function deriveModeration(events: Cg2Event[], invites: Record<string, Inv
     }
     if (c.kind === 'room') {
       if (!c.protected.includes(g.creator) || c.protected.some(a => !g.members.some(m => m.account === a))) continue;
+      // Without a verified newcomer bootstrap, never let a first policy strip my own immunity.
+      if (!state && !c.protected.includes(me)) continue;
       if (state && (state.protected.length !== c.protected.length || state.protected.some(a => !c.protected.includes(a)))) continue;
       // Any pre-policy roster received on chain must be included, even if the creator tries omitting it.
       const before = events.filter(x => x.control.kind === 'invite' && x.control.invite.id === g.id && x.from === g.creator && x.time <= e.time && x.txId !== e.txId && eventInviteTrusted(x, g, me));

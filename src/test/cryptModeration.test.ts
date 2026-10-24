@@ -52,6 +52,10 @@ describe('public-room moderation rules', () => {
     const initial: Cg2Event = { ...policy, time: 999, control: { kind: 'invite', invite: g }, txId: 'initial' };
     expect(deriveModeration([initial, policy], { [id]: g }, 'bob')).toEqual({});
   });
+  it('fails safely when an initial policy omits me and earlier invite history is missing', () => {
+    const omission = event(encodeRoomPolicy(id, true, ['alice']), 1000);
+    expect(deriveModeration([omission, event(encodeModeration(id, 'bob'), 2000)], { [id]: g }, 'bob')).toEqual({});
+  });
   it('strips hidden quotes and ignores edits sent during a mute without touching DMs', () => {
     const states = deriveModeration([policy, event(encodeModeration(id, 'carol', 15), 2000)], { [id]: g }, 'bob');
     const original = row(1500, 'before');
