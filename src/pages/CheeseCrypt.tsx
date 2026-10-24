@@ -360,7 +360,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         <span aria-hidden className="flex h-12 w-12 shrink-0 items-center justify-center text-2xl">{outcome === 'declined' ? '❌' : '⏳'}</span>
         <span className="min-w-0"><span className="block text-sm break-words">{r.name ?? 'Public room'}</span>
           <span className={cn('block text-[10px]', outcome === 'declined' ? 'text-destructive' : 'text-cheese')}>
-            {outcome === 'declined' ? `Request declined by ${nameFor(r.creator)}` : `Request pending · waiting for ${nameFor(r.creator)}`}
+            {outcome === 'declined' ? `Request declined by ${roomOwnerName(r.creator, id)}` : `Request pending · waiting for ${roomOwnerName(r.creator, id)}`}
           </span>
           {outcome === 'declined' && requestNotes[id] && <span className="block text-[11px] italic text-muted-foreground break-words">“{requestNotes[id]}”</span>}</span>
       </div>
@@ -373,6 +373,11 @@ export function Messenger({ account, session }: { account: string; session: NonN
     staleTime: 60_000, refetchInterval: () => (document.visibilityState === 'visible' ? 60_000 : false), retry: false,
   });
   const listings = useMemo(() => collectListings(roomMemos ?? []).filter(l => !blocked.includes(l.creator)), [roomMemos, blocked]);
+  /** The room owner's public username from their listing (display only), else their known name or account. */
+  function roomOwnerName(creator: string, roomId: string) {
+    const l = listings.find(x => x.id === roomId && x.creator === creator);
+    return l?.creatorName || nameFor(creator);
+  }
   const myRoomIds = useMemo(() => inviteViews.filter(v => v.isCreator && v.status === 'joined').map(v => v.invite.id), [inviteViews]);
   const listedIds = useMemo(() => listedRoomIds(account, listings, myRoomIds, localListings), [account, listings, myRoomIds, localListings]);
   /** Accounts known only through an invite group; they stay out of Friends and key discovery until a friend request is accepted. */
