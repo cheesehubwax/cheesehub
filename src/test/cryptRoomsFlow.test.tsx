@@ -64,6 +64,7 @@ describe('public rooms', () => {
   });
 
   it('lists a room from the Edit group dialog, warning that the public key becomes visible', async () => {
+    calls.rooms.mockResolvedValue([]);
     mount();
     fireEvent.click(await screen.findByRole('button', { name: /1 of 2 joined/ }));
     expect(screen.queryByRole('button', { name: 'List room publicly' })).not.toBeInTheDocument();
