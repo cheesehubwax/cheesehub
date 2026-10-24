@@ -66,3 +66,4 @@
 - [x] CHEESEFolio full history: deepest provider always used, windows backfill, notification-copy de-dupe
 
 - [x] CHEESECrypt at /crypt (hidden, no header/menu link): encrypted CHEESE-memo messenger migrated from gpkonwax/collection-manager.
+- [x] CHEESECrypt: Menu dropdown, hideable groups/friends list, Fee info dropdown, taller chat
