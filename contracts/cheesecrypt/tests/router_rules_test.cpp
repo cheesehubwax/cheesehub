@@ -26,5 +26,5 @@ int main() {
    assert(!valid_fee(MAX_FEE_UNITS + 1) && !valid_fee(-1));
    assert(platform_units(0, 35, MAX_FEE_UNITS, MAX_FEE_UNITS, MAX_FEE_UNITS) == 3500000000LL);
    assert(null_units(3500000000LL, 80) == 2800000000LL);
-   std::cout << "Router fee and bound tests passed\\n";
+   std::cout << "Router fee and bound tests passed\n";
 }
