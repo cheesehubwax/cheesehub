@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactNode } from 'react';
-import { Ban, ChevronDown, Download, KeyRound, Loader2, Menu, PanelLeftClose, PanelLeftOpen, Pencil, Radio, RefreshCw, Save, Trash2, Upload, UserPlus, Users } from 'lucide-react';
+import { Ban, ChevronDown, Download, Globe, KeyRound, Loader2, Menu, PanelLeftClose, PanelLeftOpen, Pencil, Radio, RefreshCw, Save, Trash2, Upload, UserPlus, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
