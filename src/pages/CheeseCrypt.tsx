@@ -945,7 +945,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   }
 
   return (
-    <div className={cn('w-full rounded-lg border border-cheese/20 bg-card/80 overflow-hidden grid h-[80dvh] min-h-[480px]', listHidden ? 'grid-rows-[auto_1fr]' : 'md:grid-cols-[240px_1fr]')}>
+    <div className="w-full rounded-lg border border-cheese/20 bg-card/80 overflow-hidden grid h-[80dvh] min-h-[480px] grid-cols-1 auto-rows-auto md:grid-cols-[240px_1fr] md:grid-rows-[auto_1fr]">
       {fileInput}
       {backupKey && <VaultPrompt cryptKey={backupKey} onSaved={backupSaved} onDownload={backupDownloaded} />}
       {creatingGroup && <CreateGroupDialog contacts={contacts} avatars={avatars} nameFor={nameFor} busy={busy} onClose={() => setCreatingGroup(false)}
@@ -1019,8 +1019,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         </DialogContent>
       </Dialog>}
       <PublicInboxDialog enabled={publicInbox} onChange={enabled => { savePublicInbox(account, enabled); setPublicInbox(enabled); }} open={inboxOpen} onOpenChange={setInboxOpen} />
-      <aside className={cn('border-b border-border flex flex-col min-h-0', !listHidden && 'md:border-b-0 md:border-r')}>
-        <div className={cn('flex flex-col gap-2 p-3', !listHidden && 'border-b border-border')}>
+        <div className="flex flex-col justify-center gap-2 p-3 border-b border-border md:border-r md:col-start-1 md:row-start-1">
           <div className="flex items-center gap-3">
             <PixelAvatar account={account} avatar={key.avatar} className="h-11 w-11 shrink-0" />
             <div className="min-w-0 flex-1">
@@ -1067,7 +1066,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
             </Button>
           </div>
         </div>
-        <div className={cn('flex-1 overflow-y-auto p-2 space-y-4', listHidden && 'hidden')}>
+        <div className={cn('min-h-0 max-h-[30dvh] md:max-h-none overflow-y-auto p-2 space-y-4 border-b border-border md:border-b-0 md:border-r md:col-start-1 md:row-start-2', listHidden && 'hidden')}>
           <MessageRequests requests={messageRequests} onAccept={acceptRequest} onDecline={dismissRequest} onBlock={from => { dismissRequest(from); blockAccount(from); }} />
           <Collapsible open={groupsOpen} onOpenChange={setGroupsOpen}>
             <div className="flex items-center justify-between px-2">
@@ -1125,14 +1124,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
             </CollapsibleContent>
           </Collapsible>
         </div>
-      </aside>
 
-      <section className="flex flex-col min-h-0">
-        {!active ? (
-          <p className="text-sm text-muted-foreground m-auto">💬 Pick or add a contact.</p>
-        ) : (
-          <>
-            <div className="px-4 py-3 border-b border-border font-semibold flex flex-wrap items-center gap-2">
+      {/* Chat header shares the top row with the profile box so both bottom borders form one line. */}
+      <div className={cn('min-w-0 px-4 py-3 border-b border-border font-semibold flex flex-wrap items-center gap-2 md:col-start-2 md:row-start-1', !active && 'hidden md:flex')}>
+        {active && <>
               {activeInvite ? <div className="w-full space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
                   {activeInvite.avatar ? <PixelAvatar account={activeInvite.invite.id} avatar={activeInvite.avatar} className="h-7 w-7" /> : <span>👥</span>}
@@ -1170,7 +1165,14 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 {contacts[active] && <Button size="sm" variant="ghost" className="h-7 text-xs font-normal" onClick={() => saveFriend(active, true)}>💾 Save to {FRIENDS_DIR}</Button>}
                 <Button size="sm" variant="ghost" className="h-7 text-xs font-normal text-destructive hover:text-destructive" aria-label={`Block ${active}`}
                   onClick={() => { if (window.confirm(`Block ${active}? Their messages will be hidden on this device.`)) blockAccount(active); }}><Ban className="h-3.5 w-3.5" /> Block</Button>
-              </span>}</div>
+              </span>}</>}
+      </div>
+
+      <section className={cn('flex flex-col min-h-0 md:row-start-2', listHidden ? 'md:col-start-1 md:col-span-2' : 'md:col-start-2')}>
+        {!active ? (
+          <p className="text-sm text-muted-foreground m-auto">💬 Pick or add a contact.</p>
+        ) : (
+          <>
             <Dialog open={!!openQuote} onOpenChange={(o) => { if (!o) setOpenQuote(null); }}>
               <DialogContent className="max-w-lg">
                 {openQuote && (() => {
