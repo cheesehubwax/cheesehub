@@ -158,7 +158,13 @@ export function parseCg2(text: string | null | undefined): Cg2 | null {
   let body: Record<string, unknown>;
   try { body = JSON.parse(rest.slice(colon + 1)); } catch { return null; }
   if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
-  if (kind === 'invite' || kind === 'admission') { const invite = validateInvite(body, kind === 'admission'); return invite ? { kind, invite } : null; }
+  if (kind === 'invite' || kind === 'admission') {
+    const invite = validateInvite(body, kind === 'admission');
+    if (!invite) return null;
+    if (kind === 'invite') return { kind, invite };
+    // An admission's optional note is shown only; an invalid note drops the note, never the admission.
+    return validJoinNote(body.t) ? { kind, invite, note: body.t } : { kind, invite };
+  }
   if (typeof body.i !== 'string' || !ID.test(body.i)) return null;
   const id = body.i;
   if (kind === 'add') {
@@ -186,7 +192,11 @@ export function parseCg2(text: string | null | undefined): Cg2 | null {
     return { kind, id, member: body.a, minutes: body.d as MuteMinutes };
   }
   if (kind === 'msg') return typeof body.t === 'string' && body.t.trim() ? { kind, id, text: body.t } : null;
-  if (kind === 'joined' || kind === 'leave' || kind === 'friend' || kind === 'friend-ok' || kind === 'join' || kind === 'join-no') return { kind, id };
+  if (kind === 'join' || kind === 'join-no') {
+    if (body.t === undefined) return { kind, id };
+    return validJoinNote(body.t) ? { kind, id, note: body.t } : null;
+  }
+  if (kind === 'joined' || kind === 'leave' || kind === 'friend' || kind === 'friend-ok') return { kind, id };
   if (kind === 'meta') {
     const name = parseCryptName(body.n);
     if (!name || name !== body.n) return null;
