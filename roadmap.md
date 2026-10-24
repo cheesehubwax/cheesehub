@@ -1,4 +1,5 @@
 # CHEESEHub roadmap
+- [x] CHEESECrypt: heading icons are antique skeleton keys painted in the cheese gold; OpenMojiIcon gained an optional tint that paints any glyph as a silhouette, browser-verified legible and as crisp as the untinted artwork.
 - [x] CHEESECrypt: bottom-right in-room @ reply counter, earliest-unseen jumping, visible reply consumption/highlights and read-point preservation; 163 messenger tests pass. Isolated browser verified @6→@5 by jumping, @5→@4 by scrolling, highlights and resume after switching; real-wallet history remains unverified.
 - [x] CHEESEFolio: 60s foreground price updates, refresh on return, timestamp/manual refresh, Sync refreshing prices/balances/pools; 19 regression tests pass, signed-out page opens without errors.
 - [ ] CHEESEFolio: verify live price updates inside a real wallet portfolio — requires a connected WAX wallet; timed/focus/manual changes tested with controlled prices.
