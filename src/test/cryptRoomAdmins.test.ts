@@ -10,7 +10,7 @@ const keys = Object.fromEntries(['alice', 'bob', 'carol', 'dave', 'erin'].map(a 
 const id = '0123456789abcdef';
 // alice owns; bob is a founding member; carol, dave, erin joined after the room went public.
 const g: InviteGroup = { id, name: 'room', created: 1, creator: 'alice', members: Object.values(keys).map(k => ({ account: k.account, publicKey: k.publicKey })) };
-const ME = 'erin';
+const ME = 'bob';
 const ev = (payload: string, time: number, from = 'alice'): Cg2Event => {
   const control = parseCg2(payload);
   if (!control) throw new Error('bad control');
