@@ -1159,13 +1159,23 @@ export function Messenger({ account, session }: { account: string; session: NonN
       })()}
       {moderatingRoom && (() => {
         const v = viewById(moderatingRoom);
-        if (!v?.isCreator || !listedIds.has(moderatingRoom)) return null;
-        return <RoomModerationDialog view={v} state={moderation[moderatingRoom]} now={clock} busy={busy} nameFor={nameFor} onAction={(member, minutes) => setPendingModeration({ id: v.invite.id, member, minutes })} onClose={() => setModeratingRoom(null)} />;
+        if (!v) return null;
+        const role = v.isCreator ? (listedIds.has(moderatingRoom) ? 'owner' : null) : roomRole(moderation[moderatingRoom], v.invite, account, clock) === 'admin' ? 'admin' : null;
+        if (!role) return null;
+        return <RoomModerationDialog view={v} state={moderation[moderatingRoom]} role={role} account={account} now={clock} busy={busy} nameFor={nameFor} onAction={(member, action, minutes) => setPendingModeration({ id: v.invite.id, member, action, minutes })} onClose={() => setModeratingRoom(null)} />;
       })()}
       {pendingModeration && (() => {
         const plan = moderationPlan(pendingModeration);
         if (!plan) return null;
-        return <PaidActionDialog title={pendingModeration.minutes ? `🔇 Mute ${nameFor(pendingModeration.member)}` : `🚫 Remove ${nameFor(pendingModeration.member)}`} description={pendingModeration.minutes ? `Mute for ${pendingModeration.minutes} minutes. Messages sent during the mute stay hidden after it ends.` : 'Exclude this member from future room messages. Existing blockchain copies and keys cannot be revoked.'} cost={plan.cost} confirmLabel={pendingModeration.minutes ? 'Pay & mute' : 'Pay & remove'} busy={busy} onConfirm={confirmModeration} onClose={() => setPendingModeration(null)} />;
+        const who = nameFor(pendingModeration.member);
+        const copy = {
+          mute: { title: `🔇 Mute ${who}`, description: `Mute for ${pendingModeration.minutes} minutes. Messages sent during the mute stay hidden after it ends.`, confirm: 'Pay & mute' },
+          ban: { title: `🚫 Remove ${who}`, description: 'Exclude this member from future room messages. Existing blockchain copies and keys cannot be revoked.', confirm: 'Pay & remove' },
+          admin: { title: `🛡️ Make ${who} an admin`, description: 'Admins can mute anyone except you and collapse messages from members who joined after the room went public. They cannot remove members or appoint admins.', confirm: 'Pay & appoint' },
+          unadmin: { title: `🛡️ Remove ${who} as admin`, description: `${who} goes back to being a regular member. Their earlier mutes and collapses stay in place.`, confirm: 'Pay & remove admin' },
+          collapse: { title: `🙈 Collapse ${who}'s message`, description: 'Every member sees this message collapsed. Room moderators can still open it. The blockchain copy cannot be deleted.', confirm: 'Pay & collapse' },
+        }[pendingModeration.action];
+        return <PaidActionDialog title={copy.title} description={copy.description} cost={plan.cost} confirmLabel={copy.confirm} busy={busy} onConfirm={confirmModeration} onClose={() => setPendingModeration(null)} />;
       })()}
       {editLogRoom && (() => {
         const v = viewById(editLogRoom);
