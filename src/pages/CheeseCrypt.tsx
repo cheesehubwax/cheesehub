@@ -46,6 +46,9 @@ import type { PublicKeyFile } from '@/lib/cheeseCrypt';
 import { ChainMemo, MessagingKey, MAX_MESSAGE_BYTES, MAX_HISTORY_PAGES, MAX_PARTS, messageCost, partCount, splitMessage, buildCreateKeyActions, KEY_CREATION_QUANTITY, buildPublishKeyActions, buildSendMessageActions, encryptMemo, fetchMessages, generateKey, loadContacts, loadContactAvatars, loadKey, loadRemovedContacts, removeContact, lookupPublishedKey, parseKeyFile, plaintextBytes, saveContact, saveKey, toPublicFile } from '@/lib/cheeseCrypt';
 import { download } from '@/components/crypt/cryptDownload';
 import { ChatMessageItem } from '@/components/crypt/ChatMessageItem';
+import { EditedMessagesDialog } from '@/components/crypt/EditedMessagesDialog';
+import { applyEdits, canEdit, editTarget, encodeEdit, publicEditLog } from '@/lib/cryptEdits';
+import type { ConversationEntry } from '@/lib/cryptGroups';
 import { CryptHero } from '@/components/crypt/CryptHero';
 import { CryptKeySetup } from '@/components/crypt/CryptKeySetup';
 import { CryptSidebar } from '@/components/crypt/CryptSidebar';
@@ -158,6 +161,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [loaded, setLoaded] = useState(false);
   const [readMarks, setReadMarks] = useState<ReadMarks | null>(() => loadReadMarks(account));
   const [text, setText] = useState('');
+  const [editingMessage, setEditingMessage] = useState<ConversationEntry | null>(null);
+  const [editLogRoom, setEditLogRoom] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<ReplyRef | null>(null);
   const [openQuote, setOpenQuote] = useState<ReplyRef | null>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -314,7 +319,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   }, [invites, account, contacts]);
   // Profile notes and group notices update state and never appear as chat messages or unread badges.
   // Invite-group messages/voice show only when they come from a member with that member's invite key.
-  const conversations = useMemo(() => decoded.filter(c => {
+  const editableConversations = useMemo(() => decoded.filter(c => {
     if (isProfileNote(c.text)) return false;
     if (!c.igroup) return !!c.group || !!contacts[c.from === account ? c.to : c.from];
     if (c.control && c.control.kind !== 'msg') return false;
@@ -322,6 +327,16 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const view = inviteViews.find(v => v.invite.id === c.igroup);
     return !!view && view.status !== 'declined' && !!eventFromMember({ key: c.key, txId: c.txId, time: c.time, from: c.from, to: c.to, control: { kind: 'joined', id: c.igroup }, usedKey: c.usedKey }, invites, account);
   }), [decoded, inviteViews, invites, account, contacts]);
+  const edited = useMemo(() => applyEdits(editableConversations), [editableConversations]);
+  const conversations = edited.messages;
+  const cancelEdit = () => { setEditingMessage(null); setText(''); setVoice(null); setReplyingTo(null); };
+  useEffect(() => { setEditingMessage(null); setText(''); }, [active]);
+  const beginEdit = (m: ConversationEntry) => {
+    const original = editableConversations.find(x => x.key === m.key);
+    if (!original || !canEdit(original, account) || busy) return;
+    setEditingMessage(original); setReplyingTo(parseReply(m.text)); setText(parseReply(m.text)?.body ?? m.text ?? ''); setVoice(null);
+    setTimeout(() => composerRef.current?.focus({ preventScroll: true }), 0);
+  };
   const partners = useMemo(() => {
     const s = new Set(Object.keys(contacts));
     return [...s].filter(name => !removedContacts.includes(name) && !blocked.includes(name) && !groupOnly.has(name)).sort();
@@ -409,7 +424,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const activeGroup = groups.find(g => `group:${g.id}` === active);
   const activeInvite: InviteGroupView | undefined = activeGroup ? undefined : inviteViews.find(v => `group:${v.invite.id}` === active);
   const inviteKeys = useMemo(() => activeInvite ? Object.fromEntries(activeInvite.invite.members.map(m => [m.account, m.publicKey])) : {}, [activeInvite]);
-  const recipients = activeInvite ? activeInvite.joined.filter(m => m !== account) : activeGroup ? activeGroup.members.filter(m => m !== account) : active ? [active] : [];
+  const currentRecipients = activeInvite ? activeInvite.joined.filter(m => m !== account) : activeGroup ? activeGroup.members.filter(m => m !== account) : active ? [active] : [];
+  // Edits go to the original recipients, not newly joined members who never received the original.
+  const recipients = editingMessage ? [...new Set(editableConversations.filter(m => m.from === account && m.txId === editingMessage.txId && m.igroup === editingMessage.igroup && m.group?.id === editingMessage.group?.id && editTarget(m) === editTarget(editingMessage)).map(m => m.to))] : currentRecipients;
   const missingKeys = activeInvite ? [] : recipients.filter(m => !contacts[m]);
   useEffect(() => { setReplyingTo(null); }, [active]);
   const thread = activeInvite ? conversations.filter(m => m.igroup === activeInvite.invite.id) : conversations.filter(m => activeGroup
@@ -777,13 +794,14 @@ export function Messenger({ account, session }: { account: string; session: NonN
 
   const send = async () => {
     if (!key || !active || missingKeys.length || !agreed || !text.trim() || tooLong) return;
+    if (editingMessage && !canEdit(editingMessage, account)) { toast({ title: 'The 24-hour editing window has ended', variant: 'destructive' }); return; }
     setBusy(true);
     try {
       const actions = activeInvite ? buildCg2Actions(key, recipients, inviteKeys, encodeGroupText(activeInvite.invite.id, outgoing), [permission], hasNft)
         : activeGroup ? buildGroupMessageActions(key, activeGroup, outgoing, contacts, [permission], hasNft)
         : buildSendMessageActions(account, active, splitMessage(outgoing).map(p => encryptMemo(p, contacts[active], key.secretKey)), [permission], hasNft);
-      const r = await executeTransaction(actions, { successTitle: 'Message sent' });
-      if (r.success) { setText(''); setReplyingTo(null); nearBottom.current = true; [2000, 5000, 10000].forEach(ms => setTimeout(poll, ms)); }
+      const r = await executeTransaction(actions, { successTitle: editingMessage ? 'Message edited' : 'Message sent' });
+      if (r.success && r.txId) { setText(''); setReplyingTo(null); if (!editingMessage) nearBottom.current = true; setEditingMessage(null); [2000, 5000, 10000].forEach(ms => setTimeout(poll, ms)); }
     } catch (e) { toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' }); }
     finally { setBusy(false); }
   };
@@ -791,20 +809,22 @@ export function Messenger({ account, session }: { account: string; session: NonN
   /** Signs each batch of up to 30 parts in turn; parts already sent stay on chain if a later one fails. */
   const sendVoice = async () => {
     if (!key || !active || !voice || missingKeys.length || !agreed) return;
+    if (editingMessage && !canEdit(editingMessage, account)) { toast({ title: 'The 24-hour editing window has ended', variant: 'destructive' }); return; }
     setBusy(true);
     let sent = 0, total = 0;
     try {
-      const batches = buildVoiceBatches(key, recipients, activeInvite ? { id: `${VOICE_REF_PREFIX}${activeInvite.invite.id}`, members: ['-'] } : activeGroup ?? null, voice, activeInvite ? inviteKeys : contacts, [permission]);
+      const batches = buildVoiceBatches(key, recipients, activeInvite ? { id: `${VOICE_REF_PREFIX}${activeInvite.invite.id}`, members: ['-'] } : activeGroup ?? null, voice, activeInvite ? inviteKeys : contacts, [permission], undefined, editingMessage ? editTarget(editingMessage) : undefined);
       total = batches.length;
       for (let i = 0; i < batches.length; i++) {
+        if (editingMessage && !canEdit(editingMessage, account)) throw new Error('The 24-hour editing window has ended.');
         const r = await executeTransaction(batches[i], { successTitle: total > 1 ? `Voice note: transaction ${i + 1} of ${total} sent` : 'Voice note sent' });
-        if (!r.success) break;
+        if (!r.success || !r.txId) break;
         sent++;
       }
     } catch (e) { toast({ title: 'Could not send voice note', description: (e as Error).message, variant: 'destructive' }); }
     finally {
       setBusy(false);
-      if (sent && sent === total) { setVoice(null); nearBottom.current = true; }
+      if (sent && sent === total) { setVoice(null); setText(''); setReplyingTo(null); if (!editingMessage) nearBottom.current = true; setEditingMessage(null); }
       else if (sent) toast({ title: 'Voice note partly sent', description: `${sent} of ${total} transactions went through. The receiver will see it as incomplete and it will not play. You can send the recording again.`, variant: 'destructive' });
       if (sent) [2000, 5000, 10000].forEach(ms => setTimeout(poll, ms));
     }
@@ -949,7 +969,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
   };
 
   const hasNft = parseNftMessage(text).some(seg => seg.type === 'nft');
-  const outgoing = replyingTo && text.trim() ? encodeReply(replyingTo, text) : text;
+  const body = replyingTo && text.trim() ? encodeReply(replyingTo, text) : text;
+  const outgoing = editingMessage && body.trim() ? encodeEdit(editTarget(editingMessage), body) : body;
   const size = activeInvite ? inviteTextSize(activeInvite.invite.id, outgoing) : activeGroup ? groupMessageSize(activeGroup, outgoing) : { bytes: plaintextBytes(outgoing), parts: partCount(outgoing), maxBytes: MAX_MESSAGE_BYTES };
   const { bytes, parts, maxBytes } = size;
   const tooLong = bytes > maxBytes || parts > MAX_PARTS;
@@ -1023,7 +1044,13 @@ export function Messenger({ account, session }: { account: string; session: NonN
             <span className="min-w-0 text-[11px] text-muted-foreground">{listedIds.has(editingInvite.id) ? '🌐 This room is listed publicly, so anyone can find it and ask to join.' : '🌐 Not listed. Only people you invite can find this room.'}</span>
             <Button size="sm" variant="outline" className="h-7 shrink-0 text-xs" aria-label={listedIds.has(editingInvite.id) ? 'Manage public room listing' : 'List room publicly'} onClick={() => setListingRoom(editingInvite.id)}>🌐 {listedIds.has(editingInvite.id) ? 'Manage listing' : 'List room'}</Button>
           </div>
+          {v.isCreator && listedIds.has(v.invite.id) && <Button variant="outline" size="sm" onClick={() => setEditLogRoom(v.invite.id)}>✏️ Edited messages</Button>}
         </PaidActionDialog>;
+      })()}
+      {editLogRoom && (() => {
+        const v = viewById(editLogRoom);
+        if (!v?.isCreator || !listedIds.has(editLogRoom)) return null;
+        return <EditedMessagesDialog entries={publicEditLog(edited.log, editLogRoom, v.invite.creator, account, true, clock)} nameFor={nameFor} onClose={() => setEditLogRoom(null)} />;
       })()}
       {editingInvite && paintingInvite && <AvatarEditor account="group" avatar={editingInvite.avatar} title="🎨 Group picture"
         onClose={() => setPaintingInvite(false)} onSave={a => { setEditingInvite({ ...editingInvite, avatar: a }); setPaintingInvite(false); }} />}
@@ -1144,7 +1171,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
                   <ChatMessageItem m={m} account={account} keyAvatar={key?.avatar} avatars={avatars}
                     contacts={contacts} active={active} activeGroup={activeGroup} nameFor={nameFor}
                     highlighted={replyNavigation.highlighted.has(m.key)}
-                    onReply={(x) => { setReplyingTo({ author: x.from, time: x.time, quote: quoteOf(x.text, !!x.voice) }); setVoice(null); setTimeout(() => composerRef.current?.focus(), 0); }}
+                    editable={canEdit(m, account, clock) && !busy && (!activeInvite || activeInvite.status === 'joined')} onEdit={beginEdit}
+                    onReply={(x) => { setEditingMessage(null); setReplyingTo({ author: x.from, time: x.time, quote: quoteOf(x.text, !!x.voice) }); setVoice(null); setTimeout(() => composerRef.current?.focus(), 0); }}
                     onOpenQuote={setOpenQuote} openedAt={acceptedRequestMessages.current.has(m.key) ? { current: Infinity } : openedAt} />
                 </Fragment>
               ))}
@@ -1179,7 +1207,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 replyingTo={replyingTo} setReplyingTo={setReplyingTo} composerRef={composerRef} text={text} setText={setText} voice={voice} setVoice={setVoice}
                 tooLong={tooLong} bytes={bytes} maxBytes={maxBytes} parts={parts} copies={copies} voiceParts={voiceParts} voiceTxs={voiceTxs}
                 setAttachingNft={setAttachingNft} busy={busy} listHidden={listHidden} agreed={agreed} setAgreed={setAgreed}
-                feeInfoOpen={feeInfoOpen} setFeeInfoOpen={setFeeInfoOpen} totalCost={totalCost} send={send} sendVoice={sendVoice} />
+                feeInfoOpen={feeInfoOpen} setFeeInfoOpen={setFeeInfoOpen} totalCost={totalCost} send={send} sendVoice={sendVoice}
+                editing={!!editingMessage} cancelEdit={cancelEdit} editExpired={!!editingMessage && !canEdit(editingMessage, account, clock)} />
             )}
           </>
         )}

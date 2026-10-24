@@ -11,21 +11,23 @@ import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { voiceNoteCost } from '@/lib/cryptVoice';
 import { groupMessageCost, type ConversationEntry, type CryptGroup } from '@/lib/cryptGroups';
 import { messageCost } from '@/lib/cheeseCrypt';
+import type { EditedMessage } from '@/lib/cryptEdits';
 
 /** Pure sound-effect-NFT posts render without the bubble box — sender header, playback and timestamp stay. */
-export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted }: {
-  m: ConversationEntry; account: string; keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>;
+export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, editable, onEdit }: {
+  m: EditedMessage; account: string; keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>;
   contacts: Record<string, string>; active: string; activeGroup: CryptGroup | null;
   nameFor: (id: string) => string; openedAt: { current: number };
   onReply: (m: ConversationEntry) => void; onOpenQuote: (ref: ReplyRef) => void;
   highlighted: boolean;
+  editable?: boolean; onEdit?: (m: ConversationEntry) => void;
 }) {
   const reply = parseReply(m.text);
   const body = reply ? reply.body : m.text;
   const segments = body != null ? parseNftMessage(body) : null;
   const soloAssetId = segments && segments.length === 1 && segments[0].type === 'nft' ? segments[0].assetId : null;
   const { data } = useQuery({
-    queryKey: ['crypt-nft', soloAssetId], queryFn: () => fetchAssetById(soloAssetId!),
+    queryKey: ['crypt-nft', soloAssetId], queryFn: () => { if (!soloAssetId) throw new Error('Missing asset'); return fetchAssetById(soloAssetId); },
     enabled: !!soloAssetId, staleTime: 3600_000,
   });
   const bare = !!soloAssetId && !!data?.isSfx;
@@ -50,7 +52,7 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
         {m.voice ? <VoiceNoteBubble note={m.voice} /> : body != null ? parseNftMessage(body).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} autoplayKey={m.time > openedAt.current ? `${m.key}:${i}` : undefined} txId={m.txId} /> : <span key={i} className="block">{seg.text}</span>) : <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
       </div>
       <p className="text-[10px] opacity-70 mt-1">
-        {new Date(m.time).toLocaleString()}{m.igroup ? null : ' · '}{m.igroup ? null : m.voice ? `${voiceNoteCost(m.parts, m.group ? m.group.members.length - 1 : 1)} at current rate` : m.group ? `${groupMessageCost(m.parts, m.group.members.length - 1, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))} at current rate` : messageCost(m.parts, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))}
+        {new Date(m.time).toLocaleString()}{m.editedAt && <span title={new Date(m.editedAt).toLocaleString()}> · (edited)</span>}{m.igroup ? null : ' · '}{m.igroup ? null : m.voice ? `${voiceNoteCost(m.parts, m.group ? m.group.members.length - 1 : 1)} at current rate` : m.group ? `${groupMessageCost(m.parts, m.group.members.length - 1, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))} at current rate` : messageCost(m.parts, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))}
         {m.parts > 1 && ` · ${m.parts} parts`}
         {m.missing > 0 && !m.voice && <span className="text-destructive"> · {m.missing} part{m.missing > 1 ? 's' : ''} not loaded</span>}
         {m.txId && <> · <a href={`https://waxblock.io/transaction/${encodeURIComponent(m.txId)}`} target="_blank" rel="noreferrer"
@@ -60,6 +62,7 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
     </ContextMenuTrigger>
     <ContextMenuContent>
       <ContextMenuItem onSelect={() => onReply(m)}>↩️ Reply</ContextMenuItem>
+      {editable && onEdit && <ContextMenuItem onSelect={() => onEdit(m)}>✏️ Edit</ContextMenuItem>}
     </ContextMenuContent>
     </ContextMenu>
   );
