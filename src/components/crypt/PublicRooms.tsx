@@ -7,7 +7,7 @@ import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 import { MAX_PUBLIC_ROOM_MEMBERS } from '@/lib/cryptInviteGroups';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import {
-  cleanRoomName, cleanRoomTopic, cleanTags, encodeListing, MAX_ROOM_NAME, MAX_ROOM_TOPIC, ROOM_FEE_QUANTITY, searchListings,
+  cleanRoomName, cleanRoomTopic, cleanTags, encodeListing, LISTING_STAKE_QUANTITY, MAX_ROOM_NAME, MAX_ROOM_TOPIC, ROOM_FEE_QUANTITY, searchListings,
   type JoinRequest, type RoomListing,
 } from '@/lib/cryptRooms';
 
@@ -95,7 +95,7 @@ export function RoomListingDialog({ groupId, groupName, members, publicKey, list
       </div>
       <p className="rounded-md border border-cheese/30 bg-cheese/5 p-2 text-xs text-muted-foreground">⚠️ <span className="font-semibold text-cheese">Your account and public messaging key are published on chain</span> with this listing, so anyone can read them. That only lets people send join requests for this room: regular messages from accounts you have not added stay hidden unless you turn on the Public Inbox, and you can block anyone at any time.</p>
       <p className="text-xs text-muted-foreground">{listed
-        ? `Updating details costs ${unlistCost}; unlisting costs ${unlistCost}. Platform fees split 80% to eosio.null and 20% to xcheeseliqst; includes encrypted room-policy copies for members.`
+        ? `Updating details costs ${cost}; unlisting costs ${unlistCost}. Platform fees split 80% to eosio.null and 20% to xcheeseliqst; includes encrypted room-policy copies for members.`
         : `Cost: ${cost}. Making a room public pays a 10.0000 CHEESE stake (split 80% to eosio.null and 20% to xcheeseliqst) so spam rooms cannot farm join-request fees; updating details later costs only the normal fee. Includes encrypted room-policy copies for members.`}</p>
       <TermsCheckbox id="crypt-room-terms" checked={agreed} onCheckedChange={setAgreed} />
       <DialogFooter>

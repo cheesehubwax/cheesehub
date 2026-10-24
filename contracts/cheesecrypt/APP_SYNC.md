@@ -13,7 +13,7 @@ checklist with every CHEESECrypt change, but do not reintroduce plaintext roles 
 | Key creation 100 CHEESE, publishing fee | Existing direct-transfer path, not router messaging |
 | Private 8 / public 50; only owner admits (`cryptInviteGroups.ts`) | Client-only authenticated envelopes; router bounds 49 recipients per action, not total membership |
 | 35 membership parts, usual text 20 | Router hard bound 35; client keeps content-specific bounds |
-| CRYPTROOM1 listing/unlisting 0.0100 (`cryptRooms.ts`) | Existing plaintext fee-leg broadcasts; no rooms table/action; no generic router fee substitution |
+| CRYPTROOM1 listing stake 10.0000 (new/re-list), updates and unlisting 0.0100 (`cryptRooms.ts`) | Existing plaintext fee-leg broadcasts; no rooms table/action; no generic router fee substitution |
 | Immutable first-public founder roster | Client-only encrypted policy replay |
 | Owner/admin appointment, mute, ban, collapse (`cryptModeration.ts`) | Client-only authenticated CG2 authority; NO moderation actions/tables |
 | Admin cannot ban; founders ban/admin-collapse immune | Client-only; do not infer role from fee kind, balance owner or recipient array |
