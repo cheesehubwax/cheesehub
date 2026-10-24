@@ -67,3 +67,4 @@
 
 - [x] CHEESECrypt at /crypt (hidden, no header/menu link): encrypted CHEESE-memo messenger migrated from gpkonwax/collection-manager.
 - [x] CHEESECrypt: Menu dropdown, hideable groups/friends list, Fee info dropdown, taller chat
+- [x] CHEESECrypt: composer footer order — expanded line Terms · Fee info · price · Send; compressed bottom line Terms · Fee info with price and Send pushed to the right edge; layout tests pass

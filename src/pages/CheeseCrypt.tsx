@@ -1250,15 +1250,16 @@ export function Messenger({ account, session }: { account: string; session: NonN
                   </span>
                   {!voice && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setAttachingNft(true); }}>🖼️ Attach NFT</Button>}
                   {!text.trim() && <VoiceRecorder clip={voice} onChange={setVoice} disabled={busy} />}
-                  <TermsCheckbox checked={agreed} onCheckedChange={setAgreed} className="ml-2" />
-                  {/* Fee info button, price and Send share one line in the expanded chat; in the compressed chat they drop to a second line after Terms. */}
+                  {listHidden && <TermsCheckbox checked={agreed} onCheckedChange={setAgreed} className="ml-2" />}
+                  {/* Expanded chat: Terms, fee info, price and Send share one line. Compressed chat: they form the bottom line, Terms first, price and Send pushed to the right edge. */}
                   <div className={cn('flex flex-wrap items-center gap-2 gap-y-1', !listHidden && 'order-last w-full')}>
+                    {!listHidden && <TermsCheckbox checked={agreed} onCheckedChange={setAgreed} />}
                     <Collapsible open={feeInfoOpen} onOpenChange={setFeeInfoOpen}>
                       <CollapsibleTrigger className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-cheese">
                         ℹ️ Fee info <ChevronDown className={cn('h-3 w-3 transition', !feeInfoOpen && '-rotate-90')} />
                       </CollapsibleTrigger>
                     </Collapsible>
-                    <span className={cn('text-muted-foreground', listHidden && 'ml-auto')}>{totalCost}</span>
+                    <span className="ml-auto text-muted-foreground">{totalCost}</span>
                     {voice
                       ? <Button size="sm" disabled={busy || !agreed} onClick={sendVoice} className="bg-cheese text-primary-foreground hover:bg-cheese/90">Send voice{voiceTxs > 1 ? ` (${voiceTxs} signatures)` : ''}</Button>
                       : <Button size="sm" disabled={busy || !agreed || !text.trim() || tooLong} onClick={send}
