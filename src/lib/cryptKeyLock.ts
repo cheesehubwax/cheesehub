@@ -136,7 +136,7 @@ interface LockSession {
   transact(args: unknown, options: unknown): Promise<{ resolved?: { transaction: { expiration: { toString(): string } } }; signatures: { toString(): string }[] }>;
 }
 
-export const isAnchorSession = (s: { walletPlugin: { id: string } }) => s.walletPlugin.id === 'anchor';
+export const isAnchorSession = (s: { walletPlugin?: { id?: unknown } } | null | undefined) => String(s?.walletPlugin?.id ?? '') === 'anchor';
 
 /** Free, never-broadcast Anchor signature over the fixed lock transaction. */
 export async function signLock(session: LockSession, publicKey: string): Promise<string> {
