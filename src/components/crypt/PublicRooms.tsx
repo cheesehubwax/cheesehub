@@ -64,14 +64,14 @@ export function DiscoverRoomsDialog({ open, onOpenChange, listings, loading, ref
 }
 
 /** Creator-only listing controls for an invite group. Listing and unlisting each cost the room fee and need the Terms box. */
-export function RoomListingDialog({ groupId, groupName, members, publicKey, listed, busy, onList, onUnlist, onClose, cost = ROOM_FEE_QUANTITY }: {
+export function RoomListingDialog({ groupId, groupName, members, publicKey, listed, busy, onList, onUnlist, onClose, cost = ROOM_FEE_QUANTITY, initialTopic = '', initialTags = [] }: {
   groupId: string; groupName: string; members: number; publicKey: string; listed: boolean; busy: boolean;
   onList: (info: { name: string; topic: string; tags: string[] }) => Promise<boolean>; onUnlist: () => Promise<boolean>; onClose: () => void;
-  cost?: string;
+  cost?: string; initialTopic?: string; initialTags?: string[];
 }) {
   const [name, setName] = useState(cleanRoomName(groupName));
-  const [topic, setTopic] = useState('');
-  const [tags, setTags] = useState('');
+  const [topic, setTopic] = useState(initialTopic);
+  const [tags, setTags] = useState(initialTags.join(' '));
   const [agreed, setAgreed] = useState(false);
   const info = { name: cleanRoomName(name), topic: cleanRoomTopic(topic), tags: cleanTags(tags) };
   let error = '';
