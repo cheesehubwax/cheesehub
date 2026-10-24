@@ -42,24 +42,22 @@ export function CryptSidebar({
   return (
     <>
       <div className="flex flex-col justify-center gap-2 p-3 border-b border-border md:border-r md:col-start-1 md:row-start-1">
-        <div className="flex items-center gap-3">
-          <PixelAvatar account={account} avatar={key.avatar} className="h-11 w-11 shrink-0" />
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-1">
-              <span className="truncate text-base font-bold text-cheese">{key.displayName || account}</span>
-              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-cheese" aria-label="Edit profile" title="Edit name and avatar" onClick={() => setEditingAvatar(true)}>
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-            <div className="flex items-center gap-1 truncate font-mono text-xs text-muted-foreground">
+        <button type="button" className="group flex w-full min-w-0 items-center gap-3 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="Edit profile" title="Edit name and avatar" onClick={() => setEditingAvatar(true)}>
+          <span className="relative shrink-0">
+            <PixelAvatar account={account} avatar={key.avatar} className="h-11 w-11" />
+            <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-card text-muted-foreground opacity-0 transition group-hover:opacity-100 group-hover:text-cheese group-focus-visible:opacity-100">
+              <Pencil className="h-3 w-3" />
+            </span>
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-base font-bold text-cheese group-hover:underline">{key.displayName || account}</span>
+            <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
               {loading && <Loader2 className="h-3 w-3 shrink-0 animate-spin" />}
               <span className="truncate">{account}</span>
-            </div>
-          </div>
-          <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" disabled={loading} onClick={refresh} aria-label="Refresh messages" title="Refresh messages">
-            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-          </Button>
-        </div>
+            </span>
+          </span>
+        </button>
         <div className="flex items-center gap-1">
           <Popover open={menuOpen} onOpenChange={setMenuOpen}>
             <PopoverTrigger asChild>
@@ -70,6 +68,7 @@ export function CryptSidebar({
             <PopoverContent align="start" className="w-64 p-2">
               {/* Every action closes the menu first; dialogs live outside so they survive it unmounting. */}
               <div className="grid grid-cols-3 gap-1" onClickCapture={() => setMenuOpen(false)}>
+                <CardAction icon={<RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />} label="Refresh" disabled={loading} aria-label="Refresh messages" title="Check the chain for new messages now" onClick={refresh} />
                 <CardAction icon={<Upload className="h-4 w-4" />} label="Restore" aria-label="Load a key file (yours or a contact's)" title="Load a key file (yours or a contact's)" onClick={() => fileRef.current?.click()} />
                 <CardAction icon={<Download className="h-4 w-4" />} label="Public key" aria-label="Share my public key file" title="Save my public key file to share" onClick={() => void sharePublicKey()} />
                 <CardAction icon={<Radio className="h-4 w-4" />} label="Publish" disabled={busy} aria-label={`Publish my key on chain (${MESSAGE_FEE_QUANTITY})`} title={`Publish my key on chain (${MESSAGE_FEE_QUANTITY})`} onClick={() => void publish()} />
