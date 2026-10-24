@@ -57,7 +57,9 @@ describe('compact sidebar', () => {
   });
 
   it('splits the collapsed strip into Groups and Friends sections', async () => {
-    saveGroups('alice', [createGroup('alice', ['bob'])]);
+    const carol = generateKey('carol');
+    saveContact('alice', 'carol', carol.publicKey);
+    saveGroups('alice', [createGroup('alice', ['bob', 'carol'])]);
     mount();
     await screen.findByRole('button', { name: /^bob/ });
     fireEvent.click(screen.getByRole('button', { name: 'Hide groups and friends' }));
