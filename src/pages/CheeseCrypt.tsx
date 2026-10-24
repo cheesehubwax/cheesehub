@@ -69,98 +69,17 @@ const ACCOUNT_RE = /^[a-z1-5.]{1,12}$/;
 /** How often an open, visible messenger checks history for new messages. */
 const LIVE_POLL_MS = 6000;
 
-function download(name: string, data: unknown) {
-  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
-  const a = document.createElement('a');
-  a.href = url; a.download = name; a.click();
-  URL.revokeObjectURL(url);
-}
+import { download } from '@/components/crypt/cryptDownload';
+import { ChatMessageItem } from '@/components/crypt/ChatMessageItem';
+import { CryptHero } from '@/components/crypt/CryptHero';
 
-/** Pure sound-effect-NFT posts render without the bubble box — sender header, playback and timestamp stay. */
-function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted }: {
-  m: ConversationEntry; account: string; keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>;
-  contacts: Record<string, string>; active: string; activeGroup: CryptGroup | null;
-  nameFor: (id: string) => string; openedAt: { current: number };
-  onReply: (m: ConversationEntry) => void; onOpenQuote: (ref: ReplyRef) => void;
-  highlighted: boolean;
-}) {
-  const reply = parseReply(m.text);
-  const body = reply ? reply.body : m.text;
-  const segments = body != null ? parseNftMessage(body) : null;
-  const soloAssetId = segments && segments.length === 1 && segments[0].type === 'nft' ? segments[0].assetId : null;
-  const { data } = useQuery({
-    queryKey: ['crypt-nft', soloAssetId], queryFn: () => fetchAssetById(soloAssetId!),
-    enabled: !!soloAssetId, staleTime: 3600_000,
-  });
-  const bare = !!soloAssetId && !!data?.isSfx;
-  const canReply = !!m.voice || m.text != null;
-  return (
-    <ContextMenu>
-    <ContextMenuTrigger asChild disabled={!canReply}>
-    <li data-reply-key={m.key} data-reply-highlighted={highlighted || undefined} className={cn('w-fit max-w-[80%] text-sm',
-      bare ? (m.from === account ? 'ml-auto py-1' : 'py-1') : m.from === account
-        ? 'ml-auto rounded-lg px-3 py-2 bg-cheese/20 border border-cheese/30' : 'rounded-lg px-3 py-2 bg-muted',
-      highlighted && 'ring-2 ring-reply bg-reply/10')}>
-      <div className="flex items-center gap-2 mb-1">
-        <PixelAvatar account={m.from} avatar={m.from === account ? keyAvatar : avatars[m.from]} className="h-6 w-6" />
-        <p className="text-[10px] font-semibold opacity-80 break-words">{m.from === account ? `you · ${nameFor(account)}` : nameFor(m.from)}{nameFor(m.from) !== m.from && <span className="block font-normal">{m.from}</span>}</p>
-      </div>
-      {reply && <button type="button" onClick={() => onOpenQuote(reply)} aria-label={`Show the message from ${nameFor(reply.author)} this replies to`}
-        className="mb-1 block w-full max-w-full rounded border-l-2 border-reply bg-background/60 px-2 py-1 text-left text-xs hover:bg-background">
-        <span className="block font-semibold text-reply">↩️ {reply.author === account ? 'you' : nameFor(reply.author)}</span>
-        <span className="block truncate opacity-80">{reply.quote || '…'}</span>
-      </button>}
-      <div className="whitespace-pre-wrap break-words">
-        {m.voice ? <VoiceNoteBubble note={m.voice} /> : body != null ? parseNftMessage(body).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} autoplayKey={m.time > openedAt.current ? `${m.key}:${i}` : undefined} txId={m.txId} /> : <span key={i} className="block">{seg.text}</span>) : <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
-      </div>
-      <p className="text-[10px] opacity-70 mt-1">
-        {new Date(m.time).toLocaleString()}{m.igroup ? null : ' · '}{m.igroup ? null : m.voice ? `${voiceNoteCost(m.parts, m.group ? m.group.members.length - 1 : 1)} at current rate` : m.group ? `${groupMessageCost(m.parts, m.group.members.length - 1, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))} at current rate` : messageCost(m.parts, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))}
-        {m.parts > 1 && ` · ${m.parts} parts`}
-        {m.missing > 0 && !m.voice && <span className="text-destructive"> · {m.missing} part{m.missing > 1 ? 's' : ''} not loaded</span>}
-        {m.txId && <> · <a href={`https://waxblock.io/transaction/${encodeURIComponent(m.txId)}`} target="_blank" rel="noreferrer"
-          className="font-semibold text-cheese underline underline-offset-2 hover:text-cheese/80">Tx</a></>}
-      </p>
-    </li>
-    </ContextMenuTrigger>
-    <ContextMenuContent>
-      <ContextMenuItem onSelect={() => onReply(m)}>↩️ Reply</ContextMenuItem>
-    </ContextMenuContent>
-    </ContextMenu>
-  );
-}
 
 const CheeseCrypt = () => {
   const { accountName, isConnected, login, session } = useWax();
 
   return (
     <Layout>
-      <section className="relative pt-20 pb-14 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
-        <div className="container relative z-10">
-          <div className="flex flex-col items-center gap-8">
-            <div className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center cursor-pointer" onClick={playRandomFart}>
-              <img src={import.meta.env.PROD ? `${import.meta.env.BASE_URL}cheesecrypt-relic.png` : cryptOrbAsset.url} alt="CHEESE" className="h-24 w-24 object-contain" />
-            </div>
-            <div className="w-full text-center space-y-4">
-              <CryptAbout>
-              <div className="flex items-center justify-center gap-2">
-                <OpenMojiIcon emoji="🗝️" size={26} tint="hsl(var(--cheese))" />
-                <h1 className="text-3xl md:text-4xl font-bold">
-                  <span className="text-cheese">CHEESE</span>
-                  <span className="text-foreground">Crypt</span>
-                </h1>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
-                <OpenMojiIcon emoji="🗝️" size={26} tint="hsl(var(--cheese))" />
-              </div>
-              </CryptAbout>
-              <p className="text-muted-foreground max-w-2xl mx-auto">
-                Encrypted messages sent on the WAX blockchain with CHEESE. Anyone can see that a message was sent —
-                only the conversation’s participants can read it.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+      <CryptHero />
 
       <div className="container pb-12 flex flex-col items-center max-w-5xl">
         {!isConnected || !accountName || !session ? (
