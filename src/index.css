@@ -37,6 +37,8 @@
     --positive-foreground: 0 0% 100%;
     --reply: 190 90% 38%;
     --reply-foreground: 0 0% 100%;
+    --report: 25 95% 48%;
+    --report-foreground: 0 0% 100%;
 
     --border: 40 25% 80%;
     --input: 40 25% 85%;
@@ -106,6 +108,8 @@
     --positive-foreground: 30 20% 8%;
     --reply: 190 90% 55%;
     --reply-foreground: 30 20% 8%;
+    --report: 25 95% 58%;
+    --report-foreground: 30 20% 8%;
 
     --border: 30 15% 22%;
     --input: 30 15% 18%;
