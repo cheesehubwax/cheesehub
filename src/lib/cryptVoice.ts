@@ -168,7 +168,7 @@ export function assembleVoice(parts: VoicePartMemo[], now = Date.now()): VoiceNo
 export const VOICE_FEE_QUANTITY = '1.0000 CHEESE';
 const units = (q: string) => Math.round(parseFloat(q) * 10000);
 
-/** Total CHEESE for a voice note: one flat platform fee plus 0.0010 per part to every recipient. */
+/** Total CHEESE for a voice note: one flat platform fee plus 0.0001 per part to every recipient. */
 export function voiceNoteCost(parts: number, recipients = 1): string {
   return `${((units(VOICE_FEE_QUANTITY) + units(MESSAGE_RECIPIENT_QUANTITY) * parts * recipients) / 10000).toFixed(4)} CHEESE`;
 }
