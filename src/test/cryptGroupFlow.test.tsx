@@ -46,7 +46,10 @@ describe('group creation and signing gate', () => {
         ? groupPayload(group, encodeReply({ author: 'alice', time: 1, quote: 'hello' }, `reply ${i}`))
         : encodeReply({ author: 'alice', time: 1, quote: 'hello' }, `reply ${i}`), alice.publicKey, bob.secretKey) })));
     mount(<Messenger account="alice" session={{ permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} />);
-    await waitFor(() => expect(screen.getByLabelText('6 unread, 6 replies to you')).toBeInTheDocument());
+    await waitFor(() => {
+      expect(screen.getByLabelText('6 unread')).toBeInTheDocument();
+      expect(screen.getByLabelText('6 replies to you')).toBeInTheDocument();
+    });
     fireEvent.click(screen.getByRole('button', { name: kind === 'group' ? /Group · 3 people/ : /^bob/ }));
     const jump = await screen.findByRole('button', { name: 'Jump to earliest unseen reply (6 remaining)' });
     fireEvent.click(jump);
