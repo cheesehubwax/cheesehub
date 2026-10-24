@@ -22,6 +22,7 @@
 - CHEESECrypt folder pickers start at Desktop but request the vault subfolder; retry permission failures because Chromium protects Desktop-root access. Profile precedes keys; edits refresh only verified matching-key backups (staged writes), else download.
 - CHEESECrypt: one vault/device; friends/ loads into all accounts (per-account edits), only explicit saves replace; blocked memos drop undecrypted. Keys match by content; reads merge newest.
 - Crypt inbox: bounded discovery; strangers quarantined until accepted.
+- Crypt reply views use separate per-message receipts, not timestamp watermarks, so jumps cannot consume skipped replies; scroll only the inner list.
 - Crypt About: DappAbout + crypto dialog.
 - Both NFT players normalize media via nftMedia (case-insensitive audio/clip/video, reference-only sound/mp3/sfx aliases); version music caches on detection changes to avoid stale classifications.
 - CHEESEFolio fiat/BTC/ETH figures are WAX→USD→currency per day (fx-usd-history.json, units per USD); unknown rates stay unknown.
