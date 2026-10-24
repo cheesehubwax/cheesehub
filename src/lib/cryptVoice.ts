@@ -175,7 +175,7 @@ export function voiceNoteCost(parts: number, recipients = 1): string {
 
 /**
  * Transactions to sign, in order. Each carries up to 30 parts; every recipient gets its own encrypted
- * copy of each part paid 0.0010 CHEESE. The split 1 CHEESE platform fee is paid once, in the first transaction.
+ * copy of each part paid 0.0001 CHEESE. The split 1 CHEESE platform fee is paid once, in the first transaction.
  */
 export function buildVoiceBatches(key: MessagingKey, recipients: string[], group: VoiceGroupRef | null, clip: VoiceClip,
   contacts: Record<string, string>, auth: unknown[], id?: string, editTarget?: string): unknown[][] {

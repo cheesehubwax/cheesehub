@@ -28,9 +28,9 @@ export const KEY_CREATION_MEMO = 'CHEESECrypt key creation fee';
 export const KEY_CREATION_QUANTITY = '100.0000 CHEESE';
 export const LIQUIDITY_FEE_TO = 'xcheeseliqst';
 
-export const MESSAGE_RECIPIENT_QUANTITY = '0.0010 CHEESE';
+export const MESSAGE_RECIPIENT_QUANTITY = '0.0001 CHEESE';
 export const MESSAGE_FEE_QUANTITY = '0.0100 CHEESE';
-export const MESSAGE_TOTAL_QUANTITY = '0.0110 CHEESE';
+export const MESSAGE_TOTAL_QUANTITY = '0.0101 CHEESE';
 /** Platform fee for the first part of a message that carries an NFT (replaces the normal fee). */
 export const NFT_FEE_QUANTITY = '0.0200 CHEESE';
 const units = (q: string) => Math.round(parseFloat(q) * 10000);

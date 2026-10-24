@@ -20,17 +20,17 @@ describe('ad-hoc group messages', () => {
   it('charges one split platform fee and two recipient payments for a three-person group', () => {
     const actions = buildGroupMessageActions(alice, group, 'hello', contacts, []);
     expect(actions).toHaveLength(4);
-    expect(actions.map(a => a.data.quantity)).toEqual(['0.0010 CHEESE', '0.0080 CHEESE', '0.0020 CHEESE', '0.0010 CHEESE']);
-    expect(groupMessageCost(groupMessageSize(group, 'hello').parts, 2)).toBe('0.0120 CHEESE');
-    expect(messageCost(1)).toBe('0.0110 CHEESE');
+    expect(actions.map(a => a.data.quantity)).toEqual(['0.0001 CHEESE', '0.0080 CHEESE', '0.0020 CHEESE', '0.0001 CHEESE']);
+    expect(groupMessageCost(groupMessageSize(group, 'hello').parts, 2)).toBe('0.0102 CHEESE');
+    expect(messageCost(1)).toBe('0.0101 CHEESE');
   });
-  it.each([[4, '0.0140 CHEESE'], [5, '0.0150 CHEESE']])('charges one shared fee with %i recipients', (count, expected) => {
+  it.each([[4, '0.0104 CHEESE'], [5, '0.0105 CHEESE']])('charges one shared fee with %i recipients', (count, expected) => {
     const friends = ['bob', 'carol', 'dave', 'eve', 'frank'].slice(0, count);
     const keys = Object.fromEntries(friends.map(name => [name, generateKey(name).publicKey]));
     const actions = buildGroupMessageActions(alice, createGroup('alice', friends), 'hello', keys, []);
     expect(actions.filter(a => a.data.to === 'eosio.null')).toHaveLength(1);
     expect(actions.filter(a => friends.includes(a.data.to)).map(a => a.data.to)).toEqual(friends);
-    expect(actions.reduce((sum, a) => sum + Math.round(parseFloat(a.data.quantity) * 10000), 0)).toBe(count * 10 + 100);
+    expect(actions.reduce((sum, a) => sum + Math.round(parseFloat(a.data.quantity) * 10000), 0)).toBe(count + 100);
     expect(groupMessageCost(1, count)).toBe(expected);
   });
   it('charges the shared fee once per multipart part, not per recipient copy', () => {
@@ -42,8 +42,8 @@ describe('ad-hoc group messages', () => {
     expect(actions.filter(a => a.data.to === 'xcheeseliqst').map(a => a.data.quantity)).toEqual(Array(parts).fill('0.0020 CHEESE'));
     expect(actions.filter(a => a.data.to === 'bob')).toHaveLength(parts);
     expect(actions.filter(a => a.data.to === 'carol')).toHaveLength(parts);
-    expect(actions.reduce((sum, a) => sum + Math.round(parseFloat(a.data.quantity) * 10000), 0)).toBe(parts * 120);
-    expect(groupMessageCost(parts, 2)).toBe(`${(parts * 0.012).toFixed(4)} CHEESE`);
+    expect(actions.reduce((sum, a) => sum + Math.round(parseFloat(a.data.quantity) * 10000), 0)).toBe(parts * 102);
+    expect(groupMessageCost(parts, 2)).toBe(`${(parts * 0.0102).toFixed(4)} CHEESE`);
   });
   it('discovers the same participants for both recipients and shows one sender message', () => {
     const rows = history('hello group');
@@ -77,18 +77,18 @@ describe('ad-hoc group messages', () => {
   });
 });
 describe('NFT message pricing', () => {
-  it('direct NFT message costs 0.0210 CHEESE with a split 0.0200 platform fee', async () => {
+  it('direct NFT message costs 0.0201 CHEESE with a split 0.0200 platform fee', async () => {
     const { buildSendMessageActions } = await import('@/lib/cheeseCrypt');
     const a = buildSendMessageActions('alice.wam', 'bob.wam', ['m'], [], true);
-    expect(a.map(x => x.data.quantity)).toEqual(['0.0010 CHEESE', '0.0160 CHEESE', '0.0040 CHEESE']);
-    expect(messageCost(1, true)).toBe('0.0210 CHEESE');
+    expect(a.map(x => x.data.quantity)).toEqual(['0.0001 CHEESE', '0.0160 CHEESE', '0.0040 CHEESE']);
+    expect(messageCost(1, true)).toBe('0.0201 CHEESE');
   });
   it('group NFT message splits 0.0200 once plus 0.0010 per recipient', () => {
     const actions = buildGroupMessageActions(alice, group, '[nft:1099512345678]', contacts, [], true);
     expect(actions.filter(a => a.data.to === 'eosio.null').map(a => a.data.quantity)).toEqual(['0.0160 CHEESE']);
     expect(actions.filter(a => a.data.to === 'xcheeseliqst').map(a => a.data.quantity)).toEqual(['0.0040 CHEESE']);
-    expect(actions.filter(a => contacts[a.data.to]).map(a => a.data.quantity)).toEqual(['0.0010 CHEESE', '0.0010 CHEESE']);
-    expect(groupMessageCost(1, 2, true)).toBe('0.0220 CHEESE');
-    expect(groupMessageCost(1, 5, true)).toBe('0.0250 CHEESE');
+    expect(actions.filter(a => contacts[a.data.to]).map(a => a.data.quantity)).toEqual(['0.0001 CHEESE', '0.0001 CHEESE']);
+    expect(groupMessageCost(1, 2, true)).toBe('0.0202 CHEESE');
+    expect(groupMessageCost(1, 5, true)).toBe('0.0205 CHEESE');
   });
 });

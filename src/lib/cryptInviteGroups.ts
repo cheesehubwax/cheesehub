@@ -275,7 +275,7 @@ export function inviteTextSize(id: string, text: string) {
 }
 
 /**
- * One transaction: an encrypted copy of `payload` for every recipient, each copy paying 0.0010 CHEESE per part;
+ * One transaction: an encrypted copy of `payload` for every recipient, each copy paying 0.0001 CHEESE per part;
  * the platform fee (80% eosio.null / 20% xcheeseliqst) is paid once per part, on the first recipient's copy only.
  */
 export function buildCg2Actions(key: MessagingKey, recipients: string[], keys: Record<string, string>, payload: string, auth: unknown[], hasNft = false) {

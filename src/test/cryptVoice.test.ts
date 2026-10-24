@@ -89,14 +89,14 @@ describe('CHEESECrypt voice notes', () => {
     expect(dm.filter(x => x.data.to === 'xcheeseliqst').map(x => x.data.quantity)).toEqual(['0.2000 CHEESE']);
     dmBatches.slice(1).forEach(batch => expect((batch as T[]).every(x => x.data.to === 'bob.wam')).toBe(true));
     expect(sum(dm)).toBe(voiceNoteCost(parts, 1));
-    expect(voiceNoteCost(parts, 1)).toBe(`${(1 + parts * 0.001).toFixed(4)} CHEESE`);
+    expect(voiceNoteCost(parts, 1)).toBe(`${(1 + parts * 0.0001).toFixed(4)} CHEESE`);
     const group = createGroup('alice.wam', ['bob.wam', 'carol.wam']);
     const g = buildVoiceBatches(a, ['bob.wam', 'carol.wam'], group, v, { 'bob.wam': b.publicKey, 'carol.wam': c.publicKey }, []).flat() as T[];
     expect(g.filter(x => x.data.to === 'eosio.null')).toHaveLength(1);
     expect(g.filter(x => x.data.to === 'eosio.null').map(x => x.data.quantity)).toEqual(['0.8000 CHEESE']);
     expect(g.filter(x => x.data.to === 'xcheeseliqst').map(x => x.data.quantity)).toEqual(['0.2000 CHEESE']);
     expect(sum(g)).toBe(voiceNoteCost(parts, 2));
-    expect(voiceNoteCost(parts, 2)).toBe(`${(1 + parts * 0.002).toFixed(4)} CHEESE`);
+    expect(voiceNoteCost(parts, 2)).toBe(`${(1 + parts * 0.0002).toFixed(4)} CHEESE`);
   });
   it('group notes land in the group and show once for the sender', () => {
     const group = createGroup('alice.wam', ['bob.wam', 'carol.wam']);

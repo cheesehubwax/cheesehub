@@ -45,7 +45,7 @@ export function CreateGroupDialog({ contacts, avatars, nameFor = account => acco
           </label>)}
           {!Object.keys(contacts).length && <p className="text-sm text-muted-foreground">Add friends’ public keys first.</p>}
         </div>
-        {cost && <p className="text-xs text-muted-foreground">Invites cost {cost}: 0.0100 CHEESE per part platform fee (80% eosio.null, 20% xcheeseliqst) plus 0.0010 CHEESE per part to each invited friend, in one transaction.</p>}
+        {cost && <p className="text-xs text-muted-foreground">Invites cost {cost}: 0.0100 CHEESE per part platform fee (80% eosio.null, 20% xcheeseliqst) plus 0.0001 CHEESE per part to each invited friend, in one transaction.</p>}
         <TermsCheckbox id="crypt-group-terms" checked={agreed} onCheckedChange={setAgreed} />
         <DialogFooter>
           <Button variant="outline" disabled={busy} onClick={onClose}>Cancel</Button>
