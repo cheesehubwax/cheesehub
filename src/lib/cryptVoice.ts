@@ -18,7 +18,7 @@ export const VOICE_MAX_MS = 10_000;
 export const VOICE_DURATION_TOLERANCE_MS = 500;
 export const VOICE_MAX_BYTES = 12 * 1024;
 export const VOICE_PARTS_PER_TX = 30;
-export const VOICE_MAX_PARTS = 1 + Math.ceil(VOICE_MAX_BYTES / VOICE_BODY_BYTES);
+export const VOICE_MAX_PARTS = 2 + Math.ceil(VOICE_MAX_BYTES / VOICE_BODY_BYTES);
 export const VOICE_BITRATE = 6000;
 /** A note still missing parts this long after its newest part is treated as incomplete, not loading. */
 export const VOICE_LOADING_GRACE_MS = 3 * 60_000;
@@ -55,10 +55,11 @@ function randomId(): string {
 const groupText = (g: VoiceGroupRef) => `${g.id}|${[...g.members].sort().join(',')}`;
 
 /** Plaintext payloads (one per memo) for a clip; part 0 is metadata. */
-export function splitVoice(clip: VoiceClip, group: VoiceGroupRef | null = null, id = randomId()): Uint8Array[] {
+export function splitVoice(clip: VoiceClip, group: VoiceGroupRef | null = null, id = randomId(), editTarget?: string): Uint8Array[] {
   validateClip(clip);
   if (!/^[0-9a-z]{6}$/.test(id)) throw new Error('Invalid voice id');
   const g = group ? new TextEncoder().encode(groupText(group)) : new Uint8Array(0);
+  if (editTarget && !/^[a-f0-9]{64}$/.test(editTarget)) throw new Error('Invalid edit target');
   const meta = new Uint8Array(1 + 2 + 32 + 1 + g.length);
   meta[0] = mimeCode(clip.mime);
   const ms = Math.min(65535, Math.round(clip.durationMs));
@@ -68,6 +69,7 @@ export function splitVoice(clip: VoiceClip, group: VoiceGroupRef | null = null, 
   meta.set(g, 36);
   if (meta.length > VOICE_BODY_BYTES || g.length > 255) throw new Error('Group is too large for a voice note.');
   const bodies: Uint8Array[] = [meta];
+  if (editTarget) bodies.push(Uint8Array.from(editTarget.match(/../g) ?? [], x => parseInt(x, 16)));
   for (let i = 0; i < clip.bytes.length; i += VOICE_BODY_BYTES) bodies.push(clip.bytes.slice(i, i + VOICE_BODY_BYTES));
   const total = bodies.length;
   if (total > VOICE_MAX_PARTS) throw new Error('The recording is too large.');
@@ -77,7 +79,7 @@ export function splitVoice(clip: VoiceClip, group: VoiceGroupRef | null = null, 
     for (let i = 0; i < 6; i++) out[1 + i] = id.charCodeAt(i);
     out[7] = index >> 8; out[8] = index & 0xff;
     out[9] = total >> 8; out[10] = total & 0xff;
-    out[11] = group ? 1 : 0;
+    out[11] = (group ? 1 : 0) | (editTarget ? 2 : 0);
     out.set(body, VOICE_HEADER_BYTES);
     return out;
   });
@@ -86,16 +88,16 @@ export function splitVoice(clip: VoiceClip, group: VoiceGroupRef | null = null, 
 export const voicePartCount = (clip: VoiceClip) => 1 + Math.ceil(clip.bytes.length / VOICE_BODY_BYTES);
 export const voiceTransactions = (parts: number) => Math.ceil(parts / VOICE_PARTS_PER_TX);
 
-export interface VoicePart { id: string; index: number; total: number; isGroup: boolean; body: Uint8Array }
+export interface VoicePart { id: string; index: number; total: number; isGroup: boolean; isEdit?: boolean; body: Uint8Array }
 export function parseVoicePart(bytes: Uint8Array): VoicePart | null {
   if (bytes.length < VOICE_HEADER_BYTES || bytes[0] !== VOICE_MARK) return null;
   const id = String.fromCharCode(...bytes.slice(1, 7));
   const index = (bytes[7] << 8) | bytes[8], total = (bytes[9] << 8) | bytes[10];
-  if (!/^[0-9a-z]{6}$/.test(id) || total < 2 || total > VOICE_MAX_PARTS || index >= total || bytes[11] > 1) return null;
-  return { id, index, total, isGroup: bytes[11] === 1, body: bytes.slice(VOICE_HEADER_BYTES) };
+  if (!/^[0-9a-z]{6}$/.test(id) || total < 2 || total > VOICE_MAX_PARTS || index >= total || bytes[11] > 3) return null;
+  return { id, index, total, isGroup: !!(bytes[11] & 1), isEdit: !!(bytes[11] & 2), body: bytes.slice(VOICE_HEADER_BYTES) };
 }
 
-interface VoiceMeta { mime: VoiceMime; durationMs: number; digest: Uint8Array; group: VoiceGroupRef | null }
+interface VoiceMeta { mime: VoiceMime; durationMs: number; digest: Uint8Array; group: VoiceGroupRef | null; editTarget?: string }
 function parseMeta(body: Uint8Array): VoiceMeta | null {
   if (body.length < 36) return null;
   const mime = mimeFromCode(body[0]);
@@ -103,7 +105,7 @@ function parseMeta(body: Uint8Array): VoiceMeta | null {
   if (!mime || body.length !== 36 + len) return null;
   let group: VoiceGroupRef | null = null;
   if (len) {
-    const [id, list] = new TextDecoder().decode(body.slice(36)).split('|');
+    const [id, list] = new TextDecoder().decode(body.slice(36, 36 + len)).split('|');
     if (!id || !list) return null;
     group = { id, members: list.split(',') };
   }
@@ -113,6 +115,7 @@ function parseMeta(body: Uint8Array): VoiceMeta | null {
 export interface VoicePartMemo { txId: string; time: number; from: string; to: string; part: VoicePart }
 export type VoiceStatus = 'ready' | 'loading' | 'incomplete' | 'invalid';
 export interface VoiceNote {
+  editTarget?: string; completedAt?: number;
   key: string; id: string; txId: string; time: number; from: string; to: string;
   total: number; received: number; missing: number; isGroup: boolean;
   group: VoiceGroupRef | null; mime: VoiceMime | null; durationMs: number | null;
@@ -131,22 +134,28 @@ export function assembleVoice(parts: VoicePartMemo[], now = Date.now()): VoiceNo
   for (const [key, list] of groups) {
     const total = list[0].part.total, isGroup = list[0].part.isGroup;
     const byIndex = new Map<number, Uint8Array>();
-    list.forEach(({ part }) => { if (part.total === total && part.isGroup === isGroup && !byIndex.has(part.index)) byIndex.set(part.index, part.body); });
-    const first = list.reduce((a, b) => (b.time < a.time ? b : a));
+    const isEdit = !!list[0].part.isEdit;
+    list.forEach(({ part }) => { if (part.total === total && part.isGroup === isGroup && !!part.isEdit === isEdit && !byIndex.has(part.index)) byIndex.set(part.index, part.body); });
+    const first = list.find(p => p.part.index === 0) ?? list.reduce((a, b) => (b.time < a.time ? b : a));
     const newest = list.reduce((t, p) => Math.max(t, p.time), 0);
-    const meta = byIndex.has(0) ? parseMeta(byIndex.get(0)!) : null;
+    const metaBody = byIndex.get(0);
+    const meta = metaBody ? parseMeta(metaBody) : null;
+    const targetBody = isEdit ? byIndex.get(1) : undefined;
     const note: VoiceNote = {
       key, id: list[0].part.id, txId: first.txId, time: first.time, from: first.from, to: first.to,
       total, received: byIndex.size, missing: total - byIndex.size, isGroup,
       group: meta?.group ?? null, mime: meta?.mime ?? null, durationMs: meta?.durationMs ?? null, audio: null,
       status: 'invalid',
+      ...(isEdit ? { editTarget: targetBody?.length === 32 ? Array.from(targetBody, b => b.toString(16).padStart(2, '0')).join('') : 'pending' } : {}), completedAt: newest,
     };
     if (byIndex.has(0) && (!meta || !!meta.group !== isGroup)) { out.push(note); continue; }
     if (note.missing) { note.status = now - newest < VOICE_LOADING_GRACE_MS ? 'loading' : 'incomplete'; out.push(note); continue; }
-    const size = Array.from({ length: total - 1 }, (_, i) => byIndex.get(i + 1)!.length).reduce((a, b) => a + b, 0);
+    const audioStart = isEdit ? 2 : 1;
+    if (isEdit && targetBody?.length !== 32) { out.push(note); continue; }
+    const size = Array.from({ length: total - audioStart }, (_, i) => byIndex.get(i + audioStart)?.length ?? 0).reduce((a, b) => a + b, 0);
     const audio = new Uint8Array(size);
     let at = 0;
-    for (let i = 1; i < total; i++) { audio.set(byIndex.get(i)!, at); at += byIndex.get(i)!.length; }
+    for (let i = audioStart; i < total; i++) { const body = byIndex.get(i); if (!body) continue; audio.set(body, at); at += body.length; }
     if (meta && sameBytes(voiceDigest(audio), meta.digest) && detectMime(audio) === meta.mime && audio.length <= VOICE_MAX_BYTES) {
       note.audio = audio; note.status = 'ready';
     }
@@ -169,10 +178,11 @@ export function voiceNoteCost(parts: number, recipients = 1): string {
  * copy of each part paid 0.0010 CHEESE. The split 1 CHEESE platform fee is paid once, in the first transaction.
  */
 export function buildVoiceBatches(key: MessagingKey, recipients: string[], group: VoiceGroupRef | null, clip: VoiceClip,
-  contacts: Record<string, string>, auth: unknown[], id?: string): unknown[][] {
+  contacts: Record<string, string>, auth: unknown[], id?: string, editTarget?: string): unknown[][] {
   if (!recipients.length) throw new Error('No recipients');
+  if (new Set(recipients).size !== recipients.length || recipients.includes(key.account)) throw new Error('Invalid recipients');
   if (recipients.some(r => !contacts[r])) throw new Error('Load every recipient’s public key before sending.');
-  const plain = splitVoice(clip, group, id);
+  const plain = splitVoice(clip, group, id, editTarget);
   const encrypted = recipients.map(to => plain.map(p => encryptBytesMemo(p, contacts[to], key.secretKey)));
   const batches: unknown[][] = [];
   for (let s = 0; s < plain.length; s += VOICE_PARTS_PER_TX) {

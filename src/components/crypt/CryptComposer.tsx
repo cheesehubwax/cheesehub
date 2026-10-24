@@ -16,7 +16,7 @@ import { MAX_PARTS, MAX_PLAINTEXT_BYTES, MESSAGE_FEE_QUANTITY, MESSAGE_RECIPIENT
 export function CryptComposer({
   account, active, activeGroup, activeInvite, nameFor, replyingTo, setReplyingTo, composerRef, text, setText, voice, setVoice,
   tooLong, bytes, maxBytes, parts, copies, voiceParts, voiceTxs, setAttachingNft, busy, listHidden, agreed, setAgreed,
-  feeInfoOpen, setFeeInfoOpen, totalCost, send, sendVoice,
+  feeInfoOpen, setFeeInfoOpen, totalCost, send, sendVoice, editing, cancelEdit, editExpired,
 }: {
   account: string; active: string; activeGroup: CryptGroup | undefined; activeInvite: InviteGroupView | undefined; nameFor: (id: string) => string;
   replyingTo: ReplyRef | null; setReplyingTo: (r: ReplyRef | null) => void; composerRef: RefObject<HTMLTextAreaElement>;
@@ -24,14 +24,16 @@ export function CryptComposer({
   tooLong: boolean; bytes: number; maxBytes: number; parts: number; copies: number; voiceParts: number; voiceTxs: number;
   setAttachingNft: (v: boolean) => void; busy: boolean; listHidden: boolean; agreed: boolean; setAgreed: (v: boolean) => void;
   feeInfoOpen: boolean; setFeeInfoOpen: (v: boolean) => void; totalCost: string; send: () => void; sendVoice: () => void;
+  editing?: boolean; cancelEdit?: () => void; editExpired?: boolean;
 }) {
   return (
     <div className="space-y-2 p-4 border-t border-border">
+      {editing && <div className="flex items-center gap-2 border-l-2 border-cheese bg-muted px-2 py-1 text-xs"><span className="flex-1">✏️ {editExpired ? 'Editing window ended' : 'Editing message'}</span><Button variant="ghost" size="icon" className="h-5 w-5" aria-label="Cancel edit" onClick={cancelEdit}>✕</Button></div>}
       {replyingTo && <div className="flex items-start gap-2 rounded border-l-2 border-reply bg-muted px-2 py-1 text-xs">
         <span className="min-w-0 flex-1"><span className="block font-semibold text-reply">↩️ Replying to {replyingTo.author === account ? 'yourself' : nameFor(replyingTo.author)}</span><span className="block truncate opacity-80">{replyingTo.quote || '…'}</span></span>
         <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" aria-label="Cancel reply" onClick={() => setReplyingTo(null)}>✕</Button>
       </div>}
-      <Textarea ref={composerRef} value={text} onChange={(e) => setText(e.target.value)} rows={3} disabled={!!voice} placeholder={voice ? 'Sending a voice note — discard it to type a message' : activeGroup || activeInvite ? 'Message group' : `Message ${nameFor(active)}`} />
+      <Textarea ref={composerRef} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && editing) cancelEdit?.(); }} rows={3} disabled={!!voice || busy} placeholder={voice ? 'Sending a voice note — discard it to type a message' : activeGroup || activeInvite ? 'Message group' : `Message ${nameFor(active)}`} />
       <div className="flex flex-wrap items-center gap-2 gap-y-1 text-xs">
         <span className={!voice && tooLong ? 'text-destructive' : 'text-muted-foreground'}>
           {voice ? `${voiceParts} parts · ${voiceTxs} transaction${voiceTxs > 1 ? 's' : ''}` : `${bytes}/${maxBytes} · ${parts || 1} part${parts > 1 ? 's' : ''}`}{(activeGroup || activeInvite) && ` × ${copies} recipients`}
@@ -49,9 +51,9 @@ export function CryptComposer({
           </Collapsible>
           <span className="ml-auto text-muted-foreground">{totalCost}</span>
           {voice
-            ? <Button size="sm" disabled={busy || !agreed} onClick={sendVoice} className="bg-cheese text-primary-foreground hover:bg-cheese/90">Send voice{voiceTxs > 1 ? ` (${voiceTxs} signatures)` : ''}</Button>
-            : <Button size="sm" disabled={busy || !agreed || !text.trim() || tooLong} onClick={send}
-              className="bg-cheese text-primary-foreground hover:bg-cheese/90">Send</Button>}
+            ? <Button size="sm" disabled={busy || !agreed || editExpired} onClick={sendVoice} className="bg-cheese text-primary-foreground hover:bg-cheese/90">{editing ? 'Save edit' : 'Send voice'}{voiceTxs > 1 ? ` (${voiceTxs} signatures)` : ''}</Button>
+            : <Button size="sm" disabled={busy || !agreed || !text.trim() || tooLong || editExpired} onClick={send}
+              className="bg-cheese text-primary-foreground hover:bg-cheese/90">{editing ? 'Save edit' : 'Send'}</Button>}
         </div>
         {feeInfoOpen && (
           <div className="order-last w-full basis-full space-y-1 pt-1">

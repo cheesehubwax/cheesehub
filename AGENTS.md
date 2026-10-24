@@ -1,5 +1,7 @@
 # Agent rules
 
+- CHEESECrypt edits resolve authenticated followups against an unambiguous content-and-transaction digest within the same sender/conversation; preserve original row identity/time and apply only complete in-window replacements. Voice edits use a flagged extra target part; owner logs derive from decrypted history only for currently public owned rooms, never central storage.
+
 - CHEESECrypt's orb has an intentionally source-controlled public image copy for external production hosting; preview uses its asset pointer because GitHub Pages cannot serve Lovable-relative asset paths.
 
 - Token metadata snapshots share one versioned schema and public data URL across recorder and app; precisions are chain-verified, cached metadata contains no prices, and unknown live prices remain unknown so API outages cannot fabricate portfolio valuations.
