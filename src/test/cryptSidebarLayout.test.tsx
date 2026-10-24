@@ -68,7 +68,7 @@ describe('compact sidebar', () => {
     const friends = within(strip).getByRole('group', { name: 'Friends' });
     expect(within(groups).getByText('Groups')).toBeInTheDocument();
     expect(within(friends).getByText('Friends')).toBeInTheDocument();
-    expect(groups.querySelector('button[title="Group · 2 people"]')).not.toBeNull();
+    expect(groups.querySelector('button[title="Group · 3 people"]')).not.toBeNull();
     expect(friends.querySelector('button[title="bob"]')).not.toBeNull();
     // Each avatar sits in its own section only, and Groups sits above Friends.
     expect(within(groups).queryByRole('button', { name: /^bob/ })).toBeNull();
