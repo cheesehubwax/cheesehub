@@ -1453,6 +1453,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
             {roomRestricted ? <p className="text-sm text-muted-foreground p-4 border-t border-border">{roomBanned ? 'You were removed from this room. Your earlier history stays readable.' : `Muted until ${new Date(roomMutedUntil).toLocaleString()}. Messages sent during the mute remain hidden.`}</p> : activeInvite?.status === 'invited' ? (
               <div className="space-y-2 p-4 border-t border-border text-sm">
                 <p>✉️ <span className="font-semibold">{nameFor(activeInvite.invite.creator)}</span> invited you to <span className="font-semibold">{activeInvite.name}</span> with {activeInvite.invite.members.length - 1} other{activeInvite.invite.members.length > 2 ? 's' : ''}.</p>
+                {requestNotes[activeInvite.invite.id] && <p className="italic break-words">“{requestNotes[activeInvite.invite.id]}”</p>}
                 <p className="text-xs text-muted-foreground">Joining tells the other members in encrypted messages. Declining sends nothing.</p>
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" className="bg-cheese text-primary-foreground hover:bg-cheese/90" onClick={() => setPendingNotice({ kind: 'joined', id: activeInvite.invite.id })}>Join</Button>
@@ -1489,7 +1490,7 @@ function JoinNoteField({ value, onChange, disabled, placeholder }: { value: stri
   return <div className="space-y-1">
     <label htmlFor="crypt-join-note" className="text-xs font-medium">Note (optional)</label>
     <Input id="crypt-join-note" value={value} maxLength={JOIN_NOTE_MAX} disabled={disabled} placeholder={placeholder}
-      onChange={e => onChange(e.target.value.replace(/[\r\n]+/g, ' '))} />
+      onChange={e => onChange(e.target.value.replace(/\p{Cc}+/gu, ' '))} />
     <p className="text-[10px] text-muted-foreground">Encrypted, only they can read it · {[...value.trim()].length}/{JOIN_NOTE_MAX}</p>
   </div>;
 }
