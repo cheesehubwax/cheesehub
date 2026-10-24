@@ -486,11 +486,16 @@ export function Messenger({ account, session }: { account: string; session: NonN
   }, [vault, readMarks, folderMarks, account]);
   const unread = useMemo(() => readMarks ? unreadCounts(conversations, account, readMarks) : {}, [conversations, account, readMarks]);
   const replyUnread = useMemo(() => readMarks ? unreadReplies(conversations, account, readMarks) : {}, [conversations, account, readMarks]);
-  // Conversations with an unread reply to one of your messages get the reply colour instead of cheese yellow.
-  const badge = (id: string) => unread[id] && active !== id
-    ? <span aria-label={replyUnread[id] ? `${unread[id]} unread, ${replyUnread[id]} repl${replyUnread[id] > 1 ? 'ies' : 'y'} to you` : `${unread[id]} unread`} data-reply={replyUnread[id] ? 'true' : undefined}
-      className={cn('ml-auto shrink-0 min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold leading-5 text-center', replyUnread[id] ? 'bg-reply text-reply-foreground' : 'bg-cheese text-primary-foreground')}>{replyUnread[id] ? '↩ ' : ''}{unread[id] > 99 ? '99+' : unread[id]}</span>
-    : null;
+  // Two badges per room: cheese yellow for unread messages, reply blue for unread replies to you.
+  // Both stay on the open room and count down live as messages scroll into view (onRead advances the read marker).
+  const badge = (id: string) => {
+    const u = unread[id] ?? 0, r = replyUnread[id] ?? 0;
+    if (!u && !r) return null;
+    return <span className="ml-auto flex shrink-0 items-center gap-1">
+      {u > 0 && <span aria-label={`${u} unread`} className="min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold leading-5 text-center bg-cheese text-primary-foreground">{u > 99 ? '99+' : u}</span>}
+      {r > 0 && <span aria-label={`${r} repl${r > 1 ? 'ies' : 'y'} to you`} data-reply="true" className="min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold leading-5 text-center bg-reply text-reply-foreground">↩ {r > 99 ? '99+' : r}</span>}
+    </span>;
+  };
   /** Totals for chats other than the open one, shown on the show-sidebar arrow while the list is hidden. */
   const hiddenUnread = Object.entries(unread).reduce((n, [id, c]) => id === active ? n : n + c, 0);
   const hiddenReplies = Object.entries(replyUnread).reduce((n, [id, c]) => id === active ? n : n + c, 0);
