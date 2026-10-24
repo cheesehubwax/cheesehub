@@ -48,8 +48,8 @@ import { download } from '@/components/crypt/cryptDownload';
 import { ChatMessageItem } from '@/components/crypt/ChatMessageItem';
 import { EditedMessagesDialog } from '@/components/crypt/EditedMessagesDialog';
 import { RoomModerationDialog } from '@/components/crypt/RoomModerationDialog';
-import { encodeModeration, encodePolicySnapshot, encodeRoomPolicy, type MuteMinutes } from '@/lib/cryptInviteGroups';
-import { deriveModeration, loadModerationMemos, mergeModerationMemos, moderateMessages, mutedUntil, restrictedAt, saveModerationMemos } from '@/lib/cryptModeration';
+import { encodeAdmin, encodeCollapse, encodeModeration, encodePolicySnapshot, encodeRoomPolicy, type MuteMinutes } from '@/lib/cryptInviteGroups';
+import { applyCollapses, canCollapseAuthor, canMuteMember, collapsedKeys, deriveModeration, loadModerationMemos, mergeModerationMemos, moderateMessages, mutedUntil, restrictedAt, roomRole, saveModerationMemos } from '@/lib/cryptModeration';
 import { applyEdits, canEdit, editTarget, encodeEdit, publicEditLog } from '@/lib/cryptEdits';
 import type { ConversationEntry } from '@/lib/cryptGroups';
 import { CryptHero } from '@/components/crypt/CryptHero';
@@ -167,7 +167,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [editingMessage, setEditingMessage] = useState<ConversationEntry | null>(null);
   const [editLogRoom, setEditLogRoom] = useState<string | null>(null);
   const [moderatingRoom, setModeratingRoom] = useState<string | null>(null);
-  const [pendingModeration, setPendingModeration] = useState<{ id: string; member: string; minutes?: MuteMinutes } | null>(null);
+  const [pendingModeration, setPendingModeration] = useState<{ id: string; member: string; action: 'mute' | 'ban' | 'admin' | 'unadmin' | 'collapse'; minutes?: MuteMinutes; target?: string } | null>(null);
+  const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
   const [savedControls, setSavedControls] = useState(() => loadModerationMemos(account));
   const [replyingTo, setReplyingTo] = useState<ReplyRef | null>(null);
   const [openQuote, setOpenQuote] = useState<ReplyRef | null>(null);
@@ -312,7 +313,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   }, [invites, inviteStore, account]);
   const moderation = useMemo(() => deriveModeration(allGroupEvents, invites, account), [allGroupEvents, invites, account]);
   useEffect(() => {
-    const controlTxs = new Set(allGroupEvents.filter(e => (e.control.kind === 'invite' || e.control.kind === 'admission') || e.control.kind === 'add' || e.control.kind === 'room' || e.control.kind === 'mute' || e.control.kind === 'ban' || e.control.kind === 'policy').filter(e => {
+    const controlTxs = new Set(allGroupEvents.filter(e => (e.control.kind === 'invite' || e.control.kind === 'admission') || e.control.kind === 'add' || e.control.kind === 'room' || e.control.kind === 'mute' || e.control.kind === 'ban' || e.control.kind === 'policy' || e.control.kind === 'admin' || e.control.kind === 'collapse').filter(e => {
       if ((e.control.kind === 'invite' || e.control.kind === 'admission')) return invites[e.control.invite.id]?.creator === e.from;
       return !!eventFromMember(e, invites, account);
     }).map(e => e.txId));
@@ -348,8 +349,11 @@ export function Messenger({ account, session }: { account: string; session: NonN
     return !!view && view.status !== 'declined' && !!eventFromMember({ key: c.key, txId: c.txId, time: c.time, from: c.from, to: c.to, control: { kind: 'joined', id: c.igroup }, usedKey: c.usedKey }, invites, account);
   }), [decoded, inviteViews, invites, account, contacts]);
   const edited = useMemo(() => {
-    const result = applyEdits(moderateMessages(editableConversations, moderation));
-    return { ...result, messages: moderateMessages(result.messages, moderation), log: result.log.filter(e => !e.original.igroup || !restrictedAt(moderation[e.original.igroup], e.original.from, e.original.time) && !restrictedAt(moderation[e.original.igroup], e.original.from, e.at)) };
+    const originals = moderateMessages(editableConversations, moderation);
+    const collapsed = collapsedKeys(originals, moderation);
+    const targets = new Map(originals.map(m => [m.key, editTarget(m)]));
+    const result = applyEdits(originals);
+    return { ...result, targets, messages: applyCollapses(moderateMessages(result.messages, moderation), collapsed), log: result.log.filter(e => !e.original.igroup || !restrictedAt(moderation[e.original.igroup], e.original.from, e.original.time) && !restrictedAt(moderation[e.original.igroup], e.original.from, e.at)) };
   }, [editableConversations, moderation]);
   // Older originals may fall behind a recent edit; read further before resolving them.
   useEffect(() => {
@@ -1007,13 +1011,21 @@ export function Messenger({ account, session }: { account: string; session: NonN
   };
   const moderationPlan = (n: NonNullable<typeof pendingModeration>) => {
     const v = viewById(n.id), state = moderation[n.id];
-    if (!v?.isCreator || !listedIds.has(n.id) || n.member === account || !v.invite.members.some(m => m.account === n.member) || state?.bans[n.member] !== undefined) return null;
-    if (n.minutes === undefined && (!state || state.protected.includes(n.member))) return null;
-    const policy = !state ? encodeRoomPolicy(n.id, true, v.invite.members.map(m => m.account)) : null;
-    const payload = encodeModeration(n.id, n.member, n.minutes);
-    const to = v.invite.members.map(m => m.account).filter(a => a !== account);
+    if (!v || v.status !== 'joined' || !v.invite.members.some(m => m.account === n.member) || state?.bans[n.member] !== undefined) return null;
+    const now = Date.now(), owner = v.isCreator;
+    // Owners act on their own listing; admins only inside a verified public-room policy.
+    if (owner ? !listedIds.has(n.id) : roomRole(state, v.invite, account, now) !== 'admin') return null;
+    let payload: string;
+    if (n.action === 'mute') { if (!n.minutes || !canMuteMember(state ?? { listed: true, protected: [], bans: {}, mutes: {}, admins: [], collapses: {} }, v.invite, account, n.member, now)) return null; payload = encodeModeration(n.id, n.member, n.minutes); }
+    else if (n.action === 'ban') { if (!owner || !state || state.protected.includes(n.member) || n.member === account) return null; payload = encodeModeration(n.id, n.member); }
+    else if (n.action === 'admin' || n.action === 'unadmin') { if (!owner || n.member === account || (n.action === 'admin') === !!state?.admins.includes(n.member)) return null; payload = encodeAdmin(n.id, n.member, n.action === 'admin'); }
+    else { if (!n.target || (!owner && !canCollapseAuthor(state, v.invite, account, n.member, now)) || state?.collapses[`${n.member}:${n.target}`]) return null; payload = encodeCollapse(n.id, n.member, n.target); }
+    const policy = !state && owner ? encodeRoomPolicy(n.id, true, v.invite.members.map(m => m.account)) : null;
+    const to = v.invite.members.map(m => m.account).filter(a => a !== account && state?.bans[a] === undefined);
+    if (!to.length) return null;
     return { v, to, payload, policy, cost: `${(parseFloat(cg2Cost(payload, to.length)) + (policy ? parseFloat(cg2Cost(policy, to.length)) : 0)).toFixed(4)} CHEESE` };
   };
+  const moderationTitles = { mute: 'Member muted', ban: 'Member removed', admin: 'Admin appointed', unadmin: 'Admin removed', collapse: 'Message collapsed' } as const;
   const confirmModeration = async () => {
     if (!key || !pendingModeration || busy) return false;
     const plan = moderationPlan(pendingModeration);
@@ -1021,7 +1033,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     setBusy(true);
     try {
       const actions = [...(plan.policy ? buildCg2Actions(key, plan.to, keysOf(plan.v.invite), plan.policy, [permission]) : []), ...buildCg2Actions(key, plan.to, keysOf(plan.v.invite), plan.payload, [permission])];
-      const r = await executeTransaction(actions, { successTitle: pendingModeration.minutes ? 'Member muted' : 'Member removed' });
+      const r = await executeTransaction(actions, { successTitle: moderationTitles[pendingModeration.action] });
       if (!r.success || !r.txId) return false;
       setPendingModeration(null); await refresh();
       return true;
@@ -1043,7 +1055,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const snapshot = encodePolicySnapshot(updated.id, state?.protected ?? v.invite.members.map(m => m.account), Object.keys(state?.bans ?? {}), Object.entries(state?.mutes ?? {}).flatMap(([a, intervals]) => {
       const longest = intervals.filter(m => m.until > Date.now()).sort((a, b) => b.until - a.until)[0];
       return longest ? [[a, longest.from, longest.until] as [string, number, number]] : [];
-    }));
+    }), state?.admins ?? []);
     return { v, updated, payload, delta, policy, snapshot, to, cost: `${(parseFloat(cg2Cost(payload, 1)) + parseFloat(cg2Cost(delta, to.length)) + parseFloat(cg2Cost(policy, to.length + 1)) + parseFloat(cg2Cost(snapshot, 1))).toFixed(4)} CHEESE` };
   };
   const confirmJoin = async () => {
