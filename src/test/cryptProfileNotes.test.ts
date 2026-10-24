@@ -23,7 +23,7 @@ describe('CHEESECrypt profile notes', () => {
   it('sends to friends and group members with keys, excluding self, blocked and removed', () => {
     expect(profileRecipients('alice', { bob: 'k', carol: 'k', dave: 'k' }, [['alice', 'carol', 'erin']], ['dave'])).toEqual(['bob', 'carol']);
   });
-  it('charges one shared 80/20 platform fee per part plus 0.0010 CHEESE per recipient per part', () => {
+  it('charges one shared 80/20 platform fee per part plus 0.0001 CHEESE per recipient per part', () => {
     const alice = { ...generateKey('alice'), avatar, displayName: 'Alice' };
     const bob = generateKey('bob'), carol = generateKey('carol');
     const parts = profileNoteParts(alice);
@@ -31,9 +31,9 @@ describe('CHEESECrypt profile notes', () => {
     const to = (who: string) => batch.filter(a => a.data.to === who);
     expect(to('eosio.null').map(a => a.data.quantity)).toEqual(Array(parts).fill('0.0080 CHEESE'));
     expect(to('xcheeseliqst').map(a => a.data.quantity)).toEqual(Array(parts).fill('0.0020 CHEESE'));
-    expect(to('bob').map(a => a.data.quantity)).toEqual(Array(parts).fill('0.0010 CHEESE'));
+    expect(to('bob').map(a => a.data.quantity)).toEqual(Array(parts).fill('0.0001 CHEESE'));
     expect(to('carol')).toHaveLength(parts);
-    expect(profileNoteCost(parts, 2)).toBe(`${((100 + 10 * 2) * parts / 10000).toFixed(4)} CHEESE`);
+    expect(profileNoteCost(parts, 2)).toBe(`${((100 + 1 * 2) * parts / 10000).toFixed(4)} CHEESE`);
     const bytes = decryptMemoBytes(to('bob')[0].data.memo, alice.publicKey, bob.secretKey);
     expect(bytes && bytesToText(bytes)).toBeTruthy();
   });

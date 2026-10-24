@@ -18,7 +18,7 @@ let tx = 0;
 /** Every part of `text` as encrypted memos in one transaction. */
 const memos = (text: string, from: MessagingKey, to: MessagingKey, time: number) => {
   const txId = `tx${++tx}`;
-  return splitMessage(text).map(p => ({ txId, time, from: from.account, to: to.account, quantity: '0.0010 CHEESE', memo: encryptMemo(p, to.publicKey, from.secretKey) }));
+  return splitMessage(text).map(p => ({ txId, time, from: from.account, to: to.account, quantity: '0.0001 CHEESE', memo: encryptMemo(p, to.publicKey, from.secretKey) }));
 };
 const events = (entries: ReturnType<typeof decodeConversations>): Cg2Event[] =>
   entries.flatMap(c => c.control && c.usedKey && !c.voice ? [{ key: c.key, txId: c.txId, time: c.time, from: c.from, to: c.to, control: c.control, usedKey: c.usedKey }] : []);
@@ -137,12 +137,12 @@ describe('group state', () => {
 });
 
 describe('invite group fees', () => {
-  it('one shared platform fee per part split 80/20, plus 0.0010 CHEESE to each of 3 recipients', () => {
+  it('one shared platform fee per part split 80/20, plus 0.0001 CHEESE to each of 3 recipients', () => {
     const keys = { bob: bob.publicKey, carol: carol.publicKey, dave: dave.publicKey };
     const actions = buildCg2Actions(alice, ['bob', 'carol', 'dave'], keys, encodeNotice('joined', ID), []) as { data: { to: string; quantity: string } }[];
     expect(actions.map(a => [a.data.to, a.data.quantity])).toEqual([
-      ['bob', '0.0010 CHEESE'], ['eosio.null', '0.0080 CHEESE'], ['xcheeseliqst', '0.0020 CHEESE'],
-      ['carol', '0.0010 CHEESE'], ['dave', '0.0010 CHEESE'],
+      ['bob', '0.0001 CHEESE'], ['eosio.null', '0.0080 CHEESE'], ['xcheeseliqst', '0.0020 CHEESE'],
+      ['carol', '0.0001 CHEESE'], ['dave', '0.0001 CHEESE'],
     ]);
   });
 

@@ -30,7 +30,7 @@ import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { VaultPrompt } from '@/components/crypt/VaultPrompt';
 import { CreateGroupDialog } from '@/components/crypt/CreateGroupDialog';
 import { PaidActionDialog } from '@/components/crypt/PaidActionDialog';
-import { buildCg2Actions, collectInvites, deriveInviteGroups, encodeGroupText, encodeInvite, encodeMeta, encodeNotice, inviteTextSize, invitesSignature, loadDecisions, MAX_INVITE_MEMBERS, loadFriendDecisions, loadInvites, newInviteGroupId, saveDecision, saveInvites, scopedKeys, eventFromMember, VOICE_REF_PREFIX, type Cg2Event, type InviteGroup, type InviteGroupView } from '@/lib/cryptInviteGroups';
+import { buildCg2Actions, encodeAdmission, encodeMemberAdd, MAX_PUBLIC_ROOM_MEMBERS, collectInvites, deriveInviteGroups, encodeGroupText, encodeInvite, encodeMeta, encodeNotice, inviteTextSize, invitesSignature, loadDecisions, MAX_INVITE_MEMBERS, loadFriendDecisions, loadInvites, newInviteGroupId, saveDecision, saveInvites, scopedKeys, eventFromMember, VOICE_REF_PREFIX, type Cg2Event, type InviteGroup, type InviteGroupView } from '@/lib/cryptInviteGroups';
 import { ShareKeyDialog } from '@/components/crypt/ShareKeyDialog';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { buildVoiceBatches, voiceNoteCost, voicePartCount, voiceTransactions, type VoiceClip } from '@/lib/cryptVoice';
@@ -301,24 +301,25 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const roomInviters = useMemo(() => Object.fromEntries(Object.values(roomRequests)
     .filter(r => contacts[r.creator] !== r.publicKey && !blocked.includes(r.creator)).map(r => [r.creator, r.publicKey])), [roomRequests, contacts, blocked]);
   const roomInviteEvents = useMemo(() => key && Object.keys(roomInviters).length ? decodeRoomEvents(visibleMemos, key, roomInviters)
-    .filter(e => e.control.kind === 'invite' && e.to === account && roomRequests[e.control.invite.id]?.creator === e.from) : [], [visibleMemos, key, roomInviters, roomRequests, account]);
-  const invites = useMemo(() => key ? collectInvites([...cg2Events, ...roomInviteEvents], account, key.publicKey, contacts, inviteStore, roomRequests) : inviteStore,
-    [cg2Events, roomInviteEvents, account, key, contacts, inviteStore, roomRequests]);
+    .filter(e => e.to === account && roomRequests[(e.control.kind === 'invite' || e.control.kind === 'admission') ? e.control.invite.id : e.control.id]?.creator === e.from && (e.control.kind === 'invite' || e.control.kind === 'admission' || e.control.kind === 'policy' || e.control.kind === 'room' || e.control.kind === 'add')) : [], [visibleMemos, key, roomInviters, roomRequests, account]);
+  const allGroupEvents = useMemo(() => [...new Map([...cg2Events, ...roomInviteEvents].map(e => [e.key, e])).values()], [cg2Events, roomInviteEvents]);
+  const invites = useMemo(() => key ? collectInvites(allGroupEvents, account, key.publicKey, contacts, inviteStore, roomRequests) : inviteStore,
+    [allGroupEvents, account, key, contacts, inviteStore, roomRequests]);
   useEffect(() => {
     // Compares member keys too, so a creator adding members to a known group is saved.
     if (invitesSignature(invites) === invitesSignature(inviteStore)) return;
     saveInvites(account, invites); setInviteStore(invites);
   }, [invites, inviteStore, account]);
-  const moderation = useMemo(() => deriveModeration(cg2Events, invites, account), [cg2Events, invites, account]);
+  const moderation = useMemo(() => deriveModeration(allGroupEvents, invites, account), [allGroupEvents, invites, account]);
   useEffect(() => {
-    const controlTxs = new Set(cg2Events.filter(e => e.control.kind === 'invite' || e.control.kind === 'room' || e.control.kind === 'mute' || e.control.kind === 'ban' || e.control.kind === 'policy').filter(e => {
-      if (e.control.kind === 'invite') return invites[e.control.invite.id]?.creator === e.from;
+    const controlTxs = new Set(allGroupEvents.filter(e => (e.control.kind === 'invite' || e.control.kind === 'admission') || e.control.kind === 'add' || e.control.kind === 'room' || e.control.kind === 'mute' || e.control.kind === 'ban' || e.control.kind === 'policy').filter(e => {
+      if ((e.control.kind === 'invite' || e.control.kind === 'admission')) return invites[e.control.invite.id]?.creator === e.from;
       return !!eventFromMember(e, invites, account);
     }).map(e => e.txId));
     const next = mergeModerationMemos(savedControls, memos.filter(m => controlTxs.has(m.txId)));
     if (next.length === savedControls.length) return;
     saveModerationMemos(account, next); setSavedControls(next);
-  }, [cg2Events, invites, account, memos, savedControls]);
+  }, [allGroupEvents, invites, account, memos, savedControls]);
   const inviteViews = useMemo(() => deriveInviteGroups(cg2Events.filter(e => e.control.kind !== 'msg' || !restrictedAt(moderation[e.control.id], e.from, e.time)), invites, account, decisions).map(v => {
     const banned = moderation[v.invite.id]?.bans ?? {};
     return { ...v, joined: v.joined.filter(a => banned[a] === undefined) };
@@ -892,7 +893,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   } : null;
   const createInviteGroup = async (name: string, members: string[], avatar?: CryptAvatar) => {
     const invite = draftInvite(name, members, avatar, newInviteGroupId());
-    if (!invite) return false;
+    if (!invite || invite.members.length > MAX_INVITE_MEMBERS) return false;
     let payload: string;
     try { payload = encodeInvite(invite); } catch (e) { toast({ title: (e as Error).message, variant: 'destructive' }); return false; }
     if (!(await sendCg2(members, contacts, payload, `Invites sent to ${members.length} friend${members.length > 1 ? 's' : ''}`))) return false;
@@ -1001,6 +1002,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const unlistRoom = (id: string) => {
     const v = viewById(id);
     if (!v?.isCreator) return Promise.resolve(false);
+    if (v.invite.members.length > MAX_INVITE_MEMBERS) { toast({ title: 'Rooms larger than eight members must stay public', variant: 'destructive' }); return Promise.resolve(false); }
     return sendRoomPolicy(v, encodeUnlist(id), encodeRoomPolicy(id, false, moderation[id]?.protected ?? v.invite.members.map(m => m.account)), v.invite.members.map(m => m.account).filter(a => a !== account), false);
   };
   const moderationPlan = (n: NonNullable<typeof pendingModeration>) => {
@@ -1029,25 +1031,27 @@ export function Messenger({ account, session }: { account: string; session: NonN
   /** The creator adds the requester by sending the grown invite to every member (old members keep their keys). */
   const joinPlan = (r: JoinRequest) => {
     const v = viewById(r.groupId);
-    if (!v || !v.isCreator || !listedIds.has(r.groupId) || v.invite.members.length >= MAX_INVITE_MEMBERS || v.invite.members.some(m => m.account === r.from) || moderation[r.groupId]?.bans[r.from] !== undefined) return null;
-    const updated: InviteGroup = { ...v.invite, members: [...v.invite.members, { account: r.from, publicKey: r.publicKey }] };
+    if (!v || !v.isCreator || !listedIds.has(r.groupId) || v.invite.members.length >= MAX_PUBLIC_ROOM_MEMBERS || v.invite.members.some(m => m.account === r.from) || moderation[r.groupId]?.bans[r.from] !== undefined) return null;
+    if (v.invite.members.length > MAX_INVITE_MEMBERS && !moderation[r.groupId]?.listed) return null;
+    const updated: InviteGroup = { ...v.invite, publicRoom: true, members: [...v.invite.members, { account: r.from, publicKey: r.publicKey }] };
     let payload: string;
-    try { payload = encodeInvite(updated); } catch { return null; }
-    const to = updated.members.map(m => m.account).filter(a => a !== account && moderation[v.invite.id]?.bans[a] === undefined);
+    try { payload = encodeAdmission(updated); } catch { return null; }
+    const to = v.invite.members.map(m => m.account).filter(a => a !== account && moderation[v.invite.id]?.bans[a] === undefined);
+    const delta = encodeMemberAdd(v.invite, { account: r.from, publicKey: r.publicKey });
     const state = moderation[updated.id];
     const policy = encodeRoomPolicy(updated.id, true, state?.protected ?? v.invite.members.map(m => m.account));
     const snapshot = encodePolicySnapshot(updated.id, state?.protected ?? v.invite.members.map(m => m.account), Object.keys(state?.bans ?? {}), Object.entries(state?.mutes ?? {}).flatMap(([a, intervals]) => {
       const longest = intervals.filter(m => m.until > Date.now()).sort((a, b) => b.until - a.until)[0];
       return longest ? [[a, longest.from, longest.until] as [string, number, number]] : [];
     }));
-    return { v, updated, payload, policy, snapshot, to, cost: `${(parseFloat(cg2Cost(payload, to.length)) + parseFloat(cg2Cost(policy, to.length)) + parseFloat(cg2Cost(snapshot, 1))).toFixed(4)} CHEESE` };
+    return { v, updated, payload, delta, policy, snapshot, to, cost: `${(parseFloat(cg2Cost(payload, 1)) + parseFloat(cg2Cost(delta, to.length)) + parseFloat(cg2Cost(policy, to.length + 1)) + parseFloat(cg2Cost(snapshot, 1))).toFixed(4)} CHEESE` };
   };
   const confirmJoin = async () => {
-    if (!acceptingJoin) return false;
+    if (!acceptingJoin || busy) return false;
     const plan = joinPlan(acceptingJoin);
     if (!plan) { toast({ title: 'This room is full or the request is out of date', variant: 'destructive' }); setAcceptingJoin(null); return false; }
     if (!key) return false;
-    const actions = [...buildCg2Actions(key, plan.to, keysOf(plan.updated), plan.payload, [permission]), ...buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.snapshot, [permission]), ...buildCg2Actions(key, plan.to, keysOf(plan.updated), plan.policy, [permission])];
+    const actions = [...buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.payload, [permission]), ...buildCg2Actions(key, plan.to, keysOf(plan.updated), plan.delta, [permission]), ...buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.snapshot, [permission]), ...buildCg2Actions(key, [...plan.to, acceptingJoin.from], keysOf(plan.updated), plan.policy, [permission])];
     setBusy(true);
     let r;
     try { r = await executeTransaction(actions, { successTitle: `${acceptingJoin.from} invited to ${plan.v.name}` }); }
@@ -1204,7 +1208,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         const plan = joinPlan(acceptingJoin);
         if (!plan) return null;
         return <PaidActionDialog title={`🌐 Add ${nameFor(acceptingJoin.from)} to ${plan.v.name}`} cost={plan.cost} confirmLabel="Pay & invite" busy={busy}
-          description={`Sends the updated invite, encrypted, to all ${plan.to.length} other members. ${acceptingJoin.from} then chooses Join or Decline. Existing members and their keys stay the same.`}
+          description={`Sends ${acceptingJoin.from} a complete encrypted invite and notifies ${plan.to.length} existing members of the addition. ${acceptingJoin.from} then chooses Join or Decline. Existing members and their keys stay the same.`}
           onConfirm={confirmJoin} onClose={() => setAcceptingJoin(null)} />;
       })()}
       {listingRoom && (() => {
@@ -1227,7 +1231,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         contacts={contacts} lastAt={lastAt} badge={badge} removeFriend={removeFriend} setRoomsOpen={setRoomsOpen}
         backupFile={keyLocked ? lockedFile : key} keyLocked={keyLocked} canLock={canLock} lockKey={() => void lockKey()}
         joinRequestsPanel={<JoinRequests requests={joinRequests} nameFor={nameFor} roomName={id => viewById(id)?.name ?? 'a room'}
-          roomFull={id => (invites[id]?.members.length ?? MAX_INVITE_MEMBERS) >= MAX_INVITE_MEMBERS} onAccept={setAcceptingJoin}
+          roomFull={id => (invites[id]?.members.length ?? MAX_PUBLIC_ROOM_MEMBERS) >= MAX_PUBLIC_ROOM_MEMBERS} onAccept={setAcceptingJoin}
           onDecline={r => setJoinDeclines(declineJoin(account, r.groupId, r.from, r.time))}
           onBlock={r => { setJoinDeclines(declineJoin(account, r.groupId, r.from, r.time)); blockAccount(r.from); }} />} />
 

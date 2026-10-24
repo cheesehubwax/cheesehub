@@ -17,16 +17,16 @@ describe('CHEESECrypt', () => {
     expect(new TextEncoder().encode(memo).length).toBeLessThanOrEqual(MEMO_MAX_BYTES);
     expect(() => encryptMemo('x'.repeat(MAX_PLAINTEXT_BYTES + 1), b.publicKey, a.secretKey)).toThrow();
   });
-  it('sends 0.0010 CHEESE to the recipient and splits the 0.0100 platform fee 80/20 in the same transaction', () => {
+  it('sends 0.0001 CHEESE to the recipient and splits the 0.0100 platform fee 80/20 in the same transaction', () => {
     const auth = [{ actor: 'alice.wam', permission: 'active' }];
     const actions = buildSendMessageActions('alice.wam', 'bob.wam', 'enc', auth);
     expect(actions).toHaveLength(3);
-    expect(actions[0].data).toEqual({ from: 'alice.wam', to: 'bob.wam', quantity: '0.0010 CHEESE', memo: 'enc' });
+    expect(actions[0].data).toEqual({ from: 'alice.wam', to: 'bob.wam', quantity: '0.0001 CHEESE', memo: 'enc' });
     expect(actions[1].data.to).toBe('eosio.null');
     expect(actions[1].data.quantity).toBe('0.0080 CHEESE');
     expect(actions[2].data).toMatchObject({ to: 'xcheeseliqst', quantity: '0.0020 CHEESE' });
     expect(actions.every((x) => x.account === 'cheeseburger')).toBe(true);
-    expect(MESSAGE_TOTAL_QUANTITY).toBe('0.0110 CHEESE');
+    expect(MESSAGE_TOTAL_QUANTITY).toBe('0.0101 CHEESE');
   });
   it('publishes a key with a split 0.0100 fee', () => {
     const actions = buildPublishKeyActions('alice.wam', a.publicKey, []);

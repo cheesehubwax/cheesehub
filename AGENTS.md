@@ -1,5 +1,7 @@
 # Agent rules
 
+- CHEESECrypt private invites retain their original wire cap; public admissions use bounded complete multipart bootstraps for newcomers and owner-authenticated roster-digest predecessor deltas for existing members in one atomic transaction, preserving pairwise keys and first-public protection.
+
 - CHEESECrypt public-room moderation uses authenticated encrypted CG2 owner controls and an immutable first-public protected roster; encrypted controls are retained per account and re-derived before edits/unread/rendering. Bans exclude future recipient copies, never revoke held keys, while mute intervals permanently suppress traffic and quotes sent within them.
 
 - CHEESECrypt edits resolve authenticated followups against an unambiguous content-and-transaction digest within the same sender/conversation; preserve original row identity/time and apply only complete in-window replacements. Voice edits use a flagged extra target part; owner logs derive from decrypted history only for currently public owned rooms, never central storage.

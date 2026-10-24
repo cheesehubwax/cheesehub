@@ -168,14 +168,14 @@ export function assembleVoice(parts: VoicePartMemo[], now = Date.now()): VoiceNo
 export const VOICE_FEE_QUANTITY = '1.0000 CHEESE';
 const units = (q: string) => Math.round(parseFloat(q) * 10000);
 
-/** Total CHEESE for a voice note: one flat platform fee plus 0.0010 per part to every recipient. */
+/** Total CHEESE for a voice note: one flat platform fee plus 0.0001 per part to every recipient. */
 export function voiceNoteCost(parts: number, recipients = 1): string {
   return `${((units(VOICE_FEE_QUANTITY) + units(MESSAGE_RECIPIENT_QUANTITY) * parts * recipients) / 10000).toFixed(4)} CHEESE`;
 }
 
 /**
  * Transactions to sign, in order. Each carries up to 30 parts; every recipient gets its own encrypted
- * copy of each part paid 0.0010 CHEESE. The split 1 CHEESE platform fee is paid once, in the first transaction.
+ * copy of each part paid 0.0001 CHEESE. The split 1 CHEESE platform fee is paid once, in the first transaction.
  */
 export function buildVoiceBatches(key: MessagingKey, recipients: string[], group: VoiceGroupRef | null, clip: VoiceClip,
   contacts: Record<string, string>, auth: unknown[], id?: string, editTarget?: string): unknown[][] {

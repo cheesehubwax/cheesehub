@@ -30,7 +30,7 @@ export function CreateGroupDialog({ contacts, avatars, nameFor = account => acco
     <Dialog open={!painting} onOpenChange={open => { if (!open && !busy) onClose(); }}>
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>👥 New group</DialogTitle>
-          <DialogDescription>Pick 1–{max} friends (up to {MAX_INVITE_MEMBERS} people with you). Each gets an encrypted invite and chooses to join.</DialogDescription></DialogHeader>
+          <DialogDescription>Pick 1–{max} friends (up to {MAX_INVITE_MEMBERS} people with you). Public rooms can grow to 50.</DialogDescription></DialogHeader>
         <div className="flex items-center gap-3">
           <button type="button" onClick={() => setPainting(true)} aria-label="Set group picture" title="Set group picture" className="shrink-0 rounded-md border border-border p-1 hover:border-cheese">
             {avatar ? <PixelAvatar account="group" avatar={avatar} className="h-10 w-10" /> : <span className="flex h-10 w-10 items-center justify-center text-xl">👥</span>}
@@ -45,11 +45,11 @@ export function CreateGroupDialog({ contacts, avatars, nameFor = account => acco
           </label>)}
           {!Object.keys(contacts).length && <p className="text-sm text-muted-foreground">Add friends’ public keys first.</p>}
         </div>
-        {cost && <p className="text-xs text-muted-foreground">Invites cost {cost}: 0.0100 CHEESE per part platform fee (80% eosio.null, 20% xcheeseliqst) plus 0.0010 CHEESE per part to each invited friend, in one transaction.</p>}
+        {cost && <p className="text-xs text-muted-foreground">Invites cost {cost}: 0.0100 CHEESE per part platform fee (80% eosio.null, 20% xcheeseliqst) plus 0.0001 CHEESE per part to each invited friend, in one transaction.</p>}
         <TermsCheckbox id="crypt-group-terms" checked={agreed} onCheckedChange={setAgreed} />
         <DialogFooter>
           <Button variant="outline" disabled={busy} onClick={onClose}>Cancel</Button>
-          <Button disabled={busy || !agreed || !validName || selected.length < 1} onClick={() => void onCreate(validName!, selected, avatar)}>
+          <Button disabled={busy || !agreed || !validName || selected.length < 1} onClick={() => { if (validName) void onCreate(validName, selected, avatar); }}>
             {busy ? 'Sending invites…' : 'Create & send invites'}</Button>
         </DialogFooter>
       </DialogContent>

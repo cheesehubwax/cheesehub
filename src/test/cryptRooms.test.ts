@@ -15,7 +15,7 @@ const nullLeg = (from: string, memo: string, time: number, quantity = '0.0080 CH
 let tx = 0;
 const memos = (text: string, from: MessagingKey, to: MessagingKey, time: number): ChainMemo[] => {
   const txId = `tx${++tx}`;
-  return splitMessage(text).map(p => ({ txId, time, from: from.account, to: to.account, quantity: '0.0010 CHEESE', memo: encryptMemo(p, to.publicKey, from.secretKey) }));
+  return splitMessage(text).map(p => ({ txId, time, from: from.account, to: to.account, quantity: '0.0001 CHEESE', memo: encryptMemo(p, to.publicKey, from.secretKey) }));
 };
 const events = (entries: ReturnType<typeof decodeConversations>): Cg2Event[] =>
   entries.flatMap(c => c.control && c.usedKey && !c.voice ? [{ key: c.key, txId: c.txId, time: c.time, from: c.from, to: c.to, control: c.control, usedKey: c.usedKey }] : []);
@@ -23,13 +23,13 @@ const events = (entries: ReturnType<typeof decodeConversations>): Cg2Event[] =>
 describe('room listing memos', () => {
   it('round-trips and fits one 256-byte memo even at the longest limits', () => {
     expect(parseRoomMemo(encodeListing(room))).toEqual({ kind: 'list', listing: room });
-    const longest = encodeListing({ ...room, name: 'n'.repeat(32), topic: 't'.repeat(56), tags: ['aaaaaaaaaa', 'bbbbbbbbbb', 'cccccccccc'], members: 8 });
+    const longest = encodeListing({ ...room, name: 'n'.repeat(32), topic: 't'.repeat(56), tags: ['aaaaaaaaaa', 'bbbbbbbbbb', 'cccccccccc'], members: 50 });
     expect(new TextEncoder().encode(longest).length).toBeLessThanOrEqual(256);
     expect(parseRoomMemo(encodeUnlist(ID))).toEqual({ kind: 'unlist', id: ID });
   });
-  it('rejects bad keys, 9 members, a fourth tag and over-long text', () => {
+  it('rejects bad keys, 51 members, a fourth tag and over-long text', () => {
     expect(() => encodeListing({ ...room, publicKey: 'short' })).toThrow();
-    expect(() => encodeListing({ ...room, members: 9 })).toThrow();
+    expect(() => encodeListing({ ...room, members: 51 })).toThrow();
     expect(() => encodeListing({ ...room, tags: ['a', 'b', 'c', 'd'] })).toThrow();
     expect(() => encodeListing({ ...room, name: '🧀'.repeat(32), topic: '🧀'.repeat(56) })).toThrow(/too long/);
     expect(parseRoomMemo('CRYPTROOM1:{"i":"zz"}')).toBeNull();
@@ -44,12 +44,12 @@ describe('room fee', () => {
       ['eosio.null', '0.0080 CHEESE', memo], ['xcheeseliqst', '0.0020 CHEESE', memo],
     ]);
   });
-  it('a join request is one part: 0.0010 CHEESE to the creator plus the 0.0100 CHEESE platform fee', () => {
+  it('a join request is one part: 0.0001 CHEESE to the creator plus the 0.0100 CHEESE platform fee', () => {
     const payload = encodeNotice('join', ID);
     expect(partsOf(payload)).toBe(1);
-    expect(groupMessageCost(1, 1)).toBe('0.0110 CHEESE');
+    expect(groupMessageCost(1, 1)).toBe('0.0101 CHEESE');
     const actions = buildCg2Actions(bob, ['alice'], { alice: alice.publicKey }, payload, []);
-    expect(actions.map(a => [a.data.to, a.data.quantity])).toEqual([['alice', '0.0010 CHEESE'], ['eosio.null', '0.0080 CHEESE'], ['xcheeseliqst', '0.0020 CHEESE']]);
+    expect(actions.map(a => [a.data.to, a.data.quantity])).toEqual([['alice', '0.0001 CHEESE'], ['eosio.null', '0.0080 CHEESE'], ['xcheeseliqst', '0.0020 CHEESE']]);
   });
 });
 

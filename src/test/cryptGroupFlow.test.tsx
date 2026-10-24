@@ -172,7 +172,7 @@ describe('group creation and signing gate', () => {
     expect(actions.filter(a => a.data.to === 'carol').length).toBe(parts);
     expect(actions.filter(a => a.data.to === 'eosio.null').every(a => a.data.quantity === '0.0080 CHEESE')).toBe(true);
     expect(actions.filter(a => a.data.to === 'eosio.null').length).toBe(parts);
-    expect(actions.reduce((t, a) => t + Math.round(parseFloat(a.data.quantity) * 10000), 0)).toBe(parts * 120);
+    expect(actions.reduce((t, a) => t + Math.round(parseFloat(a.data.quantity) * 10000), 0)).toBe(parts * 102);
     const stored = loadInvites('alice');
     const id = Object.keys(stored)[0];
     expect(stored[id].members.map(m => m.account)).toEqual(['alice', 'bob', 'carol']);
