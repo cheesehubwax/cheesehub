@@ -55,16 +55,46 @@ describe('public rooms', () => {
     await waitFor(() => expect(loadInvites('alice')[ID].members.map(m => m.account)).toEqual(['alice', 'bob', 'carol']));
   });
 
-  it('declining a join request is free and remembered', async () => {
+  it('declining a join request pays one encrypted decline note to the requester and is remembered', async () => {
     const view = mount();
     const panel = await screen.findByRole('region', { name: 'Room join requests' });
     fireEvent.click(within(panel).getByRole('button', { name: 'Decline' }));
-    expect(screen.queryByRole('region', { name: 'Room join requests' })).not.toBeInTheDocument();
+    const pay = await screen.findByRole('button', { name: 'Pay & decline' });
+    expect(pay).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(pay);
+    await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
+    const actions = calls.transact.mock.calls[0][0] as { data: { to: string; quantity: string } }[];
+    expect(actions.map(a => [a.data.to, a.data.quantity])).toEqual([['carol', '0.0001 CHEESE'], ['eosio.null', '0.0080 CHEESE'], ['xcheeseliqst', '0.0020 CHEESE']]);
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Room join requests' })).not.toBeInTheDocument());
     const fetchedBeforeRemount = calls.fetch.mock.calls.length;
     view.unmount(); mount();
     await waitFor(() => expect(calls.fetch.mock.calls.length).toBeGreaterThan(fetchedBeforeRemount));
     expect(screen.queryByRole('region', { name: 'Room join requests' })).not.toBeInTheDocument();
-    expect(calls.transact).not.toHaveBeenCalled();
+  });
+
+  it('the requester sees a pending request in Groups until the owner declines it', async () => {
+    localStorage.clear(); saveKey(carol);
+    saveRoomRequest('carol', { id: ID, creator: 'alice', publicKey: alice.publicKey, name: 'Cheese club' }, 1000);
+    calls.fetch.mockResolvedValue([]);
+    const mountCarol = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="carol" session={{ permissionLevel: { actor: 'carol', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
+    const first = mountCarol();
+    expect(await screen.findByText(/Request pending/)).toBeInTheDocument();
+    first.unmount();
+    calls.fetch.mockResolvedValue([{ txId: 'no', time: 5000, from: 'alice', to: 'carol', quantity: '0.0001 CHEESE', memo: encryptMemo(encodeNotice('join-no', ID), carol.publicKey, alice.secretKey) }]);
+    mountCarol();
+    expect(await screen.findByText(/Request declined by alice/)).toBeInTheDocument();
+    expect(screen.queryByText(/Request pending/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss declined request' }));
+    expect(screen.queryByText(/Request declined/)).not.toBeInTheDocument();
+  });
+
+  it('a decline sent before a newer request does not cancel it', async () => {
+    localStorage.clear(); saveKey(carol);
+    saveRoomRequest('carol', { id: ID, creator: 'alice', publicKey: alice.publicKey, name: 'Cheese club' }, 1_000_000);
+    calls.fetch.mockResolvedValue([{ txId: 'no', time: 1000, from: 'alice', to: 'carol', quantity: '0.0001 CHEESE', memo: encryptMemo(encodeNotice('join-no', ID), carol.publicKey, alice.secretKey) }]);
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="carol" session={{ permissionLevel: { actor: 'carol', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
+    expect(await screen.findByText(/Request pending/)).toBeInTheDocument();
   });
 
   it('delivers the ninth-member bootstrap through the stranger path and lets the newcomer join', async () => {
