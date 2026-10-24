@@ -1,20 +1,42 @@
-# App ↔ contract sync checklist
+# App ↔ blind router sync checklist
 
-Whenever a CHEESECrypt app feature changes, check this table and update the contract if the rule lives here too.
+The contract is a blind payment router, not a room/moderation authority. The app is still on
+direct peer-to-peer transfers; deployment and history integration are pending. Update this
+checklist with every CHEESECrypt change, but do not reintroduce plaintext roles to enforce client policy.
 
-| App rule (source) | Contract location |
+| App rule / source | Router responsibility / integration status |
 |---|---|
-| Fees 0.0100 text / 0.0200 NFT first / 1.0000 voice / 0.0001 per copy (`cheeseCrypt.ts`, `cryptVoice.ts`) | `config` defaults, `platform_fee` |
-| 80% eosio.null / 20% xcheeseliqst, integer split (`cheeseCrypt.ts`) | `pay_platform` |
-| Private cap 8, public cap 50 (`cryptInviteGroups.ts`) | `config.private_cap/public_cap`, `addmember`, `deliver` |
-| Max parts 35 (`MAX_MEMBERSHIP_PARTS`) | `config.max_parts` |
-| Room listing fee 0.0100 (`cryptRooms.ts`) | `setpublic` |
-| Founders frozen at first public listing (`cryptModeration.ts`) | `setpublic` (`ever_public`, `founder`) |
-| Mutes 15m/1h/6h/24h, owner immune, muted admins act as members | `muteuser`, `live_role` |
-| Owner-only bans, founders immune, ban removes admin | `banuser` |
-| Admin collapse blocked on owner/founders | `collapsemsg`, `uncollapse` |
-| 24h edit window, 72h owner edit-log retention (`cryptEdits.ts`) | `config.edit_window_sec/receipt_keep_sec`, `editmsg` |
-| Memo ≤ 256 bytes (eosio.token) | `deliver` |
+| Text 0.0100/part, NFT first 0.0200 + 0.0100/rest (`cheeseCrypt.ts`) | `config`, `platform_fee`; caller-declared kind, bounded arithmetic |
+| Voice 1.0000 once/note, 30-part batches (`cryptVoice.ts`) | 1.0000 per `sendmsg` call only; multi-call continuation NOT supported; retain direct voice path |
+| Recipient 0.0001 per part | `recipient_fee` per copy; exact `parts` copies per distinct recipient |
+| Shared 80% eosio.null / 20% xcheeseliqst | `pay_platform` integer split; `setconfig` requires 80 |
+| Key creation 100 CHEESE, publishing fee | Existing direct-transfer path, not router messaging |
+| Private 8 / public 50; only owner admits (`cryptInviteGroups.ts`) | Client-only authenticated envelopes; router bounds 49 recipients per action, not total membership |
+| 35 membership parts, usual text 20 | Router hard bound 35; client keeps content-specific bounds |
+| CRYPTROOM1 listing/unlisting 0.0100 (`cryptRooms.ts`) | Existing plaintext fee-leg broadcasts; no rooms table/action; no generic router fee substitution |
+| Immutable first-public founder roster | Client-only encrypted policy replay |
+| Owner/admin appointment, mute, ban, collapse (`cryptModeration.ts`) | Client-only authenticated CG2 authority; NO moderation actions/tables |
+| Admin cannot ban; founders ban/admin-collapse immune | Client-only; do not infer role from fee kind, balance owner or recipient array |
+| Mutes permanently suppress send-time traffic/quotes | Client-only presentation/filtering; malicious clients can ignore it |
+| Reports member→owner+admins, admin→owner | Encrypted ordinary text controls; notifications only; no report table |
+| Edits 24h, owner log 72h (`cryptEdits.ts`) | Client-only same-sender/conversation digest resolution; no edit receipts/table/action |
+| Memo ≤256 bytes | Router checks memo byte length, not plaintext semantics |
+| Authenticated original sender (`cheeseCrypt.ts`, `cryptGroups.ts`) | REQUIRED new trace adapter: verify sendmsg authority + inline transfer ancestry; normalize sender before decryption/authority replay |
+| TX IDs, Greymass Fuel, success before local state | Keep existing signing requirements; verify router delivery traces and rollback on testnet |
 
-Not in the contract (stay client-side): encryption, key files/locking, profiles/avatars, block list,
-public inbox, message reports (encrypted CG2 `report` notices: members → owner + admins, admins → owner; ordinary messages with the normal per-copy fee), mute *hiding* of traffic sent during a mute, reply metadata.
+Only tables: `config`, `balances`. Only explicit actions: `setconfig`, `setpaused`, `withdraw`,
+`sendmsg`; configured-token transfer notifications handle deposits. ABI breaks from old draft.
+
+## Integration gates (not yet verified)
+- Deploy fresh testnet contract; never assume old tables/config automatically migrate.
+- Exercise auth, balance ownership, exact fee split, denomination lock, paused withdrawals,
+  invalid shapes, missing recipients and atomic failure rollback through real chain execution.
+- Add trace-backed original-sender history discovery for both parties; multiple router actions
+  in one transaction must not cross-attribute copies. Never trust memo-only sender fields.
+- Verify legacy/new encrypted text, NFT, complete membership/admissions, edits, reports and
+  send-time moderation with that adapter; preserve transaction IDs and notification deduplication.
+- Keep key publishing/listings/voice on direct paths until their own compatibility gates pass.
+- Measure maximum usable fanout under WAX transaction size/CPU/NET and Fuel limitations.
+
+Native shared-rule tests cover pricing/splits/hard bounds; they are not an audit or chain tests.
+Privacy is reduced explicit metadata, not hidden senders/recipients or guaranteed secret roles.
