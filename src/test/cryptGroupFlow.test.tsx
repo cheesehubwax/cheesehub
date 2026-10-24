@@ -79,7 +79,7 @@ describe('group creation and signing gate', () => {
     expect(loadContacts('alice').carol).toBeDefined();
     expect(screen.queryByRole('button', { name: /Group · 3 people/ })).not.toBeInTheDocument();
     calls.fetch.mockResolvedValue([...history, { ...history[0], txId: 'new', memo: encryptMemo(groupPayload(group, 'new message'), alice.publicKey, bob.secretKey) }]);
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh messages' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' })); fireEvent.click(await screen.findByRole('button', { name: 'Refresh messages' }));
     await waitFor(() => expect(calls.fetch).toHaveBeenCalledTimes(2));
     view.unmount();
     mount(<Messenger {...props} />);
@@ -114,7 +114,7 @@ describe('group creation and signing gate', () => {
     expect(loadKey('alice')).toEqual(alice);
     expect(loadRemovedContacts('alice')).toContain('bob');
     expect(screen.queryByRole('button', { name: 'Remove friend bob' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh messages' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' })); fireEvent.click(await screen.findByRole('button', { name: 'Refresh messages' }));
     await waitFor(() => expect(calls.fetch).toHaveBeenCalledTimes(2));
     view.unmount();
     const remounted = mount(<Messenger {...props} />);
@@ -179,7 +179,7 @@ describe('group creation and signing gate', () => {
     await screen.findByText('Nobody else has joined yet. You can send messages once someone joins.');
 
     calls.fetch.mockResolvedValue(splitMessage(encodeNotice('joined', id)).map(p => ({ txId: 'j1', time: Date.now(), from: 'bob', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo(p, alice.publicKey, bob.secretKey) })));
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh messages' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' })); fireEvent.click(await screen.findByRole('button', { name: 'Refresh messages' }));
     const box = await screen.findByPlaceholderText('Message group');
     fireEvent.change(box, { target: { value: 'hello group' } });
     fireEvent.click(screen.getByRole('checkbox'));
