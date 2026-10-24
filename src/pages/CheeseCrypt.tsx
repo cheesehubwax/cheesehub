@@ -49,7 +49,7 @@ import { ChatMessageItem } from '@/components/crypt/ChatMessageItem';
 import { EditedMessagesDialog } from '@/components/crypt/EditedMessagesDialog';
 import { RoomModerationDialog } from '@/components/crypt/RoomModerationDialog';
 import { encodeAdmin, encodeCollapse, encodeModeration, encodePolicySnapshot, encodeRoomPolicy, type MuteMinutes } from '@/lib/cryptInviteGroups';
-import { applyCollapses, canCollapseAuthor, canMuteMember, collapsedKeys, deriveModeration, loadModerationMemos, mergeModerationMemos, moderateMessages, mutedUntil, restrictedAt, roomRole, saveModerationMemos } from '@/lib/cryptModeration';
+import { applyCollapses, canCollapseAuthor, canMuteMember, collapsedKeys, deriveModeration, founderBadges, loadModerationMemos, mergeModerationMemos, moderateMessages, mutedUntil, restrictedAt, roomRole, saveModerationMemos } from '@/lib/cryptModeration';
 import { applyEdits, canEdit, editTarget, encodeEdit, publicEditLog } from '@/lib/cryptEdits';
 import type { ConversationEntry } from '@/lib/cryptGroups';
 import { CryptHero } from '@/components/crypt/CryptHero';
