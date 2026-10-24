@@ -105,6 +105,17 @@ describe('group state', () => {
     expect(v.pending).toEqual(['carol']);
   });
 
+  it('counts members already in a public room as joined for a newcomer admitted by the owner, until they leave', () => {
+    const room = { ...invite, publicRoom: true, members: [...invite.members, { account: 'dave', publicKey: dave.publicKey }] };
+    const adm = e(alice, dave, 5, { kind: 'admission', invite: room });
+    const v = deriveInviteGroups([adm], { [ID]: room }, 'dave', { [ID]: { status: 'joined', at: 6 } })[0];
+    expect(v.joined).toEqual(['alice', 'bob', 'carol', 'dave']);
+    const forged = deriveInviteGroups([{ ...adm, from: 'bob' }], { [ID]: room }, 'dave', {})[0];
+    expect(forged.joined).toEqual(['alice']);
+    const left = deriveInviteGroups([adm, { ...e(carol, dave, 9, { kind: 'leave', id: ID }), usedKey: carol.publicKey }], { [ID]: room }, 'dave', {})[0];
+    expect(left.joined).toEqual(['alice', 'bob']);
+  });
+
   it('starts as invited and ignores notices opened with a key the invite did not list', () => {
     const forged = { ...e(carol, bob, 5, { kind: 'joined', id: ID }), usedKey: dave.publicKey };
     const v = deriveInviteGroups([forged], invites, 'bob', {})[0];

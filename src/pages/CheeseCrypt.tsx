@@ -25,7 +25,7 @@ import { nftToken, parseNftMessage } from '@/lib/cryptNft';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FriendNameDialog } from '@/components/crypt/FriendNameDialog';
 import { cryptDisplayName, loadCryptNames, saveCryptName } from '@/lib/cryptNames';
-import { accountAvatar, type CryptAvatar } from '@/lib/cryptAvatar';
+import { accountAvatar, parseAvatar, type CryptAvatar } from '@/lib/cryptAvatar';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { VaultPrompt } from '@/components/crypt/VaultPrompt';
 import { CreateGroupDialog } from '@/components/crypt/CreateGroupDialog';
@@ -326,10 +326,18 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if (next.length === savedControls.length) return;
     saveModerationMemos(account, next); setSavedControls(next);
   }, [allGroupEvents, invites, account, memos, savedControls]);
+  const { data: roomMemos, isFetching: roomsLoading, refetch: refetchRooms } = useQuery({
+    queryKey: ['crypt-rooms'], enabled: !!key, queryFn: () => fetchRoomMemos(ROOM_PREFIX),
+    staleTime: 60_000, refetchInterval: () => (document.visibilityState === 'visible' ? 60_000 : false), retry: false,
+  });
+  const listings = useMemo(() => collectListings(roomMemos ?? []).filter(l => !blocked.includes(l.creator)), [roomMemos, blocked]);
   const inviteViews = useMemo(() => deriveInviteGroups(cg2Events.filter(e => e.control.kind !== 'msg' || !restrictedAt(moderation[e.control.id], e.from, e.time)), invites, account, decisions).map(v => {
     const banned = moderation[v.invite.id]?.bans ?? {};
-    return { ...v, joined: v.joined.filter(a => banned[a] === undefined) };
-  }), [cg2Events, invites, account, decisions, moderation]);
+    // Display-only fallback: a public room's picture from the owner's own listing when no group picture reached me.
+    const listed = v.avatar ? undefined : listings.find(l => l.id === v.invite.id && l.creator === v.invite.creator)?.avatar;
+    const avatar = v.avatar ?? (listed ? parseAvatar({ version: 1, pixels: listed }) : undefined);
+    return { ...v, avatar, joined: v.joined.filter(a => banned[a] === undefined) };
+  }), [cg2Events, invites, account, decisions, moderation, listings]);
   // My own join requests: pending until the creator's invite arrives (accepted) or a decline notice does.
   const requestOutcomes = useMemo(() => roomRequestOutcomes(roomRequests, roomInviteEvents, account,
     new Set(inviteViews.filter(v => !v.isCreator).map(v => v.invite.id))), [roomRequests, roomInviteEvents, account, inviteViews]);
@@ -368,11 +376,6 @@ export function Messenger({ account, session }: { account: string; session: NonN
         className="h-7 w-7 shrink-0 text-muted-foreground" onClick={() => setRoomRequests(removeRoomRequest(account, id))}><X className="h-3.5 w-3.5" /></Button>}
     </li>;
   };
-  const { data: roomMemos, isFetching: roomsLoading, refetch: refetchRooms } = useQuery({
-    queryKey: ['crypt-rooms'], enabled: !!key, queryFn: () => fetchRoomMemos(ROOM_PREFIX),
-    staleTime: 60_000, refetchInterval: () => (document.visibilityState === 'visible' ? 60_000 : false), retry: false,
-  });
-  const listings = useMemo(() => collectListings(roomMemos ?? []).filter(l => !blocked.includes(l.creator)), [roomMemos, blocked]);
   /** The room owner's public username from their listing (display only), else their known name or account. */
   function roomOwnerName(creator: string, roomId: string) {
     const l = listings.find(x => x.id === roomId && x.creator === creator);
