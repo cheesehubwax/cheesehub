@@ -65,6 +65,17 @@ describe('public room capacity', () => {
     expect(groupMessageCost(1, 4)).toBe('0.0104 CHEESE');
     expect(groupMessageCost(1, 49)).toBe('0.0149 CHEESE');
   });
+  it('rejects additions authorized by a policy which drops a protected member', () => {
+    const privateEight = { ...group, members: [...group.members, ...people.slice(0, 6)] };
+    const delta = event(encodeMemberAdd(privateEight, people[6]));
+    const invalid = event(encodeRoomPolicy(group.id, true, ['owner', 'member']));
+    expect(collectInvites([delta, invalid], 'member', me.publicKey, {}, { [group.id]: privateEight })[group.id].members).toHaveLength(8);
+  });
+  it('rejects admission paired with an unusable moderation snapshot', () => {
+    const admission = event(encodeAdmission(group));
+    const invalid = event(encodePolicySnapshot(group.id, ['member'], [], []));
+    expect(collectInvites([admission, invalid], 'member', me.publicKey, {}, {}, { [group.id]: { creator: 'owner', publicKey: owner.publicKey } })).toEqual({});
+  });
   it('does not lose traffic when a peer key belongs to two groups, or expose their DMs', () => {
     const other = { ...group, id: 'fedcba9876543210' };
     const actions = buildCg2Actions(owner, ['member'], { member: me.publicKey }, encodeGroupText(other.id, 'second group'), []);
