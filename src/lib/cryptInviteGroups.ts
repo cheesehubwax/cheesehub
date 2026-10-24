@@ -87,8 +87,21 @@ export function encodeInvite(g: InviteGroup): string {
   return wire('invite', body);
 }
 export const rosterDigest = (g: InviteGroup) => Array.from(nacl.hash(decodeUTF8(JSON.stringify([g.id, g.creator, g.created, g.members.map(m => [m.account, m.publicKey])]))).slice(0, 32), b => b.toString(16).padStart(2, '0')).join('');
-export function encodeAdmission(g: InviteGroup) {
-  const body = { i: g.id, n: g.name, o: g.creator, c: g.created, m: g.members.map(m => [m.account, m.publicKey]), ...(g.avatar ? { a: g.avatar.pixels } : {}) };
+/** Longest note (in characters) on a join request, acceptance or decline; a join request must still fit one memo. */
+export const JOIN_NOTE_MAX = 60;
+/** A valid note is plain text of 1–JOIN_NOTE_MAX characters with no control characters and no outer spaces. */
+export const validJoinNote = (n: unknown): n is string =>
+  typeof n === 'string' && n.length > 0 && n === n.trim() && [...n].length <= JOIN_NOTE_MAX && !/\p{Cc}/u.test(n);
+/** Trimmed note, or undefined when blank; throws when it cannot be sent. */
+export function cleanJoinNote(n: string | undefined): string | undefined {
+  const t = (n ?? '').trim();
+  if (!t) return undefined;
+  if (!validJoinNote(t)) throw new Error(`Keep the note to ${JOIN_NOTE_MAX} characters on one line`);
+  return t;
+}
+export function encodeAdmission(g: InviteGroup, note?: string) {
+  const t = cleanJoinNote(note);
+  const body = { i: g.id, n: g.name, o: g.creator, c: g.created, m: g.members.map(m => [m.account, m.publicKey]), ...(g.avatar ? { a: g.avatar.pixels } : {}), ...(t ? { t } : {}) };
   if (!validateInvite(body, true)) throw new Error('Invalid public room');
   return wire('admission', body);
 }
@@ -98,7 +111,10 @@ export function encodeMemberAdd(g: InviteGroup, member: InviteMember) {
   return payload;
 }
 export const encodeGroupText = (id: string, text: string) => wire('msg', { i: checkId(id), t: text });
-export const encodeNotice = (kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'join' | 'join-no', id: string) => wire(kind, { i: checkId(id) });
+export function encodeNotice(kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'join' | 'join-no', id: string, note?: string) {
+  const t = kind === 'join' || kind === 'join-no' ? cleanJoinNote(note) : undefined;
+  return wire(kind, { i: checkId(id), ...(t ? { t } : {}) });
+}
 export function encodeRoomPolicy(id: string, listed: boolean, protectedMembers: string[]) {
   if (!protectedMembers.length || protectedMembers.length > MAX_INVITE_MEMBERS || new Set(protectedMembers).size !== protectedMembers.length || protectedMembers.some(a => !ACCOUNT.test(a))) throw new Error('Invalid protected members');
   return wire('room', { i: checkId(id), l: listed, p: protectedMembers });
