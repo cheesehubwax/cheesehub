@@ -10,10 +10,18 @@ import { parseNftMessage } from '@/lib/cryptNft';
 import type { InboxRequest } from '@/lib/cryptPublicInbox';
 import { cn } from '@/lib/utils';
 
-export function PublicInboxDialog({ enabled, onChange }: { enabled: boolean; onChange: (enabled: boolean) => void }) {
-  const [open, setOpen] = useState(false);
+export function PublicInboxButton({ enabled, onClick }: { enabled: boolean; onClick: () => void }) {
+  return <CardAction icon={<Inbox className="h-4 w-4" />} label="Inbox" aria-label="Public inbox" title={`Public inbox is ${enabled ? 'on' : 'off'}`} className={cn(enabled && 'text-cheese')} onClick={onClick} />;
+}
+
+/** Uncontrolled renders its own button; pass open/onOpenChange to open it from elsewhere (e.g. a menu that unmounts). */
+export function PublicInboxDialog({ enabled, onChange, open: openProp, onOpenChange }: { enabled: boolean; onChange: (enabled: boolean) => void; open?: boolean; onOpenChange?: (open: boolean) => void }) {
+  const [ownOpen, setOwnOpen] = useState(false);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : ownOpen;
+  const setOpen = (v: boolean) => controlled ? onOpenChange?.(v) : setOwnOpen(v);
   return <>
-    <CardAction icon={<Inbox className="h-4 w-4" />} label="Inbox" aria-label="Public inbox" title={`Public inbox is ${enabled ? 'on' : 'off'}`} className={cn(enabled && 'text-cheese')} onClick={() => setOpen(true)} />
+    {!controlled && <PublicInboxButton enabled={enabled} onClick={() => setOpen(true)} />}
     <Dialog open={open} onOpenChange={setOpen}>
     <DialogContent className="max-w-md">
       <DialogHeader><DialogTitle>📥 Public inbox</DialogTitle><DialogDescription>Let people you haven’t added send you message requests.</DialogDescription></DialogHeader>
