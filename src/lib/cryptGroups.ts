@@ -86,6 +86,12 @@ export function buildGroupMessageActions(key: MessagingKey, group: CryptGroup, t
  */
 export type ConversationEntry = AssembledMessage & { group: CryptGroup | null; voice?: VoiceNote; igroup?: string; control?: Cg2; usedKey?: string };
 
+/** True only for genuine 1-on-1 traffic: never a CG1 group envelope or a CG2 invite-group copy. */
+export function isDirectMessage(m: ConversationEntry, account: string, other: string): boolean {
+  if (m.group || m.igroup) return false;
+  return (m.from === account && m.to === other) || (m.from === other && m.to === account);
+}
+
 /**
  * Only authenticated, fully reassembled envelopes can define a group.
  * `scoped` keys (introduced by invite groups) are tried only when the partner's contact key cannot open a memo,
