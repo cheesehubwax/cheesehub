@@ -22,7 +22,19 @@ const ID = /^[a-f0-9]{16}$/;
 const ACCOUNT = /^[a-z1-5.]{1,12}$/;
 const utf8Len = (s: string) => new TextEncoder().encode(s).length;
 
-export interface RoomListingInput { id: string; name: string; topic: string; tags: string[]; publicKey: string; members: number }
+export interface RoomListingInput { id: string; name: string; topic: string; tags: string[]; publicKey: string; members: number; avatar?: string }
+
+/** Description and tags typed when a room is created, kept on this device so listing can prefill them. */
+const infoKey = (account: string) => `cheesecrypt-room-info-${account}`;
+export type RoomInfo = { topic: string; tags: string[] };
+export function loadRoomInfo(account: string): Record<string, RoomInfo> {
+  try { const o = JSON.parse(localStorage.getItem(infoKey(account)) ?? '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; }
+}
+export function saveRoomInfo(account: string, id: string, info: RoomInfo) {
+  const all = loadRoomInfo(account);
+  all[id] = { topic: cleanRoomTopic(info.topic), tags: cleanTags(info.tags.join(' ')) };
+  localStorage.setItem(infoKey(account), JSON.stringify(all));
+}
 export interface RoomListing extends RoomListingInput { creator: string; time: number; txId: string }
 
 // eslint-disable-next-line no-control-regex
@@ -55,14 +67,24 @@ function validFields(o: Record<string, unknown>): RoomListingInput | null {
   }
   if (!validKey(o.k)) return null;
   if (typeof o.m !== 'number' || !Number.isInteger(o.m) || o.m < 1 || o.m > MAX_PUBLIC_ROOM_MEMBERS) return null;
-  return { id: o.i, name: o.n, topic: o.t, tags, publicKey: o.k, members: o.m };
+  // Optional palette-index room picture (64 hex digits, data only).
+  if (o.a !== undefined && (typeof o.a !== 'string' || !AVATAR_RE.test(o.a))) return null;
+  return { id: o.i, name: o.n, topic: o.t, tags, publicKey: o.k, members: o.m, ...(typeof o.a === 'string' ? { avatar: o.a } : {}) };
 }
+const AVATAR_RE = /^[0-9a-f]{64}$/;
 
-/** Plaintext listing memo; throws when a field is invalid or the memo would not fit one 256-byte memo. */
+/** Plaintext listing memo; throws when a field is invalid or the memo would not fit one 256-byte memo.
+ *  The room picture is optional and dropped when it would not fit alongside the text fields. */
 export function encodeListing(l: RoomListingInput): string {
-  const fields = { i: l.id, n: l.name, t: l.topic, g: l.tags, k: l.publicKey, m: l.members };
-  if (!validFields(fields)) throw new Error('Invalid room listing');
-  const memo = ROOM_PREFIX + JSON.stringify(fields);
+  const base = { i: l.id, n: l.name, t: l.topic, g: l.tags, k: l.publicKey, m: l.members };
+  if (!validFields(base)) throw new Error('Invalid room listing');
+  if (l.avatar) {
+    const withPic = { ...base, a: l.avatar };
+    if (!validFields(withPic)) throw new Error('Invalid room picture');
+    const memo = ROOM_PREFIX + JSON.stringify(withPic);
+    if (utf8Len(memo) <= MEMO_MAX_BYTES) return memo;
+  }
+  const memo = ROOM_PREFIX + JSON.stringify(base);
   if (utf8Len(memo) > MEMO_MAX_BYTES) throw new Error('Room name, topic and tags are too long together — shorten them');
   return memo;
 }
