@@ -52,4 +52,16 @@ describe('compact sidebar', () => {
     fireEvent.click(screen.getByRole('button', { name: /Fee info/ }));
     expect(await screen.findByText(/Platform fees split 80% to eosio.null and 20% to xcheeseliqst/)).toBeInTheDocument();
   });
+
+  it('puts Terms on the bottom line beside Fee info with Send pushed right', async () => {
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: /^bob/ }));
+    const line = screen.getByRole('button', { name: /Fee info/ }).closest('.order-last');
+    expect(line).not.toBeNull();
+    expect(screen.getByLabelText(/I have read and agree/).closest('.order-last')).toBe(line);
+    expect(line?.querySelector('button.bg-cheese')).not.toBeNull();
+    expect(line?.querySelector('.ml-auto')).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Hide groups and friends' }));
+    expect(screen.getByLabelText(/I have read and agree/).closest('.order-last')).toBeNull();
+  });
 });
