@@ -1,4 +1,5 @@
 # CHEESEHub roadmap
+- [ ] CHEESECrypt: bottom-right in-room @ reply counter, earliest-unseen jumping, visible reply consumption/highlights and regression checks.
 - [x] CHEESEFolio: 60s foreground price updates, refresh on return, timestamp/manual refresh, Sync refreshing prices/balances/pools; 19 regression tests pass, signed-out page opens without errors.
 - [ ] CHEESEFolio: verify live price updates inside a real wallet portfolio — requires a connected WAX wallet; timed/focus/manual changes tested with controlled prices.
 - [x] CHEESEFolio: summary boxes in capital-first order Total Cost, Paper Value, Realisable Now, Unrealised P/L, Realised P/L.
