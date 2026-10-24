@@ -68,6 +68,7 @@ describe('compact sidebar', () => {
 
   it('shows separate yellow unread and blue reply badges that stay on the open room and count down with the read marker', async () => {
     const alice = generateKey('alice'), bob = generateKey('bob');
+    saveKey(alice); saveContact('alice', 'bob', bob.publicKey);
     const msg = (time: number, text: string) => ({ txId: `t${time}`, time, from: 'bob', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo(text, alice.publicKey, bob.secretKey) });
     calls.fetch.mockResolvedValue([
       msg(1, 'one'), msg(2, 'two'),
