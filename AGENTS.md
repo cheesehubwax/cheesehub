@@ -26,6 +26,7 @@
 - Crypt inbox: bounded discovery; strangers quarantined until accepted.
 - Crypt reply views use per-message receipts so jumps preserve skipped replies; scroll only the inner list.
 - Crypt About: DappAbout + crypto dialog.
+- CHEESECrypt page sections (hero, key setup, sidebar, chat header, composer, message bubble) are presentational components in components/crypt; all state, effects and handlers stay in Messenger so one owner keeps chat state consistent.
 - OpenMojiIcon's optional tint paints a glyph as a solid silhouette in a given color; use it when an OpenMoji artwork's own palette is too dark for the always-dark background.
 - Both NFT players normalize media via nftMedia (case-insensitive audio/clip/video, reference-only sound/mp3/sfx aliases); version music caches on detection changes to avoid stale classifications.
 - CHEESEFolio fiat/BTC/ETH figures are WAX→USD→currency per day (fx-usd-history.json, units per USD); unknown rates stay unknown.
