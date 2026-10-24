@@ -5,6 +5,7 @@
 // Select/create cheesecrypt there: Chromium can reject access to Desktop itself.
 import { parseKeyFile, type MessagingKey, type PublicKeyFile } from './cheeseCrypt';
 import { readKeyFileJson, skipFileName } from './cryptKeyFileText';
+import { parseLockedKeyFile, withProfile, type LockedKeyFile } from './cryptKeyLock';
 import { parseReadStateFile, toReadStateFile, type ReadMarks } from './cryptUnread';
 
 export const VAULT_DIR = 'cheesecrypt';
@@ -59,27 +60,59 @@ export async function writePrivateKey(root: DirHandle, key: MessagingKey) {
   await writeNew(await root.getDirectoryHandle(PRIVATE_DIR, { create: true }), name, key, `${VAULT_DIR}/${PRIVATE_DIR}/${name}`);
 }
 
-/** Refresh profile fields only in an existing backup of the exact same key pair. */
+/** Refresh profile fields only in an existing backup of the exact same key pair (plain or wallet-locked). */
 export async function updatePrivateKeyProfile(root: DirHandle, key: MessagingKey) {
   const incoming = parseKeyFile(key);
   if (!incoming || incoming.type !== 'gpk-msg-key') throw new Error('Invalid private key');
   const dir = await root.getDirectoryHandle(PRIVATE_DIR);
   const file = await dir.getFileHandle(privateKeyName(key.account));
   if (!file.getFile) throw new Error('Cannot verify existing backup');
-  const existing = parseKeyFile(JSON.parse(await (await file.getFile()).text()));
-  if (!existing || existing.type !== 'gpk-msg-key' || existing.account !== incoming.account
-    || existing.publicKey !== incoming.publicKey || existing.secretKey !== incoming.secretKey) {
+  const raw = JSON.parse(await (await file.getFile()).text());
+  const existing = parseKeyFile(raw);
+  const locked = existing ? null : parseLockedKeyFile(raw);
+  let next: unknown;
+  if (existing && existing.type === 'gpk-msg-key' && existing.account === incoming.account
+    && existing.publicKey === incoming.publicKey && existing.secretKey === incoming.secretKey) {
+    next = { ...existing, avatar: incoming.avatar, displayName: incoming.displayName };
+  } else if (locked && locked.account === incoming.account && locked.publicKey === incoming.publicKey) {
+    // Profile fields sit outside the seal; the locked secret is copied unchanged.
+    next = withProfile(locked, incoming);
+  } else {
     throw new Error('Existing backup does not match this private key');
   }
-  // File System Access stages writes until close; abort leaves the original intact.
+  await stagedWrite(file, next);
+}
+
+// File System Access stages writes until close; abort leaves the original intact.
+async function stagedWrite(file: { createWritable(): Promise<{ write(d: string): Promise<void>; close(): Promise<void>; abort?(): Promise<void> }> }, data: unknown) {
   const writable = await file.createWritable();
   try {
-    await writable.write(JSON.stringify({ ...existing, avatar: incoming.avatar, displayName: incoming.displayName }, null, 2));
+    await writable.write(JSON.stringify(data, null, 2));
     await writable.close();
   } catch (error) {
     await writable.abort?.().catch(() => {});
     throw error;
   }
+}
+
+/**
+ * Replaces this account's plain key file with its locked form, in place, only when the file holds the same key pair.
+ * Writes a new file when none exists. Anything else (another key, unreadable file) is left untouched and throws.
+ */
+export async function replaceWithLocked(root: DirHandle, locked: LockedKeyFile, plain: MessagingKey) {
+  if (locked.account !== plain.account || locked.publicKey !== plain.publicKey) throw new Error('Locked file does not match this key');
+  const dir = await root.getDirectoryHandle(PRIVATE_DIR, { create: true });
+  const name = privateKeyName(locked.account);
+  if (!(await exists(dir, name))) { await writeNew(dir, name, locked, `${VAULT_DIR}/${PRIVATE_DIR}/${name}`); return; }
+  const file = await dir.getFileHandle(name);
+  if (!file.getFile) throw new Error('Cannot verify existing backup');
+  const raw = JSON.parse(await (await file.getFile()).text());
+  const existing = parseKeyFile(raw);
+  const existingLocked = existing ? null : parseLockedKeyFile(raw);
+  const same = (existing && existing.type === 'gpk-msg-key' && existing.account === plain.account && existing.publicKey === plain.publicKey && existing.secretKey === plain.secretKey)
+    || (existingLocked && existingLocked.account === plain.account && existingLocked.publicKey === plain.publicKey);
+  if (!same) throw new Error('Existing backup does not match this private key');
+  await stagedWrite(file, locked);
 }
 
 /** Saves a friend's public key. `replace` (explicit user save) refreshes an existing file for that friend. */
@@ -114,17 +147,18 @@ async function findSubdir(root: DirHandle, name: string): Promise<DirHandle | nu
 }
 
 /** Every file in a folder that parses as a CHEESECrypt key file, whatever its name, extension or text encoding. */
-async function keyFilesIn(dir: DirHandle): Promise<(MessagingKey | PublicKeyFile)[]> {
+async function keyFilesIn(dir: DirHandle): Promise<(MessagingKey | PublicKeyFile | LockedKeyFile)[]> {
   if (!dir.values) return [];
   const names: string[] = [];
   for await (const e of dir.values()) if (e.kind === 'file' && !skipFileName(e.name)) names.push(e.name);
   names.sort();
-  const out: (MessagingKey | PublicKeyFile)[] = [];
+  const out: (MessagingKey | PublicKeyFile | LockedKeyFile)[] = [];
   for (const name of names) {
     try {
       const handle = await dir.getFileHandle(name);
       if (!handle.getFile) continue;
-      const parsed = parseKeyFile(await readKeyFileJson(await handle.getFile()));
+      const json = await readKeyFileJson(await handle.getFile());
+      const parsed = parseKeyFile(json) ?? parseLockedKeyFile(json);
       if (parsed) out.push(parsed);
     } catch { /* skip unreadable files */ }
   }
@@ -136,7 +170,7 @@ export async function readFriendKeys(root: DirHandle): Promise<PublicKeyFile[]> 
   const dir = await findSubdir(root, FRIENDS_DIR);
   if (!dir) return [];
   const out = new Map<string, PublicKeyFile>();
-  for (const f of await keyFilesIn(dir)) if (f.type === 'gpk-msg-pubkey') out.set(f.account, f);
+  for (const f of await keyFilesIn(dir)) if (f.type === 'gpk-msg-pubkey') out.set(f.account, f as PublicKeyFile);
   return [...out.values()];
 }
 
@@ -144,10 +178,10 @@ export async function readFriendKeys(root: DirHandle): Promise<PublicKeyFile[]> 
  * Finds this account's private key in the vault by contents: the "my private key" folder (any casing) first,
  * then the vault folder itself. File names never matter. Null when no file holds a valid key for the account.
  */
-export async function findPrivateKey(root: DirHandle, account: string): Promise<MessagingKey | null> {
+export async function findPrivateKey(root: DirHandle, account: string): Promise<MessagingKey | LockedKeyFile | null> {
   const dirs = [await findSubdir(root, PRIVATE_DIR), root].filter((d): d is DirHandle => !!d);
   for (const dir of dirs) {
-    const hit = (await keyFilesIn(dir)).find((f): f is MessagingKey => f.type === 'gpk-msg-key' && f.account === account);
+    const hit = (await keyFilesIn(dir)).find((f): f is MessagingKey | LockedKeyFile => f.type === 'gpk-msg-key' && f.account === account);
     if (hit) return hit;
   }
   return null;
