@@ -2,8 +2,6 @@
 // Intentionally not linked from the header or menus: reachable at /crypt only.
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Layout } from '@/components/Layout';
-import { OpenMojiIcon } from '@/components/OpenMojiIcon';
-import cryptOrbAsset from '@/assets/cheesecrypt-relic.png.asset.json';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -21,15 +19,12 @@ import { ChevronDown, Download, Eye, EyeOff, KeyRound, Loader2, Ban, Menu, Panel
 import { useWax } from '@/context/WaxContext';
 import { useWaxTransaction } from '@/hooks/useWaxTransaction';
 import { useToast } from '@/hooks/use-toast';
-import { playRandomFart } from '@/lib/fartSounds';
 import { cn } from '@/lib/utils';
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { encodeReply, parseReply, quoteOf, type ReplyRef } from '@/lib/cryptReply';
 import { useCryptReplyNavigation } from '@/hooks/useCryptReplyNavigation';
 import { AvatarEditor, WalletAvatarPicker } from '@/components/crypt/AvatarEditor';
 import { CryptNftCard } from '@/components/crypt/CryptNftCard';
 import { useQuery } from '@tanstack/react-query';
-import { fetchAssetById } from '@/services/atomicApi';
 import { nftToken, parseNftMessage } from '@/lib/cryptNft';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FriendNameDialog } from '@/components/crypt/FriendNameDialog';
@@ -45,7 +40,6 @@ import {
   type Cg2Event, type InviteGroup, type InviteGroupView,
 } from '@/lib/cryptInviteGroups';
 import { ShareKeyDialog } from '@/components/crypt/ShareKeyDialog';
-import { CryptAbout } from '@/components/crypt/CryptAbout';
 import { VoiceRecorder } from '@/components/crypt/VoiceRecorder';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { buildVoiceBatches, voiceNoteCost, voicePartCount, voiceTransactions, VOICE_PARTS_PER_TX, type VoiceClip } from '@/lib/cryptVoice';
