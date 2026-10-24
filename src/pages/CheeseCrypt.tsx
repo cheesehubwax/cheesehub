@@ -36,10 +36,11 @@ import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { buildVoiceBatches, voiceNoteCost, voicePartCount, voiceTransactions, type VoiceClip } from '@/lib/cryptVoice';
 import { baselineMarks, firstUnreadIndex, firstVisitMarks, loadReadMarks, mergeMarks, sameMarks, saveReadMarks, unreadCounts, unreadReplies, type ReadMarks } from '@/lib/cryptUnread';
 import { readKeyFileJson } from '@/lib/cryptKeyFileText';
+import { clearLockedEnvelope, isAnchorSession, loadLockedEnvelope, openLockedKey, parseLockedKeyFile, saveLockedEnvelope, sealKey, signLock, withProfile, ANCHOR_REQUIRED, type LockedKeyFile } from '@/lib/cryptKeyLock';
 import { buildGroupMessageActions, decodeConversations, groupMessageCost, groupMessageSize, loadGroups, loadHiddenGroups, mergeGroups, saveGroups, setGroupHidden, type CryptGroup } from '@/lib/cryptGroups';
 import {
   DirHandle, FRIENDS_DIR, PRIVATE_DIR, VAULT_DIR, VaultFileExistsError, friendKeyName, pickVault, privateKeyName,
-  findPrivateKey, readFriendKeys, readVaultMarks, recallVault, writeVaultMarks, rememberVault, updatePrivateKeyProfile, vaultSupported, vaultWritable, writeFriendKey, writeOwnPublicKey,
+  findPrivateKey, readFriendKeys, readVaultMarks, recallVault, writeVaultMarks, rememberVault, updatePrivateKeyProfile, replaceWithLocked, vaultSupported, vaultWritable, writeFriendKey, writeOwnPublicKey,
 } from '@/lib/cryptVault';
 import type { PublicKeyFile } from '@/lib/cheeseCrypt';
 import { ChainMemo, MessagingKey, MAX_MESSAGE_BYTES, MAX_HISTORY_PAGES, MAX_PARTS, messageCost, partCount, splitMessage, buildCreateKeyActions, KEY_CREATION_QUANTITY, buildPublishKeyActions, buildSendMessageActions, encryptMemo, fetchMessages, generateKey, loadContacts, loadContactAvatars, loadKey, loadRemovedContacts, removeContact, lookupPublishedKey, parseKeyFile, plaintextBytes, saveContact, saveKey, toPublicFile } from '@/lib/cheeseCrypt';
@@ -87,6 +88,18 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const { executeTransaction } = useWaxTransaction(session);
   const permission = session.permissionLevel;
   const [key, setKey] = useState<MessagingKey | null>(() => loadKey(account));
+  // Wallet-locked envelope of the current key (no secret inside); present once the key's backup is locked.
+  const [lockedFile, setLockedFile] = useState<LockedKeyFile | null>(() => { const k = loadKey(account); return k ? loadLockedEnvelope(account, k.publicKey) : null; });
+  const keyLocked = !!lockedFile && !!key && lockedFile.publicKey === key.publicKey;
+  const canLock = isAnchorSession(session);
+  const signer = useCallback((publicKey: string) => signLock(session as unknown as Parameters<typeof signLock>[0], publicKey), [session]);
+  /** Opens a wallet-locked file with one free Anchor signature (never broadcast). */
+  const unlockFile = useCallback(async (file: LockedKeyFile) => {
+    if (!isAnchorSession(session)) throw new Error(`This key is locked to ${file.account}. ${ANCHOR_REQUIRED}`);
+    const opened = await openLockedKey(signer, file, account);
+    saveKey(opened); setKey(opened); saveLockedEnvelope(file); setLockedFile(file);
+    return opened;
+  }, [session, signer, account]);
   const [contacts, setContacts] = useState<Record<string, string>>(() => loadContacts(account));
   const [removedContacts, setRemovedContacts] = useState(() => loadRemovedContacts(account));
   const [avatars, setAvatars] = useState(() => loadContactAvatars(account));
@@ -183,10 +196,18 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if (!(await vaultWritable(root, ask).catch(() => false))) return false;
     const found = await findPrivateKey(root, account).catch(() => null);
     if (!found) return false;
-    saveKey(found); setKey(found);
+    if (found.version === 2) {
+      // Never pop a wallet request on its own; a locked file opens only when you ask.
+      if (!ask) return false;
+      try { await unlockFile(found as LockedKeyFile); }
+      catch (e) { toast({ title: 'Could not unlock your key', description: (e as Error).message, variant: 'destructive' }); return true; }
+      toast({ title: 'Your messaging key was unlocked', description: `Found in your ${VAULT_DIR} folder.` });
+      return true;
+    }
+    saveKey(found as MessagingKey); setKey(found as MessagingKey);
     toast({ title: 'Your messaging key was loaded', description: `Found in your ${VAULT_DIR} folder.` });
     return true;
-  }, [account, toast]);
+  }, [account, toast, unlockFile]);
   useEffect(() => { if (vault && !key) void loadKeyFromVault(vault, false); }, [vault, key, loadKeyFromVault]);
   const findKeyInFolder = async () => {
     setSearchingVault(true);
@@ -507,13 +528,16 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if (!key) return;
     const updated = { ...key, avatar, displayName };
     saveKey(updated); setKey(updated);
+    // Profile fields sit outside the seal, so a locked backup refreshes without a new signature.
+    const lockedNow = keyLocked && lockedFile ? withProfile(lockedFile, updated) : null;
+    if (lockedNow) { saveLockedEnvelope(lockedNow); setLockedFile(lockedNow); }
     try {
       if (!vault || !(await vaultWritable(vault, true))) throw new Error('Folder access unavailable');
       await updatePrivateKeyProfile(vault, updated);
       await writeOwnPublicKey(vault, toPublicFile(updated)).catch(() => {});
       toast({ title: 'Profile and private backup updated', description: 'Share your updated public key file so friends see your name and avatar.' });
     } catch {
-      download(privateKeyName(account), updated);
+      download(privateKeyName(account), lockedNow ?? updated);
       toast({ title: 'Profile saved; refreshed backup downloaded', description: 'The existing disk file was not replaced. Keep this refreshed file safe; share only your public key.' });
     }
     setSharingProfile(true);
@@ -548,6 +572,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         return;
       }
       const created = generateKey(account, pendingProfile);
+      clearLockedEnvelope(account); setLockedFile(null);
       saveKey(created); setKey(created); setBackupKey(created); setPendingProfile(null); setCreationAgreed(false); setAgreed(false);
     } catch (e) {
       toast({ title: 'Could not create key', description: (e as Error).message, variant: 'destructive' });
@@ -696,13 +721,44 @@ export function Messenger({ account, session }: { account: string; session: NonN
     toast({ title: 'Friend removed', description: 'Saved public key, name, nickname and avatar cleared from this browser. Messages and downloaded files are unchanged.' });
   };
 
+  /** Seals the current key to this Anchor wallet (two free signatures, never broadcast) and replaces the plain backup. */
+  const lockKey = async () => {
+    if (!key || busy) return;
+    if (!canLock) { toast({ title: 'Anchor needed', description: ANCHOR_REQUIRED, variant: 'destructive' }); return; }
+    setBusy(true);
+    try {
+      const file = await sealKey(signer, key, account);
+      saveLockedEnvelope(file); setLockedFile(file);
+      try {
+        if (!vault || !(await vaultWritable(vault, true))) throw new Error('Folder access unavailable');
+        await replaceWithLocked(vault, file, key);
+        toast({ title: 'Key locked to your wallet', description: `Your ${VAULT_DIR} backup is now locked. Delete any other copies of the old unlocked file.` });
+      } catch {
+        download(privateKeyName(account), file);
+        toast({ title: 'Locked key downloaded', description: 'Replace your old key file with it and delete the old unlocked copy.' });
+      }
+    } catch (e) {
+      toast({ title: 'Key not locked', description: (e as Error).message, variant: 'destructive' });
+    } finally { setBusy(false); }
+  };
+
   const onFile = async (f: File) => {
     try {
-      const parsed = parseKeyFile(await readKeyFileJson(f));
+      const json = await readKeyFileJson(f);
+      const lockedIn = parseKeyFile(json) ? null : parseLockedKeyFile(json);
+      if (lockedIn) {
+        if (lockedIn.account !== account) { toast({ title: `That private key is locked to ${lockedIn.account}`, variant: 'destructive' }); return; }
+        try { await unlockFile(lockedIn); toast({ title: 'Your messaging key was unlocked' }); }
+        catch (e) { toast({ title: 'Could not unlock your key', description: (e as Error).message, variant: 'destructive' }); }
+        return;
+      }
+      const parsed = parseKeyFile(json);
       if (!parsed) throw new Error();
       if (parsed.type === 'gpk-msg-key') {
         if (parsed.account !== account) { toast({ title: `That private key belongs to ${parsed.account}`, variant: 'destructive' }); return; }
-        saveKey(parsed); setKey(parsed); toast({ title: 'Your messaging key was loaded' });
+        saveKey(parsed); setKey(parsed);
+        const env = loadLockedEnvelope(account, parsed.publicKey); setLockedFile(env);
+        toast(env ? { title: 'Your messaging key was loaded' } : { title: 'Your messaging key was loaded', description: "This file isn't locked to your wallet. Use Menu → Lock key so a copied file can't read your messages." });
       } else {
         if (parsed.account === account) { toast({ title: 'That is your own public key' }); return; }
         saveContact(account, parsed.account, parsed.publicKey, parsed.avatar, parsed.displayName ?? ''); setContacts(loadContacts(account)); setRemovedContacts(loadRemovedContacts(account)); setAvatars(loadContactAvatars(account)); setNames(loadCryptNames(account)); setActive(parsed.account); saveFriend(parsed.account, false);
@@ -1037,6 +1093,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         showHiddenGroups={showHiddenGroups} setShowHiddenGroups={setShowHiddenGroups} friendsOpen={friendsOpen} setFriendsOpen={setFriendsOpen}
         setAddingFriend={setAddingFriend} partners={partners} active={active} setActive={setActive} avatars={avatars} nameFor={nameFor}
         contacts={contacts} lastAt={lastAt} badge={badge} removeFriend={removeFriend} setRoomsOpen={setRoomsOpen}
+        backupFile={keyLocked ? lockedFile : key} keyLocked={keyLocked} canLock={canLock} lockKey={() => void lockKey()}
         joinRequestsPanel={<JoinRequests requests={joinRequests} nameFor={nameFor} roomName={id => viewById(id)?.name ?? 'a room'}
           roomFull={id => (invites[id]?.members.length ?? MAX_INVITE_MEMBERS) >= MAX_INVITE_MEMBERS} onAccept={setAcceptingJoin}
           onDecline={r => setJoinDeclines(declineJoin(account, r.groupId, r.from, r.time))}

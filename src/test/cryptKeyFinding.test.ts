@@ -43,7 +43,7 @@ describe('finding key files by their contents', () => {
   it('finds the private key whatever the file is called, in a differently-cased key folder', async () => {
     const keys = fakeDir('My Private Key', { 'notes.txt': 'hello', 'backup copy.json.txt': utf16le(json, true) });
     const root = fakeDir('cheesecrypt', {}, { 'My Private Key': keys });
-    expect((await findPrivateKey(root, 'alice'))?.secretKey).toBe(key.secretKey);
+    expect(((await findPrivateKey(root, 'alice')) as { secretKey?: string } | null)?.secretKey).toBe(key.secretKey);
     expect(await findPrivateKey(root, 'bob')).toBeNull();
   });
 
