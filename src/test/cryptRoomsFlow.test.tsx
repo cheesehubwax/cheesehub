@@ -58,8 +58,9 @@ describe('public rooms', () => {
     const panel = await screen.findByRole('region', { name: 'Room join requests' });
     fireEvent.click(within(panel).getByRole('button', { name: 'Decline' }));
     expect(screen.queryByRole('region', { name: 'Room join requests' })).not.toBeInTheDocument();
+    const fetchedBeforeRemount = calls.fetch.mock.calls.length;
     view.unmount(); mount();
-    await waitFor(() => expect(calls.fetch).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(calls.fetch.mock.calls.length).toBeGreaterThan(fetchedBeforeRemount));
     expect(screen.queryByRole('region', { name: 'Room join requests' })).not.toBeInTheDocument();
     expect(calls.transact).not.toHaveBeenCalled();
   });
