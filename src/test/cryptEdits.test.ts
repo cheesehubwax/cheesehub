@@ -31,6 +31,9 @@ describe('message editing rules', () => {
     const result = applyEdits([base, second, edit(second)]);
     expect(result.messages.map(m => m.text)).toEqual(['hello', 'updated']);
   });
+  it('refuses ambiguous identical originals instead of choosing one', () => {
+    expect(applyEdits([base, { ...base, key: 'duplicate' }, edit()]).messages.map(m => m.text)).toEqual(['hello', 'hello']);
+  });
   it('shows only public room owners a 72-hour log, including the exact boundary', () => {
     const root = { ...base, igroup: '0123456789abcdef' };
     const { log } = applyEdits([root, edit(root)]);

@@ -31,7 +31,13 @@ const scope = (m: ConversationEntry) => m.igroup ? `i:${m.igroup}` : m.group ? `
 export function applyEdits(entries: ConversationEntry[]): { messages: EditedMessage[]; log: EditLogEntry[] } {
   const originals = entries.filter(m => !m.text?.startsWith(EDIT_PREFIX) && !m.voice?.editTarget);
   const messages: EditedMessage[] = originals.map(m => ({ ...m }));
-  const index = new Map(originals.map((m, i) => [`${scope(m)}:${m.from}:${editTarget(m)}`, i]));
+  const index = new Map<string, number>();
+  const ambiguous = new Set<string>();
+  originals.forEach((m, i) => {
+    const ref = `${scope(m)}:${m.from}:${editTarget(m)}`;
+    if (index.has(ref)) ambiguous.add(ref);
+    else index.set(ref, i);
+  });
   const log: EditLogEntry[] = [];
   const edits = entries.filter(m => m.text?.startsWith(EDIT_PREFIX) || m.voice?.editTarget).sort((a, b) => (a.voice?.completedAt ?? a.time) - (b.voice?.completedAt ?? b.time) || a.txId.localeCompare(b.txId));
   const seen = new Set<string>();
@@ -39,7 +45,9 @@ export function applyEdits(entries: ConversationEntry[]): { messages: EditedMess
     const parsed = parseEdit(edit.text);
     const target = edit.voice?.editTarget ?? parsed?.target;
     if (!target || edit.missing || (edit.voice && edit.voice.status !== 'ready')) continue;
-    const i = index.get(`${scope(edit)}:${edit.from}:${target}`);
+    const ref = `${scope(edit)}:${edit.from}:${target}`;
+    if (ambiguous.has(ref)) continue;
+    const i = index.get(ref);
     if (i === undefined) continue;
     const original = originals[i], at = edit.voice?.completedAt ?? edit.time;
     if (!canEdit(original, edit.from, at)) continue;
