@@ -1259,7 +1259,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                         ℹ️ Fee info <ChevronDown className={cn('h-3 w-3 transition', !feeInfoOpen && '-rotate-90')} />
                       </CollapsibleTrigger>
                     </Collapsible>
-                    <span className={cn('text-muted-foreground', listHidden && 'ml-auto')}>{totalCost}</span>
+                    <span className="ml-auto text-muted-foreground">{totalCost}</span>
                     {voice
                       ? <Button size="sm" disabled={busy || !agreed} onClick={sendVoice} className="bg-cheese text-primary-foreground hover:bg-cheese/90">Send voice{voiceTxs > 1 ? ` (${voiceTxs} signatures)` : ''}</Button>
                       : <Button size="sm" disabled={busy || !agreed || !text.trim() || tooLong} onClick={send}
