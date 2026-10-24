@@ -69,3 +69,4 @@
 - [x] CHEESECrypt: Menu dropdown, hideable groups/friends list, Fee info dropdown, taller chat
 - [x] CHEESECrypt: composer footer order — expanded line Terms · Fee info · price · Send; compressed bottom line Terms · Fee info with price and Send pushed to the right edge; layout tests pass
 - [x] CHEESECrypt: group member lists (invite and legacy) now sit behind a 👥 Members dropdown showing each member's name, WAX account and avatar; group-flow tests pass
+- [x] CHEESECrypt: sidebar rooms show two live badges — yellow unread count and blue ↩ reply count — that stay on the open room and count down as messages scroll into view
