@@ -55,6 +55,7 @@ import svg53 from 'openmoji/color/svg/1F4E4.svg';
 import svg54 from 'openmoji/color/svg/1F501.svg';
 import svg55 from 'openmoji/color/svg/2139.svg';
 import svg56 from 'openmoji/color/svg/1F480.svg';
+import svg57 from 'openmoji/color/svg/1F5DD.svg';
 
 export const openMojiMap: Record<string, string> = {
   "🏠": svg1,
@@ -113,6 +114,7 @@ export const openMojiMap: Record<string, string> = {
   "🔁": svg54,
   "ℹ": svg55,
   "💀": svg56,
+  "🗝": svg57,
 };
 
 export interface OpenMojiIconProps {
@@ -120,13 +122,43 @@ export interface OpenMojiIconProps {
   size?: number;
   className?: string;
   alt?: string;
+  /**
+   * CSS color. When set, the artwork is painted as a solid silhouette in this
+   * color instead of showing its own palette — used for glyphs whose OpenMoji
+   * colors are too dark to read on the app's always-dark background.
+   */
+  tint?: string;
 }
 
-export const OpenMojiIcon: FC<OpenMojiIconProps> = ({ emoji, size = 24, className, alt }) => {
+export const OpenMojiIcon: FC<OpenMojiIconProps> = ({ emoji, size = 24, className, alt, tint }) => {
   const normalized = emoji.replace(/\uFE0F/g, '');
   const src = openMojiMap[normalized] || openMojiMap[emoji];
   if (!src) {
     return <span className={className}>{emoji}</span>;
+  }
+  if (tint) {
+    return (
+      <span
+        role="img"
+        aria-label={alt || emoji}
+        className={className}
+        style={{
+          width: size,
+          height: size,
+          display: 'inline-block',
+          verticalAlign: 'middle',
+          backgroundColor: tint,
+          WebkitMaskImage: `url("${src}")`,
+          maskImage: `url("${src}")`,
+          WebkitMaskSize: 'contain',
+          maskSize: 'contain',
+          WebkitMaskRepeat: 'no-repeat',
+          maskRepeat: 'no-repeat',
+          WebkitMaskPosition: 'center',
+          maskPosition: 'center',
+        }}
+      />
+    );
   }
   return (
     <img
