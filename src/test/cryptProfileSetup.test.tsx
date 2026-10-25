@@ -35,6 +35,7 @@ async function payCreation() {
   fireEvent.click(screen.getByRole('checkbox'));
   calls.transact.mockResolvedValueOnce({ success: true, txId: 'confirmed-create-tx' });
   await act(async () => { fireEvent.click(pay); });
+  await screen.findByRole('button', { name: 'Save backup' });
 }
 describe('profile-first key setup', () => {
   it('menu publishing requires fresh consent, keeps rejected requests open and sends only the public key with the 80/20 fee', async () => {
@@ -160,6 +161,7 @@ describe('profile-first key setup', () => {
     expect(screen.getByRole('button', { name: 'Confirming payment…' })).toBeDisabled();
     expect(calls.transact).toHaveBeenCalledTimes(2);
     await act(async () => { confirmPayment?.({ success: true, txId: 'confirmed' }); });
+    await screen.findByRole('button', { name: 'Save backup' });
     expect(loadKey('alice')?.displayName).toBe('Alice Cheese');
     expect(calls.transact).toHaveBeenCalledTimes(2);
   });
