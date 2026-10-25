@@ -265,14 +265,30 @@ export function Messenger({ account, session }: { account: string; session: NonN
     return true;
   }, [account, toast, unlockFile]);
   useEffect(() => { if (vault && !key) void loadKeyFromVault(vault, false); }, [vault, key, loadKeyFromVault]);
-  const findKeyInFolder = async () => {
+  // Opens the remembered folder (re-granting access inside this click) or picks a new one, then loads
+  // this account's key by file contents. A miss explains which accounts' keys were found instead.
+  const openVaultFolder = async (pickNew: boolean) => {
     setSearchingVault(true);
     try {
-      let root = vault;
-      if (!root) { if (!vaultSupported()) { fileRef.current?.click(); return; } root = await pickVault(); setVault(root); rememberVault(account, root).catch(() => {}); }
-      if (!(await loadKeyFromVault(root, true))) toast({ title: `No private key for ${account} in that folder`, description: 'Use "Load my private key" to pick the file yourself.', variant: 'destructive' });
+      let root = pickNew ? null : vault;
+      if (!root) {
+        if (!vaultSupported()) { fileRef.current?.click(); return; }
+        root = await pickVault(); setVault(root); rememberVault(account, root).catch(() => {});
+      }
+      if (await loadKeyFromVault(root, true)) return;
+      const others = await listPrivateKeyAccounts(root).catch(() => []);
+      toast({
+        title: `No private key for ${account} in that folder`,
+        description: others.length
+          ? `It holds keys for: ${others.join(', ')}. Sign in as one of those accounts, or use "Load my private key".`
+          : 'No key files were found there. Use "Load my private key" to pick the file yourself.',
+        variant: 'destructive',
+      });
     } catch (e) {
-      if ((e as DOMException)?.name !== 'AbortError') toast({ title: 'Could not open that folder', variant: 'destructive' });
+      if (isMissingFolderError(e) && vault) {
+        await forgetVault(vault).catch(() => {}); setVault(null);
+        toast({ title: `Your saved ${VAULT_DIR} folder was moved or deleted`, description: 'Choose where it is now, or load your key file.', variant: 'destructive' });
+      } else if ((e as DOMException)?.name !== 'AbortError') toast({ title: 'Could not open that folder', variant: 'destructive' });
     } finally { setSearchingVault(false); }
   };
   // Friends folder is shared by every account on this device; nicknames and removals stay per account.
@@ -1300,7 +1316,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
   if (!key) {
     return (
       <CryptKeySetup account={account} fileInput={fileInput} profileEditor={profileEditor} creationDialog={creationDialog}
-        fileRef={fileRef} searchingVault={searchingVault} findKeyInFolder={findKeyInFolder} makeKey={makeKey} />
+        fileRef={fileRef} searchingVault={searchingVault} hasSavedVault={!!vault}
+        openSavedFolder={() => void openVaultFolder(false)} pickFolder={() => void openVaultFolder(true)} makeKey={makeKey} />
     );
   }
 
