@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { encryptMemo, generateKey, splitMessage, type ChainMemo } from '@/lib/cheeseCrypt';
 import { encodeGroupText, encodeNotice } from '@/lib/cryptInviteGroups';
 import { encodeJoinMemo, type RoomListing } from '@/lib/cryptRooms';
-import { isAccountStorageKey, recoveryCandidates, recoverFriends, recoverRoomRequests } from '@/lib/cryptRestore';
+import { isAccountStorageKey, recoveryCandidates, recoverFriends, recoverRoomRequests, recoveredRoomEvents } from '@/lib/cryptRestore';
 
 const me = generateKey('bob'), owner = generateKey('alice');
 const id = '00112233445566ff';
@@ -43,5 +43,15 @@ describe('authenticated recovery', () => {
     expect(isAccountStorageKey('cheesecrypt-contacts-alice', 'bob')).toBe(false);
     expect(isAccountStorageKey('wallet-bob', 'bob')).toBe(false);
     expect(isAccountStorageKey(null, 'bob')).toBe(true);
+  });
+  it('retains separate creator-key pins across rooms and rejects cross-room controls', () => {
+    const rotated = generateKey('alice'), otherId = 'ffeeddccbbaa0099';
+    const requests = {
+      [id]: { id, creator: 'alice', publicKey: owner.publicKey, time: 1 },
+      [otherId]: { id: otherId, creator: 'alice', publicKey: rotated.publicKey, time: 1 },
+    };
+    const received = (room: string, sender = owner) => ({ ...sent('unused'), from: 'alice', to: 'bob', memo: encryptMemo(encodeNotice('join-no', room), me.publicKey, sender.secretKey) });
+    const events = recoveredRoomEvents([received(id), received(otherId, rotated), received(otherId)], me, requests);
+    expect(events.map(e => [e.control.kind === 'join-no' ? e.control.id : '', e.usedKey])).toEqual([[id, owner.publicKey], [otherId, rotated.publicKey]]);
   });
 });
