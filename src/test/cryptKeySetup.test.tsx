@@ -24,11 +24,12 @@ describe('key setup folder actions', () => {
   });
 
   it('offers to open the folder when none is remembered yet', () => {
+    // The page falls back to the folder picker inside openSavedFolder when nothing is remembered.
     const open = vi.fn(); const pick = vi.fn();
     render(<CryptKeySetup {...props} hasSavedVault={false} openSavedFolder={open} pickFolder={pick} />);
     fireEvent.click(screen.getByRole('button', { name: /open my cheesecrypt folder/i }));
-    expect(pick).toHaveBeenCalledTimes(1);
-    expect(open).not.toHaveBeenCalled();
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(pick).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: /choose another folder/i })).toBeNull();
   });
 
