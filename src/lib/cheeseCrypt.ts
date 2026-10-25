@@ -55,6 +55,9 @@ export interface PublicKeyFile {
 }
 
 const keyStore = (a: string) => `cheesecrypt-key-${a}`;
+// Unsealed keys are session-only. Old browser copies remain readable for explicit migration.
+const sessionKeys = new Map<string, MessagingKey>();
+export const clearSessionKeys = () => sessionKeys.clear();
 const contactStore = (a: string) => `cheesecrypt-contacts-${a}`;
 
 export function generateKey(account: string, profile: { avatar?: CryptAvatar; displayName?: string } = {}): MessagingKey {
@@ -92,12 +95,14 @@ export const toPublicFile = (k: MessagingKey): PublicKeyFile =>
   ({ type: 'gpk-msg-pubkey', version: 1, account: k.account, publicKey: k.publicKey, ...(k.avatar ? { avatar: k.avatar } : {}), ...(parseCryptName(k.displayName) ? { displayName: parseCryptName(k.displayName) } : {}) });
 
 export function loadKey(account: string): MessagingKey | null {
+  const current = sessionKeys.get(account);
+  if (current) return current;
   try {
     const v = parseKeyFile(JSON.parse(localStorage.getItem(keyStore(account)) || 'null'));
     return v && v.type === 'gpk-msg-key' && v.account === account ? v : null;
   } catch { return null; }
 }
-export const saveKey = (k: MessagingKey) => localStorage.setItem(keyStore(k.account), JSON.stringify(k));
+export const saveKey = (k: MessagingKey) => { sessionKeys.set(k.account, k); localStorage.removeItem(keyStore(k.account)); };
 
 export function loadContacts(account: string): Record<string, string> {
   try { return JSON.parse(localStorage.getItem(contactStore(account)) || '{}') || {}; } catch { return {}; }

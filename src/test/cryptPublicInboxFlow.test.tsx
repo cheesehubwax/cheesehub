@@ -1,8 +1,9 @@
+import { saveKey } from './cryptLockedFixture';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Session } from '@wharfkit/session';
-import { encryptMemo, generateKey, loadContacts, saveKey } from '@/lib/cheeseCrypt';
+import { encryptMemo, generateKey, loadContacts } from '@/lib/cheeseCrypt';
 import { Messenger } from '@/pages/CheeseCrypt';
 import { loadBlocked } from '@/lib/cryptBlocklist';
 import { loadPublicInbox } from '@/lib/cryptPublicInbox';
@@ -14,15 +15,15 @@ vi.mock('@/lib/cheeseCrypt', async original => ({ ...await original<typeof impor
 vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import('@/lib/cryptVault')>(), recallVault: async () => null }));
 const alice = generateKey('alice'), bob = generateKey('bob');
 const history = [{ txId: 'request', time: 100, from: 'bob', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo('hello support', alice.publicKey, bob.secretKey) }];
-const mount = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="alice" session={{ permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
+const mount = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="alice" session={{ actor: 'alice', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
 async function enable() {
   fireEvent.click(screen.getByRole('button', { name: 'Menu' })); fireEvent.click(await screen.findByRole('button', { name: 'Public inbox' }));
   fireEvent.click(screen.getByRole('switch', { name: 'Accept message requests' }));
   fireEvent.click(screen.getByRole('button', { name: 'Close' }));
   await screen.findByRole('button', { name: 'Accept request from bob' });
 }
-beforeEach(() => {
-  localStorage.clear(); vi.clearAllMocks(); saveKey(alice);
+beforeEach(async () => {
+  localStorage.clear(); vi.clearAllMocks(); await saveKey(alice);
   calls.fetch.mockResolvedValue(history); calls.lookup.mockResolvedValue(bob.publicKey);
   calls.transact.mockResolvedValue({ success: false });
 });

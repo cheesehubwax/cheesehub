@@ -1,9 +1,11 @@
+import { saveKey } from './cryptLockedFixture';
 import { act, fireEvent, render as renderUi, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Session } from '@wharfkit/session';
-import { generateKey, loadKey, saveKey, toPublicFile } from '@/lib/cheeseCrypt';
+import { generateKey, loadKey, toPublicFile } from '@/lib/cheeseCrypt';
 import { accountAvatar } from '@/lib/cryptAvatar';
+import { loadLockedEnvelope, LOCK_TX_EXPIRATION } from '@/lib/cryptKeyLock';
 import { Messenger } from '@/pages/CheeseCrypt';
 
 const calls = vi.hoisted(() => ({ update: vi.fn(), recall: vi.fn(), writable: vi.fn(), transact: vi.fn(), backup: vi.fn() }));
@@ -11,12 +13,12 @@ vi.mock('@/hooks/useWaxTransaction', () => ({ useWaxTransaction: () => ({ execut
 vi.mock('@/context/WaxContext', () => ({ useWax: vi.fn() }));
 vi.mock('@/components/Layout', () => ({ Layout: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock('@/lib/cheeseCrypt', async original => ({ ...await original<typeof import('@/lib/cheeseCrypt')>(), fetchMessages: async () => [] }));
-vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import('@/lib/cryptVault')>(), recallVault: calls.recall, vaultWritable: calls.writable, updatePrivateKeyProfile: calls.update, rememberVault: async () => {} }));
+vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import('@/lib/cryptVault')>(), recallVault: calls.recall, vaultWritable: calls.writable, replaceWithLocked: calls.update, rememberVault: async () => {} }));
 vi.mock('@/components/crypt/VaultPrompt', () => ({ VaultPrompt: ({ cryptKey, onSaved, onDownload }: { cryptKey: unknown; onSaved: (root: unknown) => void; onDownload: () => void }) => <div><button onClick={() => { calls.backup(cryptKey); onSaved({}); }}>Save backup</button><button onClick={() => { calls.backup(cryptKey); onDownload(); }}>Download backup</button></div> }));
 
-const props = { account: 'alice', session: { permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session };
+const props = { account: 'alice', session: { actor: 'alice', walletPlugin: { id: 'anchor' }, transact: async () => ({ resolved: { transaction: { expiration: LOCK_TX_EXPIRATION } }, signatures: ['SIG_K1_abc'] }), permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session };
 const render = (ui: React.ReactElement) => renderUi(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>);
-beforeEach(() => {
+beforeEach(async () => {
   localStorage.clear();
   vi.clearAllMocks();
   calls.recall.mockResolvedValue(null); calls.writable.mockResolvedValue(true); calls.update.mockResolvedValue(undefined);
@@ -33,10 +35,11 @@ async function payCreation() {
   fireEvent.click(screen.getByRole('checkbox'));
   calls.transact.mockResolvedValueOnce({ success: true, txId: 'confirmed-create-tx' });
   await act(async () => { fireEvent.click(pay); });
+  await screen.findByRole('button', { name: 'Save backup' });
 }
 describe('profile-first key setup', () => {
   it('menu publishing requires fresh consent, keeps rejected requests open and sends only the public key with the 80/20 fee', async () => {
-    const key = generateKey('alice'); saveKey(key);
+    const key = generateKey('alice'); await saveKey(key);
     render(<Messenger {...props} />);
     const openPublish = async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
@@ -75,7 +78,7 @@ describe('profile-first key setup', () => {
     const original = loadKey('alice');
     expect(original?.avatar).toEqual(accountAvatar('alice'));
     fireEvent.click(screen.getByRole('button', { name: action }));
-    expect(calls.backup).toHaveBeenCalledWith(original);
+    expect(calls.backup).toHaveBeenCalledWith(loadLockedEnvelope('alice'));
     expect(await screen.findByText('📣 Share your public key')).toBeInTheDocument();
     expect(loadKey('alice')?.displayName).toBeUndefined();
     if (!original) throw new Error('Key not created');
@@ -96,7 +99,7 @@ describe('profile-first key setup', () => {
     expect(created?.avatar).toEqual(accountAvatar('alice'));
     expect(screen.queryByText('📣 Share your public key')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Save backup' }));
-    expect(calls.backup).toHaveBeenCalledWith(created);
+    expect(calls.backup).toHaveBeenCalledWith(loadLockedEnvelope('alice'));
     if (!created) throw new Error('Key not created');
     expect(toPublicFile(created)).toMatchObject({ avatar: created.avatar, displayName: 'Alice Cheese', publicKey: created.publicKey });
     expect(toPublicFile(created)).not.toHaveProperty('secretKey');
@@ -139,7 +142,8 @@ describe('profile-first key setup', () => {
     const file = new File([], 'key.json');
     Object.defineProperty(file, 'text', { value: async () => JSON.stringify(existing) });
     await act(async () => { fireEvent.change(input, { target: { files: [file] } }); });
-    expect(loadKey('alice')).toEqual(existing);
+    expect(loadKey('alice')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Lock key to continue' })).toBeEnabled();
     expect(calls.transact).not.toHaveBeenCalled();
   });
   it('preserves the selected profile after wallet rejection and permits retry without double payment', async () => {
@@ -157,6 +161,7 @@ describe('profile-first key setup', () => {
     expect(screen.getByRole('button', { name: 'Confirming payment…' })).toBeDisabled();
     expect(calls.transact).toHaveBeenCalledTimes(2);
     await act(async () => { confirmPayment?.({ success: true, txId: 'confirmed' }); });
+    await screen.findByRole('button', { name: 'Save backup' });
     expect(loadKey('alice')?.displayName).toBe('Alice Cheese');
     expect(calls.transact).toHaveBeenCalledTimes(2);
   });
@@ -169,7 +174,7 @@ describe('profile-first key setup', () => {
     expect(calls.transact).not.toHaveBeenCalled();
   });
   it.each(['success', 'failure', 'denied', 'no folder'])('keeps the same encryption keys and refreshes or downloads a backup after edits: %s', async outcome => {
-    const original = generateKey('alice'); saveKey(original);
+    const original = generateKey('alice'); await saveKey(original);
     const root = { name: 'cheesecrypt' };
     calls.recall.mockResolvedValue(outcome === 'no folder' ? null : root);
     if (outcome === 'failure') calls.update.mockRejectedValue(new Error('Mismatched backup'));
@@ -182,7 +187,7 @@ describe('profile-first key setup', () => {
     const updated = loadKey('alice');
     expect(updated).toMatchObject({ publicKey: original.publicKey, secretKey: original.secretKey, displayName: 'Updated Alice', avatar: accountAvatar('alice') });
     expect(screen.queryByLabelText('CHEESECrypt name')).not.toBeInTheDocument();
-    if (outcome === 'success' || outcome === 'failure') expect(calls.update).toHaveBeenCalledWith(root, updated);
+    if (outcome === 'success' || outcome === 'failure') expect(calls.update).toHaveBeenCalledWith(root, loadLockedEnvelope('alice'), updated);
     else expect(calls.update).not.toHaveBeenCalled();
     expect(URL.createObjectURL).toHaveBeenCalledTimes(outcome === 'success' ? 0 : 1);
   });

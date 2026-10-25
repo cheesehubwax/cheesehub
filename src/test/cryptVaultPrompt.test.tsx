@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { VaultPrompt } from '@/components/crypt/VaultPrompt';
-import type { MessagingKey } from '@/lib/cheeseCrypt';
+import { LOCK_SCHEME, type LockedKeyFile } from '@/lib/cryptKeyLock';
 import type { DirHandle } from '@/lib/cryptVault';
 
 const vault = vi.hoisted(() => ({ pick: vi.fn(), write: vi.fn() }));
@@ -12,7 +12,7 @@ vi.mock('@/lib/cryptVault', async (original) => ({
   writePrivateKey: vault.write,
 }));
 
-const key: MessagingKey = { type: 'gpk-msg-key', version: 1, account: 'alice', publicKey: 'p', secretKey: 's', created: '' };
+const key: LockedKeyFile = { type: 'gpk-msg-key', version: 2, account: 'alice', publicKey: 'p', created: '', lock: { scheme: LOCK_SCHEME, salt: '', nonce: '', ciphertext: '' } };
 afterEach(() => vi.resetAllMocks());
 
 describe('vault prompt permission recovery', () => {

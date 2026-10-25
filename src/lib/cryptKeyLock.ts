@@ -18,6 +18,14 @@ export const LOCK_TOKEN_CONTRACT = 'cheeseburger';
 export const LOCK_QUANTITY = '0.0000 CHEESE';
 export const LOCK_MEMO_PREFIX = 'CHEESECrypt key lock v1 ';
 
+// A stored envelope is not proof of unlocking. Only successful sealing/opening grants session access.
+const verifiedKeys = new Map<string, { publicKey: string; secretKey: string }>();
+export const isVerifiedKey = (k: MessagingKey) => {
+  const verified = verifiedKeys.get(k.account);
+  return verified?.publicKey === k.publicKey && verified.secretKey === k.secretKey;
+};
+export const clearVerifiedKeys = () => verifiedKeys.clear();
+
 export interface KeyLock { scheme: typeof LOCK_SCHEME; salt: string; nonce: string; ciphertext: string }
 
 /** Version 2 private key file: the secret is sealed to the owning WAX account's wallet. */
@@ -158,10 +166,13 @@ export async function sealKey(sign: (publicKey: string) => Promise<string>, key:
   if (first !== second) throw new Error("Your wallet gave two different signatures, so it can't lock keys. Nothing was locked.");
   const file = toLockedFile(key, await lockSecret(key.secretKey, first));
   if ((await unlockSecret(file.lock, second, file.publicKey)) !== key.secretKey) throw new Error('Lock check failed. Nothing was locked.');
+  verifiedKeys.set(account, { publicKey: key.publicKey, secretKey: key.secretKey });
   return file;
 }
 
 export async function openLockedKey(sign: (publicKey: string) => Promise<string>, file: LockedKeyFile, account: string): Promise<MessagingKey> {
   if (file.account !== account) throw new Error(`This key is locked to ${file.account}. Sign in with that Anchor account to unlock it.`);
-  return fromLockedFile(file, await unlockSecret(file.lock, await sign(file.publicKey), file.publicKey));
+  const key = fromLockedFile(file, await unlockSecret(file.lock, await sign(file.publicKey), file.publicKey));
+  verifiedKeys.set(account, { publicKey: key.publicKey, secretKey: key.secretKey });
+  return key;
 }

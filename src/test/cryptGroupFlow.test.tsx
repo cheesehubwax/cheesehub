@@ -1,8 +1,9 @@
+import { saveKey } from './cryptLockedFixture';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Session } from '@wharfkit/session';
-import { generateKey, saveContact, saveKey, encryptMemo, splitMessage, loadContacts, loadKey, loadContactAvatars, loadRemovedContacts } from '@/lib/cheeseCrypt';
+import { generateKey, saveContact, encryptMemo, splitMessage, loadContacts, loadKey, loadContactAvatars, loadRemovedContacts } from '@/lib/cheeseCrypt';
 import { loadCryptNames, saveCryptName } from '@/lib/cryptNames';
 import { groupPayload, loadGroups, loadHiddenGroups, saveGroups } from '@/lib/cryptGroups';
 import { encodeInvite, encodeNotice, loadInvites } from '@/lib/cryptInviteGroups';
@@ -18,10 +19,10 @@ vi.mock('@/components/Layout', () => ({ Layout: ({ children }: { children: React
 vi.mock('@/components/crypt/AvatarEditor', () => ({ AvatarEditor: () => null }));
 vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import('@/lib/cryptVault')>(), recallVault: async () => null }));
 
-beforeEach(() => {
+beforeEach(async () => {
   localStorage.clear(); vi.clearAllMocks();
   Element.prototype.scrollIntoView = vi.fn();
-  saveKey(generateKey('alice'));
+  await saveKey(generateKey('alice'));
   saveContact('alice', 'bob', generateKey('bob').publicKey);
   saveContact('alice', 'carol', generateKey('carol').publicKey);
   calls.fetch.mockResolvedValue([]);
@@ -36,7 +37,7 @@ const mount = (ui: React.ReactElement) => {
 describe('group creation and signing gate', () => {
   it.each(['private', 'group'])('keeps six in-room replies independent of the %s sidebar read marker', async kind => {
     const alice = generateKey('alice'), bob = generateKey('bob');
-    saveKey(alice); saveContact('alice', 'bob', bob.publicKey);
+    await saveKey(alice); saveContact('alice', 'bob', bob.publicKey);
     const group = { id: '0123456789abcdef', members: ['alice', 'bob', 'carol'] };
     if (kind === 'group') saveGroups('alice', [group]);
     const id = kind === 'group' ? `group:${group.id}` : 'bob';
@@ -45,7 +46,7 @@ describe('group creation and signing gate', () => {
       from: 'bob', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo(kind === 'group'
         ? groupPayload(group, encodeReply({ author: 'alice', time: 1, quote: 'hello' }, `reply ${i}`))
         : encodeReply({ author: 'alice', time: 1, quote: 'hello' }, `reply ${i}`), alice.publicKey, bob.secretKey) })));
-    mount(<Messenger account="alice" session={{ permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} />);
+    mount(<Messenger account="alice" session={{ actor: 'alice', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} />);
     await waitFor(() => {
       expect(screen.getByLabelText('6 unread')).toBeInTheDocument();
       expect(screen.getByLabelText('6 replies to you')).toBeInTheDocument();
@@ -61,12 +62,12 @@ describe('group creation and signing gate', () => {
   });
   it('hides a group persistently while preserving its history and permits restoration', async () => {
     const alice = generateKey('alice'), bob = generateKey('bob');
-    saveKey(alice); saveContact('alice', 'bob', bob.publicKey);
+    await saveKey(alice); saveContact('alice', 'bob', bob.publicKey);
     const group = { id: '0123456789abcdef', members: ['alice', 'bob', 'carol'] };
     saveGroups('alice', [group]);
     const history = [{ txId: 'old', time: 1, from: 'bob', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo(groupPayload(group, 'original history'), alice.publicKey, bob.secretKey) }];
     calls.fetch.mockResolvedValue(history);
-    const props = { account: 'alice', session: { permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session };
+    const props = { account: 'alice', session: { actor: 'alice', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session };
     const view = mount(<Messenger {...props} />);
     fireEvent.click(screen.getByRole('button', { name: /Group · 3 people/ }));
     await screen.findByText('original history');
@@ -96,12 +97,12 @@ describe('group creation and signing gate', () => {
   });
   it('removes friend metadata, stays removed after history refresh/remount, and permits explicit re-add', async () => {
     const alice = generateKey('alice'), bob = generateKey('bob');
-    saveKey(alice);
+    await saveKey(alice);
     saveContact('alice', 'bob', bob.publicKey, { version: 1, pixels: '0'.repeat(64) }, 'Bob Cheese');
     saveCryptName('alice', 'bob', 'Best friend', 'nicknames');
     const history = [{ txId: 'abc', time: 1, from: 'bob', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo('hi', alice.publicKey, bob.secretKey) }];
     calls.fetch.mockResolvedValue(history);
-    const props = { account: 'alice', session: { permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session };
+    const props = { account: 'alice', session: { actor: 'alice', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session };
     const view = mount(<Messenger {...props} />);
     fireEvent.click(screen.getByRole('button', { name: /Best friend/ }));
     await screen.findByText('hi');
@@ -129,10 +130,10 @@ describe('group creation and signing gate', () => {
   });
   it('renames a friend locally, reads it back after remount, and still sends to their WAX account', async () => {
     const alice = generateKey('alice'), bob = generateKey('bob');
-    saveKey({ ...alice, displayName: 'Alice Cheese' });
+    await saveKey({ ...alice, displayName: 'Alice Cheese' });
     saveContact('alice', 'bob', bob.publicKey, undefined, 'Bob Cheese');
     calls.fetch.mockResolvedValue([{ txId: 'abc', time: 1, from: 'bob', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo('hi', alice.publicKey, bob.secretKey) }]);
-    const props = { account: 'alice', session: { permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session };
+    const props = { account: 'alice', session: { actor: 'alice', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session };
     const view = mount(<Messenger {...props} />);
     fireEvent.click(screen.getByRole('button', { name: /Bob Cheese/ }));
     await screen.findByText('hi');
@@ -153,9 +154,9 @@ describe('group creation and signing gate', () => {
   });
   it('creates an invite group: paid invites only after terms, then messages go only to members who joined', async () => {
     const alice = generateKey('alice'), bob = generateKey('bob'), carol = generateKey('carol');
-    saveKey(alice); saveContact('alice', 'bob', bob.publicKey); saveContact('alice', 'carol', carol.publicKey);
+    await saveKey(alice); saveContact('alice', 'bob', bob.publicKey); saveContact('alice', 'carol', carol.publicKey);
     calls.transact.mockResolvedValue({ success: true, txId: 'tx1' });
-    const props = { account: 'alice', session: { permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session };
+    const props = { account: 'alice', session: { actor: 'alice', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session };
     mount(<Messenger {...props} />);
     fireEvent.click(screen.getByRole('button', { name: 'New group' }));
     fireEvent.change(screen.getByLabelText('Group name'), { target: { value: 'Cheese club' } });
@@ -189,7 +190,7 @@ describe('group creation and signing gate', () => {
   });
   it('a received invite shows Join/Decline; joining is paid after terms; group-only members stay out of Friends', async () => {
     const alice = generateKey('alice'), bob = generateKey('bob'), carol = generateKey('carol');
-    localStorage.clear(); saveKey(bob); saveContact('bob', 'alice', alice.publicKey);
+    localStorage.clear(); await saveKey(bob); saveContact('bob', 'alice', alice.publicKey);
     const id = '0123456789abcdef';
     const invite = { id, name: 'Cheese club', creator: 'alice', created: 5, members: [alice, bob, carol].map(k => ({ account: k.account, publicKey: k.publicKey })) };
     calls.fetch.mockResolvedValue([
@@ -197,7 +198,7 @@ describe('group creation and signing gate', () => {
       ...splitMessage(encodeNotice('joined', id)).map(p => ({ txId: 'cj', time: 11, from: 'carol', to: 'bob', quantity: '0.0010 CHEESE', memo: encryptMemo(p, bob.publicKey, carol.secretKey) })),
     ]);
     calls.transact.mockResolvedValue({ success: true, txId: 'tx2' });
-    mount(<Messenger account="bob" session={{ permissionLevel: { actor: 'bob', permission: 'active' } } as unknown as Session} />);
+    mount(<Messenger account="bob" session={{ actor: 'bob', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'bob', permission: 'active' } } as unknown as Session} />);
     fireEvent.click(await screen.findByRole('button', { name: /Cheese club/ }));
     expect(screen.queryByRole('button', { name: /^carol/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Join' }));
@@ -212,11 +213,11 @@ describe('group creation and signing gate', () => {
   });
   it('hides invite-group members behind a Members dropdown listing names, WAX accounts and avatars', async () => {
     const alice = generateKey('alice'), bob = generateKey('bob'), carol = generateKey('carol');
-    localStorage.clear(); saveKey(bob); saveContact('bob', 'alice', alice.publicKey);
+    localStorage.clear(); await saveKey(bob); saveContact('bob', 'alice', alice.publicKey);
     const id = '0123456789abcdef';
     const invite = { id, name: 'Cheese club', creator: 'alice', created: 5, members: [alice, bob, carol].map(k => ({ account: k.account, publicKey: k.publicKey })) };
     calls.fetch.mockResolvedValue(splitMessage(encodeInvite(invite)).map(p => ({ txId: 'inv', time: 10, from: 'alice', to: 'bob', quantity: '0.0010 CHEESE', memo: encryptMemo(p, bob.publicKey, alice.secretKey) })));
-    mount(<Messenger account="bob" session={{ permissionLevel: { actor: 'bob', permission: 'active' } } as unknown as Session} />);
+    mount(<Messenger account="bob" session={{ actor: 'bob', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'bob', permission: 'active' } } as unknown as Session} />);
     fireEvent.click(await screen.findByRole('button', { name: /Cheese club/ }));
     expect(screen.queryByText('carol')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Members \(3\)/ }));
@@ -225,11 +226,11 @@ describe('group creation and signing gate', () => {
   });
   it('hides legacy group members behind the same dropdown', async () => {
     const alice = generateKey('alice'), bob = generateKey('bob');
-    localStorage.clear(); saveKey(alice); saveContact('alice', 'bob', bob.publicKey);
+    localStorage.clear(); await saveKey(alice); saveContact('alice', 'bob', bob.publicKey);
     const group = { id: '0123456789abcdef', members: ['alice', 'bob', 'carol'] };
     saveGroups('alice', [group]);
     calls.fetch.mockResolvedValue([{ txId: 'old', time: 1, from: 'bob', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo(groupPayload(group, 'original history'), alice.publicKey, bob.secretKey) }]);
-    mount(<Messenger account="alice" session={{ permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} />);
+    mount(<Messenger account="alice" session={{ actor: 'alice', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} />);
     fireEvent.click(screen.getByRole('button', { name: /Group · 3 people/ }));
     await screen.findByText('original history');
     expect(screen.queryByText('carol')).not.toBeInTheDocument();

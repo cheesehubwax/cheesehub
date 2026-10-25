@@ -1,8 +1,9 @@
+import { saveKey } from './cryptLockedFixture';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { Session } from '@wharfkit/session';
-import { encryptMemo, generateKey, saveKey, splitMessage } from '@/lib/cheeseCrypt';
+import { encryptMemo, generateKey, splitMessage } from '@/lib/cheeseCrypt';
 import { encodeAdmin, encodeGroupText, encodeRoomPolicy, saveDecision, saveInvites } from '@/lib/cryptInviteGroups';
 import { encodeListing } from '@/lib/cryptRooms';
 import { Messenger } from '@/pages/CheeseCrypt';
@@ -14,14 +15,14 @@ vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import
 const alice = generateKey('alice'), bob = generateKey('bob'), carol = generateKey('carol');
 const id = '0123456789abcdef', at = Date.now() - 10000;
 const memos = (payload: string, time: number, from = alice, to = bob, txId = `t${time}`) => splitMessage(payload).map(p => ({ from: from.account, to: to.account, time, txId, quantity: '0.0010 CHEESE', memo: encryptMemo(p, to.publicKey, from.secretKey) }));
-beforeEach(() => {
-  localStorage.clear(); vi.clearAllMocks(); saveKey(alice);
+beforeEach(async () => {
+  localStorage.clear(); vi.clearAllMocks(); await saveKey(alice);
   vi.stubGlobal('DOMRect', class { static fromRect(r: { x?: number; y?: number; width?: number; height?: number } = {}) { return { x: r.x ?? 0, y: r.y ?? 0, width: r.width ?? 0, height: r.height ?? 0, top: r.y ?? 0, left: r.x ?? 0, right: (r.x ?? 0) + (r.width ?? 0), bottom: (r.y ?? 0) + (r.height ?? 0) }; } });
   saveInvites('alice', { [id]: { id, name: 'Moderated room', creator: 'alice', created: at - 1000, members: [alice, bob, carol].map(k => ({ account: k.account, publicKey: k.publicKey })) } });
   calls.rooms.mockResolvedValue([{ from: 'alice', to: 'eosio.null', txId: 'listed', time: at, quantity: '8.0000 CHEESE', memo: encodeListing({ id, name: 'Moderated room', topic: '', tags: [], publicKey: alice.publicKey, members: 2 }) }]);
   calls.fetch.mockResolvedValue(memos(encodeRoomPolicy(id, true, ['alice', 'bob']), at));
 });
-const renderAs = (account = 'alice') => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account={account} session={{ permissionLevel: { actor: account, permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
+const renderAs = (account = 'alice') => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account={account} session={{ actor: account, walletPlugin: { id: 'anchor' }, permissionLevel: { actor: account, permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
 const chatHistory = () => [...memos(encodeRoomPolicy(id, true, ['alice', 'bob']), at), ...memos(encodeGroupText(id, 'hello from bob'), at + 100, bob, alice), ...memos(encodeGroupText(id, 'hello from carol'), at + 200, carol, alice)];
 const openMenu = async (text: string) => { fireEvent.click(await screen.findByRole('button', { name: /Moderated room/ })); fireEvent.contextMenu(await screen.findByText(text)); return screen.findByRole('menu'); };
 
@@ -66,7 +67,7 @@ it.each([
   { admin: false, recipients: ['alice', 'carol'] },
 ])('a joined non-owner can send a report with admin=$admin without owning a public listing', async ({ admin, recipients }) => {
   const invite = { id, name: 'Moderated room', creator: 'alice', created: at - 1000, members: [alice, bob, carol].map(k => ({ account: k.account, publicKey: k.publicKey })) };
-  saveKey(bob); saveInvites('bob', { [id]: invite }); saveDecision('bob', id, 'joined', at - 500);
+  await saveKey(bob); saveInvites('bob', { [id]: invite }); saveDecision('bob', id, 'joined', at - 500);
   calls.fetch.mockResolvedValue([
     ...memos(encodeRoomPolicy(id, true, ['alice', 'bob', 'carol']), at, alice, bob),
     ...memos(encodeAdmin(id, admin ? 'bob' : 'carol', true), at + 50, alice, bob),

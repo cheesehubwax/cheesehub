@@ -2,11 +2,11 @@
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import type { MessagingKey } from '@/lib/cheeseCrypt';
+import type { LockedKeyFile } from '@/lib/cryptKeyLock';
 import { DirHandle, FRIENDS_DIR, PRIVATE_DIR, VAULT_DIR, VaultFileExistsError, pickVault, privateKeyName, vaultSupported, writePrivateKey } from '@/lib/cryptVault';
 
 export function VaultPrompt({ cryptKey, onSaved, onDownload }: {
-  cryptKey: MessagingKey;
+  cryptKey: LockedKeyFile;
   onSaved: (root: DirHandle) => void;
   onDownload: () => void;
 }) {
@@ -35,7 +35,7 @@ export function VaultPrompt({ cryptKey, onSaved, onDownload }: {
         <DialogHeader>
           <DialogTitle>🔐 Keep your private key safe</DialogTitle>
           <DialogDescription>
-            Your key works now. Save a backup — without it, a new browser or device can't read your messages.
+            Your key is locked to your WAX account. Save this backup and keep access to your Anchor wallet — both are needed on a new browser or device.
           </DialogDescription>
         </DialogHeader>
         <pre className="rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed overflow-x-auto">{`📁 Desktop/

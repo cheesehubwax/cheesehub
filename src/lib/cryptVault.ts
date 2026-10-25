@@ -59,7 +59,7 @@ async function writeNew(dir: DirHandle, name: string, data: unknown, path: strin
   await w.close();
 }
 
-export async function writePrivateKey(root: DirHandle, key: MessagingKey) {
+export async function writePrivateKey(root: DirHandle, key: MessagingKey | LockedKeyFile) {
   const name = privateKeyName(key.account);
   await writeNew(await root.getDirectoryHandle(PRIVATE_DIR, { create: true }), name, key, `${VAULT_DIR}/${PRIVATE_DIR}/${name}`);
 }
