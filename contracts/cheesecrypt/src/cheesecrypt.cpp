@@ -6,16 +6,6 @@ cheesecrypt::config cheesecrypt::get_config() const {
    return cs.get_or_default(config{});
 }
 
-void cheesecrypt::debit(name owner, const asset& amount) {
-   balances_t bals(get_self(), get_self().value);
-   auto it = bals.find(owner.value);
-   check(it != bals.end(), "deposit CHEESE to this contract first");
-   check(it->funds.symbol == amount.symbol, "symbol mismatch");
-   check(amount.amount > 0 && it->funds.amount >= amount.amount, "insufficient deposited CHEESE");
-   if (it->funds.amount == amount.amount) bals.erase(it);
-   else bals.modify(it, same_payer, [&](auto& b) { b.funds -= amount; });
-}
-
 void cheesecrypt::send_token(const config& cfg, name to, const asset& qty, const string& memo) {
    if (qty.amount == 0) return;
    action(permission_level{get_self(), "active"_n}, cfg.token_contract, "transfer"_n,
@@ -47,11 +37,6 @@ void cheesecrypt::setconfig(const config& cfg) {
    check(cfg.recipient_fee.amount > 0, "copies need a positive transfer");
    check(cfg.null_percent == 80, "platform split must stay 80/20");
    check(crypt_router::valid_limits(cfg.max_parts, cfg.max_recipients), "limits exceed hard bounds");
-   const auto old = get_config();
-   if (old.token_contract != cfg.token_contract || old.token_symbol != cfg.token_symbol) {
-      balances_t bals(get_self(), get_self().value);
-      check(bals.begin() == bals.end(), "withdraw all balances before changing token denomination");
-   }
    config_singleton cs(get_self(), get_self().value);
    cs.set(cfg, get_self());
 }
@@ -67,24 +52,27 @@ void cheesecrypt::setpaused(bool paused) {
 void cheesecrypt::ontransfer(name from, name to, asset quantity, string memo) {
    if (to != get_self() || from == get_self()) return;
    const auto cfg = get_config();
-   check(!cfg.paused, "deposits are paused; withdrawals remain available");
+   check(!cfg.paused, "CHEESECrypt contract is paused");
    check(get_first_receiver() == cfg.token_contract && quantity.symbol == cfg.token_symbol,
          "only the configured CHEESE token is accepted");
    check(quantity.is_valid() && quantity.amount > 0, "positive valid quantity required");
-   // Do not let a third party create deposit rows at the router's RAM expense.
+   // Do not let a third party create pending rows at the router's RAM expense.
    require_auth(from);
-   balances_t bals(get_self(), get_self().value);
-   auto it = bals.find(from.value);
-   if (it == bals.end()) bals.emplace(from, [&](auto& b) { b.owner = from; b.funds = quantity; });
-   else bals.modify(it, same_payer, [&](auto& b) { b.funds += quantity; });
+   pending_t pend(get_self(), get_self().value);
+   auto it = pend.find(from.value);
+   if (it == pend.end()) pend.emplace(from, [&](auto& p) { p.payer = from; p.funds = quantity; });
+   else pend.modify(it, same_payer, [&](auto& p) { p.funds += quantity; });
 }
 
-void cheesecrypt::withdraw(name owner, asset quantity) {
-   require_auth(owner);
+void cheesecrypt::reclaim(name payer) {
+   require_auth(payer);
    const auto cfg = get_config();
-   check(quantity.is_valid() && quantity.symbol == cfg.token_symbol && quantity.amount > 0, "invalid quantity");
-   debit(owner, quantity);
-   send_token(cfg, owner, quantity, "CHEESECrypt withdrawal");
+   pending_t pend(get_self(), get_self().value);
+   auto it = pend.find(payer.value);
+   check(it != pend.end(), "no pending payment to reclaim");
+   const asset refund = it->funds;
+   pend.erase(it);
+   send_token(cfg, payer, refund, "CHEESECrypt payment reclaim");
 }
 
 void cheesecrypt::sendmsg(name sender, uint8_t kind, uint16_t parts, const vector<copy_t>& copies) {
@@ -108,8 +96,17 @@ void cheesecrypt::sendmsg(name sender, uint8_t kind, uint16_t parts, const vecto
    const asset fee = platform_fee(cfg, kind, parts);
    check(crypt_router::valid_fee(cfg.recipient_fee.amount) && cfg.recipient_fee.amount > 0, "invalid recipient fee");
    const asset total = fee + cfg.recipient_fee * static_cast<int64_t>(copies.size());
-   debit(sender, total);
+   // Consume this sender's in-flight payment from the same transaction; zero custody.
+   pending_t pend(get_self(), get_self().value);
+   auto it = pend.find(sender.value);
+   check(it != pend.end(), "pay the exact fee to this contract in the same transaction");
+   check(it->funds.symbol == total.symbol, "symbol mismatch");
+   check(it->funds.amount >= total.amount, "payment does not cover the message fee");
+   const int64_t change = it->funds.amount - total.amount;
+   pend.erase(it);
    pay_platform(cfg, fee);
    for (const auto& c : copies) send_token(cfg, c.to, cfg.recipient_fee, c.memo);
-   // Any failed inline transfer rolls the entire action and debit back atomically.
+   send_token(cfg, sender, asset(change, total.symbol), "CHEESECrypt change");
+   // Any failed inline transfer rolls the entire transaction back atomically, including
+   // the sender's payment, so the router never holds funds between transactions.
 }
