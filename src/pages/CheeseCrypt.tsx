@@ -103,15 +103,22 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const key = keyLocked && canLock ? candidateKey : null;
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
-  const signer = useCallback((publicKey: string) => signLock(session as unknown as Parameters<typeof signLock>[0], publicKey), [session]);
+  const currentSession = useRef(session);
+  currentSession.current = session;
+  const signer = useCallback(async (publicKey: string) => {
+    if (!alive.current || currentSession.current !== session || String(session.actor) !== account) throw new Error('Sign in with the owning Anchor account.');
+    const signature = await signLock(session as unknown as Parameters<typeof signLock>[0], publicKey);
+    if (!alive.current || currentSession.current !== session) throw new Error('The wallet changed. Please try again.');
+    return signature;
+  }, [session, account]);
   /** Opens a wallet-locked file with one free Anchor signature (never broadcast). */
   const unlockFile = useCallback(async (file: LockedKeyFile) => {
-    if (!isAnchorSession(session)) throw new Error(`This key is locked to ${file.account}. ${ANCHOR_REQUIRED}`);
+    if (!canLock) throw new Error(`This key is locked to ${file.account}. ${ANCHOR_REQUIRED}`);
     const opened = await openLockedKey(signer, file, account);
     if (!alive.current) throw new Error('The account changed. Open the key again for the current account.');
     saveKey(opened); setKey(opened); saveLockedEnvelope(file); setLockedFile(file);
     return opened;
-  }, [session, signer, account]);
+  }, [canLock, signer, account]);
   const [contacts, setContacts] = useState<Record<string, string>>(() => loadContacts(account));
   const [removedContacts, setRemovedContacts] = useState(() => loadRemovedContacts(account));
   const [avatars, setAvatars] = useState(() => loadContactAvatars(account));
@@ -205,8 +212,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
         setter(previous => JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
       const currentKey = loadKey(account);
       // A pending paid key lives only in this tab until sealing succeeds.
-      if (currentKey) update(setKey, currentKey);
-      if (!candidateKey || currentKey) update(setLockedFile, loadLockedEnvelope(account, currentKey?.publicKey));
+      if (!candidateKey || isVerifiedKey(candidateKey)) {
+        if (currentKey) update(setKey, currentKey);
+        update(setLockedFile, loadLockedEnvelope(account, currentKey?.publicKey));
+      }
       update(setContacts, loadContacts(account)); update(setRemovedContacts, loadRemovedContacts(account));
       update(setAvatars, loadContactAvatars(account)); update(setNames, loadCryptNames(account));
       update(setNicknames, loadCryptNames(account, 'nicknames'));
@@ -777,19 +786,19 @@ export function Messenger({ account, session }: { account: string; session: NonN
       setPendingProfile({ avatar, displayName }); setCreationAgreed(false); setSettingUpProfile(false);
       return;
     }
-    if (!key) return;
+    if (!key || !lockedFile) return;
     const updated = { ...key, avatar, displayName };
     saveKey(updated); setKey(updated);
     // Profile fields sit outside the seal, so a locked backup refreshes without a new signature.
-    const lockedNow = keyLocked && lockedFile ? withProfile(lockedFile, updated) : null;
-    if (lockedNow) { saveLockedEnvelope(lockedNow); setLockedFile(lockedNow); }
+    const lockedNow = withProfile(lockedFile, updated);
+    saveLockedEnvelope(lockedNow); setLockedFile(lockedNow);
     try {
       if (!vault || !(await vaultWritable(vault, true))) throw new Error('Folder access unavailable');
-      await updatePrivateKeyProfile(vault, updated);
+      await replaceWithLocked(vault, lockedNow, updated);
       await writeOwnPublicKey(vault, toPublicFile(updated)).catch(() => {});
       toast({ title: 'Profile and private backup updated', description: 'Share your updated public key file so friends see your name and avatar.' });
     } catch {
-      download(privateKeyName(account), lockedNow ?? updated);
+      download(privateKeyName(account), lockedNow);
       toast({ title: 'Profile saved; refreshed backup downloaded', description: 'The existing disk file was not replaced. Keep this refreshed file safe; share only your public key.' });
     }
     setSharingProfile(true);

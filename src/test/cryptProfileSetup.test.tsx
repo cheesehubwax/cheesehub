@@ -13,7 +13,7 @@ vi.mock('@/hooks/useWaxTransaction', () => ({ useWaxTransaction: () => ({ execut
 vi.mock('@/context/WaxContext', () => ({ useWax: vi.fn() }));
 vi.mock('@/components/Layout', () => ({ Layout: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock('@/lib/cheeseCrypt', async original => ({ ...await original<typeof import('@/lib/cheeseCrypt')>(), fetchMessages: async () => [] }));
-vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import('@/lib/cryptVault')>(), recallVault: calls.recall, vaultWritable: calls.writable, updatePrivateKeyProfile: calls.update, rememberVault: async () => {} }));
+vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import('@/lib/cryptVault')>(), recallVault: calls.recall, vaultWritable: calls.writable, replaceWithLocked: calls.update, rememberVault: async () => {} }));
 vi.mock('@/components/crypt/VaultPrompt', () => ({ VaultPrompt: ({ cryptKey, onSaved, onDownload }: { cryptKey: unknown; onSaved: (root: unknown) => void; onDownload: () => void }) => <div><button onClick={() => { calls.backup(cryptKey); onSaved({}); }}>Save backup</button><button onClick={() => { calls.backup(cryptKey); onDownload(); }}>Download backup</button></div> }));
 
 const props = { account: 'alice', session: { actor: 'alice', walletPlugin: { id: 'anchor' }, transact: async () => ({ resolved: { transaction: { expiration: LOCK_TX_EXPIRATION } }, signatures: ['SIG_K1_abc'] }), permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session };
@@ -187,7 +187,7 @@ describe('profile-first key setup', () => {
     const updated = loadKey('alice');
     expect(updated).toMatchObject({ publicKey: original.publicKey, secretKey: original.secretKey, displayName: 'Updated Alice', avatar: accountAvatar('alice') });
     expect(screen.queryByLabelText('CHEESECrypt name')).not.toBeInTheDocument();
-    if (outcome === 'success' || outcome === 'failure') expect(calls.update).toHaveBeenCalledWith(root, updated);
+    if (outcome === 'success' || outcome === 'failure') expect(calls.update).toHaveBeenCalledWith(root, loadLockedEnvelope('alice'), updated);
     else expect(calls.update).not.toHaveBeenCalled();
     expect(URL.createObjectURL).toHaveBeenCalledTimes(outcome === 'success' ? 0 : 1);
   });
