@@ -27,6 +27,7 @@ export interface DirHandle {
   values?(): AsyncIterable<{ kind: string; name: string }>;
   queryPermission?(o: { mode: 'readwrite' }): Promise<PermissionState>;
   requestPermission?(o: { mode: 'readwrite' }): Promise<PermissionState>;
+  isSameEntry?(other: DirHandle): Promise<boolean>;
 }
 
 type Picker = (o: { id?: string; mode: 'readwrite'; startIn?: string }) => Promise<DirHandle>;
@@ -35,9 +36,12 @@ const picker = (): Picker | undefined =>
 
 export const vaultSupported = () => !!picker() && window.self === window.top;
 
-/** Ensures cheesecrypt/ plus both subfolders exist; reuses a picked folder already named cheesecrypt. */
+/** Folder names accepted as the private-key folder, any casing. */
+const KEY_DIR_NAMES = [PRIVATE_DIR, 'my private keys', 'private key', 'private keys'];
+
+/** Ensures both subfolders exist; reuses a picked folder that already is (or contains) the vault. */
 export async function prepareVault(picked: DirHandle): Promise<DirHandle> {
-  const root = picked.name === VAULT_DIR ? picked : await picked.getDirectoryHandle(VAULT_DIR, { create: true });
+  const root = await resolveVaultRoot(picked);
   await root.getDirectoryHandle(PRIVATE_DIR, { create: true });
   await root.getDirectoryHandle(FRIENDS_DIR, { create: true });
   return root;
