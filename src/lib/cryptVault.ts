@@ -298,3 +298,45 @@ export async function vaultWritable(h: DirHandle, ask: boolean) {
   if ((await h.queryPermission({ mode: 'readwrite' })) === 'granted') return true;
   return ask && !!h.requestPermission && (await h.requestPermission({ mode: 'readwrite' })) === 'granted';
 }
+
+/** True when the error means the folder (or a file in it) no longer exists on disk. */
+export const isMissingFolderError = (e: unknown) =>
+  ['NotFoundError', 'InvalidStateError'].includes((e as DOMException)?.name);
+
+/**
+ * Whether a remembered folder still exists. Needs read access already granted; a handle to a folder
+ * that was deleted or moved fails on first read. Other errors (such as missing permission) are not
+ * proof the folder is gone, so they count as present.
+ */
+export async function vaultExists(h: DirHandle): Promise<boolean> {
+  try {
+    if (h.values) { for await (const _entry of h.values()) break; }
+    return true;
+  } catch (e) { return !isMissingFolderError(e); }
+}
+
+/** "ready" when usable now, "needs-permission" when a click must grant access, "missing" when deleted or moved. */
+export async function vaultStatus(h: DirHandle): Promise<'ready' | 'needs-permission' | 'missing'> {
+  if (h.queryPermission && (await h.queryPermission({ mode: 'readwrite' }).catch(() => 'denied' as PermissionState)) !== 'granted')
+    return 'needs-permission';
+  return (await vaultExists(h)) ? 'ready' : 'missing';
+}
+
+/** Forgets the remembered folder, but only if it is still the given one (a newer pick is never erased). */
+export async function forgetVault(h: DirHandle): Promise<void> {
+  if (typeof indexedDB === 'undefined') return;
+  try {
+    const cur = await recallVault('');
+    if (!cur) return;
+    if (cur !== h) {
+      // Each read from storage is a new object, so compare the folders themselves; unprovable means keep it.
+      const same = cur.isSameEntry ? await cur.isSameEntry(h).catch(() => false) : false;
+      if (!same) return;
+    }
+    const d = await db();
+    await new Promise<void>((res, rej) => {
+      const t = d.transaction(STORE, 'readwrite'); t.objectStore(STORE).delete(SHARED);
+      t.oncomplete = () => res(); t.onerror = () => rej(t.error);
+    });
+  } catch { /* nothing remembered */ }
+}
