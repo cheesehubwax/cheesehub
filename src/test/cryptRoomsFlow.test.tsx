@@ -1,8 +1,9 @@
+import { saveKey } from './cryptLockedFixture';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Session } from '@wharfkit/session';
-import { encryptMemo, generateKey, partCount, saveContact, saveKey } from '@/lib/cheeseCrypt';
+import { encryptMemo, generateKey, partCount, saveContact } from '@/lib/cheeseCrypt';
 import { encodeNotice, encodeAdmission, encodeMemberAdd, loadInvites, saveInvites, type InviteGroup } from '@/lib/cryptInviteGroups';
 import { encodeListing, saveRoomRequest } from '@/lib/cryptRooms';
 import { Messenger } from '@/pages/CheeseCrypt';
@@ -18,10 +19,10 @@ const ID = '00112233445566ff';
 const invite: InviteGroup = { id: ID, name: 'Cheese club', creator: 'alice', created: 1000, members: [alice, bob].map(k => ({ account: k.account, publicKey: k.publicKey })) };
 const listing = { txId: 'list', time: 50, from: 'alice', to: 'eosio.null', quantity: '8.0000 CHEESE', memo: encodeListing({ id: ID, name: 'Cheese club', topic: 'All cheese', tags: ['cheese'], publicKey: alice.publicKey, members: 1 }) };
 const joinMemo = { txId: 'join', time: 100, from: 'carol', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo(encodeNotice('join', ID), alice.publicKey, carol.secretKey) };
-const mount = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="alice" session={{ permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
+const mount = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="alice" session={{ actor: 'alice', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
 
-beforeEach(() => {
-  localStorage.clear(); vi.clearAllMocks(); saveKey(alice); saveContact('alice', 'bob', bob.publicKey); saveInvites('alice', { [ID]: invite });
+beforeEach(async () => {
+  localStorage.clear(); vi.clearAllMocks(); await saveKey(alice); saveContact('alice', 'bob', bob.publicKey); saveInvites('alice', { [ID]: invite });
   calls.fetch.mockResolvedValue([joinMemo]); calls.rooms.mockResolvedValue([listing]);
   calls.lookup.mockImplementation(async (a: string) => (a === 'carol' ? carol.publicKey : null));
   calls.transact.mockResolvedValue({ success: true, txId: 'tx' });
@@ -74,10 +75,10 @@ describe('public rooms', () => {
   });
 
   it('the requester sees a pending request in Groups until the owner declines it', async () => {
-    localStorage.clear(); saveKey(carol);
+    localStorage.clear(); await saveKey(carol);
     saveRoomRequest('carol', { id: ID, creator: 'alice', publicKey: alice.publicKey, name: 'Cheese club' }, 1000);
     calls.fetch.mockResolvedValue([]);
-    const mountCarol = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="carol" session={{ permissionLevel: { actor: 'carol', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
+    const mountCarol = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="carol" session={{ actor: 'carol', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'carol', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
     const first = mountCarol();
     expect(await screen.findByText(/Request pending/)).toBeInTheDocument();
     first.unmount();
@@ -90,10 +91,10 @@ describe('public rooms', () => {
   });
 
   it('a decline sent before a newer request does not cancel it', async () => {
-    localStorage.clear(); saveKey(carol);
+    localStorage.clear(); await saveKey(carol);
     saveRoomRequest('carol', { id: ID, creator: 'alice', publicKey: alice.publicKey, name: 'Cheese club' }, 1_000_000);
     calls.fetch.mockResolvedValue([{ txId: 'no', time: 1000, from: 'alice', to: 'carol', quantity: '0.0001 CHEESE', memo: encryptMemo(encodeNotice('join-no', ID), carol.publicKey, alice.secretKey) }]);
-    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="carol" session={{ permissionLevel: { actor: 'carol', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="carol" session={{ actor: 'carol', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'carol', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
     expect(await screen.findByText(/Request pending/)).toBeInTheDocument();
   });
 
@@ -108,10 +109,10 @@ describe('public rooms', () => {
     await waitFor(() => expect(loadInvites('alice')[ID].members).toHaveLength(9));
     const actions = calls.transact.mock.calls[0][0] as { data: { from: string; to: string; quantity: string; memo: string } }[];
     ownerView.unmount();
-    saveKey(carol);
+    await saveKey(carol);
     saveRoomRequest('carol', { id: ID, creator: 'alice', publicKey: alice.publicKey });
     calls.fetch.mockResolvedValue(actions.filter(a => a.data.to === 'carol').map(a => ({ ...a.data, txId: 'admission', time: Date.now() })));
-    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="carol" session={{ permissionLevel: { actor: 'carol', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="carol" session={{ actor: 'carol', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'carol', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
     await waitFor(() => expect(loadInvites('carol')[ID]?.members).toHaveLength(9));
     fireEvent.click(await screen.findByRole('button', { name: /Invited by alice/ }));
     fireEvent.click(await screen.findByRole('button', { name: /^Join$/ }));

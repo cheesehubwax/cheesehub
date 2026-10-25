@@ -1,8 +1,9 @@
+import { saveKey } from './cryptLockedFixture';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Session } from '@wharfkit/session';
-import { encryptMemo, generateKey, loadContacts, saveContact, saveKey } from '@/lib/cheeseCrypt';
+import { encryptMemo, generateKey, loadContacts, saveContact } from '@/lib/cheeseCrypt';
 import { buildCg2Actions, encodeAdmission, encodeGroupText, encodeNotice, encodePolicySnapshot, loadInvites, type InviteGroup } from '@/lib/cryptInviteGroups';
 import { encodeJoinMemo, encodeListing } from '@/lib/cryptRooms';
 import { Messenger } from '@/pages/CheeseCrypt';
@@ -26,11 +27,11 @@ const history = [
   memo('bob', 'carol', 'Private hello', 50, me, friend),
 ];
 const mount = (account = 'bob') => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-  <Messenger account={account} session={{ permissionLevel: { actor: account, permission: 'active' } } as unknown as Session} />
+  <Messenger account={account} session={{ actor: account, walletPlugin: { id: 'anchor' }, permissionLevel: { actor: account, permission: 'active' } } as unknown as Session} />
 </QueryClientProvider>);
 
-beforeEach(() => {
-  localStorage.clear(); vi.clearAllMocks(); saveKey(me);
+beforeEach(async () => {
+  localStorage.clear(); vi.clearAllMocks(); await saveKey(me);
   calls.fetch.mockResolvedValue(history);
   calls.lookup.mockImplementation(async (a: string) => a === 'carol' ? friend.publicKey : null);
   calls.rooms.mockResolvedValue([{ from: 'alice', to: 'eosio.null', time: 1, txId: 'list', quantity: '8.0000 CHEESE', memo: encodeListing({ id, name: group.name, topic: '', tags: [], publicKey: owner.publicKey, members: 2 }) }]);
@@ -47,7 +48,7 @@ describe('recovery through the messenger', () => {
     fireEvent.click(screen.getByRole('button', { name: /^carol/ }));
     expect(await screen.findByText('Private hello')).toBeInTheDocument();
     expect(screen.queryByText('Room restored')).not.toBeInTheDocument();
-    first.unmount(); saveKey(friend);
+    first.unmount(); await saveKey(friend);
     const other = mount('carol');
     expect(screen.queryByRole('button', { name: /Recovery club/ })).not.toBeInTheDocument();
     other.unmount(); mount();

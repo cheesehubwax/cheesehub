@@ -1,8 +1,9 @@
+import { saveKey } from './cryptLockedFixture';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Session } from '@wharfkit/session';
-import { generateKey, saveContact, saveKey, encryptMemo, loadContacts } from '@/lib/cheeseCrypt';
+import { generateKey, saveContact, encryptMemo, loadContacts } from '@/lib/cheeseCrypt';
 import { groupPayload, saveGroups } from '@/lib/cryptGroups';
 import { loadBlocked } from '@/lib/cryptBlocklist';
 import { Messenger } from '@/pages/CheeseCrypt';
@@ -18,11 +19,11 @@ vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import
 const mount = (ui: React.ReactElement) => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{ui}</QueryClientProvider>);
 
 describe('blocking on this device', () => {
-  beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); Element.prototype.scrollIntoView = vi.fn(); calls.transact.mockResolvedValue({ success: false }); });
+  beforeEach(async () => { localStorage.clear(); vi.clearAllMocks(); Element.prototype.scrollIntoView = vi.fn(); calls.transact.mockResolvedValue({ success: false }); });
 
   it('hides a blocked friend and their group messages, keeps their key, and restores on unblock', async () => {
     const alice = generateKey('alice'), bob = generateKey('bob'), carol = generateKey('carol');
-    saveKey(alice); saveContact('alice', 'bob', bob.publicKey); saveContact('alice', 'carol', carol.publicKey);
+    await saveKey(alice); saveContact('alice', 'bob', bob.publicKey); saveContact('alice', 'carol', carol.publicKey);
     const group = { id: '0123456789abcdef', members: ['alice', 'bob', 'carol'] };
     saveGroups('alice', [group]);
     calls.fetch.mockResolvedValue([
@@ -31,7 +32,7 @@ describe('blocking on this device', () => {
       { txId: 'c', time: 3, from: 'carol', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo(groupPayload(group, 'carol in group'), alice.publicKey, carol.secretKey) },
     ]);
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    mount(<Messenger account="alice" session={{ permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} />);
+    mount(<Messenger account="alice" session={{ actor: 'alice', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} />);
     fireEvent.click(screen.getByRole('button', { name: /^bob/ }));
     await screen.findByText('bob dm');
     fireEvent.click(screen.getByRole('button', { name: 'Block bob' }));
