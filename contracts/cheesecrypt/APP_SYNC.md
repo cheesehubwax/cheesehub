@@ -26,6 +26,7 @@ checklist with every CHEESECrypt change, but do not reintroduce plaintext roles 
 | Memo ≤256 bytes | Router checks memo byte length, not plaintext semantics |
 | Authenticated original sender (`cheeseCrypt.ts`, `cryptGroups.ts`) | REQUIRED new trace adapter: verify sendmsg authority + inline transfer ancestry; normalize sender before decryption/authority replay |
 | TX IDs, Greymass Fuel, success before local state | Keep existing signing requirements; verify router delivery traces and rollback on testnet |
+| Account recovery and tab sync (`cryptRestore.ts`) | Client-only: outgoing authenticated DM proves friendship; matching own join/request proves room consent; listing keys remain scoped; no router change |
 
 Only tables: `config`, `balances`. Only explicit actions: `setconfig`, `setpaused`, `withdraw`,
 `sendmsg`; configured-token transfer notifications handle deposits. ABI breaks from old draft.
