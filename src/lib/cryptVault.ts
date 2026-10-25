@@ -169,6 +169,45 @@ async function keyFilesIn(dir: DirHandle): Promise<(MessagingKey | PublicKeyFile
   return out;
 }
 
+/**
+ * Resolves whatever the user picked to the vault root. The cheesecrypt folder itself, a key or friends
+ * folder, a folder containing cheesecrypt, or a folder already holding key files are used as-is;
+ * anything else (such as a fresh Desktop) gets cheesecrypt created inside it by prepareVault.
+ */
+export async function resolveVaultRoot(picked: DirHandle): Promise<DirHandle> {
+  const name = picked.name.toLowerCase();
+  if (name === VAULT_DIR || name === FRIENDS_DIR || KEY_DIR_NAMES.includes(name)) return picked;
+  const inner = await findSubdir(picked, VAULT_DIR);
+  if (inner) return inner;
+  for (const n of KEY_DIR_NAMES) if (await findSubdir(picked, n)) return picked;
+  if (await findSubdir(picked, FRIENDS_DIR)) return picked;
+  if ((await keyFilesIn(picked)).length > 0) return picked;
+  return picked.getDirectoryHandle(VAULT_DIR, { create: true });
+}
+
+const MAX_SCAN_DEPTH = 3;
+const isKeyDirName = (n: string) => KEY_DIR_NAMES.includes(n.toLowerCase());
+
+/**
+ * Walks the vault for private key files: key-named folders first, then the folder itself, then other
+ * subfolders (a stray nested cheesecrypt included), skipping friends/. Bounded depth; content decides.
+ */
+async function scanPrivateKeys(root: DirHandle): Promise<(MessagingKey | LockedKeyFile)[]> {
+  const keys: (MessagingKey | LockedKeyFile)[] = [];
+  const walk = async (dir: DirHandle, depth: number) => {
+    for (const f of await keyFilesIn(dir)) if (f.type === 'gpk-msg-key') keys.push(f as MessagingKey | LockedKeyFile);
+    if (depth >= MAX_SCAN_DEPTH || !dir.values) return;
+    const subdirs: string[] = [];
+    for await (const e of dir.values()) if (e.kind === 'directory' && e.name.toLowerCase() !== FRIENDS_DIR) subdirs.push(e.name);
+    subdirs.sort((a, b) => Number(isKeyDirName(b)) - Number(isKeyDirName(a)));
+    for (const n of subdirs) {
+      try { await walk(await dir.getDirectoryHandle(n), depth + 1); } catch { /* unreadable folder */ }
+    }
+  };
+  await walk(root, 0);
+  return keys;
+}
+
 /** Reads every valid public key file in the shared friends folder (shared by all accounts on this device). */
 export async function readFriendKeys(root: DirHandle): Promise<PublicKeyFile[]> {
   const dir = await findSubdir(root, FRIENDS_DIR);
