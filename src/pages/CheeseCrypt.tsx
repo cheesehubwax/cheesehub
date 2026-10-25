@@ -39,8 +39,8 @@ import { readKeyFileJson } from '@/lib/cryptKeyFileText';
 import { clearLockedEnvelope, isAnchorSession, loadLockedEnvelope, openLockedKey, parseLockedKeyFile, saveLockedEnvelope, sealKey, signLock, withProfile, ANCHOR_REQUIRED, type LockedKeyFile } from '@/lib/cryptKeyLock';
 import { buildGroupMessageActions, decodeConversations, groupMessageCost, groupMessageSize, isDirectMessage, loadGroups, loadHiddenGroups, mergeGroups, saveGroups, setGroupHidden, type CryptGroup } from '@/lib/cryptGroups';
 import {
-  DirHandle, FRIENDS_DIR, PRIVATE_DIR, VAULT_DIR, VaultFileExistsError, friendKeyName, pickVault, privateKeyName,
-  findPrivateKey, readFriendKeys, readVaultMarks, recallVault, writeVaultMarks, rememberVault, updatePrivateKeyProfile, replaceWithLocked, vaultSupported, vaultWritable, writeFriendKey, writeOwnPublicKey,
+  DirHandle, FRIENDS_DIR, PRIVATE_DIR, VAULT_DIR, VaultFileExistsError, forgetVault, friendKeyName, isMissingFolderError, listPrivateKeyAccounts, pickVault, privateKeyName,
+  findPrivateKey, readFriendKeys, readVaultMarks, recallVault, vaultStatus, writeVaultMarks, rememberVault, updatePrivateKeyProfile, replaceWithLocked, vaultSupported, vaultWritable, writeFriendKey, writeOwnPublicKey,
 } from '@/lib/cryptVault';
 import type { PublicKeyFile } from '@/lib/cheeseCrypt';
 import { ChainMemo, MessagingKey, MAX_MESSAGE_BYTES, MAX_HISTORY_PAGES, MAX_PARTS, messageCost, partCount, splitMessage, buildCreateKeyActions, KEY_CREATION_QUANTITY, buildPublishKeyActions, buildSendMessageActions, encryptMemo, fetchMessages, generateKey, loadContacts, loadContactAvatars, loadKey, loadRemovedContacts, removeContact, lookupPublishedKey, parseKeyFile, plaintextBytes, saveContact, saveKey, toPublicFile } from '@/lib/cheeseCrypt';
@@ -219,7 +219,20 @@ export function Messenger({ account, session }: { account: string; session: NonN
     window.addEventListener('focus', sync);
     return () => { window.removeEventListener('storage', onStorage); window.removeEventListener('focus', sync); };
   }, [account]);
-  useEffect(() => { recallVault(account).then(setVault); }, [account]);
+  // A remembered folder that was deleted or moved is forgotten so nothing tries to save into it.
+  useEffect(() => {
+    let alive = true;
+    setVault(null);
+    (async () => {
+      const saved = await recallVault(account).catch(() => null);
+      if (!alive || !saved) return;
+      const status = await vaultStatus(saved).catch(() => 'ready' as const);
+      if (!alive) return;
+      if (status === 'missing') { await forgetVault(saved).catch(() => {}); setVault(null); }
+      else setVault(saved);
+    })();
+    return () => { alive = false; };
+  }, [account]);
   /** Read markers saved in the vault folder: undefined while checking, null when none or no access. */
   const [folderMarks, setFolderMarks] = useState<ReadMarks | null | undefined>(undefined);
   useEffect(() => {
