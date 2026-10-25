@@ -55,7 +55,7 @@ export function CryptSidebar({
             <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
               {loading && <Loader2 className="h-3 w-3 shrink-0 animate-spin" />}
               <span className="truncate">{account}</span>
-              {keyLocked && <ShieldCheck className="h-4 w-4 shrink-0 text-success" aria-label="Key locked to WAX account" />}
+              {keyLocked && <ShieldCheck className="h-4 w-4 shrink-0 text-positive" aria-label="Key locked to WAX account" />}
             </span>
           </span>
         </button>

@@ -97,7 +97,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const permission = session.permissionLevel;
   const [candidateKey, setKey] = useState<MessagingKey | null>(() => loadKey(account));
   // Wallet-locked envelope of the current key (no secret inside); present once the key's backup is locked.
-  const [lockedFile, setLockedFile] = useState<LockedKeyFile | null>(() => { const k = loadKey(account); return k ? loadLockedEnvelope(account, k.publicKey) : null; });
+  const [lockedFile, setLockedFile] = useState<LockedKeyFile | null>(() => { const k = loadKey(account); return loadLockedEnvelope(account, k?.publicKey); });
   const keyLocked = !!lockedFile && !!candidateKey && lockedFile.account === account && lockedFile.publicKey === candidateKey.publicKey && isVerifiedKey(candidateKey);
   const canLock = isAnchorSession(session) && String(session.actor) === account;
   const key = keyLocked && canLock ? candidateKey : null;
@@ -206,7 +206,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
       const currentKey = loadKey(account);
       // A pending paid key lives only in this tab until sealing succeeds.
       if (currentKey) update(setKey, currentKey);
-      update(setLockedFile, currentKey ? loadLockedEnvelope(account, currentKey.publicKey) : null);
+      if (!candidateKey || currentKey) update(setLockedFile, loadLockedEnvelope(account, currentKey?.publicKey));
       update(setContacts, loadContacts(account)); update(setRemovedContacts, loadRemovedContacts(account));
       update(setAvatars, loadContactAvatars(account)); update(setNames, loadCryptNames(account));
       update(setNicknames, loadCryptNames(account, 'nicknames'));
@@ -224,7 +224,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     window.addEventListener('storage', onStorage);
     window.addEventListener('focus', sync);
     return () => { window.removeEventListener('storage', onStorage); window.removeEventListener('focus', sync); };
-  }, [account]);
+  }, [account, candidateKey]);
   // A remembered folder that was deleted or moved is forgotten so nothing tries to save into it.
   useEffect(() => {
     let alive = true;
@@ -1326,6 +1326,13 @@ export function Messenger({ account, session }: { account: string; session: NonN
     </DialogContent>
   </Dialog>;
 
+  if (!candidateKey && lockedFile) {
+    return <>{fileInput}<CryptLockGate account={account} busy={busy} canLock={canLock} unlock
+      restoring={searchingVault} onRestore={() => fileRef.current?.click()} onLock={() => {
+        setBusy(true);
+        void unlockFile(lockedFile).catch(e => toast({ title: 'Could not unlock your key', description: (e as Error).message, variant: 'destructive' })).finally(() => setBusy(false));
+      }} /></>;
+  }
   if (candidateKey && !key) {
     return <>{fileInput}<CryptLockGate account={account} busy={busy} canLock={canLock}
       restoring={searchingVault} onLock={() => void lockKey()} onRestore={() => fileRef.current?.click()} /></>;

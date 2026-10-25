@@ -2,7 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Session } from '@wharfkit/session';
-import { generateKey, saveContact, saveKey, encryptMemo } from '@/lib/cheeseCrypt';
+import { generateKey, saveContact, encryptMemo } from '@/lib/cheeseCrypt';
+import { saveKey } from './cryptLockedFixture';
 import { encodeReply } from '@/lib/cryptReply';
 import { createGroup, saveGroups } from '@/lib/cryptGroups';
 import { Messenger } from '@/pages/CheeseCrypt';
@@ -16,14 +17,14 @@ vi.mock('@/components/Layout', () => ({ Layout: ({ children }: { children: React
 vi.mock('@/components/crypt/AvatarEditor', () => ({ AvatarEditor: () => null }));
 vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import('@/lib/cryptVault')>(), recallVault: async () => null }));
 
-const session = { permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session;
+const session = { actor: 'alice', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session;
 const mount = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="alice" session={session} /></QueryClientProvider>);
 
 describe('compact sidebar', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     localStorage.clear(); vi.clearAllMocks(); Element.prototype.scrollIntoView = vi.fn();
     const alice = generateKey('alice'), bob = generateKey('bob');
-    saveKey(alice); saveContact('alice', 'bob', bob.publicKey);
+    await saveKey(alice); saveContact('alice', 'bob', bob.publicKey);
     calls.fetch.mockResolvedValue([{ txId: 'a', time: 1, from: 'bob', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo('hi alice', alice.publicKey, bob.secretKey) }]);
   });
 
@@ -108,7 +109,7 @@ describe('compact sidebar', () => {
 
   it('shows separate yellow unread and blue reply badges that stay on the open room and count down with the read marker', async () => {
     const alice = generateKey('alice'), bob = generateKey('bob');
-    saveKey(alice); saveContact('alice', 'bob', bob.publicKey);
+    await saveKey(alice); saveContact('alice', 'bob', bob.publicKey);
     const msg = (time: number, text: string) => ({ txId: `t${time}`, time, from: 'bob', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo(text, alice.publicKey, bob.secretKey) });
     calls.fetch.mockResolvedValue([
       msg(1, 'one'), msg(2, 'two'),
