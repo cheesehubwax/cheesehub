@@ -27,6 +27,7 @@ export interface DirHandle {
   values?(): AsyncIterable<{ kind: string; name: string }>;
   queryPermission?(o: { mode: 'readwrite' }): Promise<PermissionState>;
   requestPermission?(o: { mode: 'readwrite' }): Promise<PermissionState>;
+  isSameEntry?(other: DirHandle): Promise<boolean>;
 }
 
 type Picker = (o: { id?: string; mode: 'readwrite'; startIn?: string }) => Promise<DirHandle>;
@@ -35,9 +36,12 @@ const picker = (): Picker | undefined =>
 
 export const vaultSupported = () => !!picker() && window.self === window.top;
 
-/** Ensures cheesecrypt/ plus both subfolders exist; reuses a picked folder already named cheesecrypt. */
+/** Folder names accepted as the private-key folder, any casing. */
+const KEY_DIR_NAMES = [PRIVATE_DIR, 'my private keys', 'private key', 'private keys'];
+
+/** Ensures both subfolders exist; reuses a picked folder that already is (or contains) the vault. */
 export async function prepareVault(picked: DirHandle): Promise<DirHandle> {
-  const root = picked.name === VAULT_DIR ? picked : await picked.getDirectoryHandle(VAULT_DIR, { create: true });
+  const root = await resolveVaultRoot(picked);
   await root.getDirectoryHandle(PRIVATE_DIR, { create: true });
   await root.getDirectoryHandle(FRIENDS_DIR, { create: true });
   return root;
@@ -165,6 +169,45 @@ async function keyFilesIn(dir: DirHandle): Promise<(MessagingKey | PublicKeyFile
   return out;
 }
 
+/**
+ * Resolves whatever the user picked to the vault root. The cheesecrypt folder itself, a key or friends
+ * folder, a folder containing cheesecrypt, or a folder already holding key files are used as-is;
+ * anything else (such as a fresh Desktop) gets cheesecrypt created inside it by prepareVault.
+ */
+export async function resolveVaultRoot(picked: DirHandle): Promise<DirHandle> {
+  const name = picked.name.toLowerCase();
+  if (name === VAULT_DIR || name === FRIENDS_DIR || KEY_DIR_NAMES.includes(name)) return picked;
+  const inner = await findSubdir(picked, VAULT_DIR);
+  if (inner) return inner;
+  for (const n of KEY_DIR_NAMES) if (await findSubdir(picked, n)) return picked;
+  if (await findSubdir(picked, FRIENDS_DIR)) return picked;
+  if ((await keyFilesIn(picked)).length > 0) return picked;
+  return picked.getDirectoryHandle(VAULT_DIR, { create: true });
+}
+
+const MAX_SCAN_DEPTH = 3;
+const isKeyDirName = (n: string) => KEY_DIR_NAMES.includes(n.toLowerCase());
+
+/**
+ * Walks the vault for private key files: key-named folders first, then the folder itself, then other
+ * subfolders (a stray nested cheesecrypt included), skipping friends/. Bounded depth; content decides.
+ */
+async function scanPrivateKeys(root: DirHandle): Promise<(MessagingKey | LockedKeyFile)[]> {
+  const keys: (MessagingKey | LockedKeyFile)[] = [];
+  const walk = async (dir: DirHandle, depth: number) => {
+    for (const f of await keyFilesIn(dir)) if (f.type === 'gpk-msg-key') keys.push(f as MessagingKey | LockedKeyFile);
+    if (depth >= MAX_SCAN_DEPTH || !dir.values) return;
+    const subdirs: string[] = [];
+    for await (const e of dir.values()) if (e.kind === 'directory' && e.name.toLowerCase() !== FRIENDS_DIR) subdirs.push(e.name);
+    subdirs.sort((a, b) => Number(isKeyDirName(b)) - Number(isKeyDirName(a)));
+    for (const n of subdirs) {
+      try { await walk(await dir.getDirectoryHandle(n), depth + 1); } catch { /* unreadable folder */ }
+    }
+  };
+  await walk(root, 0);
+  return keys;
+}
+
 /** Reads every valid public key file in the shared friends folder (shared by all accounts on this device). */
 export async function readFriendKeys(root: DirHandle): Promise<PublicKeyFile[]> {
   const dir = await findSubdir(root, FRIENDS_DIR);
@@ -175,16 +218,17 @@ export async function readFriendKeys(root: DirHandle): Promise<PublicKeyFile[]> 
 }
 
 /**
- * Finds this account's private key in the vault by contents: the "my private key" folder (any casing) first,
- * then the vault folder itself. File names never matter. Null when no file holds a valid key for the account.
+ * Finds this account's private key in the vault by contents: key-named folders first, then the vault
+ * folder itself, then other subfolders. File names never matter. Null when no file holds a valid key.
  */
 export async function findPrivateKey(root: DirHandle, account: string): Promise<MessagingKey | LockedKeyFile | null> {
-  const dirs = [await findSubdir(root, PRIVATE_DIR), root].filter((d): d is DirHandle => !!d);
-  for (const dir of dirs) {
-    const hit = (await keyFilesIn(dir)).find((f): f is MessagingKey | LockedKeyFile => f.type === 'gpk-msg-key' && f.account === account);
-    if (hit) return hit;
-  }
-  return null;
+  const wanted = account.trim().toLowerCase();
+  return (await scanPrivateKeys(root)).find(f => f.account.trim().toLowerCase() === wanted) ?? null;
+}
+
+/** Accounts of the private keys found in the vault; used to explain a miss. */
+export async function listPrivateKeyAccounts(root: DirHandle): Promise<string[]> {
+  return [...new Set((await scanPrivateKeys(root)).map(k => k.account))];
 }
 
 export const readStateName = (account: string) => `${account}-cheesecrypt-reads.json`;
@@ -253,4 +297,46 @@ export async function vaultWritable(h: DirHandle, ask: boolean) {
   if (!h.queryPermission) return true;
   if ((await h.queryPermission({ mode: 'readwrite' })) === 'granted') return true;
   return ask && !!h.requestPermission && (await h.requestPermission({ mode: 'readwrite' })) === 'granted';
+}
+
+/** True when the error means the folder (or a file in it) no longer exists on disk. */
+export const isMissingFolderError = (e: unknown) =>
+  ['NotFoundError', 'InvalidStateError'].includes((e as DOMException)?.name);
+
+/**
+ * Whether a remembered folder still exists. Needs read access already granted; a handle to a folder
+ * that was deleted or moved fails on first read. Other errors (such as missing permission) are not
+ * proof the folder is gone, so they count as present.
+ */
+export async function vaultExists(h: DirHandle): Promise<boolean> {
+  try {
+    if (h.values) { for await (const _entry of h.values()) break; }
+    return true;
+  } catch (e) { return !isMissingFolderError(e); }
+}
+
+/** "ready" when usable now, "needs-permission" when a click must grant access, "missing" when deleted or moved. */
+export async function vaultStatus(h: DirHandle): Promise<'ready' | 'needs-permission' | 'missing'> {
+  if (h.queryPermission && (await h.queryPermission({ mode: 'readwrite' }).catch(() => 'denied' as PermissionState)) !== 'granted')
+    return 'needs-permission';
+  return (await vaultExists(h)) ? 'ready' : 'missing';
+}
+
+/** Forgets the remembered folder, but only if it is still the given one (a newer pick is never erased). */
+export async function forgetVault(h: DirHandle): Promise<void> {
+  if (typeof indexedDB === 'undefined') return;
+  try {
+    const cur = await recallVault('');
+    if (!cur) return;
+    if (cur !== h) {
+      // Each read from storage is a new object, so compare the folders themselves; unprovable means keep it.
+      const same = cur.isSameEntry ? await cur.isSameEntry(h).catch(() => false) : false;
+      if (!same) return;
+    }
+    const d = await db();
+    await new Promise<void>((res, rej) => {
+      const t = d.transaction(STORE, 'readwrite'); t.objectStore(STORE).delete(SHARED);
+      t.oncomplete = () => res(); t.onerror = () => rej(t.error);
+    });
+  } catch { /* nothing remembered */ }
 }
