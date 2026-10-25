@@ -3,10 +3,11 @@ import { Button } from '@/components/ui/button';
 import { VAULT_DIR, vaultSupported } from '@/lib/cryptVault';
 
 /** Locked screen shown until a private key is loaded: restore an existing key or create a new one. */
-export function CryptKeySetup({ account, fileInput, profileEditor, creationDialog, fileRef, searchingVault, hasSavedVault, openSavedFolder, pickFolder, makeKey }: {
+export function CryptKeySetup({ account, fileInput, profileEditor, creationDialog, fileRef, searchingVault, hasSavedVault, openSavedFolder, pickFolder, makeKey, canCreate = true }: {
   account: string; fileInput: ReactNode; profileEditor: ReactNode; creationDialog: ReactNode;
   fileRef: { current: HTMLInputElement | null }; searchingVault: boolean; hasSavedVault: boolean;
   openSavedFolder: () => void; pickFolder: () => void; makeKey: () => void;
+  canCreate?: boolean;
 }) {
   return (
     <div className="w-full max-w-md space-y-5 text-center">
@@ -41,8 +42,9 @@ export function CryptKeySetup({ account, fileInput, profileEditor, creationDialo
       </div>
       <div className="rounded-lg border border-border bg-card/80 p-4 space-y-2 text-left">
         <p className="font-semibold text-sm">I'm new here</p>
-        <p className="text-xs text-muted-foreground">Choose your name and avatar first, then pay 100 CHEESE and save your new private key. Restoring an existing key is free. A new key cannot read messages sent to an older one.</p>
-        <Button className="w-full" variant="outline" onClick={makeKey}>Create a new key</Button>
+        <p className="text-xs text-muted-foreground">Choose your name and avatar first, then pay 100 CHEESE and lock your key to this WAX account with two free Anchor signatures. Only wallet-locked backups are saved. Restoring an existing key is free. A new key cannot read messages sent to an older one.</p>
+        {!canCreate && <p className="text-xs text-destructive">Sign in with Anchor to create or unlock your messaging key.</p>}
+        <Button className="w-full" variant="outline" disabled={!canCreate} onClick={makeKey}>Create a new key</Button>
       </div>
     </div>
   );
