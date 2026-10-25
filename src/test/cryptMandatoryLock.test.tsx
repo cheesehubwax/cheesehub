@@ -67,6 +67,21 @@ it('non-Anchor wallets cannot create keys or pay the creation fee', () => {
   expect(calls.pay).not.toHaveBeenCalled();
 });
 
+it('importing a plain key stays gated even when its matching envelope is already stored', async () => {
+  const key = generateKey('alice'); saveLockedEnvelope(await sealKey(async () => 'SIG_K1_abc', key, 'alice'));
+  clearVerifiedKeys();
+  const view = mount();
+  const input = view.container.querySelector('input[type=file]');
+  if (!input) throw new Error('Missing key import');
+  const file = new File([], 'legacy.json');
+  Object.defineProperty(file, 'text', { value: async () => JSON.stringify(key) });
+  await act(async () => { fireEvent.change(input, { target: { files: [file] } }); });
+  expect(screen.getByRole('button', { name: 'Lock key to continue' })).toBeEnabled();
+  expect(screen.queryByRole('button', { name: 'Menu' })).toBeNull();
+  expect(loadKey('alice')).toBeNull(); expect(calls.fetch).not.toHaveBeenCalled();
+  expect(calls.sign).not.toHaveBeenCalled(); expect(calls.pay).not.toHaveBeenCalled();
+});
+
 it('a signing result arriving after leaving the account cannot persist or export its key', async () => {
   const key = generateKey('alice'); localStorage.setItem('cheesecrypt-key-alice', JSON.stringify(key));
   let finish: ((result: unknown) => void) | undefined;
