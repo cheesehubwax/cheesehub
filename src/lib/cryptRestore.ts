@@ -26,7 +26,7 @@ export function recoverRoomRequests(memos: ChainMemo[], key: MessagingKey, listi
   const recovered = { ...stored };
   for (const listing of listings) {
     if (listing.creator === key.account || stored[listing.id]) continue;
-    const sent = memos.filter(m => m.from === key.account && m.to === listing.creator);
+    const sent = memos.filter(m => m.from === key.account && m.to === listing.creator && Number.isFinite(m.time) && m.time >= 0);
     const evidence = decodeRoomEvents(sent, key, { [listing.creator]: listing.publicKey })
       .filter(e => (e.control.kind === 'join' || e.control.kind === 'joined') && e.control.id === listing.id)
       .sort((a, b) => a.time - b.time);
@@ -35,6 +35,16 @@ export function recoverRoomRequests(memos: ChainMemo[], key: MessagingKey, listi
     if (first) recovered[listing.id] = { id: listing.id, creator: listing.creator, publicKey: listing.publicKey, name: listing.name, time: first.time };
   }
   return recovered;
+}
+
+/** Preserve room+creator+key provenance even when a creator used different keys for two rooms. */
+export function recoveredRoomEvents(memos: ChainMemo[], key: MessagingKey, requests: Record<string, RoomRequest>) {
+  return Object.values(requests).flatMap(request => decodeRoomEvents(memos, key, { [request.creator]: request.publicKey })
+    .filter(e => {
+      const id = e.control.kind === 'invite' || e.control.kind === 'admission' ? e.control.invite.id : e.control.id;
+      return e.to === key.account && e.from === request.creator && e.usedKey === request.publicKey && id === request.id &&
+        ['invite', 'admission', 'policy', 'room', 'add', 'join-no'].includes(e.control.kind);
+    }));
 }
 
 /** Storage events are origin-scoped; never read another wallet's state. */

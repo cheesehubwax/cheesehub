@@ -31,7 +31,7 @@
 - CHEESECrypt: one vault/device; friends/ loads into all accounts (per-account edits), only explicit saves replace; blocked memos drop undecrypted. Keys match by content; reads merge newest.
 - Crypt inbox: bounded discovery; strangers held until accepted
 - Crypt reply views use per-message receipts (jumps keep skipped replies), inner-list scroll only. About: DappAbout + crypto dialog.
-- Crypt sections (hero, keys, sidebar, header, composer, bubbles) are presentational in components/crypt; Messenger owns state/effects/handlers for consistent chat state.
+- Crypt sections are presentational; Messenger owns state. Recovery requires own authenticated DM/join evidence; account/origin tab sync preserves consent and scoped keys.
 - OpenMojiIcon's optional tint paints a glyph as a solid silhouette in a given color; use it when an OpenMoji artwork's own palette is too dark for the always-dark background.
 - Both NFT players normalize media via nftMedia (case-insensitive audio/clip/video, reference-only sound/mp3/sfx aliases); version music caches on detection changes to avoid stale classifications.
 - CHEESEFolio fiat/BTC/ETH figures are WAX→USD→currency per day (fx-usd-history.json, units per USD); unknown rates stay unknown.
