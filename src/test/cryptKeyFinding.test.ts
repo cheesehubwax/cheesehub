@@ -53,6 +53,22 @@ describe('finding key files by their contents', () => {
     expect(await findPrivateKey(root, 'alice')).toBeNull();
     expect((await readFriendKeys(root)).map(f => f.account)).toEqual(['bob']);
   });
+
+  it('finds a private key in a stray nested folder, but never one inside friends/', async () => {
+    const carol = generateKey('carol');
+    const stray = fakeDir('old backups', { 'carol.json': JSON.stringify(carol) });
+    const nested = fakeDir('stuff', {}, { 'old backups': stray });
+    const root = fakeDir('cheesecrypt', {}, { stuff: nested, friends: fakeDir('friends', { 'alice.json': JSON.stringify(key) }) });
+    expect(((await findPrivateKey(root, 'carol')) as { secretKey?: string } | null)?.secretKey).toBe(carol.secretKey);
+    expect(await findPrivateKey(root, 'alice')).toBeNull();
+  });
+
+  it('lists the accounts keys were found for, to explain a miss', async () => {
+    const { listPrivateKeyAccounts } = await import('@/lib/cryptVault');
+    const root = fakeDir('cheesecrypt', {}, { 'my private key': fakeDir('my private key', { 'a.json': JSON.stringify(key), 'b.json': JSON.stringify(generateKey('bob')) }) });
+    expect((await listPrivateKeyAccounts(root)).sort()).toEqual(['alice', 'bob']);
+    expect(await listPrivateKeyAccounts(fakeDir('cheesecrypt'))).toEqual([]);
+  });
 });
 
 describe('read markers shared with the folder', () => {

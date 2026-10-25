@@ -18,7 +18,7 @@ function fakeDir(name: string): DirHandle & { dirs: Map<string, any>; files: Map
         return { write: async (d: string) => { staged = d; }, close: async () => { files.set(n, staged); }, abort: async () => {} };
       } };
     },
-    async *values() { for (const n of files.keys()) yield { kind: 'file', name: n }; },
+    async *values() { for (const n of dirs.keys()) yield { kind: 'directory', name: n }; for (const n of files.keys()) yield { kind: 'file', name: n }; },
   };
 }
 const key = { type: 'gpk-msg-key', version: 1, account: 'alice', publicKey: 'p', secretKey: 's', created: '' } as MessagingKey;
@@ -118,5 +118,48 @@ describe('own public key', () => {
     const { writeOwnPublicKey } = await import('@/lib/cryptVault');
     const root = await prepareVault(fakeDir('cheesecrypt'));
     await expect(writeOwnPublicKey(root, key as never)).rejects.toThrow();
+  });
+});
+
+describe('vault root detection', () => {
+  it.each(['my private key', 'My Private Key', 'friends', 'FRIENDS'])('uses a picked "%s" folder as the vault root instead of nesting inside it', async name => {
+    const picked = fakeDir(name);
+    expect(await prepareVault(picked)).toBe(picked);
+    expect(picked.dirs.has('cheesecrypt')).toBe(false);
+  });
+
+  it('uses a cheesecrypt folder inside the picked folder, whatever its casing', async () => {
+    const desktop = fakeDir('Desktop');
+    const inner = fakeDir('CheeseCrypt');
+    desktop.dirs.set('CheeseCrypt', inner);
+    expect(await prepareVault(desktop)).toBe(inner);
+    expect(desktop.dirs.has('cheesecrypt')).toBe(false);
+  });
+
+  it('uses a picked folder that already holds a key file', async () => {
+    const picked = fakeDir('random folder');
+    picked.files.set('backup.txt', JSON.stringify(generateKey('alice')));
+    expect(await prepareVault(picked)).toBe(picked);
+    expect(picked.dirs.has('cheesecrypt')).toBe(false);
+  });
+
+  it('creates cheesecrypt inside an unrelated empty folder', async () => {
+    const desktop = fakeDir('Desktop');
+    expect((await prepareVault(desktop)).name).toBe('cheesecrypt');
+  });
+});
+
+describe('remembered folder health', () => {
+  it('reports ready, needs-permission and missing', async () => {
+    const { vaultStatus } = await import('@/lib/cryptVault');
+    const ready = Object.assign(fakeDir('cheesecrypt'), { queryPermission: async () => 'granted' as PermissionState });
+    expect(await vaultStatus(ready)).toBe('ready');
+    const prompt = Object.assign(fakeDir('cheesecrypt'), { queryPermission: async () => 'prompt' as PermissionState });
+    expect(await vaultStatus(prompt)).toBe('needs-permission');
+    const gone = Object.assign(fakeDir('cheesecrypt'), {
+      queryPermission: async () => 'granted' as PermissionState,
+      values: async function* (): AsyncIterable<{ kind: string; name: string }> { throw new DOMException('x', 'NotFoundError'); },
+    });
+    expect(await vaultStatus(gone)).toBe('missing');
   });
 });
