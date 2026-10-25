@@ -1,8 +1,9 @@
 # App ↔ blind router sync checklist
 
-The contract is a blind payment router, not a room/moderation authority. The app is still on
-direct peer-to-peer transfers; deployment and history integration are pending. Update this
-checklist with every CHEESECrypt change, but do not reintroduce plaintext roles to enforce client policy.
+The contract is a blind atomic payment router, not a room/moderation authority, and it holds
+no user balances (zero custody). The app is still on direct peer-to-peer transfers; deployment
+and history integration are pending. Update this checklist with every CHEESECrypt change, but
+do not reintroduce plaintext roles to enforce client policy.
 
 | App rule / source | Router responsibility / integration status |
 |---|---|
@@ -18,7 +19,7 @@ checklist with every CHEESECrypt change, but do not reintroduce plaintext roles 
 | Listing optional username (`u`), presentation only; creator identity stays transfer sender | Direct listing metadata; no router change |
 | Immutable first-public founder roster | Client-only encrypted policy replay |
 | Owner/admin appointment, mute, ban, collapse (`cryptModeration.ts`) | Client-only authenticated CG2 authority; NO moderation actions/tables |
-| Admin cannot ban; founders ban/admin-collapse immune | Client-only; do not infer role from fee kind, balance owner or recipient array |
+| Admin cannot ban; founders ban/admin-collapse immune | Client-only; do not infer role from fee kind, pending payer or recipient array |
 | Mutes permanently suppress send-time traffic/quotes | Client-only presentation/filtering; malicious clients can ignore it |
 | Reports member→owner+admins, admin→owner | Encrypted ordinary text controls; notifications only; no report table |
 | Join requests 0.1000 CHEESE owner fee + 0.0001 copy + 0.0100 platform = 0.1101 (`cryptRooms.ts`) | Separate plain direct transfer to the creator; not routed, no router fee kind |
@@ -28,14 +29,17 @@ checklist with every CHEESECrypt change, but do not reintroduce plaintext roles 
 | Authenticated original sender (`cheeseCrypt.ts`, `cryptGroups.ts`) | REQUIRED new trace adapter: verify sendmsg authority + inline transfer ancestry; normalize sender before decryption/authority replay |
 | TX IDs, Greymass Fuel, success before local state | Keep existing signing requirements; verify router delivery traces and rollback on testnet |
 | Account recovery and tab sync (`cryptRestore.ts`) | Client-only: outgoing authenticated DM proves friendship; matching own join/request proves room consent; listing keys remain scoped; no router change |
+| Zero custody: no stored user balances | Payment transfer + `sendmsg` in one atomic transaction; transient `pending` row consumed same-tx, change refunded inline; `reclaim` only for orphaned payments |
 
-Only tables: `config`, `balances`. Only explicit actions: `setconfig`, `setpaused`, `withdraw`,
-`sendmsg`; configured-token transfer notifications handle deposits. ABI breaks from old draft.
+Only tables: `config`, `pending` (transient, erased on use). Only explicit actions: `setconfig`,
+`setpaused`, `reclaim`, `sendmsg`; configured-token transfer notifications record in-flight
+payments. ABI breaks from old drafts.
 
 ## Integration gates (not yet verified)
 - Deploy fresh testnet contract; never assume old tables/config automatically migrate.
-- Exercise auth, balance ownership, exact fee split, denomination lock, paused withdrawals,
-  invalid shapes, missing recipients and atomic failure rollback through real chain execution.
+- Exercise auth, exact same-transaction payment, underpayment rejection, overpayment change,
+  orphaned-payment reclaim, exact fee split, denomination lock, paused behavior, invalid shapes,
+  missing recipients and atomic failure rollback through real chain execution.
 - Add trace-backed original-sender history discovery for both parties; multiple router actions
   in one transaction must not cross-attribute copies. Never trust memo-only sender fields.
 - Verify legacy/new encrypted text, NFT, complete membership/admissions, edits, reports and

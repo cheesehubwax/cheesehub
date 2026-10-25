@@ -1,5 +1,6 @@
 #pragma once
-// Blind CHEESECrypt payment router. No room IDs, rosters, roles or moderation state.
+// Blind CHEESECrypt atomic payment router. Zero custody: no stored user balances.
+// No room IDs, rosters, roles or moderation state.
 #include <eosio/eosio.hpp>
 #include <eosio/asset.hpp>
 #include <eosio/singleton.hpp>
@@ -39,24 +40,25 @@ public:
    };
    using config_singleton = singleton<"config"_n, config>;
 
-   // Public prepaid funds only; owner here is a deposit holder, NOT a room role.
-   struct [[eosio::table]] balance {
-      name owner;
+   // Transient in-flight payment, created by a token transfer and consumed by sendmsg
+   // in the same transaction. Payer here is a fee payer, NOT a room role. Rows are
+   // erased on use; reclaim refunds any row orphaned by an incomplete transaction flow.
+   struct [[eosio::table]] pending {
+      name payer;
       asset funds;
-      uint64_t primary_key() const { return owner.value; }
+      uint64_t primary_key() const { return payer.value; }
    };
-   using balances_t = multi_index<"balances"_n, balance>;
+   using pending_t = multi_index<"pending"_n, pending>;
 
    [[eosio::action]] void setconfig(const config& cfg);
    [[eosio::action]] void setpaused(bool paused);
    [[eosio::on_notify("*::transfer")]]
    void ontransfer(name from, name to, asset quantity, string memo);
-   [[eosio::action]] void withdraw(name owner, asset quantity);
+   [[eosio::action]] void reclaim(name payer);
    [[eosio::action]] void sendmsg(name sender, uint8_t kind, uint16_t parts, const vector<copy_t>& copies);
 
 private:
    config get_config() const;
-   void debit(name owner, const asset& amount);
    void pay_platform(const config& cfg, const asset& amount);
    void send_token(const config& cfg, name to, const asset& qty, const string& memo);
    asset platform_fee(const config& cfg, uint8_t kind, uint16_t parts) const;

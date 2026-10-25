@@ -1,9 +1,15 @@
-# CHEESECrypt blind payment router (WAX)
+# CHEESECrypt atomic blind payment router (WAX)
 
 Routes opaque encrypted memo copies and atomically splits platform fees 80% to `eosio.null`,
 20% to `xcheeseliqst`. **No rooms, members, room owners/admins, founders, mutes, bans,
 collapse targets or edit receipts are registered.** There are no role-management actions.
-Only `config` and prepaid `balances` are stored. A balance's `owner` is the depositor, not a room role.
+
+**Zero custody: the contract stores no user balances.** The only tables are `config` and the
+transient `pending` table. A payment arrives as a token transfer and is consumed by `sendmsg`
+in the **same transaction**; the fee split, recipient copies and any change are paid out inline
+before the transaction ends. If anything fails, the whole transaction — including the sender's
+payment — rolls back, so the router never holds funds between transactions. A `pending` row's
+`payer` is a fee payer, not a room role.
 
 The app still uses direct peer-to-peer transfers. **Do not switch it to this contract before the
 history adapter is implemented and verified on testnet.** This is an ABI-breaking replacement
@@ -15,9 +21,10 @@ Install Antelope/WAX CDT v4+ (`cdt-cpp`) and a native C++17 compiler:
 ./build.sh                    # build/cheesecrypt.wasm + build/cheesecrypt.abi
 bash tests/run.sh             # shared fee-arithmetic and hard-bound tests
 ```
-Local tests are not chain execution tests. Verify deposits, insufficient funds, unauthorized
-calls, rollback after a failed recipient transfer, paused withdrawals, recipient coverage,
-RAM and practical transaction sizes on testnet before launching.
+Local tests are not chain execution tests. Verify same-transaction payment + send, underpayment,
+overpayment change, orphaned-payment reclaim, unauthorized calls, rollback after a failed
+recipient transfer, paused behavior, recipient coverage, RAM and practical transaction sizes
+on testnet before launching.
 
 ## Deployment
 Use a dedicated testnet account first. Example (replace account and endpoint):
@@ -36,17 +43,19 @@ stranded old tables. Public data already recorded cannot be made private retroac
 | Action | Required authority | Effect |
 |---|---|---|
 | `setconfig(cfg)` | contract | Sets bounded fee amounts, sinks, operational limits; split must remain 80/20 |
-| `setpaused(paused)` | contract | Stops deposits and sends; withdrawals remain available |
-| token `transfer(from, contract, quantity, memo)` | depositor | Credits prepaid funds from the configured token only |
-| `withdraw(owner, quantity)` | depositor | Returns only that account's balance |
-| `sendmsg(sender, kind, parts, copies)` | sender | Debits sender, pays shared platform fee, delivers all copies atomically |
+| `setpaused(paused)` | contract | Stops payments and sends; `reclaim` remains available |
+| token `transfer(from, contract, quantity, memo)` | payer | Records a transient in-flight payment from the configured token only |
+| `sendmsg(sender, kind, parts, copies)` | sender | Consumes the payment, pays the shared platform fee, delivers all copies and returns change, atomically |
+| `reclaim(payer)` | payer | Refunds a payment orphaned by an incomplete transaction flow |
 
-Deposit and send can share one transaction/signature. `copies` is an array of `{to,memo}`.
-Each distinct recipient must receive exactly `parts` copies. Self/contract recipients are
-rejected; recipient accounts must exist, and memos must be 1–256 bytes. No room ID is supplied.
-Hard limits: 35 parts and 49 recipients per action (1,715 copies); `config` can lower these,
-not raise them. These are transport bounds, **not** proof of an 8/50-member room. Chain
-CPU/NET/transaction limits can be substantially tighter; max-size delivery is not verified.
+The intended transaction is two actions with one signature: `transfer` the exact fee to the
+contract, then `sendmsg`. `copies` is an array of `{to,memo}`. Each distinct recipient must
+receive exactly `parts` copies. Self/contract recipients are rejected; recipient accounts must
+exist, and memos must be 1–256 bytes. No room ID is supplied. Overpayment is returned to the
+sender as change in the same action. Hard limits: 35 parts and 49 recipients per action
+(1,715 copies); `config` can lower these, not raise them. These are transport bounds, **not**
+proof of an 8/50-member room. Chain CPU/NET/transaction limits can be substantially tighter;
+max-size delivery is not verified.
 
 Default fees (four decimal CHEESE):
 - Kind 0 text/control/edit/report: 0.0100 per part, shared across recipients.
@@ -90,10 +99,10 @@ Never accept a sender claimed solely in a memo; never reinterpret arbitrary cont
 as user-authenticated messages. Test sender history discovery as well as recipient decryption.
 
 ## Funds, RAM and operator trust
-Depositors pay their balance-row RAM (returned when emptied). Inline token transfers may bill
-the router RAM when recipients have no CHEESE balance; buy a buffer and monitor it. Large sends
-also require CPU/NET. Config and deployed code remain controlled by the contract account: secure
-its permissions; changing code can change custody rules. Fee amounts and sinks are configurable
-and must be checked before signing; per-fee values are bounded to 100,000,000 smallest units
-for safe arithmetic. Token contract/symbol cannot change until every prepaid balance is withdrawn.
-Prefer exact same-transaction funding rather than leaving substantial prepaid funds.
+Payers pay their `pending` row RAM, freed when `sendmsg` or `reclaim` erases the row. Inline
+token transfers may bill the router RAM when recipients have no CHEESE balance; buy a buffer and
+monitor it. Large sends also require CPU/NET. Config and deployed code remain controlled by the
+contract account: secure its permissions; changing code can change routing rules. Fee amounts
+and sinks are configurable and must be checked before signing; per-fee values are bounded to
+100,000,000 smallest units for safe arithmetic. Always fund with the exact same-transaction
+payment; `reclaim` exists only for payments orphaned by an incomplete flow, not for savings.
