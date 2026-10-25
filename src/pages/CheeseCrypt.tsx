@@ -55,7 +55,7 @@ import { CryptHero } from '@/components/crypt/CryptHero';
 import { CryptKeySetup } from '@/components/crypt/CryptKeySetup';
 import { CryptSidebar } from '@/components/crypt/CryptSidebar';
 import { CryptAvatarRail } from '@/components/crypt/CryptAvatarRail';
-import { isAccountStorageKey, recoveryCandidates, recoverFriends, recoverRoomRequests } from '@/lib/cryptRestore';
+import { isAccountStorageKey, recoveryCandidates, recoverFriends, recoverRoomRequests, recoveredRoomEvents } from '@/lib/cryptRestore';
 import { CryptChatHeader } from '@/components/crypt/CryptChatHeader';
 import { CryptComposer } from '@/components/crypt/CryptComposer';
 import { DiscoverRoomsDialog, JoinRequests, RoomSettingsDialog } from '@/components/crypt/PublicRooms';
@@ -181,7 +181,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const [voice, setVoice] = useState<VoiceClip | null>(null);
   /** History pages to read; grows only when a voice note touches the edge of the loaded window. */
-  const [depth, setDepth] = useState(1);
+  const [depth, setDepth] = useState(MAX_HISTORY_PAGES);
   /** Ticks so a stalled voice note moves from "loading" to "incomplete" without new history. */
   /** Only messages newer than this page visit may autoplay sound effects; older history stays silent. */
   const openedAt = useRef(Date.now());
@@ -340,8 +340,6 @@ export function Messenger({ account, session }: { account: string; session: NonN
     }
     if (changed) setContacts(loadContacts(account));
   }, [key, restoreKeys, visibleMemos, account]);
-  // Bootstrap evidence may be older than recent chat traffic; recovery reads the existing bounded window.
-  useEffect(() => { if (key && loaded && depth < MAX_HISTORY_PAGES) setDepth(d => d + 1); }, [key, loaded, depth]);
 
   const lastAt = useMemo(() => {
     const out: Record<string, number> = {};
@@ -371,10 +369,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
     }
     if (changed) setRoomRequests(loadRoomRequests(account));
   }, [restoredRequests, roomRequests, account]);
-  const roomInviters = useMemo(() => Object.fromEntries(Object.values(restoredRequests)
-    .filter(r => contacts[r.creator] !== r.publicKey && !blocked.includes(r.creator)).map(r => [r.creator, r.publicKey])), [roomRequests, contacts, blocked]);
-  const roomInviteEvents = useMemo(() => key && Object.keys(roomInviters).length ? decodeRoomEvents(visibleMemos, key, roomInviters)
-    .filter(e => e.to === account && restoredRequests[(e.control.kind === 'invite' || e.control.kind === 'admission') ? e.control.invite.id : e.control.id]?.creator === e.from && (e.control.kind === 'invite' || e.control.kind === 'admission' || e.control.kind === 'policy' || e.control.kind === 'room' || e.control.kind === 'add' || e.control.kind === 'join-no')) : [], [visibleMemos, key, roomInviters, restoredRequests, account]);
+  const roomInviteEvents = useMemo(() => key ? recoveredRoomEvents(visibleMemos, key, restoredRequests) : [],
+    [visibleMemos, key, restoredRequests]);
   const allGroupEvents = useMemo(() => [...new Map([...cg2Events, ...roomInviteEvents].map(e => [e.key, e])).values()], [cg2Events, roomInviteEvents]);
   const invites = useMemo(() => key ? collectInvites(allGroupEvents, account, key.publicKey, contacts, inviteStore, restoredRequests) : inviteStore,
     [allGroupEvents, account, key, contacts, inviteStore, restoredRequests]);
