@@ -11,6 +11,7 @@ checklist with every CHEESECrypt change, but do not reintroduce plaintext roles 
 | Recipient 0.0001 per part | `recipient_fee` per copy; exact `parts` copies per distinct recipient |
 | Shared 80% eosio.null / 20% xcheeseliqst | `pay_platform` integer split; `setconfig` requires 80 |
 | Key creation 100 CHEESE, publishing fee | Existing direct-transfer path, not router messaging |
+| Mandatory Anchor-locked keys; legacy upgrade before use; locked-only backups | Client-only seal/unlock verification; no router changes; creation fee unchanged |
 | Private 8 / public 50; only owner admits (`cryptInviteGroups.ts`) | Client-only authenticated envelopes; router bounds 49 recipients per action, not total membership |
 | 35 membership parts, usual text 20 | Router hard bound 35; client keeps content-specific bounds |
 | CRYPTROOM1 listing stake 10.0000 (new/re-list), updates and unlisting 0.0100 (`cryptRooms.ts`) | Existing plaintext fee-leg broadcasts; no rooms table/action; no generic router fee substitution |

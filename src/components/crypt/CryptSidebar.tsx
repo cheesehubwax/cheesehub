@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactNode } from 'react';
-import { Ban, ChevronDown, Download, Globe, KeyRound, Loader2, Lock, Menu, PanelLeftClose, PanelLeftOpen, Pencil, Radio, RefreshCw, Save, Trash2, Upload, UserPlus, Users } from 'lucide-react';
+import { Ban, ChevronDown, Download, Globe, KeyRound, Loader2, ShieldCheck, Menu, PanelLeftClose, PanelLeftOpen, Pencil, Radio, RefreshCw, Save, Trash2, Upload, UserPlus, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -19,7 +19,7 @@ export function CryptSidebar({
   makeKey, publicInbox, setInboxOpen, toggleList, listHidden, hiddenUnread, hiddenReplies, messageRequests, acceptRequest, dismissRequest,
   blockAccount, groupsOpen, setGroupsOpen, setCreatingGroup, inviteViews, inviteShown, hiddenGroups, inviteRow, groups, groupRow,
   showHiddenGroups, setShowHiddenGroups, friendsOpen, setFriendsOpen, setAddingFriend, partners, active, setActive, avatars, nameFor,
-  contacts, lastAt, badge, removeFriend, setRoomsOpen, joinRequestsPanel, pendingRequests = [], backupFile, keyLocked, canLock, lockKey,
+  contacts, lastAt, badge, removeFriend, setRoomsOpen, joinRequestsPanel, pendingRequests = [], backupFile, keyLocked,
 }: {
   account: string; cryptKey: MessagingKey; loading: boolean; refresh: () => void; setEditingAvatar: (v: boolean) => void;
   menuOpen: boolean; setMenuOpen: (v: boolean) => void; fileRef: { current: HTMLInputElement | null };
@@ -27,7 +27,7 @@ export function CryptSidebar({
   makeKey: () => void; publicInbox: boolean; setInboxOpen: (v: boolean) => void; toggleList: () => void; listHidden: boolean;
   hiddenUnread: number; hiddenReplies: number; messageRequests: ComponentProps<typeof MessageRequests>['requests'];
   setRoomsOpen: (v: boolean) => void; joinRequestsPanel?: ReactNode; pendingRequests?: ReactNode[];
-  /** What Back up downloads: the wallet-locked file when one exists, else the plain key. */
+  /** Back up never falls back to a plaintext private key. */
   backupFile?: unknown; keyLocked?: boolean; canLock?: boolean; lockKey?: () => void;
   acceptRequest: (from: string) => void; dismissRequest: (from: string) => void; blockAccount: (name: string) => void;
   groupsOpen: boolean; setGroupsOpen: (v: boolean) => void; setCreatingGroup: (v: boolean) => void;
@@ -55,6 +55,7 @@ export function CryptSidebar({
             <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
               {loading && <Loader2 className="h-3 w-3 shrink-0 animate-spin" />}
               <span className="truncate">{account}</span>
+              {keyLocked && <ShieldCheck className="h-4 w-4 shrink-0 text-success" aria-label="Key locked to WAX account" />}
             </span>
           </span>
         </button>
@@ -72,17 +73,11 @@ export function CryptSidebar({
                 <CardAction icon={<Upload className="h-4 w-4" />} label="Restore" aria-label="Load a key file (yours or a contact's)" title="Load a key file (yours or a contact's)" onClick={() => fileRef.current?.click()} />
                 <CardAction icon={<Download className="h-4 w-4" />} label="Public key" aria-label="Share my public key file" title="Save my public key file to share" onClick={() => void sharePublicKey()} />
                 <CardAction icon={<Radio className="h-4 w-4" />} label="Publish" disabled={busy} aria-label={`Publish my key on chain (${MESSAGE_FEE_QUANTITY})`} title={`Publish my key on chain (${MESSAGE_FEE_QUANTITY})`} onClick={() => void publish()} />
-                <CardAction icon={<Save className="h-4 w-4" />} label="Back up" aria-label="Back up private key" title={keyLocked ? 'Download my wallet-locked private key backup' : 'Download a backup of my private key — never share it'} onClick={() => download(`${account}-cheesecrypt-key-PRIVATE.json`, backupFile ?? key)} />
+                <CardAction icon={<Save className="h-4 w-4" />} label="Back up" disabled={!keyLocked || !backupFile} aria-label="Back up private key" title="Download my wallet-locked private key backup" onClick={() => { if (keyLocked && backupFile) download(`${account}-cheesecrypt-key-PRIVATE.json`, backupFile); }} />
                 <CardAction icon={<Ban className="h-4 w-4" />} label={blocked.length ? `Blocked (${blocked.length})` : 'Blocked'} aria-label="Blocked accounts" title="Accounts blocked on this device" onClick={() => setShowBlocked(true)} />
                 <CardAction icon={<KeyRound className="h-4 w-4" />} label="New key" className="hover:text-destructive" aria-label="Create a new key" title="Create a new key (it cannot read messages sent to this one)" onClick={makeKey} />
                 <PublicInboxButton enabled={publicInbox} onClick={() => setInboxOpen(true)} />
                 <CardAction icon={<Globe className="h-4 w-4" />} label="Rooms" aria-label="Find public rooms" title="Find public rooms and ask to join" onClick={() => setRoomsOpen(true)} />
-                {!keyLocked && lockKey && (
-                  <CardAction icon={<Lock className="h-4 w-4" />} label="Lock key" className="text-cheese" disabled={busy}
-                    aria-label="Lock my key file to my wallet"
-                    title={canLock ? "Your key file isn't locked: anyone with a copy can read your messages. Lock it to your Anchor wallet (free)." : "Your key file isn't locked. Sign in with Anchor to lock it."}
-                    onClick={lockKey} />
-                )}
               </div>
             </PopoverContent>
           </Popover>

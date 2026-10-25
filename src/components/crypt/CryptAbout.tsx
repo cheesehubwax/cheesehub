@@ -45,7 +45,7 @@ function CryptographyDetails() {
           </section>
           <section className="space-y-2">
             <h3 className="font-semibold text-foreground">Important security limits</h3>
-            <p>Observers, block producers and history services cannot normally decrypt the content without the relevant keys. However, recipients can copy or share plaintext, and a compromised device, malicious browser extension or exposed private key can reveal messages. Your private key is stored in this browser and in any backup files you save; those JSON backups are not password-encrypted.</p>
+            <p>Observers, block producers and history services cannot normally decrypt the content without the relevant keys. However, recipients can copy or share plaintext, and a compromised device, malicious browser extension or exposed private key can reveal messages. Keys must be locked to their owning WAX account with Anchor before use. Only the locked envelope is saved; the opened secret stays in this browser session’s memory. Legacy plain backups must be upgraded, and old copies deleted by you. Keep your locked backup and access to the same Anchor signing key: a changed wallet signing key may not unlock an older backup.</p>
             <p>There is no forward secrecy: because the same long-term keys are reused and ciphertext remains on-chain, later compromise of either participant’s private key can expose past messages for that pair when the other public key is available. Group members receive separate encrypted copies. Protect your device and backups, and keep a safe copy of your private key—losing it can make old messages unreadable.</p>
           </section>
         </div>
