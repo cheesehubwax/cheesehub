@@ -218,16 +218,17 @@ export async function readFriendKeys(root: DirHandle): Promise<PublicKeyFile[]> 
 }
 
 /**
- * Finds this account's private key in the vault by contents: the "my private key" folder (any casing) first,
- * then the vault folder itself. File names never matter. Null when no file holds a valid key for the account.
+ * Finds this account's private key in the vault by contents: key-named folders first, then the vault
+ * folder itself, then other subfolders. File names never matter. Null when no file holds a valid key.
  */
 export async function findPrivateKey(root: DirHandle, account: string): Promise<MessagingKey | LockedKeyFile | null> {
-  const dirs = [await findSubdir(root, PRIVATE_DIR), root].filter((d): d is DirHandle => !!d);
-  for (const dir of dirs) {
-    const hit = (await keyFilesIn(dir)).find((f): f is MessagingKey | LockedKeyFile => f.type === 'gpk-msg-key' && f.account === account);
-    if (hit) return hit;
-  }
-  return null;
+  const wanted = account.trim().toLowerCase();
+  return (await scanPrivateKeys(root)).find(f => f.account.trim().toLowerCase() === wanted) ?? null;
+}
+
+/** Accounts of the private keys found in the vault; used to explain a miss. */
+export async function listPrivateKeyAccounts(root: DirHandle): Promise<string[]> {
+  return [...new Set((await scanPrivateKeys(root)).map(k => k.account))];
 }
 
 export const readStateName = (account: string) => `${account}-cheesecrypt-reads.json`;
