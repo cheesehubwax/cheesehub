@@ -55,6 +55,7 @@ import { CryptHero } from '@/components/crypt/CryptHero';
 import { CryptKeySetup } from '@/components/crypt/CryptKeySetup';
 import { CryptSidebar } from '@/components/crypt/CryptSidebar';
 import { CryptAvatarRail } from '@/components/crypt/CryptAvatarRail';
+import { isAccountStorageKey, recoveryCandidates, recoverFriends, recoverRoomRequests } from '@/lib/cryptRestore';
 import { CryptChatHeader } from '@/components/crypt/CryptChatHeader';
 import { CryptComposer } from '@/components/crypt/CryptComposer';
 import { DiscoverRoomsDialog, JoinRequests, RoomSettingsDialog } from '@/components/crypt/PublicRooms';
@@ -193,6 +194,31 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const endRef = useRef<HTMLLIElement>(null);
   const [backupKey, setBackupKey] = useState<MessagingKey | null>(null);
   const [vault, setVault] = useState<DirHandle | null>(null);
+  useEffect(() => {
+    const sync = () => {
+      const update = <T,>(setter: (fn: (previous: T) => T) => void, next: T) =>
+        setter(previous => JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
+      const currentKey = loadKey(account);
+      update(setKey, currentKey);
+      update(setLockedFile, currentKey ? loadLockedEnvelope(account, currentKey.publicKey) : null);
+      update(setContacts, loadContacts(account)); update(setRemovedContacts, loadRemovedContacts(account));
+      update(setAvatars, loadContactAvatars(account)); update(setNames, loadCryptNames(account));
+      update(setNicknames, loadCryptNames(account, 'nicknames'));
+      update(setGroups, loadGroups(account)); update(setHiddenGroups, loadHiddenGroups(account));
+      update(setInviteStore, loadInvites(account)); update(setDecisions, loadDecisions(account));
+      update(setFriendDeclines, loadFriendDecisions(account)); update(setBlockedState, loadBlocked(account));
+      update(setRoomRequests, loadRoomRequests(account)); update(setLocalListings, loadLocalListings(account));
+      update(setJoinDeclines, loadJoinDeclines(account)); update(setPublicInbox, loadPublicInbox(account));
+      update(setRequestDeclines, loadRequestDeclines(account)); update(setSeenReports, loadSeenReports(account));
+      update(setSavedControls, loadModerationMemos(account)); update(setReadMarks, loadReadMarks(account));
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.storageArea === localStorage && isAccountStorageKey(event.key, account)) sync();
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', sync);
+    return () => { window.removeEventListener('storage', onStorage); window.removeEventListener('focus', sync); };
+  }, [account]);
   useEffect(() => { recallVault(account).then(setVault); }, [account]);
   /** Read markers saved in the vault folder: undefined while checking, null when none or no access. */
   const [folderMarks, setFolderMarks] = useState<ReadMarks | null | undefined>(undefined);
@@ -292,6 +318,31 @@ export function Messenger({ account, session }: { account: string; session: NonN
   // Blocked accounts are dropped before any decryption, so their DMs, group copies and voice parts never surface.
   const visibleMemos = useMemo(() => withoutBlocked(mergeModerationMemos(savedControls, memos), account, blocked), [memos, savedControls, account, blocked]);
 
+  const restoreCandidates = useMemo(() => recoveryCandidates(visibleMemos, account,
+    new Set([...Object.keys(contacts), ...blocked, ...removedContacts])), [visibleMemos, account, contacts, blocked, removedContacts]);
+  const { data: restoreKeys } = useQuery({
+    queryKey: ['crypt-restore-keys', account, key?.publicKey, restoreCandidates],
+    enabled: !!key && restoreCandidates.length > 0,
+    queryFn: async () => {
+      const found: Record<string, string> = {};
+      for (const name of restoreCandidates) {
+        try { const pub = await lookupPublishedKey(name); if (pub) found[name] = pub; } catch { /* retry on focus */ }
+      }
+      return found;
+    }, staleTime: 60_000, retry: false,
+  });
+  useEffect(() => {
+    if (!key || !restoreKeys) return;
+    let changed = false;
+    for (const [name, pub] of Object.entries(recoverFriends(visibleMemos, key, restoreKeys))) {
+      if (loadContacts(account)[name] || loadBlocked(account).includes(name) || loadRemovedContacts(account).includes(name)) continue;
+      saveContact(account, name, pub); changed = true;
+    }
+    if (changed) setContacts(loadContacts(account));
+  }, [key, restoreKeys, visibleMemos, account]);
+  // Bootstrap evidence may be older than recent chat traffic; recovery reads the existing bounded window.
+  useEffect(() => { if (key && loaded && depth < MAX_HISTORY_PAGES) setDepth(d => d + 1); }, [key, loaded, depth]);
+
   const lastAt = useMemo(() => {
     const out: Record<string, number> = {};
     visibleMemos.forEach((m) => { const p = m.from === account ? m.to : m.from; out[p] = Math.max(out[p] ?? 0, m.time); });
@@ -304,13 +355,29 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const cg2Events = useMemo<Cg2Event[]>(() => decoded.flatMap(c => c.control && c.usedKey && !c.voice
     ? [{ key: c.key, txId: c.txId, time: c.time, from: c.from, to: c.to, control: c.control, usedKey: c.usedKey }] : []), [decoded]);
   // Creators of public rooms I asked to join: their listing key reads only their invite to that room.
-  const roomInviters = useMemo(() => Object.fromEntries(Object.values(roomRequests)
+  const { data: roomMemos, isFetching: roomsLoading, refetch: refetchRooms } = useQuery({
+    queryKey: ['crypt-rooms'], enabled: !!key, queryFn: () => fetchRoomMemos(ROOM_PREFIX),
+    staleTime: 60_000, refetchInterval: () => (document.visibilityState === 'visible' ? 60_000 : false), retry: false,
+  });
+  const listings = useMemo(() => collectListings(roomMemos ?? []).filter(l => !blocked.includes(l.creator)), [roomMemos, blocked]);
+  const restoredRequests = useMemo(() => key ? recoverRoomRequests(visibleMemos, key, listings, roomRequests) : roomRequests,
+    [visibleMemos, key, listings, roomRequests]);
+  useEffect(() => {
+    if (restoredRequests === roomRequests) return;
+    let changed = false;
+    for (const [id, request] of Object.entries(restoredRequests)) {
+      if (loadRoomRequests(account)[id]) continue;
+      saveRoomRequest(account, request, request.time); changed = true;
+    }
+    if (changed) setRoomRequests(loadRoomRequests(account));
+  }, [restoredRequests, roomRequests, account]);
+  const roomInviters = useMemo(() => Object.fromEntries(Object.values(restoredRequests)
     .filter(r => contacts[r.creator] !== r.publicKey && !blocked.includes(r.creator)).map(r => [r.creator, r.publicKey])), [roomRequests, contacts, blocked]);
   const roomInviteEvents = useMemo(() => key && Object.keys(roomInviters).length ? decodeRoomEvents(visibleMemos, key, roomInviters)
-    .filter(e => e.to === account && roomRequests[(e.control.kind === 'invite' || e.control.kind === 'admission') ? e.control.invite.id : e.control.id]?.creator === e.from && (e.control.kind === 'invite' || e.control.kind === 'admission' || e.control.kind === 'policy' || e.control.kind === 'room' || e.control.kind === 'add' || e.control.kind === 'join-no')) : [], [visibleMemos, key, roomInviters, roomRequests, account]);
+    .filter(e => e.to === account && restoredRequests[(e.control.kind === 'invite' || e.control.kind === 'admission') ? e.control.invite.id : e.control.id]?.creator === e.from && (e.control.kind === 'invite' || e.control.kind === 'admission' || e.control.kind === 'policy' || e.control.kind === 'room' || e.control.kind === 'add' || e.control.kind === 'join-no')) : [], [visibleMemos, key, roomInviters, restoredRequests, account]);
   const allGroupEvents = useMemo(() => [...new Map([...cg2Events, ...roomInviteEvents].map(e => [e.key, e])).values()], [cg2Events, roomInviteEvents]);
-  const invites = useMemo(() => key ? collectInvites(allGroupEvents, account, key.publicKey, contacts, inviteStore, roomRequests) : inviteStore,
-    [allGroupEvents, account, key, contacts, inviteStore, roomRequests]);
+  const invites = useMemo(() => key ? collectInvites(allGroupEvents, account, key.publicKey, contacts, inviteStore, restoredRequests) : inviteStore,
+    [allGroupEvents, account, key, contacts, inviteStore, restoredRequests]);
   useEffect(() => {
     // Compares member keys too, so a creator adding members to a known group is saved.
     if (invitesSignature(invites) === invitesSignature(inviteStore)) return;
@@ -326,11 +393,6 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if (next.length === savedControls.length) return;
     saveModerationMemos(account, next); setSavedControls(next);
   }, [allGroupEvents, invites, account, memos, savedControls]);
-  const { data: roomMemos, isFetching: roomsLoading, refetch: refetchRooms } = useQuery({
-    queryKey: ['crypt-rooms'], enabled: !!key, queryFn: () => fetchRoomMemos(ROOM_PREFIX),
-    staleTime: 60_000, refetchInterval: () => (document.visibilityState === 'visible' ? 60_000 : false), retry: false,
-  });
-  const listings = useMemo(() => collectListings(roomMemos ?? []).filter(l => !blocked.includes(l.creator)), [roomMemos, blocked]);
   const inviteViews = useMemo(() => deriveInviteGroups(cg2Events.filter(e => e.control.kind !== 'msg' || !restrictedAt(moderation[e.control.id], e.from, e.time)), invites, account, decisions).map(v => {
     const banned = moderation[v.invite.id]?.bans ?? {};
     // Display-only fallback: a public room's picture from the owner's own listing when no group picture reached me.
