@@ -1,11 +1,12 @@
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { cn } from '@/lib/utils';
 import type { CryptAvatar } from '@/lib/cryptAvatar';
+import { Button } from '@/components/ui/button';
 
 export interface RailItem { id: string; label: string; avatarAccount: string; avatar?: CryptAvatar; emoji?: string; unread: number; replies: number }
 
 /** One labelled block of the collapsed strip, mirroring the Groups / Friends sections of the side panel. */
-export interface RailSection { id: string; label: string; emoji: string; items: RailItem[]; /** Counter shown on the section heading, e.g. unanswered friend requests. */ badge?: number }
+export interface RailSection { id: string; label: string; emoji: string; items: RailItem[]; badge?: number; badgeLabel?: string; onReview?: () => void }
 
 function RailButton({ item, active, setActive }: { item: RailItem; active: string | null; setActive: (id: string) => void }) {
   return (
@@ -24,7 +25,7 @@ function RailButton({ item, active, setActive }: { item: RailItem; active: strin
 
 /** Thin edge strip shown while the side panel is collapsed: rooms and friends in their own labelled sections, one avatar each with its unread and reply counters. */
 export function CryptAvatarRail({ sections = [], active, setActive }: { sections?: RailSection[]; active: string | null; setActive: (id: string) => void }) {
-  const shown = sections.filter(s => s.items.length);
+  const shown = sections.filter(s => s.items.length || s.badge);
   return (
     <nav aria-label="Chats" className="hidden md:flex w-16 shrink-0 flex-col items-center gap-2 overflow-y-auto border-r border-border py-3">
       {shown.map((s, i) => (
@@ -33,8 +34,11 @@ export function CryptAvatarRail({ sections = [], active, setActive }: { sections
             <span aria-hidden className="text-sm leading-none">{s.emoji}</span>
             <span className="flex items-center gap-1">
               {s.label}
-              {!!s.badge && s.badge > 0 && <span aria-label={`${s.badge} unanswered friend request${s.badge > 1 ? 's' : ''}`} title={`${s.badge} unanswered friend request${s.badge > 1 ? 's' : ''}`}
-                className="min-w-4 h-4 px-1 rounded-full text-[9px] font-bold leading-4 text-center bg-cheese text-primary-foreground">{s.badge > 99 ? '99+' : s.badge}</span>}
+              {!!s.badge && s.badge > 0 && (s.onReview
+                ? <Button size="icon" variant="ghost" aria-label={s.badgeLabel} title={s.badgeLabel} onClick={s.onReview}
+                    className="h-5 w-5 rounded-full bg-cheese text-primary-foreground hover:bg-cheese/90 text-[9px]">{s.badge > 99 ? '99+' : s.badge}</Button>
+                : <span aria-label={s.badgeLabel ?? `${s.badge} unanswered friend request${s.badge > 1 ? 's' : ''}`} title={s.badgeLabel}
+                    className="min-w-4 h-4 px-1 rounded-full text-[9px] font-bold leading-4 text-center bg-cheese text-primary-foreground">{s.badge > 99 ? '99+' : s.badge}</span>)}
             </span>
           </span>
           {s.items.map(it => <RailButton key={it.id} item={it} active={active} setActive={setActive} />)}

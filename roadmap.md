@@ -2,6 +2,8 @@
 
 Open tasks only. Completed work lives in git history.
 
+- [ ] CHEESECrypt: add live join/rejoin badges, toast/chime and owner chat requests with shared individual clearing; validate handling and failure cases.
+
 - [ ] CHEESECrypt: verify owner-approved readmission on WAX using the user's Anchor wallet; automated request/acceptance/fresh-roster/profile/departure checks pass, but the wallet and private key are unavailable here.
 
 - [ ] CHEESECrypt: verify mandatory creation/legacy locking with the user's Anchor wallet and local folder; automated signing-retry, sealed-backup, restart-unlock and preservation tests cover the client flow.
