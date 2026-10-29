@@ -51,7 +51,7 @@ export function CryptYoutubeEmbed({ link }: { link: YoutubeLink }) {
         <div className="relative">
           <Button type="button" variant="secondary" onClick={() => play(0)} aria-label={`Play video privately${link.title ? `: ${link.title}` : ''}`}
             className="relative h-auto aspect-video w-full flex-col gap-1 overflow-hidden whitespace-normal p-0">
-            {thumb && !thumbFailed && <img src={privateThumbnailUrl(link)} alt="" referrerPolicy="no-referrer" crossOrigin="anonymous"
+            {thumb && !thumbFailed && <img src={privateThumbnailUrl(link)} alt="" referrerPolicy="no-referrer"
               onError={() => setThumbFailed(true)} className="absolute inset-0 h-full w-full object-cover" />}
             <span className="relative flex flex-col items-center gap-1 rounded bg-background/70 px-3 py-2">
               <span className="text-3xl" aria-hidden>▶️</span>
