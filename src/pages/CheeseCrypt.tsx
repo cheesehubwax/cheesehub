@@ -25,7 +25,7 @@ import { nftToken, parseNftMessage } from '@/lib/cryptNft';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FriendNameDialog } from '@/components/crypt/FriendNameDialog';
 import { cryptDisplayName, loadCryptNames, saveCryptName } from '@/lib/cryptNames';
-import { deriveRoomProfiles, loadRoomProfiles, mergeRoomProfiles, roomProfileEntries, saveRoomProfiles } from '@/lib/cryptRoomProfiles';
+import { deriveRoomProfiles, encodeSelfRoomProfile, isSelfRoomProfile, loadRoomProfiles, mergeRoomProfiles, roomProfileEntries, saveRoomProfiles } from '@/lib/cryptRoomProfiles';
 import { accountAvatar, parseAvatar, type CryptAvatar } from '@/lib/cryptAvatar';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { VaultPrompt } from '@/components/crypt/VaultPrompt';
@@ -153,7 +153,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [decisions, setDecisions] = useState(() => loadDecisions(account));
   const [friendDeclines, setFriendDeclines] = useState(() => loadFriendDecisions(account));
   /** A paid group notice waiting for Terms + confirmation. */
-  const [pendingNotice, setPendingNotice] = useState<null | { kind: 'joined' | 'leave' | 'friend' | 'friend-ok'; id: string; to?: string }>(null);
+  const [pendingNotice, setPendingNotice] = useState<null | { kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'profile'; id: string; to?: string }>(null);
   const [editingInvite, setEditingInvite] = useState<null | { id: string; name: string; avatar?: CryptAvatar }>(null);
   const [paintingInvite, setPaintingInvite] = useState(false);
   const [newContact, setNewContact] = useState('');
@@ -441,10 +441,12 @@ export function Messenger({ account, session }: { account: string; session: NonN
   }, [invites, inviteStore, account]);
   const moderation = useMemo(() => deriveModeration(allGroupEvents, invites, account), [allGroupEvents, invites, account]);
   useEffect(() => {
-    const next = mergeRoomProfiles(roomProfiles, deriveRoomProfiles(allGroupEvents, invites, account));
+    // Self-descriptions from members muted or banned at send time are dropped like their other traffic.
+    const usable = allGroupEvents.filter(e => !isSelfRoomProfile(e, invites, account) || (e.control.kind === 'profiles' && !restrictedAt(moderation[e.control.id], e.from, e.time)));
+    const next = mergeRoomProfiles(roomProfiles, deriveRoomProfiles(usable, invites, account));
     if (JSON.stringify(next) === JSON.stringify(roomProfiles)) return;
     saveRoomProfiles(account, next); setRoomProfiles(next);
-  }, [allGroupEvents, invites, account, roomProfiles]);
+  }, [allGroupEvents, invites, account, roomProfiles, moderation]);
   useEffect(() => {
     const controlTxs = new Set(allGroupEvents.filter(e => (e.control.kind === 'invite' || e.control.kind === 'admission') || e.control.kind === 'add' || e.control.kind === 'room' || e.control.kind === 'mute' || e.control.kind === 'ban' || e.control.kind === 'policy' || e.control.kind === 'admin' || e.control.kind === 'collapse' || e.control.kind === 'report').filter(e => {
       if ((e.control.kind === 'invite' || e.control.kind === 'admission')) return invites[e.control.invite.id]?.creator === e.from;
