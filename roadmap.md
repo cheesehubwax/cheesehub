@@ -2,7 +2,7 @@
 
 Open tasks only. Completed work lives in git history.
 
-- [ ] CHEESECrypt: verify direct Rejoin on WAX with a former member's retained key and Anchor approval; both entry points, exact fees and moderation pass automated checks, but no wallet/key is available here.
+- [ ] CHEESECrypt: replace direct self-rejoin with owner-approved readmission and fresh room information; cover request, acceptance and replay rules with tests.
 
 - [ ] CHEESECrypt: verify mandatory creation/legacy locking with the user's Anchor wallet and local folder; automated signing-retry, sealed-backup, restart-unlock and preservation tests cover the client flow.
 
