@@ -3,7 +3,7 @@
 // WAX accounts stay the identity, friends' own profile notes and local nicknames always win.
 import { parseAvatar, type CryptAvatar } from '@/lib/cryptAvatar';
 import { parseCryptName } from '@/lib/cryptNames';
-import { memberKey, type Cg2Event, type InviteGroup, type RoomProfileEntry } from '@/lib/cryptInviteGroups';
+import { encodeRoomProfiles, memberKey, type Cg2Event, type InviteGroup, type RoomProfileEntry } from '@/lib/cryptInviteGroups';
 
 /** `self`: the owner describing themself (authenticated); otherwise the owner vouches for another member. */
 export interface RoomProfile { displayName?: string; avatar?: CryptAvatar; time: number; self: boolean }
@@ -89,4 +89,11 @@ export function roomProfileEntries(g: InviteGroup, owner: { account: string; dis
     const avatar = a === owner.account ? parseAvatar(owner.avatar) : avatars[a] ?? known[a]?.avatar;
     return displayName || avatar ? [{ account: a, ...(displayName ? { displayName } : {}), ...(avatar ? { avatar } : {}) }] : [];
   });
+}
+
+/** My own name/picture for one group's members (CG2 `profiles` with a single self entry); null when I have neither. */
+export function encodeSelfRoomProfile(id: string, me: { account: string; displayName?: string; avatar?: CryptAvatar }): string | null {
+  const displayName = parseCryptName(me.displayName), avatar = parseAvatar(me.avatar);
+  if (!displayName && !avatar) return null;
+  return encodeRoomProfiles(id, [{ account: me.account, ...(displayName ? { displayName } : {}), ...(avatar ? { avatar } : {}) }]);
 }
