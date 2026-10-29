@@ -34,7 +34,7 @@ export type Cg2 =
   | { kind: 'room'; id: string; listed: boolean; protected: string[] }
   | { kind: 'mute'; id: string; member: string; minutes: MuteMinutes }
   | { kind: 'ban'; id: string; member: string }
-  | { kind: 'policy'; id: string; protected: string[]; bans: string[]; mutes: [string, number, number][]; admins: string[] }
+  | { kind: 'policy'; id: string; protected: string[]; bans: string[]; mutes: [string, number, number][]; admins: string[]; left: string[] }
   /** Owner-only: appoint (`on`) or dismiss a public-room admin. */
   | { kind: 'admin'; id: string; member: string; on: boolean }
   /** Owner/admin: collapse the message by `member` whose edit digest (cryptEdits.editTarget) is `target`. */
@@ -126,8 +126,9 @@ export function encodeModeration(id: string, member: string, minutes?: MuteMinut
   if (!ACCOUNT.test(member) || (minutes !== undefined && !MUTE_MINUTES.includes(minutes))) throw new Error('Invalid moderation action');
   return minutes === undefined ? wire('ban', { i: checkId(id), a: member }) : wire('mute', { i: checkId(id), a: member, d: minutes });
 }
-export function encodePolicySnapshot(id: string, protectedMembers: string[], bans: string[], mutes: [string, number, number][], admins: string[] = []) {
-  const payload = wire('policy', { i: checkId(id), p: protectedMembers, b: bans, u: mutes, ...(admins.length ? { d: admins } : {}) });
+/** `left`: members who have left, so a newcomer's member list matches everyone else's. */
+export function encodePolicySnapshot(id: string, protectedMembers: string[], bans: string[], mutes: [string, number, number][], admins: string[] = [], left: string[] = []) {
+  const payload = wire('policy', { i: checkId(id), p: protectedMembers, b: bans, u: mutes, ...(admins.length ? { d: admins } : {}), ...(left.length ? { x: left } : {}) });
   if (!parseCg2(payload)) throw new Error('Invalid room policy');
   return payload;
 }
@@ -196,7 +197,9 @@ export function parseCg2(text: string | null | undefined): Cg2 | null {
     if (!accounts(body.p) || !body.p.length || !accounts(body.b) || body.b.some(a => (body.p as string[]).includes(a)) || !Array.isArray(body.u) || body.u.length > MAX_PUBLIC_ROOM_MEMBERS || body.u.some(u => !Array.isArray(u) || u.length !== 3 || typeof u[0] !== 'string' || !ACCOUNT.test(u[0]) || !Number.isSafeInteger(u[1]) || !Number.isSafeInteger(u[2]) || u[1] < 0 || !MUTE_MINUTES.some(d => u[2] - u[1] === d * 60_000))) return null;
     const admins = body.d === undefined ? [] : body.d;
     if (!accounts(admins) || admins.some(a => (body.b as string[]).includes(a))) return null;
-    return { kind, id, protected: body.p, bans: body.b, mutes: body.u as [string, number, number][], admins };
+    const left = body.x === undefined ? [] : body.x;
+    if (!accounts(left) || !left.length && body.x !== undefined) return null;
+    return { kind, id, protected: body.p, bans: body.b, mutes: body.u as [string, number, number][], admins, left };
   }
   if (kind === 'room') {
     if (typeof body.l !== 'boolean' || !Array.isArray(body.p) || !body.p.length || body.p.length > MAX_INVITE_MEMBERS || new Set(body.p).size !== body.p.length || body.p.some(a => typeof a !== 'string' || !ACCOUNT.test(a))) return null;
@@ -237,7 +240,7 @@ export interface RoomInviter { creator: string; publicKey: string }
 
 /** Semantic bootstrap validation is shared by membership and moderation replay. */
 export function policySnapshotValid(c: Extract<Cg2, { kind: 'policy' }>, g: InviteGroup, at: number) {
-  return c.protected.length <= MAX_INVITE_MEMBERS && c.protected.includes(g.creator) && c.protected.every(a => !!memberKey(g, a)) && c.bans.every(a => !!memberKey(g, a)) && c.mutes.every(([a, start]) => a !== g.creator && start <= at && !!memberKey(g, a)) && c.admins.every(a => a !== g.creator && !!memberKey(g, a));
+  return c.protected.length <= MAX_INVITE_MEMBERS && c.protected.includes(g.creator) && c.protected.every(a => !!memberKey(g, a)) && c.bans.every(a => !!memberKey(g, a)) && c.mutes.every(([a, start]) => a !== g.creator && start <= at && !!memberKey(g, a)) && c.admins.every(a => a !== g.creator && !!memberKey(g, a)) && c.left.every(a => a !== g.creator && !!memberKey(g, a));
 }
 export function roomPolicyValid(c: Extract<Cg2, { kind: 'room' }>, g: InviteGroup, protectedMembers: string[]) {
   return c.protected.includes(g.creator) && c.protected.length === protectedMembers.length && protectedMembers.every(a => c.protected.includes(a)) && c.protected.every(a => !!memberKey(g, a));
@@ -372,7 +375,15 @@ export function deriveInviteGroups(events: Cg2Event[], invites: Record<string, I
     for (const e of sorted) {
       // The owner's admission to me lists the members already in the room; their earlier joins went to others.
       if (e.control.kind === 'admission' && e.control.invite.id === g.id && e.from === g.creator && e.to === me) {
-        for (const m of e.control.invite.members) if (m.account !== me && !state.has(m.account)) state.set(m.account, { joined: true, at: e.time });
+        // Its owner-signed policy snapshot (same transaction) names members who already left.
+        const snap = sorted.find(p => p.txId === e.txId && p.from === g.creator && p.to === me && p.usedKey === e.usedKey && p.control.kind === 'policy' && p.control.id === g.id);
+        const gone = snap?.control.kind === 'policy' && policySnapshotValid(snap.control, e.control.invite, e.time) ? new Set(snap.control.left) : new Set<string>();
+        for (const m of e.control.invite.members) {
+          if (m.account === me) continue;
+          const prev = state.get(m.account);
+          if (gone.has(m.account)) { if (!prev || prev.at <= e.time) state.set(m.account, { joined: false, at: e.time }); }
+          else if (!prev) state.set(m.account, { joined: true, at: e.time });
+        }
         continue;
       }
       if ((e.control.kind === 'invite' || e.control.kind === 'admission') || e.control.id !== g.id || !eventFromMember(e, invites, me)) continue;

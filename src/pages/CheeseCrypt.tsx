@@ -1320,7 +1320,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const snapshot = encodePolicySnapshot(updated.id, state?.protected ?? v.invite.members.map(m => m.account), Object.keys(state?.bans ?? {}), Object.entries(state?.mutes ?? {}).flatMap(([a, intervals]) => {
       const longest = intervals.filter(m => m.until > Date.now()).sort((a, b) => b.until - a.until)[0];
       return longest ? [[a, longest.from, longest.until] as [string, number, number]] : [];
-    }), state?.admins ?? []);
+    }), state?.admins ?? [], v.left.filter(a => a !== v.invite.creator && a !== account));
     // Members' current names/pictures for the newcomer (owner first, then admins and founders), within one message's size.
     let profiles: string | null = null;
     try { profiles = encodeRoomProfiles(updated.id, roomProfileEntries(v.invite, { account, displayName: key?.displayName, avatar: key?.avatar }, names, avatars, roomProfiles, [...(state?.admins ?? []), ...(state?.protected ?? [])])); } catch { profiles = null; }
