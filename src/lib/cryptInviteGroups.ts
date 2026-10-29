@@ -477,3 +477,9 @@ export function declineFriendRequest(account: string, id: string, from: string) 
   localStorage.setItem(friendDecisionsStore(account), JSON.stringify(next));
   return next;
 }
+
+/** Unanswered outgoing friend requests can be re-sent after this long (declines are silent). */
+export const FRIEND_REQUEST_RESEND_MS = 30 * 24 * 60 * 60 * 1000;
+export function friendRequestResendable(sentAt: number | undefined, now: number): boolean {
+  return sentAt === undefined || now - sentAt >= FRIEND_REQUEST_RESEND_MS;
+}
