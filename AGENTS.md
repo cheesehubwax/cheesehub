@@ -23,7 +23,7 @@
 - CHEESERam history before live sampling is rebuilt from Hyperion `eosio::rammarket` table deltas (exact Bancor state, EOSDAC nodes) into 12h slots; backfill never alters existing samples, CHEESE fields stay null before CHEESE history, then use that UTC day's close; live samples are never re-priced.
 - Crypt writes CRYPT1:/CRYPTKEY1:, reads legacy GPKM1:/GPKMKEY1: and keeps gpk-msg-key files for compatibility.
 - CHEESECrypt voice notes are 0x03-headed byte memos assembled by sender+recipient+id across 30-part transactions; play only when complete and digest-verified (batches can partly fail).
-- Crypt names: validated key-file/CP1 notes (newest wins), then owner admission-tx room directories (display-only, self entries win), apart from local nicknames; listing `u` is validated display-only metadata, never authority. WAX accounts stay identities. Friend removal clears metadata/rediscovery until re-add, keeping history/groups.
+- Crypt names: validated key-file/CP1 notes (newest wins), then owner admission directories (display-only), apart from local nicknames; listing `u` is validated display-only metadata, never authority. WAX accounts stay identities. Friend removal clears metadata/rediscovery until re-add, keeping history/groups.
 - CHEESECrypt groups are pairwise copies, trusted only fully assembled. CG1 (legacy) members are fixed in-envelope; CG2 invites come from a friend creator (or the creator of a public room you asked, with that listing's key); later copies only grow membership (all existing member keys unchanged); group keys open only that group's notices and invites. Hidden IDs only hide.
 - Crypt uses integer fee splits; fanout omits fees explicitly, not by indexes. Confirm payment before local key creation; imports stay free. History uses current rates.
 - CHEESECrypt avatars are validated palette-index data in optional key-file fields and separate per-account contact storage; imports rasterize locally, and on-chain key memos stay unchanged to preserve compatibility and avoid executable or remote avatar payloads.
@@ -32,7 +32,7 @@
 - Crypt inbox: bounded discovery; strangers held until accepted
 - Crypt reply views use per-message receipts (jumps keep skipped replies), inner-list scroll only. About: DappAbout + crypto dialog.
 - Crypt sections are presentational; Messenger owns state. Recovery requires own authenticated DM/join evidence; account/origin tab sync preserves consent and scoped keys.
-- OpenMojiIcon's optional tint paints a glyph as a solid silhouette in a given color; use it when an OpenMoji artwork's own palette is too dark for the always-dark background.
+- OpenMojiIcon's optional tint paints a solid-colour silhouette; use it when an OpenMoji palette is too dark for the dark background.
 - Both NFT players normalize media via nftMedia (case-insensitive audio/clip/video, reference-only sound/mp3/sfx aliases); version music caches on detection changes to avoid stale classifications.
 - CHEESEFolio fiat/BTC/ETH figures are WAX→USD→currency per day (fx-usd-history.json, units per USD); unknown rates stay unknown.
 - Folio JSON validates/checksums raw history, merges by sequence and portfolios by ID/newest edit; IndexedDB stores both per account. Views filter the full ledger with per-token disposal P/L, never replay subsets.
