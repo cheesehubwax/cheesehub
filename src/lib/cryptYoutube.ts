@@ -139,12 +139,14 @@ export function privateThumbnailUrl(link: YoutubeLink): string {
 export async function fetchYoutubeTitle(id: string, fetcher: typeof fetch = fetch): Promise<string | null> {
   if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return null;
   const tryJson = async (url: string) => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
     try {
-      const r = await fetcher(url, { referrerPolicy: 'no-referrer', credentials: 'omit', signal: AbortSignal.timeout(8000) });
+      const r = await fetcher(url, { referrerPolicy: 'no-referrer', credentials: 'omit', signal: ctrl.signal });
       if (!r.ok) return null;
       const j = await r.json() as { title?: unknown };
       return cleanYoutubeTitle(j?.title);
-    } catch { return null; }
+    } catch { return null; } finally { clearTimeout(timer); }
   };
   for (const m of PRIVATE_YOUTUBE_MIRRORS) {
     if (m.tier !== 'invidious') continue;
