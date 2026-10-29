@@ -451,7 +451,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     saveRoomProfiles(account, next); setRoomProfiles(next);
   }, [allGroupEvents, invites, account, roomProfiles, moderation]);
   useEffect(() => {
-    const controlTxs = new Set(allGroupEvents.filter(e => (e.control.kind === 'invite' || e.control.kind === 'admission') || e.control.kind === 'add' || e.control.kind === 'room' || e.control.kind === 'mute' || e.control.kind === 'ban' || e.control.kind === 'policy' || e.control.kind === 'admin' || e.control.kind === 'collapse' || e.control.kind === 'report').filter(e => {
+    const controlTxs = new Set(allGroupEvents.filter(e => (e.control.kind === 'invite' || e.control.kind === 'admission') || e.control.kind === 'add' || e.control.kind === 'readmit' || e.control.kind === 'leave' || e.control.kind === 'joined' || e.control.kind === 'room' || e.control.kind === 'mute' || e.control.kind === 'ban' || e.control.kind === 'policy' || e.control.kind === 'admin' || e.control.kind === 'collapse' || e.control.kind === 'report').filter(e => {
       if ((e.control.kind === 'invite' || e.control.kind === 'admission')) return invites[e.control.invite.id]?.creator === e.from;
       return !!eventFromMember(e, invites, account);
     }).map(e => e.txId));

@@ -393,6 +393,7 @@ export function deriveInviteGroups(events: Cg2Event[], invites: Record<string, I
   return Object.values(invites).map(g => {
     const state = new Map<string, { joined: boolean; at: number }>();
     state.set(g.creator, { joined: true, at: 0 });
+    if (local[g.id]?.status === 'left') state.set(me, { joined: false, at: local[g.id].at });
     let meta: { name: string; avatar?: CryptAvatar; at: number } | null = null;
     const requestsIn = new Set<string>(), requested = new Set<string>(), accepted = new Set<string>();
     const requestedAt: Record<string, number> = {};
