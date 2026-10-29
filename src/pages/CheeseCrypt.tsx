@@ -31,7 +31,7 @@ import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { VaultPrompt } from '@/components/crypt/VaultPrompt';
 import { CreateGroupDialog } from '@/components/crypt/CreateGroupDialog';
 import { PaidActionDialog } from '@/components/crypt/PaidActionDialog';
-import { buildCg2Actions, JOIN_NOTE_MAX, encodeAdmission, encodeMemberAdd, encodeRoomProfiles, MAX_PUBLIC_ROOM_MEMBERS, collectInvites, countFriendRequests, friendRequestResendable, deriveInviteGroups, encodeGroupText, encodeInvite, encodeMeta, encodeNotice, inviteTextSize, invitesSignature, loadDecisions, MAX_INVITE_MEMBERS, loadFriendDecisions, loadInvites, newInviteGroupId, saveDecision, saveInvites, scopedKeys, eventFromMember, VOICE_REF_PREFIX, type Cg2Event, type InviteGroup, type InviteGroupView } from '@/lib/cryptInviteGroups';
+import { buildCg2Actions, JOIN_NOTE_MAX, encodeAdmission, encodeMemberAdd, encodeRoomProfiles, MAX_PUBLIC_ROOM_MEMBERS, collectInvites, countFriendRequests, friendRequestResendable, deriveInviteGroups, encodeGroupText, encodeInvite, encodeMeta, encodeNotice, inviteTextSize, invitesSignature, loadDecisions, MAX_INVITE_MEMBERS, loadFriendDecisions, loadInvites, newInviteGroupId, saveDecision, saveInvites, scopedKeys, eventFromMember, ownerLeaveNotices, VOICE_REF_PREFIX, type Cg2Event, type InviteGroup, type InviteGroupView } from '@/lib/cryptInviteGroups';
 import { ShareKeyDialog } from '@/components/crypt/ShareKeyDialog';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { buildVoiceBatches, voiceNoteCost, voicePartCount, voiceTransactions, type VoiceClip } from '@/lib/cryptVoice';
@@ -664,6 +664,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
       adminToggle: owner ? { isAdmin: !!state?.admins.includes(m.from), onToggle: () => setPendingModeration({ id, member: m.from, action: state?.admins.includes(m.from) ? 'unadmin' : 'admin' }) } : undefined,
     };
   };
+  const leaveNotices = useMemo(() => activeInvite ? ownerLeaveNotices(cg2Events, invites, activeInvite.invite.id, account) : [], [activeInvite, cg2Events, invites, account]);
   const inviteKeys = useMemo(() => activeInvite ? Object.fromEntries(activeInvite.invite.members.map(m => [m.account, m.publicKey])) : {}, [activeInvite]);
   const currentRecipients = activeInvite ? activeInvite.joined.filter(m => m !== account) : activeGroup ? activeGroup.members.filter(m => m !== account) : active ? [active] : [];
   // Edits go to the original recipients, not newly joined members who never received the original.
@@ -1595,6 +1596,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
               onScroll={(e) => { const el = e.currentTarget; nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; replyNavigation.inspectVisible(); }}>
               {thread.map((m, i) => (
                 <Fragment key={m.key}>
+                  {leaveNotices.filter(n => n.time <= m.time && (i === 0 || n.time > thread[i - 1].time)).map(n => <LeavePill key={n.key} name={nameFor(n.from)} account={n.from} />)}
                   {i === firstNew && firstNew >= 0 && (
                     <li ref={newMarkerRef} aria-hidden className="flex items-center gap-2 py-1">
                       <span className="h-px flex-1 bg-border" />
@@ -1613,6 +1615,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                     friend={friendAction(m)} {...authorModeration(m)} onOpenQuote={setOpenQuote} openedAt={acceptedRequestMessages.current.has(m.key) ? { current: Infinity } : openedAt} />
                 </Fragment>
               ))}
+              {leaveNotices.filter(n => !thread.length || n.time > thread[thread.length - 1].time).map(n => <LeavePill key={n.key} name={nameFor(n.from)} account={n.from} />)}
               {!thread.length && <li className="text-sm text-muted-foreground">{activeGroup || activeInvite ? 'No group messages yet.' : `No messages with ${nameFor(active)} yet.`}</li>}
               <li ref={endRef} aria-hidden />
             </ol>
@@ -1672,4 +1675,9 @@ function JoinNoteField({ value, onChange, disabled, placeholder }: { value: stri
       onChange={e => onChange(e.target.value.replace(/\p{Cc}+/gu, ' '))} />
     <p className="text-[10px] text-muted-foreground">Encrypted, only they can read it · {[...value.trim()].length}/{JOIN_NOTE_MAX}</p>
   </div>;
+}
+
+/** Owner-only system line: a member left the group. */
+function LeavePill({ name, account }: { name: string; account: string }) {
+  return <li className="flex justify-center py-1"><span className="rounded-full border border-border bg-muted px-3 py-1 text-xs text-muted-foreground">🚪 {name}{name !== account ? ` (${account})` : ''} left the group</span></li>;
 }

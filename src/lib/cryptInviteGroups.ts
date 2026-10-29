@@ -525,3 +525,15 @@ export const FRIEND_REQUEST_RESEND_MS = 30 * 24 * 60 * 60 * 1000;
 export function friendRequestResendable(sentAt: number | undefined, now: number): boolean {
   return sentAt === undefined || now - sentAt >= FRIEND_REQUEST_RESEND_MS;
 }
+
+/** Owner-only "left the group" notices: authenticated leave notices addressed to me, as creator, for one group. */
+export function ownerLeaveNotices(events: Cg2Event[], invites: Record<string, InviteGroup>, groupId: string, me: string): { key: string; from: string; time: number }[] {
+  const g = invites[groupId];
+  if (!g || g.creator !== me) return [];
+  const seen = new Set<string>();
+  return events
+    .filter(e => e.control.kind === 'leave' && e.control.id === groupId && e.to === me && e.from !== me && !!eventFromMember(e, invites, me))
+    .filter(e => !seen.has(e.txId) && !!seen.add(e.txId))
+    .map(e => ({ key: `leave:${e.txId}:${e.from}`, from: e.from, time: e.time }))
+    .sort((a, b) => a.time - b.time);
+}
