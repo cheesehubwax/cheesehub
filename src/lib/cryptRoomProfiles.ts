@@ -13,13 +13,31 @@ export type RoomProfiles = Record<string, RoomProfile>;
 const better = (a: RoomProfile, b: RoomProfile | undefined) => !b || (a.self !== b.self ? a.self : a.time > b.time);
 
 /**
- * Directory entries I can use: sent to me by the room's creator, opened with the creator's room key,
- * in the same transaction as that creator's admission of me to the room, and only about room members.
+ * A member describing only themself to me: one entry about the sender, opened with the sender's own
+ * room key. Works in any invite group (public or private); the WAX account stays the identity.
+ */
+export function isSelfRoomProfile(e: Cg2Event, invites: Record<string, InviteGroup>, me: string) {
+  if (e.control.kind !== 'profiles' || e.to !== me || e.from === me) return false;
+  const g = invites[e.control.id];
+  return !!g && e.control.entries.length === 1 && e.control.entries[0].account === e.from
+    && !!memberKey(g, me) && !!memberKey(g, e.from) && e.usedKey === memberKey(g, e.from);
+}
+
+/**
+ * Directory entries I can use: (a) sent to me by the room's creator, opened with the creator's room key,
+ * in the same transaction as that creator's admission of me to the room, and only about room members;
+ * (b) a member's own self-description (isSelfRoomProfile). Callers drop muted/banned senders' traffic first.
  */
 export function deriveRoomProfiles(events: readonly Cg2Event[], invites: Record<string, InviteGroup>, me: string): RoomProfiles {
   const out: RoomProfiles = {};
   for (const e of events) {
     if (e.control.kind !== 'profiles' || e.to !== me) continue;
+    if (isSelfRoomProfile(e, invites, me)) {
+      const entry = e.control.entries[0];
+      const p: RoomProfile = { ...(entry.displayName ? { displayName: entry.displayName } : {}), ...(entry.avatar ? { avatar: entry.avatar } : {}), time: e.time, self: true };
+      if (better(p, out[entry.account])) out[entry.account] = p;
+      continue;
+    }
     const roomId = e.control.id;
     const g = invites[roomId];
     if (!g || !g.publicRoom || e.from !== g.creator || e.usedKey !== memberKey(g, g.creator)) continue;
