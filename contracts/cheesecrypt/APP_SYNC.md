@@ -50,3 +50,4 @@ payments. ABI breaks from old drafts.
 Native shared-rule tests cover pricing/splits/hard bounds; they are not an audit or chain tests.
 Privacy is reduced explicit metadata, not hidden senders/recipients or guaranteed secret roles.
 - Join notes: optional encrypted ≤60-char note on join/admission/join-no; client-only, no contract change.
+- Room profile directory: owner adds one encrypted CG2 `profiles` message (≤20 parts) to the newcomer in the admission transaction; display-only, client-only, no contract change. Router must keep it in the same transaction as the admission.
