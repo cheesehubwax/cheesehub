@@ -25,12 +25,13 @@ import { nftToken, parseNftMessage } from '@/lib/cryptNft';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FriendNameDialog } from '@/components/crypt/FriendNameDialog';
 import { cryptDisplayName, loadCryptNames, saveCryptName } from '@/lib/cryptNames';
+import { deriveRoomProfiles, loadRoomProfiles, mergeRoomProfiles, roomProfileEntries, saveRoomProfiles } from '@/lib/cryptRoomProfiles';
 import { accountAvatar, parseAvatar, type CryptAvatar } from '@/lib/cryptAvatar';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { VaultPrompt } from '@/components/crypt/VaultPrompt';
 import { CreateGroupDialog } from '@/components/crypt/CreateGroupDialog';
 import { PaidActionDialog } from '@/components/crypt/PaidActionDialog';
-import { buildCg2Actions, JOIN_NOTE_MAX, encodeAdmission, encodeMemberAdd, MAX_PUBLIC_ROOM_MEMBERS, collectInvites, countFriendRequests, friendRequestResendable, deriveInviteGroups, encodeGroupText, encodeInvite, encodeMeta, encodeNotice, inviteTextSize, invitesSignature, loadDecisions, MAX_INVITE_MEMBERS, loadFriendDecisions, loadInvites, newInviteGroupId, saveDecision, saveInvites, scopedKeys, eventFromMember, VOICE_REF_PREFIX, type Cg2Event, type InviteGroup, type InviteGroupView } from '@/lib/cryptInviteGroups';
+import { buildCg2Actions, JOIN_NOTE_MAX, encodeAdmission, encodeMemberAdd, encodeRoomProfiles, MAX_PUBLIC_ROOM_MEMBERS, collectInvites, countFriendRequests, friendRequestResendable, deriveInviteGroups, encodeGroupText, encodeInvite, encodeMeta, encodeNotice, inviteTextSize, invitesSignature, loadDecisions, MAX_INVITE_MEMBERS, loadFriendDecisions, loadInvites, newInviteGroupId, saveDecision, saveInvites, scopedKeys, eventFromMember, VOICE_REF_PREFIX, type Cg2Event, type InviteGroup, type InviteGroupView } from '@/lib/cryptInviteGroups';
 import { ShareKeyDialog } from '@/components/crypt/ShareKeyDialog';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { buildVoiceBatches, voiceNoteCost, voicePartCount, voiceTransactions, type VoiceClip } from '@/lib/cryptVoice';
@@ -124,8 +125,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [avatars, setAvatars] = useState(() => loadContactAvatars(account));
   const [names, setNames] = useState(() => loadCryptNames(account));
   const [nicknames, setNicknames] = useState(() => loadCryptNames(account, 'nicknames'));
+  // Display-only names/pictures of public-room members, from owners' admission directories.
+  const [roomProfiles, setRoomProfiles] = useState(() => loadRoomProfiles(account));
   const [editingFriend, setEditingFriend] = useState<string | null>(null);
-  const nameFor = (id: string) => id === account ? key?.displayName ?? account : cryptDisplayName(id, names, nicknames);
+  const nameFor = (id: string) => id === account ? key?.displayName ?? account : cryptDisplayName(id, shownNames, nicknames);
   const [editingAvatar, setEditingAvatar] = useState(false);
   const [settingUpProfile, setSettingUpProfile] = useState(false);
   const [pendingProfile, setPendingProfile] = useState<{ avatar: CryptAvatar; displayName?: string } | null>(null);
@@ -218,7 +221,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
       }
       update(setContacts, loadContacts(account)); update(setRemovedContacts, loadRemovedContacts(account));
       update(setAvatars, loadContactAvatars(account)); update(setNames, loadCryptNames(account));
-      update(setNicknames, loadCryptNames(account, 'nicknames'));
+      update(setNicknames, loadCryptNames(account, 'nicknames')); update(setRoomProfiles, loadRoomProfiles(account));
       update(setGroups, loadGroups(account)); update(setHiddenGroups, loadHiddenGroups(account));
       update(setInviteStore, loadInvites(account)); update(setDecisions, loadDecisions(account));
       update(setFriendDeclines, loadFriendDecisions(account)); update(setBlockedState, loadBlocked(account));
@@ -403,6 +406,18 @@ export function Messenger({ account, session }: { account: string; session: NonN
     staleTime: 60_000, refetchInterval: () => (document.visibilityState === 'visible' ? 60_000 : false), retry: false,
   });
   const listings = useMemo(() => collectListings(roomMemos ?? []).filter(l => !blocked.includes(l.creator)), [roomMemos, blocked]);
+  // Name precedence (display only): friends' own profiles, then room directories, then a listing's creator name.
+  const shownNames = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const l of listings) if (l.creatorName && !out[l.creator]) out[l.creator] = l.creatorName;
+    for (const [a, p] of Object.entries(roomProfiles)) if (p.displayName) out[a] = p.displayName;
+    return { ...out, ...names };
+  }, [listings, roomProfiles, names]);
+  const shownAvatars = useMemo(() => {
+    const out: typeof avatars = {};
+    for (const [a, p] of Object.entries(roomProfiles)) if (p.avatar) out[a] = p.avatar;
+    return { ...out, ...avatars };
+  }, [roomProfiles, avatars]);
   const restoredRequests = useMemo(() => key ? recoverRoomRequests(visibleMemos, key, listings, roomRequests) : roomRequests,
     [visibleMemos, key, listings, roomRequests]);
   useEffect(() => {
@@ -425,6 +440,11 @@ export function Messenger({ account, session }: { account: string; session: NonN
     saveInvites(account, invites); setInviteStore(invites);
   }, [invites, inviteStore, account]);
   const moderation = useMemo(() => deriveModeration(allGroupEvents, invites, account), [allGroupEvents, invites, account]);
+  useEffect(() => {
+    const next = mergeRoomProfiles(roomProfiles, deriveRoomProfiles(allGroupEvents, invites, account));
+    if (JSON.stringify(next) === JSON.stringify(roomProfiles)) return;
+    saveRoomProfiles(account, next); setRoomProfiles(next);
+  }, [allGroupEvents, invites, account, roomProfiles]);
   useEffect(() => {
     const controlTxs = new Set(allGroupEvents.filter(e => (e.control.kind === 'invite' || e.control.kind === 'admission') || e.control.kind === 'add' || e.control.kind === 'room' || e.control.kind === 'mute' || e.control.kind === 'ban' || e.control.kind === 'policy' || e.control.kind === 'admin' || e.control.kind === 'collapse' || e.control.kind === 'report').filter(e => {
       if ((e.control.kind === 'invite' || e.control.kind === 'admission')) return invites[e.control.invite.id]?.creator === e.from;
@@ -1280,14 +1300,17 @@ export function Messenger({ account, session }: { account: string; session: NonN
       const longest = intervals.filter(m => m.until > Date.now()).sort((a, b) => b.until - a.until)[0];
       return longest ? [[a, longest.from, longest.until] as [string, number, number]] : [];
     }), state?.admins ?? []);
-    return { v, updated, payload, delta, policy, snapshot, to, cost: `${(parseFloat(cg2Cost(payload, 1)) + parseFloat(cg2Cost(delta, to.length)) + parseFloat(cg2Cost(policy, to.length + 1)) + parseFloat(cg2Cost(snapshot, 1))).toFixed(4)} CHEESE` };
+    // Members' current names/pictures for the newcomer (owner first, then admins and founders), within one message's size.
+    let profiles: string | null = null;
+    try { profiles = encodeRoomProfiles(updated.id, roomProfileEntries(v.invite, { account, displayName: key?.displayName, avatar: key?.avatar }, names, avatars, roomProfiles, [...(state?.admins ?? []), ...(state?.protected ?? [])])); } catch { profiles = null; }
+    return { v, updated, payload, delta, policy, snapshot, profiles, to, cost: `${(parseFloat(cg2Cost(payload, 1)) + parseFloat(cg2Cost(delta, to.length)) + parseFloat(cg2Cost(policy, to.length + 1)) + parseFloat(cg2Cost(snapshot, 1)) + (profiles ? parseFloat(cg2Cost(profiles, 1)) : 0)).toFixed(4)} CHEESE` };
   };
   const confirmJoin = async () => {
     if (!acceptingJoin || busy) return false;
     const plan = joinPlan(acceptingJoin);
     if (!plan) { toast({ title: 'This room is full or the request is out of date', variant: 'destructive' }); setAcceptingJoin(null); return false; }
     if (!key) return false;
-    const actions = [...buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.payload, [permission]), ...buildCg2Actions(key, plan.to, keysOf(plan.updated), plan.delta, [permission]), ...buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.snapshot, [permission]), ...buildCg2Actions(key, [...plan.to, acceptingJoin.from], keysOf(plan.updated), plan.policy, [permission])];
+    const actions = [...buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.payload, [permission]), ...buildCg2Actions(key, plan.to, keysOf(plan.updated), plan.delta, [permission]), ...buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.snapshot, [permission]), ...(plan.profiles ? buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.profiles, [permission]) : []), ...buildCg2Actions(key, [...plan.to, acceptingJoin.from], keysOf(plan.updated), plan.policy, [permission])];
     setBusy(true);
     let r;
     try { r = await executeTransaction(actions, { successTitle: `${acceptingJoin.from} invited to ${plan.v.name}` }); }
@@ -1497,7 +1520,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         groupsOpen={groupsOpen} setGroupsOpen={setGroupsOpen} setCreatingGroup={setCreatingGroup} inviteViews={inviteViews}
         inviteShown={inviteShown} hiddenGroups={hiddenGroups} inviteRow={inviteRow} groups={groups} groupRow={groupRow}
         showHiddenGroups={showHiddenGroups} setShowHiddenGroups={setShowHiddenGroups} friendsOpen={friendsOpen} setFriendsOpen={setFriendsOpen}
-        setAddingFriend={setAddingFriend} partners={partners} active={active} setActive={setActive} avatars={avatars} nameFor={nameFor}
+        setAddingFriend={setAddingFriend} partners={partners} active={active} setActive={setActive} avatars={shownAvatars} nameFor={nameFor}
         contacts={contacts} lastAt={lastAt} badge={badge} removeFriend={removeFriend} setRoomsOpen={setRoomsOpen}
         backupFile={lockedFile} keyLocked={keyLocked} friendRequests={friendRequestCount}
         pendingRequests={Object.keys(roomRequests).map(requestRow).filter(Boolean)}
@@ -1507,7 +1530,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
           onBlock={r => { setJoinDeclines(declineJoin(account, r.groupId, r.from, r.time)); blockAccount(r.from); }} />} />
 
       <CryptChatHeader account={account} active={active} activeGroup={activeGroup} activeInvite={activeInvite} keyAvatar={key.avatar}
-        avatars={avatars} contacts={contacts} blocked={blocked} friendDeclines={friendDeclines} setFriendDeclines={setFriendDeclines}
+        avatars={shownAvatars} contacts={contacts} blocked={blocked} friendDeclines={friendDeclines} setFriendDeclines={setFriendDeclines}
         nameFor={nameFor} membersOpen={membersOpen} setMembersOpen={setMembersOpen} setPendingNotice={setPendingNotice}
         setEditingInvite={setEditingInvite} setEditingFriend={setEditingFriend} saveFriend={saveFriend} blockAccount={blockAccount}
         admins={activeModeration?.admins ?? []}
@@ -1519,7 +1542,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
           ...inviteViews.filter(v => inviteShown(v) && !hiddenGroups.includes(v.invite.id)).map(v => ({ id: `group:${v.invite.id}`, label: v.name, avatarAccount: v.invite.id, avatar: v.avatar, emoji: v.avatar ? undefined : '👥' })),
           ...groups.filter(g => !hiddenGroups.includes(g.id)).map(g => ({ id: `group:${g.id}`, label: `Group · ${g.members.length} people`, avatarAccount: g.id, emoji: '👥' })),
         ] },
-        { id: 'friends', label: 'Friends', emoji: '🤝', badge: friendRequestCount, items: partners.map(p => ({ id: p, label: nameFor(p), avatarAccount: p, avatar: avatars[p] })) },
+        { id: 'friends', label: 'Friends', emoji: '🤝', badge: friendRequestCount, items: partners.map(p => ({ id: p, label: nameFor(p), avatarAccount: p, avatar: shownAvatars[p] })) },
       ].map(s => ({ ...s, items: s.items.map(it => ({ ...it, unread: unread[it.id] ?? 0, replies: replyUnread[it.id] ?? 0 })) }))} />}
       <section className="flex flex-1 flex-col min-h-0 min-w-0">
         {!active ? (
@@ -1558,7 +1581,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                       <span className="h-px flex-1 bg-border" />
                     </li>
                   )}
-                  <ChatMessageItem m={m} account={account} keyAvatar={key?.avatar} avatars={avatars}
+                  <ChatMessageItem m={m} account={account} keyAvatar={key?.avatar} avatars={shownAvatars}
                     contacts={contacts} active={active} activeGroup={activeGroup} nameFor={nameFor}
                     highlighted={replyNavigation.highlighted.has(m.key)} reportHighlighted={reportFocus === m.key} report={reportAction(m)}
                     editable={canEdit(m, account, clock) && !busy && !roomRestricted && (!activeInvite || activeInvite.status === 'joined')} onEdit={beginEdit}
