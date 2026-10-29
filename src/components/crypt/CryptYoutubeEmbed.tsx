@@ -1,5 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { getAudioPlayer } from '@/lib/musicPlayer';
 import { announcePlaying, CRYPT_NOW_PLAYING } from '@/lib/cryptAudio';
@@ -9,6 +10,7 @@ import { embedUrl, nextPrivateMirror, PRIVATE_YOUTUBE_MIRRORS, privateVideoUrl, 
 export function CryptYoutubeEmbed({ link }: { link: YoutubeLink }) {
   const [selection, setSelection] = useState<number | 'direct' | null>(null);
   const [warn, setWarn] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const source = `crypt-youtube-${useId()}`;
   const mirror = PRIVATE_YOUTUBE_MIRRORS[typeof selection === 'number' ? selection : 0];
 
@@ -20,6 +22,7 @@ export function CryptYoutubeEmbed({ link }: { link: YoutubeLink }) {
     const unsubscribe = getAudioPlayer().subscribe(state => { if (state.isPlaying) setSelection(null); });
     return () => { window.removeEventListener(CRYPT_NOW_PLAYING, stop); unsubscribe(); };
   }, [source]);
+  useEffect(() => { if (selection === null) setExpanded(false); }, [selection]);
   useEffect(() => { setSelection(null); setWarn(false); }, [link.id, link.start]);
 
   const play = (choice: number | 'direct') => {
@@ -30,12 +33,18 @@ export function CryptYoutubeEmbed({ link }: { link: YoutubeLink }) {
   };
   const src = selection === 'direct' ? embedUrl(link, 'direct') : privateVideoUrl(link, mirror, true);
 
+  const frame = (
+    <iframe key={src} src={src} title={`Video ${link.id}`} className="aspect-video w-full rounded"
+      allow="autoplay; encrypted-media; picture-in-picture" referrerPolicy="no-referrer"
+      sandbox="allow-scripts allow-same-origin allow-presentation" />
+  );
+
   return (
-    <div className="my-1 w-72 max-w-full rounded-md border border-border bg-background/60 p-1" onContextMenu={e => e.stopPropagation()}>
+    <div className="my-1 w-96 max-w-full rounded-md border border-border bg-background/60 p-1" onContextMenu={e => e.stopPropagation()}>
       {selection !== null ? (
-        <iframe key={src} src={src} title={`Video ${link.id}`} className="aspect-video w-full rounded"
-          allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerPolicy="no-referrer"
-          sandbox="allow-scripts allow-same-origin allow-presentation" />
+        expanded ? (
+          <div className="flex aspect-video w-full items-center justify-center rounded bg-muted text-xs text-muted-foreground">⛶ Playing in expanded view</div>
+        ) : frame
       ) : (
         <Button type="button" variant="secondary" onClick={() => play(0)} aria-label="Play video privately"
           className="h-auto aspect-video w-full flex-col gap-1 whitespace-normal">
@@ -48,7 +57,10 @@ export function CryptYoutubeEmbed({ link }: { link: YoutubeLink }) {
         <div className="mt-1 space-y-1 text-[11px]">
           <div className="flex flex-wrap items-center justify-between gap-1">
             <span className="min-w-0 break-all text-muted-foreground">{selection === 'direct' ? '⚠️ Google direct' : `🛡️ ${new URL(mirror.host).hostname}`}</span>
+            <div className="flex shrink-0 items-center">
+            <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0" title="Expand video" aria-label="Expand video" onClick={() => setExpanded(true)}>⛶</Button>
             <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0" title="Stop video" aria-label="Stop video" onClick={() => setSelection(null)}>⏹️</Button>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-1">
             <Button type="button" variant="outline" size="sm" className="h-auto min-h-7 whitespace-normal px-2 text-[11px]" onClick={() => play(typeof selection === 'number' ? nextPrivateMirror(selection) : 0)}>🔄 Switch mirror</Button>
@@ -64,6 +76,13 @@ export function CryptYoutubeEmbed({ link }: { link: YoutubeLink }) {
           {selection !== 'direct' && <Button type="button" variant="link" className="h-auto whitespace-normal p-0 text-[11px] text-muted-foreground" onClick={() => setWarn(true)}>⚠️ Last resort: YouTube direct</Button>}
         </div>
       )}
+      <Dialog open={expanded && selection !== null} onOpenChange={setExpanded}>
+        <DialogContent className="max-w-3xl p-4 max-h-[90dvh] overflow-y-auto">
+          <DialogTitle className="text-primary">▶️ YouTube video</DialogTitle>
+          <DialogDescription>{selection === 'direct' ? '⚠️ Google direct' : `🛡️ ${new URL(mirror.host).hostname}`}</DialogDescription>
+          {expanded && frame}
+        </DialogContent>
+      </Dialog>
       <AlertDialog open={warn} onOpenChange={setWarn}>
         <AlertDialogContent>
           <AlertDialogHeader>
