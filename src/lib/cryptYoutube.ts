@@ -53,14 +53,36 @@ export function splitYoutube(text: string): TextSegment[] {
 
 export type YoutubeTier = 'invidious' | 'piped' | 'direct';
 export const YOUTUBE_TIERS: YoutubeTier[] = ['invidious', 'piped', 'direct'];
-export const INVIDIOUS_HOST = 'https://yewtu.be';
+/** Curated origins only: never take a mirror host from message content. Public availability varies. */
+export const PRIVATE_YOUTUBE_MIRRORS = [
+  { id: 'tiekoetter', tier: 'invidious', host: 'https://invidious.tiekoetter.com' },
+  { id: 'yewtu', tier: 'invidious', host: 'https://yewtu.be' },
+  { id: 'piped', tier: 'piped', host: 'https://piped.video' },
+] as const;
+export type YoutubeMirror = (typeof PRIVATE_YOUTUBE_MIRRORS)[number];
+export const INVIDIOUS_HOST = PRIVATE_YOUTUBE_MIRRORS[0].host;
 export const PIPED_HOST = 'https://piped.video';
+
+export function privateVideoUrl(link: YoutubeLink, mirror: YoutubeMirror, embedded: boolean): string {
+  const url = new URL(embedded ? `/embed/${encodeURIComponent(link.id)}` : '/watch', mirror.host);
+  if (!embedded) url.searchParams.set('v', link.id);
+  // Invidious must proxy media too, not just the player page.
+  if (mirror.tier === 'invidious') url.searchParams.set('local', 'true');
+  if (embedded) url.searchParams.set('autoplay', '1');
+  if (link.start > 0) url.searchParams.set('t', String(link.start));
+  return url.toString();
+}
+
+/** Cycling stays private, including when wrapping back to the first mirror. */
+export function nextPrivateMirror(index: number): number {
+  return (index + 1) % PRIVATE_YOUTUBE_MIRRORS.length;
+}
 
 export function embedUrl(link: YoutubeLink, tier: YoutubeTier): string {
   const id = encodeURIComponent(link.id);
   const s = link.start > 0 ? link.start : 0;
-  if (tier === 'invidious') return `${INVIDIOUS_HOST}/embed/${id}?autoplay=1${s ? `&t=${s}` : ''}`;
-  if (tier === 'piped') return `${PIPED_HOST}/embed/${id}?autoplay=1${s ? `&t=${s}` : ''}`;
+  const mirror = PRIVATE_YOUTUBE_MIRRORS.find(m => m.tier === tier);
+  if (mirror) return privateVideoUrl(link, mirror, true);
   return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1${s ? `&start=${s}` : ''}`;
 }
 
