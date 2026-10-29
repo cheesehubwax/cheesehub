@@ -24,12 +24,13 @@ export interface InviteMember { account: string; publicKey: string }
 export interface InviteGroup { id: string; name: string; creator: string; created: number; members: InviteMember[]; avatar?: CryptAvatar; publicRoom?: boolean }
 export const MUTE_MINUTES = [15, 60, 360, 1440] as const;
 export type MuteMinutes = typeof MUTE_MINUTES[number];
-export type Cg2Kind = 'invite' | 'admission' | 'add' | 'msg' | 'joined' | 'leave' | 'meta' | 'friend' | 'friend-ok' | 'join' | 'join-no' | 'room' | 'mute' | 'ban' | 'policy' | 'admin' | 'collapse' | 'report' | 'profiles';
+export type Cg2Kind = 'invite' | 'admission' | 'add' | 'readmit' | 'msg' | 'joined' | 'leave' | 'meta' | 'friend' | 'friend-ok' | 'join' | 'join-no' | 'room' | 'mute' | 'ban' | 'policy' | 'admin' | 'collapse' | 'report' | 'profiles';
 export type Cg2 =
   | { kind: 'invite'; invite: InviteGroup }
   /** `note`: optional short text from the creator when accepting a join request. */
   | { kind: 'admission'; invite: InviteGroup; note?: string }
   | { kind: 'add'; id: string; previous: string; count: number; member: InviteMember }
+  | { kind: 'readmit'; id: string; member: string }
   | { kind: 'msg'; id: string; text: string }
   | { kind: 'room'; id: string; listed: boolean; protected: string[] }
   | { kind: 'mute'; id: string; member: string; minutes: MuteMinutes }
@@ -114,6 +115,10 @@ export function encodeMemberAdd(g: InviteGroup, member: InviteMember) {
   return payload;
 }
 export const encodeGroupText = (id: string, text: string) => wire('msg', { i: checkId(id), t: text });
+export function encodeReadmit(id: string, member: string) {
+  if (!ACCOUNT.test(member)) throw new Error('Invalid member');
+  return wire('readmit', { i: checkId(id), a: member });
+}
 export function encodeNotice(kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'join' | 'join-no', id: string, note?: string) {
   const t = kind === 'join' || kind === 'join-no' ? cleanJoinNote(note) : undefined;
   return wire(kind, { i: checkId(id), ...(t ? { t } : {}) });
@@ -171,6 +176,7 @@ export function parseCg2(text: string | null | undefined): Cg2 | null {
   }
   if (typeof body.i !== 'string' || !ID.test(body.i)) return null;
   const id = body.i;
+  if (kind === 'readmit') return typeof body.a === 'string' && ACCOUNT.test(body.a) ? { kind, id, member: body.a } : null;
   if (kind === 'profiles') {
     if (!Array.isArray(body.p) || !body.p.length || body.p.length > MAX_PUBLIC_ROOM_MEMBERS) return null;
     const seen = new Set<string>();
@@ -325,8 +331,18 @@ export function collectInvites(events: Cg2Event[], me: string, myPublicKey: stri
         out[g.id] = { ...g, publicRoom: true, members: [...g.members, c.member] }; changed = true;
       } else if (c.kind === 'invite' || c.kind === 'admission') {
         const id = c.invite.id, current = out[id];
-        // Public bootstraps only establish the requested room, never replace an existing roster.
-        if (c.kind === 'admission' && (current || !rooms[id] || !events.some(p => p.txId === e.txId && p.from === e.from && p.to === me && p.usedKey === e.usedKey && p.control.kind === 'policy' && p.control.id === id && policySnapshotValid(p.control, c.invite, e.time)))) continue;
+        // Readmission can refresh a retained roster, but never replace any existing key or founder protection.
+        if (c.kind === 'admission') {
+          const room = rooms[id];
+          const snapshot = events.find(p => p.txId === e.txId && p.from === e.from && p.to === me && p.usedKey === e.usedKey && p.control.kind === 'policy' && p.control.id === id && policySnapshotValid(p.control, c.invite, e.time));
+          if (!snapshot || !room || room.creator !== e.from || room.publicKey !== e.usedKey || !inviteAcceptable(e, me, myPublicKey, contacts, rooms)) continue;
+          if (current) {
+            if (c.invite.creator !== current.creator || c.invite.created !== current.created || current.members.some(m => memberKey(c.invite, m.account) !== m.publicKey)) continue;
+            if (snapshot.control.kind !== 'policy' || (protectedRosters[id] && !roomPolicyValid({ kind: 'room', id, listed: true, protected: snapshot.control.protected }, c.invite, protectedRosters[id]))) continue;
+            if (invitesSignature({ [id]: current }) !== invitesSignature({ [id]: c.invite })) { out[id] = { ...current, publicRoom: true, members: c.invite.members }; changed = true; }
+            continue;
+          }
+        }
         if (c.kind === 'admission') {
           const bootstrap = events.find(p => p.txId === e.txId && p.from === e.from && p.to === me && p.control.kind === 'policy' && p.control.id === id);
           if (bootstrap?.control.kind === 'policy') protectedRosters[id] = bootstrap.control.protected;
@@ -372,9 +388,11 @@ export function deriveInviteGroups(events: Cg2Event[], invites: Record<string, I
     let meta: { name: string; avatar?: CryptAvatar; at: number } | null = null;
     const requestsIn = new Set<string>(), requested = new Set<string>(), accepted = new Set<string>();
     const requestedAt: Record<string, number> = {};
+    const approvals = new Map<string, number>();
+    let readmittedAt = 0;
     for (const e of sorted) {
       // The owner's admission to me lists the members already in the room; their earlier joins went to others.
-      if (e.control.kind === 'admission' && e.control.invite.id === g.id && e.from === g.creator && e.to === me) {
+      if (e.control.kind === 'admission' && e.control.invite.id === g.id && e.from === g.creator && e.to === me && e.usedKey === memberKey(g, g.creator) && e.control.invite.members.every(m => memberKey(g, m.account) === m.publicKey)) {
         // Its owner-signed policy snapshot (same transaction) names members who already left.
         const snap = sorted.find(p => p.txId === e.txId && p.from === g.creator && p.to === me && p.usedKey === e.usedKey && p.control.kind === 'policy' && p.control.id === g.id);
         const gone = snap?.control.kind === 'policy' && policySnapshotValid(snap.control, e.control.invite, e.time) ? new Set(snap.control.left) : new Set<string>();
@@ -382,14 +400,18 @@ export function deriveInviteGroups(events: Cg2Event[], invites: Record<string, I
           if (m.account === me) continue;
           const prev = state.get(m.account);
           if (gone.has(m.account)) { if (!prev || prev.at <= e.time) state.set(m.account, { joined: false, at: e.time }); }
-          else if (!prev) state.set(m.account, { joined: true, at: e.time });
+          else if (!prev || prev.at <= e.time) state.set(m.account, { joined: true, at: e.time });
         }
         continue;
       }
       if ((e.control.kind === 'invite' || e.control.kind === 'admission') || e.control.id !== g.id || !eventFromMember(e, invites, me)) continue;
       const c = e.control;
-      if (c.kind === 'joined' || c.kind === 'msg') {
+      if (c.kind === 'readmit' && e.from === g.creator && memberKey(g, c.member)) {
+        approvals.set(c.member, e.time);
+        if (c.member === me && sorted.some(a => a.txId === e.txId && a.to === me && a.from === g.creator && a.usedKey === memberKey(g, g.creator) && a.control.kind === 'admission' && a.control.invite.id === g.id)) readmittedAt = e.time;
+      } else if (c.kind === 'joined' || c.kind === 'msg') {
         const prev = state.get(e.from);
+        if (prev?.joined === false && (approvals.get(e.from) ?? 0) <= prev.at) continue;
         if (!prev || prev.at <= e.time) state.set(e.from, { joined: true, at: e.time });
       } else if (c.kind === 'leave') {
         state.set(e.from, { joined: false, at: e.time });
@@ -406,7 +428,8 @@ export function deriveInviteGroups(events: Cg2Event[], invites: Record<string, I
     const mine = state.get(me);
     const decision = local[g.id];
     let status: MyStatus;
-    if (decision && (!mine || decision.at >= mine.at || (isCreator && mine.at === 0))) status = decision.status;
+    if (readmittedAt > (decision?.at ?? 0) && readmittedAt > (mine?.at ?? 0)) status = 'invited';
+    else if (decision && (!mine || decision.at >= mine.at || (isCreator && mine.at === 0))) status = decision.status;
     else if (mine) status = mine.joined ? 'joined' : 'left';
     else status = 'invited';
     if (isCreator && status === 'invited') status = 'joined';

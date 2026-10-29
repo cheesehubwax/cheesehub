@@ -47,10 +47,19 @@ export function deriveModeration(events: Cg2Event[], invites: Record<string, Inv
     seen.add(fingerprint);
     let state = out[g.id];
     if (c.kind === 'policy') {
-      // A bootstrap snapshot is only for a recipient whose first invite is in this transaction.
-      // Existing members always retain their own original event history and ignore the snapshot.
+      // Readmission refreshes current policy while preserving immutable founders and historical restrictions.
       const myInvites = events.filter(x => (x.control.kind === 'invite' || x.control.kind === 'admission') && x.control.invite.id === g.id && x.from === g.creator && x.to === me);
-      if (state || !myInvites.some(x => x.txId === e.txId) || myInvites.some(x => x.time < e.time) || !policySnapshotValid(c, g, e.time)) continue;
+      const readmission = events.some(x => x.txId === e.txId && x.to === me && x.from === g.creator && x.control.kind === 'readmit' && x.control.id === g.id && x.control.member === me && eventFromMember(x, invites, me));
+      if (!myInvites.some(x => x.txId === e.txId) || !policySnapshotValid(c, g, e.time)) continue;
+      if (state || myInvites.some(x => x.time < e.time)) {
+        if (!readmission || (state && !roomPolicyValid({ kind: 'room', id: g.id, listed: true, protected: c.protected }, g, state.protected))) continue;
+        if (state) {
+          state.admins = [...c.admins];
+          for (const a of c.bans) state.bans[a] ??= e.time;
+          for (const [a, from, until] of c.mutes) if (!state.mutes[a]?.some(m => m.from === from && m.until === until)) state.mutes[a] = [...(state.mutes[a] ?? []), { from, until }];
+          continue;
+        }
+      }
       state = { listed: true, protected: [...c.protected], bans: Object.fromEntries(c.bans.map(a => [a, e.time])), mutes: {}, admins: [...c.admins], collapses: {} };
       for (const [a, from, until] of c.mutes) state.mutes[a] = [...(state.mutes[a] ?? []), { from, until }];
       out[g.id] = state;
