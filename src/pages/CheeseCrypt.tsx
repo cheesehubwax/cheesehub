@@ -1499,7 +1499,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         showHiddenGroups={showHiddenGroups} setShowHiddenGroups={setShowHiddenGroups} friendsOpen={friendsOpen} setFriendsOpen={setFriendsOpen}
         setAddingFriend={setAddingFriend} partners={partners} active={active} setActive={setActive} avatars={avatars} nameFor={nameFor}
         contacts={contacts} lastAt={lastAt} badge={badge} removeFriend={removeFriend} setRoomsOpen={setRoomsOpen}
-        backupFile={lockedFile} keyLocked={keyLocked}
+        backupFile={lockedFile} keyLocked={keyLocked} friendRequests={friendRequestCount}
         pendingRequests={Object.keys(roomRequests).map(requestRow).filter(Boolean)}
         joinRequestsPanel={<JoinRequests requests={joinRequests} nameFor={nameFor} roomName={id => viewById(id)?.name ?? 'a room'}
           roomFull={id => (invites[id]?.members.length ?? MAX_PUBLIC_ROOM_MEMBERS) >= MAX_PUBLIC_ROOM_MEMBERS} onAccept={r => { setJoinNote(''); setAcceptingJoin(r); }}
