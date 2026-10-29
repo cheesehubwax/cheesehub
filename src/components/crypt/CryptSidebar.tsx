@@ -19,7 +19,7 @@ export function CryptSidebar({
   makeKey, publicInbox, setInboxOpen, toggleList, listHidden, hiddenUnread, hiddenReplies, messageRequests, acceptRequest, dismissRequest,
   blockAccount, groupsOpen, setGroupsOpen, setCreatingGroup, inviteViews, inviteShown, hiddenGroups, inviteRow, groups, groupRow,
   showHiddenGroups, setShowHiddenGroups, friendsOpen, setFriendsOpen, setAddingFriend, partners, active, setActive, avatars, nameFor,
-  contacts, lastAt, badge, removeFriend, setRoomsOpen, joinRequestsPanel, pendingRequests = [], backupFile, keyLocked,
+  contacts, lastAt, badge, removeFriend, setRoomsOpen, joinRequestsPanel, pendingRequests = [], backupFile, keyLocked, friendRequests = 0,
 }: {
   account: string; cryptKey: MessagingKey; loading: boolean; refresh: () => void; setEditingAvatar: (v: boolean) => void;
   menuOpen: boolean; setMenuOpen: (v: boolean) => void; fileRef: { current: HTMLInputElement | null };
@@ -29,6 +29,8 @@ export function CryptSidebar({
   setRoomsOpen: (v: boolean) => void; joinRequestsPanel?: ReactNode; pendingRequests?: ReactNode[];
   /** Back up never falls back to a plaintext private key. */
   backupFile?: unknown; keyLocked?: boolean; canLock?: boolean; lockKey?: () => void;
+  /** Unanswered incoming friend requests, shown on the Friends heading. */
+  friendRequests?: number;
   acceptRequest: (from: string) => void; dismissRequest: (from: string) => void; blockAccount: (name: string) => void;
   groupsOpen: boolean; setGroupsOpen: (v: boolean) => void; setCreatingGroup: (v: boolean) => void;
   inviteViews: InviteGroupView[]; inviteShown: (v: InviteGroupView) => boolean; hiddenGroups: string[];
@@ -124,6 +126,8 @@ export function CryptSidebar({
           <div className="flex items-center justify-between px-2">
             <CollapsibleTrigger className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-cheese">
               <ChevronDown className={cn('h-3.5 w-3.5 transition', !friendsOpen && '-rotate-90')} /> 🤝 Friends
+              {friendRequests > 0 && <span aria-label={`${friendRequests} unanswered friend request${friendRequests > 1 ? 's' : ''}`} title={`${friendRequests} unanswered friend request${friendRequests > 1 ? 's' : ''}`}
+                className="min-w-4 h-4 px-1 rounded-full text-[9px] font-bold leading-4 text-center bg-cheese text-primary-foreground">{friendRequests > 99 ? '99+' : friendRequests}</span>}
             </CollapsibleTrigger>
             <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Add friend" title="Add friend" onClick={() => setAddingFriend(true)}><UserPlus className="h-4 w-4" /></Button>
           </div>
