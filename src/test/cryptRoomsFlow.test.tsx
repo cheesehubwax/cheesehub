@@ -56,7 +56,7 @@ describe('public rooms', () => {
     render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="bob" session={{ actor: 'bob', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'bob', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
     await waitFor(() => expect(loadInvites('bob')[ID]?.members).toHaveLength(3));
     await waitFor(() => expect(loadRoomProfiles('bob').alice?.displayName).toBe('cheeseplum'));
-    fireEvent.click(await screen.findByRole('button', { name: /Invited by alice/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Invited by cheeseplum/ }));
     expect(screen.queryByPlaceholderText('Message group')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Join$/ }));
     fireEvent.click(screen.getByRole('checkbox'));
