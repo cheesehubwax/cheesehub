@@ -5,7 +5,7 @@ import type { CryptAvatar } from '@/lib/cryptAvatar';
 export interface RailItem { id: string; label: string; avatarAccount: string; avatar?: CryptAvatar; emoji?: string; unread: number; replies: number }
 
 /** One labelled block of the collapsed strip, mirroring the Groups / Friends sections of the side panel. */
-export interface RailSection { id: string; label: string; emoji: string; items: RailItem[] }
+export interface RailSection { id: string; label: string; emoji: string; items: RailItem[]; /** Counter shown on the section heading, e.g. unanswered friend requests. */ badge?: number }
 
 function RailButton({ item, active, setActive }: { item: RailItem; active: string | null; setActive: (id: string) => void }) {
   return (
