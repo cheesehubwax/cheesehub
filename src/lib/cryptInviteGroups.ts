@@ -24,7 +24,7 @@ export interface InviteMember { account: string; publicKey: string }
 export interface InviteGroup { id: string; name: string; creator: string; created: number; members: InviteMember[]; avatar?: CryptAvatar; publicRoom?: boolean }
 export const MUTE_MINUTES = [15, 60, 360, 1440] as const;
 export type MuteMinutes = typeof MUTE_MINUTES[number];
-export type Cg2Kind = 'invite' | 'admission' | 'add' | 'msg' | 'joined' | 'leave' | 'meta' | 'friend' | 'friend-ok' | 'join' | 'join-no' | 'room' | 'mute' | 'ban' | 'policy' | 'admin' | 'collapse' | 'report';
+export type Cg2Kind = 'invite' | 'admission' | 'add' | 'msg' | 'joined' | 'leave' | 'meta' | 'friend' | 'friend-ok' | 'join' | 'join-no' | 'room' | 'mute' | 'ban' | 'policy' | 'admin' | 'collapse' | 'report' | 'profiles';
 export type Cg2 =
   | { kind: 'invite'; invite: InviteGroup }
   /** `note`: optional short text from the creator when accepting a join request. */
@@ -45,7 +45,10 @@ export type Cg2 =
   /** `join-no`: the creator tells a requester their join request was declined (notification only). */
   /** `note`: optional short text on `join` and `join-no` only. */
   | { kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'join' | 'join-no'; id: string; note?: string }
-  | { kind: 'meta'; id: string; name: string; avatar?: CryptAvatar };
+  | { kind: 'meta'; id: string; name: string; avatar?: CryptAvatar }
+  /** Display-only: the owner's known names/pictures of room members, sent to a newcomer in the admission transaction. */
+  | { kind: 'profiles'; id: string; entries: RoomProfileEntry[] };
+export interface RoomProfileEntry { account: string; avatar?: CryptAvatar; displayName?: string }
 
 const validPublicKey = (k: unknown): k is string => {
   if (typeof k !== 'string') return false;
@@ -167,6 +170,23 @@ export function parseCg2(text: string | null | undefined): Cg2 | null {
   }
   if (typeof body.i !== 'string' || !ID.test(body.i)) return null;
   const id = body.i;
+  if (kind === 'profiles') {
+    if (!Array.isArray(body.p) || !body.p.length || body.p.length > MAX_PUBLIC_ROOM_MEMBERS) return null;
+    const seen = new Set<string>();
+    const entries: RoomProfileEntry[] = [];
+    for (const raw of body.p) {
+      if (!Array.isArray(raw) || raw.length < 2 || raw.length > 3) return null;
+      const [account, pixels, name] = raw as unknown[];
+      if (typeof account !== 'string' || !ACCOUNT.test(account) || seen.has(account) || typeof pixels !== 'string') return null;
+      const avatar = pixels ? parseAvatar({ version: 1, pixels }) : undefined;
+      if (pixels && !avatar) return null;
+      const displayName = name === undefined ? undefined : parseCryptName(name);
+      if (name !== undefined && displayName !== name) return null;
+      if (!avatar && !displayName) return null;
+      seen.add(account); entries.push({ account, ...(avatar ? { avatar } : {}), ...(displayName ? { displayName } : {}) });
+    }
+    return { kind, id, entries };
+  }
   if (kind === 'add') {
     if (typeof body.h !== 'string' || !/^[a-f0-9]{64}$/.test(body.h) || !Number.isInteger(body.c) || typeof body.c !== 'number' || body.c < 2 || body.c >= MAX_PUBLIC_ROOM_MEMBERS || !Array.isArray(body.m) || body.m.length !== 2 || typeof body.m[0] !== 'string' || !ACCOUNT.test(body.m[0]) || !validPublicKey(body.m[1])) return null;
     return { kind, id, previous: body.h, count: body.c, member: { account: body.m[0], publicKey: body.m[1] } };
@@ -424,6 +444,28 @@ export function buildCg2Actions(key: MessagingKey, recipients: string[], keys: R
 }
 
 export const partsOf = (payload: string) => partCount(payload);
+
+const profileWire = (id: string, entries: RoomProfileEntry[]) =>
+  wire('profiles', { i: checkId(id), p: entries.map(e => e.displayName ? [e.account, e.avatar?.pixels ?? '', e.displayName] : [e.account, e.avatar?.pixels ?? '']) });
+/**
+ * Room profile directory for a newcomer, in priority order, keeping only entries that fit `maxParts`
+ * (each part costs a platform fee). Entries without a picture or name are skipped; null when nothing fits.
+ */
+export function encodeRoomProfiles(id: string, entries: RoomProfileEntry[], maxParts = MAX_PARTS): string | null {
+  const kept: RoomProfileEntry[] = [];
+  const seen = new Set<string>();
+  for (const e of entries) {
+    const avatar = parseAvatar(e.avatar), displayName = parseCryptName(e.displayName);
+    if (seen.has(e.account) || !ACCOUNT.test(e.account) || (!avatar && !displayName)) continue;
+    const next = [...kept, { account: e.account, ...(avatar ? { avatar } : {}), ...(displayName ? { displayName } : {}) }];
+    if (partCount(profileWire(id, next)) > maxParts) continue;
+    kept.push(next[next.length - 1]); seen.add(e.account);
+  }
+  if (!kept.length) return null;
+  const payload = profileWire(id, kept);
+  if (!parseCg2(payload)) throw new Error('Invalid room profiles');
+  return payload;
+}
 
 // ---- per-account storage: known invites and my own decisions (device-only) ----
 const invitesStore = (a: string) => `cheesecrypt-invite-groups-${a}`;

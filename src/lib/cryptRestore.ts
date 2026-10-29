@@ -43,7 +43,7 @@ export function recoveredRoomEvents(memos: ChainMemo[], key: MessagingKey, reque
     .filter(e => {
       const id = e.control.kind === 'invite' || e.control.kind === 'admission' ? e.control.invite.id : e.control.id;
       return e.to === key.account && e.from === request.creator && e.usedKey === request.publicKey && id === request.id &&
-        ['invite', 'admission', 'policy', 'room', 'add', 'join-no'].includes(e.control.kind);
+        ['invite', 'admission', 'policy', 'room', 'add', 'join-no', 'profiles'].includes(e.control.kind);
     }));
 }
 
