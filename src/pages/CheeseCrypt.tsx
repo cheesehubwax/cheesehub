@@ -1164,6 +1164,15 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const payload = encodeNotice(n.kind, n.id);
     return { v, to, payload, cost: to.length ? cg2Cost(payload, to.length) : '0.0000 CHEESE' };
   };
+  /** Opens a notice confirmation; explains instead when a profile share isn't possible. */
+  const requestNotice = (n: NonNullable<typeof pendingNotice>) => {
+    if (n.kind === 'profile' && !noticePlan(n)) {
+      const muted = restrictedAt(moderation[n.id], account, Date.now());
+      toast({ title: muted ? "You can't share right now" : 'Nothing to share yet', description: muted ? 'You are muted or removed from this group.' : 'Set a name or picture first (⚙️ edit your profile).', variant: 'destructive' });
+      return;
+    }
+    setPendingNotice(n);
+  };
   const confirmNotice = async () => {
     if (!pendingNotice) return false;
     const plan = noticePlan(pendingNotice);
@@ -1543,7 +1552,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
 
       <CryptChatHeader account={account} active={active} activeGroup={activeGroup} activeInvite={activeInvite} keyAvatar={key.avatar}
         avatars={shownAvatars} contacts={contacts} blocked={blocked} friendDeclines={friendDeclines} setFriendDeclines={setFriendDeclines}
-        nameFor={nameFor} membersOpen={membersOpen} setMembersOpen={setMembersOpen} setPendingNotice={setPendingNotice}
+        nameFor={nameFor} membersOpen={membersOpen} setMembersOpen={setMembersOpen} setPendingNotice={requestNotice}
         setEditingInvite={setEditingInvite} setEditingFriend={setEditingFriend} saveFriend={saveFriend} blockAccount={blockAccount}
         admins={activeModeration?.admins ?? []}
         />
