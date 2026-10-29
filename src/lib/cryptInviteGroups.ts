@@ -254,10 +254,12 @@ export function roomPolicyValid(c: Extract<Cg2, { kind: 'room' }>, g: InviteGrou
 
 /** A complete owner bootstrap, authenticated against retained member keys and its atomic policy. */
 export function authenticatedAdmission(e: Cg2Event, events: readonly Cg2Event[], g: InviteGroup, me: string) {
-  return e.control.kind === 'admission' && e.control.invite.id === g.id && e.from === g.creator && e.to === me
-    && e.usedKey === memberKey(g, g.creator) && e.control.invite.creator === g.creator && e.control.invite.created === g.created
-    && e.control.invite.members.every(m => memberKey(g, m.account) === m.publicKey)
-    && events.some(p => p.txId === e.txId && p.from === e.from && p.to === me && p.usedKey === e.usedKey && p.control.kind === 'policy' && p.control.id === g.id && policySnapshotValid(p.control, e.control.invite, e.time));
+  if (e.control.kind !== 'admission') return false;
+  const admitted = e.control.invite;
+  return admitted.id === g.id && e.from === g.creator && e.to === me
+    && e.usedKey === memberKey(g, g.creator) && admitted.creator === g.creator && admitted.created === g.created
+    && admitted.members.every(m => memberKey(g, m.account) === m.publicKey)
+    && events.some(p => p.txId === e.txId && p.from === e.from && p.to === me && p.usedKey === e.usedKey && p.control.kind === 'policy' && p.control.id === g.id && policySnapshotValid(p.control, admitted, e.time));
 }
 
 /**
