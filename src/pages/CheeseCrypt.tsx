@@ -1519,7 +1519,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
           ...inviteViews.filter(v => inviteShown(v) && !hiddenGroups.includes(v.invite.id)).map(v => ({ id: `group:${v.invite.id}`, label: v.name, avatarAccount: v.invite.id, avatar: v.avatar, emoji: v.avatar ? undefined : '👥' })),
           ...groups.filter(g => !hiddenGroups.includes(g.id)).map(g => ({ id: `group:${g.id}`, label: `Group · ${g.members.length} people`, avatarAccount: g.id, emoji: '👥' })),
         ] },
-        { id: 'friends', label: 'Friends', emoji: '🤝', items: partners.map(p => ({ id: p, label: nameFor(p), avatarAccount: p, avatar: avatars[p] })) },
+        { id: 'friends', label: 'Friends', emoji: '🤝', badge: friendRequestCount, items: partners.map(p => ({ id: p, label: nameFor(p), avatarAccount: p, avatar: avatars[p] })) },
       ].map(s => ({ ...s, items: s.items.map(it => ({ ...it, unread: unread[it.id] ?? 0, replies: replyUnread[it.id] ?? 0 })) }))} />}
       <section className="flex flex-1 flex-col min-h-0 min-w-0">
         {!active ? (
