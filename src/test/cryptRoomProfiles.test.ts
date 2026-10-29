@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { encodeRoomProfiles, parseCg2, type Cg2Event, type InviteGroup } from '@/lib/cryptInviteGroups';
-import { deriveRoomProfiles, loadRoomProfiles, mergeRoomProfiles, roomProfileEntries, saveRoomProfiles } from '@/lib/cryptRoomProfiles';
+import { deriveRoomProfiles, encodeSelfRoomProfile, loadRoomProfiles, mergeRoomProfiles, roomProfileEntries, saveRoomProfiles } from '@/lib/cryptRoomProfiles';
 import { MAX_PARTS, partCount } from '@/lib/cheeseCrypt';
 
 const pk = (n: number) => btoa(String.fromCharCode(...new Array(32).fill(n)));
@@ -66,5 +66,40 @@ describe('room profile directory', () => {
     saveRoomProfiles('newbie', { fren1: { displayName: 'Fren', time: 1, self: false } });
     expect(loadRoomProfiles('newbie').fren1.displayName).toBe('Fren');
     expect(loadRoomProfiles('other')).toEqual({});
+  });
+});
+
+describe('room profile sync (members sharing their own profile)', () => {
+  const self = (account: string, name: string) => parseCg2(encodeSelfRoomProfile(ID, { account, displayName: name })!)!;
+
+  it('a member can send their own name to non-friend members, no admission needed', () => {
+    const p = deriveRoomProfiles([ev(self('fren1', 'Fren'), { from: 'fren1', to: 'bum.gpk', usedKey: pk(2), txId: 'tx9' })], { [ID]: room }, 'bum.gpk');
+    expect(p.fren1).toMatchObject({ displayName: 'Fren', self: true });
+  });
+
+  it('works in private invite groups too', () => {
+    const p = deriveRoomProfiles([ev(self('fren1', 'Fren'), { from: 'fren1', to: 'bum.gpk', usedKey: pk(2) })], { [ID]: { ...room, publicRoom: false } }, 'bum.gpk');
+    expect(p.fren1?.displayName).toBe('Fren');
+  });
+
+  it('a member cannot describe someone else', () => {
+    expect(deriveRoomProfiles([ev(self('dr.cheese', 'fake'), { from: 'fren1', to: 'bum.gpk', usedKey: pk(2) })], { [ID]: room }, 'bum.gpk')).toEqual({});
+  });
+
+  it('needs the sender\'s own room key and room membership', () => {
+    expect(deriveRoomProfiles([ev(self('fren1', 'Fren'), { from: 'fren1', to: 'bum.gpk', usedKey: pk(9) })], { [ID]: room }, 'bum.gpk')).toEqual({});
+    expect(deriveRoomProfiles([ev(self('outsider', 'X'), { from: 'outsider', to: 'bum.gpk', usedKey: pk(9) })], { [ID]: room }, 'bum.gpk')).toEqual({});
+  });
+
+  it('newest self update wins over an older one', () => {
+    const p = deriveRoomProfiles([
+      ev(self('fren1', 'Old'), { from: 'fren1', to: 'bum.gpk', usedKey: pk(2), time: 10 }),
+      ev(self('fren1', 'New'), { from: 'fren1', to: 'bum.gpk', usedKey: pk(2), time: 20 }),
+    ], { [ID]: room }, 'bum.gpk');
+    expect(p.fren1.displayName).toBe('New');
+  });
+
+  it('nothing to send without a name or picture', () => {
+    expect(encodeSelfRoomProfile(ID, { account: 'fren1' })).toBeNull();
   });
 });

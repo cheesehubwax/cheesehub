@@ -25,7 +25,7 @@ import { nftToken, parseNftMessage } from '@/lib/cryptNft';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FriendNameDialog } from '@/components/crypt/FriendNameDialog';
 import { cryptDisplayName, loadCryptNames, saveCryptName } from '@/lib/cryptNames';
-import { deriveRoomProfiles, loadRoomProfiles, mergeRoomProfiles, roomProfileEntries, saveRoomProfiles } from '@/lib/cryptRoomProfiles';
+import { deriveRoomProfiles, encodeSelfRoomProfile, isSelfRoomProfile, loadRoomProfiles, mergeRoomProfiles, roomProfileEntries, saveRoomProfiles } from '@/lib/cryptRoomProfiles';
 import { accountAvatar, parseAvatar, type CryptAvatar } from '@/lib/cryptAvatar';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { VaultPrompt } from '@/components/crypt/VaultPrompt';
@@ -153,7 +153,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [decisions, setDecisions] = useState(() => loadDecisions(account));
   const [friendDeclines, setFriendDeclines] = useState(() => loadFriendDecisions(account));
   /** A paid group notice waiting for Terms + confirmation. */
-  const [pendingNotice, setPendingNotice] = useState<null | { kind: 'joined' | 'leave' | 'friend' | 'friend-ok'; id: string; to?: string }>(null);
+  const [pendingNotice, setPendingNotice] = useState<null | { kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'profile'; id: string; to?: string }>(null);
   const [editingInvite, setEditingInvite] = useState<null | { id: string; name: string; avatar?: CryptAvatar }>(null);
   const [paintingInvite, setPaintingInvite] = useState(false);
   const [newContact, setNewContact] = useState('');
@@ -441,10 +441,12 @@ export function Messenger({ account, session }: { account: string; session: NonN
   }, [invites, inviteStore, account]);
   const moderation = useMemo(() => deriveModeration(allGroupEvents, invites, account), [allGroupEvents, invites, account]);
   useEffect(() => {
-    const next = mergeRoomProfiles(roomProfiles, deriveRoomProfiles(allGroupEvents, invites, account));
+    // Self-descriptions from members muted or banned at send time are dropped like their other traffic.
+    const usable = allGroupEvents.filter(e => !isSelfRoomProfile(e, invites, account) || (e.control.kind === 'profiles' && !restrictedAt(moderation[e.control.id], e.from, e.time)));
+    const next = mergeRoomProfiles(roomProfiles, deriveRoomProfiles(usable, invites, account));
     if (JSON.stringify(next) === JSON.stringify(roomProfiles)) return;
     saveRoomProfiles(account, next); setRoomProfiles(next);
-  }, [allGroupEvents, invites, account, roomProfiles]);
+  }, [allGroupEvents, invites, account, roomProfiles, moderation]);
   useEffect(() => {
     const controlTxs = new Set(allGroupEvents.filter(e => (e.control.kind === 'invite' || e.control.kind === 'admission') || e.control.kind === 'add' || e.control.kind === 'room' || e.control.kind === 'mute' || e.control.kind === 'ban' || e.control.kind === 'policy' || e.control.kind === 'admin' || e.control.kind === 'collapse' || e.control.kind === 'report').filter(e => {
       if ((e.control.kind === 'invite' || e.control.kind === 'admission')) return invites[e.control.invite.id]?.creator === e.from;
@@ -1150,9 +1152,26 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if (!v) return null;
     if (n.kind === 'joined' && moderation[n.id]?.bans[account] !== undefined) return null;
     const others = v.invite.members.map(m => m.account).filter(a => a !== account && moderation[n.id]?.bans[a] === undefined);
+    if (n.kind === 'profile') {
+      // My own name/picture to members currently in the group (not banned or blocked); muted/removed senders can't share.
+      if (!key || v.status !== 'joined' || restrictedAt(moderation[n.id], account, Date.now())) return null;
+      const payload = encodeSelfRoomProfile(n.id, { account, displayName: key.displayName, avatar: key.avatar });
+      if (!payload) return null;
+      const to = v.joined.filter(a => others.includes(a) && !blocked.includes(a));
+      return { v, to, payload, cost: to.length ? cg2Cost(payload, to.length) : '0.0000 CHEESE' };
+    }
     const to = n.kind === 'joined' ? others : n.kind === 'leave' ? v.joined.filter(a => a !== account) : n.to ? [n.to] : [];
     const payload = encodeNotice(n.kind, n.id);
     return { v, to, payload, cost: to.length ? cg2Cost(payload, to.length) : '0.0000 CHEESE' };
+  };
+  /** Opens a notice confirmation; explains instead when a profile share isn't possible. */
+  const requestNotice = (n: NonNullable<typeof pendingNotice>) => {
+    if (n.kind === 'profile' && !noticePlan(n)) {
+      const muted = restrictedAt(moderation[n.id], account, Date.now());
+      toast({ title: muted ? "You can't share right now" : 'Nothing to share yet', description: muted ? 'You are muted or removed from this group.' : 'Set a name or picture first: click your avatar in the sidebar.', variant: 'destructive' });
+      return;
+    }
+    setPendingNotice(n);
   };
   const confirmNotice = async () => {
     if (!pendingNotice) return false;
@@ -1161,7 +1180,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const { v, to, payload } = plan;
     const n = pendingNotice;
     if (n.kind === 'leave' && !to.length) { setDecisions(saveDecision(account, n.id, 'left')); setPendingNotice(null); return true; }
-    const titles = { joined: `Joined ${v.name}`, leave: `Left ${v.name}`, friend: 'Friend request sent', 'friend-ok': 'Friend request accepted' } as const;
+    if (n.kind === 'profile' && !to.length) { setPendingNotice(null); return true; }
+    const titles = { joined: `Joined ${v.name}`, leave: `Left ${v.name}`, friend: 'Friend request sent', 'friend-ok': 'Friend request accepted', profile: `Name and picture shared with ${v.name}` } as const;
     if (!(await sendCg2(to, keysOf(v.invite), payload, titles[n.kind]))) return false;
     if (n.kind === 'joined' || n.kind === 'leave') setDecisions(saveDecision(account, n.id, n.kind === 'joined' ? 'joined' : 'left'));
     if (n.kind === 'friend-ok' && n.to) {
@@ -1407,6 +1427,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
           leave: { title: `🚪 Leave ${plan.v.name}`, description: plan.to.length ? `Tells the ${plan.to.length} member${plan.to.length > 1 ? 's' : ''} still in the group that you left, so they stop sending you copies. Your history stays readable.` : 'Nobody else is in the group, so nothing is sent.', label: plan.to.length ? 'Pay & leave' : 'Leave' },
           friend: { title: `🤝 Friend request to ${who}`, description: `Sent encrypted to ${who} only. If they accept, you become friends and can message each other directly.`, label: 'Pay & send request' },
           'friend-ok': { title: `🤝 Accept ${who}`, description: `Adds ${who} as a friend using the key ${plan.v.name} introduced, and lets them know in an encrypted message.`, label: 'Pay & accept' },
+          profile: { title: `📣 Share my name & picture with ${plan.v.name}`, description: plan.to.length ? `Sends your current name${key.displayName ? ` (${key.displayName})` : ''} and picture, encrypted, to the ${plan.to.length} member${plan.to.length > 1 ? 's' : ''} in this group, including people who aren't your friends. It never shows as a chat message, and doesn't make anyone a friend. Your WAX account stays your identity; people's own nicknames for you still win.` : 'Nobody else is in the group yet, so nothing is sent.', label: plan.to.length ? 'Pay & share' : 'Close' },
         }[pendingNotice.kind];
         return <PaidActionDialog title={copy.title} description={copy.description} cost={plan.cost} confirmLabel={copy.label} busy={busy}
           onConfirm={confirmNotice} onClose={() => setPendingNotice(null)} />;
@@ -1531,7 +1552,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
 
       <CryptChatHeader account={account} active={active} activeGroup={activeGroup} activeInvite={activeInvite} keyAvatar={key.avatar}
         avatars={shownAvatars} contacts={contacts} blocked={blocked} friendDeclines={friendDeclines} setFriendDeclines={setFriendDeclines}
-        nameFor={nameFor} membersOpen={membersOpen} setMembersOpen={setMembersOpen} setPendingNotice={setPendingNotice}
+        nameFor={nameFor} membersOpen={membersOpen} setMembersOpen={setMembersOpen} setPendingNotice={requestNotice}
         setEditingInvite={setEditingInvite} setEditingFriend={setEditingFriend} saveFriend={saveFriend} blockAccount={blockAccount}
         admins={activeModeration?.admins ?? []}
         />
