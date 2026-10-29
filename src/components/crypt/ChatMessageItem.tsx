@@ -35,6 +35,8 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
   /** Members report to admins; admins report to the owner for a possible ban. */
   report?: { toOwner: boolean; onReport: () => void };
   reportHighlighted?: boolean;
+  /** Friend shortcut for another member's message: add (or show a sent request) when not a friend, remove when a friend. */
+  friend?: { isFriend: boolean; onAdd?: () => void; onRemove?: () => void; pendingLabel?: string };
 }) {
   const hidden = !!m.collapsed && !revealed;
   const reply = parseReply(m.text);
