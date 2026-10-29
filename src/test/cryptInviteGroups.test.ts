@@ -126,6 +126,23 @@ describe('group state', () => {
     expect(left.joined).toEqual(['alice', 'bob']);
   });
 
+  it("marks members the owner's admission snapshot lists as left, until they rejoin; only the owner's snapshot counts", () => {
+    const room = { ...invite, publicRoom: true, members: [...invite.members, { account: 'dave', publicKey: dave.publicKey }] };
+    const adm = e(alice, dave, 5, { kind: 'admission', invite: room });
+    const snap = encodePolicySnapshot(ID, ['alice', 'bob', 'carol'], [], [], [], ['carol']);
+    const policy = parseCg2(snap)!;
+    expect(policy).toMatchObject({ kind: 'policy', left: ['carol'] });
+    const pe = { ...e(alice, dave, 5, policy), txId: adm.txId };
+    const v = deriveInviteGroups([adm, pe], { [ID]: room }, 'dave', { [ID]: { status: 'joined', at: 6 } })[0];
+    expect(v.left).toEqual(['carol']);
+    expect(v.joined).toEqual(['alice', 'bob', 'dave']);
+    const back = deriveInviteGroups([adm, pe, { ...e(carol, dave, 9, { kind: 'joined', id: ID }), usedKey: carol.publicKey }], { [ID]: room }, 'dave', {})[0];
+    expect(back.left).toEqual([]);
+    const forged = deriveInviteGroups([adm, { ...pe, from: 'bob' }], { [ID]: room }, 'dave', {})[0];
+    expect(forged.left).toEqual([]);
+    expect(parseCg2(encodePolicySnapshot(ID, ['alice'], [], [])) ).toMatchObject({ left: [] });
+  });
+
   it('starts as invited and ignores notices opened with a key the invite did not list', () => {
     const forged = { ...e(carol, bob, 5, { kind: 'joined', id: ID }), usedKey: dave.publicKey };
     const v = deriveInviteGroups([forged], invites, 'bob', {})[0];
