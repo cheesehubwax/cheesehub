@@ -113,6 +113,8 @@ describe('group state', () => {
     expect(before.left).toEqual([]);
     expect(deriveInviteGroups([leave], invites, 'bob', {})[0].left).toEqual(['carol']);
     expect(deriveInviteGroups([leave, e(carol, bob, 12, { kind: 'joined', id: ID })], invites, 'bob', {})[0].left).toEqual(['carol']);
+    expect(deriveInviteGroups([leave, e(carol, bob, 12, { kind: 'msg', id: ID, text: 'self rejoin' })], invites, 'bob', {})[0].left).toEqual(['carol']);
+    expect(deriveInviteGroups([leave, e(carol, bob, 11, { kind: 'readmit', id: ID, member: 'carol' }), e(carol, bob, 12, { kind: 'joined', id: ID })], invites, 'bob', {})[0].left).toEqual(['carol']);
     expect(deriveInviteGroups([leave, e(alice, bob, 11, { kind: 'readmit', id: ID, member: 'carol' }), e(carol, bob, 12, { kind: 'joined', id: ID })], invites, 'bob', {})[0].left).toEqual([]);
     expect(deriveInviteGroups([], invites, 'bob', { [ID]: { status: 'left', at: 20 } })[0].left).toEqual(['bob']);
   });
