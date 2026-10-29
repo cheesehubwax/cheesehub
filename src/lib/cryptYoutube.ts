@@ -2,9 +2,24 @@
  * YouTube links inside decrypted CHEESECrypt text. Links are only parsed locally; nothing is fetched
  * until the reader presses play. Playback tiers: Invidious (default), Piped, then direct YouTube
  * (youtube-nocookie) only after an explicit IP-exposure warning.
+ *
+ * Titles travel inside the encrypted message: the sender may add one right after the link as
+ * ` 〔Title〕`, so readers see it without any network request. Older clients just show it as text.
  */
-export type YoutubeLink = { id: string; start: number; url: string };
+export type YoutubeLink = { id: string; start: number; url: string; title?: string };
 export type TextSegment = { type: 'text'; text: string } | { type: 'youtube'; link: YoutubeLink };
+
+export const MAX_YOUTUBE_TITLE = 100;
+const TITLE_RE = /^ 〔([^〔〕\n]{1,100})〕/;
+
+/** Display-only plain text: no brackets, line breaks or control characters, bounded length. */
+export function cleanYoutubeTitle(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  // eslint-disable-next-line no-control-regex
+  const t = raw.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069〔〕]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!t) return null;
+  return [...t].slice(0, MAX_YOUTUBE_TITLE).join('').trim();
+}
 
 const ID = /^[A-Za-z0-9_-]{11}$/;
 const HOSTS = new Set(['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtube-nocookie.com', 'www.youtube-nocookie.com', 'youtu.be']);
@@ -34,21 +49,40 @@ export function parseYoutubeUrl(raw: string): YoutubeLink | null {
   return { id, start: parseStart(u.searchParams.get('t') ?? u.searchParams.get('start')), url: raw };
 }
 
-/** Splits text into plain and YouTube segments; non-YouTube links stay as text. */
+/** Splits text into plain and YouTube segments; non-YouTube links stay as text. A title tag right after a link is consumed. */
 export function splitYoutube(text: string): TextSegment[] {
   const out: TextSegment[] = [];
   let last = 0;
   for (const m of text.matchAll(URL_RE)) {
+    const at = m.index ?? 0;
+    if (at < last) continue;
     const raw = m[0].replace(/[).,!?;:]+$/, '');
     const link = parseYoutubeUrl(raw);
     if (!link) continue;
-    const at = m.index ?? 0;
     if (at > last) out.push({ type: 'text', text: text.slice(last, at) });
+    let end = at + raw.length;
+    const tag = TITLE_RE.exec(text.slice(end));
+    const title = tag ? cleanYoutubeTitle(tag[1]) : null;
+    if (tag && title) { link.title = title; end += tag[0].length; }
     out.push({ type: 'youtube', link });
-    last = at + raw.length;
+    last = end;
   }
   if (last < text.length) out.push({ type: 'text', text: text.slice(last) });
   return out.length ? out : [{ type: 'text', text }];
+}
+
+/** YouTube links in a draft that don't carry a title yet (unique by URL). */
+export function untitledYoutubeLinks(text: string): YoutubeLink[] {
+  const seen = new Set<string>();
+  return splitYoutube(text).flatMap(s => s.type === 'youtube' && !s.link.title && !seen.has(s.link.url) && seen.add(s.link.url) ? [s.link] : []);
+}
+
+/** Inserts ` 〔title〕` after every untitled occurrence of `url`; titled links are left unchanged. */
+export function withYoutubeTitle(text: string, url: string, rawTitle: string): string {
+  const title = cleanYoutubeTitle(rawTitle);
+  if (!title) return text;
+  return splitYoutube(text).map(s => s.type === 'text' ? s.text
+    : s.link.url + (s.link.title ? ` 〔${s.link.title}〕` : s.link.url === url ? ` 〔${title}〕` : '')).join('');
 }
 
 export type YoutubeTier = 'invidious' | 'piped' | 'direct';
