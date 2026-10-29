@@ -2,7 +2,7 @@
 
 Open tasks only. Completed work lives in git history.
 
-- [ ] CHEESECrypt: add direct Rejoin from former members' chats and public listings; verify retained-key eligibility, moderation and normal fees.
+- [ ] CHEESECrypt: verify direct Rejoin on WAX with a former member's retained key and Anchor approval; both entry points, exact fees and moderation pass automated checks, but no wallet/key is available here.
 
 - [ ] CHEESECrypt: verify mandatory creation/legacy locking with the user's Anchor wallet and local folder; automated signing-retry, sealed-backup, restart-unlock and preservation tests cover the client flow.
 
