@@ -1592,7 +1592,25 @@ export function Messenger({ account, session }: { account: string; session: NonN
         contacts={contacts} lastAt={lastAt} badge={badge} removeFriend={removeFriend} setRoomsOpen={setRoomsOpen}
         backupFile={lockedFile} keyLocked={keyLocked} friendRequests={friendRequestCount} joinRequestCount={joinRequests.length}
         pendingRequests={Object.keys(roomRequests).map(requestRow).filter(Boolean)}
-        joinRequestsPanel={joinRequestPanel(joinRequests)} />
+        joinRequestsPanel={<>
+          {joinRequestPanel(joinRequests)}
+          {(() => {
+            // Unanswered invites (including owner-approved rejoins) sit with join requests so they can't be missed.
+            const pendingInvites = inviteViews.filter(v => !v.isCreator && v.status === 'invited' && inviteShown(v));
+            if (!pendingInvites.length) return null;
+            return <section aria-label="Group invites" className="space-y-2 rounded-md border border-cheese/30 bg-cheese/5 p-2">
+              <div className="px-1 text-[10px] font-bold uppercase tracking-wider text-cheese">✉️ Group invites</div>
+              {pendingInvites.map(v => <div key={v.invite.id} className="space-y-1.5 px-1">
+                <p className="text-xs break-words"><span className="font-semibold">{nameFor(v.invite.creator)}</span> invited you to <span className="font-semibold">{v.name}</span></p>
+                {requestNotes[v.invite.id] && <p className="text-xs italic text-muted-foreground break-words">“{requestNotes[v.invite.id]}”</p>}
+                <div className="flex gap-1">
+                  <Button size="sm" className="h-7 flex-1 bg-cheese text-primary-foreground hover:bg-cheese/90" onClick={() => { setActive(`group:${v.invite.id}`); setPendingNotice({ kind: 'joined', id: v.invite.id }); }}>Join</Button>
+                  <Button size="sm" variant="outline" className="h-7 flex-1" onClick={() => declineInvite(v.invite.id, false)}>Decline</Button>
+                </div>
+              </div>)}
+            </section>;
+          })()}
+        </>} />
 
       <CryptChatHeader account={account} active={active} activeGroup={activeGroup} activeInvite={activeInvite} keyAvatar={key.avatar}
         avatars={shownAvatars} contacts={contacts} blocked={blocked} friendDeclines={friendDeclines} setFriendDeclines={setFriendDeclines}
