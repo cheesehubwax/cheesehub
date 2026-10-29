@@ -52,3 +52,4 @@ Privacy is reduced explicit metadata, not hidden senders/recipients or guarantee
 - Join notes: optional encrypted ≤60-char note on join/admission/join-no; client-only, no contract change.
 - Room profile directory: owner adds one encrypted CG2 `profiles` message (≤20 parts) to the newcomer in the admission transaction; display-only, client-only, no contract change. Router must keep it in the same transaction as the admission.
 - Room profile sync: any member may send one encrypted CG2 `profiles` message with a single self entry (their own name/picture) to the group's current members, priced as a normal group message; display-only, client-only, no contract change.
+- Admission policy snapshot may carry optional `x` (members who left) so newcomers' member lists match; owner-signed, client-only, no contract change.
