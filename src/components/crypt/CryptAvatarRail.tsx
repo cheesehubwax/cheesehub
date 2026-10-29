@@ -5,7 +5,7 @@ import type { CryptAvatar } from '@/lib/cryptAvatar';
 export interface RailItem { id: string; label: string; avatarAccount: string; avatar?: CryptAvatar; emoji?: string; unread: number; replies: number }
 
 /** One labelled block of the collapsed strip, mirroring the Groups / Friends sections of the side panel. */
-export interface RailSection { id: string; label: string; emoji: string; items: RailItem[] }
+export interface RailSection { id: string; label: string; emoji: string; items: RailItem[]; /** Counter shown on the section heading, e.g. unanswered friend requests. */ badge?: number }
 
 function RailButton({ item, active, setActive }: { item: RailItem; active: string | null; setActive: (id: string) => void }) {
   return (
@@ -31,7 +31,11 @@ export function CryptAvatarRail({ sections = [], active, setActive }: { sections
         <div key={s.id} role="group" aria-label={s.label} className={cn('flex w-full shrink-0 flex-col items-center gap-2', i > 0 && 'mt-1 border-t border-border pt-2')}>
           <span className="flex flex-col items-center gap-0.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
             <span aria-hidden className="text-sm leading-none">{s.emoji}</span>
-            <span>{s.label}</span>
+            <span className="flex items-center gap-1">
+              {s.label}
+              {!!s.badge && s.badge > 0 && <span aria-label={`${s.badge} unanswered friend request${s.badge > 1 ? 's' : ''}`} title={`${s.badge} unanswered friend request${s.badge > 1 ? 's' : ''}`}
+                className="min-w-4 h-4 px-1 rounded-full text-[9px] font-bold leading-4 text-center bg-cheese text-primary-foreground">{s.badge > 99 ? '99+' : s.badge}</span>}
+            </span>
           </span>
           {s.items.map(it => <RailButton key={it.id} item={it} active={active} setActive={setActive} />)}
         </div>

@@ -30,7 +30,7 @@ import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { VaultPrompt } from '@/components/crypt/VaultPrompt';
 import { CreateGroupDialog } from '@/components/crypt/CreateGroupDialog';
 import { PaidActionDialog } from '@/components/crypt/PaidActionDialog';
-import { buildCg2Actions, JOIN_NOTE_MAX, encodeAdmission, encodeMemberAdd, MAX_PUBLIC_ROOM_MEMBERS, collectInvites, deriveInviteGroups, encodeGroupText, encodeInvite, encodeMeta, encodeNotice, inviteTextSize, invitesSignature, loadDecisions, MAX_INVITE_MEMBERS, loadFriendDecisions, loadInvites, newInviteGroupId, saveDecision, saveInvites, scopedKeys, eventFromMember, VOICE_REF_PREFIX, type Cg2Event, type InviteGroup, type InviteGroupView } from '@/lib/cryptInviteGroups';
+import { buildCg2Actions, JOIN_NOTE_MAX, encodeAdmission, encodeMemberAdd, MAX_PUBLIC_ROOM_MEMBERS, collectInvites, countFriendRequests, deriveInviteGroups, encodeGroupText, encodeInvite, encodeMeta, encodeNotice, inviteTextSize, invitesSignature, loadDecisions, MAX_INVITE_MEMBERS, loadFriendDecisions, loadInvites, newInviteGroupId, saveDecision, saveInvites, scopedKeys, eventFromMember, VOICE_REF_PREFIX, type Cg2Event, type InviteGroup, type InviteGroupView } from '@/lib/cryptInviteGroups';
 import { ShareKeyDialog } from '@/components/crypt/ShareKeyDialog';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { buildVoiceBatches, voiceNoteCost, voicePartCount, voiceTransactions, type VoiceClip } from '@/lib/cryptVoice';
@@ -930,6 +930,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
 
   /** Declined invites, and unanswered invites from accounts you've since blocked, never show. */
   const inviteShown = (v: InviteGroupView) => v.status !== 'declined' && !(v.status === 'invited' && blocked.includes(v.invite.creator));
+  /** Unanswered friend requests across every visible group, deduplicated: shown on the Friends heading. */
+  const friendRequestCount = useMemo(() => countFriendRequests(inviteViews, contacts, blocked, friendDeclines),
+    [inviteViews, contacts, blocked, friendDeclines]);
   const inviteRow = (v: InviteGroupView, hidden: boolean) => {
     const id = v.invite.id;
     const requests = v.friendRequests.filter(a => !contacts[a] && !blocked.includes(a) && !friendDeclines.includes(`${id}:${a}`)).length;
@@ -1496,7 +1499,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         showHiddenGroups={showHiddenGroups} setShowHiddenGroups={setShowHiddenGroups} friendsOpen={friendsOpen} setFriendsOpen={setFriendsOpen}
         setAddingFriend={setAddingFriend} partners={partners} active={active} setActive={setActive} avatars={avatars} nameFor={nameFor}
         contacts={contacts} lastAt={lastAt} badge={badge} removeFriend={removeFriend} setRoomsOpen={setRoomsOpen}
-        backupFile={lockedFile} keyLocked={keyLocked}
+        backupFile={lockedFile} keyLocked={keyLocked} friendRequests={friendRequestCount}
         pendingRequests={Object.keys(roomRequests).map(requestRow).filter(Boolean)}
         joinRequestsPanel={<JoinRequests requests={joinRequests} nameFor={nameFor} roomName={id => viewById(id)?.name ?? 'a room'}
           roomFull={id => (invites[id]?.members.length ?? MAX_PUBLIC_ROOM_MEMBERS) >= MAX_PUBLIC_ROOM_MEMBERS} onAccept={r => { setJoinNote(''); setAcceptingJoin(r); }}
@@ -1516,7 +1519,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
           ...inviteViews.filter(v => inviteShown(v) && !hiddenGroups.includes(v.invite.id)).map(v => ({ id: `group:${v.invite.id}`, label: v.name, avatarAccount: v.invite.id, avatar: v.avatar, emoji: v.avatar ? undefined : '👥' })),
           ...groups.filter(g => !hiddenGroups.includes(g.id)).map(g => ({ id: `group:${g.id}`, label: `Group · ${g.members.length} people`, avatarAccount: g.id, emoji: '👥' })),
         ] },
-        { id: 'friends', label: 'Friends', emoji: '🤝', items: partners.map(p => ({ id: p, label: nameFor(p), avatarAccount: p, avatar: avatars[p] })) },
+        { id: 'friends', label: 'Friends', emoji: '🤝', badge: friendRequestCount, items: partners.map(p => ({ id: p, label: nameFor(p), avatarAccount: p, avatar: avatars[p] })) },
       ].map(s => ({ ...s, items: s.items.map(it => ({ ...it, unread: unread[it.id] ?? 0, replies: replyUnread[it.id] ?? 0 })) }))} />}
       <section className="flex flex-1 flex-col min-h-0 min-w-0">
         {!active ? (

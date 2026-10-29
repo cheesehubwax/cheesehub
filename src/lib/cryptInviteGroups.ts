@@ -389,6 +389,19 @@ export function scopedKeys(invites: Record<string, InviteGroup>, me: string): Sc
   return Object.values(invites).flatMap(g => g.members.filter(m => m.account !== me).map(m => ({ groupId: g.id, account: m.account, publicKey: m.publicKey })));
 }
 
+/** Unanswered friend requests across every visible group, deduplicated by account: the 🤝 Friends heading badge. */
+export function countFriendRequests(views: InviteGroupView[], contacts: Record<string, string>, blocked: string[], friendDeclines: string[]): number {
+  const seen = new Set<string>();
+  for (const v of views) {
+    if (v.status === 'declined' || (v.status === 'invited' && blocked.includes(v.invite.creator))) continue;
+    for (const a of v.friendRequests) {
+      if (seen.has(a) || contacts[a] || blocked.includes(a) || friendDeclines.includes(`${v.invite.id}:${a}`)) continue;
+      seen.add(a);
+    }
+  }
+  return seen.size;
+}
+
 /** Size of a group text once wrapped (JSON escaping can grow it). */
 export function inviteTextSize(id: string, text: string) {
   return { parts: partCount(encodeGroupText(id, text)), maxBytes: MAX_MESSAGE_BYTES - plaintextBytes(encodeGroupText(id, '')), bytes: plaintextBytes(text) };
