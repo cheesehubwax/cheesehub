@@ -36,7 +36,7 @@ export function CryptYoutubeEmbed({ link }: { link: YoutubeLink }) {
   const src = selection === 'direct' ? embedUrl(link, 'direct') : privateVideoUrl(link, mirror, true);
 
   const frame = (
-    <iframe key={src} src={src} title={`Video ${link.id}`} className="aspect-video w-full rounded"
+    <iframe key={src} src={src} title={link.title ?? `Video ${link.id}`} className="aspect-video w-full rounded"
       allow="autoplay; encrypted-media; picture-in-picture" referrerPolicy="no-referrer"
       sandbox="allow-scripts allow-same-origin allow-presentation" />
   );
@@ -88,7 +88,7 @@ export function CryptYoutubeEmbed({ link }: { link: YoutubeLink }) {
       )}
       <Dialog open={expanded && selection !== null} onOpenChange={setExpanded}>
         <DialogContent className="max-w-3xl p-4 max-h-[90dvh] overflow-y-auto">
-          <DialogTitle className="text-primary">▶️ YouTube video</DialogTitle>
+          <DialogTitle className="text-primary">▶️ {link.title ?? 'YouTube video'}</DialogTitle>
           <DialogDescription>{selection === 'direct' ? '⚠️ Google direct' : `🛡️ ${new URL(mirror.host).hostname}`}</DialogDescription>
           {expanded && frame}
         </DialogContent>
