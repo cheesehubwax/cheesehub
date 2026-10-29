@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getAudioPlayer } from '@/lib/audioPlayer';
+import { getAudioPlayer } from '@/lib/musicPlayer';
 import { announcePlaying } from '@/lib/cryptAudio';
 import { embedUrl, type YoutubeLink, type YoutubeTier } from '@/lib/cryptYoutube';
 
