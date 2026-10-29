@@ -14,10 +14,10 @@ describe('Friends heading friend-request counter', () => {
     expect(countFriendRequests(views, {}, [], [])).toBe(3);
   });
 
-  it('ignores friends, blocked accounts and declined requests', () => {
+  it('ignores friends, blocked accounts and declined requests, keeping the rest', () => {
     const views = [view('g1', 'joined', ['bob', 'carol', 'dan']), view('g2', 'joined', ['erin'])];
-    // bob is already a friend, dan declined in g1, carol is blocked, erin's group is declined.
-    expect(countFriendRequests(views, { bob: 'KEY' }, ['carol'], ['g1:dan'])).toBe(0);
+    // bob is already a friend, dan declined in g1, carol is blocked; erin stays unanswered.
+    expect(countFriendRequests(views, { bob: 'KEY' }, ['carol'], ['g1:dan'])).toBe(1);
   });
 
   it('ignores requests arriving through a group I declined or whose creator I blocked', () => {
