@@ -29,6 +29,39 @@ beforeEach(async () => {
 });
 
 describe('public rooms', () => {
+  it('owner readmission refreshes a retained roster, room name, profiles and departure information before joining', async () => {
+    const now = Date.now();
+    const room = { ...invite, publicRoom: true, members: [alice, bob, carol].map(k => ({ account: k.account, publicKey: k.publicKey })) };
+    saveInvites('alice', { [ID]: room });
+    const leave = (k: typeof bob, at: number) => ({ txId: `leave-${k.account}`, time: at, from: k.account, to: 'alice', quantity: '0.0001 CHEESE', memo: encryptMemo(encodeNotice('leave', ID), alice.publicKey, k.secretKey) });
+    const meta = { txId: 'meta', time: now - 4000, from: 'alice', to: 'bob', quantity: '0.0001 CHEESE', memo: encryptMemo('\u0002CG2:meta:' + JSON.stringify({ i: ID, n: 'Updated cheese club' }), bob.publicKey, alice.secretKey) };
+    const request = { txId: 'request', time: now - 1000, from: 'bob', to: 'alice', quantity: '0.0001 CHEESE', memo: encryptMemo(encodeNotice('join', ID), alice.publicKey, bob.secretKey) };
+    const ownerHistory = [leave(bob, now - 3000), leave(carol, now - 2000), meta, request];
+    calls.fetch.mockResolvedValue(ownerHistory);
+    const owner = mount();
+    const panel = await screen.findByRole('region', { name: 'Room join requests' });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Accept' }));
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Pay & invite' }));
+    await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
+    const actions = calls.transact.mock.calls[0][0] as { data: { from: string; to: string; quantity: string; memo: string } }[];
+    expect(loadInvites('alice')[ID].members).toHaveLength(3);
+    expect(actions.filter(a => a.data.to === 'bob' || a.data.to === 'carol').every(a => a.data.quantity === '0.0001 CHEESE')).toBe(true);
+    owner.unmount();
+    await saveKey(bob); saveInvites('bob', { [ID]: invite }); saveDecision('bob', ID, 'left', now - 3000);
+    saveRoomRequest('bob', { id: ID, creator: 'alice', publicKey: alice.publicKey, name: 'Cheese club' }, now - 1000);
+    calls.fetch.mockResolvedValue(actions.filter(a => a.data.to === 'bob').map(a => ({ ...a.data, txId: 'readmission', time: now })));
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="bob" session={{ actor: 'bob', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'bob', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
+    await waitFor(() => expect(loadInvites('bob')[ID]?.members).toHaveLength(3));
+    fireEvent.click(await screen.findByRole('button', { name: /Invited by alice/ }));
+    expect(screen.queryByPlaceholderText('Message group')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Join$/ }));
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Pay & join' }));
+    await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(2));
+    expect(await screen.findByPlaceholderText('Message group')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Updated cheese club/ })).toBeInTheDocument();
+  });
   it.each(['chat', 'listing'])('requests owner approval from its %s and stays left until acceptance', async entry => {
     localStorage.clear(); await saveKey(bob); saveInvites('bob', { [ID]: invite }); saveDecision('bob', ID, 'left');
     calls.fetch.mockResolvedValue([]);
