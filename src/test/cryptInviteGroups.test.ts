@@ -6,6 +6,7 @@ import {
   buildCg2Actions, collectInvites, deriveInviteGroups, encodeGroupText, encodeInvite, encodeMeta, encodeNotice, inviteAcceptable, parseCg2,
   scopedKeys, validateInvite, type Cg2Event, type InviteGroup,
 } from '@/lib/cryptInviteGroups';
+import { encodePolicySnapshot } from '@/lib/cryptInviteGroups';
 
 const alice = generateKey('alice'), bob = generateKey('bob'), carol = generateKey('carol'), dave = generateKey('dave');
 const ID = '00112233445566ff';
