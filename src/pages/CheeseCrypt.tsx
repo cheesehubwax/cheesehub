@@ -1152,6 +1152,14 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if (!v) return null;
     if (n.kind === 'joined' && moderation[n.id]?.bans[account] !== undefined) return null;
     const others = v.invite.members.map(m => m.account).filter(a => a !== account && moderation[n.id]?.bans[a] === undefined);
+    if (n.kind === 'profile') {
+      // My own name/picture to members currently in the group (not banned or blocked); muted/removed senders can't share.
+      if (!key || v.status !== 'joined' || restrictedAt(moderation[n.id], account, Date.now())) return null;
+      const payload = encodeSelfRoomProfile(n.id, { account, displayName: key.displayName, avatar: key.avatar });
+      if (!payload) return null;
+      const to = v.joined.filter(a => others.includes(a) && !blocked.includes(a));
+      return { v, to, payload, cost: to.length ? cg2Cost(payload, to.length) : '0.0000 CHEESE' };
+    }
     const to = n.kind === 'joined' ? others : n.kind === 'leave' ? v.joined.filter(a => a !== account) : n.to ? [n.to] : [];
     const payload = encodeNotice(n.kind, n.id);
     return { v, to, payload, cost: to.length ? cg2Cost(payload, to.length) : '0.0000 CHEESE' };
@@ -1163,7 +1171,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const { v, to, payload } = plan;
     const n = pendingNotice;
     if (n.kind === 'leave' && !to.length) { setDecisions(saveDecision(account, n.id, 'left')); setPendingNotice(null); return true; }
-    const titles = { joined: `Joined ${v.name}`, leave: `Left ${v.name}`, friend: 'Friend request sent', 'friend-ok': 'Friend request accepted' } as const;
+    if (n.kind === 'profile' && !to.length) { setPendingNotice(null); return true; }
+    const titles = { joined: `Joined ${v.name}`, leave: `Left ${v.name}`, friend: 'Friend request sent', 'friend-ok': 'Friend request accepted', profile: `Name and picture shared with ${v.name}` } as const;
     if (!(await sendCg2(to, keysOf(v.invite), payload, titles[n.kind]))) return false;
     if (n.kind === 'joined' || n.kind === 'leave') setDecisions(saveDecision(account, n.id, n.kind === 'joined' ? 'joined' : 'left'));
     if (n.kind === 'friend-ok' && n.to) {
@@ -1409,6 +1418,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
           leave: { title: `🚪 Leave ${plan.v.name}`, description: plan.to.length ? `Tells the ${plan.to.length} member${plan.to.length > 1 ? 's' : ''} still in the group that you left, so they stop sending you copies. Your history stays readable.` : 'Nobody else is in the group, so nothing is sent.', label: plan.to.length ? 'Pay & leave' : 'Leave' },
           friend: { title: `🤝 Friend request to ${who}`, description: `Sent encrypted to ${who} only. If they accept, you become friends and can message each other directly.`, label: 'Pay & send request' },
           'friend-ok': { title: `🤝 Accept ${who}`, description: `Adds ${who} as a friend using the key ${plan.v.name} introduced, and lets them know in an encrypted message.`, label: 'Pay & accept' },
+          profile: { title: `📣 Share my name & picture with ${plan.v.name}`, description: plan.to.length ? `Sends your current name${key.displayName ? ` (${key.displayName})` : ''} and picture, encrypted, to the ${plan.to.length} member${plan.to.length > 1 ? 's' : ''} in this group, including people who aren't your friends. It never shows as a chat message, and doesn't make anyone a friend. Your WAX account stays your identity; people's own nicknames for you still win.` : 'Nobody else is in the group yet, so nothing is sent.', label: plan.to.length ? 'Pay & share' : 'Close' },
         }[pendingNotice.kind];
         return <PaidActionDialog title={copy.title} description={copy.description} cost={plan.cost} confirmLabel={copy.label} busy={busy}
           onConfirm={confirmNotice} onClose={() => setPendingNotice(null)} />;
