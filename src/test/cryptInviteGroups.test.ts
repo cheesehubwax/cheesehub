@@ -103,6 +103,16 @@ describe('group state', () => {
     expect(v.status).toBe('joined');
     expect(v.joined).toEqual(['alice', 'bob']);
     expect(v.pending).toEqual(['carol']);
+    expect(v.left).toEqual(['carol']);
+  });
+
+  it('removes a leaver from the member list, and restores them if they join again', () => {
+    const leave = e(carol, bob, 9, { kind: 'leave', id: ID });
+    const before = deriveInviteGroups([e(carol, bob, 5, { kind: 'joined', id: ID })], invites, 'bob', {})[0];
+    expect(before.left).toEqual([]);
+    expect(deriveInviteGroups([leave], invites, 'bob', {})[0].left).toEqual(['carol']);
+    expect(deriveInviteGroups([leave, e(carol, bob, 12, { kind: 'joined', id: ID })], invites, 'bob', {})[0].left).toEqual([]);
+    expect(deriveInviteGroups([], invites, 'bob', { [ID]: { status: 'left', at: 20 } })[0].left).toEqual(['bob']);
   });
 
   it('counts members already in a public room as joined for a newcomer admitted by the owner, until they leave', () => {
