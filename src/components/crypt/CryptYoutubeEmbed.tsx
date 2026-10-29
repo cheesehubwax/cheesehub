@@ -36,7 +36,7 @@ export function CryptYoutubeEmbed({ link }: { link: YoutubeLink }) {
   const frame = (
     <iframe key={src} src={src} title={`Video ${link.id}`} className="aspect-video w-full rounded"
       allow="autoplay; encrypted-media; picture-in-picture" referrerPolicy="no-referrer"
-      sandbox="allow-scripts allow-same-origin" />
+      sandbox="allow-scripts allow-same-origin allow-presentation" />
   );
 
   return (
