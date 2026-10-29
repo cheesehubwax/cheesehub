@@ -7,6 +7,7 @@ import { decryptMemo, encryptMemo, generateKey, partCount, saveContact } from '@
 import { encodeNotice, encodeAdmission, encodeMemberAdd, loadDecisions, loadInvites, saveDecision, saveInvites, type InviteGroup } from '@/lib/cryptInviteGroups';
 import { encodeListing, saveRoomRequest } from '@/lib/cryptRooms';
 import { Messenger } from '@/pages/CheeseCrypt';
+import { loadRoomProfiles } from '@/lib/cryptRoomProfiles';
 
 const calls = vi.hoisted(() => ({ fetch: vi.fn(), lookup: vi.fn(), transact: vi.fn(), rooms: vi.fn() }));
 vi.mock('@/context/WaxContext', () => ({ useWax: vi.fn() }));
@@ -29,7 +30,43 @@ beforeEach(async () => {
 });
 
 describe('public rooms', () => {
-  it.each(['chat', 'listing'])('rejoins a retained room from its %s without another owner request fee', async entry => {
+  it('owner readmission refreshes a retained roster, room name, profiles and departure information before joining', async () => {
+    const now = Date.now();
+    await saveKey({ ...alice, displayName: 'cheeseplum' });
+    const room = { ...invite, publicRoom: true, members: [alice, bob, carol].map(k => ({ account: k.account, publicKey: k.publicKey })) };
+    saveInvites('alice', { [ID]: room });
+    const leave = (k: typeof bob, at: number) => ({ txId: `leave-${k.account}`, time: at, from: k.account, to: 'alice', quantity: '0.0001 CHEESE', memo: encryptMemo(encodeNotice('leave', ID), alice.publicKey, k.secretKey) });
+    const meta = { txId: 'meta', time: now - 4000, from: 'alice', to: 'bob', quantity: '0.0001 CHEESE', memo: encryptMemo('\u0002CG2:meta:' + JSON.stringify({ i: ID, n: 'Updated cheese club' }), bob.publicKey, alice.secretKey) };
+    const request = { txId: 'request', time: now - 1000, from: 'bob', to: 'alice', quantity: '0.0001 CHEESE', memo: encryptMemo(encodeNotice('join', ID), alice.publicKey, bob.secretKey) };
+    const ownerHistory = [leave(bob, now - 3000), leave(carol, now - 2000), meta, request];
+    calls.fetch.mockResolvedValue(ownerHistory);
+    const owner = mount();
+    const panel = await screen.findByRole('region', { name: 'Room join requests' });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Accept' }));
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Pay & invite' }));
+    await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
+    const actions = calls.transact.mock.calls[0][0] as { data: { from: string; to: string; quantity: string; memo: string } }[];
+    expect(loadInvites('alice')[ID].members).toHaveLength(3);
+    expect(actions.filter(a => a.data.to === 'bob' || a.data.to === 'carol').every(a => a.data.quantity === '0.0001 CHEESE')).toBe(true);
+    owner.unmount();
+    await saveKey(bob); saveInvites('bob', { [ID]: invite }); saveDecision('bob', ID, 'left', now - 3000);
+    saveRoomRequest('bob', { id: ID, creator: 'alice', publicKey: alice.publicKey, name: 'Cheese club' }, now - 1000);
+    calls.fetch.mockResolvedValue(actions.filter(a => a.data.to === 'bob').map(a => ({ ...a.data, txId: 'readmission', time: now })));
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="bob" session={{ actor: 'bob', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'bob', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
+    await waitFor(() => expect(loadInvites('bob')[ID]?.members).toHaveLength(3));
+    await waitFor(() => expect(loadRoomProfiles('bob').alice?.displayName).toBe('cheeseplum'));
+    fireEvent.click(await screen.findByRole('button', { name: /Invited by cheeseplum/ }));
+    expect(screen.queryByPlaceholderText('Message group')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^Join$/ }));
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Pay & join' }));
+    await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(2));
+    expect(await screen.findByPlaceholderText('Message group')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Updated cheese club/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Members \(2\)/ })).toBeInTheDocument();
+  });
+  it.each(['chat', 'listing'])('requests owner approval from its %s and stays left until acceptance', async entry => {
     localStorage.clear(); await saveKey(bob); saveInvites('bob', { [ID]: invite }); saveDecision('bob', ID, 'left');
     calls.fetch.mockResolvedValue([]);
     render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="bob" session={{ actor: 'bob', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'bob', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
@@ -37,15 +74,16 @@ describe('public rooms', () => {
       fireEvent.click(await screen.findByRole('button', { name: 'Public rooms' }));
       await screen.findByRole('list', { name: 'Listed rooms' });
     } else fireEvent.click(await screen.findByRole('button', { name: /Cheese club/ }));
-    fireEvent.click(await screen.findByRole('button', { name: '👥 Rejoin group' }));
-    const pay = await screen.findByRole('button', { name: 'Pay & rejoin' });
+    fireEvent.click(await screen.findByRole('button', { name: entry === 'chat' ? 'Ask owner to rejoin' : /Ask to rejoin/ }));
+    const pay = await screen.findByRole('button', { name: 'Pay & ask' });
     expect(pay).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(pay);
-    await waitFor(() => expect(loadDecisions('bob')[ID]?.status).toBe('joined'));
+    await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
+    expect(loadDecisions('bob')[ID]?.status).toBe('left');
     const actions = calls.transact.mock.calls[0][0] as { data: { to: string; quantity: string; memo: string } }[];
-    expect(actions.map(a => [a.data.to, a.data.quantity])).toEqual([['alice', '0.0001 CHEESE'], ['eosio.null', '0.0080 CHEESE'], ['xcheeseliqst', '0.0020 CHEESE']]);
-    expect(decryptMemo(actions[0].data.memo, bob.publicKey, alice.secretKey)).toBe(encodeNotice('joined', ID));
-    expect(await screen.findByPlaceholderText('Message group')).toBeInTheDocument();
+    expect(actions.map(a => [a.data.to, a.data.quantity])).toEqual([['alice', '0.0001 CHEESE'], ['alice', '0.1000 CHEESE'], ['eosio.null', '0.0080 CHEESE'], ['xcheeseliqst', '0.0020 CHEESE']]);
+    expect(actions[0].data.memo).not.toBe(encodeNotice('joined', ID));
+    expect(screen.queryByPlaceholderText('Message group')).not.toBeInTheDocument();
   });
 
   it('shows the listed room in search and a stranger\'s join request; accepting pays one updated invite to every member', async () => {

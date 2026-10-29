@@ -59,7 +59,8 @@ import { CryptSidebar } from '@/components/crypt/CryptSidebar';
 import { CryptAvatarRail } from '@/components/crypt/CryptAvatarRail';
 import { isAccountStorageKey, recoveryCandidates, recoverFriends, recoverRoomRequests, recoveredRoomEvents } from '@/lib/cryptRestore';
 import { CryptChatHeader } from '@/components/crypt/CryptChatHeader';
-import { canRejoin } from '@/lib/cryptRejoin';
+import { canRequestRejoin } from '@/lib/cryptRejoin';
+import { encodeReadmit } from '@/lib/cryptInviteGroups';
 import { CryptComposer } from '@/components/crypt/CryptComposer';
 import { DiscoverRoomsDialog, JoinRequests, RoomSettingsDialog } from '@/components/crypt/PublicRooms';
 import { fetchRoomMemos } from '@/lib/cheeseCrypt';
@@ -450,7 +451,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     saveRoomProfiles(account, next); setRoomProfiles(next);
   }, [allGroupEvents, invites, account, roomProfiles, moderation]);
   useEffect(() => {
-    const controlTxs = new Set(allGroupEvents.filter(e => (e.control.kind === 'invite' || e.control.kind === 'admission') || e.control.kind === 'add' || e.control.kind === 'room' || e.control.kind === 'mute' || e.control.kind === 'ban' || e.control.kind === 'policy' || e.control.kind === 'admin' || e.control.kind === 'collapse' || e.control.kind === 'report').filter(e => {
+    const controlTxs = new Set(allGroupEvents.filter(e => (e.control.kind === 'invite' || e.control.kind === 'admission') || e.control.kind === 'add' || e.control.kind === 'readmit' || e.control.kind === 'leave' || e.control.kind === 'joined' || e.control.kind === 'room' || e.control.kind === 'mute' || e.control.kind === 'ban' || e.control.kind === 'policy' || e.control.kind === 'admin' || e.control.kind === 'collapse' || e.control.kind === 'report').filter(e => {
       if ((e.control.kind === 'invite' || e.control.kind === 'admission')) return invites[e.control.invite.id]?.creator === e.from;
       return !!eventFromMember(e, invites, account);
     }).map(e => e.txId));
@@ -458,16 +459,16 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if (next.length === savedControls.length) return;
     saveModerationMemos(account, next); setSavedControls(next);
   }, [allGroupEvents, invites, account, memos, savedControls]);
-  const inviteViews = useMemo(() => deriveInviteGroups(cg2Events.filter(e => e.control.kind !== 'msg' || !restrictedAt(moderation[e.control.id], e.from, e.time)), invites, account, decisions).map(v => {
+  const inviteViews = useMemo(() => deriveInviteGroups(allGroupEvents.filter(e => e.control.kind !== 'msg' || !restrictedAt(moderation[e.control.id], e.from, e.time)), invites, account, decisions).map(v => {
     const banned = moderation[v.invite.id]?.bans ?? {};
     // Display-only fallback: a public room's picture from the owner's own listing when no group picture reached me.
     const listed = v.avatar ? undefined : listings.find(l => l.id === v.invite.id && l.creator === v.invite.creator)?.avatar;
     const avatar = v.avatar ?? (listed ? parseAvatar({ version: 1, pixels: listed }) : undefined);
     return { ...v, avatar, joined: v.joined.filter(a => banned[a] === undefined) };
-  }), [cg2Events, invites, account, decisions, moderation, listings]);
+  }), [allGroupEvents, invites, account, decisions, moderation, listings]);
   // My own join requests: pending until the creator's invite arrives (accepted) or a decline notice does.
   const requestOutcomes = useMemo(() => roomRequestOutcomes(roomRequests, roomInviteEvents, account,
-    new Set(inviteViews.filter(v => !v.isCreator).map(v => v.invite.id))), [roomRequests, roomInviteEvents, account, inviteViews]);
+     new Set(inviteViews.filter(v => !v.isCreator && v.status !== 'left').map(v => v.invite.id))), [roomRequests, roomInviteEvents, account, inviteViews]);
   const requestNotes = useMemo(() => roomRequestNotes(roomRequests, roomInviteEvents, account, requestOutcomes), [roomRequests, roomInviteEvents, account, requestOutcomes]);
   useEffect(() => {
     const storeKey = `cheesecrypt-room-outcomes-${account}`;
@@ -580,8 +581,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
     Object.fromEntries(requestCandidates.flatMap(from => requestKeys[from] ? [[from, requestKeys[from]]] : []))) : [],
     [key, listedIds, visibleMemos, requestCandidates, requestKeys]);
   const joinRequests = useMemo(() => collectJoinRequests([...cg2Events, ...strangerJoinEvents], account, listedIds,
-    Object.fromEntries(Object.values(invites).map(g => [g.id, g.members.map(m => m.account)])), blocked, joinDeclines),
-    [cg2Events, strangerJoinEvents, account, listedIds, invites, blocked, joinDeclines]);
+    Object.fromEntries(inviteViews.map(v => [v.invite.id, v.invite.members.map(m => m.account).filter(a => !v.left.includes(a))])), blocked, joinDeclines),
+    [cg2Events, strangerJoinEvents, account, listedIds, inviteViews, blocked, joinDeclines]);
   // A member who accepted my friend request becomes a friend with the key their group introduced.
   useEffect(() => {
     let changed = false;
@@ -1155,7 +1156,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const noticePlan = (n: NonNullable<typeof pendingNotice>) => {
     const v = viewById(n.id);
     if (!v) return null;
-    if (n.kind === 'joined' && (restrictedAt(moderation[n.id], account, Date.now()) || !v.invite.members.some(m => m.account === account) || (v.status !== 'invited' && !canRejoin(v, account, moderation[n.id], Date.now())))) return null;
+    if (n.kind === 'joined' && (restrictedAt(moderation[n.id], account, Date.now()) || !v.invite.members.some(m => m.account === account) || v.status !== 'invited')) return null;
     const others = v.invite.members.map(m => m.account).filter(a => a !== account && moderation[n.id]?.bans[a] === undefined);
     if (n.kind === 'profile') {
       // My own name/picture to members currently in the group (not banned or blocked); muted/removed senders can't share.
@@ -1228,7 +1229,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if (v && restrictedAt(moderation[l.id], account, clock)) return 'restricted' as const;
     if (v && v.status === 'invited') return 'invited' as const;
     if (v?.status === 'joined') return 'member' as const;
-    if (canRejoin(v, account, moderation[l.id], clock)) return 'left' as const;
+    if (v?.status === 'left' && roomRequests[l.id] && requestOutcomes[l.id] === 'pending') return 'requested' as const;
+    if (canRequestRejoin(v, account, moderation[l.id], clock)) return 'left' as const;
     return roomRequests[l.id] ? 'requested' as const : null;
   };
   const askToJoin = async (l: RoomListing) => {
@@ -1321,30 +1323,32 @@ export function Messenger({ account, session }: { account: string; session: NonN
   /** The creator adds the requester by sending the grown invite to every member (old members keep their keys). */
   const joinPlan = (r: JoinRequest, note = joinNote) => {
     const v = viewById(r.groupId);
-    if (!v || !v.isCreator || !listedIds.has(r.groupId) || v.invite.members.length >= MAX_PUBLIC_ROOM_MEMBERS || v.invite.members.some(m => m.account === r.from) || moderation[r.groupId]?.bans[r.from] !== undefined) return null;
+    const retained = v?.invite.members.find(m => m.account === r.from);
+    if (!v || !v.isCreator || !listedIds.has(r.groupId) || (retained ? !v.left.includes(r.from) || retained.publicKey !== r.publicKey : v.invite.members.length >= MAX_PUBLIC_ROOM_MEMBERS) || restrictedAt(moderation[r.groupId], r.from, Date.now())) return null;
     if (v.invite.members.length > MAX_INVITE_MEMBERS && !moderation[r.groupId]?.listed) return null;
-    const updated: InviteGroup = { ...v.invite, publicRoom: true, members: [...v.invite.members, { account: r.from, publicKey: r.publicKey }] };
+    const updated: InviteGroup = { ...v.invite, name: v.name, avatar: v.avatar, publicRoom: true, members: retained ? v.invite.members : [...v.invite.members, { account: r.from, publicKey: r.publicKey }] };
     let payload: string;
     try { payload = encodeAdmission(updated, note); } catch { return null; }
-    const to = v.invite.members.map(m => m.account).filter(a => a !== account && moderation[v.invite.id]?.bans[a] === undefined);
-    const delta = encodeMemberAdd(v.invite, { account: r.from, publicKey: r.publicKey });
+    const to = v.invite.members.map(m => m.account).filter(a => a !== account && a !== r.from && moderation[v.invite.id]?.bans[a] === undefined);
+    const delta = retained ? encodeReadmit(updated.id, r.from) : encodeMemberAdd(v.invite, { account: r.from, publicKey: r.publicKey });
     const state = moderation[updated.id];
     const policy = encodeRoomPolicy(updated.id, true, state?.protected ?? v.invite.members.map(m => m.account));
     const snapshot = encodePolicySnapshot(updated.id, state?.protected ?? v.invite.members.map(m => m.account), Object.keys(state?.bans ?? {}), Object.entries(state?.mutes ?? {}).flatMap(([a, intervals]) => {
       const longest = intervals.filter(m => m.until > Date.now()).sort((a, b) => b.until - a.until)[0];
       return longest ? [[a, longest.from, longest.until] as [string, number, number]] : [];
-    }), state?.admins ?? [], v.left.filter(a => a !== v.invite.creator && a !== account));
+    }), state?.admins ?? [], v.left.filter(a => a !== v.invite.creator && a !== account && a !== r.from));
     // Members' current names/pictures for the newcomer (owner first, then admins and founders), within one message's size.
     let profiles: string | null = null;
     try { profiles = encodeRoomProfiles(updated.id, roomProfileEntries(v.invite, { account, displayName: key?.displayName, avatar: key?.avatar }, names, avatars, roomProfiles, [...(state?.admins ?? []), ...(state?.protected ?? [])])); } catch { profiles = null; }
-    return { v, updated, payload, delta, policy, snapshot, profiles, to, cost: `${(parseFloat(cg2Cost(payload, 1)) + parseFloat(cg2Cost(delta, to.length)) + parseFloat(cg2Cost(policy, to.length + 1)) + parseFloat(cg2Cost(snapshot, 1)) + (profiles ? parseFloat(cg2Cost(profiles, 1)) : 0)).toFixed(4)} CHEESE` };
+    const deltaTo = retained ? [...to, r.from] : to;
+    return { v, updated, payload, delta, deltaTo, policy, snapshot, profiles, to, cost: `${(parseFloat(cg2Cost(payload, 1)) + (deltaTo.length ? parseFloat(cg2Cost(delta, deltaTo.length)) : 0) + parseFloat(cg2Cost(policy, to.length + 1)) + parseFloat(cg2Cost(snapshot, 1)) + (profiles ? parseFloat(cg2Cost(profiles, 1)) : 0)).toFixed(4)} CHEESE` };
   };
   const confirmJoin = async () => {
     if (!acceptingJoin || busy) return false;
     const plan = joinPlan(acceptingJoin);
     if (!plan) { toast({ title: 'This room is full or the request is out of date', variant: 'destructive' }); setAcceptingJoin(null); return false; }
     if (!key) return false;
-    const actions = [...buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.payload, [permission]), ...buildCg2Actions(key, plan.to, keysOf(plan.updated), plan.delta, [permission]), ...buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.snapshot, [permission]), ...(plan.profiles ? buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.profiles, [permission]) : []), ...buildCg2Actions(key, [...plan.to, acceptingJoin.from], keysOf(plan.updated), plan.policy, [permission])];
+    const actions = [...buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.payload, [permission]), ...(plan.deltaTo.length ? buildCg2Actions(key, plan.deltaTo, keysOf(plan.updated), plan.delta, [permission]) : []), ...buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.snapshot, [permission]), ...(plan.profiles ? buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.profiles, [permission]) : []), ...buildCg2Actions(key, [...plan.to, acceptingJoin.from], keysOf(plan.updated), plan.policy, [permission])];
     setBusy(true);
     let r;
     try { r = await executeTransaction(actions, { successTitle: `${acceptingJoin.from} invited to ${plan.v.name}` }); }
@@ -1447,7 +1451,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         if (!plan) return null;
         const who = pendingNotice.to ? nameFor(pendingNotice.to) : '';
         const copy = {
-          joined: { title: `👥 ${plan.v.status === 'left' ? 'Rejoin' : 'Join'} ${plan.v.name}`, description: plan.to.length ? `Tells the ${plan.to.length} other member${plan.to.length > 1 ? 's' : ''} you joined, in encrypted messages. You'll then get new group messages.` : 'Nobody else can receive a notice, so nothing is sent.', label: plan.to.length ? (plan.v.status === 'left' ? 'Pay & rejoin' : 'Pay & join') : 'Rejoin' },
+          joined: { title: `👥 Join ${plan.v.name}`, description: plan.to.length ? `Tells the ${plan.to.length} other member${plan.to.length > 1 ? 's' : ''} you joined, in encrypted messages. You'll then get new group messages.` : 'Nobody else can receive a notice, so nothing is sent.', label: plan.to.length ? 'Pay & join' : 'Join' },
           leave: { title: `🚪 Leave ${plan.v.name}`, description: plan.to.length ? `Tells the ${plan.to.length} member${plan.to.length > 1 ? 's' : ''} still in the group that you left, so they stop sending you copies. Your history stays readable.` : 'Nobody else is in the group, so nothing is sent.', label: plan.to.length ? 'Pay & leave' : 'Leave' },
           friend: { title: `🤝 Friend request to ${who}`, description: `Sent encrypted to ${who} only. If they accept, you become friends and can message each other directly.`, label: 'Pay & send request' },
           'friend-ok': { title: `🤝 Accept ${who}`, description: `Adds ${who} as a friend using the key ${plan.v.name} introduced, and lets them know in an encrypted message.`, label: 'Pay & accept' },
@@ -1536,7 +1540,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         </DialogContent>
       </Dialog>}
       <DiscoverRoomsDialog open={roomsOpen} onOpenChange={o => { setRoomsOpen(o); if (o) void refetchRooms(); }} listings={listings} loading={roomsLoading}
-        refresh={() => void refetchRooms()} account={account} nameFor={nameFor} roomStatus={roomStatus} joinCost={roomJoinCost} onRejoin={l => { if (roomStatus(l) !== 'left') return; setRoomsOpen(false); requestNotice({ kind: 'joined', id: l.id }); }} onAsk={l => { setRoomsOpen(false); setJoinNote(''); setAskingRoom(l); }} />
+        refresh={() => void refetchRooms()} account={account} nameFor={nameFor} roomStatus={roomStatus} joinCost={roomJoinCost} onAsk={l => { setRoomsOpen(false); setJoinNote(''); setAskingRoom(l); }} />
       {askingRoom && <PaidActionDialog title={`🌐 Ask to join ${askingRoom.name}`} cost={roomJoinCost} confirmLabel="Pay & ask" busy={busy}
         description={`Sends ${askingRoom.creatorName || nameFor(askingRoom.creator)} an encrypted request naming only this room, plus a 0.1000 CHEESE join fee paid to them (kept whether they accept or decline). If they accept, an invite appears in your Groups and you choose Join or Decline.`}
         onConfirm={() => askToJoin(askingRoom)} onClose={() => setAskingRoom(null)}>
@@ -1570,7 +1574,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         backupFile={lockedFile} keyLocked={keyLocked} friendRequests={friendRequestCount}
         pendingRequests={Object.keys(roomRequests).map(requestRow).filter(Boolean)}
         joinRequestsPanel={<JoinRequests requests={joinRequests} nameFor={nameFor} roomName={id => viewById(id)?.name ?? 'a room'}
-          roomFull={id => (invites[id]?.members.length ?? MAX_PUBLIC_ROOM_MEMBERS) >= MAX_PUBLIC_ROOM_MEMBERS} onAccept={r => { setJoinNote(''); setAcceptingJoin(r); }}
+          roomFull={(id, requester) => (invites[id]?.members.length ?? MAX_PUBLIC_ROOM_MEMBERS) >= MAX_PUBLIC_ROOM_MEMBERS && !viewById(id)?.left.includes(requester)} onAccept={r => { setJoinNote(''); setAcceptingJoin(r); }}
           onDecline={r => { setJoinNote(''); setDecliningJoin(r); }}
           onBlock={r => { setJoinDeclines(declineJoin(account, r.groupId, r.from, r.time)); blockAccount(r.from); }} />} />
 
@@ -1669,7 +1673,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
             ) : activeInvite?.status === 'left' ? (
               <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground p-4 border-t border-border">
                 <p>You left this group. Your history stays readable here.</p>
-                {canRejoin(activeInvite, account, activeModeration, clock) && <Button size="sm" variant="outline" disabled={busy} onClick={() => requestNotice({ kind: 'joined', id: activeInvite.invite.id })}>👥 Rejoin group</Button>}
+                {canRequestRejoin(activeInvite, account, activeModeration, clock) && <Button size="sm" variant="outline" disabled={busy || requestOutcomes[activeInvite.invite.id] === 'pending'} onClick={() => {
+                  const l = listings.find(l => l.id === activeInvite.invite.id && l.creator === activeInvite.invite.creator && l.publicKey === keysOf(activeInvite.invite)[l.creator]);
+                  if (l) { setJoinNote(''); setAskingRoom(l); } else { setRoomsOpen(true); void refetchRooms(); }
+                }}>{requestOutcomes[activeInvite.invite.id] === 'pending' ? 'Request pending' : 'Ask owner to rejoin'}</Button>}
               </div>
             ) : activeInvite && !recipients.length ? (
               <p className="text-sm text-muted-foreground p-4 border-t border-border">Nobody else has joined yet. You can send messages once someone joins.</p>

@@ -250,7 +250,9 @@ export function collectJoinRequests(events: Cg2Event[], me: string, listed: Set<
     const id = e.control.id;
     if (!members[id] || members[id].includes(e.from) || blocked.includes(e.from)) continue;
     const k = `${id}:${e.from}`;
-    if (e.time <= (declines[k] ?? 0) || (latest.get(k)?.time ?? 0) > e.time) continue;
+    const handledAt = Math.max(0, ...events.filter(x => x.from === me && x.to === e.from && x.usedKey === e.usedKey && ((x.control.kind === 'admission' && x.control.invite.id === id) || (x.control.kind === 'readmit' && x.control.id === id && x.control.member === e.from))).map(x => x.time));
+    const leftAt = Math.max(0, ...events.filter(x => x.from === e.from && x.to === me && x.usedKey === e.usedKey && x.control.kind === 'leave' && x.control.id === id).map(x => x.time));
+    if (e.time <= Math.max(declines[k] ?? 0, handledAt, leftAt) || (latest.get(k)?.time ?? 0) > e.time) continue;
     latest.set(k, { groupId: id, from: e.from, publicKey: e.usedKey, time: e.time, ...(e.control.note ? { note: e.control.note } : {}) });
   }
   return [...latest.values()].sort((a, b) => b.time - a.time);

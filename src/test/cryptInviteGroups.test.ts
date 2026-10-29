@@ -107,23 +107,27 @@ describe('group state', () => {
     expect(v.left).toEqual(['carol']);
   });
 
-  it('removes a leaver from the member list, and restores them if they join again', () => {
+  it('removes a leaver from the member list, and requires owner approval before restoring a leaver', () => {
     const leave = e(carol, bob, 9, { kind: 'leave', id: ID });
     const before = deriveInviteGroups([e(carol, bob, 5, { kind: 'joined', id: ID })], invites, 'bob', {})[0];
     expect(before.left).toEqual([]);
     expect(deriveInviteGroups([leave], invites, 'bob', {})[0].left).toEqual(['carol']);
-    expect(deriveInviteGroups([leave, e(carol, bob, 12, { kind: 'joined', id: ID })], invites, 'bob', {})[0].left).toEqual([]);
+    expect(deriveInviteGroups([leave, e(carol, bob, 12, { kind: 'joined', id: ID })], invites, 'bob', {})[0].left).toEqual(['carol']);
+    expect(deriveInviteGroups([leave, e(carol, bob, 12, { kind: 'msg', id: ID, text: 'self rejoin' })], invites, 'bob', {})[0].left).toEqual(['carol']);
+    expect(deriveInviteGroups([leave, e(carol, bob, 11, { kind: 'readmit', id: ID, member: 'carol' }), e(carol, bob, 12, { kind: 'joined', id: ID })], invites, 'bob', {})[0].left).toEqual(['carol']);
+    expect(deriveInviteGroups([leave, e(alice, bob, 11, { kind: 'readmit', id: ID, member: 'carol' }), e(carol, bob, 12, { kind: 'joined', id: ID })], invites, 'bob', {})[0].left).toEqual([]);
     expect(deriveInviteGroups([], invites, 'bob', { [ID]: { status: 'left', at: 20 } })[0].left).toEqual(['bob']);
   });
 
   it('counts members already in a public room as joined for a newcomer admitted by the owner, until they leave', () => {
     const room = { ...invite, publicRoom: true, members: [...invite.members, { account: 'dave', publicKey: dave.publicKey }] };
     const adm = e(alice, dave, 5, { kind: 'admission', invite: room });
-    const v = deriveInviteGroups([adm], { [ID]: room }, 'dave', { [ID]: { status: 'joined', at: 6 } })[0];
+    const policy = e(alice, dave, 5, { kind: 'policy', id: ID, protected: ['alice', 'bob', 'carol'], bans: [], mutes: [], admins: [], left: [] });
+    const v = deriveInviteGroups([adm, policy], { [ID]: room }, 'dave', { [ID]: { status: 'joined', at: 6 } })[0];
     expect(v.joined).toEqual(['alice', 'bob', 'carol', 'dave']);
     const forged = deriveInviteGroups([{ ...adm, from: 'bob' }], { [ID]: room }, 'dave', {})[0];
     expect(forged.joined).toEqual(['alice']);
-    const left = deriveInviteGroups([adm, { ...e(carol, dave, 9, { kind: 'leave', id: ID }), usedKey: carol.publicKey }], { [ID]: room }, 'dave', {})[0];
+    const left = deriveInviteGroups([adm, policy, { ...e(carol, dave, 9, { kind: 'leave', id: ID }), usedKey: carol.publicKey }], { [ID]: room }, 'dave', {})[0];
     expect(left.joined).toEqual(['alice', 'bob']);
   });
 
@@ -137,7 +141,7 @@ describe('group state', () => {
     const v = deriveInviteGroups([adm, pe], { [ID]: room }, 'dave', { [ID]: { status: 'joined', at: 6 } })[0];
     expect(v.left).toEqual(['carol']);
     expect(v.joined).toEqual(['alice', 'bob', 'dave']);
-    const back = deriveInviteGroups([adm, pe, { ...e(carol, dave, 9, { kind: 'joined', id: ID }), usedKey: carol.publicKey }], { [ID]: room }, 'dave', {})[0];
+    const back = deriveInviteGroups([adm, pe, e(alice, dave, 8, { kind: 'readmit', id: ID, member: 'carol' }), { ...e(carol, dave, 9, { kind: 'joined', id: ID }), usedKey: carol.publicKey }], { [ID]: room }, 'dave', {})[0];
     expect(back.left).toEqual([]);
     const forged = deriveInviteGroups([adm, { ...pe, from: 'bob' }], { [ID]: room }, 'dave', {})[0];
     expect(forged.left).toEqual([]);
