@@ -125,3 +125,31 @@ export function nextTier(t: YoutubeTier): YoutubeTier | null {
   const i = YOUTUBE_TIERS.indexOf(t);
   return YOUTUBE_TIERS[i + 1] ?? null;
 }
+
+/** Proxied still picture from the default private mirror; only requested when the reader asks. */
+export function privateThumbnailUrl(link: YoutubeLink): string {
+  return new URL(`/vi/${encodeURIComponent(link.id)}/mqdefault.jpg`, INVIDIOUS_HOST).toString();
+}
+
+/**
+ * Sender-side title lookup, only on an explicit tap. Tries the private Invidious mirrors, then
+ * noembed.com (a third-party oEmbed proxy). Neither path contacts Google from the sender's browser;
+ * whichever service answers sees the sender's IP. Returns null when nothing answers.
+ */
+export async function fetchYoutubeTitle(id: string, fetcher: typeof fetch = fetch): Promise<string | null> {
+  if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return null;
+  const tryJson = async (url: string) => {
+    try {
+      const r = await fetcher(url, { referrerPolicy: 'no-referrer', credentials: 'omit', signal: AbortSignal.timeout(8000) });
+      if (!r.ok) return null;
+      const j = await r.json() as { title?: unknown };
+      return cleanYoutubeTitle(j?.title);
+    } catch { return null; }
+  };
+  for (const m of PRIVATE_YOUTUBE_MIRRORS) {
+    if (m.tier !== 'invidious') continue;
+    const t = await tryJson(`${m.host}/api/v1/videos/${id}?fields=title`);
+    if (t) return t;
+  }
+  return tryJson(`https://noembed.com/embed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}`);
+}
