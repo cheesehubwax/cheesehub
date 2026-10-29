@@ -132,17 +132,18 @@ export function RoomSettingsDialog({ groupId, groupName, groupAvatar, members, p
 }
 
 /** Join requests to my listed rooms, shown at the top of the sidebar. Declining and blocking are free. */
-export function JoinRequests({ requests, roomName, roomFull, nameFor, onAccept, onDecline, onBlock }: {
+export function JoinRequests({ requests, roomName, roomFull, nameFor, onAccept, onDecline, onBlock, isRejoin = () => false, label = 'Room join requests' }: {
   requests: JoinRequest[]; roomName: (id: string) => string; roomFull: (id: string, requester: string) => boolean; nameFor: (a: string) => string;
   onAccept: (r: JoinRequest) => void; onDecline: (r: JoinRequest) => void; onBlock: (r: JoinRequest) => void;
+  isRejoin?: (r: JoinRequest) => boolean; label?: string;
 }) {
   if (!requests.length) return null;
-  return <section aria-label="Room join requests" className="space-y-2 rounded-md border border-cheese/30 bg-cheese/5 p-2">
+  return <section aria-label={label} className="space-y-2 rounded-md border border-cheese/30 bg-cheese/5 p-2">
     <div className="flex items-center gap-1 px-1 text-[10px] font-bold uppercase tracking-wider text-cheese"><Globe className="h-3.5 w-3.5" /> Join requests</div>
     {requests.map(r => {
       const full = roomFull(r.groupId, r.from);
       return <div key={`${r.groupId}:${r.from}`} className="space-y-1.5 px-1">
-        <p className="text-xs break-words"><span className="font-semibold">{nameFor(r.from)}</span>{nameFor(r.from) !== r.from && <span className="font-mono text-muted-foreground"> ({r.from})</span>} wants to join <span className="font-semibold">{roomName(r.groupId)}</span></p>
+        <p className="text-xs break-words"><span className="font-semibold">{nameFor(r.from)}</span>{nameFor(r.from) !== r.from && <span className="font-mono text-muted-foreground"> ({r.from})</span>} wants to {isRejoin(r) ? 'rejoin' : 'join'} <span className="font-semibold">{roomName(r.groupId)}</span></p>
         {r.note && <p className="text-xs italic text-muted-foreground break-words">“{r.note}”</p>}
         <div className="flex gap-1">
           <Button size="sm" className="h-7 flex-1 bg-cheese text-primary-foreground hover:bg-cheese/90" disabled={full} title={full ? 'This room is full' : 'Sends the updated invite to everyone in the room'} onClick={() => onAccept(r)}>{full ? 'Full' : 'Accept'}</Button>

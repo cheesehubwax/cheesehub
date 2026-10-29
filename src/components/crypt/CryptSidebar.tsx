@@ -19,7 +19,7 @@ export function CryptSidebar({
   makeKey, publicInbox, setInboxOpen, toggleList, listHidden, hiddenUnread, hiddenReplies, messageRequests, acceptRequest, dismissRequest,
   blockAccount, groupsOpen, setGroupsOpen, setCreatingGroup, inviteViews, inviteShown, hiddenGroups, inviteRow, groups, groupRow,
   showHiddenGroups, setShowHiddenGroups, friendsOpen, setFriendsOpen, setAddingFriend, partners, active, setActive, avatars, nameFor,
-  contacts, lastAt, badge, removeFriend, setRoomsOpen, joinRequestsPanel, pendingRequests = [], backupFile, keyLocked, friendRequests = 0,
+  contacts, lastAt, badge, removeFriend, setRoomsOpen, joinRequestsPanel, pendingRequests = [], backupFile, keyLocked, friendRequests = 0, joinRequestCount = 0,
 }: {
   account: string; cryptKey: MessagingKey; loading: boolean; refresh: () => void; setEditingAvatar: (v: boolean) => void;
   menuOpen: boolean; setMenuOpen: (v: boolean) => void; fileRef: { current: HTMLInputElement | null };
@@ -31,6 +31,7 @@ export function CryptSidebar({
   backupFile?: unknown; keyLocked?: boolean; canLock?: boolean; lockKey?: () => void;
   /** Unanswered incoming friend requests, shown on the Friends heading. */
   friendRequests?: number;
+  joinRequestCount?: number;
   acceptRequest: (from: string) => void; dismissRequest: (from: string) => void; blockAccount: (name: string) => void;
   groupsOpen: boolean; setGroupsOpen: (v: boolean) => void; setCreatingGroup: (v: boolean) => void;
   inviteViews: InviteGroupView[]; inviteShown: (v: InviteGroupView) => boolean; hiddenGroups: string[];
@@ -98,6 +99,8 @@ export function CryptSidebar({
           <div className="flex items-center justify-between px-2">
             <CollapsibleTrigger className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-cheese">
               <ChevronDown className={cn('h-3.5 w-3.5 transition', !groupsOpen && '-rotate-90')} /> 👥 Groups
+              {joinRequestCount > 0 && <span aria-label={`${joinRequestCount} pending room requests`}
+                className="min-w-4 h-4 px-1 rounded-full text-[9px] font-bold leading-4 text-center bg-cheese text-primary-foreground">{joinRequestCount > 99 ? '99+' : joinRequestCount}</span>}
             </CollapsibleTrigger>
             <span className="flex items-center">
               <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Public rooms" title="Find public rooms" onClick={() => setRoomsOpen(true)}><Globe className="h-4 w-4" /></Button>

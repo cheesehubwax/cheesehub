@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { encodeReply, parseReply, quoteOf, type ReplyRef } from '@/lib/cryptReply';
 import { useCryptReplyNavigation } from '@/hooks/useCryptReplyNavigation';
+import { useCryptJoinAlerts } from '@/hooks/useCryptJoinAlerts';
 import { AvatarEditor, WalletAvatarPicker } from '@/components/crypt/AvatarEditor';
 import { CryptNftCard } from '@/components/crypt/CryptNftCard';
 import { useQuery } from '@tanstack/react-query';
@@ -583,6 +584,17 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const joinRequests = useMemo(() => collectJoinRequests([...cg2Events, ...strangerJoinEvents], account, listedIds,
     Object.fromEntries(inviteViews.map(v => [v.invite.id, v.invite.members.map(m => m.account).filter(a => !v.left.includes(a))])), blocked, joinDeclines),
     [cg2Events, strangerJoinEvents, account, listedIds, inviteViews, blocked, joinDeclines]);
+  const isRejoinRequest = (r: JoinRequest) => !!inviteViews.find(v => v.invite.id === r.groupId)?.left.includes(r.from);
+  const reviewJoin = (r: JoinRequest) => { setActive(`group:${r.groupId}`); setGroupsOpen(true); setListHidden(false); };
+  useCryptJoinAlerts(account, joinRequests, !!key && loaded,
+    r => `🌐 ${isRejoinRequest(r) ? 'Rejoin' : 'Join'} request: ${nameFor(r.from)} · ${inviteViews.find(v => v.invite.id === r.groupId)?.name ?? 'your room'}`, reviewJoin);
+  const openJoin = (r: JoinRequest) => { setJoinNote(''); setAcceptingJoin(r); };
+  const openDecline = (r: JoinRequest) => { setJoinNote(''); setDecliningJoin(r); };
+  const blockJoin = (r: JoinRequest) => { setJoinDeclines(declineJoin(account, r.groupId, r.from, r.time)); blockAccount(r.from); };
+  const joinRequestPanel = (requests: JoinRequest[], label?: string) => <JoinRequests requests={requests} label={label}
+    nameFor={nameFor} roomName={id => inviteViews.find(v => v.invite.id === id)?.name ?? 'a room'} isRejoin={isRejoinRequest}
+    roomFull={(id, requester) => (invites[id]?.members.length ?? MAX_PUBLIC_ROOM_MEMBERS) >= MAX_PUBLIC_ROOM_MEMBERS && !inviteViews.find(v => v.invite.id === id)?.left.includes(requester)}
+    onAccept={openJoin} onDecline={openDecline} onBlock={blockJoin} />;
   // A member who accepted my friend request becomes a friend with the key their group introduced.
   useEffect(() => {
     let changed = false;
@@ -668,6 +680,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
     };
   };
   const leaveNotices = useMemo(() => activeInvite ? ownerLeaveNotices(cg2Events, invites, activeInvite.invite.id, account) : [], [activeInvite, cg2Events, invites, account]);
+  const chatJoinRequests = activeInvite?.isCreator ? joinRequests.filter(r => r.groupId === activeInvite.invite.id) : [];
+  const requestPills = (before: number, after = -Infinity) => chatJoinRequests.filter(r => r.time <= before && r.time > after)
+    .map(r => <li key={`join:${r.groupId}:${r.from}:${r.time}`}>{joinRequestPanel([r], `Chat request from ${r.from}`)}</li>);
   const inviteKeys = useMemo(() => activeInvite ? Object.fromEntries(activeInvite.invite.members.map(m => [m.account, m.publicKey])) : {}, [activeInvite]);
   const currentRecipients = activeInvite ? activeInvite.joined.filter(m => m !== account) : activeGroup ? activeGroup.members.filter(m => m !== account) : active ? [active] : [];
   // Edits go to the original recipients, not newly joined members who never received the original.
@@ -1322,6 +1337,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   };
   /** The creator adds the requester by sending the grown invite to every member (old members keep their keys). */
   const joinPlan = (r: JoinRequest, note = joinNote) => {
+    if (!joinRequests.some(p => p.groupId === r.groupId && p.from === r.from && p.time === r.time && p.publicKey === r.publicKey)) return null;
     const v = viewById(r.groupId);
     const retained = v?.invite.members.find(m => m.account === r.from);
     if (!v || !v.isCreator || !listedIds.has(r.groupId) || (retained ? !v.left.includes(r.from) || retained.publicKey !== r.publicKey : v.invite.members.length >= MAX_PUBLIC_ROOM_MEMBERS) || restrictedAt(moderation[r.groupId], r.from, Date.now())) return null;
@@ -1355,6 +1371,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
     catch (e) { toast({ title: 'Invite failed', description: (e as Error).message, variant: 'destructive' }); return false; }
     finally { setBusy(false); }
     if (!r.success || !r.txId) return false;
+    // Consume this request immediately, even if the history node has not indexed the admission yet.
+    setJoinDeclines(declineJoin(account, acceptingJoin.groupId, acceptingJoin.from, acceptingJoin.time));
     await refresh();
     const next = { ...inviteStore, [plan.updated.id]: plan.updated };
     saveInvites(account, next); setInviteStore(next);
@@ -1366,11 +1384,12 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const confirmDecline = async () => {
     const r = decliningJoin;
     if (!r || !key || busy) return false;
+    if (!joinRequests.some(p => p.groupId === r.groupId && p.from === r.from && p.time === r.time && p.publicKey === r.publicKey)) { setDecliningJoin(null); return false; }
     setBusy(true);
     try {
       // Encrypted to the key carried in the request, so a requester who never published can still read it.
       const res = await executeTransaction(buildCg2Actions(key, [r.from], { [r.from]: r.publicKey }, declinePayload(r), [permission]), { successTitle: `Declined ${r.from}` });
-      if (!res.success) return false;
+      if (!res.success || !res.txId) return false;
     } catch (e) { toast({ title: 'Could not decline', description: (e as Error).message, variant: 'destructive' }); return false; }
     finally { setBusy(false); }
     setJoinDeclines(declineJoin(account, r.groupId, r.from, r.time));
@@ -1571,12 +1590,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
         showHiddenGroups={showHiddenGroups} setShowHiddenGroups={setShowHiddenGroups} friendsOpen={friendsOpen} setFriendsOpen={setFriendsOpen}
         setAddingFriend={setAddingFriend} partners={partners} active={active} setActive={setActive} avatars={shownAvatars} nameFor={nameFor}
         contacts={contacts} lastAt={lastAt} badge={badge} removeFriend={removeFriend} setRoomsOpen={setRoomsOpen}
-        backupFile={lockedFile} keyLocked={keyLocked} friendRequests={friendRequestCount}
+        backupFile={lockedFile} keyLocked={keyLocked} friendRequests={friendRequestCount} joinRequestCount={joinRequests.length}
         pendingRequests={Object.keys(roomRequests).map(requestRow).filter(Boolean)}
-        joinRequestsPanel={<JoinRequests requests={joinRequests} nameFor={nameFor} roomName={id => viewById(id)?.name ?? 'a room'}
-          roomFull={(id, requester) => (invites[id]?.members.length ?? MAX_PUBLIC_ROOM_MEMBERS) >= MAX_PUBLIC_ROOM_MEMBERS && !viewById(id)?.left.includes(requester)} onAccept={r => { setJoinNote(''); setAcceptingJoin(r); }}
-          onDecline={r => { setJoinNote(''); setDecliningJoin(r); }}
-          onBlock={r => { setJoinDeclines(declineJoin(account, r.groupId, r.from, r.time)); blockAccount(r.from); }} />} />
+        joinRequestsPanel={joinRequestPanel(joinRequests)} />
 
       <CryptChatHeader account={account} active={active} activeGroup={activeGroup} activeInvite={activeInvite} keyAvatar={key.avatar}
         avatars={shownAvatars} contacts={contacts} blocked={blocked} friendDeclines={friendDeclines} setFriendDeclines={setFriendDeclines}
@@ -1587,7 +1603,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
 
       <div className={cn('flex flex-1 min-h-0 md:row-start-2', listHidden ? 'md:col-start-1 md:col-span-2' : 'md:col-start-2')}>
       {listHidden && <CryptAvatarRail active={active} setActive={setActive} sections={[
-        { id: 'groups', label: 'Groups', emoji: '👥', items: [
+        { id: 'groups', label: 'Groups', emoji: '👥', badge: joinRequests.length, badgeLabel: `${joinRequests.length} pending room requests`, onReview: () => { const r = joinRequests[0]; if (r) reviewJoin(r); }, items: [
           ...inviteViews.filter(v => inviteShown(v) && !hiddenGroups.includes(v.invite.id)).map(v => ({ id: `group:${v.invite.id}`, label: v.name, avatarAccount: v.invite.id, avatar: v.avatar, emoji: v.avatar ? undefined : '👥' })),
           ...groups.filter(g => !hiddenGroups.includes(g.id)).map(g => ({ id: `group:${g.id}`, label: `Group · ${g.members.length} people`, avatarAccount: g.id, emoji: '👥' })),
         ] },
@@ -1624,6 +1640,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
               {thread.map((m, i) => (
                 <Fragment key={m.key}>
                   {leaveNotices.filter(n => n.time <= m.time && (i === 0 || n.time > thread[i - 1].time)).map(n => <LeavePill key={n.key} name={nameFor(n.from)} account={n.from} />)}
+                  {requestPills(m.time, i === 0 ? -Infinity : thread[i - 1].time)}
                   {i === firstNew && firstNew >= 0 && (
                     <li ref={newMarkerRef} aria-hidden className="flex items-center gap-2 py-1">
                       <span className="h-px flex-1 bg-border" />
@@ -1643,6 +1660,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 </Fragment>
               ))}
               {leaveNotices.filter(n => !thread.length || n.time > thread[thread.length - 1].time).map(n => <LeavePill key={n.key} name={nameFor(n.from)} account={n.from} />)}
+              {requestPills(Infinity, thread.length ? thread[thread.length - 1].time : -Infinity)}
               {!thread.length && <li className="text-sm text-muted-foreground">{activeGroup || activeInvite ? 'No group messages yet.' : `No messages with ${nameFor(active)} yet.`}</li>}
               <li ref={endRef} aria-hidden />
             </ol>
