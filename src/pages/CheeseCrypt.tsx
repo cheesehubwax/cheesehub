@@ -977,6 +977,16 @@ export function Messenger({ account, session }: { account: string; session: NonN
     toast({ title: `${name} unblocked` });
   };
 
+  /** Right-click friend shortcut on another member's room message. */
+  const friendAction = (m: ConversationEntry) => {
+    if (m.from === account || (!activeInvite && !activeGroup) || blocked.includes(m.from)) return undefined;
+    if (contacts[m.from]) return { isFriend: true, onRemove: () => { if (window.confirm(`Remove ${nameFor(m.from)} from your friends? Chat history and rooms are kept.`)) removeFriend(m.from); } };
+    if (!activeInvite || activeInvite.status !== 'joined' || !activeInvite.invite.members.some(x => x.account === m.from)) return undefined;
+    const id = activeInvite.invite.id;
+    if (activeInvite.friendRequests.includes(m.from) && !friendDeclines.includes(`${id}:${m.from}`)) return { isFriend: false, onAdd: () => setPendingNotice({ kind: 'friend-ok', id, to: m.from }) };
+    if (activeInvite.requested.includes(m.from)) return { isFriend: false, pendingLabel: 'Friend request sent' };
+    return { isFriend: false, onAdd: () => setPendingNotice({ kind: 'friend', id, to: m.from }) };
+  };
   const removeFriend = (name: string) => {
     removeContact(account, name);
     setContacts(loadContacts(account)); setRemovedContacts(loadRemovedContacts(account));
@@ -1553,7 +1563,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                     canReveal={myRoomRole !== 'member'} revealed={revealed.has(m.key)} onReveal={() => setRevealed(s => new Set(s).add(m.key))}
                     onCollapse={collapseTarget(m) && activeInvite ? () => setPendingModeration({ id: activeInvite.invite.id, member: m.from, action: 'collapse', target: collapseTarget(m)! }) : undefined}
                     badges={activeInvite ? { owner: m.from === activeInvite.invite.creator, admin: m.from !== activeInvite.invite.creator && !!moderation[activeInvite.invite.id]?.admins.includes(m.from), founder: founderBadges(moderation[activeInvite.invite.id], activeInvite.invite, listedIds.has(activeInvite.invite.id)).includes(m.from) } : undefined}
-                    {...authorModeration(m)} onOpenQuote={setOpenQuote} openedAt={acceptedRequestMessages.current.has(m.key) ? { current: Infinity } : openedAt} />
+                    friend={friendAction(m)} {...authorModeration(m)} onOpenQuote={setOpenQuote} openedAt={acceptedRequestMessages.current.has(m.key) ? { current: Infinity } : openedAt} />
                 </Fragment>
               ))}
               {!thread.length && <li className="text-sm text-muted-foreground">{activeGroup || activeInvite ? 'No group messages yet.' : `No messages with ${nameFor(active)} yet.`}</li>}
