@@ -4,9 +4,9 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { getAudioPlayer } from '@/lib/musicPlayer';
 import { announcePlaying, CRYPT_NOW_PLAYING } from '@/lib/cryptAudio';
-import { embedUrl, nextPrivateMirror, PRIVATE_YOUTUBE_MIRRORS, privateVideoUrl, type YoutubeLink } from '@/lib/cryptYoutube';
+import { embedUrl, nextPrivateMirror, PRIVATE_YOUTUBE_MIRRORS, privateThumbnailUrl, privateVideoUrl, type YoutubeLink } from '@/lib/cryptYoutube';
 
-/** No remote image, probe or iframe before play; failures never silently connect to Google. */
+/** No remote image, probe or iframe before the reader taps play or "Preview picture"; failures never silently connect to Google. */
 export function CryptYoutubeEmbed({ link }: { link: YoutubeLink }) {
   const [selection, setSelection] = useState<number | 'direct' | null>(null);
   const [warn, setWarn] = useState(false);
