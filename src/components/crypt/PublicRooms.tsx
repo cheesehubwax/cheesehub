@@ -13,9 +13,10 @@ import {
 } from '@/lib/cryptRooms';
 
 /** Search listed rooms; asking to join is confirmed (and paid) by the Messenger. Presentational only. */
-export function DiscoverRoomsDialog({ open, onOpenChange, listings, loading, refresh, account, nameFor, roomStatus, joinCost, onAsk }: {
+export function DiscoverRoomsDialog({ open, onOpenChange, listings, loading, refresh, account, nameFor, roomStatus, joinCost, onAsk, onRejoin }: {
   open: boolean; onOpenChange: (open: boolean) => void; listings: RoomListing[]; loading: boolean; refresh: () => void; account: string;
-  roomStatus: (l: RoomListing) => 'own' | 'member' | 'invited' | 'requested' | null; joinCost: string; onAsk: (l: RoomListing) => void;
+  roomStatus: (l: RoomListing) => 'own' | 'member' | 'invited' | 'requested' | 'left' | 'restricted' | null; joinCost: string; onAsk: (l: RoomListing) => void;
+  onRejoin: (l: RoomListing) => void;
   nameFor?: (account: string) => string;
 }) {
   const [q, setQ] = useState('');
@@ -54,6 +55,8 @@ export function DiscoverRoomsDialog({ open, onOpenChange, listings, loading, ref
               <span className="text-[11px] text-muted-foreground">Listed {new Date(l.time).toLocaleDateString()}</span>
               {status === 'own' ? <span className="text-xs text-muted-foreground">Your room</span>
                 : status === 'member' ? <span className="text-xs text-muted-foreground">Joined</span>
+                : status === 'restricted' ? <span className="text-xs text-muted-foreground">Muted or removed</span>
+                : status === 'left' ? <Button size="sm" variant="outline" onClick={() => onRejoin(l)}>👥 Rejoin group</Button>
                 : status === 'invited' ? <span className="text-xs text-cheese">Invite waiting in Groups</span>
                 : status === 'requested' ? <span className="text-xs text-muted-foreground">Requested</span>
                 : <Button size="sm" disabled={full} className="bg-cheese text-primary-foreground hover:bg-cheese/90" onClick={() => onAsk(l)}>{full ? 'Full' : `Ask to join (${joinCost})`}</Button>}
