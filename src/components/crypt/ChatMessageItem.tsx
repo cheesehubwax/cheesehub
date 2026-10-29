@@ -6,6 +6,8 @@ import { MUTE_MINUTES, type MuteMinutes } from '@/lib/cryptInviteGroups';
 const MUTE_LABELS: Record<MuteMinutes, string> = { 15: '15 minutes', 60: '1 hour', 360: '6 hours', 1440: '24 hours' };
 import { parseReply, type ReplyRef } from '@/lib/cryptReply';
 import { CryptNftCard } from '@/components/crypt/CryptNftCard';
+import { CryptYoutubeEmbed } from '@/components/crypt/CryptYoutubeEmbed';
+import { splitYoutube } from '@/lib/cryptYoutube';
 import { fetchAssetById } from '@/services/atomicApi';
 import { parseNftMessage } from '@/lib/cryptNft';
 import type { CryptAvatar } from '@/lib/cryptAvatar';
@@ -72,7 +74,7 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
         <span className="block truncate opacity-80">{reply.quote || '…'}</span>
       </button>}
       <div className="whitespace-pre-wrap break-words">
-        {m.voice ? <VoiceNoteBubble note={m.voice} /> : body != null ? parseNftMessage(body).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} autoplayKey={m.time > openedAt.current ? `${m.key}:${i}` : undefined} txId={m.txId} /> : <span key={i} className="block">{seg.text}</span>) : <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
+        {m.voice ? <VoiceNoteBubble note={m.voice} /> : body != null ? parseNftMessage(body).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} autoplayKey={m.time > openedAt.current ? `${m.key}:${i}` : undefined} txId={m.txId} /> : <span key={i} className="block">{splitYoutube(seg.text).map((y, j) => y.type === 'youtube' ? <CryptYoutubeEmbed key={j} link={y.link} /> : <span key={j}>{y.text}</span>)}</span>) : <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
       </div>
       </>}
       <p className="text-[10px] opacity-70 mt-1">
