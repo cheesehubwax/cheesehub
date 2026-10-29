@@ -61,8 +61,7 @@ describe('public rooms', () => {
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(2));
     expect(await screen.findByPlaceholderText('Message group')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Updated cheese club/ })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Members/ }));
-    expect(screen.getByRole('menu')).not.toHaveTextContent('carol');
+    expect(screen.getByRole('button', { name: /Members \(2\)/ })).toBeInTheDocument();
   });
   it.each(['chat', 'listing'])('requests owner approval from its %s and stays left until acceptance', async entry => {
     localStorage.clear(); await saveKey(bob); saveInvites('bob', { [ID]: invite }); saveDecision('bob', ID, 'left');
