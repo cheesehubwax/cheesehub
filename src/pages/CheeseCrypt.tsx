@@ -1168,7 +1168,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const requestNotice = (n: NonNullable<typeof pendingNotice>) => {
     if (n.kind === 'profile' && !noticePlan(n)) {
       const muted = restrictedAt(moderation[n.id], account, Date.now());
-      toast({ title: muted ? "You can't share right now" : 'Nothing to share yet', description: muted ? 'You are muted or removed from this group.' : 'Set a name or picture first (⚙️ edit your profile).', variant: 'destructive' });
+      toast({ title: muted ? "You can't share right now" : 'Nothing to share yet', description: muted ? 'You are muted or removed from this group.' : 'Set a name or picture first: click your avatar in the sidebar.', variant: 'destructive' });
       return;
     }
     setPendingNotice(n);

@@ -16,12 +16,13 @@ export function ProfileShareDialog({ recipients, cost, busy, onSend, onClose }: 
           <DialogDescription>
             {recipients.length
               ? 'Send your new name and avatar inside an encrypted message so friends and group members see it. It never shows up as a chat message.'
-              : 'Add friends first — there is no one to update yet.'}
+              : 'Add friends first — there is no one to update yet. For room members who aren\'t your friends, open the room and press 📣 Share my profile.'}
           </DialogDescription>
         </DialogHeader>
         {recipients.length > 0 && <>
           <p className="text-sm">{recipients.length} {recipients.length === 1 ? 'person' : 'people'}: <span className="text-muted-foreground break-words">{recipients.join(', ')}</span></p>
           <p className="text-sm">Cost: <span className="font-semibold text-cheese">{cost}</span> <span className="text-xs text-muted-foreground">(platform fee 80% nulled to eosio.null, 20% to xcheeseliqst; the rest is delivered to each person)</span></p>
+          <p className="text-xs text-muted-foreground">Room members who aren't your friends don't get this. Open each room and press <span className="font-semibold">📣 Share my profile</span>.</p>
           <TermsCheckbox id="profile-note-terms" checked={agreed} onCheckedChange={setAgreed} />
         </>}
         <div className="flex justify-end gap-2">
