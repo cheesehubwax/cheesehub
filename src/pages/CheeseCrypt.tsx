@@ -1574,7 +1574,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         backupFile={lockedFile} keyLocked={keyLocked} friendRequests={friendRequestCount}
         pendingRequests={Object.keys(roomRequests).map(requestRow).filter(Boolean)}
         joinRequestsPanel={<JoinRequests requests={joinRequests} nameFor={nameFor} roomName={id => viewById(id)?.name ?? 'a room'}
-          roomFull={id => (invites[id]?.members.length ?? MAX_PUBLIC_ROOM_MEMBERS) >= MAX_PUBLIC_ROOM_MEMBERS && !viewById(id)?.left.length} onAccept={r => { setJoinNote(''); setAcceptingJoin(r); }}
+          roomFull={(id, requester) => (invites[id]?.members.length ?? MAX_PUBLIC_ROOM_MEMBERS) >= MAX_PUBLIC_ROOM_MEMBERS && !viewById(id)?.left.includes(requester)} onAccept={r => { setJoinNote(''); setAcceptingJoin(r); }}
           onDecline={r => { setJoinNote(''); setDecliningJoin(r); }}
           onBlock={r => { setJoinDeclines(declineJoin(account, r.groupId, r.from, r.time)); blockAccount(r.from); }} />} />
 

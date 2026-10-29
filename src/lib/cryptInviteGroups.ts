@@ -252,6 +252,14 @@ export function roomPolicyValid(c: Extract<Cg2, { kind: 'room' }>, g: InviteGrou
   return c.protected.includes(g.creator) && c.protected.length === protectedMembers.length && protectedMembers.every(a => c.protected.includes(a)) && c.protected.every(a => !!memberKey(g, a));
 }
 
+/** A complete owner bootstrap, authenticated against retained member keys and its atomic policy. */
+export function authenticatedAdmission(e: Cg2Event, events: readonly Cg2Event[], g: InviteGroup, me: string) {
+  return e.control.kind === 'admission' && e.control.invite.id === g.id && e.from === g.creator && e.to === me
+    && e.usedKey === memberKey(g, g.creator) && e.control.invite.creator === g.creator && e.control.invite.created === g.created
+    && e.control.invite.members.every(m => memberKey(g, m.account) === m.publicKey)
+    && events.some(p => p.txId === e.txId && p.from === e.from && p.to === me && p.usedKey === e.usedKey && p.control.kind === 'policy' && p.control.id === g.id && policySnapshotValid(p.control, e.control.invite, e.time));
+}
+
 /**
  * Invite acceptance. The invite must come from its creator and name both sides with the keys in use.
  * Received: the creator must be my contact with the same key that opened it (or the creator of a public room
@@ -392,7 +400,8 @@ export function deriveInviteGroups(events: Cg2Event[], invites: Record<string, I
     let readmittedAt = 0;
     for (const e of sorted) {
       // The owner's admission to me lists the members already in the room; their earlier joins went to others.
-      if (e.control.kind === 'admission' && e.control.invite.id === g.id && e.from === g.creator && e.to === me && e.usedKey === memberKey(g, g.creator) && e.control.invite.members.every(m => memberKey(g, m.account) === m.publicKey)) {
+      if (e.control.kind === 'admission' && authenticatedAdmission(e, sorted, g, me)) {
+        meta = { name: e.control.invite.name, avatar: e.control.invite.avatar, at: e.time };
         // Its owner-signed policy snapshot (same transaction) names members who already left.
         const snap = sorted.find(p => p.txId === e.txId && p.from === g.creator && p.to === me && p.usedKey === e.usedKey && p.control.kind === 'policy' && p.control.id === g.id);
         const gone = snap?.control.kind === 'policy' && policySnapshotValid(snap.control, e.control.invite, e.time) ? new Set(snap.control.left) : new Set<string>();
@@ -408,7 +417,7 @@ export function deriveInviteGroups(events: Cg2Event[], invites: Record<string, I
       const c = e.control;
       if (c.kind === 'readmit' && e.from === g.creator && memberKey(g, c.member)) {
         approvals.set(c.member, e.time);
-        if (c.member === me && sorted.some(a => a.txId === e.txId && a.to === me && a.from === g.creator && a.usedKey === memberKey(g, g.creator) && a.control.kind === 'admission' && a.control.invite.id === g.id)) readmittedAt = e.time;
+        if (c.member === me && sorted.some(a => a.txId === e.txId && authenticatedAdmission(a, sorted, g, me))) readmittedAt = e.time;
       } else if (c.kind === 'joined' || c.kind === 'msg') {
         const prev = state.get(e.from);
         if (prev?.joined === false && (approvals.get(e.from) ?? 0) <= prev.at) continue;
