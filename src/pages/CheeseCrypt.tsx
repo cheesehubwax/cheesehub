@@ -30,7 +30,7 @@ import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { VaultPrompt } from '@/components/crypt/VaultPrompt';
 import { CreateGroupDialog } from '@/components/crypt/CreateGroupDialog';
 import { PaidActionDialog } from '@/components/crypt/PaidActionDialog';
-import { buildCg2Actions, JOIN_NOTE_MAX, encodeAdmission, encodeMemberAdd, MAX_PUBLIC_ROOM_MEMBERS, collectInvites, countFriendRequests, deriveInviteGroups, encodeGroupText, encodeInvite, encodeMeta, encodeNotice, inviteTextSize, invitesSignature, loadDecisions, MAX_INVITE_MEMBERS, loadFriendDecisions, loadInvites, newInviteGroupId, saveDecision, saveInvites, scopedKeys, eventFromMember, VOICE_REF_PREFIX, type Cg2Event, type InviteGroup, type InviteGroupView } from '@/lib/cryptInviteGroups';
+import { buildCg2Actions, JOIN_NOTE_MAX, encodeAdmission, encodeMemberAdd, MAX_PUBLIC_ROOM_MEMBERS, collectInvites, countFriendRequests, friendRequestResendable, deriveInviteGroups, encodeGroupText, encodeInvite, encodeMeta, encodeNotice, inviteTextSize, invitesSignature, loadDecisions, MAX_INVITE_MEMBERS, loadFriendDecisions, loadInvites, newInviteGroupId, saveDecision, saveInvites, scopedKeys, eventFromMember, VOICE_REF_PREFIX, type Cg2Event, type InviteGroup, type InviteGroupView } from '@/lib/cryptInviteGroups';
 import { ShareKeyDialog } from '@/components/crypt/ShareKeyDialog';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { buildVoiceBatches, voiceNoteCost, voicePartCount, voiceTransactions, type VoiceClip } from '@/lib/cryptVoice';
@@ -987,7 +987,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if (!activeInvite || activeInvite.status !== 'joined' || !activeInvite.invite.members.some(x => x.account === m.from)) return undefined;
     const id = activeInvite.invite.id;
     if (activeInvite.friendRequests.includes(m.from) && !friendDeclines.includes(`${id}:${m.from}`)) return { isFriend: false, onAdd: () => setPendingNotice({ kind: 'friend-ok', id, to: m.from }) };
-    if (activeInvite.requested.includes(m.from)) return { isFriend: false, pendingLabel: 'Friend request sent' };
+    if (!friendRequestResendable(activeInvite.requestedAt?.[m.from], Date.now())) return { isFriend: false, pendingLabel: 'Friend request sent' };
     return { isFriend: false, onAdd: () => setPendingNotice({ kind: 'friend', id, to: m.from }) };
   };
   const removeFriend = (name: string) => {
