@@ -59,6 +59,7 @@ import { CryptSidebar } from '@/components/crypt/CryptSidebar';
 import { CryptAvatarRail } from '@/components/crypt/CryptAvatarRail';
 import { isAccountStorageKey, recoveryCandidates, recoverFriends, recoverRoomRequests, recoveredRoomEvents } from '@/lib/cryptRestore';
 import { CryptChatHeader } from '@/components/crypt/CryptChatHeader';
+import { canRejoin } from '@/lib/cryptRejoin';
 import { CryptComposer } from '@/components/crypt/CryptComposer';
 import { DiscoverRoomsDialog, JoinRequests, RoomSettingsDialog } from '@/components/crypt/PublicRooms';
 import { fetchRoomMemos } from '@/lib/cheeseCrypt';
@@ -1154,7 +1155,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const noticePlan = (n: NonNullable<typeof pendingNotice>) => {
     const v = viewById(n.id);
     if (!v) return null;
-    if (n.kind === 'joined' && moderation[n.id]?.bans[account] !== undefined) return null;
+    if (n.kind === 'joined' && (restrictedAt(moderation[n.id], account, Date.now()) || !v.invite.members.some(m => m.account === account) || (v.status !== 'invited' && !canRejoin(v, account, moderation[n.id], Date.now())))) return null;
     const others = v.invite.members.map(m => m.account).filter(a => a !== account && moderation[n.id]?.bans[a] === undefined);
     if (n.kind === 'profile') {
       // My own name/picture to members currently in the group (not banned or blocked); muted/removed senders can't share.
@@ -1170,6 +1171,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
   };
   /** Opens a notice confirmation; explains instead when a profile share isn't possible. */
   const requestNotice = (n: NonNullable<typeof pendingNotice>) => {
+    if (n.kind === 'joined' && !noticePlan(n)) {
+      toast({ title: "You can't join right now", description: 'You may be muted, removed, or already joined.', variant: 'destructive' });
+      return;
+    }
     if (n.kind === 'profile' && !noticePlan(n)) {
       const muted = restrictedAt(moderation[n.id], account, Date.now());
       toast({ title: muted ? "You can't share right now" : 'Nothing to share yet', description: muted ? 'You are muted or removed from this group.' : 'Set a name or picture first: click your avatar in the sidebar.', variant: 'destructive' });
@@ -1184,10 +1189,12 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const { v, to, payload } = plan;
     const n = pendingNotice;
     if (n.kind === 'leave' && !to.length) { setDecisions(saveDecision(account, n.id, 'left')); setPendingNotice(null); return true; }
+    if (n.kind === 'joined' && !to.length) { setDecisions(saveDecision(account, n.id, 'joined')); setActive(`group:${n.id}`); setPendingNotice(null); return true; }
     if (n.kind === 'profile' && !to.length) { setPendingNotice(null); return true; }
     const titles = { joined: `Joined ${v.name}`, leave: `Left ${v.name}`, friend: 'Friend request sent', 'friend-ok': 'Friend request accepted', profile: `Name and picture shared with ${v.name}` } as const;
     if (!(await sendCg2(to, keysOf(v.invite), payload, titles[n.kind]))) return false;
     if (n.kind === 'joined' || n.kind === 'leave') setDecisions(saveDecision(account, n.id, n.kind === 'joined' ? 'joined' : 'left'));
+    if (n.kind === 'joined') setActive(`group:${n.id}`);
     if (n.kind === 'friend-ok' && n.to) {
       saveContact(account, n.to, keysOf(v.invite)[n.to]); setContacts(loadContacts(account)); setRemovedContacts(loadRemovedContacts(account));
     }
@@ -1216,9 +1223,12 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const roomJoinCost = JOIN_REQUEST_COST;
   const roomStatus = (l: RoomListing) => {
     if (l.creator === account) return 'own' as const;
-    const v = viewById(l.id);
+    const found = viewById(l.id);
+    const v = found?.invite.creator === l.creator && keysOf(found.invite)[l.creator] === l.publicKey ? found : undefined;
+    if (v && restrictedAt(moderation[l.id], account, clock)) return 'restricted' as const;
     if (v && v.status === 'invited') return 'invited' as const;
-    if (v && v.status !== 'declined') return 'member' as const;
+    if (v?.status === 'joined') return 'member' as const;
+    if (canRejoin(v, account, moderation[l.id], clock)) return 'left' as const;
     return roomRequests[l.id] ? 'requested' as const : null;
   };
   const askToJoin = async (l: RoomListing) => {
@@ -1437,7 +1447,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         if (!plan) return null;
         const who = pendingNotice.to ? nameFor(pendingNotice.to) : '';
         const copy = {
-          joined: { title: `👥 Join ${plan.v.name}`, description: `Tells the ${plan.to.length} other member${plan.to.length > 1 ? 's' : ''} you joined, in encrypted messages. You'll then get new group messages.`, label: 'Pay & join' },
+          joined: { title: `👥 ${plan.v.status === 'left' ? 'Rejoin' : 'Join'} ${plan.v.name}`, description: plan.to.length ? `Tells the ${plan.to.length} other member${plan.to.length > 1 ? 's' : ''} you joined, in encrypted messages. You'll then get new group messages.` : 'Nobody else can receive a notice, so nothing is sent.', label: plan.to.length ? (plan.v.status === 'left' ? 'Pay & rejoin' : 'Pay & join') : 'Rejoin' },
           leave: { title: `🚪 Leave ${plan.v.name}`, description: plan.to.length ? `Tells the ${plan.to.length} member${plan.to.length > 1 ? 's' : ''} still in the group that you left, so they stop sending you copies. Your history stays readable.` : 'Nobody else is in the group, so nothing is sent.', label: plan.to.length ? 'Pay & leave' : 'Leave' },
           friend: { title: `🤝 Friend request to ${who}`, description: `Sent encrypted to ${who} only. If they accept, you become friends and can message each other directly.`, label: 'Pay & send request' },
           'friend-ok': { title: `🤝 Accept ${who}`, description: `Adds ${who} as a friend using the key ${plan.v.name} introduced, and lets them know in an encrypted message.`, label: 'Pay & accept' },
@@ -1526,7 +1536,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         </DialogContent>
       </Dialog>}
       <DiscoverRoomsDialog open={roomsOpen} onOpenChange={o => { setRoomsOpen(o); if (o) void refetchRooms(); }} listings={listings} loading={roomsLoading}
-        refresh={() => void refetchRooms()} account={account} nameFor={nameFor} roomStatus={roomStatus} joinCost={roomJoinCost} onAsk={l => { setRoomsOpen(false); setJoinNote(''); setAskingRoom(l); }} />
+        refresh={() => void refetchRooms()} account={account} nameFor={nameFor} roomStatus={roomStatus} joinCost={roomJoinCost} onRejoin={l => { if (roomStatus(l) !== 'left') return; setRoomsOpen(false); requestNotice({ kind: 'joined', id: l.id }); }} onAsk={l => { setRoomsOpen(false); setJoinNote(''); setAskingRoom(l); }} />
       {askingRoom && <PaidActionDialog title={`🌐 Ask to join ${askingRoom.name}`} cost={roomJoinCost} confirmLabel="Pay & ask" busy={busy}
         description={`Sends ${askingRoom.creatorName || nameFor(askingRoom.creator)} an encrypted request naming only this room, plus a 0.1000 CHEESE join fee paid to them (kept whether they accept or decline). If they accept, an invite appears in your Groups and you choose Join or Decline.`}
         onConfirm={() => askToJoin(askingRoom)} onClose={() => setAskingRoom(null)}>
@@ -1657,7 +1667,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 </div>
               </div>
             ) : activeInvite?.status === 'left' ? (
-              <p className="text-sm text-muted-foreground p-4 border-t border-border">You left this group. Your history stays readable here.</p>
+              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground p-4 border-t border-border">
+                <p>You left this group. Your history stays readable here.</p>
+                {canRejoin(activeInvite, account, activeModeration, clock) && <Button size="sm" variant="outline" disabled={busy} onClick={() => requestNotice({ kind: 'joined', id: activeInvite.invite.id })}>👥 Rejoin group</Button>}
+              </div>
             ) : activeInvite && !recipients.length ? (
               <p className="text-sm text-muted-foreground p-4 border-t border-border">Nobody else has joined yet. You can send messages once someone joins.</p>
             ) : missingKeys.length ? (
