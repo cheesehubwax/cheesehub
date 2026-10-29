@@ -333,6 +333,8 @@ export interface InviteGroupView {
   friendRequests: string[];
   /** Members I sent a friend request to here. */
   requested: string[];
+  /** Newest outgoing friend request time per account (ms). */
+  requestedAt: Record<string, number>;
   /** Members who accepted my friend request here. */
   accepted: string[];
 }
@@ -344,6 +346,7 @@ export function deriveInviteGroups(events: Cg2Event[], invites: Record<string, I
     state.set(g.creator, { joined: true, at: 0 });
     let meta: { name: string; avatar?: CryptAvatar; at: number } | null = null;
     const requestsIn = new Set<string>(), requested = new Set<string>(), accepted = new Set<string>();
+    const requestedAt: Record<string, number> = {};
     for (const e of sorted) {
       // The owner's admission to me lists the members already in the room; their earlier joins went to others.
       if (e.control.kind === 'admission' && e.control.invite.id === g.id && e.from === g.creator && e.to === me) {
@@ -360,7 +363,7 @@ export function deriveInviteGroups(events: Cg2Event[], invites: Record<string, I
       } else if (c.kind === 'meta') {
         if (e.from === g.creator && (!meta || e.time >= meta.at)) meta = { name: c.name, avatar: c.avatar, at: e.time };
       } else if (c.kind === 'friend') {
-        if (e.to === me) requestsIn.add(e.from); else requested.add(e.to);
+        if (e.to === me) requestsIn.add(e.from); else { requested.add(e.to); requestedAt[e.to] = Math.max(requestedAt[e.to] ?? 0, e.time); }
       } else if (c.kind === 'friend-ok') {
         if (e.to === me && requested.has(e.from)) accepted.add(e.from);
         if (e.from === me) requestsIn.delete(e.to);
@@ -378,7 +381,7 @@ export function deriveInviteGroups(events: Cg2Event[], invites: Record<string, I
     return {
       invite: g, name: meta?.name ?? g.name, avatar: meta ? meta.avatar : g.avatar, status, isCreator, joined,
       pending: g.members.map(m => m.account).filter(a => !joined.includes(a)),
-      friendRequests: [...requestsIn].filter(a => !accepted.has(a)), requested: [...requested], accepted: [...accepted],
+      friendRequests: [...requestsIn].filter(a => !accepted.has(a)), requested: [...requested], requestedAt, accepted: [...accepted],
     };
   });
 }
