@@ -34,6 +34,7 @@ export function CryptComposer({
         <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" aria-label="Cancel reply" onClick={() => setReplyingTo(null)}>✕</Button>
       </div>}
       <Textarea ref={composerRef} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && editing) cancelEdit?.(); }} rows={3} disabled={!!voice || busy} placeholder={voice ? 'Sending a voice note — discard it to type a message' : activeGroup || activeInvite ? 'Message group' : `Message ${nameFor(active)}`} />
+      {!voice && <YoutubeTitleHelper text={text} setText={setText} disabled={busy} />}
       <div className="flex flex-wrap items-center gap-2 gap-y-1 text-xs">
         <span className={!voice && tooLong ? 'text-destructive' : 'text-muted-foreground'}>
           {voice ? `${voiceParts} parts · ${voiceTxs} transaction${voiceTxs > 1 ? 's' : ''}` : `${bytes}/${maxBytes} · ${parts || 1} part${parts > 1 ? 's' : ''}`}{(activeGroup || activeInvite) && ` × ${copies} recipients`}
