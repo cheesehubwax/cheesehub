@@ -17,7 +17,7 @@ import { messageCost } from '@/lib/cheeseCrypt';
 import type { EditedMessage } from '@/lib/cryptEdits';
 
 /** Pure sound-effect-NFT posts render without the bubble box — sender header, playback and timestamp stay. */
-export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, editable, onEdit, onCollapse, canReveal, revealed, onReveal, badges, onMute, ban, adminToggle, report, reportHighlighted }: {
+export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, editable, onEdit, onCollapse, canReveal, revealed, onReveal, badges, onMute, ban, adminToggle, report, reportHighlighted, friend }: {
   m: EditedMessage; account: string; keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>;
   contacts: Record<string, string>; active: string; activeGroup: CryptGroup | null;
   nameFor: (id: string) => string; openedAt: { current: number };
@@ -51,7 +51,7 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
   const canReply = (!!m.voice || m.text != null) && !hidden;
   return (
     <ContextMenu>
-    <ContextMenuTrigger asChild disabled={!canReply && !onCollapse && !onMute && !ban && !adminToggle && !report}>
+    <ContextMenuTrigger asChild disabled={!canReply && !onCollapse && !onMute && !ban && !adminToggle && !report && !friend}>
     <li data-reply-key={m.key} data-reply-highlighted={highlighted || undefined} data-report-highlighted={reportHighlighted || undefined} className={cn('w-fit max-w-[80%] text-sm',
       bare ? (m.from === account ? 'ml-auto py-1' : 'py-1') : m.from === account
         ? 'ml-auto rounded-lg px-3 py-2 bg-cheese/20 border border-cheese/30' : 'rounded-lg px-3 py-2 bg-muted',
@@ -89,7 +89,12 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
       {editable && onEdit && !hidden && <ContextMenuItem onSelect={() => onEdit(m)}>✏️ Edit</ContextMenuItem>}
       {onCollapse && !m.collapsed && <ContextMenuItem onSelect={onCollapse}>🙈 Collapse message</ContextMenuItem>}
       {report && <ContextMenuItem onSelect={report.onReport}>🚩 {report.toOwner ? 'Report to owner' : 'Report to admins'}</ContextMenuItem>}
-      {(onMute || ban || adminToggle) && (canReply || onCollapse || report) && <ContextMenuSeparator />}
+      {friend && (canReply || onCollapse || report) && <ContextMenuSeparator />}
+      {friend && (friend.isFriend
+        ? <ContextMenuItem onSelect={friend.onRemove}>➖ Remove friend</ContextMenuItem>
+        : friend.onAdd ? <ContextMenuItem onSelect={friend.onAdd}>➕ Add friend</ContextMenuItem>
+        : <ContextMenuItem disabled>⏳ {friend.pendingLabel ?? 'Friend request sent'}</ContextMenuItem>)}
+      {(onMute || ban || adminToggle) && (canReply || onCollapse || report || friend) && <ContextMenuSeparator />}
       {onMute && <ContextMenuSub>
         <ContextMenuSubTrigger>🔇 Mute user</ContextMenuSubTrigger>
         <ContextMenuSubContent>
