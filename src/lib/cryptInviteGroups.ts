@@ -349,6 +349,8 @@ export interface InviteGroupView {
   joined: string[];
   /** Members who have not joined (or have left). */
   pending: string[];
+  /** Members whose newest authenticated notice is a leave (or me, after leaving): hidden from the member list. */
+  left: string[];
   /** Friend requests to me from members in this group that I haven't answered. */
   friendRequests: string[];
   /** Members I sent a friend request to here. */
@@ -401,6 +403,7 @@ export function deriveInviteGroups(events: Cg2Event[], invites: Record<string, I
     return {
       invite: g, name: meta?.name ?? g.name, avatar: meta ? meta.avatar : g.avatar, status, isCreator, joined,
       pending: g.members.map(m => m.account).filter(a => !joined.includes(a)),
+      left: g.members.map(m => m.account).filter(a => a === me ? status === 'left' : state.get(a)?.joined === false),
       friendRequests: [...requestsIn].filter(a => !accepted.has(a)), requested: [...requested], requestedAt, accepted: [...accepted],
     };
   });

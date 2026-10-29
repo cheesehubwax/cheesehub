@@ -60,7 +60,7 @@ export function CryptChatHeader({
                   <span className="block text-[10px] font-normal text-muted-foreground">created by {nameFor(activeInvite.invite.creator)}</span>
                 </span>
                 <span className="ml-auto flex items-center gap-1">
-                  {membersDropdown(activeInvite.invite.members.map(({ account: member }) => member),
+                  {membersDropdown(activeInvite.invite.members.map(({ account: member }) => member).filter(member => !activeInvite.left.includes(member)),
                     member => `${member === activeInvite.invite.creator ? '👑 ' : admins.includes(member) ? '🛡️ ' : ''}${activeInvite.joined.includes(member) ? 'joined' : 'invited'}`,
                     member => {
                       if (member !== account && activeInvite.status === 'joined' && !contacts[member] && !blocked.includes(member) && !activeInvite.requested.includes(member) && !activeInvite.friendRequests.includes(member))
