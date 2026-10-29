@@ -95,6 +95,7 @@ const CheeseCrypt = () => {
 export function Messenger({ account, session }: { account: string; session: NonNullable<ReturnType<typeof useWax>['session']> }) {
   const { toast } = useToast();
   const { executeTransaction } = useWaxTransaction(session);
+  const [sendDeclined, setSendDeclined] = useState<string | null>(null);
   const permission = session.permissionLevel;
   const [candidateKey, setKey] = useState<MessagingKey | null>(() => loadKey(account));
   // Wallet-locked envelope of the current key (no secret inside); present once the key's backup is locked.
@@ -1086,9 +1087,11 @@ export function Messenger({ account, session }: { account: string; session: NonN
       const actions = activeInvite ? buildCg2Actions(key, recipients, inviteKeys, encodeGroupText(activeInvite.invite.id, outgoing), [permission], hasNft)
         : activeGroup ? buildGroupMessageActions(key, activeGroup, outgoing, contacts, [permission], hasNft)
         : buildSendMessageActions(account, active, splitMessage(outgoing).map(p => encryptMemo(p, contacts[active], key.secretKey)), [permission], hasNft);
-      const r = await executeTransaction(actions, { successTitle: editingMessage ? 'Message edited' : 'Message sent' });
+      // Success is shown by the message appearing in the chat; only a failure gets a popup.
+      const r = await executeTransaction(actions, { showSuccessToast: false, showErrorToast: false });
       if (r.success && r.txId) { setText(''); setReplyingTo(null); if (!editingMessage) nearBottom.current = true; setEditingMessage(null); [2000, 5000, 10000].forEach(ms => setTimeout(poll, ms)); }
-    } catch (e) { toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' }); }
+      else setSendDeclined(r.error?.message ?? 'The transaction could not be confirmed.');
+    } catch (e) { setSendDeclined((e as Error).message); }
     finally { setBusy(false); }
   };
 
@@ -1105,11 +1108,11 @@ export function Messenger({ account, session }: { account: string; session: NonN
       for (let i = 0; i < batches.length; i++) {
         if (activeInvite && restrictedAt(activeModeration, account, Date.now())) throw new Error('You are muted or removed from this room.');
         if (editingMessage && !canEdit(editingMessage, account)) throw new Error('The 24-hour editing window has ended.');
-        const r = await executeTransaction(batches[i], { successTitle: total > 1 ? `Voice note: transaction ${i + 1} of ${total} sent` : 'Voice note sent' });
-        if (!r.success || !r.txId) break;
+        const r = await executeTransaction(batches[i], { showSuccessToast: false, showErrorToast: false });
+        if (!r.success || !r.txId) { if (!sent) setSendDeclined(r.error?.message ?? 'The transaction could not be confirmed.'); break; }
         sent++;
       }
-    } catch (e) { toast({ title: 'Could not send voice note', description: (e as Error).message, variant: 'destructive' }); }
+    } catch (e) { setSendDeclined((e as Error).message); }
     finally {
       setBusy(false);
       if (sent && sent === total) { setVoice(null); setText(''); setReplyingTo(null); if (!editingMessage) nearBottom.current = true; setEditingMessage(null); }
@@ -1415,6 +1418,16 @@ export function Messenger({ account, session }: { account: string; session: NonN
   return (
     <div className="w-full rounded-lg border border-cheese/20 bg-card/80 overflow-hidden flex flex-col md:grid h-[80dvh] min-h-[480px] md:grid-cols-[240px_1fr] md:grid-rows-[auto_1fr]">
       {fileInput}
+      <Dialog open={!!sendDeclined} onOpenChange={o => { if (!o) setSendDeclined(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="text-center">
+            <div aria-hidden className="mx-auto mb-2 text-4xl">❌</div>
+            <DialogTitle className="text-center">Transaction declined</DialogTitle>
+            <DialogDescription className="text-center">Your message was not sent. {sendDeclined}</DialogDescription>
+          </DialogHeader>
+          <Button onClick={() => setSendDeclined(null)} className="w-full">OK</Button>
+        </DialogContent>
+      </Dialog>
       {backupKey && <VaultPrompt cryptKey={backupKey} onSaved={backupSaved} onDownload={backupDownloaded} />}
       {creatingGroup && <CreateGroupDialog contacts={contacts} avatars={avatars} nameFor={nameFor} busy={busy} onClose={() => setCreatingGroup(false)}
         onCreate={createInviteGroup}
