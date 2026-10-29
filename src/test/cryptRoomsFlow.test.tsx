@@ -7,6 +7,7 @@ import { decryptMemo, encryptMemo, generateKey, partCount, saveContact } from '@
 import { encodeNotice, encodeAdmission, encodeMemberAdd, loadDecisions, loadInvites, saveDecision, saveInvites, type InviteGroup } from '@/lib/cryptInviteGroups';
 import { encodeListing, saveRoomRequest } from '@/lib/cryptRooms';
 import { Messenger } from '@/pages/CheeseCrypt';
+import { loadRoomProfiles } from '@/lib/cryptRoomProfiles';
 
 const calls = vi.hoisted(() => ({ fetch: vi.fn(), lookup: vi.fn(), transact: vi.fn(), rooms: vi.fn() }));
 vi.mock('@/context/WaxContext', () => ({ useWax: vi.fn() }));
@@ -31,6 +32,7 @@ beforeEach(async () => {
 describe('public rooms', () => {
   it('owner readmission refreshes a retained roster, room name, profiles and departure information before joining', async () => {
     const now = Date.now();
+    await saveKey({ ...alice, displayName: 'cheeseplum' });
     const room = { ...invite, publicRoom: true, members: [alice, bob, carol].map(k => ({ account: k.account, publicKey: k.publicKey })) };
     saveInvites('alice', { [ID]: room });
     const leave = (k: typeof bob, at: number) => ({ txId: `leave-${k.account}`, time: at, from: k.account, to: 'alice', quantity: '0.0001 CHEESE', memo: encryptMemo(encodeNotice('leave', ID), alice.publicKey, k.secretKey) });
@@ -53,6 +55,7 @@ describe('public rooms', () => {
     calls.fetch.mockResolvedValue(actions.filter(a => a.data.to === 'bob').map(a => ({ ...a.data, txId: 'readmission', time: now })));
     render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="bob" session={{ actor: 'bob', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'bob', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
     await waitFor(() => expect(loadInvites('bob')[ID]?.members).toHaveLength(3));
+    await waitFor(() => expect(loadRoomProfiles('bob').alice?.displayName).toBe('cheeseplum'));
     fireEvent.click(await screen.findByRole('button', { name: /Invited by alice/ }));
     expect(screen.queryByPlaceholderText('Message group')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Join$/ }));
