@@ -1,6 +1,7 @@
 import type { RefObject } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { YoutubeTitleHelper } from '@/components/crypt/YoutubeTitleHelper';
 import { Textarea } from '@/components/ui/textarea';
 import { Collapsible, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { TermsCheckbox } from '@/components/shared/TermsCheckbox';

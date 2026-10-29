@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { fetchYoutubeTitle, untitledYoutubeLinks, withYoutubeTitle } from '@/lib/cryptYoutube';
 
@@ -10,11 +10,14 @@ import { fetchYoutubeTitle, untitledYoutubeLinks, withYoutubeTitle } from '@/lib
 export function YoutubeTitleHelper({ text, setText, disabled }: { text: string; setText: (t: string) => void; disabled?: boolean }) {
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
+  const latest = useRef(text);
+  useEffect(() => { latest.current = text; }, [text]);
   const links = untitledYoutubeLinks(text);
   if (!links.length) return null;
 
   const addTitles = async () => {
     setLoading(true); setFailed(false);
+    const start = text;
     let next = text, missed = false;
     for (const l of links) {
       const title = await fetchYoutubeTitle(l.id);
@@ -23,7 +26,7 @@ export function YoutubeTitleHelper({ text, setText, disabled }: { text: string; 
     setLoading(false);
     setFailed(missed);
     // Only apply when the draft hasn't changed meanwhile, so typing is never overwritten.
-    setText(next);
+    if (latest.current === start) setText(next); else setFailed(true);
   };
 
   return (
