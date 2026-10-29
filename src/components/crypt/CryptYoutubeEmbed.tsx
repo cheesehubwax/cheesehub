@@ -11,6 +11,8 @@ export function CryptYoutubeEmbed({ link }: { link: YoutubeLink }) {
   const [selection, setSelection] = useState<number | 'direct' | null>(null);
   const [warn, setWarn] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [thumb, setThumb] = useState(false);
+  const [thumbFailed, setThumbFailed] = useState(false);
   const source = `crypt-youtube-${useId()}`;
   const mirror = PRIVATE_YOUTUBE_MIRRORS[typeof selection === 'number' ? selection : 0];
 
@@ -23,7 +25,7 @@ export function CryptYoutubeEmbed({ link }: { link: YoutubeLink }) {
     return () => { window.removeEventListener(CRYPT_NOW_PLAYING, stop); unsubscribe(); };
   }, [source]);
   useEffect(() => { if (selection === null) setExpanded(false); }, [selection]);
-  useEffect(() => { setSelection(null); setWarn(false); }, [link.id, link.start]);
+  useEffect(() => { setSelection(null); setWarn(false); setThumb(false); setThumbFailed(false); }, [link.id, link.start]);
 
   const play = (choice: number | 'direct') => {
     getAudioPlayer().pause();
@@ -46,12 +48,20 @@ export function CryptYoutubeEmbed({ link }: { link: YoutubeLink }) {
           <div className="flex aspect-video w-full items-center justify-center rounded bg-muted text-xs text-muted-foreground">⛶ Playing in expanded view</div>
         ) : frame
       ) : (
-        <Button type="button" variant="secondary" onClick={() => play(0)} aria-label="Play video privately"
-          className="h-auto aspect-video w-full flex-col gap-1 whitespace-normal">
-          <span className="text-3xl" aria-hidden>▶️</span>
-          <span className="text-xs font-semibold">YouTube video</span>
-          <span className="text-[11px] text-muted-foreground">🛡️ Invidious</span>
-        </Button>
+        <div className="relative">
+          <Button type="button" variant="secondary" onClick={() => play(0)} aria-label={`Play video privately${link.title ? `: ${link.title}` : ''}`}
+            className="relative h-auto aspect-video w-full flex-col gap-1 overflow-hidden whitespace-normal p-0">
+            {thumb && !thumbFailed && <img src={privateThumbnailUrl(link)} alt="" referrerPolicy="no-referrer" crossOrigin="anonymous"
+              onError={() => setThumbFailed(true)} className="absolute inset-0 h-full w-full object-cover" />}
+            <span className="relative flex flex-col items-center gap-1 rounded bg-background/70 px-3 py-2">
+              <span className="text-3xl" aria-hidden>▶️</span>
+              <span className="line-clamp-2 text-xs font-semibold text-foreground">{link.title ?? 'YouTube video'}</span>
+              <span className="text-[11px] text-muted-foreground">🛡️ Invidious</span>
+            </span>
+          </Button>
+          {!thumb && <Button type="button" variant="ghost" size="sm" className="absolute bottom-1 right-1 h-6 bg-background/80 px-2 text-[11px]" onClick={() => setThumb(true)}>🖼️ Preview picture</Button>}
+          {thumbFailed && <span className="absolute bottom-1 right-1 rounded bg-background/80 px-2 text-[11px] text-muted-foreground">Picture unavailable</span>}
+        </div>
       )}
       {selection !== null && (
         <div className="mt-1 space-y-1 text-[11px]">
