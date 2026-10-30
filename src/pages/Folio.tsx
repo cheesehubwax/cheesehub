@@ -15,7 +15,7 @@ import { useFolioHoldings } from '@/hooks/useFolioHoldings';
 import { useAlcorTokenPrices } from '@/hooks/useAlcorTokenPrices';
 import { useWaxPrice } from '@/hooks/useWaxPrice';
 import { useFolio } from '@/hooks/useFolio';
-import { PortfolioControls, PortfolioTokenPicker } from '@/components/folio/PortfolioControls';
+import { PortfolioControls } from '@/components/folio/PortfolioControls';
 import { scopePortfolio } from '@/lib/folio/portfolios';
 import { hasCoverageGap } from '@/lib/folio/scanner';
 import type { HoldingRow } from '@/lib/folio/holdings';
