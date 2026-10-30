@@ -47,6 +47,9 @@ export function computeAmounts(
   precision: number,
 ): AirdropRecipient[] {
   if (holders.length === 0) return [];
+  if (mode === 'prorata' && holders.some(h => !Number.isFinite(h.weight) || h.weight < 0)) {
+    throw new Error('Holder weights must be finite and nonnegative');
+  }
 
   if (mode === "fixed") {
     const each = parseUnits(amountText, precision);
@@ -68,7 +71,7 @@ export function computeAmounts(
     shares = holders.map((h) => ({ account: h.account, weight: h.weight, num: 1n }));
   } else {
     const totalWeight = holders.reduce((s, h) => s + h.weight, 0);
-    if (totalWeight <= 0) throw new Error("Holder weights sum to zero");
+    if (!Number.isFinite(totalWeight) || totalWeight <= 0) throw new Error("Holder weights must have a finite positive sum");
     den = SCALE;
     shares = holders.map((h) => ({
       account: h.account,
@@ -83,6 +86,9 @@ export function computeAmounts(
       const maxIdx = shares.reduce((mi, x, i, a) => (x.weight > (a[mi]?.weight ?? 0) ? i : mi), 0);
       const target = shares[maxIdx];
       if (target) target.num += drift;
+    }
+    if (shares.some(s => s.num < 0n)) {
+      throw new Error('Holder weights cannot be safely represented at this allocation precision');
     }
   }
 
@@ -102,6 +108,7 @@ export function computeAmounts(
     a.floor += 1n;
     remainder -= 1n;
   }
+  if (remainder !== 0n || alloc.some(a => a.floor < 0n)) throw new Error('Allocation total could not be conserved');
   return alloc
     .filter((a) => a.floor > 0n)
     .map((a) => ({ account: a.account, weight: a.weight, units: a.floor }));
@@ -112,6 +119,7 @@ export function totalUnits(recipients: AirdropRecipient[]): bigint {
 }
 
 export function chunk<T>(items: T[], size: number): T[][] {
+  if (!Number.isSafeInteger(size) || size <= 0) throw new Error('Batch size must be a positive whole number');
   const out: T[][] = [];
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
   return out;
@@ -257,6 +265,9 @@ export function allocateAssets(
   mode: DistributionMode = "fixed",
   amountText = "1",
 ): NftAllocation {
+  if (mode === 'prorata' && holders.some(h => !Number.isFinite(h.weight) || h.weight < 0)) {
+    throw new Error('Holder weights must be finite and nonnegative');
+  }
   const empty: NftAllocation = {
     assignments: [],
     assigned: 0,
@@ -287,6 +298,7 @@ export function allocateAssets(
       for (let i = 0; i < holders.length; i++) counts[i] = base + (i < rem ? 1 : 0);
     } else {
       const totalWeight = holders.reduce((s, h) => s + (h.weight > 0 ? h.weight : 0), 0);
+      if (!Number.isFinite(totalWeight)) throw new Error('Holder weights must have a finite sum');
       if (!(totalWeight > 0)) return empty;
       const exact = holders.map((h) => (total * (h.weight > 0 ? h.weight : 0)) / totalWeight);
       let handed = 0;
@@ -416,11 +428,13 @@ export interface RamPlan {
  * lands under the minimum.
  */
 export function sliceRamUnits(units: bigint, minUnits: bigint, maxUnits: bigint): bigint[] {
+  if (minUnits < 0n || maxUnits < 0n || (maxUnits > 0n && minUnits > maxUnits)) throw new Error('Invalid RAM purchase limits');
   if (units <= 0n) return [];
+  if (units < minUnits) throw new Error('RAM share is below the minimum purchase');
   if (maxUnits <= 0n || units <= maxUnits) return [units];
-  let n = (units + maxUnits - 1n) / maxUnits;
-  // Never create a slice below the minimum (only reachable with odd configs).
-  while (n > 1n && minUnits > 0n && units / n < minUnits) n -= 1n;
+  const n = (units + maxUnits - 1n) / maxUnits;
+  if (minUnits > 0n && units / n < minUnits) throw new Error('RAM share cannot be split within the purchase limits');
+  if (n > 10000n) throw new Error('RAM share requires too many purchases; lower the amount');
   const base = units / n;
   const remainder = units % n;
   const out: bigint[] = [];
@@ -438,6 +452,7 @@ export function planRamPurchases(
   minUnits: bigint,
   maxUnits: bigint,
 ): RamPlan {
+  if (minUnits < 0n || maxUnits < 0n || (maxUnits > 0n && minUnits > maxUnits)) throw new Error('Invalid RAM purchase limits');
   const included: AirdropRecipient[] = [];
   const purchases: RamPurchase[] = [];
   const purchaseCounts = new Map<string, number>();
