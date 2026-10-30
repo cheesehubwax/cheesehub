@@ -207,8 +207,8 @@ interface AirdropContextValue {
 // Keep mounted providers and refreshed consumers on the same context identity.
 // Fast Refresh can reload this module while preserving the existing page tree.
 const AirdropContext: Context<AirdropContextValue | null> =
-  import.meta.hot?.data.airdropContext ?? createContext<AirdropContextValue | null>(null);
-if (import.meta.hot) import.meta.hot.data.airdropContext = AirdropContext;
+  import.meta.hot?.data?.airdropContext ?? createContext<AirdropContextValue | null>(null);
+if (import.meta.hot?.data) import.meta.hot.data.airdropContext = AirdropContext;
 
 export function useAirdrop(): AirdropContextValue {
   const ctx = useContext(AirdropContext);
@@ -221,8 +221,8 @@ export function useAirdrop(): AirdropContextValue {
 function createAirSlice<K extends keyof AirdropContextValue>(name: string, keys: readonly K[]) {
   type Slice = Pick<AirdropContextValue, K>;
   const hotKey = `air${name}Context`;
-  const context: Context<Slice | null> = import.meta.hot?.data[hotKey] ?? createContext<Slice | null>(null);
-  if (import.meta.hot) import.meta.hot.data[hotKey] = context;
+  const context: Context<Slice | null> = import.meta.hot?.data?.[hotKey] ?? createContext<Slice | null>(null);
+  if (import.meta.hot?.data) import.meta.hot.data[hotKey] = context;
   function useSlice(): Slice {
     const value = useContext(context);
     if (!value) throw new Error(`useAir${name} must be used inside <AirdropProvider>`);
@@ -778,17 +778,17 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
   return (
     <AirdropContext.Provider value={value}>
       <AirSendSlice.Provider value={sendValue}>
-      <AirSnapshotSlice.Provider value={snapshotValue}>
-      <AirDistributionSlice.Provider value={distributionValue}>
-      <AirHoldersSlice.Provider value={holdersValue}>
-      <AirCostsSlice.Provider value={costsValue}>
-      <AirRunSlice.Provider value={runValue}>
-        {children}
-      </AirRunSlice.Provider>
-      </AirCostsSlice.Provider>
-      </AirHoldersSlice.Provider>
-      </AirDistributionSlice.Provider>
-      </AirSnapshotSlice.Provider>
+        <AirSnapshotSlice.Provider value={snapshotValue}>
+          <AirDistributionSlice.Provider value={distributionValue}>
+            <AirHoldersSlice.Provider value={holdersValue}>
+              <AirCostsSlice.Provider value={costsValue}>
+                <AirRunSlice.Provider value={runValue}>
+                  {children}
+                </AirRunSlice.Provider>
+              </AirCostsSlice.Provider>
+            </AirHoldersSlice.Provider>
+          </AirDistributionSlice.Provider>
+        </AirSnapshotSlice.Provider>
       </AirSendSlice.Provider>
     </AirdropContext.Provider>
   );
