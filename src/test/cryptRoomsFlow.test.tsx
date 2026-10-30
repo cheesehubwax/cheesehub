@@ -81,7 +81,7 @@ describe('public rooms', () => {
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
     expect(loadDecisions('bob')[ID]?.status).toBe('left');
     const actions = calls.transact.mock.calls[0][0] as { data: { to: string; quantity: string; memo: string } }[];
-    expect(actions.map(a => [a.data.to, a.data.quantity])).toEqual([['alice', '0.0001 CHEESE'], ['alice', '0.1000 CHEESE'], ['eosio.null', '0.0080 CHEESE'], ['xcheeseliqst', '0.0020 CHEESE']]);
+    expect(actions.map(a => [a.data.to, a.data.quantity])).toEqual([['alice', '0.0001 CHEESE'], ['eosio.null', '0.0080 CHEESE'], ['xcheeseliqst', '0.0020 CHEESE']]);
     expect(actions[0].data.memo).not.toBe(encodeNotice('joined', ID));
     expect(screen.queryByPlaceholderText('Message group')).not.toBeInTheDocument();
   });

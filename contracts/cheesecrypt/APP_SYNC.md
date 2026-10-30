@@ -9,7 +9,7 @@ do not reintroduce plaintext roles to enforce client policy.
 |---|---|
 | Router account `crypt.cheese` (`CRYPT_ROUTER_ACCOUNT`, `cheeseCrypt.ts`) | Deploy target; contract uses `get_self()`, no hardcoded name |
 | Uniform 0.0100/part for text, NFT, links and controls (`cheeseCrypt.ts`) | `config.part_fee`, `platform_fee`; no kind parameter, bounded arithmetic |
-| Voice 1.0000 once/note, 30-part batches (`cryptVoice.ts`) | Not routed; no voice fee in router; retain direct voice path |
+| Voice 0.0100 per encrypted part, shared across recipients, up to 30 parts/batch (`cryptVoice.ts`) | Same arithmetic as `config.part_fee`; no special voice fee or continuation needed. Still direct pending verified history/resource integration |
 | Recipient 0.0001 per part | `recipient_fee` per copy; exact `parts` copies per distinct recipient |
 | Shared 80% eosio.null / 20% xcheeseliqst | `pay_platform` integer split; `setconfig` requires 80 |
 | Key creation 100 CHEESE, publishing fee | Existing direct-transfer path, not router messaging |
@@ -23,7 +23,7 @@ do not reintroduce plaintext roles to enforce client policy.
 | Admin cannot ban; founders ban/admin-collapse immune | Client-only; do not infer role from fee kind, pending payer or recipient array |
 | Mutes permanently suppress send-time traffic/quotes | Client-only presentation/filtering; malicious clients can ignore it |
 | Reports member→owner+admins, admin→owner | Encrypted ordinary text controls; notifications only; no report table |
-| Join requests 0.1000 CHEESE owner fee + 0.0001 copy + 0.0100 platform = 0.1101 (`cryptRooms.ts`) | Separate plain direct transfer to the creator; not routed, no router fee kind |
+| Join/rejoin requests 0.0001 copy + 0.0100 platform = 0.0101 (`cryptRooms.ts`); no owner surcharge | Ordinary single-part arithmetic; still direct with request-carried key pending verified adapter. No join action, fee kind or identifying fee memo |
 | Join-request declines (`join-no`) creator→requester | One encrypted part with the normal message fee; notification only; no request table |
 | Edits 24h, owner log 72h (`cryptEdits.ts`) | Client-only same-sender/conversation digest resolution; no edit receipts/table/action |
 | Memo ≤256 bytes | Router checks memo byte length, not plaintext semantics |
@@ -56,3 +56,5 @@ Privacy is reduced explicit metadata, not hidden senders/recipients or guarantee
 - Admission policy snapshot may carry optional `x` (members who left) so newcomers' member lists match; owner-signed, client-only, no contract change.
 - Voluntary leavers must request owner approval (ordinary join-request fee); readmission delivers a fresh retained-key-compatible bootstrap, profiles and policy/departure snapshot. Owner-authenticated CG2 `readmit` controls authorize subsequent `joined` notices to existing members; self-joined/messages cannot undo a leave. Shared platform/delivery fees remain unchanged; no router/ABI change.
 - Live owner join/rejoin counters, toast/chime and in-chat controls share the authenticated pending list; individual confirmed handling clears all matching alerts immediately. Client-only presentation/receipts; fees, envelopes and router ABI unchanged.
+
+- Voice and join fee flattening requires no contract source/ABI update: its existing uniform `part_fee` already matches. Voice metadata/edit-target parts are charged; each signed batch pays only its own parts. Join request key suffixes, memo sizes and transaction fanout remain visible; uniform fees do not guarantee indistinguishability.
