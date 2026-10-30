@@ -26,8 +26,8 @@ export function downloadActivityCsv(
 }
 
 export interface HoldingCsvRow {
-  symbol: string; contract: string; balance: number; walletBalance: number; pooledBalance: number; avgCostWax: number | null; priceWax: number;
-  valueWax: number; unrealizedWax: number | null; realizedWax: number; complete: boolean;
+  symbol: string; contract: string; balance: number; walletBalance: number; pooledBalance: number; avgCostWax: number | null; priceWax: number | null;
+  valueWax: number | null; unrealizedWax: number | null; realizedWax: number; complete: boolean;
   avgCostUsd: number | null; valueUsd: number | null; unrealizedUsd: number | null; realizedUsd: number; realisableWax: number | null;
 }
 
@@ -38,7 +38,7 @@ export function downloadHoldingsCsv(account: string, fiat: string, rows: Holding
     `token,contract,balance,wallet,in_pools,average_cost_wax,price_wax,value_wax,realisable_wax,unrealized_pl_wax,realized_pl_wax,average_cost_${f},value_${f},unrealized_pl_${f},realized_pl_${f},history_complete`,
   ];
   for (const r of rows) {
-    lines.push([r.symbol, r.contract, r.balance, r.walletBalance, r.pooledBalance, r.avgCostWax ?? '', r.priceWax, r.valueWax, r.realisableWax ?? '', r.unrealizedWax ?? '', r.realizedWax,
+    lines.push([r.symbol, r.contract, r.balance, r.walletBalance, r.pooledBalance, r.avgCostWax ?? '', r.priceWax ?? '', r.valueWax ?? '', r.realisableWax ?? '', r.unrealizedWax ?? '', r.realizedWax,
       r.avgCostUsd ?? '', r.valueUsd ?? '', r.unrealizedUsd ?? '', r.realizedUsd, r.complete ? 'yes' : 'no'].join(','));
   }
   downloadCsvFile(`cheesefolio-holdings-${account}.csv`, lines);

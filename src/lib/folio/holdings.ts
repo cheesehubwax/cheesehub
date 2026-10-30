@@ -147,3 +147,46 @@ export function realisableGapPct(realisableWax: number | null, paperWax: number 
   if (realisableWax == null || paperWax == null || !(paperWax > 0)) return null;
   return ((realisableWax - paperWax) / paperWax) * 100;
 }
+
+export interface HoldingTotals {
+  /** Known amounts summed; null only when nothing in the group is known. */
+  value: number | null; valuePartial: boolean;
+  valueUsd: number | null; valueUsdPartial: boolean;
+  unrealized: number | null; unrealizedPartial: boolean;
+  unrealizedUsd: number | null; unrealizedUsdPartial: boolean;
+  /** Selling everything now; null when any priced token's exit value is unknown. */
+  realisableWax: number | null;
+}
+
+/**
+ * Summary-box totals. An unpriced token or unknown rate is never counted as
+ * zero: known parts are summed and the matching `Partial` flag is raised.
+ */
+export function holdingTotals(holdings: HoldingRow[], realisable: Map<TokenKey, { wax: number | null }> | null | undefined): HoldingTotals {
+  const sum = (vals: (number | null)[]) => {
+    const known = vals.filter((v): v is number => v != null);
+    return { total: known.length ? known.reduce((a, b) => a + b, 0) : vals.length ? null : 0, partial: known.length < vals.length };
+  };
+  const open = holdings.filter((h) => !h.closed);
+  const pl = open.filter((h) => h.key !== WAX_KEY);
+  const v = sum(open.map((h) => h.valueWax));
+  const vu = sum(open.map((h) => h.valueUsd));
+  const u = sum(pl.map((h) => h.unrealizedWax));
+  const uu = sum(pl.map((h) => h.unrealizedUsd));
+  let realisableWax: number | null = realisable ? 0 : null;
+  for (const h of open) {
+    if (realisableWax == null) break;
+    if (h.key === WAX_KEY) realisableWax += h.balance;
+    else if (h.valueWax == null) realisableWax = null;
+    else if (h.valueWax < 1) realisableWax += h.valueWax;
+    else {
+      const r = realisable?.get(h.key)?.wax;
+      realisableWax = r == null ? null : realisableWax + r;
+    }
+  }
+  return {
+    value: v.total, valuePartial: v.partial, valueUsd: vu.total, valueUsdPartial: vu.partial,
+    unrealized: u.total, unrealizedPartial: u.partial, unrealizedUsd: uu.total, unrealizedUsdPartial: uu.partial,
+    realisableWax,
+  };
+}
