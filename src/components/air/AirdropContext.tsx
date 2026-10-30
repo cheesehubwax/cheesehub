@@ -35,7 +35,7 @@ import { getVenueLpHolders, type VenueLpPair } from '@/lib/airdropVenueLp';
 import { DEFAULT_CPU_PERCENT } from '@/lib/airdropCheese';
 import { bytesPerCheese } from '@/lib/airdropResources';
 import { useAirAllocation } from '@/hooks/useAirAllocation';
-import { useAirCosts } from '@/hooks/useAirCosts';
+import { useAirCosts as useAirCostEstimates } from '@/hooks/useAirCosts';
 import { useAirdropRunner, shortError, type PurchaseLogEntry, type BatchLogEntry } from '@/hooks/useAirdropRunner';
 export { shortError, type PurchaseLogEntry, type BatchLogEntry } from '@/hooks/useAirdropRunner';
 export { RAM_BYTES_PER_ROW } from '@/hooks/useAirCosts';
@@ -216,66 +216,80 @@ export function useAirdrop(): AirdropContextValue {
   return ctx;
 }
 
-// Preserve every slice identity during Fast Refresh, just like the legacy context.
-type AirSendValue = Pick<AirdropContextValue, 'assetKind' | 'setAssetKind' | 'isNft' | 'isRam' | 'ramLimits' | 'cheesePerRamKb' | 'cheeseBalance' | 'actor' | 'sendContract' | 'setSendContract' | 'sendSymbol' | 'setSendSymbol' | 'tokenStat' | 'walletTokens' | 'nftCollections' | 'nftCollection' | 'setNftCollection' | 'nftTemplates' | 'nftTemplateId' | 'setNftTemplateId' | 'nftPool' | 'nftLoading' | 'nftError'>;
-const AirSendContext: Context<AirSendValue | null> =
-  import.meta.hot?.data.airSendContext ?? createContext<AirSendValue | null>(null);
-if (import.meta.hot) import.meta.hot.data.airSendContext = AirSendContext;
-export function useAirSend(): AirSendValue {
-  const value = useContext(AirSendContext);
-  if (!value) throw new Error('useAirSend must be used inside <AirdropProvider>');
-  return value;
+// Each card gets a memoized projection, not the entire changing dashboard value.
+// Contexts (including every slice) retain their identities across Fast Refresh.
+function createAirSlice<K extends keyof AirdropContextValue>(name: string, keys: readonly K[]) {
+  type Slice = Pick<AirdropContextValue, K>;
+  const hotKey = `air${name}Context`;
+  const context: Context<Slice | null> = import.meta.hot?.data[hotKey] ?? createContext<Slice | null>(null);
+  if (import.meta.hot) import.meta.hot.data[hotKey] = context;
+  function useSlice(): Slice {
+    const value = useContext(context);
+    if (!value) throw new Error(`useAir${name} must be used inside <AirdropProvider>`);
+    return value;
+  }
+  function useValue(value: AirdropContextValue): Slice {
+    // Keys are fixed at module initialization; compare each field by identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return useMemo(() => Object.fromEntries(keys.map(key => [key, value[key]])) as Slice, keys.map(key => value[key]));
+  }
+  return { Provider: context.Provider, useSlice, useValue };
 }
 
-type AirSnapshotValue = Pick<AirdropContextValue, 'snapshotMode' | 'setSnapshotMode' | 'snapContract' | 'setSnapContract' | 'snapSymbol' | 'setSnapSymbol' | 'snapCollection' | 'setSnapCollection' | 'snapSuffix' | 'setSnapSuffix' | 'snapSchema' | 'setSnapSchema' | 'snapTemplate' | 'setSnapTemplate' | 'lpPairs' | 'lpPairsLoading' | 'lpPair' | 'setLpPair' | 'lpPoolsScanned' | 'lpPositions' | 'snapshot' | 'snapshotAt' | 'snapshotError' | 'loadSnapshot' | 'downloadSnapshotCsv' | 'busy'>;
-const AirSnapshotContext: Context<AirSnapshotValue | null> =
-  import.meta.hot?.data.airSnapshotContext ?? createContext<AirSnapshotValue | null>(null);
-if (import.meta.hot) import.meta.hot.data.airSnapshotContext = AirSnapshotContext;
-export function useAirSnapshot(): AirSnapshotValue {
-  const value = useContext(AirSnapshotContext);
-  if (!value) throw new Error('useAirSnapshot must be used inside <AirdropProvider>');
-  return value;
-}
+const AirSendSlice = createAirSlice('Send', [
+  'assetKind', 'setAssetKind', 'isNft', 'isRam', 'ramLimits',
+  'cheesePerRamKb', 'cheeseBalance', 'actor', 'sendContract', 'setSendContract',
+  'sendSymbol', 'setSendSymbol', 'tokenStat', 'walletTokens', 'nftCollections',
+  'nftCollection', 'setNftCollection', 'nftTemplates', 'nftTemplateId', 'setNftTemplateId',
+  'nftPool', 'nftLoading', 'nftError',
+]);
+export const useAirSend = AirSendSlice.useSlice;
 
-type AirDistributionValue = Pick<AirdropContextValue, 'isNft' | 'isRam' | 'ramUnit' | 'setRamUnit' | 'ramExcluded' | 'ramPurchaseCount' | 'ramLimits' | 'ramMinViable' | 'applyRamMinViable' | 'ramPoolWax' | 'ramPoolMaxViable' | 'applyRamPoolMax' | 'selectedCount' | 'nftPoolSize' | 'mode' | 'setMode' | 'amountText' | 'setAmountText' | 'sendSymbol' | 'snapshot' | 'memo' | 'setMemo' | 'batchSize' | 'setBatchSize' | 'minWeight' | 'setMinWeight'>;
-const AirDistributionContext: Context<AirDistributionValue | null> =
-  import.meta.hot?.data.airDistributionContext ?? createContext<AirDistributionValue | null>(null);
-if (import.meta.hot) import.meta.hot.data.airDistributionContext = AirDistributionContext;
-export function useAirDistribution(): AirDistributionValue {
-  const value = useContext(AirDistributionContext);
-  if (!value) throw new Error('useAirDistribution must be used inside <AirdropProvider>');
-  return value;
-}
+const AirSnapshotSlice = createAirSlice('Snapshot', [
+  'snapshotMode', 'setSnapshotMode', 'snapContract', 'setSnapContract', 'snapSymbol',
+  'setSnapSymbol', 'snapCollection', 'setSnapCollection', 'snapSuffix', 'setSnapSuffix',
+  'snapSchema', 'setSnapSchema', 'snapTemplate', 'setSnapTemplate', 'lpPairs',
+  'lpPairsLoading', 'lpPair', 'setLpPair', 'lpPoolsScanned', 'lpPositions',
+  'snapshot', 'snapshotAt', 'snapshotError', 'loadSnapshot', 'downloadSnapshotCsv',
+  'busy',
+]);
+export const useAirSnapshot = AirSnapshotSlice.useSlice;
 
-type AirHoldersValue = Pick<AirdropContextValue, 'filteredHolders' | 'selected' | 'toggle' | 'quickSelect' | 'snapshot' | 'snapshotMode' | 'isNft' | 'isRam' | 'sendSymbol' | 'recipients' | 'ramPurchaseCounts' | 'nftAssignments' | 'precision' | 'cheesePerRamKb'>;
-const AirHoldersContext: Context<AirHoldersValue | null> =
-  import.meta.hot?.data.airHoldersContext ?? createContext<AirHoldersValue | null>(null);
-if (import.meta.hot) import.meta.hot.data.airHoldersContext = AirHoldersContext;
-export function useAirHolders(): AirHoldersValue {
-  const value = useContext(AirHoldersContext);
-  if (!value) throw new Error('useAirHolders must be used inside <AirdropProvider>');
-  return value;
-}
+const AirDistributionSlice = createAirSlice('Distribution', [
+  'isNft', 'isRam', 'ramUnit', 'setRamUnit', 'ramExcluded',
+  'ramPurchaseCount', 'ramLimits', 'ramMinViable', 'applyRamMinViable', 'ramPoolWax',
+  'ramPoolMaxViable', 'applyRamPoolMax', 'selectedCount', 'nftPoolSize', 'mode',
+  'setMode', 'amountText', 'setAmountText', 'sendSymbol', 'snapshot',
+  'memo', 'setMemo', 'batchSize', 'setBatchSize', 'minWeight',
+  'setMinWeight',
+]);
+export const useAirDistribution = AirDistributionSlice.useSlice;
 
-type AirCostsValue = Pick<AirdropContextValue, 'actor' | 'isNft' | 'isRam' | 'ramCheeseTotal' | 'ramBytesTotal' | 'ramExcluded' | 'ramPurchaseCount' | 'ramPoolWax' | 'ramMinViable' | 'ramLimits' | 'selectedCount' | 'recipientCount' | 'total' | 'precision' | 'sendSymbol' | 'estimate' | 'nftAssignments' | 'nftAssigned' | 'nftSkipped' | 'nftLeftover' | 'nftPoolSize' | 'rowStats' | 'rowCheckLoading' | 'recipients' | 'estCpuCheese' | 'estRamCheese' | 'cheesePerCpuMs' | 'cheesePerRamKb' | 'requiredRamCheese' | 'suggestedCpuCheese' | 'cheeseBalance'>;
-const AirCostsContext: Context<AirCostsValue | null> =
-  import.meta.hot?.data.airCostsContext ?? createContext<AirCostsValue | null>(null);
-if (import.meta.hot) import.meta.hot.data.airCostsContext = AirCostsContext;
-export function useAirCosts(): AirCostsValue {
-  const value = useContext(AirCostsContext);
-  if (!value) throw new Error('useAirCosts must be used inside <AirdropProvider>');
-  return value;
-}
+const AirHoldersSlice = createAirSlice('Holders', [
+  'filteredHolders', 'selected', 'toggle', 'quickSelect', 'snapshot',
+  'snapshotMode', 'isNft', 'isRam', 'sendSymbol', 'recipients',
+  'ramPurchaseCounts', 'nftAssignments', 'precision', 'cheesePerRamKb',
+]);
+export const useAirHolders = AirHoldersSlice.useSlice;
 
-type AirRunValue = Pick<AirdropContextValue, 'actor' | 'isRam' | 'estimate' | 'ramCheeseTotal' | 'warnings' | 'runError' | 'runState' | 'recipientCount' | 'canRun' | 'runAirdrop' | 'cancelRequested' | 'requestCancel' | 'downloadResultsCsv' | 'purchaseLog' | 'batchLog' | 'termsAccepted' | 'setTermsAccepted'>;
-const AirRunContext: Context<AirRunValue | null> =
-  import.meta.hot?.data.airRunContext ?? createContext<AirRunValue | null>(null);
-if (import.meta.hot) import.meta.hot.data.airRunContext = AirRunContext;
-export function useAirRun(): AirRunValue {
-  const value = useContext(AirRunContext);
-  if (!value) throw new Error('useAirRun must be used inside <AirdropProvider>');
-  return value;
-}
+const AirCostsSlice = createAirSlice('Costs', [
+  'actor', 'isNft', 'isRam', 'ramCheeseTotal', 'ramBytesTotal',
+  'ramExcluded', 'ramPurchaseCount', 'ramPoolWax', 'ramMinViable', 'ramLimits',
+  'selectedCount', 'recipientCount', 'total', 'precision', 'sendSymbol',
+  'estimate', 'nftAssignments', 'nftAssigned', 'nftSkipped', 'nftLeftover',
+  'nftPoolSize', 'rowStats', 'rowCheckLoading', 'recipients', 'estCpuCheese',
+  'estRamCheese', 'cheesePerCpuMs', 'cheesePerRamKb', 'requiredRamCheese', 'suggestedCpuCheese',
+  'cheeseBalance',
+]);
+export const useAirCosts = AirCostsSlice.useSlice;
+
+const AirRunSlice = createAirSlice('Run', [
+  'actor', 'isRam', 'estimate', 'ramCheeseTotal', 'warnings',
+  'runError', 'runState', 'recipientCount', 'canRun', 'runAirdrop',
+  'cancelRequested', 'requestCancel', 'downloadResultsCsv', 'purchaseLog', 'batchLog',
+  'termsAccepted', 'setTermsAccepted',
+]);
+export const useAirRun = AirRunSlice.useSlice;
 
 // Stable empty query results prevent unrelated input changes invalidating allocations.
 const EMPTY_WALLET_TOKENS: AirdropContextValue['walletTokens'] = [];
@@ -471,7 +485,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     };
   }, [recipientAccounts, rowKey, rowCacheVersion]);
 
-  const costs = useAirCosts({ ...allocation, isRam, isNft, batchSize, ramPrice, rowStats, pricing, cheeseBalance, mode, precision, sendSymbol, resources, cpuPercent });
+  const costs = useAirCostEstimates({ ...allocation, isRam, isNft, batchSize, ramPrice, rowStats, pricing, cheeseBalance, mode, precision, sendSymbol, resources, cpuPercent });
   const { ramPurchaseCount, estimate, warnings, hasError, recipientCount, suggestedCpuCheese, requiredRamCheese, cheesePerCpuMs, cheesePerRamKb, estCpuCheese, estRamCheese } = costs;
   const { termsAccepted, setTermsAccepted, busy, setBusy, runState, setRunState, runError, purchaseLog, batchLog, setBatchLog, cancelRequested, requestCancel, canRun, runAirdrop } = useAirdropRunner({ session, actor, cheeseBalance, isRam, isNft, hasError, nftAssignments, nftShortfall, recipients, ramPurchases, ramCheeseTotal, pricing, suggestedCpuCheese, requiredRamCheese, cpuPercent, batchSize, memo, sendContract, sendSymbol, precision, tokenStat, refetchResources, refreshBalance });
 
@@ -754,319 +768,28 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     downloadResultsCsv,
   };
 
-  const sendValue = useMemo<AirSendValue>(() => ({
-    assetKind: value.assetKind,
-    setAssetKind: value.setAssetKind,
-    isNft: value.isNft,
-    isRam: value.isRam,
-    ramLimits: value.ramLimits,
-    cheesePerRamKb: value.cheesePerRamKb,
-    cheeseBalance: value.cheeseBalance,
-    actor: value.actor,
-    sendContract: value.sendContract,
-    setSendContract: value.setSendContract,
-    sendSymbol: value.sendSymbol,
-    setSendSymbol: value.setSendSymbol,
-    tokenStat: value.tokenStat,
-    walletTokens: value.walletTokens,
-    nftCollections: value.nftCollections,
-    nftCollection: value.nftCollection,
-    setNftCollection: value.setNftCollection,
-    nftTemplates: value.nftTemplates,
-    nftTemplateId: value.nftTemplateId,
-    setNftTemplateId: value.setNftTemplateId,
-    nftPool: value.nftPool,
-    nftLoading: value.nftLoading,
-    nftError: value.nftError,
-  }), [
-    value.assetKind,
-    value.setAssetKind,
-    value.isNft,
-    value.isRam,
-    value.ramLimits,
-    value.cheesePerRamKb,
-    value.cheeseBalance,
-    value.actor,
-    value.sendContract,
-    value.setSendContract,
-    value.sendSymbol,
-    value.setSendSymbol,
-    value.tokenStat,
-    value.walletTokens,
-    value.nftCollections,
-    value.nftCollection,
-    value.setNftCollection,
-    value.nftTemplates,
-    value.nftTemplateId,
-    value.setNftTemplateId,
-    value.nftPool,
-    value.nftLoading,
-    value.nftError,
-  ]);
-
-  const snapshotValue = useMemo<AirSnapshotValue>(() => ({
-    snapshotMode: value.snapshotMode,
-    setSnapshotMode: value.setSnapshotMode,
-    snapContract: value.snapContract,
-    setSnapContract: value.setSnapContract,
-    snapSymbol: value.snapSymbol,
-    setSnapSymbol: value.setSnapSymbol,
-    snapCollection: value.snapCollection,
-    setSnapCollection: value.setSnapCollection,
-    snapSuffix: value.snapSuffix,
-    setSnapSuffix: value.setSnapSuffix,
-    snapSchema: value.snapSchema,
-    setSnapSchema: value.setSnapSchema,
-    snapTemplate: value.snapTemplate,
-    setSnapTemplate: value.setSnapTemplate,
-    lpPairs: value.lpPairs,
-    lpPairsLoading: value.lpPairsLoading,
-    lpPair: value.lpPair,
-    setLpPair: value.setLpPair,
-    lpPoolsScanned: value.lpPoolsScanned,
-    lpPositions: value.lpPositions,
-    snapshot: value.snapshot,
-    snapshotAt: value.snapshotAt,
-    snapshotError: value.snapshotError,
-    loadSnapshot: value.loadSnapshot,
-    downloadSnapshotCsv: value.downloadSnapshotCsv,
-    busy: value.busy,
-  }), [
-    value.snapshotMode,
-    value.setSnapshotMode,
-    value.snapContract,
-    value.setSnapContract,
-    value.snapSymbol,
-    value.setSnapSymbol,
-    value.snapCollection,
-    value.setSnapCollection,
-    value.snapSuffix,
-    value.setSnapSuffix,
-    value.snapSchema,
-    value.setSnapSchema,
-    value.snapTemplate,
-    value.setSnapTemplate,
-    value.lpPairs,
-    value.lpPairsLoading,
-    value.lpPair,
-    value.setLpPair,
-    value.lpPoolsScanned,
-    value.lpPositions,
-    value.snapshot,
-    value.snapshotAt,
-    value.snapshotError,
-    value.loadSnapshot,
-    value.downloadSnapshotCsv,
-    value.busy,
-  ]);
-
-  const distributionValue = useMemo<AirDistributionValue>(() => ({
-    isNft: value.isNft,
-    isRam: value.isRam,
-    ramUnit: value.ramUnit,
-    setRamUnit: value.setRamUnit,
-    ramExcluded: value.ramExcluded,
-    ramPurchaseCount: value.ramPurchaseCount,
-    ramLimits: value.ramLimits,
-    ramMinViable: value.ramMinViable,
-    applyRamMinViable: value.applyRamMinViable,
-    ramPoolWax: value.ramPoolWax,
-    ramPoolMaxViable: value.ramPoolMaxViable,
-    applyRamPoolMax: value.applyRamPoolMax,
-    selectedCount: value.selectedCount,
-    nftPoolSize: value.nftPoolSize,
-    mode: value.mode,
-    setMode: value.setMode,
-    amountText: value.amountText,
-    setAmountText: value.setAmountText,
-    sendSymbol: value.sendSymbol,
-    snapshot: value.snapshot,
-    memo: value.memo,
-    setMemo: value.setMemo,
-    batchSize: value.batchSize,
-    setBatchSize: value.setBatchSize,
-    minWeight: value.minWeight,
-    setMinWeight: value.setMinWeight,
-  }), [
-    value.isNft,
-    value.isRam,
-    value.ramUnit,
-    value.setRamUnit,
-    value.ramExcluded,
-    value.ramPurchaseCount,
-    value.ramLimits,
-    value.ramMinViable,
-    value.applyRamMinViable,
-    value.ramPoolWax,
-    value.ramPoolMaxViable,
-    value.applyRamPoolMax,
-    value.selectedCount,
-    value.nftPoolSize,
-    value.mode,
-    value.setMode,
-    value.amountText,
-    value.setAmountText,
-    value.sendSymbol,
-    value.snapshot,
-    value.memo,
-    value.setMemo,
-    value.batchSize,
-    value.setBatchSize,
-    value.minWeight,
-    value.setMinWeight,
-  ]);
-
-  const holdersValue = useMemo<AirHoldersValue>(() => ({
-    filteredHolders: value.filteredHolders,
-    selected: value.selected,
-    toggle: value.toggle,
-    quickSelect: value.quickSelect,
-    snapshot: value.snapshot,
-    snapshotMode: value.snapshotMode,
-    isNft: value.isNft,
-    isRam: value.isRam,
-    sendSymbol: value.sendSymbol,
-    recipients: value.recipients,
-    ramPurchaseCounts: value.ramPurchaseCounts,
-    nftAssignments: value.nftAssignments,
-    precision: value.precision,
-    cheesePerRamKb: value.cheesePerRamKb,
-  }), [
-    value.filteredHolders,
-    value.selected,
-    value.toggle,
-    value.quickSelect,
-    value.snapshot,
-    value.snapshotMode,
-    value.isNft,
-    value.isRam,
-    value.sendSymbol,
-    value.recipients,
-    value.ramPurchaseCounts,
-    value.nftAssignments,
-    value.precision,
-    value.cheesePerRamKb,
-  ]);
-
-  const costsValue = useMemo<AirCostsValue>(() => ({
-    actor: value.actor,
-    isNft: value.isNft,
-    isRam: value.isRam,
-    ramCheeseTotal: value.ramCheeseTotal,
-    ramBytesTotal: value.ramBytesTotal,
-    ramExcluded: value.ramExcluded,
-    ramPurchaseCount: value.ramPurchaseCount,
-    ramPoolWax: value.ramPoolWax,
-    ramMinViable: value.ramMinViable,
-    ramLimits: value.ramLimits,
-    selectedCount: value.selectedCount,
-    recipientCount: value.recipientCount,
-    total: value.total,
-    precision: value.precision,
-    sendSymbol: value.sendSymbol,
-    estimate: value.estimate,
-    nftAssignments: value.nftAssignments,
-    nftAssigned: value.nftAssigned,
-    nftSkipped: value.nftSkipped,
-    nftLeftover: value.nftLeftover,
-    nftPoolSize: value.nftPoolSize,
-    rowStats: value.rowStats,
-    rowCheckLoading: value.rowCheckLoading,
-    recipients: value.recipients,
-    estCpuCheese: value.estCpuCheese,
-    estRamCheese: value.estRamCheese,
-    cheesePerCpuMs: value.cheesePerCpuMs,
-    cheesePerRamKb: value.cheesePerRamKb,
-    requiredRamCheese: value.requiredRamCheese,
-    suggestedCpuCheese: value.suggestedCpuCheese,
-    cheeseBalance: value.cheeseBalance,
-  }), [
-    value.actor,
-    value.isNft,
-    value.isRam,
-    value.ramCheeseTotal,
-    value.ramBytesTotal,
-    value.ramExcluded,
-    value.ramPurchaseCount,
-    value.ramPoolWax,
-    value.ramMinViable,
-    value.ramLimits,
-    value.selectedCount,
-    value.recipientCount,
-    value.total,
-    value.precision,
-    value.sendSymbol,
-    value.estimate,
-    value.nftAssignments,
-    value.nftAssigned,
-    value.nftSkipped,
-    value.nftLeftover,
-    value.nftPoolSize,
-    value.rowStats,
-    value.rowCheckLoading,
-    value.recipients,
-    value.estCpuCheese,
-    value.estRamCheese,
-    value.cheesePerCpuMs,
-    value.cheesePerRamKb,
-    value.requiredRamCheese,
-    value.suggestedCpuCheese,
-    value.cheeseBalance,
-  ]);
-
-  const runValue = useMemo<AirRunValue>(() => ({
-    actor: value.actor,
-    isRam: value.isRam,
-    estimate: value.estimate,
-    ramCheeseTotal: value.ramCheeseTotal,
-    warnings: value.warnings,
-    runError: value.runError,
-    runState: value.runState,
-    recipientCount: value.recipientCount,
-    canRun: value.canRun,
-    runAirdrop: value.runAirdrop,
-    cancelRequested: value.cancelRequested,
-    requestCancel: value.requestCancel,
-    downloadResultsCsv: value.downloadResultsCsv,
-    purchaseLog: value.purchaseLog,
-    batchLog: value.batchLog,
-    termsAccepted: value.termsAccepted,
-    setTermsAccepted: value.setTermsAccepted,
-  }), [
-    value.actor,
-    value.isRam,
-    value.estimate,
-    value.ramCheeseTotal,
-    value.warnings,
-    value.runError,
-    value.runState,
-    value.recipientCount,
-    value.canRun,
-    value.runAirdrop,
-    value.cancelRequested,
-    value.requestCancel,
-    value.downloadResultsCsv,
-    value.purchaseLog,
-    value.batchLog,
-    value.termsAccepted,
-    value.setTermsAccepted,
-  ]);
+  const sendValue = AirSendSlice.useValue(value);
+  const snapshotValue = AirSnapshotSlice.useValue(value);
+  const distributionValue = AirDistributionSlice.useValue(value);
+  const holdersValue = AirHoldersSlice.useValue(value);
+  const costsValue = AirCostsSlice.useValue(value);
+  const runValue = AirRunSlice.useValue(value);
 
   return (
     <AirdropContext.Provider value={value}>
-      <AirSendContext.Provider value={sendValue}>
-      <AirSnapshotContext.Provider value={snapshotValue}>
-      <AirDistributionContext.Provider value={distributionValue}>
-      <AirHoldersContext.Provider value={holdersValue}>
-      <AirCostsContext.Provider value={costsValue}>
-      <AirRunContext.Provider value={runValue}>
+      <AirSendSlice.Provider value={sendValue}>
+      <AirSnapshotSlice.Provider value={snapshotValue}>
+      <AirDistributionSlice.Provider value={distributionValue}>
+      <AirHoldersSlice.Provider value={holdersValue}>
+      <AirCostsSlice.Provider value={costsValue}>
+      <AirRunSlice.Provider value={runValue}>
         {children}
-      </AirRunContext.Provider>
-      </AirCostsContext.Provider>
-      </AirHoldersContext.Provider>
-      </AirDistributionContext.Provider>
-      </AirSnapshotContext.Provider>
-      </AirSendContext.Provider>
+      </AirRunSlice.Provider>
+      </AirCostsSlice.Provider>
+      </AirHoldersSlice.Provider>
+      </AirDistributionSlice.Provider>
+      </AirSnapshotSlice.Provider>
+      </AirSendSlice.Provider>
     </AirdropContext.Provider>
   );
 }
