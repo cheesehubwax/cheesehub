@@ -8,8 +8,8 @@ do not reintroduce plaintext roles to enforce client policy.
 | App rule / source | Router responsibility / integration status |
 |---|---|
 | Router account `crypt.cheese` (`CRYPT_ROUTER_ACCOUNT`, `cheeseCrypt.ts`) | Deploy target; contract uses `get_self()`, no hardcoded name |
-| Text 0.0100/part, NFT first 0.0200 + 0.0100/rest (`cheeseCrypt.ts`) | `config`, `platform_fee`; caller-declared kind, bounded arithmetic |
-| Voice 1.0000 once/note, 30-part batches (`cryptVoice.ts`) | 1.0000 per `sendmsg` call only; multi-call continuation NOT supported; retain direct voice path |
+| Uniform 0.0100/part for text, NFT, links and controls (`cheeseCrypt.ts`) | `config.part_fee`, `platform_fee`; no kind parameter, bounded arithmetic |
+| Voice 1.0000 once/note, 30-part batches (`cryptVoice.ts`) | Not routed; no voice fee in router; retain direct voice path |
 | Recipient 0.0001 per part | `recipient_fee` per copy; exact `parts` copies per distinct recipient |
 | Shared 80% eosio.null / 20% xcheeseliqst | `pay_platform` integer split; `setconfig` requires 80 |
 | Key creation 100 CHEESE, publishing fee | Existing direct-transfer path, not router messaging |

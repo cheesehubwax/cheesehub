@@ -77,18 +77,18 @@ describe('ad-hoc group messages', () => {
   });
 });
 describe('NFT message pricing', () => {
-  it('direct NFT message costs 0.0201 CHEESE with a split 0.0200 platform fee', async () => {
+  it('direct NFT message costs 0.0101 CHEESE, the same as text', async () => {
     const { buildSendMessageActions } = await import('@/lib/cheeseCrypt');
     const a = buildSendMessageActions('alice.wam', 'bob.wam', ['m'], [], true);
-    expect(a.map(x => x.data.quantity)).toEqual(['0.0001 CHEESE', '0.0160 CHEESE', '0.0040 CHEESE']);
-    expect(messageCost(1, true)).toBe('0.0201 CHEESE');
+    expect(a.map(x => x.data.quantity)).toEqual(['0.0001 CHEESE', '0.0080 CHEESE', '0.0020 CHEESE']);
+    expect(messageCost(1, true)).toBe(messageCost(1));
   });
-  it('group NFT message splits 0.0200 once plus 0.0010 per recipient', () => {
+  it('group NFT message costs the same as group text', () => {
     const actions = buildGroupMessageActions(alice, group, '[nft:1099512345678]', contacts, [], true);
-    expect(actions.filter(a => a.data.to === 'eosio.null').map(a => a.data.quantity)).toEqual(['0.0160 CHEESE']);
-    expect(actions.filter(a => a.data.to === 'xcheeseliqst').map(a => a.data.quantity)).toEqual(['0.0040 CHEESE']);
+    expect(actions.filter(a => a.data.to === 'eosio.null').map(a => a.data.quantity)).toEqual(['0.0080 CHEESE']);
+    expect(actions.filter(a => a.data.to === 'xcheeseliqst').map(a => a.data.quantity)).toEqual(['0.0020 CHEESE']);
     expect(actions.filter(a => contacts[a.data.to]).map(a => a.data.quantity)).toEqual(['0.0001 CHEESE', '0.0001 CHEESE']);
-    expect(groupMessageCost(1, 2, true)).toBe('0.0202 CHEESE');
-    expect(groupMessageCost(1, 5, true)).toBe('0.0205 CHEESE');
+    expect(groupMessageCost(1, 2, true)).toBe('0.0102 CHEESE');
+    expect(groupMessageCost(1, 5, true)).toBe('0.0105 CHEESE');
   });
 });

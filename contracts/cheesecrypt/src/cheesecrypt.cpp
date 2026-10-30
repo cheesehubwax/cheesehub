@@ -19,9 +19,9 @@ void cheesecrypt::pay_platform(const config& cfg, const asset& amount) {
    send_token(cfg, cfg.liquidity_account, asset(amount.amount - nulled, amount.symbol), "CHEESECrypt messaging fee");
 }
 
-asset cheesecrypt::platform_fee(const config& cfg, uint8_t kind, uint16_t parts) const {
-   const int64_t units = crypt_router::platform_units(kind, parts, cfg.text_fee.amount, cfg.nft_fee.amount, cfg.voice_fee.amount);
-   check(units >= 0, "invalid message kind, fee or parts");
+asset cheesecrypt::platform_fee(const config& cfg, uint16_t parts) const {
+   const int64_t units = crypt_router::platform_units(parts, cfg.part_fee.amount);
+   check(units >= 0, "invalid fee or parts");
    return asset(units, cfg.token_symbol);
 }
 
@@ -32,7 +32,7 @@ void cheesecrypt::setconfig(const config& cfg) {
    check(is_account(cfg.null_account) && is_account(cfg.liquidity_account), "fee account does not exist");
    check(cfg.null_account != get_self() && cfg.liquidity_account != get_self() &&
          cfg.null_account != cfg.liquidity_account, "fee accounts must be distinct and external");
-   for (const asset* a : {&cfg.text_fee, &cfg.nft_fee, &cfg.voice_fee, &cfg.recipient_fee})
+   for (const asset* a : {&cfg.part_fee, &cfg.recipient_fee})
       check(a->is_valid() && a->symbol == cfg.token_symbol && crypt_router::valid_fee(a->amount), "invalid fee");
    check(cfg.recipient_fee.amount > 0, "copies need a positive transfer");
    check(cfg.null_percent == 80, "platform split must stay 80/20");
@@ -75,7 +75,7 @@ void cheesecrypt::reclaim(name payer) {
    send_token(cfg, payer, refund, "CHEESECrypt payment reclaim");
 }
 
-void cheesecrypt::sendmsg(name sender, uint8_t kind, uint16_t parts, const vector<copy_t>& copies) {
+void cheesecrypt::sendmsg(name sender, uint16_t parts, const vector<copy_t>& copies) {
    require_auth(sender);
    const auto cfg = get_config();
    check(!cfg.paused, "CHEESECrypt contract is paused");
@@ -93,7 +93,7 @@ void cheesecrypt::sendmsg(name sender, uint8_t kind, uint16_t parts, const vecto
    check(counts.size() <= cfg.max_recipients, "too many distinct recipients");
    for (const auto& count : counts) check(count.second == parts, "each recipient must receive exactly parts copies");
    // Inputs and config are bounded before arithmetic, including the total and integer split.
-   const asset fee = platform_fee(cfg, kind, parts);
+   const asset fee = platform_fee(cfg, parts);
    check(crypt_router::valid_fee(cfg.recipient_fee.amount) && cfg.recipient_fee.amount > 0, "invalid recipient fee");
    const asset total = fee + cfg.recipient_fee * static_cast<int64_t>(copies.size());
    // Consume this sender's in-flight payment from the same transaction; zero custody.
