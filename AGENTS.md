@@ -9,8 +9,8 @@
 - Crypt orb: source-controlled public image for external hosting; preview uses its asset pointer since GitHub Pages cannot serve Lovable-relative paths.
 
 - App/recorder token snapshots share a versioned schema/URL; chain-verify precisions, cache no prices, keep unavailable prices unknown to prevent fabricated valuations.
-- CHEESEAir keeps context identity in Vite hot data (shared provider/card state).
-- CHEESEAir LP token columns aggregate current underlying quantities in normalized pair order, separate from USD payout weights so presentation never changes distribution.
+- CHEESEAir: keep HMR context identity; provider owns snapshots/selection/CSV, focused hooks own allocation/costs/run. Runner gates terms, concurrency and TX IDs.
+- CHEESEAir LP columns aggregate normalized underlying quantities; USD payout weights stay separate.
 - CHEESEAir suffix unions use timestamp cursors, bounded reads and complete-only cache; stalled providers flag partial results because indexes differ and skip stops at 10,000 rows.
 - CHEESEFolio re-derives raw IndexedDB history per account; live balances are truth. Shared prices poll foreground-only/refetch on focus; metadata/placeholders never get live timestamps.
 - Folio acquisitions use cumulative trade/free receipts, separate from holdings; never alter basis or infer sources after disposals.
