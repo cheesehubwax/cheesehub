@@ -1561,7 +1561,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
       <DiscoverRoomsDialog open={roomsOpen} onOpenChange={o => { setRoomsOpen(o); if (o) void refetchRooms(); }} listings={listings} loading={roomsLoading}
         refresh={() => void refetchRooms()} account={account} nameFor={nameFor} roomStatus={roomStatus} joinCost={roomJoinCost} onAsk={l => { setRoomsOpen(false); setJoinNote(''); setAskingRoom(l); }} />
       {askingRoom && <PaidActionDialog title={`🌐 Ask to join ${askingRoom.name}`} cost={roomJoinCost} confirmLabel="Pay & ask" busy={busy}
-        description={`Sends ${askingRoom.creatorName || nameFor(askingRoom.creator)} an encrypted request naming only this room, plus a 0.1000 CHEESE join fee paid to them (kept whether they accept or decline). If they accept, an invite appears in your Groups and you choose Join or Decline.`}
+        description={`Sends ${askingRoom.creatorName || nameFor(askingRoom.creator)} an encrypted request at the ordinary message rate, with no extra owner fee. If they accept, an invite appears in your Groups and you choose Join or Decline. The request payment is not refunded if declined.`}
         onConfirm={() => askToJoin(askingRoom)} onClose={() => setAskingRoom(null)}>
         <JoinNoteField value={joinNote} onChange={setJoinNote} disabled={busy} placeholder="e.g. Hey, it's John from work" />
       </PaidActionDialog>}

@@ -8,7 +8,7 @@
  * 0x03 is used because 0x01 marks multipart text and 0x02 starts the group text envelope.
  */
 import nacl from 'tweetnacl';
-import { buildCryptFeeActions, buildSendMessageActions, encryptBytesMemo, MAX_PLAINTEXT_BYTES, MESSAGE_RECIPIENT_QUANTITY, type MessagingKey } from '@/lib/cheeseCrypt';
+import { buildCryptFeeActions, buildSendMessageActions, encryptBytesMemo, MAX_PLAINTEXT_BYTES, MESSAGE_FEE_QUANTITY, MESSAGE_RECIPIENT_QUANTITY, type MessagingKey } from '@/lib/cheeseCrypt';
 
 export const VOICE_MARK = 0x03;
 export const VOICE_HEADER_BYTES = 12;
@@ -164,18 +164,18 @@ export function assembleVoice(parts: VoicePartMemo[], now = Date.now()): VoiceNo
   return out;
 }
 
-/** Flat platform fee per voice note, whatever its length or number of recipients. */
-export const VOICE_FEE_QUANTITY = '1.0000 CHEESE';
+/** Same shared platform fee per encrypted part as text and NFTs. */
+export const VOICE_FEE_QUANTITY = MESSAGE_FEE_QUANTITY;
 const units = (q: string) => Math.round(parseFloat(q) * 10000);
 
-/** Total CHEESE for a voice note: one flat platform fee plus 0.0001 per part to every recipient. */
+/** Total CHEESE: one shared platform fee per part plus a carrier payment per recipient per part. */
 export function voiceNoteCost(parts: number, recipients = 1): string {
-  return `${((units(VOICE_FEE_QUANTITY) + units(MESSAGE_RECIPIENT_QUANTITY) * parts * recipients) / 10000).toFixed(4)} CHEESE`;
+  return `${((parts * (units(VOICE_FEE_QUANTITY) + units(MESSAGE_RECIPIENT_QUANTITY) * recipients)) / 10000).toFixed(4)} CHEESE`;
 }
 
 /**
  * Transactions to sign, in order. Each carries up to 30 parts; every recipient gets its own encrypted
- * copy of each part paid 0.0001 CHEESE. The split 1 CHEESE platform fee is paid once, in the first transaction.
+ * copy of each part paid 0.0001 CHEESE. Every part pays the ordinary shared platform split in its own batch.
  */
 export function buildVoiceBatches(key: MessagingKey, recipients: string[], group: VoiceGroupRef | null, clip: VoiceClip,
   contacts: Record<string, string>, auth: unknown[], id?: string, editTarget?: string): unknown[][] {
@@ -188,7 +188,9 @@ export function buildVoiceBatches(key: MessagingKey, recipients: string[], group
   for (let s = 0; s < plain.length; s += VOICE_PARTS_PER_TX) {
     const payments = recipients.flatMap((to, ri) =>
       buildSendMessageActions(key.account, to, encrypted[ri].slice(s, s + VOICE_PARTS_PER_TX), auth, false, false));
-    if (s === 0) payments.push(...buildCryptFeeActions(key.account, VOICE_FEE_QUANTITY, auth));
+    for (const _part of plain.slice(s, s + VOICE_PARTS_PER_TX)) {
+      payments.push(...buildCryptFeeActions(key.account, VOICE_FEE_QUANTITY, auth));
+    }
     batches.push(payments);
   }
   return batches;
