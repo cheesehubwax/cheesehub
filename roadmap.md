@@ -2,7 +2,7 @@
 
 Open tasks only. Completed work lives in git history.
 
-- [ ] CHEESEAir phases 1–2: add allocation safety coverage; extract allocation, resource calculations and the sending runner without changing valid distribution or transaction behaviour.
+- [ ] CHEESEAir: verify one signed airdrop and chain readback after stages 1–2 — requires the user's Anchor signatures. Allocation/resource/runner checks pass; remaining audit findings are recorded in `.lovable/cheeseair-audit.md` for later stages.
 
 - [ ] Verify flattened voice and join/rejoin fees on WAX — requires the user's Anchor signatures; automated fee/delivery checks cover the changed paths.
 
