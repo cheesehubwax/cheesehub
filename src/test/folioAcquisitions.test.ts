@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { acquisitionBreakdown, giftReceipts } from '@/components/folio/FolioParts';
+import { acquisitionBreakdown, giftReceipts } from '@/lib/folio/acquisitions';
 import { buildLedger } from '@/lib/folio/ledger';
 import type { FolioEvent } from '@/lib/folio/types';
 

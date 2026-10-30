@@ -20,4 +20,4 @@ Open tasks only. Completed work lives in git history.
 - [ ] CHEESECrypt atomic blind router (zero custody, transient pending payments): owner deploys to a fresh testnet account; verify chain auth/fees/change/refund/rollback/resources, then add authenticated original-sender trace decoding before app integration — waits on deployment. Voice now charges per part in each batch; voice, key publishing and public listings stay direct pending integration gates.
 - [ ] Token registry activation: run GitHub Actions → Token Price History once after changes reach GitHub.
 
-- [ ] CHEESEFolio tidy: Stages 1-3 done (golden ledger, sync engine, valuation safety); Stages 4-6 (UI split, render perf, cleanup) pending approval one at a time
+- [ ] CHEESEFolio tidy: Stages 1-4 done (golden ledger, sync engine, valuation safety, UI split); Stages 5-6 (render perf, cleanup) pending approval one at a time

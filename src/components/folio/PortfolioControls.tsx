@@ -8,7 +8,7 @@ import { TokenLogo } from '@/components/TokenLogo';
 import { toast } from '@/hooks/use-toast';
 import type { FolioPortfolio } from '@/lib/folio/portfolios';
 import type { HoldingRow } from '@/lib/folio/holdings';
-import { fmt } from './FolioParts';
+import { fmt } from './format';
 
 interface Props {
   portfolios: FolioPortfolio[];
