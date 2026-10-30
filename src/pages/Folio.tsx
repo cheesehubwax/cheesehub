@@ -18,7 +18,7 @@ import { PortfolioControls, PortfolioTokenPicker } from '@/components/folio/Port
 import { scopePortfolio } from '@/lib/folio/portfolios';
 import { usePooledTokens } from '@/hooks/usePooledTokens';
 import { hasCoverageGap } from '@/lib/folio/scanner';
-import { buildHoldings, type HoldingRow } from '@/lib/folio/holdings';
+import { buildHoldings, holdingTotals, type HoldingRow } from '@/lib/folio/holdings';
 import { downloadActivityCsv, downloadHoldingsCsv } from '@/lib/folio/csv';
 import { ActivityList, HoldingsTable, money, PlChart, SummaryBox, TokenDialog, totalHoldingCost, usdFmt, waxFmt, type Currency } from '@/components/folio/FolioParts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -133,25 +133,12 @@ const Folio = () => {
   const totalCost = useMemo(() => totalHoldingCost(holdings), [holdings]);
 
   const totals = useMemo(() => {
-    let value = 0, unrealized = 0, realized = 0, valueUsd = 0, unrealizedUsd = 0, realizedUsd = 0, realisableWax = 0, realisableKnown = true;
-    for (const h of holdings) {
-      value += h.valueWax ?? 0;
-      unrealized += h.unrealizedWax ?? 0;
-      valueUsd += h.valueUsd ?? 0;
-      unrealizedUsd += h.unrealizedUsd ?? 0;
-      if (h.key === 'eosio.token:WAX') realisableWax += h.balance;
-      else if ((h.valueWax ?? 0) < 1) realisableWax += h.valueWax ?? 0;
-      else {
-        const r = realisable?.get(h.key)?.wax;
-        if (r == null) realisableKnown = false;
-        else realisableWax += r;
-      }
-    }
+    let realized = 0, realizedUsd = 0;
     for (const p of scoped.ledger.positions.values()) {
       realized += p.realizedWax;
       realizedUsd += p.realizedUsd;
     }
-    return { value, unrealized, realized, valueUsd, unrealizedUsd, realizedUsd, realisableWax: realisable && realisableKnown ? realisableWax : null };
+    return { ...holdingTotals(holdings, realisable), realized, realizedUsd };
   }, [holdings, scoped.ledger, realisable]);
 
   // Cumulative realised profit/loss, one point per day with a sale.
@@ -230,8 +217,8 @@ const Folio = () => {
                   </Button>
                 )}
                 <Button size="sm" variant="outline" disabled={!holdings.length} onClick={() => downloadHoldingsCsv(accountName, fiat, holdings.map((h) => ({
-                  symbol: h.symbol, contract: h.contract, balance: h.balance, walletBalance: h.walletBalance, pooledBalance: h.pooledBalance, avgCostWax: h.avgCostWax, priceWax: h.priceWax ?? 0,
-                  valueWax: h.valueWax ?? 0, unrealizedWax: h.unrealizedWax, realizedWax: h.realizedWax, complete: h.complete,
+                  symbol: h.symbol, contract: h.contract, balance: h.balance, walletBalance: h.walletBalance, pooledBalance: h.pooledBalance, avgCostWax: h.avgCostWax, priceWax: h.priceWax,
+                  valueWax: h.valueWax, unrealizedWax: h.unrealizedWax, realizedWax: h.realizedWax, complete: h.complete,
                   avgCostUsd: h.avgCostUsd, valueUsd: h.valueUsd, unrealizedUsd: h.unrealizedUsd, realizedUsd: h.realizedUsd,
                   realisableWax: h.key === 'eosio.token:WAX' ? h.balance : realisable?.get(h.key)?.wax ?? null,
                 })))}>Holdings CSV</Button>
@@ -341,14 +328,14 @@ const Folio = () => {
                   ? (usd ? totalCost.usd : totalCost.wax) == null ? 'Cost unavailable' : 'Partial · known costs only'
                   : usd ? waxFmt(totalCost.wax) : usdFmt(totalCost.wax, waxUsd, fiat)}
               />
-              <SummaryBox label="Paper value" value={usd ? money(totals.valueUsd, cur) : waxFmt(totals.value)} sub={usd ? waxFmt(totals.value) : usdFmt(totals.value, waxUsd, fiat)} />
+              <SummaryBox label="Paper value" value={usd ? money(totals.valueUsd, cur) : waxFmt(totals.value)} sub={(usd ? totals.valueUsdPartial : totals.valuePartial) ? 'Partial · priced tokens only' : usd ? waxFmt(totals.value) : usdFmt(totals.value, waxUsd, fiat)} />
               <SummaryBox
                 label="Realisable now"
                 value={totals.realisableWax == null ? '…' : usd ? money(waxUsd ? totals.realisableWax * waxUsd : null, cur) : waxFmt(totals.realisableWax)}
-                sub={totals.realisableWax != null && totals.value > 0 ? `${totals.realisableWax >= totals.value ? '+' : ''}${(((totals.realisableWax - totals.value) / totals.value) * 100).toFixed(2)}% vs paper` : 'selling everything on Alcor now'}
-                subTone={totals.realisableWax != null && totals.value > 0 ? ((totals.realisableWax - totals.value) / totals.value) * 100 : null}
+                sub={totals.realisableWax != null && totals.value != null && totals.value > 0 ? `${totals.realisableWax >= totals.value ? '+' : ''}${(((totals.realisableWax - totals.value) / totals.value) * 100).toFixed(2)}% vs paper` : 'selling everything on Alcor now'}
+                subTone={totals.realisableWax != null && totals.value != null && totals.value > 0 ? ((totals.realisableWax - totals.value) / totals.value) * 100 : null}
               />
-              <SummaryBox label="Unrealised P/L" value={usd ? money(totals.unrealizedUsd, cur) : waxFmt(totals.unrealized)} sub={usd ? undefined : usdFmt(totals.unrealized, waxUsd, fiat)} tone={usd ? totals.unrealizedUsd : totals.unrealized} />
+              <SummaryBox label="Unrealised P/L" value={usd ? money(totals.unrealizedUsd, cur) : waxFmt(totals.unrealized)} sub={(usd ? totals.unrealizedUsdPartial : totals.unrealizedPartial) ? 'Partial · costed tokens only' : usd ? undefined : usdFmt(totals.unrealized, waxUsd, fiat)} tone={usd ? totals.unrealizedUsd : totals.unrealized} />
               <SummaryBox label="Realised P/L" value={usd ? money(totals.realizedUsd, cur) : waxFmt(totals.realized)} sub={usd ? undefined : usdFmt(totals.realized, waxUsd, fiat)} tone={usd ? totals.realizedUsd : totals.realized} />
             </div>
             <p className="w-full text-xs text-muted-foreground text-center">
