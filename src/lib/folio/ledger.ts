@@ -300,20 +300,3 @@ export function buildLedger(events: FolioEvent[], priceAt: PriceAt = () => null,
   }
   return { positions, realizedByEvent, realizedUsdByEvent, realizedByEventToken, realizedUsdByEventToken, valueByEvent, valueUsdByEvent };
 }
-
-/** Daily wallet quantity per token, replaying events up to each day's end. */
-export function quantitiesByDay(events: FolioEvent[], dayEnds: number[]): Map<TokenKey, number>[] {
-  const sorted = [...events].sort((a, b) => a.seq - b.seq);
-  const qty = new Map<TokenKey, number>();
-  const out: Map<TokenKey, number>[] = [];
-  let i = 0;
-  for (const end of dayEnds) {
-    while (i < sorted.length && sorted[i].ts <= end) {
-      const ev = sorted[i++];
-      for (const a of ev.out) qty.set(a.key, Math.max(0, (qty.get(a.key) ?? 0) - a.amount));
-      for (const a of ev.in) qty.set(a.key, (qty.get(a.key) ?? 0) + a.amount);
-    }
-    out.push(new Map(qty));
-  }
-  return out;
-}
