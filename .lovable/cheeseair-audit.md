@@ -3,7 +3,7 @@
 ## Completed
 - Characterized token equal/fixed/pro-rata allocation, exact decimal parsing, NFT allocation/shortfalls, RAM exclusion/splitting and resource purchase minima before extraction.
 - Separated allocation into `useAirAllocation`, cost/resource derivation into `useAirCosts`, and wallet preparation/delivery into `useAirdropRunner`.
-- Kept snapshot selection, row discovery, CSV exports and hot-reload context identity in the provider; reduced it from 1,489 to 686 lines.
+- Kept snapshot selection, row discovery, CSV exports, public exports and hot-reload context identity in the provider; reduced it from 1,489 to about 690 lines.
 - Kept valid payout algorithms, transaction payloads, inter-batch delays, failed-batch continuation and resource-purchase abort behaviour unchanged.
 - Enforced the existing terms/error gate inside the sending function, blocked concurrent invocation and required transaction IDs for confirmed resource/delivery logs.
 

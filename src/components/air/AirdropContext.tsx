@@ -37,6 +37,7 @@ import { bytesPerCheese } from '@/lib/airdropResources';
 import { useAirAllocation } from '@/hooks/useAirAllocation';
 import { useAirCosts } from '@/hooks/useAirCosts';
 import { useAirdropRunner, shortError, type PurchaseLogEntry, type BatchLogEntry } from '@/hooks/useAirdropRunner';
+export { shortError, type PurchaseLogEntry, type BatchLogEntry } from '@/hooks/useAirdropRunner';
 export { RAM_BYTES_PER_ROW } from '@/hooks/useAirCosts';
 
 import {
