@@ -11,6 +11,11 @@ import { toast } from 'sonner';
 import { AccountResources, formatBytes } from './WalletResources';
 import { fetchWithFallback } from '@/lib/fetchWithFallback';
 import { AreaChart, Area, ResponsiveContainer, Tooltip, YAxis } from 'recharts';
+import { BuyRamCard } from '@/components/ram/BuyRamCard';
+import { SellRamCard } from '@/components/ram/SellRamCard';
+import { useAccountRam, useCheeseRamConfig, useCheeseRamReserves, useRamPrice } from '@/hooks/useCheeseRam';
+import { useCheesePriceData } from '@/hooks/useCheesePriceData';
+import cheeseLogo from '@/assets/cheese-logo.png';
 
 const WAX_ENDPOINTS = ['https://wax.greymass.com', 'https://api.wax.alohaeos.com', 'https://wax.eosphere.io'];
 
@@ -22,7 +27,54 @@ interface RamManagerProps {
 
 interface PricePoint { time: number; price: number; }
 
-export function RamManager({ resources, onTransactionComplete, onTransactionSuccess }: RamManagerProps) {
+/** CHEESERam is the default way to buy/sell RAM; native WAX RAM stays as a backup tab (mirrors CHEESEUp vs WAX PowerUp). */
+export function RamManager(props: RamManagerProps) {
+  const { accountName } = useWax();
+  const [paymentMode, setPaymentMode] = useState<'cheese' | 'wax'>('cheese');
+  const { data: config, refetch: refetchConfig } = useCheeseRamConfig();
+  const { data: reserves, refetch: refetchReserves } = useCheeseRamReserves();
+  const { pricePerByte, refetch: refetchRamPrice } = useRamPrice();
+  const { data: accountRam, refetch: refetchAccountRam } = useAccountRam(accountName);
+  const { data: cheesePrice } = useCheesePriceData();
+  const liveWaxPerCheese = cheesePrice?.waxPrice && cheesePrice.waxPrice > 0 ? cheesePrice.waxPrice : null;
+  const availableBytes = accountRam
+    ? Math.max(0, accountRam.quota - accountRam.usage)
+    : props.resources ? Math.max(0, props.resources.ram_quota - props.resources.ram_usage) : 0;
+
+  const handleCheeseComplete = useCallback(() => {
+    const refresh = () => { refetchConfig(); refetchReserves(); refetchRamPrice(); refetchAccountRam(); props.onTransactionComplete?.(); };
+    refresh();
+    [1500, 4000, 8000].forEach((d) => window.setTimeout(refresh, d));
+  }, [refetchConfig, refetchReserves, refetchRamPrice, refetchAccountRam, props]);
+
+  return (
+    <Tabs value={paymentMode} onValueChange={(v) => setPaymentMode(v as 'cheese' | 'wax')} className="w-full">
+      <TabsList className="w-full">
+        <TabsTrigger value="cheese" className="flex-1 gap-2">
+          <img src={cheeseLogo} alt="CHEESE" className="h-4 w-4" />
+          CHEESERam
+        </TabsTrigger>
+        <TabsTrigger value="wax" className="flex-1 gap-2">WAX RAM</TabsTrigger>
+      </TabsList>
+      <TabsContent value="cheese" className="mt-4">
+        <Tabs defaultValue="buy" className="w-full">
+          <TabsList className="w-full"><TabsTrigger value="buy" className="flex-1">Buy RAM</TabsTrigger><TabsTrigger value="sell" className="flex-1">Sell RAM</TabsTrigger></TabsList>
+          <TabsContent value="buy" className="mt-4 [&>div]:max-w-none [&>div]:p-4">
+            <BuyRamCard config={config} pricePerByte={pricePerByte} liveWaxPerCheese={liveWaxPerCheese} onComplete={handleCheeseComplete} />
+          </TabsContent>
+          <TabsContent value="sell" className="mt-4 [&>div]:max-w-none [&>div]:p-4">
+            <SellRamCard config={config} pricePerByte={pricePerByte} liveWaxPerCheese={liveWaxPerCheese} reserves={reserves} availableBytes={availableBytes} onComplete={handleCheeseComplete} />
+          </TabsContent>
+        </Tabs>
+      </TabsContent>
+      <TabsContent value="wax" className="mt-4">
+        <WaxRamManager {...props} />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function WaxRamManager({ resources, onTransactionComplete, onTransactionSuccess }: RamManagerProps) {
   const { session, accountName } = useWax();
   const [isTransacting, setIsTransacting] = useState(false);
   const [ramPricePerByte, setRamPricePerByte] = useState<number | null>(null);
