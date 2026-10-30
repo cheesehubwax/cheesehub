@@ -63,33 +63,26 @@ export function computeAmounts(
   const n = BigInt(holders.length);
   // Exact rational shares: share_i = total * num_i / den.
   // equal -> num_i = 1, den = n. prorata -> num_i = weight_i scaled, den = sum.
-  const SCALE = 1_000_000n;
   let shares: Array<{ account: string; weight: number; num: bigint }> = [];
   let den: bigint;
   if (mode === "equal") {
     den = n;
     shares = holders.map((h) => ({ account: h.account, weight: h.weight, num: 1n }));
   } else {
-    const totalWeight = holders.reduce((s, h) => s + h.weight, 0);
-    if (!Number.isFinite(totalWeight) || totalWeight <= 0) throw new Error("Holder weights must have a finite positive sum");
-    den = SCALE;
-    shares = holders.map((h) => ({
-      account: h.account,
-      weight: h.weight,
-      num: BigInt(Math.round((h.weight / totalWeight) * Number(SCALE))),
-    }));
-    // Ensure numerators sum to the denominator for exact conservation.
-    const numSum = shares.reduce((s, x) => s + x.num, 0n);
-    const drift = den - numSum;
-    if (drift !== 0n) {
-      // apply drift to the largest holder
-      const maxIdx = shares.reduce((mi, x, i, a) => (x.weight > (a[mi]?.weight ?? 0) ? i : mi), 0);
-      const target = shares[maxIdx];
-      if (target) target.num += drift;
-    }
-    if (shares.some(s => s.num < 0n)) {
-      throw new Error('Holder weights cannot be safely represented at this allocation precision');
-    }
+    // Preserve the decimal value supplied by the snapshot, including scientific
+    // notation, without normalizing to lossy millionths or overflowing a sum.
+    const weights = holders.map(h => {
+      const [mantissa = '0', exponent = '0'] = h.weight.toString().toLowerCase().split('e');
+      const [whole = '0', fraction = ''] = mantissa.split('.');
+      return { digits: BigInt(whole + fraction), power: Number(exponent) - fraction.length };
+    });
+    const commonPower = weights.reduce((p, w) => Math.min(p, w.power), 0);
+    shares = holders.map((h, i) => {
+      const w = weights[i];
+      return { ...h, num: w ? w.digits * 10n ** BigInt(w.power - commonPower) : 0n };
+    });
+    den = shares.reduce((s, h) => s + h.num, 0n);
+    if (den <= 0n) throw new Error('Holder weights sum to zero');
   }
 
   // Largest remainder allocation in base units.
@@ -297,28 +290,10 @@ export function allocateAssets(
       const rem = total % holders.length;
       for (let i = 0; i < holders.length; i++) counts[i] = base + (i < rem ? 1 : 0);
     } else {
-      const totalWeight = holders.reduce((s, h) => s + (h.weight > 0 ? h.weight : 0), 0);
-      if (!Number.isFinite(totalWeight)) throw new Error('Holder weights must have a finite sum');
-      if (!(totalWeight > 0)) return empty;
-      const exact = holders.map((h) => (total * (h.weight > 0 ? h.weight : 0)) / totalWeight);
-      let handed = 0;
-      for (let i = 0; i < holders.length; i++) {
-        const floor = Math.floor(exact[i] ?? 0);
-        counts[i] = floor;
-        handed += floor;
-      }
-      const order = holders
-        .map((_, i) => i)
-        .sort((a, b) => ((exact[b] ?? 0) % 1) - ((exact[a] ?? 0) % 1));
-      let k = 0;
-      while (handed < total && order.length > 0) {
-        const idx = order[k % order.length];
-        if (idx !== undefined) {
-          counts[idx] = (counts[idx] ?? 0) + 1;
-          handed += 1;
-        }
-        k += 1;
-      }
+      if (total === 0) return empty;
+      const allocated = computeAmounts(holders, 'prorata', String(total), 0);
+      const amounts = new Map(allocated.map(r => [r.account, Number(r.units)]));
+      for (let i = 0; i < holders.length; i++) counts[i] = amounts.get(holders[i]?.account ?? '') ?? 0;
     }
   }
 
