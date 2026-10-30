@@ -64,14 +64,17 @@ proof of an 8/50-member room. Chain CPU/NET/transaction limits can be substantia
 max-size delivery is not verified.
 
 Default fees (four decimal CHEESE):
-- Every message (text, NFT, links, controls, edits, reports): 0.0100 per part, shared across
-  recipients. There is no message type parameter, so amounts never reveal content type.
+- Every message (text, NFT, voice parts, join requests, links, controls, edits, reports): 0.0100 per part, shared across
+  recipients. There is no message type parameter or content-specific fee; sizes and traffic patterns can still distinguish activity.
 - Every delivered copy adds 0.0001, paid to its recipient, not split.
 - Split uses integer floor for the 80% share; the remainder goes to liquidity.
 
-The app charges NFTs the same as text. The blind contract cannot prove a logical multipart message
-or enforce one fee across multiple actions. Voice notes (1.0000 once per note, 30-part batches) are not
-routed; keep voice on the existing direct-transfer path until a separately reviewed continuation design exists.
+The app charges text, NFTs and voice the same 0.0100 per encrypted part. Each voice batch
+(up to 30 parts) pays its own shared per-part platform fees plus recipient carriers: 30 parts
+cost 0.3000 platform fees, or 0.3030 total for one recipient. No cross-action flat-fee continuation
+is needed. Join/rejoin requests cost the ordinary 0.0101 total, without an owner surcharge.
+Both paths remain direct until authenticated router history and practical resource limits are verified;
+request-carried keys and ciphertext sizes still distinguish some requests. No source/ABI change is required.
 Public key publishing, 100-CHEESE key creation and `CRYPTROOM1:` listing/unlisting also stay
 on the existing direct path; generic router fee memos are not listing or key publications.
 

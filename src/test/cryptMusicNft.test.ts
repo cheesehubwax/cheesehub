@@ -43,9 +43,9 @@ describe('CHEESECrypt music NFTs', () => {
     expect(nftMediaTracks({ clip: 'c' }, r)).toEqual([{ label: 'Main', url: 'https://gw/c' }]);
     expect(nftMediaTracks({ video: 'v' }, r)).toEqual([{ label: 'Main', url: 'https://gw/v' }]);
   });
-  it('a music attachment costs the NFT price: 0.0201 in a DM, 0.0203 with 3 group recipients', () => {
+  it('a music attachment costs the NFT price: 0.0101 in a DM, 0.0103 with 3 group recipients', () => {
     const hasNft = parseNftMessage(nftToken('1099512345678')).some(s => s.type === 'nft');
-    expect(messageCost(1, hasNft)).toBe('0.0201 CHEESE');
-    expect(groupMessageCost(1, 3, hasNft)).toBe('0.0203 CHEESE');
+    expect(messageCost(1, hasNft)).toBe('0.0101 CHEESE');
+    expect(groupMessageCost(1, 3, hasNft)).toBe('0.0103 CHEESE');
   });
 });

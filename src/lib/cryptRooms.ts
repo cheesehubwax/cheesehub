@@ -1,8 +1,8 @@
 // CHEESECrypt public rooms. A creator may publish a plaintext listing for one of their invite (CG2) groups so
 // others can find it and ask to join in an encrypted message. Only the room's name, topic, tags, member count,
 // creator account and the creator's public key are public — never the member list or any message.
-// Making a room public pays a 10.0000 CHEESE listing stake (80% eosio.null / 20% xcheeseliqst) so spammers cannot
-// farm join-request fees with throwaway rooms; updating a staked listing's details and unlisting pay the normal
+// Making a room public pays a 10.0000 CHEESE listing stake (80% eosio.null / 20% xcheeseliqst) to deter
+// throwaway spam listings; updating a staked listing's details and unlisting pay the normal
 // 0.0100 CHEESE platform fee. Both fee legs carry the memo.
 import { decodeBase64 } from 'tweetnacl-util';
 import { parseCryptName } from '@/lib/cryptNames';
@@ -228,18 +228,12 @@ export function encodeJoinMemo(key: MessagingKey, roomId: string, creatorPublicK
   return memo;
 }
 
-/** Paid straight to the room creator on every join request: rewards owners and deters repeat requests after a decline. */
-export const JOIN_OWNER_FEE_QUANTITY = '0.1000 CHEESE';
-export const JOIN_OWNER_FEE_MEMO = 'CHEESECrypt join request fee';
-/** Total of one join request: 0.0001 CHEESE message copy + 0.1000 CHEESE owner fee + 0.0100 CHEESE platform fee. */
-export const JOIN_REQUEST_COST = `${((Math.round(parseFloat(messageCost(1)) * 10000) + Math.round(parseFloat(JOIN_OWNER_FEE_QUANTITY) * 10000)) / 10000).toFixed(4)} CHEESE`;
+/** A join/rejoin request pays exactly the ordinary single-part direct-message fee. */
+export const JOIN_REQUEST_COST = messageCost(1);
 
-/** The 0.0001 CHEESE encrypted request to the creator, a separate plain 0.1000 CHEESE owner fee to the creator, then the normal platform fee. */
-export const buildJoinRequestActions = (key: MessagingKey, creator: string, creatorPublicKey: string, roomId: string, auth: unknown[], note?: string) => {
-  const [request, ...platform] = buildSendMessageActions(key.account, creator, [encodeJoinMemo(key, roomId, creatorPublicKey, note)], auth, false, true);
-  const ownerFee = { account: 'cheeseburger', name: 'transfer', authorization: auth, data: { from: key.account, to: creator, quantity: JOIN_OWNER_FEE_QUANTITY, memo: JOIN_OWNER_FEE_MEMO } };
-  return [request, ownerFee, ...platform];
-};
+/** Encrypted request carrier to the creator plus the normal platform fee; no extra owner payment or identifying fee memo. */
+export const buildJoinRequestActions = (key: MessagingKey, creator: string, creatorPublicKey: string, roomId: string, auth: unknown[], note?: string) =>
+  buildSendMessageActions(key.account, creator, [encodeJoinMemo(key, roomId, creatorPublicKey, note)], auth, false, true);
 
 export interface JoinRequest { groupId: string; from: string; publicKey: string; time: number; note?: string }
 /** Join requests to my listed rooms from non-members, newest per (room, requester), after any decline. */

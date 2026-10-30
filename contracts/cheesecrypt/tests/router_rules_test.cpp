@@ -7,6 +7,9 @@ int main() {
    // One uniform 0.0100 CHEESE price per part for every message type.
    assert(platform_units(3, 100) == 300);
    assert(platform_units(1, 100) + 1 == 101);
+   assert(platform_units(30, 100) == 3000); // 0.3000 voice batch platform fee
+   assert(platform_units(30, 100) + 30 == 3030); // 0.3030 with one recipient
+   assert(platform_units(30, 100) + 30 * 2 == 3060); // shared, not doubled
    const int64_t platform = platform_units(35, 100);
    assert(platform + 35 * 49 == 5215); // one shared fee + 0.0001 per copy
    assert(null_units(100, 80) == 80);

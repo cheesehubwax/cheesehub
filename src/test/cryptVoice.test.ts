@@ -77,26 +77,42 @@ describe('CHEESECrypt voice notes', () => {
     batches.forEach(t => expect(partsIn(t)).toBeLessThanOrEqual(VOICE_PARTS_PER_TX));
     expect(batches.reduce((n, t) => n + partsIn(t), 0)).toBe(voicePartCount(v));
   });
-  it('splits 1 CHEESE once 80/20 plus 0.0010 per part per recipient', () => {
+  it('charges 0.0100 per part split 80/20 in every batch, shared across recipients', () => {
     const v = clip();
     const parts = voicePartCount(v);
     type T = { data: { to: string; quantity: string } };
     const sum = (l: T[]) => (l.reduce((t, x) => t + Math.round(parseFloat(x.data.quantity) * 10000), 0) / 10000).toFixed(4) + ' CHEESE';
     const dmBatches = buildVoiceBatches(a, ['bob.wam'], null, v, { 'bob.wam': b.publicKey }, []);
     const dm = dmBatches.flat() as T[];
-    expect(dm.filter(x => x.data.to === 'eosio.null').map(x => x.data.quantity)).toEqual(['0.8000 CHEESE']);
-    expect((dmBatches[0] as T[]).some(x => x.data.to === 'eosio.null')).toBe(true);
-    expect(dm.filter(x => x.data.to === 'xcheeseliqst').map(x => x.data.quantity)).toEqual(['0.2000 CHEESE']);
-    dmBatches.slice(1).forEach(batch => expect((batch as T[]).every(x => x.data.to === 'bob.wam')).toBe(true));
+    expect(dm.filter(x => x.data.to === 'eosio.null').map(x => x.data.quantity)).toEqual(Array(parts).fill('0.0080 CHEESE'));
+    expect(dm.filter(x => x.data.to === 'xcheeseliqst').map(x => x.data.quantity)).toEqual(Array(parts).fill('0.0020 CHEESE'));
+    dmBatches.forEach(batch => {
+      const rows = batch as T[];
+      const count = rows.filter(x => x.data.to === 'bob.wam').length;
+      expect(rows.filter(x => x.data.to === 'eosio.null')).toHaveLength(count);
+      expect(rows.filter(x => x.data.to === 'xcheeseliqst')).toHaveLength(count);
+      expect(rows.filter(x => x.data.to === 'bob.wam').every(x => x.data.quantity === '0.0001 CHEESE')).toBe(true);
+    });
+    expect(sum(dmBatches[0] as T[])).toBe('0.3030 CHEESE');
     expect(sum(dm)).toBe(voiceNoteCost(parts, 1));
-    expect(voiceNoteCost(parts, 1)).toBe(`${(1 + parts * 0.0001).toFixed(4)} CHEESE`);
+    expect(voiceNoteCost(parts, 1)).toBe(`${(parts * 0.0101).toFixed(4)} CHEESE`);
     const group = createGroup('alice.wam', ['bob.wam', 'carol.wam']);
     const g = buildVoiceBatches(a, ['bob.wam', 'carol.wam'], group, v, { 'bob.wam': b.publicKey, 'carol.wam': c.publicKey }, []).flat() as T[];
-    expect(g.filter(x => x.data.to === 'eosio.null')).toHaveLength(1);
-    expect(g.filter(x => x.data.to === 'eosio.null').map(x => x.data.quantity)).toEqual(['0.8000 CHEESE']);
-    expect(g.filter(x => x.data.to === 'xcheeseliqst').map(x => x.data.quantity)).toEqual(['0.2000 CHEESE']);
+    expect(g.filter(x => x.data.to === 'eosio.null')).toHaveLength(parts);
+    expect(g.filter(x => x.data.to === 'eosio.null').map(x => x.data.quantity)).toEqual(Array(parts).fill('0.0080 CHEESE'));
+    expect(g.filter(x => x.data.to === 'xcheeseliqst').map(x => x.data.quantity)).toEqual(Array(parts).fill('0.0020 CHEESE'));
     expect(sum(g)).toBe(voiceNoteCost(parts, 2));
-    expect(voiceNoteCost(parts, 2)).toBe(`${(1 + parts * 0.0002).toFixed(4)} CHEESE`);
+    expect(voiceNoteCost(parts, 2)).toBe(`${(parts * 0.0102).toFixed(4)} CHEESE`);
+  });
+  it('charges metadata and the extra edit-target part at the same rate', () => {
+    const v = clip(1000);
+    const rows = buildVoiceBatches(a, ['bob.wam'], null, v, { 'bob.wam': b.publicKey }, [], 'abcdef', 'a'.repeat(64)).flat() as { data: { to: string; quantity: string } }[];
+    const parts = voicePartCount(v) + 1;
+    expect(rows.filter(x => x.data.to === 'bob.wam')).toHaveLength(parts);
+    expect(rows.filter(x => x.data.to === 'eosio.null')).toHaveLength(parts);
+    const total = rows.reduce((n, x) => n + Math.round(parseFloat(x.data.quantity) * 10000), 0);
+    expect(total).toBe(parts * 101);
+    expect(voiceNoteCost(parts)).toBe(`${(total / 10000).toFixed(4)} CHEESE`);
   });
   it('group notes land in the group and show once for the sender', () => {
     const group = createGroup('alice.wam', ['bob.wam', 'carol.wam']);

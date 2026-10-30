@@ -53,14 +53,14 @@ describe('room fee', () => {
       ['eosio.null', '8.0000 CHEESE', memo], ['xcheeseliqst', '2.0000 CHEESE', memo],
     ]);
   });
-  it('a join request pays the creator 0.0001 + 0.1000 CHEESE plus the 0.0100 CHEESE platform fee (0.1101 total)', () => {
+  it('a join request pays the ordinary 0.0101 CHEESE with no owner surcharge', () => {
     const payload = encodeNotice('join', ID);
     expect(partsOf(payload)).toBe(1);
     expect(groupMessageCost(1, 1)).toBe('0.0101 CHEESE');
     const actions = buildJoinRequestActions(bob, 'alice', alice.publicKey, ID, []) as { data: { to: string; quantity: string; memo: string } }[];
-    expect(actions.map(a => [a.data.to, a.data.quantity])).toEqual([['alice', '0.0001 CHEESE'], ['alice', '0.1000 CHEESE'], ['eosio.null', '0.0080 CHEESE'], ['xcheeseliqst', '0.0020 CHEESE']]);
-    expect(actions[1].data.memo).toBe('CHEESECrypt join request fee');
-    expect(JOIN_REQUEST_COST).toBe('0.1101 CHEESE');
+    expect(actions.map(a => [a.data.to, a.data.quantity])).toEqual([['alice', '0.0001 CHEESE'], ['eosio.null', '0.0080 CHEESE'], ['xcheeseliqst', '0.0020 CHEESE']]);
+    expect(actions.some(a => a.data.memo === 'CHEESECrypt join request fee')).toBe(false);
+    expect(JOIN_REQUEST_COST).toBe('0.0101 CHEESE');
   });
 });
 
@@ -135,7 +135,7 @@ describe('asking to join and being added', () => {
     const ev = decodeRoomEvents([{ txId: 'j', time: 15, from: 'carol', to: 'alice', quantity: '0.0001 CHEESE', memo }], alice, {});
     expect(collectJoinRequests(ev, 'alice', new Set([ID]), { [ID]: ['alice', 'bob'] }, [], {})).toEqual([{ groupId: ID, from: 'carol', publicKey: carol.publicKey, time: 15 }]);
     const actions = buildJoinRequestActions(carol, 'alice', alice.publicKey, ID, []) as { data: { to: string; quantity: string } }[];
-    expect(actions.map(a => [a.data.to, a.data.quantity])).toEqual([['alice', '0.0001 CHEESE'], ['alice', '0.1000 CHEESE'], ['eosio.null', '0.0080 CHEESE'], ['xcheeseliqst', '0.0020 CHEESE']]);
+    expect(actions.map(a => [a.data.to, a.data.quantity])).toEqual([['alice', '0.0001 CHEESE'], ['eosio.null', '0.0080 CHEESE'], ['xcheeseliqst', '0.0020 CHEESE']]);
   });
 
   it('a key inside a memo never opens anything but a join request', () => {
