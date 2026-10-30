@@ -14,6 +14,9 @@ import { combineWaxFiat, fxLookup, isCrypto, type DisplayCode } from '@/lib/foli
 import { downloadFolioFile, exportFolio, mergeFolio, parseFolioFile, PortableError, type MergeResult } from '@/lib/folio/portable';
 import { validPortfolios, type FolioPortfolio } from '@/lib/folio/portfolios';
 
+/** Stable empty list so memoized rows don't redraw on every render. */
+const NO_PORTFOLIOS: FolioPortfolio[] = [];
+
 const emptyRecord = (account: string): StoredFolio => ({
   account, schema: FOLIO_SCHEMA, transfers: [], cursors: {}, syncedAt: null,
 });
@@ -261,7 +264,7 @@ export function useFolio(account: string | null, fiat: DisplayCode = 'USD') {
     clear,
     exportFile,
     importFile,
-    portfolios: rec?.portfolios ?? [],
+    portfolios: rec?.portfolios ?? NO_PORTFOLIOS,
     savePortfolios,
   };
 }

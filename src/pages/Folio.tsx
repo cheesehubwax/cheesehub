@@ -15,7 +15,7 @@ import { useFolioHoldings } from '@/hooks/useFolioHoldings';
 import { useAlcorTokenPrices } from '@/hooks/useAlcorTokenPrices';
 import { useWaxPrice } from '@/hooks/useWaxPrice';
 import { useFolio } from '@/hooks/useFolio';
-import { PortfolioControls, PortfolioTokenPicker } from '@/components/folio/PortfolioControls';
+import { PortfolioControls } from '@/components/folio/PortfolioControls';
 import { scopePortfolio } from '@/lib/folio/portfolios';
 import { hasCoverageGap } from '@/lib/folio/scanner';
 import type { HoldingRow } from '@/lib/folio/holdings';
@@ -94,6 +94,10 @@ const Folio = () => {
   const { allHoldings, holdings, totals, totalCost, realisable, pooled, pooledLoading, liveLoading } = useFolioHoldings({
     account: accountName, ledger: folio.ledger, scopedLedger: scoped.ledger, priceMap, waxRate: waxUsd, showClosed, portfolioKeys,
   });
+  const portfolioPicker = useMemo(
+    () => ({ portfolios: folio.portfolios, onSave: folio.savePortfolios, disabled: folio.syncing }),
+    [folio.portfolios, folio.savePortfolios, folio.syncing],
+  );
   const venueName: Record<string, string> = { alcor: 'Alcor', taco: 'Taco', defibox: 'Defibox' };
 
   // Cumulative realised profit/loss, one point per day with a sale.
@@ -322,7 +326,7 @@ const Folio = () => {
                   Couldn't read your {pooled.failed.map((v) => venueName[v] ?? v).join(' and ')} pool positions right now, so tokens there are left out. Refresh to try again.
                 </div>
               ) : null}
-              <HoldingsTable rows={holdings} events={folio.events} waxUsd={waxUsd} cur={cur} fiat={fiat} realisable={realisable} onPick={setPicked} portfolioAction={(row) => <PortfolioTokenPicker tokenKey={row.key} portfolios={folio.portfolios} onSave={folio.savePortfolios} disabled={folio.syncing} />} />
+              <HoldingsTable rows={holdings} events={folio.events} waxUsd={waxUsd} cur={cur} fiat={fiat} realisable={realisable} onPick={setPicked} portfolio={portfolioPicker} />
             </div>
 
             <div className="w-full space-y-2">
