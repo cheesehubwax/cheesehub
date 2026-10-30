@@ -2,7 +2,7 @@ import { Profiler, type ReactNode } from 'react';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AirdropProvider, useAirSend, useAirSnapshot, useAirDistribution, useAirHolders, useAirCosts, useAirRun } from '@/components/air/AirdropContext';
+import { AirdropProvider, useAirSend, useAirSnapshot, useAirDistribution, useAirHolders, useAirCostSummary, useAirRun } from '@/components/air/AirdropContext';
 import { AirHoldersTable } from '@/components/air/AirHoldersTable';
 
 const mocks = vi.hoisted(() => ({
@@ -54,7 +54,7 @@ function SendProbe() { useAirSend(); renders.send++; return null; }
 function SnapshotProbe() { snapshotApi = useAirSnapshot(); renders.snapshot++; return null; }
 function DistributionProbe() { distributionApi = useAirDistribution(); renders.distribution++; return null; }
 function HoldersProbe() { holdersApi = useAirHolders(); renders.holders++; return null; }
-function CostsProbe() { useAirCosts(); renders.costs++; return null; }
+function CostsProbe() { useAirCostSummary(); renders.costs++; return null; }
 function RunProbe() { runApi = useAirRun(); renders.run++; return null; }
 
 function mount(children?: ReactNode) {

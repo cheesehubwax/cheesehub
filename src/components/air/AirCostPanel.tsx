@@ -4,7 +4,7 @@ import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { formatUnits, RAM_BYTES_PER_NFT } from '@/lib/airdrop';
 import { formatCheese } from '@/lib/airdropResources';
 import { CHEESE_RAM_CONTRACT, CHEESE_SYMBOL, MIN_RAM_PURCHASE_CHEESE } from '@/lib/airdropCheese';
-import { RAM_BYTES_PER_ROW, useAirCosts } from '@/components/air/AirdropContext';
+import { RAM_BYTES_PER_ROW, useAirCostSummary } from '@/components/air/AirdropContext';
 
 function Metric({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -52,7 +52,7 @@ export function AirCostPanel() {
     requiredRamCheese,
     suggestedCpuCheese,
     cheeseBalance,
-  } = useAirCosts();
+  } = useAirCostSummary();
 
   // CPU pricing is calibrated from the connected account's own stake weight.
   const unavailable = actor ? 'unavailable' : 'connect wallet';

@@ -281,7 +281,8 @@ const AirCostsSlice = createAirSlice('Costs', [
   'estRamCheese', 'cheesePerCpuMs', 'cheesePerRamKb', 'requiredRamCheese', 'suggestedCpuCheese',
   'cheeseBalance',
 ]);
-export const useAirCosts = AirCostsSlice.useSlice;
+// Distinct from the calculation hook in hooks/useAirCosts: this reads UI state.
+export const useAirCostSummary = AirCostsSlice.useSlice;
 
 const AirRunSlice = createAirSlice('Run', [
   'actor', 'isRam', 'estimate', 'ramCheeseTotal', 'warnings',
