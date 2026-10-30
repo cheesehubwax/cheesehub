@@ -8,7 +8,7 @@ const pricing: ResourcePricing = {
   waxPerCheese: 1, priceSource: 'pool', powerup: null,
   ram: { enabled: true, minCheese: 1, maxCheese: 10, waxPerByte: 0.001, feeBps: 0, historicalBytesPerCheese: null, liquidWax: 100, minLiquidReserve: 10, reserveBufferBps: 0 },
 };
-const holders = [{ account: 'alice', weight: 2 }, { account: 'bob', weight: 1 }, { account: 'carol', weight: 1 }];
+const holders = [{ account: 'alice', weight: 2, raw: '2' }, { account: 'bob', weight: 1, raw: '1' }, { account: 'carol', weight: 1, raw: '1' }];
 function input() {
   return {
     actor: 'sender', tokenStat: { precision: 4, supply: '100.0000 CHEESE' },
@@ -16,7 +16,7 @@ function input() {
     sendContract: 'cheeseburger', sendSymbol: 'cheese', precision: 4, pricing,
     ramUnit: 'cheese' as const, amountText: '20', isRam: false, isNft: false,
     filteredHolders: holders, selected: new Set(['alice', 'carol']),
-    snapshot: { holders, source: 'test', truncated: false }, mode: 'equal' as const,
+    snapshot: { holders, source: 'lightapi' as const, truncated: false, hasBalances: true }, mode: 'equal' as const,
     nftPool: [], setAmountText: vi.fn(),
   };
 }
