@@ -15,10 +15,6 @@ using std::vector;
 class [[eosio::contract("cheesecrypt")]] cheesecrypt : public contract {
 public:
    using contract::contract;
-   static constexpr uint8_t KIND_TEXT = 0;
-   static constexpr uint8_t KIND_NFT = 1;
-   static constexpr uint8_t KIND_VOICE = 2;
-
    struct copy_t {
       name to;
       string memo; // Opaque original encrypted memo. Sender attribution is in sendmsg.
@@ -29,9 +25,7 @@ public:
       symbol token_symbol = symbol("CHEESE", 4);
       name null_account = "eosio.null"_n;
       name liquidity_account = "xcheeseliqst"_n;
-      asset text_fee = asset(100, symbol("CHEESE", 4));
-      asset nft_fee = asset(200, symbol("CHEESE", 4));
-      asset voice_fee = asset(10000, symbol("CHEESE", 4));
+      asset part_fee = asset(100, symbol("CHEESE", 4)); // same for text, NFT, links and controls
       asset recipient_fee = asset(1, symbol("CHEESE", 4));
       uint8_t null_percent = 80;
       uint32_t max_recipients = crypt_router::HARD_MAX_RECIPIENTS;
@@ -55,11 +49,11 @@ public:
    [[eosio::on_notify("*::transfer")]]
    void ontransfer(name from, name to, asset quantity, string memo);
    [[eosio::action]] void reclaim(name payer);
-   [[eosio::action]] void sendmsg(name sender, uint8_t kind, uint16_t parts, const vector<copy_t>& copies);
+   [[eosio::action]] void sendmsg(name sender, uint16_t parts, const vector<copy_t>& copies);
 
 private:
    config get_config() const;
    void pay_platform(const config& cfg, const asset& amount);
    void send_token(const config& cfg, name to, const asset& qty, const string& memo);
-   asset platform_fee(const config& cfg, uint8_t kind, uint16_t parts) const;
+   asset platform_fee(const config& cfg, uint16_t parts) const;
 };

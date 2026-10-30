@@ -15,12 +15,10 @@ inline bool batch_shape(uint16_t parts, uint64_t copies, uint16_t max_parts, uin
    return valid_limits(max_parts, max_recipients) && parts >= 1 && parts <= max_parts &&
           copies > 0 && copies <= uint64_t(parts) * max_recipients && copies % parts == 0;
 }
-inline int64_t platform_units(uint8_t kind, uint16_t parts, int64_t text, int64_t nft, int64_t voice) {
-   if (parts < 1 || parts > HARD_MAX_PARTS || !valid_fee(text) || !valid_fee(nft) || !valid_fee(voice)) return -1;
-   if (kind == 0) return text * parts;
-   if (kind == 1) return nft + text * (parts - 1);
-   if (kind == 2) return voice;
-   return -1;
+// One uniform price per part: the router never learns or reveals what a message contains.
+inline int64_t platform_units(uint16_t parts, int64_t part_fee) {
+   if (parts < 1 || parts > HARD_MAX_PARTS || !valid_fee(part_fee)) return -1;
+   return part_fee * parts;
 }
 inline int64_t null_units(int64_t platform, uint8_t percent) {
    if (platform < 0 || platform > MAX_FEE_UNITS * HARD_MAX_PARTS || percent > 100) return -1;

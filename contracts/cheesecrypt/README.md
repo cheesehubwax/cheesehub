@@ -51,7 +51,7 @@ stranded old tables. Public data already recorded cannot be made private retroac
 | `setconfig(cfg)` | contract | Sets bounded fee amounts, sinks, operational limits; split must remain 80/20 |
 | `setpaused(paused)` | contract | Stops payments and sends; `reclaim` remains available |
 | token `transfer(from, contract, quantity, memo)` | payer | Records a transient in-flight payment from the configured token only |
-| `sendmsg(sender, kind, parts, copies)` | sender | Consumes the payment, pays the shared platform fee, delivers all copies and returns change, atomically |
+| `sendmsg(sender, parts, copies)` | sender | Consumes the payment, pays the shared platform fee, delivers all copies and returns change, atomically |
 | `reclaim(payer)` | payer | Refunds a payment orphaned by an incomplete transaction flow |
 
 The intended transaction is two actions with one signature: `transfer` the exact fee to the
@@ -64,17 +64,14 @@ proof of an 8/50-member room. Chain CPU/NET/transaction limits can be substantia
 max-size delivery is not verified.
 
 Default fees (four decimal CHEESE):
-- Kind 0 text/control/edit/report: 0.0100 per part, shared across recipients.
-- Kind 1 NFT: 0.0200 first part + 0.0100 per remaining part.
-- Kind 2 voice: 1.0000 **per router action**.
+- Every message (text, NFT, links, controls, edits, reports): 0.0100 per part, shared across
+  recipients. There is no message type parameter, so amounts never reveal content type.
 - Every delivered copy adds 0.0001, paid to its recipient, not split.
 - Split uses integer floor for the 80% share; the remainder goes to liquidity.
 
-**Fees are unchanged in the app, including moderation fees.** The blind contract cannot
-verify the encrypted content's declared kind. It cannot prove a logical multipart message
-or enforce one fee across multiple actions. In particular, the app's 30-part voice batches
-charge 1.0000 once per whole note, while this action charges once per call. Keep voice on the
-existing direct-transfer path until a separately reviewed continuation design exists.
+The app charges NFTs the same as text. The blind contract cannot prove a logical multipart message
+or enforce one fee across multiple actions. Voice notes (1.0000 once per note, 30-part batches) are not
+routed; keep voice on the existing direct-transfer path until a separately reviewed continuation design exists.
 Public key publishing, 100-CHEESE key creation and `CRYPTROOM1:` listing/unlisting also stay
 on the existing direct path; generic router fee memos are not listing or key publications.
 
