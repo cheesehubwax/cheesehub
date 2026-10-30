@@ -58,7 +58,7 @@ describe('public rooms', () => {
     await waitFor(() => expect(loadRoomProfiles('bob').alice?.displayName).toBe('cheeseplum'));
     fireEvent.click(await screen.findByRole('button', { name: /Invited by cheeseplum/ }));
     expect(screen.queryByPlaceholderText('Message group')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /^Join$/ }));
+    fireEvent.click(within(screen.getByRole('region', { name: 'Group invites' })).getByRole('button', { name: /^Join$/ }));
     fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(screen.getByRole('button', { name: 'Pay & join' }));
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(2));
@@ -172,7 +172,7 @@ describe('public rooms', () => {
     render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="carol" session={{ actor: 'carol', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'carol', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
     await waitFor(() => expect(loadInvites('carol')[ID]?.members).toHaveLength(9));
     fireEvent.click(await screen.findByRole('button', { name: /Invited by alice/ }));
-    fireEvent.click(await screen.findByRole('button', { name: /^Join$/ }));
+    fireEvent.click(within(await screen.findByRole('region', { name: 'Group invites' })).getByRole('button', { name: /^Join$/ }));
     const pay = await screen.findByRole('button', { name: 'Pay & join' });
     expect(pay).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox'));
