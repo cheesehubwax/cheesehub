@@ -25,6 +25,8 @@ export function useFolio(account: string | null, fiat: DisplayCode = 'USD') {
   const [progress, setProgress] = useState<ScanProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  /** The scan still unwinding, so a new one never mutates or saves alongside it. */
+  const runningRef = useRef<Promise<void> | null>(null);
   const [version, setVersion] = useState(0);
 
   const runSync = useCallback(async (start: StoredFolio) => {
@@ -33,8 +35,14 @@ export function useFolio(account: string | null, fiat: DisplayCode = 'USD') {
     abortRef.current = ctrl;
     setSyncing(true);
     setError(null);
+    const previous = runningRef.current;
+    let finish!: () => void;
+    const mine = new Promise<void>((r) => { finish = r; });
+    runningRef.current = mine;
     let lastSave = 0;
     try {
+      if (previous) await previous;
+      if (ctrl.signal.aborted) return;
       const result = await syncFolio(start, async (r, p) => {
         if (ctrl.signal.aborted) return;
         setProgress(p);
@@ -53,11 +61,20 @@ export function useFolio(account: string | null, fiat: DisplayCode = 'USD') {
     } catch (e) {
       if (!ctrl.signal.aborted) setError(e instanceof Error ? e.message : 'History sync failed');
     } finally {
+      finish();
+      if (runningRef.current === mine) runningRef.current = null;
       if (abortRef.current === ctrl) {
         setSyncing(false);
         abortRef.current = null;
       }
     }
+  }, []);
+
+  /** Aborts any scan and waits until it has stopped writing. */
+  const halt = useCallback(async () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    await runningRef.current;
   }, []);
 
   useEffect(() => {
