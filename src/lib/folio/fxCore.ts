@@ -49,7 +49,6 @@ export type CryptoCode = (typeof CRYPTO_CURRENCIES)[number]['code'];
 /** Any non-WAX currency figures can be shown in. */
 export type DisplayCode = FiatCode | CryptoCode;
 export const isCrypto = (c: string): c is CryptoCode => CRYPTO_CURRENCIES.some((f) => f.code === c);
-export const isDisplay = (c: string): c is DisplayCode => isFiat(c) || isCrypto(c);
 
 /** Binance 1d klines → close (USD per coin) by UTC day. */
 export function parseBinanceKlines(rows: unknown): Record<string, number> {
