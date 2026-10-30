@@ -2,6 +2,8 @@
 
 Open tasks only. Completed work lives in git history.
 
+- [ ] CHEESEAir Phase 3: isolate card subscriptions and memoize holder rows; verify render counts and unchanged selection/allocation behavior.
+
 - [ ] CHEESEAir: verify one signed airdrop and chain readback after stages 1–2 — requires the user's Anchor signatures. Allocation/resource/runner checks pass; remaining audit findings are recorded in `.lovable/cheeseair-audit.md` for later stages.
 
 - [ ] Verify flattened voice and join/rejoin fees on WAX — requires the user's Anchor signatures; automated fee/delivery checks cover the changed paths.
