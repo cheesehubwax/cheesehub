@@ -11,7 +11,7 @@ import type { ReplyRef } from '@/lib/cryptReply';
 import { VOICE_PARTS_PER_TX, type VoiceClip } from '@/lib/cryptVoice';
 import type { CryptGroup } from '@/lib/cryptGroups';
 import type { InviteGroupView } from '@/lib/cryptInviteGroups';
-import { MAX_PARTS, MAX_PLAINTEXT_BYTES, MESSAGE_FEE_QUANTITY, MESSAGE_RECIPIENT_QUANTITY, MESSAGE_TOTAL_QUANTITY, NFT_FEE_QUANTITY, PART_BODY_BYTES } from '@/lib/cheeseCrypt';
+import { MAX_PARTS, MAX_PLAINTEXT_BYTES, MESSAGE_FEE_QUANTITY, MESSAGE_RECIPIENT_QUANTITY, MESSAGE_TOTAL_QUANTITY, PART_BODY_BYTES } from '@/lib/cheeseCrypt';
 
 /** Message composer: reply bar, text box and footer (counter, NFT, voice, Terms, Fee info, price, Send). State lives in Messenger. */
 export function CryptComposer({
