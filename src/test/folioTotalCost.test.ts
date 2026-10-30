@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { holdingCost, totalHoldingCost } from '@/components/folio/FolioParts';
+import { holdingCost, totalHoldingCost } from '@/lib/folio/acquisitions';
 import { buildHoldings, type HoldingRow } from '@/lib/folio/holdings';
 import type { TokenPosition } from '@/lib/folio/types';
 

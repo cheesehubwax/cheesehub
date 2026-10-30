@@ -1,7 +1,8 @@
 // Mobile layout: holdings and activity render as cards with a card/table toggle.
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { ActivityList, HoldingsTable } from '@/components/folio/FolioParts';
+import { ActivityList } from '@/components/folio/ActivityList';
+import { HoldingsTable } from '@/components/folio/HoldingsTable';
 import type { HoldingRow } from '@/lib/folio/holdings';
 import type { FolioEvent } from '@/lib/folio/types';
 

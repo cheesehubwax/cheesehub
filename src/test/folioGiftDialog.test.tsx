@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { GiftListDialog, HoldingsTable } from '@/components/folio/FolioParts';
+import { GiftListDialog } from '@/components/folio/GiftListDialog';
+import { HoldingsTable } from '@/components/folio/HoldingsTable';
 import { buildLedger } from '@/lib/folio/ledger';
 import type { HoldingRow } from '@/lib/folio/holdings';
 import type { FolioEvent } from '@/lib/folio/types';
