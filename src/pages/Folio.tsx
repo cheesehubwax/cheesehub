@@ -18,7 +18,7 @@ import { PortfolioControls, PortfolioTokenPicker } from '@/components/folio/Port
 import { scopePortfolio } from '@/lib/folio/portfolios';
 import { usePooledTokens } from '@/hooks/usePooledTokens';
 import { hasCoverageGap } from '@/lib/folio/scanner';
-import { buildHoldings, type HoldingRow } from '@/lib/folio/holdings';
+import { buildHoldings, holdingTotals, type HoldingRow } from '@/lib/folio/holdings';
 import { downloadActivityCsv, downloadHoldingsCsv } from '@/lib/folio/csv';
 import { ActivityList, HoldingsTable, money, PlChart, SummaryBox, TokenDialog, totalHoldingCost, usdFmt, waxFmt, type Currency } from '@/components/folio/FolioParts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
