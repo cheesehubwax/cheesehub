@@ -8,8 +8,8 @@ it('p',()=>{
  const l=buildLedger([
   ev('b1',1,'trade',[{...W,amount:100}],[{...C,amount:200}]),
   ev('b2',2,'trade',[{...W,amount:300}],[{...C,amount:200}]),
-  ev('g',3,'transfer-in',[],[{...C,amount:100}]),
-  ev('s',4,'trade',[{...C,amount:250}],[{...W,amount:500}]),
+  ev('g',3,'received',[],[{...C,amount:100}]),
+  ev('lp',4,'liquidity-add',[{...C,amount:50}],[]),ev('lr',5,'liquidity-remove',[],[{...C,amount:50}]),ev('s',6,'trade',[{...C,amount:250}],[{...W,amount:500}]),
  ]);
  console.log(JSON.stringify([...l.positions.values()]), JSON.stringify([...l.realizedByEvent]));
 });
