@@ -23,6 +23,8 @@ export const msgPrefixOf = (memo: string) => memo.startsWith(MSG_PREFIX) ? MSG_P
 export const keyPrefixOf = (memo: string) => memo.startsWith(KEY_PREFIX) ? KEY_PREFIX : memo.startsWith(LEGACY_KEY_PREFIX) ? LEGACY_KEY_PREFIX : null;
 export const MEMO_MAX_BYTES = 256;
 export const KEY_PUBLISH_TO = 'eosio.null';
+/** Blind atomic fee router account (contracts/cheesecrypt). Not used for sending until testnet gates pass. */
+export const CRYPT_ROUTER_ACCOUNT = 'crypt.cheese';
 export const FEE_MEMO = 'CHEESECrypt messaging fee';
 export const KEY_CREATION_MEMO = 'CHEESECrypt key creation fee';
 export const KEY_CREATION_QUANTITY = '100.0000 CHEESE';
