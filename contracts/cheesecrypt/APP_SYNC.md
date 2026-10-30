@@ -7,6 +7,7 @@ do not reintroduce plaintext roles to enforce client policy.
 
 | App rule / source | Router responsibility / integration status |
 |---|---|
+| Router account `crypt.cheese` (`CRYPT_ROUTER_ACCOUNT`, `cheeseCrypt.ts`) | Deploy target; contract uses `get_self()`, no hardcoded name |
 | Text 0.0100/part, NFT first 0.0200 + 0.0100/rest (`cheeseCrypt.ts`) | `config`, `platform_fee`; caller-declared kind, bounded arithmetic |
 | Voice 1.0000 once/note, 30-part batches (`cryptVoice.ts`) | 1.0000 per `sendmsg` call only; multi-call continuation NOT supported; retain direct voice path |
 | Recipient 0.0001 per part | `recipient_fee` per copy; exact `parts` copies per distinct recipient |

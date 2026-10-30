@@ -27,11 +27,17 @@ recipient transfer, paused behavior, recipient coverage, RAM and practical trans
 on testnet before launching.
 
 ## Deployment
-Use a dedicated testnet account first. Example (replace account and endpoint):
+Mainnet contract account: **`crypt.cheese`** (a `.cheese` suffix name, created by the `cheese`
+account owner). Test on a dedicated testnet account first (replace the testnet account name):
 ```sh
-cleos -u https://testnet.waxsweden.org set contract cheesecrypt1 build cheesecrypt.wasm cheesecrypt.abi
-cleos -u https://testnet.waxsweden.org set account permission cheesecrypt1 active --add-code
+cleos -u https://testnet.waxsweden.org set contract <testnet-account> build cheesecrypt.wasm cheesecrypt.abi
+cleos -u https://testnet.waxsweden.org set account permission <testnet-account> active --add-code
+# Mainnet, after testnet gates pass:
+cleos -u https://wax.greymass.com set contract crypt.cheese build cheesecrypt.wasm cheesecrypt.abi
+cleos -u https://wax.greymass.com set account permission crypt.cheese active --add-code
 ```
+The code uses `get_self()`, so no account name is compiled in; the app reads it from
+`CRYPT_ROUTER_ACCOUNT` in `src/lib/cheeseCrypt.ts`.
 `--add-code` adds the contract's `eosio.code` permission for inline CHEESE transfers.
 The default token is `cheeseburger` / `4,CHEESE`; deploy/configure the corresponding test token
 if those accounts do not exist on testnet. Review `config` and fund resource buffers first.
