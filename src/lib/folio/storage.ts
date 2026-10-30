@@ -33,6 +33,8 @@ export interface StoredFolio {
   cursors: Record<string, ProviderCursor>;
   /** Epoch ms of the last completed sync. */
   syncedAt: number | null;
+  /** True from the start of a sync until one finishes complete; survives reloads. */
+  partial?: boolean;
   /** Oldest transfer any chosen provider holds (epoch ms). */
   coverageFrom?: number;
   /** Account creation time from the chain (epoch ms). */

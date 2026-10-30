@@ -14,7 +14,7 @@
 - CHEESEAir suffix unions use timestamp cursors, bounded reads and complete-only cache; stalled providers flag partial results because indexes differ and skip stops at 10,000 rows.
 - CHEESEFolio re-derives raw IndexedDB history per account; live balances are truth. Shared prices poll foreground-only/refetch on focus; metadata/placeholders never get live timestamps.
 - Folio acquisitions use cumulative trade/free receipts, separate from holdings; never alter basis or infer sources after disposals.
-- Folio sync requires reading the deepest provider to the end; big pages sequential, small pages windowed, concurrency capped to avoid Hyperion drops.
+- Folio sync requires reading the deepest provider to the end (else the persisted partial flag shows history incomplete); big pages sequential, small pages windowed, concurrency capped to avoid Hyperion drops. One scan per record at a time: every request honours the stop signal and new scans/clears/imports wait for the old one to unwind, preventing duplicate rows and late saves.
 - Folio deduplicates global sequences and identical inline transfer creator copies to prevent receiver-notification double counting.
 - Folio order-book fills: one large-limit Alcor per-account deal request (skip paging is gappy); only leftovers use Hyperion, routed by provider history start, avoiding slow per-transaction-only lookups.
 - CHEESEFolio holdings roll live pool positions (Alcor positions read per pool scope on chain, Taco/Defibox share tokens × reserves) into each token row; a venue that can't be read hides P/L for tokens history says are pooled, never counts as zero.

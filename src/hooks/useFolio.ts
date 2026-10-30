@@ -25,6 +25,8 @@ export function useFolio(account: string | null, fiat: DisplayCode = 'USD') {
   const [progress, setProgress] = useState<ScanProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  /** The scan still unwinding, so a new one never mutates or saves alongside it. */
+  const runningRef = useRef<Promise<void> | null>(null);
   const [version, setVersion] = useState(0);
 
   const runSync = useCallback(async (start: StoredFolio) => {
@@ -33,8 +35,14 @@ export function useFolio(account: string | null, fiat: DisplayCode = 'USD') {
     abortRef.current = ctrl;
     setSyncing(true);
     setError(null);
+    const previous = runningRef.current;
+    let finish!: () => void;
+    const mine = new Promise<void>((r) => { finish = r; });
+    runningRef.current = mine;
     let lastSave = 0;
     try {
+      if (previous) await previous;
+      if (ctrl.signal.aborted) return;
       const result = await syncFolio(start, async (r, p) => {
         if (ctrl.signal.aborted) return;
         setProgress(p);
@@ -53,11 +61,20 @@ export function useFolio(account: string | null, fiat: DisplayCode = 'USD') {
     } catch (e) {
       if (!ctrl.signal.aborted) setError(e instanceof Error ? e.message : 'History sync failed');
     } finally {
+      finish();
+      if (runningRef.current === mine) runningRef.current = null;
       if (abortRef.current === ctrl) {
         setSyncing(false);
         abortRef.current = null;
       }
     }
+  }, []);
+
+  /** Aborts any scan and waits until it has stopped writing. */
+  const halt = useCallback(async () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    await runningRef.current;
   }, []);
 
   useEffect(() => {
@@ -88,36 +105,34 @@ export function useFolio(account: string | null, fiat: DisplayCode = 'USD') {
 
   const rescan = useCallback(async () => {
     if (!account) return;
-    abortRef.current?.abort();
+    await halt();
     await clearFolio(account).catch(() => undefined);
     const fresh = emptyRecord(account);
     fresh.portfolios = rec?.portfolios ?? [];
     setRec(fresh);
     setProgress(null);
     void runSync(fresh);
-  }, [account, rec, runSync]);
+  }, [account, rec, runSync, halt]);
 
   const stop = useCallback(() => {
     const ctrl = abortRef.current;
     if (!ctrl) return;
-    ctrl.abort();
-    abortRef.current = null;
     setSyncing(false);
-    if (rec) {
+    void halt().then(() => {
+      if (!rec) return;
       void saveFolio(rec).catch(() => undefined);
       setRec({ ...rec });
-    }
-  }, [rec]);
+    });
+  }, [rec, halt]);
 
   const clear = useCallback(async () => {
     if (!account) return;
-    abortRef.current?.abort();
-    abortRef.current = null;
+    await halt();
     await clearFolio(account).catch(() => undefined);
     setRec(emptyRecord(account));
     setProgress(null);
     setSyncing(false);
-  }, [account]);
+  }, [account, halt]);
 
   const exportFile = useCallback(async () => {
     if (!rec) return;
@@ -138,16 +153,15 @@ export function useFolio(account: string | null, fiat: DisplayCode = 'USD') {
   const importFile = useCallback(async (file: File): Promise<MergeResult> => {
     if (!account || !rec) throw new PortableError('Sign in first.');
     const imported = await parseFolioFile(await file.text(), account);
-    abortRef.current?.abort();
-    abortRef.current = null;
     setSyncing(false);
+    await halt();
     const result = mergeFolio(rec, imported);
     await saveFolio(result.rec);
     setRec(result.rec);
     setProgress(null);
     setError(null);
     return result;
-  }, [account, rec]);
+  }, [account, rec, halt]);
 
   // `version` changes as pages arrive mid-scan; the record is mutated in place.
   const transferCount = rec?.transfers.length ?? 0;
@@ -235,6 +249,8 @@ export function useFolio(account: string | null, fiat: DisplayCode = 'USD') {
     fxNow,
     fxUnavailable,
     syncedAt: rec?.syncedAt ?? null,
+    /** Last sync stopped before the deepest provider was read to the end. */
+    partial: !!rec?.partial,
     coverageFrom: rec?.coverageFrom ?? null,
     accountCreated: rec?.accountCreated ?? null,
     transferCount,

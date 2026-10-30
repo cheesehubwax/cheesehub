@@ -215,10 +215,10 @@ const Folio = () => {
                   folio.hasHistory && folio.syncedAt ? 'Checking for new transactions…' : `Scanning history for ${accountName}…`
                 ) : !folio.loaded ? (
                   'Loading saved history…'
-                ) : folio.syncedAt ? (
+                ) : folio.syncedAt && !folio.partial ? (
                   `Up to date · last checked ${new Date(folio.syncedAt).toLocaleTimeString()} · ${folio.transferCount.toLocaleString()} transfers saved in this browser`
                 ) : (
-                  folio.hasHistory ? 'Scan paused — press Continue scan to pick up where it stopped' : 'No history scanned yet'
+                  folio.hasHistory ? 'History incomplete — press Continue scan to pick up where it stopped' : 'No history scanned yet'
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
@@ -226,7 +226,7 @@ const Folio = () => {
                   <Button size="sm" variant="outline" onClick={folio.stop}>Stop scan</Button>
                 ) : (
                   <Button size="sm" disabled={!folio.loaded} onClick={syncNow}>
-                    {folio.error && folio.hasHistory ? 'Continue scan' : folio.syncedAt ? 'Sync now' : folio.hasHistory ? 'Continue scan' : 'Scan my history'}
+                    {(folio.error || folio.partial) && folio.hasHistory ? 'Continue scan' : folio.syncedAt ? 'Sync now' : folio.hasHistory ? 'Continue scan' : 'Scan my history'}
                   </Button>
                 )}
                 <Button size="sm" variant="outline" disabled={!holdings.length} onClick={() => downloadHoldingsCsv(accountName, fiat, holdings.map((h) => ({
