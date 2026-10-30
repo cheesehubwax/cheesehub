@@ -5,10 +5,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useWaxTransaction } from '@/hooks/useWaxTransaction';
 import { useTransactionSuccess } from '@/context/TransactionSuccessContext';
 import { refreshResourceGauges } from '@/components/shared/ResourceGauges';
-import { chunk, formatQuantity, type AirdropRecipient, type NftAssignment, type RamPurchase } from '@/lib/airdrop';
+import { chunk, formatQuantity, formatUnits, type AirdropRecipient, type NftAssignment, type RamPurchase } from '@/lib/airdrop';
 import { CHEESE_CONTRACT, CHEESE_CPU_CONTRACT, CHEESE_PRECISION, CHEESE_RAM_CONTRACT, CHEESE_SYMBOL, powerupMemo, ramMemo } from '@/lib/airdropCheese';
 import { formatCheese, splitPurchases, type ResourcePricing } from '@/lib/airdropResources';
 import type { CsvBatchItem } from '@/lib/airdropCsv';
+import { cheeseBalanceUnits, cheeseBudgetUnits } from '@/lib/airdropBudget';
 const ATOMICASSETS_CONTRACT = 'atomicassets';
 export function shortError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
@@ -169,6 +170,13 @@ export function useAirdropRunner({ session, actor, cheeseBalance, isRam, isNft, 
       );
       return;
     }
+    if (!isRam && requiredRamCheese === null) throw new Error('CHEESE RAM pricing is unavailable; try again later');
+    // Validate the entire plan before the first paid CPU/RAM request.
+    const ramTopups = isRam ? [] : splitPurchases(requiredRamCheese ?? 0, pricing.ram.minCheese, pricing.ram.maxCheese);
+    const budget = cheeseBudgetUnits({ isRam, isNft, sendContract, sendSymbol, precision, recipients, ramPurchases, ramTopups, cpuCheese: suggestedCpuCheese });
+    const available = cheeseBalanceUnits(cheeseBalance);
+    if (available === null) throw new Error('Your CHEESE balance could not be safely verified. Refresh your wallet before sending.');
+    if (available < budget) throw new Error(`This airdrop needs ${formatUnits(budget, CHEESE_PRECISION)} CHEESE for delivery and resources together, but your balance is ${formatUnits(available, CHEESE_PRECISION)} CHEESE.`);
     if (isRam) {
       // The drop itself is the RAM purchase: no sender RAM buy, only CPU/NET.
       const needed = ramCheeseTotal + (suggestedCpuCheese ?? 0);
@@ -202,7 +210,7 @@ export function useAirdropRunner({ session, actor, cheeseBalance, isRam, isNft, 
       }
       const ramOk = await buyWithCheese(
         'ram',
-        splitPurchases(requiredRamCheese, pricing.ram.minCheese, pricing.ram.maxCheese),
+        ramTopups,
       );
       if (!ramOk) return;
     }

@@ -40,6 +40,30 @@ async function run(overrides: Partial<Parameters<typeof useAirdropRunner>[0]> = 
 }
 
 describe('CHEESEAir sending runner', () => {
+  it('rejects CHEESE delivery plus resources before spending when separately affordable', async () => {
+    const { result } = await run({ cheeseBalance: 10.02 });
+    expect(mocks.execute).not.toHaveBeenCalled();
+    expect(result.current.runError).toContain('10.0303 CHEESE');
+  });
+  it('permits exactly the combined delivery and resource budget', async () => {
+    await run({ cheeseBalance: 10.0303 });
+    expect(mocks.execute).toHaveBeenCalledTimes(3);
+  });
+  it('includes raised minimum top-ups before buying CPU', async () => {
+    const { result } = await run({ cheeseBalance: 1.5, suggestedCpuCheese: 1, requiredRamCheese: 0.1 });
+    expect(mocks.execute).not.toHaveBeenCalled();
+    expect(result.current.runError).toContain('2.0303 CHEESE');
+  });
+  it('rejects an incomplete RAM top-up before any CPU purchase', async () => {
+    const { result } = await run({ requiredRamCheese: 5001, suggestedCpuCheese: 1, cheeseBalance: 10000 });
+    expect(mocks.execute).not.toHaveBeenCalled();
+    expect(result.current.runError).toContain('50 purchases');
+  });
+  it('fails closed when the CHEESE balance is unknown', async () => {
+    const { result } = await run({ cheeseBalance: null });
+    expect(mocks.execute).not.toHaveBeenCalled();
+    expect(result.current.runError).toContain('balance');
+  });
   beforeEach(() => {
     vi.useFakeTimers(); vi.clearAllMocks();
     mocks.execute.mockResolvedValue({ success: true, txId: 'confirmed-id' });

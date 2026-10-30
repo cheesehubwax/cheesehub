@@ -13,7 +13,7 @@ interface CostInput extends ReturnType<typeof useAirAllocation> {
   rowStats: { existing: number; checked: number; newRows: number; complete: boolean };
   mode: 'fixed' | 'equal' | 'prorata'; precision: number; sendSymbol: string; cpuPercent: number;
 }
-export function useAirCosts({ isRam, isNft, ramPurchases, batchSize, nftAssignments, recipients, ramPrice, rowStats, pricing, cheeseBalance, ramCheeseTotal, ramPoolWax, ramExcluded, ramLimits, mode, nftShortfall, nftAllocation, nftPoolSize, senderBalanceUnits, total, precision, sendSymbol, resources, cpuPercent }: CostInput) {
+export function useAirCosts({ allocationError, isRam, isNft, ramPurchases, batchSize, nftAssignments, recipients, ramPrice, rowStats, pricing, cheeseBalance, ramCheeseTotal, ramPoolWax, ramExcluded, ramLimits, mode, nftShortfall, nftAllocation, nftPoolSize, senderBalanceUnits, total, precision, sendSymbol, resources, cpuPercent }: CostInput) {
   /** RAM mode: every contract purchase is one action, so slices count too. */
   const ramPurchaseCount = ramPurchases.length;
 
@@ -47,6 +47,7 @@ export function useAirCosts({ isRam, isNft, ramPurchases, batchSize, nftAssignme
 
 
   const warnings = useMemo(() => {
+    if (allocationError) return [{ level: 'error' as const, message: allocationError }];
     if (isRam) {
       // RAM lands directly in each recipient's account, so the sender only
       // needs enough CHEESE — plus every purchase must obey the contract limits.
@@ -134,6 +135,7 @@ export function useAirCosts({ isRam, isNft, ramPurchases, batchSize, nftAssignme
       sendSymbol.toUpperCase(),
     );
   }, [
+    allocationError,
     isRam,
     pricing,
     cheeseBalance,

@@ -6,6 +6,7 @@
  */
 
 import { CHEESE_PRECISION } from "./airdropCheese";
+import { parseUnits, sliceRamUnits } from './airdrop';
 
 export interface RamPricing {
   /** ram.chz buying enabled flag. */
@@ -192,28 +193,19 @@ export function cheeseForCpuUs(
  * anything smaller). Returns [] for non-positive input.
  */
 export function splitPurchases(total: number, minCheese: number, maxCheese: number): number[] {
-  if (!(total > 0)) return [];
-  const max = maxCheese > 0 ? maxCheese : total;
-  const min = minCheese > 0 ? minCheese : 0;
-  let remaining = ceilCheese(Math.max(total, min));
-  const out: number[] = [];
-  while (remaining > 0 && out.length < 50) {
-    let take = Math.min(remaining, max);
-    const rest = ceilCheese(remaining - take);
-    // Avoid leaving a final slice below the contract minimum.
-    if (rest > 0 && rest < min) {
-      take = ceilCheese(Math.max(min, remaining - max + (min - rest)));
-      if (take > max) take = max;
-    }
-    take = ceilCheese(Math.max(take, Math.min(min, remaining)));
-    out.push(take);
-    remaining = ceilCheese(remaining - take);
-    if (remaining > 0 && remaining < min) {
-      out.push(min);
-      remaining = 0;
-    }
+  if (![total, minCheese, maxCheese].every(Number.isFinite) || minCheese < 0 || maxCheese < 0 || (maxCheese > 0 && minCheese > maxCheese)) {
+    throw new Error('Invalid RAM purchase amount or limits');
   }
-  return out;
+  if (!(total > 0)) return [];
+  const factor = 10 ** CHEESE_PRECISION;
+  const requested = ceilCheese(Math.max(total, minCheese));
+  if (!Number.isSafeInteger(Math.round(requested * factor))) throw new Error('RAM purchase amount exceeds safe precision');
+  const units = parseUnits(formatCheese(requested), CHEESE_PRECISION);
+  const minUnits = parseUnits(formatCheese(ceilCheese(minCheese)), CHEESE_PRECISION);
+  const maxUnits = maxCheese > 0 ? BigInt(Math.floor(maxCheese * factor)) : 0n;
+  if (maxCheese > 0 && maxUnits === 0n) throw new Error('RAM maximum is below token precision');
+  if (maxUnits > 0n && (units + maxUnits - 1n) / maxUnits > 50n) throw new Error('RAM top-up requires more than 50 purchases; lower the amount');
+  return sliceRamUnits(units, minUnits, maxUnits).map(u => Number(u) / factor);
 }
 
 /** Total of a purchase plan. */

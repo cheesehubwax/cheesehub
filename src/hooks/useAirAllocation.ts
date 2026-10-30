@@ -56,13 +56,14 @@ export function useAirAllocation({ actor, tokenStat, walletTokens, sendContract,
   );
   const selectedCount = chosenHolders.length;
 
-  const { recipients, ramPurchases, ramPurchaseCounts, ramExcluded, ramBelowMin } = useMemo<{
+  const { recipients, ramPurchases, ramPurchaseCounts, ramExcluded, ramBelowMin, allocationError } = useMemo<{
     recipients: AirdropRecipient[];
     ramPurchases: RamPurchase[];
     ramPurchaseCounts: Map<string, number>;
     ramExcluded: { belowMin: number; split: number };
     /** RAM mode: selected accounts whose share is below the contract minimum. */
     ramBelowMin: AirdropRecipient[];
+    allocationError: string | null;
   }>(() => {
     const none = {
       recipients: [],
@@ -70,6 +71,7 @@ export function useAirAllocation({ actor, tokenStat, walletTokens, sendContract,
       ramPurchaseCounts: new Map<string, number>(),
       ramExcluded: { belowMin: 0, split: 0 },
       ramBelowMin: [],
+      allocationError: null,
     };
     const text = isRam ? ramCheeseText : amountText;
     if (!snapshot || !text) return none;
@@ -81,6 +83,7 @@ export function useAirAllocation({ actor, tokenStat, walletTokens, sendContract,
       const maxUnits = ramLimits ? BigInt(Math.round(ramLimits.maxCheese * base)) : 0n;
       const plan = planRamPurchases(all, minUnits, maxUnits);
       return {
+        allocationError: null,
         recipients: plan.included,
         ramPurchases: plan.purchases,
         ramPurchaseCounts: plan.purchaseCounts,
@@ -90,8 +93,8 @@ export function useAirAllocation({ actor, tokenStat, walletTokens, sendContract,
         },
         ramBelowMin: plan.belowMin,
       };
-    } catch {
-      return none;
+    } catch (error) {
+      return { ...none, allocationError: error instanceof Error ? error.message : 'Cannot safely calculate this airdrop' };
     }
   }, [
     snapshot,
@@ -191,24 +194,25 @@ export function useAirAllocation({ actor, tokenStat, walletTokens, sendContract,
 
 
 
-  const nftAllocation = useMemo(
-    () =>
-      isNft
-        ? allocateAssets(nftPool, chosenHolders, mode, amountText)
-        : {
+  const { nftAllocation, nftError } = useMemo(() => {
+    const empty = {
             assignments: [] as NftAssignment[],
             assigned: 0,
             skipped: 0,
             leftover: 0,
             shortfall: 0,
             capped: false,
-          },
-    [isNft, nftPool, chosenHolders, mode, amountText],
-  );
+          };
+    try {
+      return { nftAllocation: isNft ? allocateAssets(nftPool, chosenHolders, mode, amountText) : empty, nftError: null };
+    } catch (error) {
+      return { nftAllocation: empty, nftError: error instanceof Error ? error.message : 'Cannot safely allocate NFTs' };
+    }
+  }, [isNft, nftPool, chosenHolders, mode, amountText]);
   const nftAssignments = nftAllocation.assignments;
   const nftShortfall = nftAllocation.shortfall;
   const nftPoolSize = nftPool.length;
 
 
-  return { senderBalanceUnits, ramLimits, ramCheeseText, chosenHolders, selectedCount, recipients, ramPurchases, ramPurchaseCounts, ramExcluded, ramBelowMin, total, ramCheeseTotal, ramBytesTotal, ramMinViable, applyRamMinViable, ramPoolWax, ramPoolMaxViable, applyRamPoolMax, nftAllocation, nftAssignments, nftShortfall, nftPoolSize };
+  return { allocationError: isNft ? nftError : allocationError, senderBalanceUnits, ramLimits, ramCheeseText, chosenHolders, selectedCount, recipients, ramPurchases, ramPurchaseCounts, ramExcluded, ramBelowMin, total, ramCheeseTotal, ramBytesTotal, ramMinViable, applyRamMinViable, ramPoolWax, ramPoolMaxViable, applyRamPoolMax, nftAllocation, nftAssignments, nftShortfall, nftPoolSize };
 }
