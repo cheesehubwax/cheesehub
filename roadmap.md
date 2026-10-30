@@ -2,6 +2,8 @@
 
 Open tasks only. Completed work lives in git history.
 
+- [ ] CHEESEAir phases 1–2: add allocation safety coverage; extract allocation, resource calculations and the sending runner without changing valid distribution or transaction behaviour.
+
 - [ ] Verify flattened voice and join/rejoin fees on WAX — requires the user's Anchor signatures; automated fee/delivery checks cover the changed paths.
 
 - [ ] CHEESECrypt: verify successful public-mirror video streaming; private switching/external links/consent tests pass and browser observed no video-service requests before play or Google requests during the private attempt, but the default mirror returned “No compatible source.” Requires a functioning public proxy; no automatic Google fallback.
