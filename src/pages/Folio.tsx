@@ -10,15 +10,15 @@ import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useWax } from '@/context/WaxContext';
-import { useAllTokenBalances } from '@/hooks/useAllTokenBalances';
+import { useFolioCurrency, type CryptoChoice } from '@/hooks/useFolioCurrency';
+import { useFolioHoldings } from '@/hooks/useFolioHoldings';
 import { useAlcorTokenPrices } from '@/hooks/useAlcorTokenPrices';
 import { useWaxPrice } from '@/hooks/useWaxPrice';
 import { useFolio } from '@/hooks/useFolio';
 import { PortfolioControls, PortfolioTokenPicker } from '@/components/folio/PortfolioControls';
 import { scopePortfolio } from '@/lib/folio/portfolios';
-import { usePooledTokens } from '@/hooks/usePooledTokens';
 import { hasCoverageGap } from '@/lib/folio/scanner';
-import { buildHoldings, holdingTotals, type HoldingRow } from '@/lib/folio/holdings';
+import type { HoldingRow } from '@/lib/folio/holdings';
 import { downloadActivityCsv, downloadHoldingsCsv } from '@/lib/folio/csv';
 import { ActivityList } from '@/components/folio/ActivityList';
 import { HoldingsTable } from '@/components/folio/HoldingsTable';
@@ -26,10 +26,8 @@ import { PlChart } from '@/components/folio/PlChart';
 import { SummaryBox } from '@/components/folio/SummaryBox';
 import { TokenDialog } from '@/components/folio/TokenDialog';
 import { money, usdFmt, waxFmt, type Currency } from '@/components/folio/format';
-import { totalHoldingCost } from '@/lib/folio/acquisitions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CRYPTO_CURRENCIES, FIAT_CURRENCIES, isCrypto, isFiat, type CryptoCode, type DisplayCode, type FiatCode } from '@/lib/folio/fxCore';
-import { useRealisableValues } from '@/hooks/useRealisableValues';
 import { playRandomFart } from '@/lib/fartSounds';
 import walletOrb from '@/assets/wallet-icon.png';
 
@@ -43,17 +41,7 @@ const RANGES = [
 const Folio = () => {
   const { accountName, isConnected, login } = useWax();
   const queryClient = useQueryClient();
-  // Two pickers: crypto (WAX/BTC/ETH) or fiat; only one is active. Stored as one code.
-  type CryptoChoice = 'WAX' | CryptoCode;
-  const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('cheesefolio-currency') ?? '' : '';
-  const [mode, setMode] = useState<'CRYPTO' | 'FIAT'>(() => (!stored || stored === 'WAX' || isCrypto(stored) ? 'CRYPTO' : 'FIAT'));
-  const [chosenCrypto, setChosenCrypto] = useState<CryptoChoice>(() => (isCrypto(stored) ? stored : 'WAX'));
-  const [chosenFiat, setChosenFiat] = useState<FiatCode>(() => {
-    if (typeof localStorage === 'undefined') return 'USD';
-    const f = localStorage.getItem('cheesefolio-fiat') ?? stored;
-    return isFiat(f) ? f : 'USD';
-  });
-  const activeCode: DisplayCode = mode === 'CRYPTO' && chosenCrypto !== 'WAX' ? chosenCrypto : chosenFiat;
+  const { mode, chosenCrypto, chosenFiat, activeCode, showCrypto, showFiat } = useFolioCurrency();
   const folio = useFolio(accountName, activeCode);
   const [selectedPortfolio, setSelectedPortfolio] = useState<string | null>(null);
   useEffect(() => { setSelectedPortfolio(null); setPicked(null); }, [accountName]);
@@ -79,17 +67,6 @@ const Folio = () => {
   const cryptoUnavailable = mode === 'CRYPTO' && chosenCrypto !== 'WAX' && folio.fxUnavailable;
   const fiat = folio.fiat;
   const cur: Currency = mode === 'CRYPTO' ? (chosenCrypto === 'WAX' || cryptoUnavailable ? 'WAX' : fiat) : fiat;
-  const showCrypto = (c: CryptoChoice) => {
-    setMode('CRYPTO');
-    setChosenCrypto(c);
-    try { localStorage.setItem('cheesefolio-currency', c); } catch { /* private mode */ }
-  };
-  const showFiat = (f: FiatCode) => {
-    setMode('FIAT');
-    setChosenFiat(f);
-    try { localStorage.setItem('cheesefolio-currency', f); localStorage.setItem('cheesefolio-fiat', f); } catch { /* private mode */ }
-  };
-  const { tokens: live, isLoading: liveLoading } = useAllTokenBalances(accountName ?? undefined);
   const { data: priceMap, isFetching: pricesFetching, pricesUpdatedAt } = useAlcorTokenPrices(isConnected);
   const { data: waxUsdLive = 0, isFetching: waxPriceFetching } = useWaxPrice();
   const [refreshingPrices, setRefreshingPrices] = useState(false);
@@ -114,38 +91,10 @@ const Folio = () => {
   const usd = cur !== 'WAX';
   const [showClosed, setShowClosed] = useState(false);
 
-  const shares = useMemo(
-    () => live.filter((t) => t.isLpToken).map((t) => ({ contract: t.contract, symbol: t.symbol, balance: t.balance })),
-    [live],
-  );
-  const { data: pooled, isFetching: pooledLoading } = usePooledTokens(accountName, shares, !liveLoading);
-  const allHoldings = useMemo(
-    () =>
-      buildHoldings(
-        folio.ledger.positions,
-        live.filter((t) => !t.isLpToken).map((t) => ({
-          key: `${t.contract}:${t.symbol}`, contract: t.contract, symbol: t.symbol, precision: t.precision, balance: t.balance,
-        })),
-        (key) => priceMap?.get(key) ?? null,
-        waxUsd,
-        pooled ?? null,
-        true,
-      ),
-    [folio.ledger, live, priceMap, waxUsd, pooled],
-  );
-  const holdings = useMemo(() => allHoldings.filter((h) => (showClosed || !h.closed) && (!portfolioKeys || portfolioKeys.has(h.key))), [allHoldings, showClosed, portfolioKeys]);
+  const { allHoldings, holdings, totals, totalCost, realisable, pooled, pooledLoading, liveLoading } = useFolioHoldings({
+    account: accountName, ledger: folio.ledger, scopedLedger: scoped.ledger, priceMap, waxRate: waxUsd, showClosed, portfolioKeys,
+  });
   const venueName: Record<string, string> = { alcor: 'Alcor', taco: 'Taco', defibox: 'Defibox' };
-  const { data: realisable } = useRealisableValues(holdings, accountName);
-  const totalCost = useMemo(() => totalHoldingCost(holdings), [holdings]);
-
-  const totals = useMemo(() => {
-    let realized = 0, realizedUsd = 0;
-    for (const p of scoped.ledger.positions.values()) {
-      realized += p.realizedWax;
-      realizedUsd += p.realizedUsd;
-    }
-    return { ...holdingTotals(holdings, realisable), realized, realizedUsd };
-  }, [holdings, scoped.ledger, realisable]);
 
   // Cumulative realised profit/loss, one point per day with a sale.
   const plSeries = useMemo(() => {
