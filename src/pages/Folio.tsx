@@ -10,7 +10,7 @@ import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useWax } from '@/context/WaxContext';
-import { useFolioCurrency, type CryptoChoice } from '@/hooks/useFolioCurrency';
+import { useFolioCurrency } from '@/hooks/useFolioCurrency';
 import { useFolioHoldings } from '@/hooks/useFolioHoldings';
 import { useAlcorTokenPrices } from '@/hooks/useAlcorTokenPrices';
 import { useWaxPrice } from '@/hooks/useWaxPrice';
@@ -27,7 +27,7 @@ import { SummaryBox } from '@/components/folio/SummaryBox';
 import { TokenDialog } from '@/components/folio/TokenDialog';
 import { money, usdFmt, waxFmt, type Currency } from '@/components/folio/format';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CRYPTO_CURRENCIES, FIAT_CURRENCIES, isCrypto, isFiat, type CryptoCode, type DisplayCode, type FiatCode } from '@/lib/folio/fxCore';
+import { CRYPTO_CURRENCIES, FIAT_CURRENCIES, isCrypto, isFiat } from '@/lib/folio/fxCore';
 import { playRandomFart } from '@/lib/fartSounds';
 import walletOrb from '@/assets/wallet-icon.png';
 
