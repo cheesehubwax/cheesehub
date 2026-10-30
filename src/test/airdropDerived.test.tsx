@@ -31,6 +31,7 @@ describe('CHEESEAir extracted allocation and costs', () => {
     const { result } = renderHook(() => useAirAllocation({ ...input(), amountText: '1.00001' }));
     expect(result.current.recipients).toEqual([]);
     expect(result.current.total).toBe(0n);
+    expect(result.current.allocationError).toContain('Too many decimals');
   });
   it('splits RAM shares without changing selected totals or recipient counts', () => {
     const { result } = renderHook(() => useAirAllocation({ ...input(), isRam: true, amountText: '50' }));
@@ -53,6 +54,11 @@ describe('CHEESEAir extracted allocation and costs', () => {
       return useAirCosts({ ...allocation, isRam: params.isRam, isNft: params.isNft, batchSize: 1, ramPrice: undefined, rowStats: { existing: 2 - newRows, checked, newRows, complete: checked === 2 }, pricing: params.pricing, cheeseBalance: 100, mode: params.mode, precision: params.precision, sendSymbol: params.sendSymbol, resources: undefined, cpuPercent: 80 });
     });
   }
+  it('surfaces impossible RAM plans as blocking warnings', () => {
+    const { result } = cost({ ...input(), isRam: true, amountText: '22', pricing: { ...pricing, ram: { ...pricing.ram, minCheese: 6, maxCheese: 10 } } });
+    expect(result.current.hasError).toBe(true);
+    expect(result.current.warnings[0].message).toContain('cannot be split');
+  });
   it('keeps unknown token rows conservative and credits known existing rows', () => {
     expect(cost().result.current.estimate.maxNewRows).toBe(2);
     expect(cost(input(), 1, 1).result.current.estimate.maxNewRows).toBe(1);

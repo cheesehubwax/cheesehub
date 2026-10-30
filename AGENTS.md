@@ -9,7 +9,7 @@
 - Crypt orb: source-controlled public image for external hosting; preview uses its asset pointer since GitHub Pages cannot serve Lovable-relative paths.
 
 - App/recorder token snapshots share a versioned schema/URL; chain-verify precisions, cache no prices, keep unavailable prices unknown to prevent fabricated valuations.
-- CHEESEAir: keep HMR context identity; provider owns snapshots/selection/CSV, focused hooks own allocation/costs/run. Runner gates terms, concurrency and TX IDs.
+- CHEESEAir: keep HMR context identity; provider owns snapshots/selection/CSV, focused hooks own allocation/costs/run. Use decimal integer ratios for pro-rata and complete bounded integer RAM plans; surface unsafe plans. Runner gates terms, concurrency, TX IDs and combined CHEESE delivery/resource budgets before any paid action.
 - CHEESEAir LP columns aggregate normalized underlying quantities; USD payout weights stay separate.
 - CHEESEAir suffix unions use timestamp cursors, bounded reads and complete-only cache; stalled providers flag partial results because indexes differ and skip stops at 10,000 rows.
 - CHEESEFolio re-derives raw IndexedDB history per account; live balances are truth. Shared prices poll foreground-only/refetch on focus; metadata/placeholders never get live timestamps.
