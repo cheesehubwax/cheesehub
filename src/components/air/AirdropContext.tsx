@@ -462,6 +462,9 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     }
   }, [
     snapshotMode,
+    setBatchLog,
+    setBusy,
+    setRunState,
     snapContract,
     snapSymbol,
     snapCollection,

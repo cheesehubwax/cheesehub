@@ -145,7 +145,7 @@ export function useAirAllocation({ actor, tokenStat, walletTokens, sendContract,
 
   const applyRamMinViable = useCallback(() => {
     if (ramMinViable) setAmountText(ramMinViable.text);
-  }, [ramMinViable]);
+  }, [ramMinViable, setAmountText]);
 
   /**
    * RAM mode: the WAX the CHEESERam pool would have to spend on this drop
@@ -185,7 +185,7 @@ export function useAirAllocation({ actor, tokenStat, walletTokens, sendContract,
 
   const applyRamPoolMax = useCallback(() => {
     if (ramPoolMaxViable) setAmountText(ramPoolMaxViable.text);
-  }, [ramPoolMaxViable]);
+  }, [ramPoolMaxViable, setAmountText]);
 
 
 
