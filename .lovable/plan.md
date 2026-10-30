@@ -1,74 +1,49 @@
-# Compile and deploy the CHEESECrypt contract with Docker Desktop (first-timer guide)
+# CHEESEFolio audit and tidy — staged plan
 
-This is a guide only. No app code changes. Once you approve, I give you the finished guide with every command filled in for your PC (Windows or Mac).
+Goal: apply the same anti-entropy treatment CHEESEAir received, without blocking or breaking features still being built. Each stage is small, ships on its own, keeps every existing check passing, and changes no numbers the user sees unless a stage explicitly fixes a proven bug.
 
-## Before you start: important warnings
-- **You need 4 files, not 2:** `include/cheesecrypt.hpp`, `include/router_rules.hpp`, `src/cheesecrypt.cpp`, and `build.sh`. The contract won't compile without `router_rules.hpp`.
-- **Test on testnet first.** The contract hasn't been audited. The app isn't wired to it yet, so deploying to mainnet early gains you nothing.
-- **Protect the keys.** Whoever controls `crypt.cheese` can change its fees and rules. Use a dedicated key, never paste it into websites, and delete the temporary wallet afterwards.
+## Ground rules (all stages)
+- Behaviour freeze per stage: refactors must produce identical values (holdings, Total Cost, P/L, Realisable Now) — locked by tests first.
+- New Folio features in progress go into the new structure as it lands; no parallel old/new copies left behind.
+- No new markdown scratch files; findings go into one short audit note that is deleted when Folio is done. Rules go into AGENTS.md (replace, never duplicate).
+- Unknown prices/rates stay unknown; live balances stay the truth.
 
-## Step 1: Set up the folder
-```text
-C:\cheesecrypt\            (Mac: ~/cheesecrypt/)
-  build.sh
-  include\cheesecrypt.hpp
-  include\router_rules.hpp
-  src\cheesecrypt.cpp
-```
-Keep the folder names `include` and `src` exactly; the code looks for them.
+## Stage 1 — Lock the numbers (tests only, no code changes)
+- Golden-ledger test: a fixed raw history fixture (trades, gifts, LP add/remove, Alcor deals, duplicate inline copies) asserting holdings, Total Cost, realised/unrealised P/L, disposal P/L and acquisitions.
+- Sync tests: deepest-provider-to-end rule, sequence dedup, creator-copy dedup, capped concurrency, provider dropout mid-scan.
+- Storage tests: per-account isolation, JSON export/import round trip with checksums, newest-edit portfolio merge.
+- Outcome: a safety net for every later stage.
 
-## Step 2: Install and start Docker Desktop
-- Download it from docker.com, install, then open it and wait until it says "Engine running".
-- Open a terminal (Windows: PowerShell; Mac: Terminal) and run `docker --version` to check it works.
+## Stage 2 — Sync engine (`scanner.ts`, `useFolio.ts`)
+- Split scanner (488 lines) into: provider paging, merge/dedup, gap detection (creator trust), Alcor/order-book leftovers.
+- Single cancellable scan lifecycle per account: abort on account switch/unmount, no overlapping scans, no state writes after abort.
+- Explicit partial-sync state shown to the user (instead of silently incomplete history).
+- Confirm endpoint order always comes from the health resolver.
 
-## Step 3: Build a reusable compiler image (one time only)
-Create a file called `Dockerfile` (no extension) in the folder:
-```text
-FROM --platform=linux/amd64 ubuntu:22.04
-RUN apt-get update && apt-get install -y wget ca-certificates && \
-    wget https://github.com/AntelopeIO/cdt/releases/download/v4.1.0/cdt_4.1.0-1_amd64.deb && \
-    apt-get install -y ./cdt_4.1.0-1_amd64.deb && rm cdt_4.1.0-1_amd64.deb
-WORKDIR /work
-```
-Then run, from inside the folder:
-```text
-cd C:\cheesecrypt
-docker build -t cheese-cdt .
-```
+## Stage 3 — Valuation safety (`pooled.ts`, `prices.ts`, `holdings.ts`, `fx*`)
+- Verify every unreadable venue/price/rate path yields "unknown" and hides P/L, never zero.
+- Price polling: foreground-only, single interval owner, refetch on focus, no leaked timers.
+- Remove any duplicated pricing/precision helpers shared with the wallet/token registry.
 
-## Step 4: Compile
-Windows PowerShell:
-```text
-docker run --rm -v ${PWD}:/work cheese-cdt bash build.sh
-```
-Mac:
-```text
-docker run --rm -v "$(pwd)":/work cheese-cdt bash build.sh
-```
-Success prints "Built build/cheesecrypt.wasm and build/cheesecrypt.abi". A new `build` folder holds both files.
-- On Windows, if you see `$'\r': command not found`, the file has Windows line endings. Run `docker run --rm -v ${PWD}:/work cheese-cdt cdt-cpp -abigen -I include -contract cheesecrypt -o build/cheesecrypt.wasm src/cheesecrypt.cpp` instead.
+## Stage 4 — UI decomposition (`FolioParts.tsx` 666 lines, `Folio.tsx` 421 lines)
+- Split into focused files: summary boxes, token row, mobile card, disposal P/L panel, gift dialog, sync status.
+- Page becomes layout only; data comes from focused hooks (holdings, sync, portfolios, display currency).
+- Keep the five summary boxes order and compact rows exactly as today.
 
-## Step 5: Check the RAM you need
-- Look at the size of `cheesecrypt.wasm`. Deploying uses roughly 10 times the file size in RAM.
-- Buy at least that much on `crypt.cheese`, plus about 50 KB extra for the contract's working data.
+## Stage 5 — Render performance
+- Memoize token rows by per-token primitive props so price ticks or toggles redraw only changed rows.
+- Render-count tests like CHEESEAir: changing currency, portfolio, or Card/Table view refreshes only what changed.
 
-## Step 6: Deploy with cleos inside Docker
-1. Build a second image with WAX's command-line tool (cleos), Leap 5.x. The finished guide will include this Dockerfile.
-2. Start it with your folder attached, create a temporary wallet, and import the `crypt.cheese` active key.
-3. Upload the contract:
-   `cleos -u https://wax.greymass.com set contract crypt.cheese /work/build cheesecrypt.wasm cheesecrypt.abi`
-4. Give the contract permission to send CHEESE itself (needed for the 80/20 split and change refunds):
-   `cleos -u https://wax.greymass.com set account permission crypt.cheese active --add-code`
-5. Lock the wallet, exit the container (`--rm` deletes the container), and delete the wallet files.
+## Stage 6 — Cleanup and handover
+- Delete dead exports, unused types and the temporary audit note.
+- Update AGENTS.md Folio rules (merge where possible), roadmap.md.
+- Live check in the preview with a real account: sync, holdings, LP rows, import/export.
 
-For testnet, use `https://testnet.waxsweden.org` and a testnet account instead.
+## Handling ongoing Folio building
+- Before each stage, I'll check roadmap.md for open Folio feature work; if a feature touches the same files, it is finished or folded into that stage first.
+- Stages 1 and 3 are safe to run anytime; Stages 2 and 4 are the ones to schedule around active feature work.
 
-## Step 7: Check it worked
-- Open waxblock.io and search `crypt.cheese`. The Contract tab should show the actions `sendmsg`, `reclaim`, `setconfig` and `setpaused`, and the tables `config` and `pending`.
-- No `setconfig` call is needed. The built-in defaults already use `cheeseburger`, CHEESE, the 80% `eosio.null` / 20% `xcheeseliqst` split and the current fees.
-- Tell me when it's deployed. Wiring the app to the contract comes after testnet checks (see the integration steps in the sync checklist).
+## Not changing
+- No contract, fee, or Crypt changes. No new data stored off-device (keeps Folio local-only — no privacy or custody concerns).
 
-## Technical notes
-- CDT 4.1.0 from the AntelopeIO GitHub releases, run in an amd64 Ubuntu 22.04 image. On Apple Silicon Macs, Docker runs it in emulation; it's slower but works.
-- The contract uses `get_self()`, so the account name isn't built into the compiled files.
-- `--add-code` adds `crypt.cheese@eosio.code` to the active permission. Without it, the contract can't make its own transfers, so every send fails.
+Recommended order: 1 → 2 → 3 → 4 → 5 → 6, one stage per approval.
