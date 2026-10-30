@@ -1,5 +1,5 @@
 // CHEESEAir — snapshot/selection state and the shared presentational interface.
-// The UI cards below `src/components/air/` are presentational and read from here.
+// Cards subscribe only to their own memoized context slice; state and signing stay shared.
 import {
   createContext,
   useCallback,
@@ -35,7 +35,7 @@ import { getVenueLpHolders, type VenueLpPair } from '@/lib/airdropVenueLp';
 import { DEFAULT_CPU_PERCENT } from '@/lib/airdropCheese';
 import { bytesPerCheese } from '@/lib/airdropResources';
 import { useAirAllocation } from '@/hooks/useAirAllocation';
-import { useAirCosts } from '@/hooks/useAirCosts';
+import { useAirCosts as useAirCostEstimates } from '@/hooks/useAirCosts';
 import { useAirdropRunner, shortError, type PurchaseLogEntry, type BatchLogEntry } from '@/hooks/useAirdropRunner';
 export { shortError, type PurchaseLogEntry, type BatchLogEntry } from '@/hooks/useAirdropRunner';
 export { RAM_BYTES_PER_ROW } from '@/hooks/useAirCosts';
@@ -207,14 +207,97 @@ interface AirdropContextValue {
 // Keep mounted providers and refreshed consumers on the same context identity.
 // Fast Refresh can reload this module while preserving the existing page tree.
 const AirdropContext: Context<AirdropContextValue | null> =
-  import.meta.hot?.data.airdropContext ?? createContext<AirdropContextValue | null>(null);
-if (import.meta.hot) import.meta.hot.data.airdropContext = AirdropContext;
+  import.meta.hot?.data?.airdropContext ?? createContext<AirdropContextValue | null>(null);
+if (import.meta.hot?.data) import.meta.hot.data.airdropContext = AirdropContext;
 
 export function useAirdrop(): AirdropContextValue {
   const ctx = useContext(AirdropContext);
   if (!ctx) throw new Error('useAirdrop must be used inside <AirdropProvider>');
   return ctx;
 }
+
+// Each card gets a memoized projection, not the entire changing dashboard value.
+// Contexts (including every slice) retain their identities across Fast Refresh.
+function createAirSlice<K extends keyof AirdropContextValue>(name: string, keys: readonly K[]) {
+  type Slice = Pick<AirdropContextValue, K>;
+  const hotKey = `air${name}Context`;
+  const context: Context<Slice | null> = import.meta.hot?.data?.[hotKey] ?? createContext<Slice | null>(null);
+  if (import.meta.hot?.data) import.meta.hot.data[hotKey] = context;
+  function useSlice(): Slice {
+    const value = useContext(context);
+    if (!value) throw new Error(`useAir${name} must be used inside <AirdropProvider>`);
+    return value;
+  }
+  function useValue(value: AirdropContextValue): Slice {
+    // Keys are fixed at module initialization; compare each field by identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return useMemo(() => Object.fromEntries(keys.map(key => [key, value[key]])) as Slice, keys.map(key => value[key]));
+  }
+  return { Provider: context.Provider, useSlice, useValue };
+}
+
+const AirSendSlice = createAirSlice('Send', [
+  'assetKind', 'setAssetKind', 'isNft', 'isRam', 'ramLimits',
+  'cheesePerRamKb', 'cheeseBalance', 'actor', 'sendContract', 'setSendContract',
+  'sendSymbol', 'setSendSymbol', 'tokenStat', 'walletTokens', 'nftCollections',
+  'nftCollection', 'setNftCollection', 'nftTemplates', 'nftTemplateId', 'setNftTemplateId',
+  'nftPool', 'nftLoading', 'nftError',
+]);
+export const useAirSend = AirSendSlice.useSlice;
+
+const AirSnapshotSlice = createAirSlice('Snapshot', [
+  'snapshotMode', 'setSnapshotMode', 'snapContract', 'setSnapContract', 'snapSymbol',
+  'setSnapSymbol', 'snapCollection', 'setSnapCollection', 'snapSuffix', 'setSnapSuffix',
+  'snapSchema', 'setSnapSchema', 'snapTemplate', 'setSnapTemplate', 'lpPairs',
+  'lpPairsLoading', 'lpPair', 'setLpPair', 'lpPoolsScanned', 'lpPositions',
+  'snapshot', 'snapshotAt', 'snapshotError', 'loadSnapshot', 'downloadSnapshotCsv',
+  'busy',
+]);
+export const useAirSnapshot = AirSnapshotSlice.useSlice;
+
+const AirDistributionSlice = createAirSlice('Distribution', [
+  'isNft', 'isRam', 'ramUnit', 'setRamUnit', 'ramExcluded',
+  'ramPurchaseCount', 'ramLimits', 'ramMinViable', 'applyRamMinViable', 'ramPoolWax',
+  'ramPoolMaxViable', 'applyRamPoolMax', 'selectedCount', 'nftPoolSize', 'mode',
+  'setMode', 'amountText', 'setAmountText', 'sendSymbol', 'snapshot',
+  'memo', 'setMemo', 'batchSize', 'setBatchSize', 'minWeight',
+  'setMinWeight',
+]);
+export const useAirDistribution = AirDistributionSlice.useSlice;
+
+const AirHoldersSlice = createAirSlice('Holders', [
+  'filteredHolders', 'selected', 'toggle', 'quickSelect', 'snapshot',
+  'snapshotMode', 'isNft', 'isRam', 'sendSymbol', 'recipients',
+  'ramPurchaseCounts', 'nftAssignments', 'precision', 'cheesePerRamKb',
+]);
+export const useAirHolders = AirHoldersSlice.useSlice;
+
+const AirCostsSlice = createAirSlice('Costs', [
+  'actor', 'isNft', 'isRam', 'ramCheeseTotal', 'ramBytesTotal',
+  'ramExcluded', 'ramPurchaseCount', 'ramPoolWax', 'ramMinViable', 'ramLimits',
+  'selectedCount', 'recipientCount', 'total', 'precision', 'sendSymbol',
+  'estimate', 'nftAssignments', 'nftAssigned', 'nftSkipped', 'nftLeftover',
+  'nftPoolSize', 'rowStats', 'rowCheckLoading', 'recipients', 'estCpuCheese',
+  'estRamCheese', 'cheesePerCpuMs', 'cheesePerRamKb', 'requiredRamCheese', 'suggestedCpuCheese',
+  'cheeseBalance',
+]);
+// Distinct from the calculation hook in hooks/useAirCosts: this reads UI state.
+export const useAirCostSummary = AirCostsSlice.useSlice;
+
+const AirRunSlice = createAirSlice('Run', [
+  'actor', 'isRam', 'estimate', 'ramCheeseTotal', 'warnings',
+  'runError', 'runState', 'recipientCount', 'canRun', 'runAirdrop',
+  'cancelRequested', 'requestCancel', 'downloadResultsCsv', 'purchaseLog', 'batchLog',
+  'termsAccepted', 'setTermsAccepted',
+]);
+export const useAirRun = AirRunSlice.useSlice;
+
+// Stable empty query results prevent unrelated input changes invalidating allocations.
+const EMPTY_WALLET_TOKENS: AirdropContextValue['walletTokens'] = [];
+const EMPTY_COLLECTIONS: InventoryCollection[] = [];
+const EMPTY_TEMPLATES: InventoryTemplate[] = [];
+const EMPTY_ASSETS: string[] = [];
+const EMPTY_PAIRS: VenueLpPair[] = [];
 
 export function AirdropProvider({ children }: { children: ReactNode }) {
   const { session, accountName, cheeseBalance, refreshBalance } = useWax();
@@ -230,11 +313,11 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
   const [sendContract, setSendContract] = useState('eosio.token');
   const [sendSymbol, setSendSymbol] = useState('WAX');
   const { data: tokenStatData } = useAirTokenStat(sendContract, sendSymbol);
-  const tokenStat = tokenStatData
+  const tokenStat = useMemo(() => tokenStatData
     ? { precision: tokenStatData.precision, supply: tokenStatData.supply }
-    : null;
+    : null, [tokenStatData]);
   const precision = tokenStat?.precision ?? 8;
-  const { data: walletTokens = [] } = useAirWalletTokens(actor);
+  const { data: walletTokens = EMPTY_WALLET_TOKENS } = useAirWalletTokens(actor);
 
   // ---- NFT inventory ----------------------------------------------------
   const [nftCollection, setNftCollection] = useState('');
@@ -242,9 +325,9 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
   const collectionsQuery = useAirInventoryCollections(actor, isNft);
   const templatesQuery = useAirInventoryTemplates(actor, nftCollection, isNft);
   const assetsQuery = useAirInventoryAssets(actor, nftCollection, nftTemplateId, isNft);
-  const nftCollections = collectionsQuery.data ?? [];
-  const nftTemplates = templatesQuery.data ?? [];
-  const nftPool = assetsQuery.data?.assetIds ?? [];
+  const nftCollections = collectionsQuery.data ?? EMPTY_COLLECTIONS;
+  const nftTemplates = templatesQuery.data ?? EMPTY_TEMPLATES;
+  const nftPool = assetsQuery.data?.assetIds ?? EMPTY_ASSETS;
   const nftLoading: null | 'collections' | 'templates' | 'assets' = collectionsQuery.isFetching
     ? 'collections'
     : templatesQuery.isFetching
@@ -272,7 +355,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
   const [lpPositions, setLpPositions] = useState<number | null>(null);
   // Prefetched as soon as CHEESEAir opens so the LP picker is ready on arrival.
   const lpPairsQuery = useAirAlcorPairs(true);
-  const lpPairs = lpPairsQuery.data ?? [];
+  const lpPairs = lpPairsQuery.data ?? EMPTY_PAIRS;
   const [snapContract, setSnapContract] = useState('');
   const [snapSymbol, setSnapSymbol] = useState('');
   const [snapCollection, setSnapCollection] = useState('');
@@ -403,7 +486,7 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     };
   }, [recipientAccounts, rowKey, rowCacheVersion]);
 
-  const costs = useAirCosts({ ...allocation, isRam, isNft, batchSize, ramPrice, rowStats, pricing, cheeseBalance, mode, precision, sendSymbol, resources, cpuPercent });
+  const costs = useAirCostEstimates({ ...allocation, isRam, isNft, batchSize, ramPrice, rowStats, pricing, cheeseBalance, mode, precision, sendSymbol, resources, cpuPercent });
   const { ramPurchaseCount, estimate, warnings, hasError, recipientCount, suggestedCpuCheese, requiredRamCheese, cheesePerCpuMs, cheesePerRamKb, estCpuCheese, estRamCheese } = costs;
   const { termsAccepted, setTermsAccepted, busy, setBusy, runState, setRunState, runError, purchaseLog, batchLog, setBatchLog, cancelRequested, requestCancel, canRun, runAirdrop } = useAirdropRunner({ session, actor, cheeseBalance, isRam, isNft, hasError, nftAssignments, nftShortfall, recipients, ramPurchases, ramCheeseTotal, pricing, suggestedCpuCheese, requiredRamCheese, cpuPercent, batchSize, memo, sendContract, sendSymbol, precision, tokenStat, refetchResources, refreshBalance });
 
@@ -686,5 +769,28 @@ export function AirdropProvider({ children }: { children: ReactNode }) {
     downloadResultsCsv,
   };
 
-  return <AirdropContext.Provider value={value}>{children}</AirdropContext.Provider>;
+  const sendValue = AirSendSlice.useValue(value);
+  const snapshotValue = AirSnapshotSlice.useValue(value);
+  const distributionValue = AirDistributionSlice.useValue(value);
+  const holdersValue = AirHoldersSlice.useValue(value);
+  const costsValue = AirCostsSlice.useValue(value);
+  const runValue = AirRunSlice.useValue(value);
+
+  return (
+    <AirdropContext.Provider value={value}>
+      <AirSendSlice.Provider value={sendValue}>
+        <AirSnapshotSlice.Provider value={snapshotValue}>
+          <AirDistributionSlice.Provider value={distributionValue}>
+            <AirHoldersSlice.Provider value={holdersValue}>
+              <AirCostsSlice.Provider value={costsValue}>
+                <AirRunSlice.Provider value={runValue}>
+                  {children}
+                </AirRunSlice.Provider>
+              </AirCostsSlice.Provider>
+            </AirHoldersSlice.Provider>
+          </AirDistributionSlice.Provider>
+        </AirSnapshotSlice.Provider>
+      </AirSendSlice.Provider>
+    </AirdropContext.Provider>
+  );
 }

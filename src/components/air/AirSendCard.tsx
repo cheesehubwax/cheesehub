@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { formatCheese } from '@/lib/airdropResources';
 import { CHEESE_RAM_CONTRACT, CHEESE_SYMBOL } from '@/lib/airdropCheese';
 import type { InventoryTemplate } from '@/lib/airdropChain';
-import { useAirdrop } from '@/components/air/AirdropContext';
+import { useAirSend } from '@/components/air/AirdropContext';
 
 export function AirSendCard() {
   const {
@@ -38,7 +38,7 @@ export function AirSendCard() {
     nftPool,
     nftLoading,
     nftError,
-  } = useAirdrop();
+  } = useAirSend();
 
   return (
     <Card className="border-cheese/20 bg-card/80 backdrop-blur-sm">

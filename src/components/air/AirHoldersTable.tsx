@@ -1,12 +1,13 @@
 // CHEESEAir — the holder list with per-account selection and the computed payout.
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { cn } from '@/lib/utils';
 import { formatUnits } from '@/lib/airdrop';
 import { CHEESE_PRECISION, CHEESE_SYMBOL } from '@/lib/airdropCheese';
-import { useAirdrop } from '@/components/air/AirdropContext';
+import { useAirHolders, type SnapshotMode } from '@/components/air/AirdropContext';
+import type { Holder } from '@/lib/airdropChain';
 
 const QUICK = [10, 50, 100];
 const MAX_ROWS = 500;
@@ -28,7 +29,7 @@ export function AirHoldersTable() {
     nftAssignments,
     precision,
     cheesePerRamKb,
-  } = useAirdrop();
+  } = useAirHolders();
 
 
   const amountByAccount = useMemo(
@@ -126,13 +127,63 @@ export function AirHoldersTable() {
                 </tr>
               </thead>
               <tbody>
-                {filteredHolders.slice(0, MAX_ROWS).map((h, i) => {
-                  const isSelected = selected.has(h.account);
-                  const units = amountByAccount.get(h.account);
-                  const assetIds = assetsByAccount.get(h.account);
-                  return (
+                {filteredHolders.slice(0, MAX_ROWS).map((h, i) => (
+                  <AirHolderRow
+                    key={h.account}
+                    h={h}
+                    i={i}
+                    isSelected={selected.has(h.account)}
+                    units={amountByAccount.get(h.account)}
+                    assetIds={assetsByAccount.get(h.account)}
+                    purchaseCount={ramPurchaseCounts.get(h.account) ?? 1}
+                    snapshotMode={snapshotMode}
+                    isNft={isNft}
+                    isRam={isRam}
+                    precision={precision}
+                    cheesePerRamKb={cheesePerRamKb}
+                    toggle={toggle}
+                  />
+                ))}
+              </tbody>
+            </table>
+            {filteredHolders.length > MAX_ROWS && (
+              <p className="bg-secondary px-3 py-2 text-xs text-muted-foreground">
+                Showing first {MAX_ROWS} rows — all {filteredHolders.length.toLocaleString()}{' '}
+                selected accounts are still included in the drop.
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="rounded-md border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
+            Load a holder list to preview recipients.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+
+interface AirHolderRowProps {
+  h: Holder;
+  i: number;
+  isSelected: boolean;
+  units: bigint | undefined;
+  assetIds: string[] | undefined;
+  purchaseCount: number;
+  snapshotMode: SnapshotMode;
+  isNft: boolean;
+  isRam: boolean;
+  precision: number;
+  cheesePerRamKb: number | null;
+  toggle: (account: string) => void;
+}
+
+// Maps/sets remain in the table; each row receives only its own current values.
+// Fixed payouts leave other rows untouched when one recipient is toggled.
+export const AirHolderRow = memo(function AirHolderRow({ h, i, isSelected, units, assetIds, purchaseCount, snapshotMode, isNft, isRam, precision, cheesePerRamKb, toggle }: AirHolderRowProps) {
+  return (
                     <tr
-                      key={h.account}
                       className={cn(
                         'border-t border-border/50 font-mono',
                         isSelected ? 'bg-cheese/5' : 'opacity-60',
@@ -196,9 +247,9 @@ export function AirHoldersTable() {
                                 KB
                               </span>
                             )}
-                            {isRam && (ramPurchaseCounts.get(h.account) ?? 1) > 1 && (
+                            {isRam && (purchaseCount) > 1 && (
                               <span className="block text-xs text-cheese">
-                                {ramPurchaseCounts.get(h.account)} purchases
+                                {purchaseCount} purchases
                               </span>
                             )}
                           </>
@@ -209,23 +260,5 @@ export function AirHoldersTable() {
                       </td>
 
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {filteredHolders.length > MAX_ROWS && (
-              <p className="bg-secondary px-3 py-2 text-xs text-muted-foreground">
-                Showing first {MAX_ROWS} rows — all {filteredHolders.length.toLocaleString()}{' '}
-                selected accounts are still included in the drop.
-              </p>
-            )}
-          </div>
-        ) : (
-          <p className="rounded-md border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
-            Load a holder list to preview recipients.
-          </p>
-        )}
-      </CardContent>
-    </Card>
   );
-}
+});

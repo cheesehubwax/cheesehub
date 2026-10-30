@@ -24,7 +24,7 @@ import {
 } from '@/lib/airdropVenueLp';
 import { normaliseSuffix } from '@/lib/airdropSuffix';
 import { getTokenLogoUrl } from '@/lib/tokenLogos';
-import { ACCOUNT_RE, useAirdrop, type SnapshotMode } from '@/components/air/AirdropContext';
+import { ACCOUNT_RE, useAirSnapshot, type SnapshotMode } from '@/components/air/AirdropContext';
 
 /** Small Alcor token logo with a graceful placeholder fallback. */
 function TokenLogo({ contract, symbol }: { contract: string; symbol: string }) {
@@ -100,7 +100,7 @@ export function AirSnapshotCard() {
     loadSnapshot,
     downloadSnapshotCsv,
     busy,
-  } = useAirdrop();
+  } = useAirSnapshot();
 
   const [pairOpen, setPairOpen] = useState(false);
   const [pairQuery, setPairQuery] = useState('');

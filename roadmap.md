@@ -2,7 +2,7 @@
 
 Open tasks only. Completed work lives in git history.
 
-- [ ] CHEESEAir: verify one signed airdrop and chain readback after stages 1–2 — requires the user's Anchor signatures. Allocation/resource/runner checks pass; remaining audit findings are recorded in `.lovable/cheeseair-audit.md` for later stages.
+- [ ] CHEESEAir: verify one signed airdrop and chain readback — requires the user's Anchor signatures. Phases 1–3 safety/render checks pass, and live 500-row snapshot/edit/selection checks pass without sending funds; remaining audit findings are recorded in `.lovable/cheeseair-audit.md` for later stages.
 
 - [ ] Verify flattened voice and join/rejoin fees on WAX — requires the user's Anchor signatures; automated fee/delivery checks cover the changed paths.
 
