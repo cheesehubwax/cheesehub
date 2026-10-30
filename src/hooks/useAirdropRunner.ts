@@ -42,6 +42,7 @@ export function useAirdropRunner({ session, actor, cheeseBalance, isRam, isNft, 
   const [cancelRequested, setCancelRequested] = useState(false);
   const cancelRef = useRef(false);
   const runLogRef = useRef<BatchLogEntry[]>([]);
+  const inFlightRef = useRef(false);
 
 
   const refreshAccount = useCallback(async () => {
@@ -78,7 +79,7 @@ export function useAirdropRunner({ session, actor, cheeseBalance, isRam, isNft, 
             ],
             { showSuccessToast: false, showErrorToast: true, errorTitle: 'Resource purchase failed' },
           );
-          if (result.success) {
+          if (result.success && result.txId) {
             setPurchaseLog((prev) => [...prev, { kind, cheese, txId: result.txId ?? undefined }]);
           } else {
             ok = false;
@@ -145,8 +146,11 @@ export function useAirdropRunner({ session, actor, cheeseBalance, isRam, isNft, 
         : recipients.length > 0 && tokenStat !== null);
 
   const runAirdrop = useCallback(async () => {
+    if (!canRun || inFlightRef.current) return;
     if (!session || !actor) return;
     if (isNft ? nftAssignments.length === 0 || nftShortfall > 0 : recipients.length === 0) return;
+    inFlightRef.current = true;
+    try {
 
     setBatchLog([]);
     setPurchaseLog([]);
@@ -236,7 +240,7 @@ export function useAirdropRunner({ session, actor, cheeseBalance, isRam, isNft, 
           { showSuccessToast: false, showErrorToast: false },
         );
         appendBatch(
-          result.success
+          result.success && result.txId
             ? {
                 batch: i + 1,
                 recipients: batch.length,
@@ -278,7 +282,7 @@ export function useAirdropRunner({ session, actor, cheeseBalance, isRam, isNft, 
           { showSuccessToast: false, showErrorToast: false },
         );
         appendBatch(
-          result.success
+          result.success && result.txId
             ? {
                 batch: i + 1,
                 recipients: batch.length,
@@ -323,7 +327,7 @@ export function useAirdropRunner({ session, actor, cheeseBalance, isRam, isNft, 
         { showSuccessToast: false, showErrorToast: false },
       );
       appendBatch(
-        result.success
+        result.success && result.txId
           ? {
               batch: i + 1,
               recipients: batch.length,
@@ -343,8 +347,14 @@ export function useAirdropRunner({ session, actor, cheeseBalance, isRam, isNft, 
     finishRun('token');
     void refreshAccount();
     void queryClient.invalidateQueries({ queryKey: ['air-wallet-tokens'] });
-
+    } catch (error) {
+      setRunError(shortError(error));
+      setRunState(runLogRef.current.length > 0 ? 'done' : 'idle');
+    } finally {
+      inFlightRef.current = false;
+    }
   }, [
+    canRun,
     appendBatch,
     finishRun,
 
