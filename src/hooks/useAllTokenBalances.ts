@@ -36,13 +36,12 @@ async function fetchBalancesForAccount(accountName: string): Promise<{ tokens: T
       console.warn('[Balance] Hyperion is stale, falling back to RPC for tokens from stale response + critical tokens');
       usedFallback = true;
 
-      // Only query tokens Hyperion already reported + critical tokens (WAX, CHEESE)
-      // instead of all 28 registry tokens — avoids failed RPC calls to dead contracts
-      const criticalTokens = WAX_TOKENS.filter(t => t.symbol === 'WAX' || t.symbol === 'CHEESE' || t.symbol === 'WAXDAO');
+      // A stale index misses tokens received after it stopped updating, so query
+      // the tokens it reported plus every curated registry token directly.
       const hyperionTokenKeys = new Set(hyperionResult.tokens.map((ht: HyperionToken) => `${ht.contract}:${ht.symbol}`));
       const tokensToQuery = [
         ...hyperionResult.tokens.map((ht: HyperionToken) => ({ contract: ht.contract, symbol: ht.symbol, precision: ht.precision || 8 })),
-        ...criticalTokens.filter(t => !hyperionTokenKeys.has(`${t.contract}:${t.symbol}`)),
+        ...WAX_TOKENS.filter(t => !hyperionTokenKeys.has(`${t.contract}:${t.symbol}`)),
       ];
 
       const rpcBalances = await fetchAllTokenBalancesViaRpc(
