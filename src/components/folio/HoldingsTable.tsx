@@ -3,7 +3,7 @@ import { memo, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { TokenLogo } from '@/components/TokenLogo';
 import type { FolioEvent } from '@/lib/folio/types';
-import type { HoldingRow } from '@/lib/folio/holdings';
+import { sameHolding, shallowEqual, type HoldingRow } from '@/lib/folio/holdings';
 import type { Realisable } from '@/hooks/useRealisableValues';
 import { useIsMobile } from '@/hooks/use-mobile';
 import type { DisplayCode } from '@/lib/folio/fxCore';
@@ -45,29 +45,6 @@ interface RowProps {
   onPick: (r: HoldingRow) => void;
   onGifts: (r: HoldingRow) => void;
   portfolio: PortfolioPicker | undefined;
-}
-
-const shallowEqual = (a: object | null | undefined, b: object | null | undefined): boolean => {
-  if (a === b) return true;
-  if (!a || !b) return false;
-  const ka = Object.keys(a);
-  if (ka.length !== Object.keys(b).length) return false;
-  return ka.every((k) => (a as Record<string, unknown>)[k] === (b as Record<string, unknown>)[k]);
-};
-
-/**
- * Rows are rebuilt on every price tick or balance refresh, so compare what a
- * row shows rather than object identity: unchanged tokens skip redrawing.
- */
-export function sameHolding(a: HoldingRow, b: HoldingRow): boolean {
-  if (a === b) return true;
-  for (const k of Object.keys(a) as (keyof HoldingRow)[]) {
-    if (k === 'position' || k === 'pooledParts') continue;
-    if (a[k] !== b[k]) return false;
-  }
-  return shallowEqual(a.position, b.position)
-    && a.pooledParts.length === b.pooledParts.length
-    && a.pooledParts.every((x, i) => shallowEqual(x, b.pooledParts[i]));
 }
 
 const sameRowProps = (a: RowProps, b: RowProps) =>
