@@ -1,6 +1,5 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { getAudioPlayer } from '@/lib/musicPlayer';
 import { announcePlaying, CRYPT_NOW_PLAYING } from '@/lib/cryptAudio';
@@ -13,8 +12,21 @@ export function CryptYoutubeEmbed({ link }: { link: YoutubeLink }) {
   const [expanded, setExpanded] = useState(false);
   const [thumb, setThumb] = useState(false);
   const [thumbFailed, setThumbFailed] = useState(false);
+  const playerDialog = useRef<HTMLDialogElement>(null);
   const source = `crypt-youtube-${useId()}`;
+  const titleId = useId();
+  const playing = selection !== null;
   const mirror = PRIVATE_YOUTUBE_MIRRORS[typeof selection === 'number' ? selection : 0];
+
+  // The browser's top layer expands the SAME dialog and iframe without moving
+  // either DOM node. Reparenting even an existing iframe reloads its document.
+  useLayoutEffect(() => {
+    const dialog = playerDialog.current;
+    if (!dialog || !playing) return;
+    dialog.close();
+    if (expanded) dialog.showModal();
+    else dialog.show();
+  }, [expanded, playing]);
 
   useEffect(() => {
     const stop = (event: Event) => {
@@ -44,9 +56,27 @@ export function CryptYoutubeEmbed({ link }: { link: YoutubeLink }) {
   return (
     <div className="my-1 w-96 max-w-full rounded-md border border-border bg-background/60 p-1" onContextMenu={e => e.stopPropagation()}>
       {selection !== null ? (
-        expanded ? (
-          <div className="flex aspect-video w-full items-center justify-center rounded bg-muted text-xs text-muted-foreground">⛶ Playing in expanded view</div>
-        ) : frame
+        <>
+          {expanded && <div className="flex aspect-video w-full items-center justify-center rounded bg-muted text-xs text-muted-foreground">⛶ Playing in expanded view</div>}
+          <dialog ref={playerDialog} aria-labelledby={expanded ? titleId : undefined}
+            aria-label={expanded ? undefined : (link.title ?? 'YouTube video')}
+            className={expanded
+              ? 'fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-3xl max-h-[90dvh] overflow-y-auto rounded-lg border border-border bg-background p-4 text-foreground shadow-lg backdrop:bg-background/80'
+              : 'relative m-0 block w-full max-w-none border-0 bg-transparent p-0 text-foreground'}
+            onCancel={event => { event.preventDefault(); setExpanded(false); }}
+            onClick={event => {
+              if (!expanded || event.target !== event.currentTarget) return;
+              const bounds = event.currentTarget.getBoundingClientRect();
+              if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) setExpanded(false);
+            }}>
+            <div hidden={!expanded} className="mb-4 pr-8">
+              <h2 id={titleId} className="text-lg font-semibold text-primary">▶️ {link.title ?? 'YouTube video'}</h2>
+              <p className="text-sm text-muted-foreground">{selection === 'direct' ? '⚠️ Google direct' : `🛡️ ${new URL(mirror.host).hostname}`}</p>
+              <Button type="button" variant="ghost" size="icon" className="absolute right-2 top-2 h-7 w-7" aria-label="Close expanded video" title="Close expanded video" onClick={() => setExpanded(false)}>✕</Button>
+            </div>
+            {frame}
+          </dialog>
+        </>
       ) : (
         <div className="relative">
           <Button type="button" variant="secondary" onClick={() => play(0)} aria-label={`Play video privately${link.title ? `: ${link.title}` : ''}`}
@@ -86,13 +116,6 @@ export function CryptYoutubeEmbed({ link }: { link: YoutubeLink }) {
           {selection !== 'direct' && <Button type="button" variant="link" className="h-auto whitespace-normal p-0 text-[11px] text-muted-foreground" onClick={() => setWarn(true)}>⚠️ Last resort: YouTube direct</Button>}
         </div>
       )}
-      <Dialog open={expanded && selection !== null} onOpenChange={setExpanded}>
-        <DialogContent className="max-w-3xl p-4 max-h-[90dvh] overflow-y-auto">
-          <DialogTitle className="text-primary">▶️ {link.title ?? 'YouTube video'}</DialogTitle>
-          <DialogDescription>{selection === 'direct' ? '⚠️ Google direct' : `🛡️ ${new URL(mirror.host).hostname}`}</DialogDescription>
-          {expanded && frame}
-        </DialogContent>
-      </Dialog>
       <AlertDialog open={warn} onOpenChange={setWarn}>
         <AlertDialogContent>
           <AlertDialogHeader>
