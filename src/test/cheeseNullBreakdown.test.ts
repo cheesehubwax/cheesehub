@@ -114,3 +114,38 @@ describe('fetchNullBreakdown contract rows', () => {
     expect(entries.find((e) => e.contract === 'crypt')?.amount).toBeUndefined();
   });
 });
+
+function memoNull(from: string, amount: number, daysAgo: number, memo: string, to = 'eosio.null') {
+  return {
+    act: { data: { from, to, quantity: `${amount.toFixed(4)} CHEESE`, memo } },
+    '@timestamp': new Date(Date.now() - daysAgo * DAY_MS).toISOString(),
+  };
+}
+
+describe('CHEESECrypt null tracking', () => {
+  it('counts pre-contract direct fees and crypt.cheese router nulls together', async () => {
+    mockHistory([
+      memoNull('alice', 80, 40, 'CHEESECrypt key creation fee'),
+      memoNull('bob', 0.01, 30, 'GPK messaging fee'),
+      memoNull('bob', 0.008, 20, 'CHEESECrypt messaging fee'),
+      memoNull('carol', 80, 10, 'CRYPTROOM1:{"i":"r1"}'),
+      memoNull('crypt.cheese', 80, 2, 'CHEESECrypt key creation fee'),
+      memoNull('crypt.cheese', 0.008, 1, 'CHEESECrypt messaging fee'),
+    ]);
+    const { entries } = await fetchNullBreakdown();
+    const e = entries.find((x) => x.contract === 'crypt.cheese')!;
+    expect(e.displayName).toBe('CHEESECrypt');
+    expect(e.amount).toBeCloseTo(240.026, 4);
+    expect(e.amount7d).toBeCloseTo(80.008, 4);
+    expect(e.trackedDays).toBeCloseTo(40, 0);
+  });
+
+  it('ignores liquidity legs and unrelated user nulls', async () => {
+    mockHistory([
+      memoNull('alice', 20, 3, 'CHEESECrypt key creation fee', 'xcheeseliqst'),
+      memoNull('alice', 5, 3, 'random burn'),
+    ]);
+    const { entries } = await fetchNullBreakdown();
+    expect(entries.find((x) => x.contract === 'crypt.cheese')!.amount).toBe(0);
+  });
+});
