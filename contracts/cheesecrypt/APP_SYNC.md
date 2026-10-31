@@ -1,8 +1,10 @@
 # App ↔ blind router sync checklist
 
 The contract is a blind atomic payment router, not a room/moderation authority, and it holds
-no user balances (zero custody). The app is still on direct peer-to-peer transfers; deployment
-and history integration are pending. Update this checklist with every CHEESECrypt change, but
+no user balances (zero custody). Deployed at `crypt.cheese` (2026-10-31). The app routes every transaction that fits the exact router
+shape (`routeCryptActions`); key creation/publishing, listings, fee-less profile batches and mixed
+admissions stay direct. History resolves router deliveries via the same-transaction `sendmsg`
+(`resolveRouterRows`), requiring the sender's authorization. Update this checklist with every CHEESECrypt change, but
 do not reintroduce plaintext roles to enforce client policy.
 
 | App rule / source | Router responsibility / integration status |
