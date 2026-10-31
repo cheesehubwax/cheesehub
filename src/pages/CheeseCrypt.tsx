@@ -22,8 +22,7 @@ import { useCryptJoinAlerts } from '@/hooks/useCryptJoinAlerts';
 import { AvatarEditor, WalletAvatarPicker } from '@/components/crypt/AvatarEditor';
 import { CryptNftCard } from '@/components/crypt/CryptNftCard';
 import { useQuery } from '@tanstack/react-query';
-import { fetchIsAdmin } from '@/lib/adminData';
-import { filterVisibleListings, loadLocalHides, saveLocalHides } from '@/lib/cryptRoomDenylist';
+import { activeHides, cachedHides, fetchRoomHides, filterVisibleListings } from '@/lib/cryptRoomDenylist';
 import { nftToken, parseNftMessage } from '@/lib/cryptNft';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FriendNameDialog } from '@/components/crypt/FriendNameDialog';
@@ -415,14 +414,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
     staleTime: 60_000, refetchInterval: () => (document.visibilityState === 'visible' ? 60_000 : false), retry: false,
   });
   const listings = useMemo(() => collectListings(roomMemos ?? []).filter(l => !blocked.includes(l.creator)), [roomMemos, blocked]);
-  // Platform admins (cheesebannad admins table) may hide rooms from the directory; hiding is display-only.
-  const { data: isPlatformAdmin = false } = useQuery({ queryKey: ['admin-access', account], queryFn: () => fetchIsAdmin(account).catch(() => false), staleTime: 5 * 60_000 });
-  const [roomHides, setRoomHides] = useState<string[]>(() => loadLocalHides());
-  const setRoomHidden = useCallback((entry: string, hidden: boolean) => setRoomHides(prev => {
-    const next = hidden ? [...new Set([...prev, entry])] : prev.filter(x => x !== entry);
-    saveLocalHides(next);
-    return next;
-  }), []);
+  // CHEESEHub admins hide rooms on chain from /admin; display-only, the last good read is kept during outages.
+  const { data: hideRecords } = useQuery({ queryKey: ['crypt-room-hides'], enabled: !!key, queryFn: fetchRoomHides, staleTime: 5 * 60_000, retry: false });
+  const roomHides = useMemo(() => hideRecords ? activeHides(hideRecords) : cachedHides(), [hideRecords]);
   const directoryListings = useMemo(() => filterVisibleListings(listings, roomHides), [listings, roomHides]);
   // Name precedence (display only): friends' own profiles, then room directories, then a listing's creator name.
   const shownNames = useMemo(() => {
@@ -1573,8 +1567,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         </DialogContent>
       </Dialog>}
       <DiscoverRoomsDialog open={roomsOpen} onOpenChange={o => { setRoomsOpen(o); if (o) void refetchRooms(); }} listings={directoryListings} loading={roomsLoading}
-        refresh={() => void refetchRooms()} account={account} nameFor={nameFor} roomStatus={roomStatus} joinCost={roomJoinCost} onAsk={l => { setRoomsOpen(false); setJoinNote(''); setAskingRoom(l); }}
-        moderation={isPlatformAdmin ? { hides: roomHides, allListings: listings, setHidden: setRoomHidden } : undefined} />
+        refresh={() => void refetchRooms()} account={account} nameFor={nameFor} roomStatus={roomStatus} joinCost={roomJoinCost} onAsk={l => { setRoomsOpen(false); setJoinNote(''); setAskingRoom(l); }} />
       {askingRoom && <PaidActionDialog title={`🌐 Ask to join ${askingRoom.name}`} cost={roomJoinCost} confirmLabel="Pay & ask" busy={busy}
         description={`Sends ${askingRoom.creatorName || nameFor(askingRoom.creator)} an encrypted request at the ordinary message rate, with no extra owner fee. If they accept, an invite appears in your Groups and you choose Join or Decline. The request payment is not refunded if declined.`}
         onConfirm={() => askToJoin(askingRoom)} onClose={() => setAskingRoom(null)}>
