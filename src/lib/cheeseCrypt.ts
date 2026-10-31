@@ -316,6 +316,112 @@ export function buildSendMessageActions(from: string, to: string, memo: string |
   ]);
 }
 
+/**
+ * Live sending goes through the crypt.cheese blind router. Unit/flow tests keep asserting the
+ * legacy direct shape (still used for anything the router cannot express); the adapter has its own tests.
+ */
+export const CRYPT_ROUTER_ENABLED = import.meta.env.MODE !== 'test';
+const ROUTER_MAX_PARTS = 35;
+const ROUTER_MAX_RECIPIENTS = 49;
+type TransferAction = { account: string; name: string; authorization: unknown; data: { from: string; to: string; quantity: string; memo: string } };
+
+/**
+ * Converts a direct CHEESECrypt message transaction into one exact payment + `crypt.cheese::sendmsg`.
+ * Only exact router shapes convert: every action a CHEESE transfer from one sender, 0.0001 copies
+ * with message memos, every recipient receiving the same `parts` copies, and an 80/20 platform fee of
+ * exactly 0.0100 per part. Anything else (key creation/publishing, listings, fee-less profile batches,
+ * mixed admissions) is returned unchanged so it stays on the direct path.
+ */
+export function routeCryptActions<T>(actions: T[]): T[] | Record<string, unknown>[] {
+  if (!actions.length) return actions;
+  const list = actions as unknown as TransferAction[];
+  const first = list[0];
+  if (!list.every(a => a?.account === 'cheeseburger' && a.name === 'transfer' && a.data && a.data.from === first.data.from
+    && JSON.stringify(a.authorization) === JSON.stringify(first.authorization))) return actions;
+  const sender = first.data.from;
+  const copies: { to: string; memo: string }[] = [];
+  let nulled = 0, liquidity = 0;
+  for (const a of list) {
+    const { to, quantity, memo } = a.data;
+    if (to === KEY_PUBLISH_TO || to === LIQUIDITY_FEE_TO) {
+      if (memo !== FEE_MEMO) return actions;
+      if (to === KEY_PUBLISH_TO) nulled += units(quantity); else liquidity += units(quantity);
+    } else {
+      if (to === CRYPT_ROUTER_ACCOUNT || to === sender || quantity !== MESSAGE_RECIPIENT_QUANTITY || !msgPrefixOf(memo)) return actions;
+      if (new TextEncoder().encode(memo).length > MEMO_MAX_BYTES) return actions;
+      copies.push({ to, memo });
+    }
+  }
+  if (!copies.length) return actions;
+  const counts = new Map<string, number>();
+  for (const c of copies) counts.set(c.to, (counts.get(c.to) ?? 0) + 1);
+  const parts = counts.get(copies[0].to)!;
+  if (![...counts.values()].every(n => n === parts) || parts > ROUTER_MAX_PARTS || counts.size > ROUTER_MAX_RECIPIENTS) return actions;
+  const fee = nulled + liquidity;
+  if (fee !== parts * units(MESSAGE_FEE_QUANTITY) || nulled * 5 !== fee * 4) return actions;
+  const total = fee + copies.length * units(MESSAGE_RECIPIENT_QUANTITY);
+  return [
+    { account: 'cheeseburger', name: 'transfer', authorization: first.authorization, data: { from: sender, to: CRYPT_ROUTER_ACCOUNT, quantity: `${(total / 10000).toFixed(4)} CHEESE`, memo: FEE_MEMO } },
+    { account: CRYPT_ROUTER_ACCOUNT, name: 'sendmsg', authorization: first.authorization, data: { sender, parts, copies } },
+  ];
+}
+
+/**
+ * Router deliveries arrive as `crypt.cheese → recipient` transfers. The real sender comes only from the
+ * `sendmsg` action in the same transaction, authorized by that sender (the contract also requires it).
+ * Returns every authenticated copy as a direct-style row; memo-only claims are never trusted.
+ */
+export function expandRouterActions(txId: string, time: number, actions: unknown[]): ChainMemo[] {
+  const out: ChainMemo[] = [];
+  for (const raw of actions) {
+    const act = (raw as { act?: { account?: string; name?: string; authorization?: { actor?: string }[]; data?: { sender?: string; copies?: { to?: string; memo?: string }[] } } })?.act;
+    if (act?.account !== CRYPT_ROUTER_ACCOUNT || act.name !== 'sendmsg') continue;
+    const sender = act.data?.sender;
+    if (!sender || !act.authorization?.some(a => a.actor === sender) || !Array.isArray(act.data?.copies)) continue;
+    for (const c of act.data!.copies!) {
+      if (typeof c?.to === 'string' && typeof c.memo === 'string' && c.to !== sender)
+        out.push({ txId, time, from: sender, to: c.to, memo: c.memo, quantity: MESSAGE_RECIPIENT_QUANTITY });
+    }
+  }
+  return out;
+}
+
+const routerTxCache = new Map<string, ChainMemo[]>();
+async function routerTransaction(txId: string, time: number): Promise<ChainMemo[] | null> {
+  const hit = routerTxCache.get(txId);
+  if (hit) return hit;
+  for (const raw of await resolveEndpoints('hyperion-v2')) {
+    const base = normalizeEndpoint(raw);
+    try {
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), 10000);
+      const r = await fetch(`${base}/v2/history/get_transaction?id=${encodeURIComponent(txId)}`, { signal: ctl.signal }).finally(() => clearTimeout(t));
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = await r.json();
+      if (!Array.isArray(j.actions) || !j.actions.length) throw new Error('Transaction not indexed yet');
+      const rows = expandRouterActions(txId, time, j.actions);
+      if (routerTxCache.size > 5000) routerTxCache.clear();
+      routerTxCache.set(txId, rows);
+      return rows;
+    } catch { benchEndpoint(base); }
+  }
+  return null;
+}
+
+/** Replaces router-delivered rows with their authenticated sender rows; unresolved ones are dropped until a later poll. */
+export async function resolveRouterRows(account: string, rows: ChainMemo[]): Promise<ChainMemo[]> {
+  const direct = rows.filter(r => r.from !== CRYPT_ROUTER_ACCOUNT && r.to !== CRYPT_ROUTER_ACCOUNT);
+  const txs = new Map<string, number>();
+  for (const r of rows) if (r.from === CRYPT_ROUTER_ACCOUNT || r.to === CRYPT_ROUTER_ACCOUNT) if (!txs.has(r.txId)) txs.set(r.txId, r.time);
+  const entries = [...txs];
+  const resolved: ChainMemo[] = [];
+  for (let i = 0; i < entries.length; i += 4) {
+    const batch = await Promise.all(entries.slice(i, i + 4).map(([id, time]) => routerTransaction(id, time)));
+    for (const b of batch) if (b) resolved.push(...b.filter(m => m.from === account || m.to === account));
+  }
+  return direct.concat(resolved);
+}
+
 /** Both fee legs carry the key; lookup reads the eosio.null leg. */
 export function buildPublishKeyActions(from: string, publicKey: string, auth: unknown[]) {
   return buildCryptFeeActions(from, MESSAGE_FEE_QUANTITY, auth, keyMemo(publicKey));
