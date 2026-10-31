@@ -29,7 +29,7 @@ describe('crypt.cheese router adapter', () => {
 
   it('leaves key creation, key publishing and fee-less batches on the direct path', () => {
     for (const a of [buildCreateKeyActions('alice', auth), buildPublishKeyActions('alice', 'PUB', auth), buildSendMessageActions('alice', 'bob', ['CRYPT1:x'], auth, false, false)])
-      expect(routeCryptActions(a)).toBe(a);
+      expect(routeCryptActions(a, { payfee: false })).toBe(a);
   });
 
   it('leaves uneven per-recipient copies on the direct path', () => {

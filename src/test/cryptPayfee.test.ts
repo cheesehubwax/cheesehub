@@ -10,9 +10,13 @@ const PUB = 'A'.repeat(43) + '=';
 const room = { id: '0123456789abcdef', name: 'Cheese', topic: 't', tags: [], publicKey: PUB, members: 1 };
 
 describe('crypt.cheese payfee routing', () => {
-  it('stays on the direct path until the payfee contract is live', () => {
+  it('payfee routing is live by default now the contract is deployed', () => {
+    expect(routeCryptActions(buildCreateKeyActions('alice', auth))).toHaveLength(2);
+  });
+
+  it('stays on the direct path when payfee is switched off', () => {
     const a = buildCreateKeyActions('alice', auth);
-    expect(routeCryptActions(a)).toBe(a);
+    expect(routeCryptActions(a, { payfee: false })).toBe(a);
   });
 
   it('key creation: one 100.0000 CHEESE payment to crypt.cheese plus payfee with the creation memo', () => {
