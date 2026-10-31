@@ -3,7 +3,7 @@
 The contract is a blind atomic payment router, not a room/moderation authority, and it holds
 no user balances (zero custody). Deployed at `crypt.cheese` (2026-10-31). The app routes every transaction that fits the exact router
 shape (`routeCryptActions`). Standalone fees (key creation/publishing, listing/update/unlist) use
-`payfee` once the version with that action is deployed and `CRYPT_PAYFEE_LIVE` is on; until then they
+`payfee` (deployed and verified on mainnet; `CRYPT_PAYFEE_LIVE` is on). Turning the switch off makes them
 stay direct. Fee-less profile batches and mixed admissions stay direct. History resolves router deliveries via the same-transaction `sendmsg`
 (`resolveRouterRows`), requiring the sender's authorization. Update this checklist with every CHEESECrypt change, but
 do not reintroduce plaintext roles to enforce client policy.
