@@ -11,15 +11,24 @@ import {
   cleanRoomName, cleanRoomTopic, cleanTags, encodeListing, LISTING_FEE_QUANTITY, MAX_ROOM_NAME, MAX_ROOM_TOPIC, ROOM_FEE_QUANTITY, searchListings,
   type JoinRequest, type RoomListing,
 } from '@/lib/cryptRooms';
+import { isGloballySuppressed, isSuppressed, roomEntry } from '@/lib/cryptRoomDenylist';
 
 /** Search listed rooms; asking to join is confirmed (and paid) by the Messenger. Presentational only. */
-export function DiscoverRoomsDialog({ open, onOpenChange, listings, loading, refresh, account, nameFor, roomStatus, joinCost, onAsk }: {
+export function DiscoverRoomsDialog({ open, onOpenChange, listings, loading, refresh, account, nameFor, roomStatus, joinCost, onAsk, moderation }: {
   open: boolean; onOpenChange: (open: boolean) => void; listings: RoomListing[]; loading: boolean; refresh: () => void; account: string;
   roomStatus: (l: RoomListing) => 'own' | 'member' | 'invited' | 'requested' | 'left' | 'restricted' | null; joinCost: string; onAsk: (l: RoomListing) => void;
   nameFor?: (account: string) => string;
+  /** Platform admins only: hide/unhide rooms from the directory (display-only, never touches the chain). */
+  moderation?: { hides: string[]; allListings: RoomListing[]; setHidden: (entry: string, hidden: boolean) => void };
 }) {
   const [q, setQ] = useState('');
-  const shown = useMemo(() => searchListings(listings, q), [listings, q]);
+  const [showHidden, setShowHidden] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const source = moderation && showHidden ? moderation.allListings : listings;
+  const shown = useMemo(() => searchListings(source, q), [source, q]);
+  const exportHides = () => {
+    void navigator.clipboard?.writeText(JSON.stringify(moderation?.hides ?? [], null, 2)).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }, () => {});
+  };
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="max-w-lg max-h-[85dvh] overflow-y-auto">
       <DialogHeader>
@@ -32,12 +41,28 @@ export function DiscoverRoomsDialog({ open, onOpenChange, listings, loading, ref
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
         </Button>
       </div>
+      {moderation && <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-cheese/30 bg-cheese/5 p-2 text-xs">
+        <span className="text-cheese">🛡️ Admin · {moderation.hides.length} hidden on this device</span>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setShowHidden(s => !s)}>{showHidden ? 'Hide suppressed' : 'Show suppressed'}</Button>
+          <Button size="sm" variant="outline" disabled={!moderation.hides.length} onClick={exportHides}>{copied ? 'Copied' : 'Export IDs'}</Button>
+        </div>
+      </div>}
       <ul className="space-y-2" aria-label="Listed rooms">
         {!shown.length && <li className="py-4 text-center text-sm text-muted-foreground">{loading ? 'Looking for rooms…' : 'No rooms found.'}</li>}
         {shown.map(l => {
           const status = roomStatus(l);
           const full = l.members >= MAX_PUBLIC_ROOM_MEMBERS;
-          return <li key={`${l.creator}:${l.id}`} className="space-y-1.5 rounded-md border border-border bg-background/50 p-3">
+          const entry = roomEntry(l);
+          const globallyHidden = isGloballySuppressed(l);
+          const hidden = !!moderation && isSuppressed(l, moderation.hides);
+          return <li key={entry} className={`space-y-1.5 rounded-md border border-border bg-background/50 p-3 ${hidden ? 'opacity-50' : ''}`}>
+            {moderation && <div className="flex items-center justify-end gap-2">
+              {hidden && <span className="text-[11px] text-destructive">{globallyHidden ? 'Hidden for everyone' : 'Hidden'}</span>}
+              {!globallyHidden && <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={() => moderation.setHidden(entry, !moderation.hides.includes(entry))}>
+                {moderation.hides.includes(entry) ? '👁️ Unhide' : '🛡️ Hide'}
+              </Button>}
+            </div>}
             <div className="flex items-start justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
                 <PixelAvatar account={l.id} avatar={l.avatar ? { version: 1, pixels: l.avatar } : undefined} className="h-10 w-10 shrink-0" />
