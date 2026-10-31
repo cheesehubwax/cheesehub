@@ -80,7 +80,7 @@ export function CryptSidebar({
                 <CardAction icon={<Ban className="h-4 w-4" />} label={blocked.length ? `Blocked (${blocked.length})` : 'Blocked'} aria-label="Blocked accounts" title="Accounts blocked on this device" onClick={() => setShowBlocked(true)} />
                 <CardAction icon={<KeyRound className="h-4 w-4" />} label="New key" className="hover:text-destructive" aria-label="Create a new key" title="Create a new key (it cannot read messages sent to this one)" onClick={makeKey} />
                 <PublicInboxButton enabled={publicInbox} onClick={() => setInboxOpen(true)} />
-                <CardAction icon={<Globe className="h-4 w-4" />} label="Rooms" aria-label="Find public rooms" title="Find public rooms and ask to join" onClick={() => setRoomsOpen(true)} />
+                <CardAction icon={<Globe className="h-4 w-4" />} label="Public groups" aria-label="Search public groups" title="Search public groups and ask to join" onClick={() => setRoomsOpen(true)} />
               </div>
             </PopoverContent>
           </Popover>
@@ -102,11 +102,12 @@ export function CryptSidebar({
               {joinRequestCount > 0 && <span aria-label={`${joinRequestCount} pending room requests`}
                 className="min-w-4 h-4 px-1 rounded-full text-[9px] font-bold leading-4 text-center bg-cheese text-primary-foreground">{joinRequestCount > 99 ? '99+' : joinRequestCount}</span>}
             </CollapsibleTrigger>
-            <span className="flex items-center">
-              <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Public rooms" title="Find public rooms" onClick={() => setRoomsOpen(true)}><Globe className="h-4 w-4" /></Button>
-              <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="New group" title="New group" onClick={() => setCreatingGroup(true)}><Users className="h-4 w-4" /></Button>
-            </span>
+            <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="New group" title="New group" onClick={() => setCreatingGroup(true)}><Users className="h-4 w-4" /></Button>
           </div>
+          <Button variant="outline" size="sm" className="mt-1 w-full justify-start gap-2 border-cheese/40 text-cheese hover:bg-cheese/10 hover:text-cheese"
+            aria-label="Public rooms" title="Search public groups and ask to join" onClick={() => setRoomsOpen(true)}>
+            <Globe className="h-4 w-4" /> Search public groups
+          </Button>
           <CollapsibleContent>
             <ul className="space-y-1 pt-1">
         {pendingRequests}
