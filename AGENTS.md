@@ -13,7 +13,7 @@
 - CHEESEAir LP columns aggregate normalized underlying quantities; USD payout weights stay separate.
 - CHEESEAir suffix unions use timestamp cursors, bounded reads and complete-only cache; stalled providers flag partial results because indexes differ and skip stops at 10,000 rows.
 - CHEESEFolio re-derives raw IndexedDB history per account; live balances are truth. Shared prices poll foreground-only/refetch on focus; metadata/placeholders never get live timestamps.
-- Folio acquisitions use cumulative trade/free receipts, separate from holdings; never alter basis or infer sources after disposals.
+- Folio acquisitions use cumulative trade/free receipts, separate from holdings; never alter basis/infer sources after disposals.
 - Folio sync requires reading the deepest provider to the end (else the persisted partial flag shows history incomplete); big pages sequential, small pages windowed, concurrency capped to avoid Hyperion drops. One scan per record at a time: every request honours the stop signal and new scans/clears/imports wait for the old one to unwind, preventing duplicate rows and late saves.
 - Folio deduplicates global sequences and identical inline transfer creator copies to prevent receiver-notification double counting.
 - Folio order-book fills: one large-limit Alcor per-account deal request (skip paging is gappy); only leftovers use Hyperion, routed by provider history start, avoiding slow per-transaction-only lookups.
@@ -33,7 +33,7 @@
 - Crypt sections are presentational; Messenger owns state. Recovery needs authenticated DM/join evidence; tab sync preserves consent/scoped keys. Join alerts share account/room/requester/time identities; only confirmed handling clears matching toast, counts and chat controls, retaining others.
 - OpenMojiIcon tint paints a solid silhouette for palettes too dark on dark backgrounds.
 - Both NFT players normalize media via nftMedia (case-insensitive audio/clip/video, reference-only sound/mp3/sfx aliases); version music caches on detection changes to avoid stale classifications.
-- CHEESEFolio fiat/BTC/ETH figures are WAX→USD→currency per day (fx-usd-history.json, units per USD); unknown rates stay unknown.
+- Folio fiat/BTC/ETH figures are WAX→USD→currency per day (fx-usd-history.json, units per USD); unknown rates stay unknown.
 - Folio JSON validates/checksums raw history, merges by sequence and portfolios by ID/newest edit; IndexedDB stores both per account. Views filter the full ledger with per-token disposal P/L, never replay subsets.
 
 - CHEESECrypt public rooms are plaintext CRYPTROOM1: listings on paid eosio.null CHEESE fee legs (newest per creator+room wins, unlist hides); join requests are CG2 notices carrying the requester key after the ciphertext (no publishing; that key opens only joins) via a separate decode path; member lists never go on-chain.
