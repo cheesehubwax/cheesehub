@@ -326,15 +326,23 @@ const ROUTER_MAX_RECIPIENTS = 49;
 type TransferAction = { account: string; name: string; authorization: unknown; data: { from: string; to: string; quantity: string; memo: string } };
 
 /**
- * Converts a direct CHEESECrypt message transaction (including join/rejoin requests and each voice
- * batch) into one exact payment + `crypt.cheese::sendmsg`. Encrypted bytes and join-key suffixes
- * remain untouched; the router does not need or expose a content-type parameter.
- * Only exact router shapes convert: every action a CHEESE transfer from one sender, 0.0001 copies
- * with message memos, every recipient receiving the same `parts` copies, and an 80/20 platform fee of
- * exactly 0.0100 per part. Anything else (key creation/publishing, listings, fee-less profile batches,
- * mixed admissions) is returned unchanged so it stays on the direct path.
+ * Standalone fees (key creation, key publishing, room listing/update/unlist) route through
+ * `crypt.cheese::payfee` only once the contract version with that action is deployed. Until then
+ * they stay direct, so live wallets never sign an action the deployed contract does not have.
  */
-export function routeCryptActions<T>(actions: T[]): T[] | Record<string, unknown>[] {
+export const CRYPT_PAYFEE_LIVE = false;
+
+/**
+ * Converts a direct CHEESECrypt transaction into one exact payment to `crypt.cheese` followed by
+ * `payfee` (one per standalone fee memo, in order) and/or `sendmsg` (message copies, including
+ * join/rejoin requests and each voice batch). Encrypted bytes, join-key suffixes and fee memos stay
+ * untouched; the router never gets a content-type parameter.
+ * Only exact shapes convert: every action a CHEESE transfer from one sender; messaging fees (FEE_MEMO)
+ * exactly 0.0100 per part, 80/20, only with copies; every recipient the same `parts` copies of 0.0001;
+ * every other fee memo an exact 80/20 pair. Anything else is returned unchanged (direct path).
+ */
+export function routeCryptActions<T>(actions: T[], opts: { payfee?: boolean } = {}): T[] | Record<string, unknown>[] {
+  const payfee = opts.payfee ?? CRYPT_PAYFEE_LIVE;
   if (!actions.length) return actions;
   const list = actions as unknown as TransferAction[];
   const first = list[0];
@@ -342,30 +350,43 @@ export function routeCryptActions<T>(actions: T[]): T[] | Record<string, unknown
     && JSON.stringify(a.authorization) === JSON.stringify(first.authorization))) return actions;
   const sender = first.data.from;
   const copies: { to: string; memo: string }[] = [];
-  let nulled = 0, liquidity = 0;
+  const fees = new Map<string, { nulled: number; liquidity: number }>();
   for (const a of list) {
     const { to, quantity, memo } = a.data;
     if (to === KEY_PUBLISH_TO || to === LIQUIDITY_FEE_TO) {
-      if (memo !== FEE_MEMO) return actions;
-      if (to === KEY_PUBLISH_TO) nulled += units(quantity); else liquidity += units(quantity);
+      const q = /^\d+\.\d{4} CHEESE$/.test(quantity) ? units(quantity) : NaN;
+      if (!Number.isSafeInteger(q) || q <= 0 || !memo || new TextEncoder().encode(memo).length > MEMO_MAX_BYTES) return actions;
+      const f = fees.get(memo) ?? { nulled: 0, liquidity: 0 };
+      if (to === KEY_PUBLISH_TO) f.nulled += q; else f.liquidity += q;
+      fees.set(memo, f);
     } else {
       if (to === CRYPT_ROUTER_ACCOUNT || to === sender || quantity !== MESSAGE_RECIPIENT_QUANTITY || !msgPrefixOf(memo)) return actions;
       if (new TextEncoder().encode(memo).length > MEMO_MAX_BYTES) return actions;
       copies.push({ to, memo });
     }
   }
-  if (!copies.length) return actions;
-  const counts = new Map<string, number>();
-  for (const c of copies) counts.set(c.to, (counts.get(c.to) ?? 0) + 1);
-  const parts = counts.get(copies[0].to);
-  if (parts === undefined) return actions;
-  if (![...counts.values()].every(n => n === parts) || parts > ROUTER_MAX_PARTS || counts.size > ROUTER_MAX_RECIPIENTS) return actions;
-  const fee = nulled + liquidity;
-  if (fee !== parts * units(MESSAGE_FEE_QUANTITY) || nulled * 5 !== fee * 4) return actions;
-  const total = fee + copies.length * units(MESSAGE_RECIPIENT_QUANTITY);
+  const messaging = fees.get(FEE_MEMO);
+  fees.delete(FEE_MEMO);
+  const standalone = [...fees].map(([memo, f]) => ({ memo, fee: f.nulled + f.liquidity, ...f }));
+  if (standalone.length && !payfee) return actions;
+  if (standalone.some(f => f.fee % 5 !== 0 || f.nulled * 5 !== f.fee * 4)) return actions;
+  if (!copies.length && !standalone.length) return actions;
+  let parts = 0;
+  const msgFee = messaging ? messaging.nulled + messaging.liquidity : 0;
+  if (copies.length) {
+    const counts = new Map<string, number>();
+    for (const c of copies) counts.set(c.to, (counts.get(c.to) ?? 0) + 1);
+    parts = counts.get(copies[0].to) ?? 0;
+    if (![...counts.values()].every(n => n === parts) || parts > ROUTER_MAX_PARTS || counts.size > ROUTER_MAX_RECIPIENTS) return actions;
+    if (!messaging || msgFee !== parts * units(MESSAGE_FEE_QUANTITY) || messaging.nulled * 5 !== msgFee * 4) return actions;
+  } else if (messaging) return actions;
+  const total = standalone.reduce((n, f) => n + f.fee, 0) + msgFee + copies.length * units(MESSAGE_RECIPIENT_QUANTITY);
+  const cheese = (u: number) => `${(u / 10000).toFixed(4)} CHEESE`;
   return [
-    { account: 'cheeseburger', name: 'transfer', authorization: first.authorization, data: { from: sender, to: CRYPT_ROUTER_ACCOUNT, quantity: `${(total / 10000).toFixed(4)} CHEESE`, memo: FEE_MEMO } },
-    { account: CRYPT_ROUTER_ACCOUNT, name: 'sendmsg', authorization: first.authorization, data: { sender, parts, copies } },
+    { account: 'cheeseburger', name: 'transfer', authorization: first.authorization, data: { from: sender, to: CRYPT_ROUTER_ACCOUNT, quantity: cheese(total), memo: FEE_MEMO } },
+    // payfee runs first and leaves the rest pending for sendmsg, which refunds any change.
+    ...standalone.map(f => ({ account: CRYPT_ROUTER_ACCOUNT, name: 'payfee', authorization: first.authorization, data: { payer: sender, fee: cheese(f.fee), memo: f.memo } })),
+    ...(copies.length ? [{ account: CRYPT_ROUTER_ACCOUNT, name: 'sendmsg', authorization: first.authorization, data: { sender, parts, copies } }] : []),
   ];
 }
 
