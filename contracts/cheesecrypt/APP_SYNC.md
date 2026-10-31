@@ -2,8 +2,9 @@
 
 The contract is a blind atomic payment router, not a room/moderation authority, and it holds
 no user balances (zero custody). Deployed at `crypt.cheese` (2026-10-31). The app routes every transaction that fits the exact router
-shape (`routeCryptActions`); key creation/publishing, listings, fee-less profile batches and mixed
-admissions stay direct. History resolves router deliveries via the same-transaction `sendmsg`
+shape (`routeCryptActions`). Standalone fees (key creation/publishing, listing/update/unlist) use
+`payfee` once the version with that action is deployed and `CRYPT_PAYFEE_LIVE` is on; until then they
+stay direct. Fee-less profile batches and mixed admissions stay direct. History resolves router deliveries via the same-transaction `sendmsg`
 (`resolveRouterRows`), requiring the sender's authorization. Update this checklist with every CHEESECrypt change, but
 do not reintroduce plaintext roles to enforce client policy.
 
@@ -19,11 +20,11 @@ or redeployment is required for these paths.
 | Voice 0.0100 per encrypted part, shared across recipients, up to 30 parts/batch (`cryptVoice.ts`) | Routed by the shared adapter, including metadata/edit-target parts; each batch gets its own atomic payment + sendmsg. Automated history/fee checks; live wallet/resource checks pending |
 | Recipient 0.0001 per part | `recipient_fee` per copy; exact `parts` copies per distinct recipient |
 | Shared 80% eosio.null / 20% xcheeseliqst | `pay_platform` integer split; `setconfig` requires 80 |
-| Key creation 100 CHEESE, publishing fee | Existing direct-transfer path, not router messaging |
+| Key creation 100 CHEESE, publishing fee 0.0100 | `payfee` with the original memo (gated by `CRYPT_PAYFEE_LIVE`); key lookup reads payer-authorized `payfee` actions plus legacy direct legs |
 | Mandatory Anchor-locked keys; legacy upgrade before use; locked-only backups | Client-only seal/unlock verification; no router changes; creation fee unchanged |
 | Private 8 / public 50; only owner admits (`cryptInviteGroups.ts`) | Client-only authenticated envelopes; router bounds 49 recipients per action, not total membership |
 | 35 membership parts, usual text 20 | Router hard bound 35; client keeps content-specific bounds |
-| CRYPTROOM1 listing fee 100.0000 (new/re-list), updates and unlisting 0.0100 (`cryptRooms.ts`) | Existing plaintext fee-leg broadcasts; no rooms table/action; no generic router fee substitution |
+| CRYPTROOM1 one-time non-refundable listing fee 100.0000 (new/re-list), updates and unlisting 0.0100 (`cryptRooms.ts`) | `payfee` (then `sendmsg` for policy copies) once live; directory reads `payfee` actions attributed to the authorizing payer, never router-sent legs; no rooms table |
 | Listing optional username (`u`), presentation only; creator identity stays transfer sender | Direct listing metadata; no router change |
 | Immutable first-public founder roster | Client-only encrypted policy replay |
 | Owner/admin appointment, mute, ban, collapse (`cryptModeration.ts`) | Client-only authenticated CG2 authority; NO moderation actions/tables |
@@ -40,7 +41,7 @@ or redeployment is required for these paths.
 | Zero custody: no stored user balances | Payment transfer + `sendmsg` in one atomic transaction; transient `pending` row consumed same-tx, change refunded inline; `reclaim` only for orphaned payments |
 
 Only tables: `config`, `pending` (transient, erased on use). Only explicit actions: `setconfig`,
-`setpaused`, `reclaim`, `sendmsg`; configured-token transfer notifications record in-flight
+`setpaused`, `reclaim`, `sendmsg`, `payfee`; configured-token transfer notifications record in-flight
 payments. ABI breaks from old drafts.
 
 ## Integration gates (not yet verified)
