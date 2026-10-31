@@ -4,7 +4,7 @@ Open tasks only. Completed work lives in git history.
 
 - [ ] CHEESEAir: verify one signed airdrop and chain readback — requires the user's Anchor signatures. Phases 1–3 safety/render checks pass, and live 500-row snapshot/edit/selection checks pass without sending funds; remaining audit findings are recorded in `.lovable/cheeseair-audit.md` for later stages.
 
-- [ ] Verify flattened voice and join/rejoin fees on WAX — requires the user's Anchor signatures; automated fee/delivery checks cover the changed paths.
+- [ ] CHEESECrypt: verify routed voice and join/rejoin requests on WAX — requires the user's Anchor signatures; check crypt.cheese payment/sendmsg, 80/20 split and decrypted sender/recipient readback.
 
 - [ ] CHEESECrypt: verify successful public-mirror video streaming; private switching/external links/consent tests pass and browser observed no video-service requests before play or Google requests during the private attempt, but the default mirror returned “No compatible source.” Requires a functioning public proxy; no automatic Google fallback.
 
@@ -17,7 +17,7 @@ Open tasks only. Completed work lives in git history.
 - [ ] CHEESECrypt: verify 50-member admissions/delivery and CPU/NET feasibility, room mutes/removals, admins and message collapsing, message edits, owner edit logs, group send/reply, invite groups, public rooms, public inbox, profile notes, replies and Anchor key lock/unlock on WAX — requires connected wallets and signing approval.
 - [ ] CHEESECrypt: verify owned-NFT avatar sharing and the OS folder picker in a real session.
 - [ ] CHEESEFolio (/folio, hidden): verify live prices and portfolios with a real connected wallet.
-- [ ] CHEESECrypt atomic blind router (zero custody, transient pending payments): owner deploys to a fresh testnet account; verify chain auth/fees/change/refund/rollback/resources, then add authenticated original-sender trace decoding before app integration — waits on deployment. Voice now charges per part in each batch; voice, key publishing and public listings stay direct pending integration gates.
+- [ ] CHEESECrypt atomic blind router: deployed on mainnet with user-confirmed message delivery and 80/20 split; still verify underpayment rejection, change/refund/reclaim, rollback and maximum resources with the user's Anchor signatures. Authenticated sender decoding is integrated; key creation/publishing and public listings remain direct.
 - [ ] Token registry activation: run GitHub Actions → Token Price History once after changes reach GitHub.
 
 - [ ] CHEESEFolio tidy: Stages 1-6 done; remaining: live check with a connected wallet (sync, holdings, pool rows, file save/load) — needs the user's wallet sign-in in the preview.
