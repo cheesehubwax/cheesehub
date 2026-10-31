@@ -105,7 +105,7 @@ Never accept a sender claimed solely in a memo; never reinterpret arbitrary cont
 as user-authenticated messages. Test sender history discovery as well as recipient decryption.
 
 ## Funds, RAM and operator trust
-Payers pay their `pending` row RAM, freed when `sendmsg` or `reclaim` erases the row. Inline
+The router pays each `pending` row's RAM (WAX forbids billing the payer inside a transfer notification); the row is freed in the same transaction when `sendmsg` erases it, or later by `reclaim`. Inline
 token transfers may bill the router RAM when recipients have no CHEESE balance; buy a buffer and
 monitor it. Large sends also require CPU/NET. Config and deployed code remain controlled by the
 contract account: secure its permissions; changing code can change routing rules. Fee amounts
