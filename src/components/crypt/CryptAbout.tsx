@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { DappAbout } from '@/components/about/DappAbout';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -161,7 +162,7 @@ function PrivacyAndResponsibility() {
       <section className="space-y-2">
         <Heading>Public rooms and takedowns</Heading>
         <p className={p}>CHEESECrypt exists for private messaging; public room listings are an optional extra. CHEESEHub actively watches its public room list and hides illegal or abusive rooms on its own initiative, ideally before anyone needs to report them. Every valid takedown notice or report is acted on promptly, and CHEESEHub will never ignore one. CHEESEHub may also turn off public room creation and listing at any time. Hiding removes a room from CHEESEHub only; it stays on the blockchain and may still appear on other websites. To report a room, contact the moderation team in the official <a href={REPORT_URL} target="_blank" rel="noopener noreferrer" className="text-cheese underline">CHEESE Telegram group</a>.</p>
-        <p className={p}>Read the full <a href="/terms" className="text-cheese underline">Terms of Use</a>.</p>
+        <p className={p}>Read the full <Link to="/terms" className="text-cheese underline">Terms of Use</Link>.</p>
       </section>
     </>
   );
@@ -171,7 +172,7 @@ export function CryptAbout({ children }: { children: ReactNode }) {
   return (
     <DappAbout
       title="CHEESECrypt"
-      introduction={<>Send private messages to friends, private groups or public rooms on WAX, paid in CHEESE. Message text is protected with <CryptographyDetails />, while the transaction activity remains public.</>}
+      introduction={<>Send private messages to friends, private groups or public rooms on WAX, paid in CHEESE. Message text is protected with <CryptographyDetails />, while who sent to whom, when and how much stays public on the blockchain.</>}
       sections={[
         { title: 'Get started', body: 'Connect with Anchor, choose your profile and create a messaging key for 100 CHEESE (80 to eosio.null, 20 to xcheeseliqst), or load your existing private key file for free. Every key must be locked to its WAX account before use; legacy keys are upgraded without changing friends or rooms. Anchor requests two free, never-broadcast signatures for locking, or one to open a locked backup. Keep your locked backup and Anchor signing key safe. Add a friend using their published public key or load their public key file. Share only your public key, never your private key.' },
         { title: 'Publishing and the Public Inbox', body: 'Publishing (Menu → Publish) puts your account and public key permanently on chain so others can find you; it costs 0.0100 CHEESE. (CHEESECrypt recommends you do not publish your public key and instead share it privately and directly with friends) This feature benefits public figures who wish to be found and contactable. Public Inbox is off by default. Turn it on and strangers can send text or NFT message requests that you Accept, Decline or Block for free. Blocked accounts are ignored and you never see their messages.' },
