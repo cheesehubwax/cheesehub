@@ -97,7 +97,10 @@ const CheeseCrypt = () => {
 
 export function Messenger({ account, session }: { account: string; session: NonNullable<ReturnType<typeof useWax>['session']> }) {
   const { toast } = useToast();
-  const { executeTransaction } = useWaxTransaction(session);
+  const { executeTransaction: executeDirect } = useWaxTransaction(session);
+  // Every CHEESECrypt transaction that fits the crypt.cheese router shape is sent through it; others stay direct.
+  const executeTransaction = useCallback((actions: unknown[], options?: Parameters<typeof executeDirect>[1]) =>
+    executeDirect(CRYPT_ROUTER_ENABLED ? routeCryptActions(actions) : actions, options), [executeDirect]);
   const [sendDeclined, setSendDeclined] = useState<string | null>(null);
   const permission = session.permissionLevel;
   const [candidateKey, setKey] = useState<MessagingKey | null>(() => loadKey(account));
