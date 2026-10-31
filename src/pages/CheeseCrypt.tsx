@@ -45,7 +45,7 @@ import {
   findPrivateKey, readFriendKeys, readVaultMarks, recallVault, vaultStatus, writeVaultMarks, rememberVault, replaceWithLocked, vaultSupported, vaultWritable, writeFriendKey, writeOwnPublicKey,
 } from '@/lib/cryptVault';
 import type { PublicKeyFile } from '@/lib/cheeseCrypt';
-import { ChainMemo, MessagingKey, MAX_MESSAGE_BYTES, MAX_HISTORY_PAGES, MAX_PARTS, messageCost, partCount, splitMessage, buildCreateKeyActions, KEY_CREATION_QUANTITY, buildPublishKeyActions, buildSendMessageActions, encryptMemo, fetchMessages, generateKey, loadContacts, loadContactAvatars, loadKey, loadRemovedContacts, removeContact, lookupPublishedKey, parseKeyFile, plaintextBytes, saveContact, saveKey, toPublicFile } from '@/lib/cheeseCrypt';
+import { ChainMemo, MessagingKey, MAX_MESSAGE_BYTES, MAX_HISTORY_PAGES, MAX_PARTS, messageCost, partCount, splitMessage, buildCreateKeyActions, KEY_CREATION_QUANTITY, buildPublishKeyActions, buildSendMessageActions, CRYPT_ROUTER_ENABLED, routeCryptActions, encryptMemo, fetchMessages, generateKey, loadContacts, loadContactAvatars, loadKey, loadRemovedContacts, removeContact, lookupPublishedKey, parseKeyFile, plaintextBytes, saveContact, saveKey, toPublicFile } from '@/lib/cheeseCrypt';
 import { download } from '@/components/crypt/cryptDownload';
 import { ChatMessageItem } from '@/components/crypt/ChatMessageItem';
 import { EditedMessagesDialog } from '@/components/crypt/EditedMessagesDialog';
@@ -97,7 +97,10 @@ const CheeseCrypt = () => {
 
 export function Messenger({ account, session }: { account: string; session: NonNullable<ReturnType<typeof useWax>['session']> }) {
   const { toast } = useToast();
-  const { executeTransaction } = useWaxTransaction(session);
+  const { executeTransaction: executeDirect } = useWaxTransaction(session);
+  // Every CHEESECrypt transaction that fits the crypt.cheese router shape is sent through it; others stay direct.
+  const executeTransaction = useCallback((actions: unknown[], options?: Parameters<typeof executeDirect>[1]) =>
+    executeDirect(CRYPT_ROUTER_ENABLED ? routeCryptActions(actions) : actions, options), [executeDirect]);
   const [sendDeclined, setSendDeclined] = useState<string | null>(null);
   const permission = session.permissionLevel;
   const [candidateKey, setKey] = useState<MessagingKey | null>(() => loadKey(account));
