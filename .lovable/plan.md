@@ -1,71 +1,36 @@
-# Redeploy crypt.cheese with the new `payfee` action (Windows + Docker Desktop + waxblock.io)
+# CHEESECrypt privacy disclaimer and liability terms
 
-Your folder: `C:\Users\User\Desktop\wax contracts\cheesecrypt`
+## What is already there
+- The CHEESECrypt About guide already lists "Public on WAX" (sender, recipient, timestamps, IDs, amounts) — but only inside the expandable cryptography details. The main intro just says "transaction activity remains public".
+- The site Terms of Use (18 sections) has general No Warranties and Limitation of Liability clauses, but nothing about messaging, user content, public rooms or room takedowns.
 
-## Step 0 - Put the latest contract files in your folder
-Replace these files in your folder with the latest versions from this project (`contracts/cheesecrypt/`), keeping the same layout:
+## 1. CHEESECrypt About guide
+- Add a short, always-visible **"What is private and what is public"** box at the top of the guide (not hidden in details):
+  - Private: message text, voice notes, NFT IDs and group details inside messages — only the people in the chat can read them.
+  - Public forever on WAX: who sent to whom, when, transaction IDs, amounts, number of parts, and anything you publish (public key, public room name/description, owner).
+  - Nobody — including CHEESEHub — can delete anything from the blockchain, recover a lost key, or read your private messages.
+  - Anyone you message can screenshot or share what you sent.
+- Add a **"Your responsibility"** section: you alone are responsible for what you send, publish or list; CHEESEHub does not monitor, store, review or endorse private messages; public room listings can be hidden from CHEESEHub's directory but remain on-chain and on other sites.
+- Link to the full Terms of Use.
 
-```text
-cheesecrypt\
-  Dockerfile
-  build.sh
-  include\cheesecrypt.hpp
-  include\router_rules.hpp
-  src\cheesecrypt.cpp
-```
-Delete the old `build` folder inside it if one exists, so old files can't be mixed up with new ones.
+## 2. Terms of Use — new section "CHEESECrypt Messaging"
+Inserted after "Prohibited Use", covering:
+- Software only: CHEESEHub provides client-side software; messages go directly on the WAX blockchain. It does not host, store, transmit, monitor, or have access to message content, and cannot decrypt it.
+- Public metadata: sender, recipient, timestamps and amounts are public permanently.
+- User content: users are solely responsible for all content they send, publish or list, and must comply with all laws. Illegal content is prohibited (extends Prohibited Use).
+- Public rooms: listings are public; CHEESEHub may hide any listing from its own interface at its sole discretion without notice or refund; hiding never removes chain data. Listing fees are non-refundable.
+- Keys: lost keys and messages cannot be recovered; no forward secrecy; encryption is not guaranteed against future attacks.
+- No guarantee of delivery, privacy or availability; the `crypt.cheese` contract holds no funds and is provided as-is.
 
-## Step 1 - Open Docker Desktop
-Start Docker Desktop and wait until it says "Engine running" (bottom left).
+## 3. Strengthen general liability clauses
+- **Limitation of Liability:** add explicit exclusion for user-generated content, messages, public room listings, data exposure via public blockchain metadata, key loss, and smart contract behaviour.
+- **New "Indemnification" clause:** users indemnify the owner, CHEESE DAO and contributors against claims arising from their use, content or law-breaking.
+- **No Warranties:** add that no warranty is made on encryption, anonymity or privacy.
+- Bump the "last updated" date if present.
 
-## Step 2 - Open Command Prompt (CMD, not PowerShell)
-Press Windows key, type `cmd`, press Enter. Copy and paste each line exactly, pressing Enter after each:
-
-```text
-cd /d "C:\Users\User\Desktop\wax contracts\cheesecrypt"
-```
-```text
-docker build -t cheesecrypt-cdt .
-```
-(Note the space and full stop at the end. Takes a minute or two the first time; fast after.)
-
-```text
-docker run --rm -v "%cd%:/work" cheesecrypt-cdt bash -c "sed -i 's/\r$//' build.sh && bash build.sh"
-```
-Success looks like: `Built build/cheesecrypt.wasm and build/cheesecrypt.abi`.
-Warnings are fine; the word `error` is not - if you see one, paste it to me and stop.
-
-## Step 3 - Confirm the new files contain payfee
-```text
-dir build
-```
-```text
-findstr /c:"payfee" build\cheesecrypt.abi
-```
-The second command must print at least one line. If it prints nothing, stop and tell me.
-
-## Step 4 - Deploy on waxblock.io
-1. Go to `https://waxblock.io/account/crypt.cheese` and log in with Anchor as **crypt.cheese** (active permission).
-2. Open the **Contract** tab, then **Deploy** (or "Set contract").
-3. WASM file: choose `C:\Users\User\Desktop\wax contracts\cheesecrypt\build\cheesecrypt.wasm`
-4. ABI file: choose `C:\Users\User\Desktop\wax contracts\cheesecrypt\build\cheesecrypt.abi`
-5. Click Deploy, approve in Anchor.
-6. If it fails with "insufficient RAM", buy about 50 KB of RAM for `crypt.cheese` (CHEESERam or the waxblock RAM page) and retry. If it fails on CPU/NET, power up `crypt.cheese` with CHEESEUp and retry.
-
-Do NOT change any permissions. The `crypt.cheese@eosio.code` entry you added earlier stays exactly as it is.
-
-## Step 5 - Check it on-chain
-On `https://waxblock.io/account/crypt.cheese` -> Contract -> Actions, you should now see:
-`payfee`, `reclaim`, `sendmsg`, `setconfig`, `setpaused`.
-Under Tables, `config` should still show your previous settings and `pending` should be empty. Existing messages, rooms and keys are unaffected.
-
-## Step 6 - Tell me "redeployed"
-Then I will (in build mode):
-1. Read the live contract to confirm `payfee` exists with the expected fields.
-2. Turn on the app switch so key creation, key publishing and room listing/update/unlist fees go through `crypt.cheese` (they stay on the old direct path until then, so nothing breaks in the meantime).
-3. Run the tests, then you do one test key publish and one test room listing; I verify the 80/20 split and empty `pending` table from the transaction IDs.
+## Legal warning (important)
+This wording reduces risk but is **not legal advice**, and some of it can't be enforced in every country (e.g. consumer law in Australia/EU won't let you exclude liability for everything). A disclaimer also doesn't protect you if you ignore a valid takedown notice for a public room. Before public launch, I strongly recommend having a lawyer review the Terms — especially as you're in Queensland.
 
 ## Technical details
-- Image: Ubuntu 22.04 + Antelope CDT 4.1.0; build runs `cdt-cpp -abigen -I include -contract cheesecrypt`.
-- The `sed` strips Windows line endings from `build.sh` so bash can run it.
-- App switch: `CRYPT_PAYFEE_LIVE` in `src/lib/cheeseCrypt.ts` (currently `false`); flipped only after on-chain confirmation.
+- Files: `src/components/crypt/CryptAbout.tsx`, `src/components/shared/TermsContent.tsx` (renumber sections after insert).
+- Copy only; no fee, contract or logic changes, so no `APP_SYNC.md`/contract update needed. No tests (copy is not tested by rule).
