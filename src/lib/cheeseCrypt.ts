@@ -486,6 +486,7 @@ export async function fetchMessages(account: string, pages = 1): Promise<ChainMe
     if (!Number.isFinite(oldest)) break;
     before = new Date(oldest).toISOString();
   }
+  rows = await resolveRouterRows(account, rows);
   const seen = new Set<string>();
   return rows.filter((r) => {
     if (!msgPrefixOf(r.memo) || (r.from !== account && r.to !== account)) return false;
