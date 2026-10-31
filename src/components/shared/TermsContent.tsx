@@ -107,22 +107,47 @@ export function TermsContent() {
         </ul>
       </section>
 
+
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-cheese">11. Third-Party Services</h2>
+        <h2 className="text-lg font-semibold text-cheese">11. CHEESECrypt Messaging</h2>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          CHEESECrypt is client-side software for private, encrypted messaging on the WAX blockchain. Messages are encrypted in your browser and written directly to the WAX blockchain by your own wallet. CHEESEHub does not host, store, transmit, monitor, review or have access to message content, and cannot decrypt it.
+        </p>
+        <ul className="text-sm text-muted-foreground leading-relaxed list-disc list-inside space-y-2">
+          <li><strong className="text-foreground">Public metadata:</strong> sender and recipient accounts, timestamps, transaction IDs, amounts, part counts and anything you choose to publish (such as a public key or public room listing) are permanently public on the WAX blockchain and cannot be deleted by anyone.</li>
+          <li><strong className="text-foreground">Your content:</strong> you are solely responsible for all content you send, publish or list, and must comply with all applicable laws. Sending, publishing or listing illegal, abusive or infringing content is prohibited. Recipients can copy and share anything you send them.</li>
+          <li><strong className="text-foreground">Keys:</strong> your private key exists only on your device and in your own backups. Lost keys and the messages encrypted for them cannot be recovered. CHEESECrypt has no forward secrecy, and no guarantee is made that the encryption will resist all present or future attacks.</li>
+          <li><strong className="text-foreground">Smart contract:</strong> fees are routed through the <code className="text-foreground bg-muted px-1 rounded">crypt.cheese</code> contract, which splits them in the same transaction and holds no user funds between transactions. It is provided as is. All fees, including listing fees, are non-refundable.</li>
+          <li><strong className="text-foreground">No guarantee:</strong> no guarantee is made of delivery, privacy, anonymity or availability.</li>
+        </ul>
+        <h3 className="text-base font-semibold text-foreground">Public rooms and takedown policy</h3>
+        <ul className="text-sm text-muted-foreground leading-relaxed list-disc list-inside space-y-2">
+          <li><strong className="text-foreground">Purpose:</strong> CHEESECrypt exists for private on-chain messaging. Public room listings are an optional directory convenience, not the core service.</li>
+          <li><strong className="text-foreground">Proactive moderation:</strong> CHEESEHub actively reviews its public room directory and hides illegal or abusive listings on its own initiative, with the aim of removing them before any notice is ever needed.</li>
+          <li><strong className="text-foreground">Takedown commitment:</strong> CHEESEHub will promptly act on every valid legal, regulatory, copyright or law-enforcement notice and every credible abuse report, hiding the room from its directory without delay. CHEESEHub will never ignore a valid takedown notice.</li>
+          <li><strong className="text-foreground">Reporting:</strong> send takedown notices or reports to the moderation team in the official CHEESE Telegram group at <a href="https://t.me/cheeseonwaxofficial" target="_blank" rel="noopener noreferrer" className="text-cheese underline hover:text-cheese/80">t.me/cheeseonwaxofficial</a>.</li>
+          <li><strong className="text-foreground">Right to disable:</strong> CHEESEHub may hide any listing at its sole discretion without notice, and may restrict, pause or permanently turn off public room creation and listing at any time.</li>
+          <li><strong className="text-foreground">On-chain reality:</strong> hiding removes a room from CHEESEHub only. It cannot alter or delete blockchain data or stop other websites displaying it, and it does not affect the room's members or their encrypted messages.</li>
+          <li><strong className="text-foreground">Fees:</strong> listing fees are non-refundable, including when a room is hidden or public listings are turned off.</li>
+        </ul>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold text-cheese">12. Third-Party Services</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
           CHEESEHub may contain links to or integrations with third-party services, including but not limited to Alcor Exchange, AtomicHub, WaxDAO, NFTHive, and blockchain wallet providers. These third-party services are not operated or controlled by CHEESEHub. We are not responsible for the content, privacy policies, terms of service, availability, or practices of any third-party platforms. Your use of third-party services is at your own risk and subject to their respective terms. Any liquidity provision conducted via third-party decentralised exchanges such as Alcor Exchange is entirely self-directed and carries inherent risks including impermanent loss. No APR, APY, or return of any kind is promised or guaranteed by CHEESEHub. The CHEESESwap widget embedded within CHEESEHub is a convenience interface to Alcor Exchange's swap routing and does not constitute the operation of an exchange, dealing service, or trading platform by CHEESEHub.
         </p>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-cheese">12. Merchandise & Consumer Protection</h2>
+        <h2 className="text-lg font-semibold text-cheese">13. Merchandise & Consumer Protection</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
           Purchases of CHEESE NFTs and merchandise made through CHEESEDrop are covered by applicable consumer protection laws in your jurisdiction. All goods purchased through the portal may be returned undamaged for a full refund at any time. You acknowledge that such purchases constitute consumer transactions and do not represent a financial investment, security, or speculative instrument.
         </p>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-cheese">13. Risk Warnings</h2>
+        <h2 className="text-lg font-semibold text-cheese">14. Risk Warnings</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
           You acknowledge and accept the following risks associated with using CHEESEHub and interacting with digital assets:
         </p>
@@ -139,7 +164,7 @@ export function TermsContent() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-cheese">14. Tax & Regulatory Compliance</h2>
+        <h2 className="text-lg font-semibold text-cheese">15. Tax & Regulatory Compliance</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
           You are solely responsible for determining and fulfilling any tax obligations arising from your use of CHEESEHub and your interactions with digital assets, including but not limited to capital gains tax, income tax, and goods and services tax. CHEESEHub does not provide tax advice, tax reporting, or any form of tax documentation.
         </p>
@@ -149,28 +174,36 @@ export function TermsContent() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-cheese">15. No Warranties</h2>
+        <h2 className="text-lg font-semibold text-cheese">16. No Warranties</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          CHEESEHub is provided on an "as is" and "as available" basis without warranties of any kind, whether express or implied. No guarantee is made regarding the uptime, accuracy, completeness, reliability, or availability of the platform or any content displayed on it. CHEESEHub may be modified, updated, interrupted, suspended, or discontinued at any time without notice or liability.
+          CHEESEHub is provided on an "as is" and "as available" basis without warranties of any kind, whether express or implied. No guarantee is made regarding the uptime, accuracy, completeness, reliability, or availability of the platform or any content displayed on it. CHEESEHub may be modified, updated, interrupted, suspended, or discontinued at any time without notice or liability. No warranty is made that any encryption, messaging feature or smart contract is secure, private, anonymous or free from error.
         </p>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-cheese">16. Limitation of Liability</h2>
+        <h2 className="text-lg font-semibold text-cheese">17. Limitation of Liability</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          To the fullest extent permitted by applicable law, the owner of this website, the CHEESE DAO, its contributors, members, developers, and any individuals or entities associated with the development or maintenance of CHEESEHub accept no liability for any direct, indirect, incidental, consequential, or punitive damages arising from your use of, or inability to use, the platform. This includes, but is not limited to, loss of funds, loss of profits, loss of data, or any other losses howsoever arising.
+          To the fullest extent permitted by applicable law, the owner of this website, the CHEESE DAO, its contributors, members, developers, and any individuals or entities associated with the development or maintenance of CHEESEHub accept no liability for any direct, indirect, incidental, consequential, or punitive damages arising from your use of, or inability to use, the platform. This includes, but is not limited to, loss of funds, loss of profits, loss of data, or any other losses howsoever arising. Without limiting the above, no liability is accepted for any messages, user content or public room listings created by users; any exposure of information through public blockchain metadata; the loss or compromise of any key or backup; or the behaviour of any smart contract. Nothing in these terms excludes rights that cannot be excluded under applicable law, such as consumer guarantees.
+        </p>
+      </section>
+
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold text-cheese">18. Indemnification</h2>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          To the fullest extent permitted by applicable law, you agree to indemnify and hold harmless the owner of this website, the CHEESE DAO, and its contributors, members and developers against any claims, losses, liabilities and expenses (including reasonable legal costs) arising from your use of CHEESEHub, any content you send, publish or list, or your breach of these terms or of any law.
         </p>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-cheese">17. Modifications to Terms</h2>
+        <h2 className="text-lg font-semibold text-cheese">19. Modifications to Terms</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
           These Terms of Use may be updated or modified at any time without prior notice. Changes will be effective immediately upon being published on this page. It is your responsibility to review these terms periodically. Your continued use of CHEESEHub after any modifications constitutes your acceptance of the updated terms.
         </p>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-cheese">18. Governing Law</h2>
+        <h2 className="text-lg font-semibold text-cheese">20. Governing Law</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
           These Terms of Use shall be governed by and construed in accordance with the applicable laws of the jurisdiction in which any dispute arises. Given the decentralised and global nature of the CHEESE DAO and the WAX blockchain, no specific jurisdiction is designated. Users are responsible for understanding and complying with the laws applicable to them in their own jurisdiction.
         </p>

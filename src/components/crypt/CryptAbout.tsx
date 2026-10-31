@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { DappAbout } from '@/components/about/DappAbout';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -139,17 +140,46 @@ function ChatTypesAndRoles() {
   );
 }
 
+const REPORT_URL = 'https://t.me/cheeseonwaxofficial';
+
+function PrivacyAndResponsibility() {
+  const p = 'pl-3.5 text-sm leading-relaxed text-muted-foreground';
+  return (
+    <>
+      <section className="space-y-2 rounded-md border border-cheese/30 bg-cheese/5 p-3">
+        <Heading>What is private and what is public</Heading>
+        <ul className={`${p} list-disc list-inside space-y-1`}>
+          <li><span className="font-medium text-foreground">Private:</span> message text, voice notes, shared NFT IDs and group details inside messages. Only the people in the chat can read them.</li>
+          <li><span className="font-medium text-foreground">Public forever on WAX:</span> who sent to whom, when, transaction IDs, amounts and number of parts, plus anything you publish (your public key, a public room’s name, description and owner).</li>
+          <li>Nobody, including CHEESEHub, can delete anything from the blockchain, recover a lost key or read your private messages.</li>
+          <li>Anyone you message can copy, screenshot or share what you sent them.</li>
+        </ul>
+      </section>
+      <section className="space-y-2">
+        <Heading>Your responsibility</Heading>
+        <p className={p}>You alone are responsible for everything you send, publish or list, and for following the law where you live. CHEESEHub does not monitor, store, review or endorse private messages and cannot read them. CHEESEHub is software only; your messages go directly onto the WAX blockchain.</p>
+      </section>
+      <section className="space-y-2">
+        <Heading>Public rooms and takedowns</Heading>
+        <p className={p}>CHEESECrypt exists for private messaging; public room listings are an optional extra. CHEESEHub actively watches its public room list and hides illegal or abusive rooms on its own initiative, ideally before anyone needs to report them. Every valid takedown notice or report is acted on promptly, and CHEESEHub will never ignore one. CHEESEHub may also turn off public room creation and listing at any time. Hiding removes a room from CHEESEHub only; it stays on the blockchain and may still appear on other websites. To report a room, contact the moderation team in the official <a href={REPORT_URL} target="_blank" rel="noopener noreferrer" className="text-cheese underline">CHEESE Telegram group</a>.</p>
+        <p className={p}>Read the full <Link to="/terms" className="text-cheese underline">Terms of Use</Link>.</p>
+      </section>
+    </>
+  );
+}
+
 export function CryptAbout({ children }: { children: ReactNode }) {
   return (
     <DappAbout
       title="CHEESECrypt"
-      introduction={<>Send private messages to friends, private groups or public rooms on WAX, paid in CHEESE. Message text is protected with <CryptographyDetails />, while the transaction activity remains public.</>}
+      introduction={<>Send private messages to friends, private groups or public rooms on WAX, paid in CHEESE. Message text is protected with <CryptographyDetails />, while who sent to whom, when and how much stays public on the blockchain.</>}
       sections={[
         { title: 'Get started', body: 'Connect with Anchor, choose your profile and create a messaging key for 100 CHEESE (80 to eosio.null, 20 to xcheeseliqst), or load your existing private key file for free. Every key must be locked to its WAX account before use; legacy keys are upgraded without changing friends or rooms. Anchor requests two free, never-broadcast signatures for locking, or one to open a locked backup. Keep your locked backup and Anchor signing key safe. Add a friend using their published public key or load their public key file. Share only your public key, never your private key.' },
         { title: 'Publishing and the Public Inbox', body: 'Publishing (Menu → Publish) puts your account and public key permanently on chain so others can find you; it costs 0.0100 CHEESE. (CHEESECrypt recommends you do not publish your public key and instead share it privately and directly with friends) This feature benefits public figures who wish to be found and contactable. Public Inbox is off by default. Turn it on and strangers can send text or NFT message requests that you Accept, Decline or Block for free. Blocked accounts are ignored and you never see their messages.' },
         { title: 'Messaging features', body: 'Longer messages are split and shown as one message. Reply to a message to quote it; the blue @ button jumps to replies you have not seen. You can edit your own messages for 24 hours; edited messages are marked (edited). Set a name and pixel avatar in your profile and give friends private nicknames. When the side panel is collapsed, a thin strip keeps every room and friend with their unread counts in view.' },
       ]}
       extra={<>
+        <PrivacyAndResponsibility />
         <ChatTypesAndRoles />
         {[
           { title: 'Costs and records', body: 'Each part costs 0.0001 CHEESE to each recipient plus a 0.0100 CHEESE platform fee once, shared across the whole group. A three-person group costs 0.0102 CHEESE per part; direct messages remain 0.0101 CHEESE per part. Asking to join or rejoin a public room costs 0.0101 CHEESE, the same as an ordinary one-part direct message: 0.0001 CHEESE with the request and a shared 0.0100 CHEESE platform fee, with no extra owner payment. Making a room public costs a one-time, non-refundable 100.0000 CHEESE listing fee (unlisting never returns it) to deter throwaway spam listings; updating a listed room’s details or unlisting costs only the usual 0.0100 CHEESE. Room actions such as mutes, bans, admin changes and reports are sent as messages and cost the same. All platform fees split 80% to eosio.null and 20% to xcheeseliqst; recipient payments stay separate. Text, NFTs, YouTube links and voice all use the same platform rate per part. Amounts no longer explicitly price content types, but part counts, ciphertext sizes, requester keys and recipient patterns can still distinguish activity. Review the full total before signing. History shows the current rate, not proof of the fee paid on older transactions. The Tx link opens the public WAX transaction, not your readable message text.' },
