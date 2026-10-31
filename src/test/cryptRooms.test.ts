@@ -11,7 +11,7 @@ const ID = '00112233445566ff';
 const pk = (k: MessagingKey) => ({ account: k.account, publicKey: k.publicKey });
 const room = { id: ID, name: 'Cheese club', topic: 'All things cheese', tags: ['cheese', 'wax'], publicKey: alice.publicKey, members: 2 };
 const nullLeg = (from: string, memo: string, time: number, quantity = '0.0080 CHEESE'): ChainMemo => ({ txId: `t${time}`, time, from, to: 'eosio.null', memo, quantity });
-const stakeLeg = (from: string, memo: string, time: number): ChainMemo => nullLeg(from, memo, time, '8.0000 CHEESE');
+const stakeLeg = (from: string, memo: string, time: number): ChainMemo => nullLeg(from, memo, time, '80.0000 CHEESE');
 
 let tx = 0;
 const memos = (text: string, from: MessagingKey, to: MessagingKey, time: number): ChainMemo[] => {
@@ -50,7 +50,7 @@ describe('room fee', () => {
     const memo = encodeListing(room);
     const actions = buildRoomActions('alice', memo, [], LISTING_STAKE_QUANTITY);
     expect(actions.map(a => [a.data.to, a.data.quantity, a.data.memo])).toEqual([
-      ['eosio.null', '8.0000 CHEESE', memo], ['xcheeseliqst', '2.0000 CHEESE', memo],
+      ['eosio.null', '80.0000 CHEESE', memo], ['xcheeseliqst', '20.0000 CHEESE', memo],
     ]);
   });
   it('a join request pays the ordinary 0.0101 CHEESE with no owner surcharge', () => {
