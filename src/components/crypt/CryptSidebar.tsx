@@ -73,14 +73,14 @@ export function CryptSidebar({
               {/* Every action closes the menu first; dialogs live outside so they survive it unmounting. */}
               <div className="grid grid-cols-3 gap-1" onClickCapture={() => setMenuOpen(false)}>
                 <CardAction icon={<RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />} label="Refresh" disabled={loading} aria-label="Refresh messages" title="Check the chain for new messages now" onClick={refresh} />
-                <CardAction icon={<Upload className="h-4 w-4" />} label="Restore" aria-label="Load a key file (yours or a contact's)" title="Load a key file (yours or a contact's)" onClick={() => fileRef.current?.click()} />
-                <CardAction icon={<Download className="h-4 w-4" />} label="Public key" aria-label="Share my public key file" title="Save my public key file to share" onClick={() => void sharePublicKey()} />
-                <CardAction icon={<Radio className="h-4 w-4" />} label="Publish" disabled={busy} aria-label={`Publish my key on chain (${MESSAGE_FEE_QUANTITY})`} title={`Publish my key on chain (${MESSAGE_FEE_QUANTITY})`} onClick={() => void publish()} />
+                <CardAction icon={<Upload className="h-4 w-4" />} label="Import Private Key" aria-label="Load a private key file (yours or a contact's)" title="Load a private key file (yours or a contact's)" onClick={() => fileRef.current?.click()} />
+                <CardAction icon={<Download className="h-4 w-4" />} label="Export Public Key" aria-label="Save my public key file to share" title="Save my public key file to share" onClick={() => void sharePublicKey()} />
                 <CardAction icon={<Save className="h-4 w-4" />} label="Back up" disabled={!keyLocked || !backupFile} aria-label="Back up private key" title="Download my wallet-locked private key backup" onClick={() => { if (keyLocked && backupFile) download(`${account}-cheesecrypt-key-PRIVATE.json`, backupFile); }} />
                 <CardAction icon={<Ban className="h-4 w-4" />} label={blocked.length ? `Blocked (${blocked.length})` : 'Blocked'} aria-label="Blocked accounts" title="Accounts blocked on this device" onClick={() => setShowBlocked(true)} />
                 <CardAction icon={<KeyRound className="h-4 w-4" />} label="New key" className="hover:text-destructive" aria-label="Create a new key" title="Create a new key (it cannot read messages sent to this one)" onClick={makeKey} />
-                <PublicInboxButton enabled={publicInbox} onClick={() => setInboxOpen(true)} />
                 <CardAction icon={<Globe className="h-4 w-4" />} label="Public groups" aria-label="Search public groups" title="Search public groups and ask to join" onClick={() => setRoomsOpen(true)} />
+                <PublicInboxButton enabled={publicInbox} onClick={() => setInboxOpen(true)} className="text-destructive" />
+                <CardAction icon={<Radio className="h-4 w-4" />} label="Publish key" className="text-destructive" disabled={busy} aria-label={`Publish my key on chain (${MESSAGE_FEE_QUANTITY})`} title={`Publish my key on chain (${MESSAGE_FEE_QUANTITY})`} onClick={() => void publish()} />
               </div>
             </PopoverContent>
           </Popover>

@@ -10,8 +10,8 @@ import { parseNftMessage } from '@/lib/cryptNft';
 import type { InboxRequest } from '@/lib/cryptPublicInbox';
 import { cn } from '@/lib/utils';
 
-export function PublicInboxButton({ enabled, onClick }: { enabled: boolean; onClick: () => void }) {
-  return <CardAction icon={<Inbox className="h-4 w-4" />} label="Inbox" aria-label="Public inbox" title={`Public inbox is ${enabled ? 'on' : 'off'}`} className={cn(enabled && 'text-cheese')} onClick={onClick} />;
+export function PublicInboxButton({ enabled, onClick, className }: { enabled: boolean; onClick: () => void; className?: string }) {
+  return <CardAction icon={<Inbox className="h-4 w-4" />} label="Inbox toggle" aria-label="Public inbox" title={`Public inbox is ${enabled ? 'on' : 'off'}`} className={cn(enabled && 'text-cheese', className)} onClick={onClick} />;
 }
 
 /** Uncontrolled renders its own button; pass open/onOpenChange to open it from elsewhere (e.g. a menu that unmounts). */
