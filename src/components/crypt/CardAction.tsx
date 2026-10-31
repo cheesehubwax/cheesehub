@@ -11,7 +11,7 @@ export function CardAction({ icon, label, className, ...props }: ButtonProps & {
       {...props}
     >
       {icon}
-      <span className="text-[10px] leading-none font-semibold">{label}</span>
+      <span className="text-[10px] leading-tight font-semibold break-words line-clamp-2">{label}</span>
     </Button>
   );
 }
