@@ -13,10 +13,12 @@ import {
 } from '@/lib/cryptRooms';
 
 /** Search listed rooms; asking to join is confirmed (and paid) by the Messenger. Presentational only. */
-export function DiscoverRoomsDialog({ open, onOpenChange, listings, loading, refresh, account, nameFor, roomStatus, joinCost, onAsk }: {
+export function DiscoverRoomsDialog({ open, onOpenChange, listings, loading, refresh, account, nameFor, roomStatus, joinCost, onAsk, onReport }: {
   open: boolean; onOpenChange: (open: boolean) => void; listings: RoomListing[]; loading: boolean; refresh: () => void; account: string;
   roomStatus: (l: RoomListing) => 'own' | 'member' | 'invited' | 'requested' | 'left' | 'restricted' | null; joinCost: string; onAsk: (l: RoomListing) => void;
   nameFor?: (account: string) => string;
+  /** Report a listing to CHEESEHub moderators (never shown on your own rooms). */
+  onReport?: (l: RoomListing) => void;
 }) {
   const [q, setQ] = useState('');
   const shown = useMemo(() => searchListings(listings, q), [listings, q]);
@@ -51,7 +53,9 @@ export function DiscoverRoomsDialog({ open, onOpenChange, listings, loading, ref
             {l.topic && <p className="break-words text-sm">{l.topic}</p>}
             {l.tags.length > 0 && <div className="flex flex-wrap gap-1">{l.tags.map(t => <span key={t} className="rounded bg-cheese/10 px-1.5 py-0.5 text-[11px] text-cheese">#{t}</span>)}</div>}
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] text-muted-foreground">Listed {new Date(l.time).toLocaleDateString()}</span>
+              <span className="flex items-center gap-1 text-[11px] text-muted-foreground">Listed {new Date(l.time).toLocaleDateString()}
+                {onReport && status !== 'own' && <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[11px]" aria-label={`Report ${l.name} to CHEESEHub`} title="Report this room to CHEESEHub" onClick={() => onReport(l)}>🚩 Report</Button>}
+              </span>
               {status === 'own' ? <span className="text-xs text-muted-foreground">Your room</span>
                 : status === 'member' ? <span className="text-xs text-muted-foreground">Joined</span>
                 : status === 'restricted' ? <span className="text-xs text-muted-foreground">Muted or removed</span>

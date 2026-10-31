@@ -673,6 +673,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const activeGroup = groups.find(g => `group:${g.id}` === active);
   const activeInvite: InviteGroupView | undefined = activeGroup ? undefined : inviteViews.find(v => `group:${v.invite.id}` === active);
   const activeModeration = activeInvite ? moderation[activeInvite.invite.id] : undefined;
+  // The open room's public listing (if it has one), so members can report it to CHEESEHub, including its owner or admins.
+  const activeListing = useMemo(() => activeInvite ? listings.find(l => l.id === activeInvite.invite.id && l.creator === activeInvite.invite.creator) : undefined, [activeInvite, listings]);
   const roomBanned = activeModeration?.bans[account] !== undefined;
   const roomMutedUntil = mutedUntil(activeModeration, account, clock);
   const roomRestricted = roomBanned || !!roomMutedUntil;
