@@ -7,11 +7,16 @@ admissions stay direct. History resolves router deliveries via the same-transact
 (`resolveRouterRows`), requiring the sender's authorization. Update this checklist with every CHEESECrypt change, but
 do not reintroduce plaintext roles to enforce client policy.
 
+Join/rejoin requests and each voice batch already meet this shape and use the shared live adapter.
+Their encrypted memos (including the request-carried key) are preserved verbatim. Integration tests
+cover fees and sender/recipient decoding; live voice/join wallet checks remain pending. No recompile
+or redeployment is required for these paths.
+
 | App rule / source | Router responsibility / integration status |
 |---|---|
 | Router account `crypt.cheese` (`CRYPT_ROUTER_ACCOUNT`, `cheeseCrypt.ts`) | Deploy target; contract uses `get_self()`, no hardcoded name |
 | Uniform 0.0100/part for text, NFT, links and controls (`cheeseCrypt.ts`) | `config.part_fee`, `platform_fee`; no kind parameter, bounded arithmetic |
-| Voice 0.0100 per encrypted part, shared across recipients, up to 30 parts/batch (`cryptVoice.ts`) | Same arithmetic as `config.part_fee`; no special voice fee or continuation needed. Still direct pending verified history/resource integration |
+| Voice 0.0100 per encrypted part, shared across recipients, up to 30 parts/batch (`cryptVoice.ts`) | Routed by the shared adapter, including metadata/edit-target parts; each batch gets its own atomic payment + sendmsg. Automated history/fee checks; live wallet/resource checks pending |
 | Recipient 0.0001 per part | `recipient_fee` per copy; exact `parts` copies per distinct recipient |
 | Shared 80% eosio.null / 20% xcheeseliqst | `pay_platform` integer split; `setconfig` requires 80 |
 | Key creation 100 CHEESE, publishing fee | Existing direct-transfer path, not router messaging |
@@ -25,7 +30,7 @@ do not reintroduce plaintext roles to enforce client policy.
 | Admin cannot ban; founders ban/admin-collapse immune | Client-only; do not infer role from fee kind, pending payer or recipient array |
 | Mutes permanently suppress send-time traffic/quotes | Client-only presentation/filtering; malicious clients can ignore it |
 | Reports member→owner+admins, admin→owner | Encrypted ordinary text controls; notifications only; no report table |
-| Join/rejoin requests 0.0001 copy + 0.0100 platform = 0.0101 (`cryptRooms.ts`); no owner surcharge | Ordinary single-part arithmetic; still direct with request-carried key pending verified adapter. No join action, fee kind or identifying fee memo |
+| Join/rejoin requests 0.0001 copy + 0.0100 platform = 0.0101 (`cryptRooms.ts`); no owner surcharge | Routed with the request-carried key unchanged; automated authenticated decoding/fee checks, live wallet check pending. No join action, fee kind or identifying fee memo |
 | Join-request declines (`join-no`) creator→requester | One encrypted part with the normal message fee; notification only; no request table |
 | Edits 24h, owner log 72h (`cryptEdits.ts`) | Client-only same-sender/conversation digest resolution; no edit receipts/table/action |
 | Memo ≤256 bytes | Router checks memo byte length, not plaintext semantics |
@@ -47,7 +52,7 @@ payments. ABI breaks from old drafts.
   in one transaction must not cross-attribute copies. Never trust memo-only sender fields.
 - Verify legacy/new encrypted text, NFT, complete membership/admissions, edits, reports and
   send-time moderation with that adapter; preserve transaction IDs and notification deduplication.
-- Keep key publishing/listings/voice on direct paths until their own compatibility gates pass.
+- Keep key creation/publishing and listings on direct paths; voice and join/rejoin use the shared router, with live checks still pending.
 - Measure maximum usable fanout under WAX transaction size/CPU/NET and Fuel limitations.
 
 Native shared-rule tests cover pricing/splits/hard bounds; they are not an audit or chain tests.

@@ -326,7 +326,9 @@ const ROUTER_MAX_RECIPIENTS = 49;
 type TransferAction = { account: string; name: string; authorization: unknown; data: { from: string; to: string; quantity: string; memo: string } };
 
 /**
- * Converts a direct CHEESECrypt message transaction into one exact payment + `crypt.cheese::sendmsg`.
+ * Converts a direct CHEESECrypt message transaction (including join/rejoin requests and each voice
+ * batch) into one exact payment + `crypt.cheese::sendmsg`. Encrypted bytes and join-key suffixes
+ * remain untouched; the router does not need or expose a content-type parameter.
  * Only exact router shapes convert: every action a CHEESE transfer from one sender, 0.0001 copies
  * with message memos, every recipient receiving the same `parts` copies, and an 80/20 platform fee of
  * exactly 0.0100 per part. Anything else (key creation/publishing, listings, fee-less profile batches,
@@ -355,7 +357,8 @@ export function routeCryptActions<T>(actions: T[]): T[] | Record<string, unknown
   if (!copies.length) return actions;
   const counts = new Map<string, number>();
   for (const c of copies) counts.set(c.to, (counts.get(c.to) ?? 0) + 1);
-  const parts = counts.get(copies[0].to)!;
+  const parts = counts.get(copies[0].to);
+  if (parts === undefined) return actions;
   if (![...counts.values()].every(n => n === parts) || parts > ROUTER_MAX_PARTS || counts.size > ROUTER_MAX_RECIPIENTS) return actions;
   const fee = nulled + liquidity;
   if (fee !== parts * units(MESSAGE_FEE_QUANTITY) || nulled * 5 !== fee * 4) return actions;
@@ -377,8 +380,9 @@ export function expandRouterActions(txId: string, time: number, actions: unknown
     const act = (raw as { act?: { account?: string; name?: string; authorization?: { actor?: string }[]; data?: { sender?: string; copies?: { to?: string; memo?: string }[] } } })?.act;
     if (act?.account !== CRYPT_ROUTER_ACCOUNT || act.name !== 'sendmsg') continue;
     const sender = act.data?.sender;
-    if (!sender || !act.authorization?.some(a => a.actor === sender) || !Array.isArray(act.data?.copies)) continue;
-    for (const c of act.data!.copies!) {
+    const copies = act.data?.copies;
+    if (!sender || !act.authorization?.some(a => a.actor === sender) || !Array.isArray(copies)) continue;
+    for (const c of copies) {
       if (typeof c?.to === 'string' && typeof c.memo === 'string' && c.to !== sender)
         out.push({ txId, time, from: sender, to: c.to, memo: c.memo, quantity: MESSAGE_RECIPIENT_QUANTITY });
     }
