@@ -56,11 +56,13 @@ void cheesecrypt::ontransfer(name from, name to, asset quantity, string memo) {
    check(get_first_receiver() == cfg.token_contract && quantity.symbol == cfg.token_symbol,
          "only the configured CHEESE token is accepted");
    check(quantity.is_valid() && quantity.amount > 0, "positive valid quantity required");
-   // Do not let a third party create pending rows at the router's RAM expense.
+   // Only the payer's own signed transfer may open a pending row. WAX forbids billing
+   // another account's RAM inside a notification, so the router pays the row's RAM;
+   // sendmsg/reclaim erase it, so normal sends use no net router RAM.
    require_auth(from);
    pending_t pend(get_self(), get_self().value);
    auto it = pend.find(from.value);
-   if (it == pend.end()) pend.emplace(from, [&](auto& p) { p.payer = from; p.funds = quantity; });
+   if (it == pend.end()) pend.emplace(get_self(), [&](auto& p) { p.payer = from; p.funds = quantity; });
    else pend.modify(it, same_payer, [&](auto& p) { p.funds += quantity; });
 }
 
