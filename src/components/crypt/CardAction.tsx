@@ -7,7 +7,7 @@ export function CardAction({ icon, label, className, ...props }: ButtonProps & {
   return (
     <Button
       variant="ghost"
-      className={cn('h-auto w-full flex-col gap-1.5 rounded-md px-1 py-2 text-muted-foreground hover:text-cheese', className)}
+      className={cn('h-auto w-full min-w-0 flex-col gap-1.5 rounded-md px-1 py-2 text-muted-foreground whitespace-normal hover:text-cheese', className)}
       {...props}
     >
       {icon}
