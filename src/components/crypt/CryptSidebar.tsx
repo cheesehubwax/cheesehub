@@ -1,9 +1,10 @@
-import type { ComponentProps, ReactNode } from 'react';
+import { useState, type ComponentProps, type ReactNode } from 'react';
 import { Ban, ChevronDown, Download, Globe, KeyRound, Loader2, ShieldCheck, Menu, PanelLeftClose, PanelLeftOpen, Pencil, Radio, RefreshCw, Save, Trash2, Upload, UserPlus, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { CardAction } from '@/components/crypt/CardAction';
+import { CryptConfirmDialog, type CryptConfirm } from '@/components/crypt/CryptConfirmDialog';
 import { MessageRequests, PublicInboxButton } from '@/components/crypt/PublicInbox';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { download } from '@/components/crypt/cryptDownload';
@@ -42,8 +43,10 @@ export function CryptSidebar({
   lastAt: Record<string, number>; badge: (id: string) => ReactNode; removeFriend: (name: string) => void;
 }) {
   const key = cryptKey;
+  const [confirm, setConfirm] = useState<CryptConfirm | null>(null);
   return (
     <>
+      <CryptConfirmDialog confirm={confirm} onClose={() => setConfirm(null)} />
       <div className="flex flex-col justify-center gap-2 p-3 border-b border-border md:border-r md:col-start-1 md:row-start-1">
         <button type="button" className="group flex w-full min-w-0 items-center gap-3 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label="Edit profile" title="Edit name and avatar" onClick={() => setEditingAvatar(true)}>
@@ -72,15 +75,15 @@ export function CryptSidebar({
             <PopoverContent align="start" className="w-64 p-2">
               {/* Every action closes the menu first; dialogs live outside so they survive it unmounting. */}
               <div className="grid grid-cols-3 gap-1" onClickCapture={() => setMenuOpen(false)}>
-                <CardAction icon={<RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />} label="Refresh" disabled={loading} aria-label="Refresh messages" title="Check the chain for new messages now" onClick={refresh} />
-                <CardAction icon={<Upload className="h-4 w-4" />} label="Import Private Key" aria-label="Load a key file (yours or a contact's)" title="Load a key file (yours or a contact's)" onClick={() => fileRef.current?.click()} />
-                <CardAction icon={<Download className="h-4 w-4" />} label="Export Public Key" aria-label="Share my public key file" title="Save my public key file to share" onClick={() => void sharePublicKey()} />
-                <CardAction icon={<Save className="h-4 w-4" />} label="Export Private Key" disabled={!keyLocked || !backupFile} aria-label="Back up private key" title="Download my wallet-locked private key backup" onClick={() => { if (keyLocked && backupFile) download(`${account}-cheesecrypt-key-PRIVATE.json`, backupFile); }} />
-                <CardAction icon={<Ban className="h-4 w-4" />} label="Block List" aria-label="Blocked accounts" title="Accounts blocked on this device" onClick={() => setShowBlocked(true)} />
-                <CardAction icon={<KeyRound className="h-4 w-4" />} label="Create New Key" className="hover:text-destructive" aria-label="Create a new key" title="Create a new key (it cannot read messages sent to this one)" onClick={makeKey} />
-                <CardAction icon={<Globe className="h-4 w-4" />} label="Public groups" aria-label="Search public groups" title="Search public groups and ask to join" onClick={() => setRoomsOpen(true)} />
-                <PublicInboxButton enabled={publicInbox} onClick={() => setInboxOpen(true)} className="text-destructive" />
-                <CardAction icon={<Radio className="h-4 w-4" />} label="Publish key" className="text-destructive" disabled={busy} aria-label={`Publish my key on chain (${MESSAGE_FEE_QUANTITY})`} title={`Publish my key on chain (${MESSAGE_FEE_QUANTITY})`} onClick={() => void publish()} />
+                <CardAction icon={<RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />} label="Refresh" disabled={loading} aria-label="Refresh messages" title="Check the chain for new messages now" onClick={() => setConfirm({ title: '🔄 Refresh messages?', body: 'Check the chain for new messages now.', run: refresh })} />
+                <CardAction icon={<Download className="h-4 w-4" />} label="Import Private Key" aria-label="Load a key file (yours or a contact's)" title="Load a key file (yours or a contact's)" onClick={() => setConfirm({ title: '📥 Import private key?', body: "Load a key file from this device (yours or a contact's).", run: () => fileRef.current?.click() })} />
+                <CardAction icon={<Upload className="h-4 w-4" />} label="Export Public Key" aria-label="Share my public key file" title="Save my public key file to share" onClick={() => setConfirm({ title: '📤 Export public key?', body: 'Save your public key file so others can add you as a friend.', run: () => void sharePublicKey() })} />
+                <CardAction icon={<Save className="h-4 w-4" />} label="Export Private Key" disabled={!keyLocked || !backupFile} aria-label="Back up private key" title="Download my wallet-locked private key backup" onClick={() => setConfirm({ title: '🔐 Export private key?', body: 'Download your wallet-locked private key backup. Keep it safe — it is the only way to recover your messages.', run: () => { if (keyLocked && backupFile) download(`${account}-cheesecrypt-key-PRIVATE.json`, backupFile); } })} />
+                <CardAction icon={<Ban className="h-4 w-4" />} label="Block List" aria-label="Blocked accounts" title="Accounts blocked on this device" onClick={() => setConfirm({ title: '🚫 Open block list?', body: 'Show the accounts blocked on this device.', run: () => setShowBlocked(true) })} />
+                <CardAction icon={<KeyRound className="h-4 w-4" />} label="Create New Key" className="hover:text-destructive" aria-label="Create a new key" title="Create a new key (it cannot read messages sent to this one)" onClick={() => setConfirm({ title: '🔑 Create new key?', body: 'Create a new key. It cannot read messages sent to this one.', run: makeKey })} />
+                <CardAction icon={<Globe className="h-4 w-4" />} label="Public groups" aria-label="Search public groups" title="Search public groups and ask to join" onClick={() => setConfirm({ title: '🌐 Search public groups?', body: 'Browse the curated public group directory and ask to join.', run: () => setRoomsOpen(true) })} />
+                <PublicInboxButton enabled={publicInbox} onClick={() => setConfirm({ title: '📬 Open inbox settings?', body: 'Choose whether strangers can request to message you.', run: () => setInboxOpen(true) })} className="text-destructive" />
+                <CardAction icon={<Radio className="h-4 w-4" />} label="Publish key" className="text-destructive" disabled={busy} aria-label={`Publish my key on chain (${MESSAGE_FEE_QUANTITY})`} title={`Publish my key on chain (${MESSAGE_FEE_QUANTITY})`} onClick={() => setConfirm({ title: '📡 Publish key on chain?', body: `Publish your public key on the WAX blockchain for ${MESSAGE_FEE_QUANTITY} so friends can find you automatically.`, run: () => void publish() })} />
               </div>
             </PopoverContent>
           </Popover>
