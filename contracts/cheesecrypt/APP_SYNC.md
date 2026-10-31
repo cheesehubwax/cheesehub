@@ -23,7 +23,7 @@ or redeployment is required for these paths.
 | Mandatory Anchor-locked keys; legacy upgrade before use; locked-only backups | Client-only seal/unlock verification; no router changes; creation fee unchanged |
 | Private 8 / public 50; only owner admits (`cryptInviteGroups.ts`) | Client-only authenticated envelopes; router bounds 49 recipients per action, not total membership |
 | 35 membership parts, usual text 20 | Router hard bound 35; client keeps content-specific bounds |
-| CRYPTROOM1 listing stake 100.0000 (new/re-list), updates and unlisting 0.0100 (`cryptRooms.ts`) | Existing plaintext fee-leg broadcasts; no rooms table/action; no generic router fee substitution |
+| CRYPTROOM1 listing fee 100.0000 (new/re-list), updates and unlisting 0.0100 (`cryptRooms.ts`) | Existing plaintext fee-leg broadcasts; no rooms table/action; no generic router fee substitution |
 | Listing optional username (`u`), presentation only; creator identity stays transfer sender | Direct listing metadata; no router change |
 | Immutable first-public founder roster | Client-only encrypted policy replay |
 | Owner/admin appointment, mute, ban, collapse (`cryptModeration.ts`) | Client-only authenticated CG2 authority; NO moderation actions/tables |
