@@ -12,11 +12,11 @@ void cheesecrypt::send_token(const config& cfg, name to, const asset& qty, const
           std::make_tuple(get_self(), to, qty, memo)).send();
 }
 
-void cheesecrypt::pay_platform(const config& cfg, const asset& amount) {
+void cheesecrypt::pay_platform(const config& cfg, const asset& amount, const string& memo) {
    const int64_t nulled = crypt_router::null_units(amount.amount, cfg.null_percent);
    check(nulled >= 0, "invalid platform split");
-   send_token(cfg, cfg.null_account, asset(nulled, amount.symbol), "CHEESECrypt messaging fee");
-   send_token(cfg, cfg.liquidity_account, asset(amount.amount - nulled, amount.symbol), "CHEESECrypt messaging fee");
+   send_token(cfg, cfg.null_account, asset(nulled, amount.symbol), memo);
+   send_token(cfg, cfg.liquidity_account, asset(amount.amount - nulled, amount.symbol), memo);
 }
 
 asset cheesecrypt::platform_fee(const config& cfg, uint16_t parts) const {
@@ -106,9 +106,28 @@ void cheesecrypt::sendmsg(name sender, uint16_t parts, const vector<copy_t>& cop
    check(it->funds.amount >= total.amount, "payment does not cover the message fee");
    const int64_t change = it->funds.amount - total.amount;
    pend.erase(it);
-   pay_platform(cfg, fee);
+   pay_platform(cfg, fee, "CHEESECrypt messaging fee");
    for (const auto& c : copies) send_token(cfg, c.to, cfg.recipient_fee, c.memo);
    send_token(cfg, sender, asset(change, total.symbol), "CHEESECrypt change");
    // Any failed inline transfer rolls the entire transaction back atomically, including
    // the sender's payment, so the router never holds funds between transactions.
+}
+
+void cheesecrypt::payfee(name payer, asset fee, string memo) {
+   require_auth(payer);
+   const auto cfg = get_config();
+   check(!cfg.paused, "CHEESECrypt contract is paused");
+   check(fee.is_valid() && fee.symbol == cfg.token_symbol, "fee must be the configured CHEESE token");
+   check(crypt_router::valid_standalone_fee(fee.amount), "fee must be positive, bounded and split exactly 80/20");
+   check(!memo.empty() && memo.size() <= 256, "memo must be 1 to 256 bytes");
+   pending_t pend(get_self(), get_self().value);
+   auto it = pend.find(payer.value);
+   check(it != pend.end(), "pay the fee to this contract in the same transaction");
+   check(it->funds.symbol == fee.symbol, "symbol mismatch");
+   check(it->funds.amount >= fee.amount, "payment does not cover the fee");
+   // Consume exactly the fee. A remainder only exists when a sendmsg follows in this same transaction
+   // (it consumes the rest and refunds change); otherwise the client pays the exact fee and the row is erased.
+   if (it->funds.amount == fee.amount) pend.erase(it);
+   else pend.modify(it, same_payer, [&](auto& p) { p.funds -= fee; });
+   pay_platform(cfg, fee, memo);
 }

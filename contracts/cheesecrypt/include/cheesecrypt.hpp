@@ -50,10 +50,15 @@ public:
    void ontransfer(name from, name to, asset quantity, string memo);
    [[eosio::action]] void reclaim(name payer);
    [[eosio::action]] void sendmsg(name sender, uint16_t parts, const vector<copy_t>& copies);
+   // Standalone platform fee (key creation, key publishing, room listing/update/unlist). Consumes exactly
+   // `fee` from the payer's same-transaction payment and splits it 80/20 with `memo` on both legs.
+   // Any remainder stays pending for a following sendmsg in the same transaction (which refunds change);
+   // nothing is stored about the payer, the memo or what the fee was for.
+   [[eosio::action]] void payfee(name payer, asset fee, string memo);
 
 private:
    config get_config() const;
-   void pay_platform(const config& cfg, const asset& amount);
+   void pay_platform(const config& cfg, const asset& amount, const string& memo);
    void send_token(const config& cfg, name to, const asset& qty, const string& memo);
    asset platform_fee(const config& cfg, uint16_t parts) const;
 };
