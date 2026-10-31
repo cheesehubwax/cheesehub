@@ -79,7 +79,7 @@ describe('collecting listings', () => {
     expect(out.map(l => [l.creator, l.name])).toEqual([['carol', 'Wax art']]);
     expect(collectListings([...rows, stakeLeg('alice', encodeListing(room), 50)]).map(l => l.creator)).toEqual(['alice', 'carol']);
   });
-  it('a listing without the 10 CHEESE stake never appears; a 0.01 memo only updates a staked listing', () => {
+  it('a listing without the 100 CHEESE stake never appears; a 0.01 memo only updates a staked listing', () => {
     // Old-style cheap listing on its own: ignored.
     expect(collectListings([nullLeg('alice', encodeListing(room), 10)])).toEqual([]);
     // Stake, then a cheap update refreshes the details and bumps the time.
