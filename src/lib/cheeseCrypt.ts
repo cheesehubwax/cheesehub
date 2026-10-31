@@ -330,7 +330,7 @@ type TransferAction = { account: string; name: string; authorization: unknown; d
  * `crypt.cheese::payfee` only once the contract version with that action is deployed. Until then
  * they stay direct, so live wallets never sign an action the deployed contract does not have.
  */
-export const CRYPT_PAYFEE_LIVE = false;
+export const CRYPT_PAYFEE_LIVE = true;
 
 /**
  * Converts a direct CHEESECrypt transaction into one exact payment to `crypt.cheese` followed by
