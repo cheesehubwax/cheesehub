@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
 import { fetchRoomMemos } from '@/lib/cheeseCrypt';
 import { collectListings, ROOM_PREFIX } from '@/lib/cryptRooms';
+import { collectReports, REPORT_PREFIX, REPORT_REASONS, type ReportReason } from '@/lib/cryptRoomReports';
 import { activeHides, buildHideAction, fetchRoomHides, HIDE_QUANTITY, hideEntry, isSuppressed, type HideTarget } from '@/lib/cryptRoomDenylist';
 
 type Pending = { target: HideTarget; hidden: boolean; label: string };
@@ -33,6 +34,7 @@ export function CryptRoomModerationPanel() {
     const w = q.toLowerCase().trim();
     return (rooms.data ?? []).filter(l => !w || `${l.name} ${l.topic} ${l.creator} ${l.id}`.toLowerCase().includes(w));
   }, [rooms.data, q]);
+  const reports = useQuery({ queryKey: ['admin-crypt-reports'], queryFn: async () => collectReports(await fetchRoomMemos(REPORT_PREFIX)), staleTime: 60_000, retry: false });
   const accountHides = (hides.data ?? []).filter(h => h.hidden && h.id === '*');
 
   const submit = async () => {
@@ -61,14 +63,39 @@ export function CryptRoomModerationPanel() {
     <CardHeader>
       <CardTitle className="flex items-center justify-between gap-2">
         <span>🔐 CHEESECrypt public rooms</span>
-        <Button size="icon" variant="outline" aria-label="Refresh rooms" disabled={rooms.isFetching || hides.isFetching} onClick={() => { void rooms.refetch(); void hides.refetch(); }}>
-          {rooms.isFetching || hides.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+        <Button size="icon" variant="outline" aria-label="Refresh rooms" disabled={rooms.isFetching || hides.isFetching || reports.isFetching} onClick={() => { void rooms.refetch(); void hides.refetch(); void reports.refetch(); }}>
+          {rooms.isFetching || hides.isFetching || reports.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
         </Button>
       </CardTitle>
       <CardDescription>Hide a room from the CHEESECrypt directory for every visitor. Each hide or restore is a public {HIDE_QUANTITY} nulled transfer from your admin account. The listing itself stays on the blockchain and its members can keep chatting.</CardDescription>
     </CardHeader>
     <CardContent className="space-y-4">
       {hides.isError && <p className="text-sm text-destructive">Couldn't read the current hide list. Refresh before making changes.</p>}
+      <section className="space-y-2 rounded-md border border-destructive/40 bg-destructive/5 p-3" aria-label="Reported rooms">
+        <p className="text-sm font-semibold">🚩 Reported rooms ({reports.data?.length ?? 0})</p>
+        <p className="text-xs text-muted-foreground">In-app reports from users (one per reporter per room; owners can't report their own room). Reports never hide anything by themselves. Recent reports only; also check Telegram and cheesehub@protonmail.com.</p>
+        {reports.isError && <p className="text-xs text-destructive">Couldn't load reports. Refresh to try again.</p>}
+        {reports.isLoading && <p className="text-xs text-muted-foreground">Loading reports…</p>}
+        {reports.data && !reports.data.length && <p className="text-xs text-muted-foreground">No reports.</p>}
+        <ul className="max-h-[320px] space-y-2 overflow-y-auto">
+          {(reports.data ?? []).map(r => {
+            const l = rooms.data?.find(x => x.creator === r.creator && x.id === r.id);
+            const hidden = isSuppressed(r, active);
+            const name = l?.name ?? '(listing not found)';
+            return <li key={`${r.creator}:${r.id}`} className={`flex items-center justify-between gap-3 rounded-md border border-border bg-background/50 p-2 ${hidden ? 'opacity-60' : ''}`}>
+              <div className="min-w-0 text-xs">
+                <div className="break-words text-sm font-semibold text-cheese">{name}</div>
+                <div className="truncate text-muted-foreground">by {r.creator} · {r.id}</div>
+                <div><span className="font-semibold text-destructive">{r.reporters} reporter{r.reporters === 1 ? '' : 's'}</span> · {(Object.entries(r.reasons) as unknown as [string, number][]).map(([k, n]) => `${REPORT_REASONS[Number(k) as ReportReason]} ×${n}`).join(', ')}</div>
+                <div className="text-muted-foreground">Latest {new Date(r.latest).toLocaleString()} · from {r.reports.slice(0, 5).map(x => x.reporter).join(', ')}{r.reports.length > 5 ? '…' : ''}</div>
+              </div>
+              {hidden ? <span className="shrink-0 text-xs text-destructive">Already hidden</span>
+                : <Button size="sm" variant="destructive" disabled={!session || hides.isError}
+                  onClick={() => setPending({ target: { creator: r.creator, id: r.id }, hidden: true, label: `"${name}" by ${r.creator}` })}>Hide</Button>}
+            </li>;
+          })}
+        </ul>
+      </section>
       <Input placeholder="Search room name, topic, creator or ID" aria-label="Search public rooms" value={q} onChange={e => setQ(e.target.value)} />
       <ul className="max-h-[420px] space-y-2 overflow-y-auto" aria-label="Public rooms">
         {!shown.length && <li className="py-4 text-center text-sm text-muted-foreground">{rooms.isLoading ? 'Loading rooms…' : rooms.isError ? "Couldn't load rooms." : 'No listed rooms.'}</li>}
