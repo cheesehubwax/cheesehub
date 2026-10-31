@@ -104,7 +104,7 @@ function ChatTypesAndRoles() {
             ['Earlier messages', 'Whole conversation', 'Newcomers do not see earlier messages', 'Newcomers do not see earlier messages'],
           ]}
         />
-        <p className="pl-3.5 text-sm leading-relaxed text-muted-foreground">Messages stay in the chat they were sent to: group and room messages never appear in private chats, and private chats never appear in groups. A private group must be listed publicly to grow past 8. Everyone who was a member when the room was first listed becomes a permanent Founder.</p>
+        <p className="pl-3.5 text-sm leading-relaxed text-muted-foreground">A private group must be listed publicly to grow past 8. Everyone who was a member when the room was first listed becomes a permanent Founder.</p>
       </section>
 
       <section className="space-y-2">
@@ -161,7 +161,7 @@ function PrivacyAndResponsibility() {
       </section>
       <section className="space-y-2">
         <Heading>Public rooms and takedowns</Heading>
-        <p className={p}>CHEESECrypt exists for private messaging; public room listings are an optional extra. The public room directory is curated: only CHEESEHub admins can list rooms in it, and everyone else creates private rooms and groups by invitation. Listings by other accounts may exist on the blockchain but are never shown in CHEESEHub. CHEESEHub actively watches its public room list and hides illegal or abusive rooms on its own initiative, ideally before anyone needs to report them. Every valid takedown notice or report is acted on promptly, and CHEESEHub will never ignore one. CHEESEHub may also turn off public room creation and listing at any time. Hiding removes a room from CHEESEHub only; it stays on the blockchain and may still appear on other websites. To report a room, including its owner or admins, use the 🚩 Report button on the room (fastest), contact the moderation team in the official <a href={REPORT_URL} target="_blank" rel="noopener noreferrer" className="text-cheese underline">CHEESE Telegram group</a> (fast), or email <a href="mailto:cheesehub@protonmail.com" className="text-cheese underline">cheesehub@protonmail.com</a> (slower; best for formal notices). These reports go to CHEESEHub, not the room's owner.</p>
+        <p className={p}>CHEESECrypt exists for private messaging; public room listings are an optional extra. The public room directory is curated: only CHEESEHub admins can list rooms in it, and everyone else creates private rooms and groups by invitation. To report a room, including its owner or admins, use the 🚩 Report button on the room (fastest), contact the moderation team in the official <a href={REPORT_URL} target="_blank" rel="noopener noreferrer" className="text-cheese underline">CHEESE Telegram group</a> (fast), or email <a href="mailto:cheesehub@protonmail.com" className="text-cheese underline">cheesehub@protonmail.com</a> (slower; best for formal notices). These reports go to CHEESEHub, not the room's owner.</p>
         <p className={p}>Read the full <Link to="/terms" className="text-cheese underline">Terms of Use</Link>.</p>
       </section>
     </>
