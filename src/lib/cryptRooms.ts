@@ -7,7 +7,7 @@
 import { decodeBase64 } from 'tweetnacl-util';
 import { parseCryptName } from '@/lib/cryptNames';
 import {
-  assembleMessages, bytesToText, buildCryptFeeActions, buildSendMessageActions, decryptMemoBytes, encryptMemo, KEY_PUBLISH_TO, MEMO_MAX_BYTES, MESSAGE_FEE_QUANTITY,
+  assembleMessages, bytesToText, buildCryptFeeActions, CRYPT_ROUTER_ACCOUNT, buildSendMessageActions, decryptMemoBytes, encryptMemo, KEY_PUBLISH_TO, MEMO_MAX_BYTES, MESSAGE_FEE_QUANTITY,
   messageCost, msgPrefixOf, type ChainMemo, type MessagingKey,
 } from '@/lib/cheeseCrypt';
 import { encodeNotice, JOIN_NOTE_MAX, isCg2, MAX_PUBLIC_ROOM_MEMBERS, parseCg2, type Cg2Event, type RoomInviter } from '@/lib/cryptInviteGroups';
@@ -133,7 +133,7 @@ const paidUnits = (quantity: string) => {
  */
 export function collectListings(transfers: ChainMemo[]): RoomListing[] {
   const events = transfers
-    .map(t => ({ t, r: t.to === KEY_PUBLISH_TO && ACCOUNT.test(t.from) ? parseRoomMemo(t.memo) : null, units: paidUnits(t.quantity) }))
+    .map(t => ({ t, r: t.to === KEY_PUBLISH_TO && ACCOUNT.test(t.from) && t.from !== CRYPT_ROUTER_ACCOUNT ? parseRoomMemo(t.memo) : null, units: paidUnits(t.quantity) }))
     .filter((x): x is { t: ChainMemo; r: RoomMemo; units: number } => !!x.r && x.units >= ROOM_NULL_UNITS)
     .sort((a, b) => a.t.time - b.t.time || (a.r.kind === 'unlist' ? 1 : 0) - (b.r.kind === 'unlist' ? 1 : 0));
   const state = new Map<string, { paid: boolean; listing: RoomListing | null }>();
