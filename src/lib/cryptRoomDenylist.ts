@@ -91,3 +91,22 @@ export function cachedHides(): string[] {
 export function buildHideAction(admin: string, auth: unknown[], target: HideTarget, hidden: boolean) {
   return { account: 'cheeseburger', name: 'transfer', authorization: auth, data: { from: admin, to: KEY_PUBLISH_TO, quantity: HIDE_QUANTITY, memo: encodeHide(target, hidden) } };
 }
+
+/**
+ * Curated directory: only rooms listed by CHEESEHub admins (cheesebannad admins table, or cheesebannad itself)
+ * appear in Discover. Display-only; anyone can still write a listing memo on chain, CHEESEHub just never shows it.
+ * Fails closed: with no admin list known, nothing is shown.
+ */
+const CURATORS_CACHE_KEY = 'cheesecrypt-room-curators-v1';
+export const curatorSet = (admins: readonly string[]) => new Set([...admins.filter(a => ACCOUNT.test(a)), PLATFORM_ACCOUNT]);
+export function filterCuratedListings<T extends Pick<RoomListing, 'creator'>>(listings: T[], curators: ReadonlySet<string>): T[] {
+  return listings.filter(l => curators.has(l.creator));
+}
+export async function fetchRoomCurators(): Promise<string[]> {
+  const admins = (await fetchBannadAdmins()).map(a => a.account).filter(a => ACCOUNT.test(a));
+  try { localStorage.setItem(CURATORS_CACHE_KEY, JSON.stringify(admins)); } catch { /* storage blocked */ }
+  return admins;
+}
+export function cachedCurators(): string[] {
+  try { const v = JSON.parse(localStorage.getItem(CURATORS_CACHE_KEY) ?? '[]'); return Array.isArray(v) ? v.filter((a: unknown) => typeof a === 'string' && ACCOUNT.test(a)) : []; } catch { return []; }
+}

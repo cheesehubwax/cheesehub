@@ -75,8 +75,8 @@ export function DiscoverRoomsDialog({ open, onOpenChange, listings, loading, ref
  *  group update can never be mistaken for a listing update. A fresh listing pays the 100.0000 CHEESE
  *  anti-spam listing fee; updating a listed room's details and unlisting pay the normal room fee.
  *  One Terms box gates every paid button; each button shows its own cost. */
-export function RoomSettingsDialog({ groupId, groupName, groupAvatar, members, publicKey, creatorName, listed, busy, metaCost, onNameChange, onPaint, onUpdateMeta, onList, onUnlist, onEditLog, onClose, listCost = LISTING_FEE_QUANTITY, updateCost = ROOM_FEE_QUANTITY, unlistCost = ROOM_FEE_QUANTITY, initialName, initialTopic = '', initialTags = [] }: {
-  groupId: string; groupName: string; groupAvatar?: CryptAvatar; members: number; publicKey: string; listed: boolean; busy: boolean;
+export function RoomSettingsDialog({ groupId, groupName, groupAvatar, members, publicKey, creatorName, listed, canList = true, busy, metaCost, onNameChange, onPaint, onUpdateMeta, onList, onUnlist, onEditLog, onClose, listCost = LISTING_FEE_QUANTITY, updateCost = ROOM_FEE_QUANTITY, unlistCost = ROOM_FEE_QUANTITY, initialName, initialTopic = '', initialTags = [] }: {
+  groupId: string; groupName: string; groupAvatar?: CryptAvatar; members: number; publicKey: string; listed: boolean; canList?: boolean; busy: boolean;
   metaCost: string; onNameChange: (name: string) => void; onPaint: () => void; onUpdateMeta: () => Promise<boolean>;
   onList: (info: { name: string; topic: string; tags: string[] }) => Promise<boolean>; onUnlist: () => Promise<boolean>; onClose: () => void;
   listCost?: string; updateCost?: string; unlistCost?: string; initialName?: string; initialTopic?: string; initialTags?: string[];
@@ -109,6 +109,10 @@ export function RoomSettingsDialog({ groupId, groupName, groupAvatar, members, p
       <hr className="border-border" />
       <section className="space-y-2" aria-label="Public listing">
         <p className="text-[10px] font-bold uppercase tracking-wider text-cheese">🌐 Public listing</p>
+        {!canList ? <>
+        <p className="text-[11px] text-muted-foreground">Public rooms are curated: only CHEESEHub admins can list rooms in the public directory. Your room stays private and only people you invite can join.{listed ? ' This room was listed earlier but is no longer shown in CHEESEHub. You can still unlist it.' : ''}</p>
+        {listed && <Button size="sm" variant="outline" disabled={busy || !agreed} onClick={() => void onUnlist()}>{busy ? 'Sending…' : `Pay & unlist (${unlistCost})`}</Button>}
+        </> : <>
         <p className="text-[11px] text-muted-foreground">{listed
           ? 'This room is listed publicly, so anyone can find it and ask to join. Requests appear at the top of your sidebar.'
           : 'Not listed. Only people you invite can find this room. Listing publishes the room name, topic, tags, member count, your username and public key on chain so others can ask to join; the member list and messages are never published.'}</p>
@@ -125,6 +129,7 @@ export function RoomSettingsDialog({ groupId, groupName, groupAvatar, members, p
           {listed && <Button size="sm" variant="outline" disabled={busy || !agreed} onClick={() => void onUnlist()}>{busy ? 'Sending…' : `Pay & unlist (${unlistCost})`}</Button>}
           <Button size="sm" disabled={busy || !agreed || !!error} onClick={() => void onList(info)}>{busy ? 'Sending…' : listed ? `Update details (${updateCost})` : `Pay & list room (${listCost})`}</Button>
         </div>
+        </>}
       </section>
       {onEditLog && <Button variant="outline" size="sm" onClick={onEditLog}>✏️ Edited messages</Button>}
       <TermsCheckbox id="crypt-room-settings-terms" checked={agreed} onCheckedChange={setAgreed} />
