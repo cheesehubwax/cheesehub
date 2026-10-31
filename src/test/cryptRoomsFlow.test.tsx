@@ -18,7 +18,7 @@ vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import
 const alice = generateKey('alice'), bob = generateKey('bob'), carol = generateKey('carol');
 const ID = '00112233445566ff';
 const invite: InviteGroup = { id: ID, name: 'Cheese club', creator: 'alice', created: 1000, members: [alice, bob].map(k => ({ account: k.account, publicKey: k.publicKey })) };
-const listing = { txId: 'list', time: 50, from: 'alice', to: 'eosio.null', quantity: '8.0000 CHEESE', memo: encodeListing({ id: ID, name: 'Cheese club', topic: 'All cheese', tags: ['cheese'], publicKey: alice.publicKey, members: 1 }) };
+const listing = { txId: 'list', time: 50, from: 'alice', to: 'eosio.null', quantity: '80.0000 CHEESE', memo: encodeListing({ id: ID, name: 'Cheese club', topic: 'All cheese', tags: ['cheese'], publicKey: alice.publicKey, members: 1 }) };
 const joinMemo = { txId: 'join', time: 100, from: 'carol', to: 'alice', quantity: '0.0010 CHEESE', memo: encryptMemo(encodeNotice('join', ID), alice.publicKey, carol.secretKey) };
 const mount = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><Messenger account="alice" session={{ actor: 'alice', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} /></QueryClientProvider>);
 

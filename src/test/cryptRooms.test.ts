@@ -45,8 +45,8 @@ describe('room fee', () => {
       ['eosio.null', '0.0080 CHEESE', memo], ['xcheeseliqst', '0.0020 CHEESE', memo],
     ]);
   });
-  it('a new public listing pays the 10.0000 CHEESE stake: 8.0000 to eosio.null and 2.0000 to xcheeseliqst', () => {
-    expect(LISTING_STAKE_QUANTITY).toBe('10.0000 CHEESE');
+  it('a new public listing pays the 100.0000 CHEESE stake: 80.0000 to eosio.null and 20.0000 to xcheeseliqst', () => {
+    expect(LISTING_STAKE_QUANTITY).toBe('100.0000 CHEESE');
     const memo = encodeListing(room);
     const actions = buildRoomActions('alice', memo, [], LISTING_STAKE_QUANTITY);
     expect(actions.map(a => [a.data.to, a.data.quantity, a.data.memo])).toEqual([
