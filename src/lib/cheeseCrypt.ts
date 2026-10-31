@@ -454,7 +454,7 @@ export function buildPublishKeyActions(from: string, publicKey: string, auth: un
 
 export interface ChainMemo { txId: string; time: number; from: string; to: string; memo: string; quantity: string }
 
-async function hyperionTransfers(query: string): Promise<ChainMemo[]> {
+async function hyperionActions(query: string): Promise<any[]> {
   let lastErr: unknown = null;
   for (const raw of await resolveEndpoints('hyperion-v2')) {
     const base = normalizeEndpoint(raw);
@@ -464,22 +464,57 @@ async function hyperionTransfers(query: string): Promise<ChainMemo[]> {
       const r = await fetch(`${base}/v2/history/get_actions?${query}`, { signal: ctl.signal }).finally(() => clearTimeout(t));
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json();
-      return (j.actions || []).map((a: any) => ({
-        txId: a.trx_id, time: Date.parse((a['@timestamp'] || a.timestamp) + 'Z'),
-        from: a.act?.data?.from, to: a.act?.data?.to, memo: a.act?.data?.memo || '',
-        quantity: a.act?.data?.quantity || '',
-      }));
+      return Array.isArray(j.actions) ? j.actions : [];
     } catch (e) { lastErr = e; benchEndpoint(base); }
   }
   throw lastErr instanceof Error ? lastErr : new Error('History lookup failed');
 }
+
+const actionTime = (a: any) => Date.parse((a['@timestamp'] || a.timestamp) + 'Z');
+
+async function hyperionTransfers(query: string): Promise<ChainMemo[]> {
+  return (await hyperionActions(query)).map((a: any) => ({
+    txId: a.trx_id, time: actionTime(a),
+    from: a.act?.data?.from, to: a.act?.data?.to, memo: a.act?.data?.memo || '',
+    quantity: a.act?.data?.quantity || '',
+  }));
+}
+
+/**
+ * `crypt.cheese::payfee` actions as the equivalent direct eosio.null fee leg: the payer comes only from
+ * the action data and must have authorized it (the contract requires it); the quantity is the 80% leg the
+ * contract sent, so existing listing/key readers apply unchanged. Malformed actions are dropped.
+ */
+export function expandPayfeeActions(actions: any[]): ChainMemo[] {
+  const out: ChainMemo[] = [];
+  for (const a of actions) {
+    const act = a?.act;
+    if (act?.account !== CRYPT_ROUTER_ACCOUNT || act.name !== 'payfee') continue;
+    const payer = act.data?.payer, fee = act.data?.fee, memo = act.data?.memo;
+    if (typeof payer !== 'string' || typeof memo !== 'string' || !memo || typeof fee !== 'string') continue;
+    if (!Array.isArray(act.authorization) || !act.authorization.some((x: { actor?: string }) => x?.actor === payer)) continue;
+    if (!/^\d+\.\d{4} CHEESE$/.test(fee)) continue;
+    const u = units(fee);
+    if (!Number.isSafeInteger(u) || u <= 0 || u % 5 !== 0) continue;
+    out.push({ txId: a.trx_id, time: actionTime(a), from: payer, to: KEY_PUBLISH_TO, memo, quantity: `${(u * 4 / 5 / 10000).toFixed(4)} CHEESE` });
+  }
+  return out;
+}
+
+const PAYFEE_FILTER = `filter=${CRYPT_ROUTER_ACCOUNT}:payfee`;
+const newestFirst = (rows: ChainMemo[]) => rows.sort((a, b) => b.time - a.time);
 
 // Continue reading legacy WAX messages and published keys.
 const FILTER = 'filter=eosio.token:transfer,cheeseburger:transfer';
 
 /** Newest key the account published on chain (new or legacy prefix), if any. */
 export async function lookupPublishedKey(account: string): Promise<string | null> {
-  return newestPublishedKey(account, await hyperionTransfers(`account=${account}&${FILTER}&transfer.to=${KEY_PUBLISH_TO}&sort=desc&limit=100`));
+  // Direct legacy publishes plus router payfee publishes; both must load so a newer key is never missed.
+  const [direct, routed] = await Promise.all([
+    hyperionTransfers(`account=${account}&${FILTER}&transfer.to=${KEY_PUBLISH_TO}&sort=desc&limit=100`),
+    hyperionActions(`account=${account}&${PAYFEE_FILTER}&sort=desc&limit=100`).then(expandPayfeeActions),
+  ]);
+  return newestPublishedKey(account, newestFirst([...direct, ...routed]));
 }
 
 /** Rows are newest first; the first valid key memo from the account wins, whichever prefix it uses. */
@@ -525,18 +560,27 @@ export async function fetchMessages(account: string, pages = 1): Promise<ChainMe
 export const ROOM_SCAN_PAGES = 4;
 /** Recent CHEESE transfers to eosio.null whose memo starts with `prefix` (bounded, newest first, deduped). */
 export async function fetchRoomMemos(prefix: string, pages = ROOM_SCAN_PAGES): Promise<ChainMemo[]> {
-  let rows: ChainMemo[] = [];
-  let before: string | null = null;
-  for (let p = 0; p < Math.max(1, pages); p++) {
-    const page = await hyperionTransfers(`account=${KEY_PUBLISH_TO}&filter=cheeseburger:transfer&transfer.to=${KEY_PUBLISH_TO}&sort=desc&limit=${HISTORY_PAGE}${before ? `&before=${encodeURIComponent(before)}` : ''}`);
-    rows = rows.concat(page);
-    if (page.length < HISTORY_PAGE) break;
-    const oldest = Math.min(...page.map(r => r.time).filter(Number.isFinite));
-    if (!Number.isFinite(oldest)) break;
-    before = new Date(oldest).toISOString();
-  }
+  const scan = async (query: string, read: (q: string) => Promise<ChainMemo[]>) => {
+    let rows: ChainMemo[] = [];
+    let before: string | null = null;
+    for (let p = 0; p < Math.max(1, pages); p++) {
+      const page = await read(`${query}&sort=desc&limit=${HISTORY_PAGE}${before ? `&before=${encodeURIComponent(before)}` : ''}`);
+      rows = rows.concat(page);
+      if (page.length < HISTORY_PAGE) break;
+      const oldest = Math.min(...page.map(r => r.time).filter(Number.isFinite));
+      if (!Number.isFinite(oldest)) break;
+      before = new Date(oldest).toISOString();
+    }
+    return rows;
+  };
+  const [direct, routed] = await Promise.all([
+    scan(`account=${KEY_PUBLISH_TO}&filter=cheeseburger:transfer&transfer.to=${KEY_PUBLISH_TO}`, hyperionTransfers),
+    // Payfee pages are counted in actions (one per fee), so the same page bound applies.
+    scan(`account=${CRYPT_ROUTER_ACCOUNT}&${PAYFEE_FILTER}`, async q => expandPayfeeActions(await hyperionActions(q))),
+  ]);
   const seen = new Set<string>();
-  return rows.filter(r => {
+  // Router-sent legs are attributed only through their payfee action, never to crypt.cheese itself.
+  return newestFirst([...direct.filter(r => r.from !== CRYPT_ROUTER_ACCOUNT), ...routed]).filter(r => {
     if (r.to !== KEY_PUBLISH_TO || !r.memo.startsWith(prefix)) return false;
     const id = `${r.txId}:${r.from}:${r.memo}`;
     if (seen.has(id)) return false;
