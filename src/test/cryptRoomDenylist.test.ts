@@ -1,23 +1,32 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { filterVisibleListings, isSuppressed, loadLocalHides, saveLocalHides } from '@/lib/cryptRoomDenylist';
+import { describe, expect, it } from 'vitest';
+import { activeHides, collectHides, encodeHide, filterVisibleListings, parseHide } from '@/lib/cryptRoomDenylist';
+import type { ChainMemo } from '@/lib/cheeseCrypt';
 
-const a = { creator: 'dr.cheese', id: '8159da67cc9ab1fd' };
-const b = { creator: 'bum.gpk', id: '0123456789abcdef' };
-const c = { creator: 'bum.gpk', id: 'fedcba9876543210' };
+const room = { creator: 'dr.cheese', id: '8159da67cc9ab1fd' };
+const other = { creator: 'bum.gpk', id: '0123456789abcdef' };
+const leg = (from: string, memo: string, time: number, to = 'eosio.null'): ChainMemo => ({ from, to, memo, time, txId: `t${time}`, quantity: '0.0001 CHEESE' });
 
-describe('room directory suppression', () => {
-  beforeEach(() => localStorage.clear());
-  it('hides one exact room', () => {
-    expect(filterVisibleListings([a, b, c], ['bum.gpk:0123456789abcdef'])).toEqual([a, c]);
+describe('admin room hides', () => {
+  it('an admin hide removes the room for everyone', () => {
+    const hides = activeHides(collectHides([leg('fragglerockk', encodeHide(room, true), 1)], ['fragglerockk']));
+    expect(filterVisibleListings([room, other], hides)).toEqual([other]);
   });
-  it('a creator wildcard hides every room by that account', () => {
-    expect(filterVisibleListings([a, b, c], ['bum.gpk:*'])).toEqual([a]);
+  it('a non-admin hide memo is ignored', () => {
+    expect(activeHides(collectHides([leg('mallory', encodeHide(room, true), 1)], ['fragglerockk']))).toEqual([]);
   });
-  it('nothing is hidden without entries', () => {
-    expect(isSuppressed(a, [])).toBe(false);
+  it('a hide not sent to eosio.null is ignored', () => {
+    expect(activeHides(collectHides([leg('fragglerockk', encodeHide(room, true), 1, 'someone')], ['fragglerockk']))).toEqual([]);
   });
-  it('local hides persist and drop malformed entries', () => {
-    saveLocalHides(['dr.cheese:8159da67cc9ab1fd', 'junk', 'dr.cheese:8159da67cc9ab1fd']);
-    expect(loadLocalHides()).toEqual(['dr.cheese:8159da67cc9ab1fd']);
+  it('a later restore wins over an earlier hide, from any admin', () => {
+    const rows = [leg('fragglerockk', encodeHide(room, true), 1), leg('qu.ug.wam', encodeHide(room, false), 2)];
+    expect(activeHides(collectHides(rows, ['fragglerockk', 'qu.ug.wam']))).toEqual([]);
+  });
+  it('a whole-account hide removes every room by that creator', () => {
+    const hides = activeHides(collectHides([leg('cheesebannad', encodeHide({ creator: 'bum.gpk', id: '*' }, true), 1)], []));
+    expect(filterVisibleListings([room, other, { creator: 'bum.gpk', id: 'fedcba9876543210' }], hides)).toEqual([room]);
+  });
+  it('malformed hide memos are rejected', () => {
+    expect(parseHide('CRYPTHIDE1:{"c":"BAD","i":"*","h":1}')).toBeNull();
+    expect(parseHide('CRYPTHIDE1:{"c":"bum.gpk","i":"xyz","h":1}')).toBeNull();
   });
 });
