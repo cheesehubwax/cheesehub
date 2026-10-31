@@ -14,7 +14,7 @@ type Notice = { kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'profile'; i
 /** Chat title bar: friend or group title, Members dropdown and per-chat actions. State lives in Messenger. */
 export function CryptChatHeader({
   account, active, activeGroup, activeInvite, keyAvatar, avatars, contacts, blocked, friendDeclines, setFriendDeclines,
-  nameFor, membersOpen, setMembersOpen, setPendingNotice, setEditingInvite, setEditingFriend, saveFriend, blockAccount, admins = [],
+  nameFor, membersOpen, setMembersOpen, setPendingNotice, setEditingInvite, setEditingFriend, saveFriend, blockAccount, admins = [], onReportRoom,
 }: {
   account: string; active: string | null; activeGroup: CryptGroup | undefined; activeInvite: InviteGroupView | undefined;
   keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>; contacts: Record<string, string>; blocked: string[];
@@ -24,6 +24,8 @@ export function CryptChatHeader({
   saveFriend: (name: string, ask: boolean) => Promise<unknown>; blockAccount: (name: string) => void;
   /** Current public-room admins (badge only). */
   admins?: string[];
+  /** Report this public room to CHEESEHub moderators (covers owner/admin misconduct). */
+  onReportRoom?: () => void;
 }) {
   const memberLine = (member: string, status?: string, action?: ReactNode) => (
     <li key={member} className="flex items-center gap-2 min-w-0">
@@ -70,6 +72,7 @@ export function CryptChatHeader({
                     })}
                   {activeInvite.isCreator && activeInvite.status === 'joined' && <Button size="sm" variant="ghost" className="h-7 text-xs font-normal" onClick={() => setEditingInvite({ id: activeInvite.invite.id, name: activeInvite.name, avatar: activeInvite.avatar })}><Pencil className="h-3 w-3" /> Edit group</Button>}
                   {activeInvite.status === 'joined' && <Button size="sm" variant="ghost" className="h-7 text-xs font-normal" title="Send your current name and picture to everyone in this group, including people who aren't your friends" onClick={() => setPendingNotice({ kind: 'profile', id: activeInvite.invite.id })}>📣 Share my profile</Button>}
+                  {onReportRoom && <Button size="sm" variant="ghost" className="h-7 text-xs font-normal" title="Report this room, including its owner or admins, to the CHEESEHub moderation team" onClick={onReportRoom}>🚩 Report room</Button>}
                   {activeInvite.status === 'joined' && <Button size="sm" variant="ghost" className="h-7 text-xs font-normal text-destructive hover:text-destructive" onClick={() => setPendingNotice({ kind: 'leave', id: activeInvite.invite.id })}>🚪 Leave group</Button>}
                 </span>
               </div>
