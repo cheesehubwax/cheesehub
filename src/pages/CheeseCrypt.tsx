@@ -66,7 +66,7 @@ import { CryptComposer } from '@/components/crypt/CryptComposer';
 import { DiscoverRoomsDialog, JoinRequests, RoomSettingsDialog } from '@/components/crypt/PublicRooms';
 import { fetchRoomMemos } from '@/lib/cheeseCrypt';
 import {
-  JOIN_REQUEST_COST, LISTING_STAKE_QUANTITY, ROOM_FEE_QUANTITY, buildJoinRequestActions, buildRoomActions, collectJoinRequests, collectListings, decodeRoomEvents, declineJoin, removeRoomRequest, roomRequestOutcomes, roomRequestNotes, encodeListing, encodeUnlist, listedRoomIds, loadJoinDeclines,
+  JOIN_REQUEST_COST, LISTING_FEE_QUANTITY, ROOM_FEE_QUANTITY, buildJoinRequestActions, buildRoomActions, collectJoinRequests, collectListings, decodeRoomEvents, declineJoin, removeRoomRequest, roomRequestOutcomes, roomRequestNotes, encodeListing, encodeUnlist, listedRoomIds, loadJoinDeclines,
   loadLocalListings, loadRoomInfo, loadRoomRequests, ROOM_PREFIX, saveLocalListing, saveRoomInfo, saveRoomRequest, type JoinRequest, type RoomListing,
 } from '@/lib/cryptRooms';
 
@@ -1276,16 +1276,16 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const protectedMembers = moderation[id]?.protected ?? v.invite.members.map(m => m.account);
     const payload = encodeRoomPolicy(id, true, protectedMembers);
     const to = v.invite.members.map(m => m.account).filter(a => a !== account);
-    // A room that is already listed pays the cheap update fee; a fresh (or re-)listing pays the 10 CHEESE stake.
+    // A room that is already listed pays the cheap update fee; a fresh (or re-)listing pays the 100 CHEESE listing fee.
     const isUpdate = listedIds.has(id);
-    return sendRoomPolicy(v, memo, payload, to, true, isUpdate ? ROOM_FEE_QUANTITY : LISTING_STAKE_QUANTITY);
+    return sendRoomPolicy(v, memo, payload, to, true, isUpdate ? ROOM_FEE_QUANTITY : LISTING_FEE_QUANTITY);
   };
   const sendRoomPolicy = async (v: InviteGroupView, memo: string, payload: string, to: string[], listed: boolean, feeQuantity = ROOM_FEE_QUANTITY) => {
     if (!key || busy) return false;
     setBusy(true);
     try {
       const actions = [...buildRoomActions(account, memo, [permission], feeQuantity), ...buildCg2Actions(key, to, keysOf(v.invite), payload, [permission])];
-      const r = await executeTransaction(actions, { successTitle: listed ? (feeQuantity === LISTING_STAKE_QUANTITY ? 'Room listed' : 'Listing updated') : 'Room unlisted' });
+      const r = await executeTransaction(actions, { successTitle: listed ? (feeQuantity === LISTING_FEE_QUANTITY ? 'Room listed' : 'Listing updated') : 'Room unlisted' });
       if (!r.success || !r.txId) return false;
       setLocalListings(saveLocalListing(account, v.invite.id, listed));
       await refresh(); void refetchRooms();
@@ -1495,7 +1495,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         return <RoomSettingsDialog groupId={v.invite.id} groupName={editingInvite.name} groupAvatar={editingInvite.avatar}
           members={Math.max(1, v.joined.length)} publicKey={key.publicKey} creatorName={key.displayName} listed={isListed} busy={busy}
           metaCost={metaCost} onNameChange={name => setEditingInvite({ ...editingInvite, name })} onPaint={() => setPaintingInvite(true)} onUpdateMeta={confirmMeta}
-          listCost={fee(LISTING_STAKE_QUANTITY)} updateCost={fee(ROOM_FEE_QUANTITY)} unlistCost={fee(ROOM_FEE_QUANTITY)}
+          listCost={fee(LISTING_FEE_QUANTITY)} updateCost={fee(ROOM_FEE_QUANTITY)} unlistCost={fee(ROOM_FEE_QUANTITY)}
           initialName={current?.name ?? v.name} initialTopic={(current ?? saved)?.topic ?? ''} initialTags={(current ?? saved)?.tags ?? []}
           onList={info => listRoom(v.invite.id, info)} onUnlist={() => unlistRoom(v.invite.id)}
           onEditLog={v.isCreator && isListed ? () => setEditLogRoom(v.invite.id) : undefined}

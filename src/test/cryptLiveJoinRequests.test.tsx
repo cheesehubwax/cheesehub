@@ -32,7 +32,7 @@ beforeEach(async () => {
   calls.dismiss.mockImplementation((id: string) => { calls.pending.delete(id); });
   await saveKey(alice); saveContact('alice', 'bob', bob.publicKey);
   saveInvites('alice', { [ID]: { id: ID, name: 'Cheese club', creator: 'alice', created: 1000, publicRoom: true, members: [alice, bob].map(k => ({ account: k.account, publicKey: k.publicKey })) } });
-  calls.rooms.mockResolvedValue([{ txId: 'list', time: 50, from: 'alice', to: 'eosio.null', quantity: '8.0000 CHEESE', memo: encodeListing({ id: ID, name: 'Cheese club', topic: '', tags: [], publicKey: alice.publicKey, members: 1 }) }]);
+  calls.rooms.mockResolvedValue([{ txId: 'list', time: 50, from: 'alice', to: 'eosio.null', quantity: '80.0000 CHEESE', memo: encodeListing({ id: ID, name: 'Cheese club', topic: '', tags: [], publicKey: alice.publicKey, members: 1 }) }]);
   calls.lookup.mockResolvedValue(null);
   calls.transact.mockResolvedValue({ success: true, txId: 'confirmed' });
 });

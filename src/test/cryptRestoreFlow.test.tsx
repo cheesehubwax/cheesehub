@@ -34,7 +34,7 @@ beforeEach(async () => {
   localStorage.clear(); vi.clearAllMocks(); await saveKey(me);
   calls.fetch.mockResolvedValue(history);
   calls.lookup.mockImplementation(async (a: string) => a === 'carol' ? friend.publicKey : null);
-  calls.rooms.mockResolvedValue([{ from: 'alice', to: 'eosio.null', time: 1, txId: 'list', quantity: '8.0000 CHEESE', memo: encodeListing({ id, name: group.name, topic: '', tags: [], publicKey: owner.publicKey, members: 2 }) }]);
+  calls.rooms.mockResolvedValue([{ from: 'alice', to: 'eosio.null', time: 1, txId: 'list', quantity: '80.0000 CHEESE', memo: encodeListing({ id, name: group.name, topic: '', tags: [], publicKey: owner.publicKey, members: 2 }) }]);
 });
 
 describe('recovery through the messenger', () => {

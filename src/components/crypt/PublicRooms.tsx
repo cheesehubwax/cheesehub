@@ -8,7 +8,7 @@ import { MAX_PUBLIC_ROOM_MEMBERS } from '@/lib/cryptInviteGroups';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import type { CryptAvatar } from '@/lib/cryptAvatar';
 import {
-  cleanRoomName, cleanRoomTopic, cleanTags, encodeListing, LISTING_STAKE_QUANTITY, MAX_ROOM_NAME, MAX_ROOM_TOPIC, ROOM_FEE_QUANTITY, searchListings,
+  cleanRoomName, cleanRoomTopic, cleanTags, encodeListing, LISTING_FEE_QUANTITY, MAX_ROOM_NAME, MAX_ROOM_TOPIC, ROOM_FEE_QUANTITY, searchListings,
   type JoinRequest, type RoomListing,
 } from '@/lib/cryptRooms';
 
@@ -69,9 +69,9 @@ export function DiscoverRoomsDialog({ open, onOpenChange, listings, loading, ref
 
 /** Creator-only room settings: the group name/picture and the public listing in one window, so a
  *  group update can never be mistaken for a listing update. A fresh listing pays the 100.0000 CHEESE
- *  anti-spam stake; updating a listed room's details and unlisting pay the normal room fee.
+ *  anti-spam listing fee; updating a listed room's details and unlisting pay the normal room fee.
  *  One Terms box gates every paid button; each button shows its own cost. */
-export function RoomSettingsDialog({ groupId, groupName, groupAvatar, members, publicKey, creatorName, listed, busy, metaCost, onNameChange, onPaint, onUpdateMeta, onList, onUnlist, onEditLog, onClose, listCost = LISTING_STAKE_QUANTITY, updateCost = ROOM_FEE_QUANTITY, unlistCost = ROOM_FEE_QUANTITY, initialName, initialTopic = '', initialTags = [] }: {
+export function RoomSettingsDialog({ groupId, groupName, groupAvatar, members, publicKey, creatorName, listed, busy, metaCost, onNameChange, onPaint, onUpdateMeta, onList, onUnlist, onEditLog, onClose, listCost = LISTING_FEE_QUANTITY, updateCost = ROOM_FEE_QUANTITY, unlistCost = ROOM_FEE_QUANTITY, initialName, initialTopic = '', initialTags = [] }: {
   groupId: string; groupName: string; groupAvatar?: CryptAvatar; members: number; publicKey: string; listed: boolean; busy: boolean;
   metaCost: string; onNameChange: (name: string) => void; onPaint: () => void; onUpdateMeta: () => Promise<boolean>;
   onList: (info: { name: string; topic: string; tags: string[] }) => Promise<boolean>; onUnlist: () => Promise<boolean>; onClose: () => void;
@@ -116,7 +116,7 @@ export function RoomSettingsDialog({ groupId, groupName, groupAvatar, members, p
         <p className="rounded-md border border-cheese/30 bg-cheese/5 p-2 text-xs text-muted-foreground">⚠️ <span className="font-semibold text-cheese">Your account and public messaging key are published on chain</span> with this listing, so anyone can read them. That only lets people send join requests for this room: regular messages from accounts you have not added stay hidden unless you turn on the Public Inbox, and you can block anyone at any time.</p>
         <p className="text-xs text-muted-foreground">{listed
           ? 'Updating details and unlisting pay the normal room fee; platform fees split 80% to eosio.null and 20% to xcheeseliqst. Costs include encrypted room-policy copies for members.'
-          : 'Making a room public pays a 100.0000 CHEESE stake (split 80% to eosio.null and 20% to xcheeseliqst) to deter throwaway spam listings; updating details later costs only the normal fee. Costs include encrypted room-policy copies for members.'}</p>
+          : 'Making a room public pays a one-time, non-refundable 100.0000 CHEESE listing fee (split 80% to eosio.null and 20% to xcheeseliqst) to deter throwaway spam listings; updating details later costs only the normal fee. Costs include encrypted room-policy copies for members.'}</p>
         <div className="flex flex-wrap gap-2">
           {listed && <Button size="sm" variant="outline" disabled={busy || !agreed} onClick={() => void onUnlist()}>{busy ? 'Sending…' : `Pay & unlist (${unlistCost})`}</Button>}
           <Button size="sm" disabled={busy || !agreed || !!error} onClick={() => void onList(info)}>{busy ? 'Sending…' : listed ? `Update details (${updateCost})` : `Pay & list room (${listCost})`}</Button>

@@ -11,9 +11,12 @@ before the transaction ends. If anything fails, the whole transaction — includ
 payment — rolls back, so the router never holds funds between transactions. A `pending` row's
 `payer` is a fee payer, not a room role.
 
-The app still uses direct peer-to-peer transfers. **Do not switch it to this contract before the
-history adapter is implemented and verified on testnet.** This is an ABI-breaking replacement
-of the earlier draft, not an automatic migration. It is not audited or production-approved.
+Deployed at `crypt.cheese`. Messages, join/rejoin requests and voice batches already route through
+`sendmsg`. This version adds `payfee` for the standalone fees (key creation, key publishing, room
+listing/update/unlist). The app keeps those fees on the direct path until this version is deployed
+and the app switch `CRYPT_PAYFEE_LIVE` in `src/lib/cheeseCrypt.ts` is turned on. Adding `payfee` is an
+ABI addition only: existing `sendmsg`, `reclaim`, `setconfig`, `setpaused`, `config` and `pending`
+are unchanged, so redeploying does not break live messaging. Not audited.
 
 ## Build and local tests
 Install Antelope/WAX CDT v4+ (`cdt-cpp`) and a native C++17 compiler:
@@ -52,6 +55,7 @@ stranded old tables. Public data already recorded cannot be made private retroac
 | `setpaused(paused)` | contract | Stops payments and sends; `reclaim` remains available |
 | token `transfer(from, contract, quantity, memo)` | payer | Records a transient in-flight payment from the configured token only |
 | `sendmsg(sender, parts, copies)` | sender | Consumes the payment, pays the shared platform fee, delivers all copies and returns change, atomically |
+| `payfee(payer, fee, memo)` | payer | Consumes exactly `fee` from the payment and splits it 80/20 with `memo` on both legs; a remainder stays pending only for a following `sendmsg` in the same transaction |
 | `reclaim(payer)` | payer | Refunds a payment orphaned by an incomplete transaction flow |
 
 The intended transaction is two actions with one signature: `transfer` the exact fee to the
@@ -75,8 +79,15 @@ cost 0.3000 platform fees, or 0.3030 total for one recipient. No cross-action fl
 is needed. Join/rejoin requests cost the ordinary 0.0101 total, without an owner surcharge.
 Both paths remain direct until authenticated router history and practical resource limits are verified;
 request-carried keys and ciphertext sizes still distinguish some requests. No source/ABI change is required.
-Public key publishing, 100-CHEESE key creation and `CRYPTROOM1:` listing/unlisting also stay
-on the existing direct path; generic router fee memos are not listing or key publications.
+Standalone fees use `payfee`: key creation (100.0000, memo `CHEESECrypt key creation fee`), key
+publishing (0.0100, memo = the key), a one-time non-refundable room listing fee (100.0000, memo =
+`CRYPTROOM1:` listing), listing updates and unlisting (0.0100). The fee must be positive, at most the
+arithmetic ceiling and a multiple of 0.0005 so the 80/20 split is exact; memos are 1–256 bytes. A room
+listing transaction is `transfer` (fee + policy copies) → `payfee` → `sendmsg`; `payfee` must come
+first because `sendmsg` refunds change. A lone `payfee` is paid exactly, so the row is erased. Nothing
+about the payer, memo or purpose is stored; the memo remains public in the action and the 80% leg,
+exactly as with the direct path. The app reads key publishes and listings from `payfee` actions,
+attributing them only to the authorizing `payer`, never to `crypt.cheese`; legacy direct legs still count.
 
 ## Privacy and authority boundaries
 - Removing tables avoids explicit role/roster disclosure, **not anonymity**. WAX still exposes

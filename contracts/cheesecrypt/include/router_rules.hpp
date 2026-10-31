@@ -24,4 +24,7 @@ inline int64_t null_units(int64_t platform, uint8_t percent) {
    if (platform < 0 || platform > MAX_FEE_UNITS * HARD_MAX_PARTS || percent > 100) return -1;
    return platform * percent / 100;
 }
+// Standalone fees (key creation/publishing, room listings) are paid whole: positive, within the arithmetic
+// ceiling and a multiple of 5 units so the 80/20 split is exact with no rounding.
+inline bool valid_standalone_fee(int64_t value) { return value > 0 && valid_fee(value) && value % 5 == 0; }
 } // namespace crypt_router
