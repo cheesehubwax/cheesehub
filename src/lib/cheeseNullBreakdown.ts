@@ -12,6 +12,21 @@ import { fetchContractStats, parseAssetAmount } from './cheeseNullApi';
 import { fetchActionsUnion, sumAssetField } from './hyperionHistory';
 import { STATIC_ENDPOINTS } from './endpointHealth';
 import { chainPost } from './chainRequest';
+import { FEE_MEMO, KEY_CREATION_MEMO, KEY_PREFIX, LEGACY_KEY_PREFIX, CRYPT_ROUTER_ACCOUNT } from './cheeseCrypt';
+import { ROOM_PREFIX } from './cryptRooms';
+import { HIDE_PREFIX } from './cryptRoomDenylist';
+import { REPORT_PREFIX } from './cryptRoomReports';
+
+/** Legacy direct messaging fee label used before the CHEESECrypt rename. */
+const LEGACY_FEE_MEMO = 'GPK messaging fee';
+const CRYPT_MEMO_EXACT = new Set([FEE_MEMO, KEY_CREATION_MEMO, LEGACY_FEE_MEMO]);
+const CRYPT_MEMO_PREFIXES = [KEY_PREFIX, LEGACY_KEY_PREFIX, ROOM_PREFIX, HIDE_PREFIX, REPORT_PREFIX];
+
+/** True when a user's direct eosio.null transfer is a CHEESECrypt fee leg (pre-contract or non-routed). */
+export function isCryptNullMemo(memo: unknown): boolean {
+  if (typeof memo !== 'string' || !memo) return false;
+  return CRYPT_MEMO_EXACT.has(memo) || CRYPT_MEMO_PREFIXES.some((p) => memo.startsWith(p));
+}
 
 const BATCH_SIZE = 1000;
 const MAX_ACTIONS = 50000;
@@ -91,6 +106,7 @@ const NULL_CONTRACTS = [
   { account: 'ram.chz', displayName: 'ram.chz' },
   { account: 'cheesebannad', displayName: 'cheesebannad' },
   { account: 'cheesenftwax', displayName: 'cheesenftwax' },
+  { account: 'crypt.cheese', displayName: 'CHEESECrypt' },
   { account: 'liquidcheese', displayName: 'Liquidity Fees' },
 ] as const;
 
@@ -175,6 +191,8 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
   // here double-counted cheesepowerz in the 24h/7d/30d columns.
   addActions(nullActions, (data) => {
     if (data.to !== 'eosio.null' || typeof data.from !== 'string') return null;
+    // CHEESECrypt: router nulls by sender, direct user fee legs by memo label.
+    if (data.from === CRYPT_ROUTER_ACCOUNT || isCryptNullMemo(data.memo)) return CRYPT_ROUTER_ACCOUNT;
     return data.from;
   });
 
