@@ -65,6 +65,8 @@ import { canRequestRejoin } from '@/lib/cryptRejoin';
 import { encodeReadmit } from '@/lib/cryptInviteGroups';
 import { CryptComposer } from '@/components/crypt/CryptComposer';
 import { DiscoverRoomsDialog, JoinRequests, RoomSettingsDialog } from '@/components/crypt/PublicRooms';
+import { ReportRoomDialog } from '@/components/crypt/ReportRoomDialog';
+import { buildReportAction, type ReportReason } from '@/lib/cryptRoomReports';
 import { fetchRoomMemos } from '@/lib/cheeseCrypt';
 import {
   JOIN_REQUEST_COST, LISTING_FEE_QUANTITY, ROOM_FEE_QUANTITY, buildJoinRequestActions, buildRoomActions, collectJoinRequests, collectListings, decodeRoomEvents, declineJoin, removeRoomRequest, roomRequestOutcomes, roomRequestNotes, encodeListing, encodeUnlist, listedRoomIds, loadJoinDeclines,
@@ -173,6 +175,17 @@ export function Messenger({ account, session }: { account: string; session: NonN
   // Public rooms: listings are public; my requests, local list actions and join declines stay on this device.
   const [roomsOpen, setRoomsOpen] = useState(false);
   const [askingRoom, setAskingRoom] = useState<RoomListing | null>(null);
+  // Platform reports go to CHEESEHub admins (/admin), never the room's owner; one plain eosio.null notice, not a crypt.cheese fee.
+  const [reportingRoom, setReportingRoom] = useState<RoomListing | null>(null);
+  const [reportBusy, setReportBusy] = useState(false);
+  const reportRoom = useCallback(async (room: RoomListing, reason: ReportReason) => {
+    setReportBusy(true);
+    try {
+      const r = await executeDirect([buildReportAction(account, [permission], { creator: room.creator, id: room.id }, reason)],
+        { successTitle: 'Report sent to CHEESEHub', successDescription: 'The moderation team will review this room.', errorTitle: 'Report not sent' });
+      if (r.success && r.txId) setReportingRoom(null);
+    } finally { setReportBusy(false); }
+  }, [executeDirect, account, permission]);
   const [acceptingJoin, setAcceptingJoin] = useState<JoinRequest | null>(null);
   const [decliningJoin, setDecliningJoin] = useState<JoinRequest | null>(null);
   // Optional short note typed into the ask / accept / decline dialog (only one is open at a time).
@@ -1567,7 +1580,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
         </DialogContent>
       </Dialog>}
       <DiscoverRoomsDialog open={roomsOpen} onOpenChange={o => { setRoomsOpen(o); if (o) void refetchRooms(); }} listings={directoryListings} loading={roomsLoading}
-        refresh={() => void refetchRooms()} account={account} nameFor={nameFor} roomStatus={roomStatus} joinCost={roomJoinCost} onAsk={l => { setRoomsOpen(false); setJoinNote(''); setAskingRoom(l); }} />
+        refresh={() => void refetchRooms()} account={account} nameFor={nameFor} roomStatus={roomStatus} joinCost={roomJoinCost} onAsk={l => { setRoomsOpen(false); setJoinNote(''); setAskingRoom(l); }}
+        onReport={l => { setRoomsOpen(false); setReportingRoom(l); }} />
+      {reportingRoom && <ReportRoomDialog room={reportingRoom} busy={reportBusy} onReport={reason => void reportRoom(reportingRoom, reason)} onClose={() => setReportingRoom(null)} />}
       {askingRoom && <PaidActionDialog title={`🌐 Ask to join ${askingRoom.name}`} cost={roomJoinCost} confirmLabel="Pay & ask" busy={busy}
         description={`Sends ${askingRoom.creatorName || nameFor(askingRoom.creator)} an encrypted request at the ordinary message rate, with no extra owner fee. If they accept, an invite appears in your Groups and you choose Join or Decline. The request payment is not refunded if declined.`}
         onConfirm={() => askToJoin(askingRoom)} onClose={() => setAskingRoom(null)}>
@@ -1625,6 +1640,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         nameFor={nameFor} membersOpen={membersOpen} setMembersOpen={setMembersOpen} setPendingNotice={requestNotice}
         setEditingInvite={setEditingInvite} setEditingFriend={setEditingFriend} saveFriend={saveFriend} blockAccount={blockAccount}
         admins={activeModeration?.admins ?? []}
+        onReportRoom={activeListing && activeListing.creator !== account ? () => setReportingRoom(activeListing) : undefined}
         />
 
       <div className={cn('flex flex-1 min-h-0 md:row-start-2', listHidden ? 'md:col-start-1 md:col-span-2' : 'md:col-start-2')}>
