@@ -43,8 +43,10 @@ export function CryptSidebar({
   lastAt: Record<string, number>; badge: (id: string) => ReactNode; removeFriend: (name: string) => void;
 }) {
   const key = cryptKey;
+  const [confirm, setConfirm] = useState<CryptConfirm | null>(null);
   return (
     <>
+      <CryptConfirmDialog confirm={confirm} onClose={() => setConfirm(null)} />
       <div className="flex flex-col justify-center gap-2 p-3 border-b border-border md:border-r md:col-start-1 md:row-start-1">
         <button type="button" className="group flex w-full min-w-0 items-center gap-3 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label="Edit profile" title="Edit name and avatar" onClick={() => setEditingAvatar(true)}>
