@@ -30,3 +30,14 @@ describe('admin room hides', () => {
     expect(parseHide('CRYPTHIDE1:{"c":"bum.gpk","i":"xyz","h":1}')).toBeNull();
   });
 });
+
+import { curatorSet, filterCuratedListings } from '@/lib/cryptRoomDenylist';
+describe('curated public room directory', () => {
+  const ls = [{ creator: 'dr.cheese', id: 'a' }, { creator: 'randomuser11', id: 'b' }, { creator: 'cheesebannad', id: 'c' }];
+  it('shows only rooms listed by admins or cheesebannad', () => {
+    expect(filterCuratedListings(ls, curatorSet(['dr.cheese'])).map(l => l.id)).toEqual(['a', 'c']);
+  });
+  it('hides every non-platform listing when no admin list is known', () => {
+    expect(filterCuratedListings(ls, curatorSet([])).map(l => l.id)).toEqual(['c']);
+  });
+});

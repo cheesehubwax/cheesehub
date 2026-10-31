@@ -22,7 +22,7 @@ import { useCryptJoinAlerts } from '@/hooks/useCryptJoinAlerts';
 import { AvatarEditor, WalletAvatarPicker } from '@/components/crypt/AvatarEditor';
 import { CryptNftCard } from '@/components/crypt/CryptNftCard';
 import { useQuery } from '@tanstack/react-query';
-import { activeHides, cachedHides, fetchRoomHides, filterVisibleListings } from '@/lib/cryptRoomDenylist';
+import { activeHides, cachedCurators, cachedHides, curatorSet, fetchRoomCurators, fetchRoomHides, filterCuratedListings, filterVisibleListings } from '@/lib/cryptRoomDenylist';
 import { nftToken, parseNftMessage } from '@/lib/cryptNft';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FriendNameDialog } from '@/components/crypt/FriendNameDialog';
@@ -430,7 +430,11 @@ export function Messenger({ account, session }: { account: string; session: NonN
   // CHEESEHub admins hide rooms on chain from /admin; display-only, the last good read is kept during outages.
   const { data: hideRecords } = useQuery({ queryKey: ['crypt-room-hides'], enabled: !!key, queryFn: fetchRoomHides, staleTime: 5 * 60_000, retry: false });
   const roomHides = useMemo(() => hideRecords ? activeHides(hideRecords) : cachedHides(), [hideRecords]);
-  const directoryListings = useMemo(() => filterVisibleListings(listings, roomHides), [listings, roomHides]);
+  // Curated directory: only CHEESEHub admins can list public rooms; everyone else keeps private rooms.
+  const { data: curatorList } = useQuery({ queryKey: ['crypt-room-curators'], enabled: !!key, queryFn: fetchRoomCurators, staleTime: 5 * 60_000, retry: false });
+  const curators = useMemo(() => curatorSet(curatorList ?? cachedCurators()), [curatorList]);
+  const canListRooms = curators.has(account);
+  const directoryListings = useMemo(() => filterVisibleListings(filterCuratedListings(listings, curators), roomHides), [listings, curators, roomHides]);
   // Name precedence (display only): friends' own profiles, then room directories, then a listing's creator name.
   const shownNames = useMemo(() => {
     const out: Record<string, string> = {};
@@ -1298,6 +1302,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const to = v.invite.members.map(m => m.account).filter(a => a !== account);
     // A room that is already listed pays the cheap update fee; a fresh (or re-)listing pays the 100 CHEESE listing fee.
     const isUpdate = listedIds.has(id);
+    if (!canListRooms) { toast({ title: 'Only CHEESEHub admins can list public rooms', description: 'Your room stays private; you can still invite people to it.', variant: 'destructive' }); return false; }
     return sendRoomPolicy(v, memo, payload, to, true, isUpdate ? ROOM_FEE_QUANTITY : LISTING_FEE_QUANTITY);
   };
   const sendRoomPolicy = async (v: InviteGroupView, memo: string, payload: string, to: string[], listed: boolean, feeQuantity = ROOM_FEE_QUANTITY) => {
@@ -1513,7 +1518,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         const saved = loadRoomInfo(account)[v.invite.id];
         const fee = (q: string) => `${(parseFloat(q) + policyCost).toFixed(4)} CHEESE`;
         return <RoomSettingsDialog groupId={v.invite.id} groupName={editingInvite.name} groupAvatar={editingInvite.avatar}
-          members={Math.max(1, v.joined.length)} publicKey={key.publicKey} creatorName={key.displayName} listed={isListed} busy={busy}
+          members={Math.max(1, v.joined.length)} publicKey={key.publicKey} creatorName={key.displayName} listed={isListed} canList={canListRooms} busy={busy}
           metaCost={metaCost} onNameChange={name => setEditingInvite({ ...editingInvite, name })} onPaint={() => setPaintingInvite(true)} onUpdateMeta={confirmMeta}
           listCost={fee(LISTING_FEE_QUANTITY)} updateCost={fee(ROOM_FEE_QUANTITY)} unlistCost={fee(ROOM_FEE_QUANTITY)}
           initialName={current?.name ?? v.name} initialTopic={(current ?? saved)?.topic ?? ''} initialTags={(current ?? saved)?.tags ?? []}
