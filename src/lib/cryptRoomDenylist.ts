@@ -1,35 +1,93 @@
 import type { RoomListing } from '@/lib/cryptRooms';
+import { HISTORY_PAGE, hyperionTransfers, KEY_PUBLISH_TO, type ChainMemo } from '@/lib/cheeseCrypt';
+import { fetchBannadAdmins } from '@/lib/adminData';
 
 /**
- * Operator suppression for the public room directory. Display-only: the chain listing is untouched and
- * cannot be erased; suppressed rooms simply never render in CHEESEHub's directory. Entries are
- * `creator:roomId` (one room) or `creator:*` (every room from that account).
- * To hide a room for every visitor, add its entry here (Export in the directory copies the current hides).
+ * Platform suppression of the public room directory, published on chain by CHEESEHub admins from /admin:
+ * a 0.0001 CHEESE transfer to eosio.null with memo `CRYPTHIDE1:{"c":creator,"i":roomId|"*","h":1|0}`.
+ * Only senders in the cheesebannad admins table (or cheesebannad itself) count; newest per target wins.
+ * Display-only: the room listing and its chats stay on chain; hidden rooms just never render in CHEESEHub.
  */
-export const GLOBAL_ROOM_DENYLIST: readonly string[] = [];
+export const HIDE_PREFIX = 'CRYPTHIDE1:';
+export const HIDE_QUANTITY = '0.0001 CHEESE';
+const PLATFORM_ACCOUNT = 'cheesebannad';
+const ACCOUNT = /^[a-z1-5.]{1,12}$/;
+const ROOM_ID = /^[a-f0-9]{16}$/;
+const CACHE_KEY = 'cheesecrypt-room-hides-v1';
+const ADMIN_PAGES = 10;
 
-const STORAGE_KEY = 'cheesecrypt-room-hides';
-export const roomEntry = (l: Pick<RoomListing, 'creator' | 'id'>) => `${l.creator}:${l.id}`;
-const VALID = /^[a-z1-5.]{1,12}:(\*|[a-f0-9]{16})$/;
+export interface HideTarget { creator: string; id: string } // id '*' = every room by creator
+export interface HideRecord extends HideTarget { hidden: boolean; by: string; time: number; txId: string }
 
-export function loadLocalHides(): string[] {
+export const hideEntry = (t: HideTarget) => `${t.creator}:${t.id}`;
+
+export function encodeHide(t: HideTarget, hidden: boolean): string {
+  if (!ACCOUNT.test(t.creator) || (t.id !== '*' && !ROOM_ID.test(t.id))) throw new Error('Invalid room');
+  return HIDE_PREFIX + JSON.stringify({ c: t.creator, i: t.id, h: hidden ? 1 : 0 });
+}
+
+export function parseHide(memo: string): (HideTarget & { hidden: boolean }) | null {
+  if (!memo.startsWith(HIDE_PREFIX)) return null;
   try {
-    const v = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]');
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && VALID.test(x)) : [];
+    const o = JSON.parse(memo.slice(HIDE_PREFIX.length));
+    if (typeof o?.c !== 'string' || !ACCOUNT.test(o.c) || typeof o.i !== 'string' || (o.i !== '*' && !ROOM_ID.test(o.i)) || (o.h !== 0 && o.h !== 1)) return null;
+    return { creator: o.c, id: o.i, hidden: o.h === 1 };
+  } catch { return null; }
+}
+
+/** Newest admin decision per target, from paid eosio.null legs sent by an authorised admin only. */
+export function collectHides(rows: ChainMemo[], admins: readonly string[]): HideRecord[] {
+  const allowed = new Set([...admins, PLATFORM_ACCOUNT]);
+  const latest = new Map<string, HideRecord>();
+  for (const r of [...rows].sort((a, b) => a.time - b.time)) {
+    if (r.to !== KEY_PUBLISH_TO || !allowed.has(r.from) || !/^\d+\.\d{4} CHEESE$/.test(r.quantity.trim())) continue;
+    const h = parseHide(r.memo);
+    if (!h) continue;
+    latest.set(hideEntry(h), { ...h, by: r.from, time: r.time, txId: r.txId });
+  }
+  return [...latest.values()].sort((a, b) => b.time - a.time);
+}
+
+export const activeHides = (records: readonly HideRecord[]) => records.filter(r => r.hidden).map(hideEntry);
+
+export function isSuppressed(l: Pick<RoomListing, 'creator' | 'id'>, hides: readonly string[]): boolean {
+  return hides.includes(`${l.creator}:${l.id}`) || hides.includes(`${l.creator}:*`);
+}
+
+export function filterVisibleListings<T extends Pick<RoomListing, 'creator' | 'id'>>(listings: T[], hides: readonly string[]): T[] {
+  return hides.length ? listings.filter(l => !isSuppressed(l, hides)) : listings;
+}
+
+/** Full read of every admin's eosio.null CHEESE history (admin accounts are small, so hides never age out). */
+export async function fetchRoomHides(): Promise<HideRecord[]> {
+  const admins = (await fetchBannadAdmins()).map(a => a.account).filter(a => ACCOUNT.test(a));
+  const senders = [...new Set([...admins, PLATFORM_ACCOUNT])];
+  const per = await Promise.all(senders.map(async account => {
+    let rows: ChainMemo[] = [];
+    let before: string | null = null;
+    for (let p = 0; p < ADMIN_PAGES; p++) {
+      const page = await hyperionTransfers(`account=${account}&filter=cheeseburger:transfer&transfer.from=${account}&transfer.to=${KEY_PUBLISH_TO}&sort=desc&limit=${HISTORY_PAGE}${before ? `&before=${encodeURIComponent(before)}` : ''}`);
+      rows = rows.concat(page);
+      if (page.length < HISTORY_PAGE) break;
+      const oldest = Math.min(...page.map(r => r.time).filter(Number.isFinite));
+      if (!Number.isFinite(oldest)) break;
+      before = new Date(oldest).toISOString();
+    }
+    return rows;
+  }));
+  const records = collectHides(per.flat(), admins);
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify(activeHides(records))); } catch { /* storage full or blocked */ }
+  return records;
+}
+
+/** Last successfully read hide list, so hidden rooms stay hidden while history nodes are down. */
+export function cachedHides(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(CACHE_KEY) ?? '[]');
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && /^[a-z1-5.]{1,12}:(\*|[a-f0-9]{16})$/.test(x)) : [];
   } catch { return []; }
 }
 
-export function saveLocalHides(hides: string[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify([...new Set(hides.filter(x => VALID.test(x)))]));
-}
-
-export function isSuppressed(l: Pick<RoomListing, 'creator' | 'id'>, hides: readonly string[]): boolean {
-  const all = [...GLOBAL_ROOM_DENYLIST, ...hides];
-  return all.includes(roomEntry(l)) || all.includes(`${l.creator}:*`);
-}
-
-export const isGloballySuppressed = (l: Pick<RoomListing, 'creator' | 'id'>) => isSuppressed(l, []);
-
-export function filterVisibleListings<T extends Pick<RoomListing, 'creator' | 'id'>>(listings: T[], hides: readonly string[]): T[] {
-  return listings.filter(l => !isSuppressed(l, hides));
+export function buildHideAction(admin: string, auth: unknown[], target: HideTarget, hidden: boolean) {
+  return { account: 'cheeseburger', name: 'transfer', authorization: auth, data: { from: admin, to: KEY_PUBLISH_TO, quantity: HIDE_QUANTITY, memo: encodeHide(target, hidden) } };
 }

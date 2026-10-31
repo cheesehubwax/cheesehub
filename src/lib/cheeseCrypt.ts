@@ -472,7 +472,7 @@ async function hyperionActions(query: string): Promise<any[]> {
 
 const actionTime = (a: any) => Date.parse((a['@timestamp'] || a.timestamp) + 'Z');
 
-async function hyperionTransfers(query: string): Promise<ChainMemo[]> {
+export async function hyperionTransfers(query: string): Promise<ChainMemo[]> {
   return (await hyperionActions(query)).map((a: any) => ({
     txId: a.trx_id, time: actionTime(a),
     from: a.act?.data?.from, to: a.act?.data?.to, memo: a.act?.data?.memo || '',

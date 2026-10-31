@@ -6,6 +6,7 @@ import { ContractStatusCard } from '@/components/admin/ContractStatusCard';
 import { PriceDeviationGauge } from '@/components/admin/PriceDeviationGauge';
 import { FailedTransactionLog } from '@/components/admin/FailedTransactionLog';
 import { NodeHealthPanel } from '@/components/admin/NodeHealthPanel';
+import { CryptRoomModerationPanel } from '@/components/admin/CryptRoomModerationPanel';
 import { AddBannerSlotsCard } from '@/components/admin/AddBannerSlotsCard';
 import { parseAssetAmount, getDeviationSeverity } from '@/lib/adminData';
 import { DropPurchaseLog } from '@/components/admin/DropPurchaseLog';
@@ -291,6 +292,9 @@ export default function Admin() {
 
             {/* Failed Transactions */}
             <FailedTransactionLog transactions={failedTxs ?? []} isLoading={txsLoading} />
+
+            {/* CHEESECrypt public room suppression */}
+            <CryptRoomModerationPanel />
 
             {/* Node health (read-only) */}
             <NodeHealthPanel />
