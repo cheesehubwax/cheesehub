@@ -69,12 +69,12 @@ function TxLink({ txId }: { txId: string }) {
 
 /**
  * Sound-effect NFTs: a borderless tile (25% smaller than other NFTs) — click the picture to play/stop,
- * autoplays once when it arrives while the chat is open, no caption, no dialog.
+ * autoplays once the first time it is sent or seen on this device (any party), no caption, no dialog.
  * Video NFTs: the tile shows a ▶ overlay and the larger view plays the video; a music NFT with an
  * attached music video keeps streaming audio in the bubble and gets a "Watch video" toggle instead.
  * Every other NFT: a tile that opens a larger view with picture, name, artist and transaction link
  * (no asset ID, collection, mint number or explorer links are shown).
- * `autoplayKey` is set only for messages that arrived while the chat was open.
+ * `autoplayKey` identifies the message per account; played keys persist in localStorage.
  */
 export function CryptNftCard({ assetId, autoplayKey, txId }: { assetId: string; autoplayKey?: string; txId?: string }) {
   const [open, setOpen] = useState(false);
@@ -89,7 +89,7 @@ export function CryptNftCard({ assetId, autoplayKey, txId }: { assetId: string; 
   const sfxKey = `${assetId}:0`;
   useEffect(() => {
     if (!autoplayKey || !data?.isSfx || !tracks.length || autoplayed.has(autoplayKey)) return;
-    autoplayed.add(autoplayKey);
+    markAutoplayed(autoplayKey);
     cryptAudio.toggle(sfxKey, tracks[0].url);
   }, [autoplayKey, data, tracks, sfxKey]);
   const heading = data ? (data.title || data.name) : '';
