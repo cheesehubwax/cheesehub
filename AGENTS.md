@@ -33,7 +33,7 @@
 - Crypt reply views use per-message receipts (jumps keep skipped replies), inner-list scroll only. About: DappAbout + crypto dialog.
 - Crypt sections are presentational; Messenger owns state. Recovery needs authenticated DM/join evidence; tab sync preserves consent/scoped keys. Join alerts share account/room/requester/time identities; only confirmed handling clears matching toast, counts and chat controls, retaining others.
 - OpenMojiIcon tint paints a solid silhouette for palettes too dark on dark backgrounds.
-- NFT players share nftMedia normalization; version detection caches. Artwork prefers bundled copies then AtomicHub with IPFS fallbacks; audio/video keep raw gateways (resizer is image-only).
+- NFT players share nftMedia. Wallets/grids share ipfsGateways: bundled→AtomicHub→IPFS, recovering normalized hashes for retries. Audio/video use raw gateways, never the resizer.
 - Folio fiat/BTC/ETH figures are WAX→USD→currency per day (fx-usd-history.json, units per USD); unknown rates stay unknown.
 - Folio JSON validates/checksums raw history, merges by sequence and portfolios by ID/newest edit; IndexedDB stores both per account. Views filter the full ledger with per-token disposal P/L, never replay subsets.
 

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   atomicHubImageUrl, buildIpfsImageUrl, getIpfsUrl,
-  ipfsImageCandidates, preferredIpfsImageUrl, raceIpfsImage,
+  extractIpfsHash, ipfsImageCandidates, preferredIpfsImageUrl, raceIpfsImage,
 } from '@/lib/ipfsGateways';
 
 const hash = 'QmcyKFxZWFMFJAmjuowJ4F1DUzGGUpEFDV6Co4mV9Dx5ND';
@@ -24,6 +24,14 @@ describe('NFT artwork resolution', () => {
     expect(original).not.toContain('resizer.atomichub.io');
     expect(ipfsImageCandidates(hash).slice(1)).toContain(original);
     expect(preferredIpfsImageUrl('https://example.com/art.png')).toBe('https://example.com/art.png');
+  });
+
+  it('retains original gateway fallbacks after wallet artwork normalization', () => {
+    const normalized = preferredIpfsImageUrl(hash);
+    const recoveredHash = extractIpfsHash(normalized);
+    expect(recoveredHash).toBe(hash);
+    expect(ipfsImageCandidates(recoveredHash ?? '')).toContain(getIpfsUrl(hash));
+    expect(preferredIpfsImageUrl(normalized)).toBe(normalized);
   });
 
   it('retains bundled copies ahead of third-party artwork', () => {

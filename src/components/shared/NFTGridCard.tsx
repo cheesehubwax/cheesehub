@@ -2,22 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { Check, Loader2, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const IPFS_GATEWAYS = [
-  "https://gateway.pinata.cloud/ipfs/",
-  "https://ipfs.io/ipfs/",
-  "https://cloudflare-ipfs.com/ipfs/",
-  "https://dweb.link/ipfs/",
-];
-
-function extractIpfsHash(url: string): string | null {
-  if (!url) return null;
-  if (url.startsWith("ipfs://")) return url.replace("ipfs://", "");
-  const m = url.match(/\/ipfs\/([a-zA-Z0-9]+.*)/);
-  if (m) return m[1];
-  if (/^Qm[a-zA-Z0-9]{44}/.test(url) || /^bafy[a-zA-Z0-9]+/.test(url)) return url;
-  return null;
-}
+import { extractIpfsHash, ipfsImageCandidates } from "@/lib/ipfsGateways";
 
 export interface NFTGridCardData {
   asset_id: string;
@@ -53,27 +38,34 @@ export const NFTGridCard = React.memo(function NFTGridCard({
   const [imgLoaded, setImgLoaded] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
-  const ipfsHash = extractIpfsHash(nft.image);
   const hasValidImage = Boolean(nft.image && nft.image !== "/placeholder.svg");
+  const imageCandidates = useMemo(() => {
+    const hash = extractIpfsHash(nft.image);
+    return hash ? ipfsImageCandidates(hash) : [nft.image || "/placeholder.svg"];
+  }, [nft.image]);
+
+  useEffect(() => {
+    setGatewayIndex(0);
+    setImgError(false);
+    setImgLoaded(false);
+    setRetryCount(0);
+  }, [nft.asset_id, nft.image]);
 
   const currentImageUrl = useMemo(() => {
     if (!nft.image || nft.image === "/placeholder.svg") return "/placeholder.svg";
-    if (ipfsHash) {
-      const baseUrl = `${IPFS_GATEWAYS[gatewayIndex]}${ipfsHash}`;
-      return retryCount > 0 ? `${baseUrl}?retry=${retryCount}` : baseUrl;
-    }
-    const sep = nft.image.includes("?") ? "&" : "?";
-    return retryCount > 0 ? `${nft.image}${sep}retry=${retryCount}` : nft.image;
-  }, [nft.image, ipfsHash, gatewayIndex, retryCount]);
+    const baseUrl = imageCandidates[gatewayIndex] ?? imageCandidates[0];
+    const sep = baseUrl.includes("?") ? "&" : "?";
+    return retryCount > 0 ? `${baseUrl}${sep}retry=${retryCount}` : baseUrl;
+  }, [nft.image, imageCandidates, gatewayIndex, retryCount]);
 
   const handleImageError = useCallback(() => {
-    if (ipfsHash && gatewayIndex < IPFS_GATEWAYS.length - 1) {
+    if (gatewayIndex < imageCandidates.length - 1) {
       setGatewayIndex((p) => p + 1);
       setImgLoaded(false);
     } else {
       setImgError(true);
     }
-  }, [ipfsHash, gatewayIndex]);
+  }, [imageCandidates.length, gatewayIndex]);
 
   // Timeout fallback – try next gateway after 10s
   useEffect(() => {
