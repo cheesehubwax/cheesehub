@@ -55,7 +55,8 @@ async function main(): Promise<void> {
   await maintain({
     read: async () => {
       const state = await snapshot();
-      return { balance: state.balance, voter: state.voter, now: utcMs(state.info.head_block_time) };
+      return { balance: state.balance, voter: state.voter, now: utcMs(state.info.head_block_time),
+        hasRefund: state.account.refund_request != null };
     },
     claim: () => submit(claimAction()),
     stake: units => submit(stakeAction(units)),
