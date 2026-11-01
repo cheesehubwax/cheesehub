@@ -47,8 +47,20 @@ function CryptVideo({ url, poster, label }: { url: string; poster?: string; labe
   );
 }
 
-/** Message keys whose sound effect already autoplayed this session (never replay on re-render or poll). */
-const autoplayed = new Set<string>();
+/**
+ * Message keys (per account) whose sound effect already autoplayed on this device. Persisted so each
+ * sound effect plays automatically exactly once — the first time it is sent or seen — never on re-render,
+ * poll, reload or reopening the chat. Bounded to the most recent entries.
+ */
+const PLAYED_KEY = 'crypt-sfx-played-v1';
+const PLAYED_MAX = 5000;
+const autoplayed: Set<string> = (() => {
+  try { return new Set<string>(JSON.parse(localStorage.getItem(PLAYED_KEY) || '[]')); } catch { return new Set<string>(); }
+})();
+function markAutoplayed(key: string) {
+  autoplayed.add(key);
+  try { localStorage.setItem(PLAYED_KEY, JSON.stringify([...autoplayed].slice(-PLAYED_MAX))); } catch { /* storage full/blocked: session-only */ }
+}
 
 function TxLink({ txId }: { txId: string }) {
   return <a href={`https://waxblock.io/transaction/${encodeURIComponent(txId)}`} target="_blank" rel="noreferrer"
