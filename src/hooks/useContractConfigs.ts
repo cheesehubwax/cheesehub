@@ -24,6 +24,7 @@ import {
   type CheeseRamStats,
   type ContractReserves,
 } from '@/lib/cheeseRam';
+import { fetchCryptStatus, fetchPowerzAutomation, type CryptStatus, type PowerzAutomation } from '@/lib/adminAutomation';
 
 export interface PoolPriceData {
   pool1252: {
@@ -46,6 +47,8 @@ export interface ContractConfigsData {
   ramConfig: CheeseRamConfig | null;
   ramStats: CheeseRamStats | null;
   ramReserves: ContractReserves | null;
+  cryptStatus: CryptStatus | null;
+  powerzAutomation: PowerzAutomation | null;
   poolPrices: PoolPriceData;
   deviations: {
     cheeseWax: number | null;
@@ -67,6 +70,8 @@ async function fetchAllConfigs(): Promise<ContractConfigsData> {
     ramReserves,
     pool1252,
     pool1236,
+    cryptStatus,
+    powerzAutomation,
   ] = await Promise.all([
     fetchBurnerConfig().catch(() => null),
     fetchBurnerStats().catch(() => null),
@@ -79,6 +84,8 @@ async function fetchAllConfigs(): Promise<ContractConfigsData> {
     fetchContractReserves().catch(() => null),
     fetchPoolReserves(1252).catch(() => null),
     fetchPoolReserves(1236).catch(() => null),
+    fetchCryptStatus().catch(() => null),
+    fetchPowerzAutomation().catch(() => null),
   ]);
 
   // Pool 1252: CHEESE/WAX
@@ -126,6 +133,8 @@ async function fetchAllConfigs(): Promise<ContractConfigsData> {
     ramConfig,
     ramStats,
     ramReserves,
+    cryptStatus,
+    powerzAutomation,
     poolPrices: { pool1252: pool1252Prices, pool1236: pool1236Prices },
     deviations: {
       cheeseWax: cheeseWaxDev,

@@ -103,8 +103,36 @@ const powerupFlow: FlowStep[] = [
     label: 'WAX reserves funded by',
     items: [
       { pct: '5%', dest: 'cheeseburner (vote reward allocation)', highlight: 'stake' },
-      { pct: '25%', dest: 'cheesebannad (ad revenue allocation)', highlight: 'fee' },
+      { pct: '20%', dest: 'cheesebannad (ad revenue allocation)', highlight: 'fee' },
       { pct: '—', dest: 'WAX vote rewards (direct staking rewards)', highlight: 'swap' },
+    ],
+  },
+];
+
+const powerzCompoundFlow: FlowStep[] = [
+  {
+    label: 'Hourly check (power-compound runner, cheesepowerz@compound)',
+    items: [
+      { pct: '24h 5m', dest: 'eosio::claimgbmvote once the last claim is 24h + 5m old', highlight: 'swap' },
+      { pct: '> 400', dest: 'Liquid WAX above 400 → eosio::delegatebw to own CPU', highlight: 'stake' },
+      { pct: '400', dest: 'Liquid WAX reserve kept for powerups', highlight: 'power' },
+    ],
+  },
+];
+
+const cryptFlow: FlowStep[] = [
+  {
+    label: 'User pays CHEESE to crypt.cheese (same transaction as the message)',
+    items: [
+      { pct: '80%', dest: 'Nulled (eosio.null)', highlight: 'burn' },
+      { pct: '20%', dest: 'xcheeseliqst (liquid staking)', highlight: 'liq' },
+      { pct: 'Change', dest: 'Refunded to the sender inline', highlight: 'neutral' },
+    ],
+  },
+  {
+    label: 'Contract holds nothing',
+    items: [
+      { pct: '—', dest: 'Pending rows exist only mid-transaction; reclaim refunds any orphan', highlight: 'neutral' },
     ],
   },
 ];
@@ -211,7 +239,12 @@ const automation = [
   {
     name: 'Daily CPU powerup',
     schedule: 'Once daily (GitHub Actions)',
-    detail: 'Powers up eligible CHEESE stakers with CPU/NET via cheesepowerz, and checks whether cheesepowerz has claimable WAX vote rewards — claiming them when available, otherwise retrying on the next daily run.',
+    detail: 'Powers up eligible CHEESE stakers with CPU/NET via cheesepowerz. Vote reward claiming is handled by the power-compound runner below.',
+  },
+  {
+    name: 'Power-compound runner',
+    schedule: 'Hourly at minute 23 (GitHub Actions)',
+    detail: 'Signs with the restricted cheesepowerz@compound key, which is linked only to eosio::claimgbmvote and eosio::delegatebw. Claims cheesepowerz vote rewards once 24h + 5m have passed since the last claim, waits for the claim to become irreversible, then stakes any liquid WAX above the 400 WAX reserve to its own CPU. Runs only when the POWER_COMPOUND_ENABLED repository variable is true. Note: the key\'s action links limit which actions it can sign, not their arguments — the 400 WAX reserve and own-CPU-only staking are runner rules.',
   },
   {
     name: 'Powerup watchdog',
@@ -248,7 +281,7 @@ const dapps: DApp[] = [
     name: 'CHEESERam',
     contracts: ['ram.chz'],
     owner: 'CHEESE team',
-    description: 'Two-way RAM gateway for CHEESE, live at /ram and public in the header. Buying: the user sends CHEESE to ram.chz, the contract values it in WAX using the live Alcor CHEESE/WAX pool minus a 0.5% spread, then spends that much WAX from its own liquid reserve on eosio::buyram for the recipient. The user\'s CHEESE is never sold — 80% (plus rounding remainder) is nulled and 20% goes to xcheeseliqst. Selling: the user transfers RAM bytes to ram.chz and is paid CHEESE out of the contract\'s payout pool at the Alcor rate minus 0.5%; the WAX proceeds are split four ways and the buyback CHEESE is nulled on arrival. Anyone can top the payout pool up by sending CHEESE with the memo "deposit", and anyone can trigger the contract\'s own vote-reward claim from the "Fund WAX Pool" box (claimvotes takes the caller as an argument).',
+    description: 'Two-way RAM gateway for CHEESE, live at /ram and public in the header. Buying: the user sends CHEESE to ram.chz, the contract values it in WAX using the live Alcor CHEESE/WAX pool minus a 0.5% spread, then spends that much WAX from its own liquid reserve on eosio::buyram for the recipient. Its WAX reserve also receives 20% of every CHEESEAds banner rental. The user\'s CHEESE is never sold — 80% (plus rounding remainder) is nulled and 20% goes to xcheeseliqst. Selling: the user transfers RAM bytes to ram.chz and is paid CHEESE out of the contract\'s payout pool at the Alcor rate minus 0.5%; the WAX proceeds are split four ways and the buyback CHEESE is nulled on arrival. Anyone can top the payout pool up by sending CHEESE with the memo "deposit", and anyone can trigger the contract\'s own vote-reward claim from the "Fund WAX Pool" box (claimvotes takes the caller as an argument).',
     pricingNote: '0.5% spread per side, plus WAX\'s 0.5% system sellram fee and the Alcor pool fee — a full buy-then-sell round trip costs roughly 1.5–2%. Buys are bounded by min/max CHEESE and a per-trade pool-impact cap; sells are bounded by min/max bytes and switch off when the CHEESE payout pool falls below its floor.',
     flows: [
       { title: 'Buy RAM with CHEESE', steps: ramBuyFlow },
@@ -281,7 +314,7 @@ const dapps: DApp[] = [
     name: 'CHEESEAds',
     contracts: ['cheesebannad'],
     owner: 'CHEESE team',
-    description: 'Banner ad rental system for CHEESEHub. Users rent ad slots for a daily WAX fee. Revenue is split between burning, powerups, and liquidity.',
+    description: 'Banner ad rental system for CHEESEHub. Users rent ad slots for a daily WAX fee. Each rental\'s WAX is split 10% to cheeseburner, 20% to cheesepowerz, 20% to ram.chz (RAM reserve) and 50% swapped to CHEESE on Alcor, of which 66% is nulled and 34% goes to xcheeseliqst.',
     pricingNote: '100 WAX/day exclusive • 70 WAX/day shared (30% off) • cheesepromoz accounts get 50% discount (stacks with shared)',
     flows: [{ title: 'Fee Flow', steps: adsFlow }],
   },
@@ -301,9 +334,21 @@ const dapps: DApp[] = [
     name: 'CHEESEUp',
     contracts: ['cheesepowerz'],
     owner: 'CHEESE team',
-    description: 'Smart contract that converts CHEESE into CPU/NET resources for WAX users. Users send CHEESE (with configurable min/max limits) to the cheesepowerz contract. The contract burns 100% of the received CHEESE, calculates the WAX equivalent using the live Alcor pool rate, then executes the eosio powerup action from its WAX reserves. Memo format supports custom CPU/NET split and gifting to other accounts. WAX reserves are replenished by cheeseburner (5%) and cheesebannad (20% of ad rentals).',
+    description: 'Smart contract that converts CHEESE into CPU/NET resources for WAX users. Users send CHEESE (with configurable min/max limits) to the cheesepowerz contract. The contract burns 100% of the received CHEESE, calculates the WAX equivalent using the live Alcor pool rate, then executes the eosio powerup action from its WAX reserves. Memo format supports custom CPU/NET split and gifting to other accounts. WAX reserves are replenished by cheeseburner (5%) and cheesebannad (20% of ad rentals). Its own vote rewards are claimed and compounded automatically: every 24h + 5m the power-compound runner claims them, keeps 400 WAX liquid, and stakes any excess to cheesepowerz\'s own CPU.',
     feeNote: 'No platform fee on top. User pays in CHEESE which is fully burned. WAX reserves fund the powerup.',
-    flows: [{ title: 'PowerUp Flow', steps: powerupFlow }],
+    flows: [
+      { title: 'PowerUp Flow', steps: powerupFlow },
+      { title: 'Vote Reward Automation', steps: powerzCompoundFlow },
+    ],
+  },
+  {
+    id: 'crypt',
+    name: 'CHEESECrypt',
+    contracts: ['crypt.cheese'],
+    owner: 'CHEESE team',
+    description: 'End-to-end encrypted messaging on WAX. Messages, groups, NFT shares, voice notes and moderation controls are encrypted in the browser with keys locked to the user\'s WAX account; the chain only carries ciphertext. crypt.cheese is a zero-custody fee router: a CHEESE payment and the sendmsg action share one transaction, the fee is split on the spot and any change refunded inline, so the contract never keeps a balance. Standalone fees (100 CHEESE key creation, 100 CHEESE public room listing) go through payfee. reclaim refunds any payment left pending by an incomplete transaction.',
+    pricingNote: 'Contract defaults: 0.0100 CHEESE per message part plus 0.0001 CHEESE per recipient, uniform for text, NFTs, links and controls; 100 CHEESE key creation; 100 CHEESE non-refundable listing fee. Max 49 recipients and 35 parts per send.',
+    flows: [{ title: 'Fee Flow', steps: cryptFlow }],
   },
   {
     id: 'amp',
