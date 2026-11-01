@@ -45,8 +45,9 @@ const adsFlow: FlowStep[] = [
   {
     label: 'Ad Payment (WAX)',
     items: [
-      { pct: '25%', dest: 'cheeseburner', highlight: 'burn' },
-      { pct: '25%', dest: 'cheesepowerz', highlight: 'power' },
+      { pct: '10%', dest: 'cheeseburner', highlight: 'burn' },
+      { pct: '20%', dest: 'cheesepowerz', highlight: 'power' },
+      { pct: '20%', dest: 'ram.chz', highlight: 'stake' },
       { pct: '50%', dest: 'Swapped to CHEESE on Alcor', highlight: 'swap' },
     ],
   },
@@ -300,7 +301,7 @@ const dapps: DApp[] = [
     name: 'CHEESEUp',
     contracts: ['cheesepowerz'],
     owner: 'CHEESE team',
-    description: 'Smart contract that converts CHEESE into CPU/NET resources for WAX users. Users send CHEESE (with configurable min/max limits) to the cheesepowerz contract. The contract burns 100% of the received CHEESE, calculates the WAX equivalent using the live Alcor pool rate, then executes the eosio powerup action from its WAX reserves. Memo format supports custom CPU/NET split and gifting to other accounts. WAX reserves are replenished by cheeseburner (5%) and cheesebannad (25%).',
+    description: 'Smart contract that converts CHEESE into CPU/NET resources for WAX users. Users send CHEESE (with configurable min/max limits) to the cheesepowerz contract. The contract burns 100% of the received CHEESE, calculates the WAX equivalent using the live Alcor pool rate, then executes the eosio powerup action from its WAX reserves. Memo format supports custom CPU/NET split and gifting to other accounts. WAX reserves are replenished by cheeseburner (5%) and cheesebannad (20% of ad rentals).',
     feeNote: 'No platform fee on top. User pays in CHEESE which is fully burned. WAX reserves fund the powerup.',
     flows: [{ title: 'PowerUp Flow', steps: powerupFlow }],
   },
