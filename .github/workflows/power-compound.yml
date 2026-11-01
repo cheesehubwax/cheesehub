@@ -1,0 +1,43 @@
+name: CHEESEPower vote rewards and CPU
+
+on:
+  schedule:
+    # Eligibility checks, not hourly reward claims; chain time enforces 24h+5m.
+    - cron: "23 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Read-only test (leave enabled for the first run)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cheesepowerz-compound
+  cancel-in-progress: false
+
+jobs:
+  compound:
+    if: github.event_name == 'workflow_dispatch' || vars.POWER_COMPOUND_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+      - name: Install locked dependencies
+        working-directory: scripts/power-compound
+        run: bun install --frozen-lockfile
+      - name: Test maintenance rules
+        working-directory: scripts/power-compound
+        run: bun test
+      - name: Check rewards and liquid reserve
+        working-directory: scripts/power-compound
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '0' }}
+          POWER_COMPOUND_ENABLED: ${{ vars.POWER_COMPOUND_ENABLED }}
+          WAX_POWER_COMPOUND_KEY: ${{ secrets.WAX_POWER_COMPOUND_KEY }}
+        run: bun run run.ts

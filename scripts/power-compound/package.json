@@ -1,0 +1,11 @@
+{
+  "name": "cheese-power-compound",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "bun run run.ts", "test": "bun test" },
+  "dependencies": {
+    "@wharfkit/session": "1.6.1",
+    "@wharfkit/wallet-plugin-privatekey": "1.1.0",
+    "@wharfkit/transact-plugin-resource-provider": "1.1.3"
+  }
+}
