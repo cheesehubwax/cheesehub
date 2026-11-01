@@ -111,6 +111,15 @@ export function getIpfsUrl(hash: string): string {
 export function extractIpfsHash(url: string): string | null {
   if (!url) return null;
 
+  // Normalized wallet artwork still needs its original hash for retry fallbacks.
+  if (url.startsWith('https://resizer.atomichub.io/')) {
+    try {
+      return new URL(url).searchParams.get('ipfs');
+    } catch {
+      return null;
+    }
+  }
+
   if (url.startsWith('ipfs://')) {
     return url.replace('ipfs://', '').split('/')[0];
   }

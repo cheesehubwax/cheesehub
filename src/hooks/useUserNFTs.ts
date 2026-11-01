@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { fetchWithFallback } from '@/lib/fetchWithFallback';
 import { ATOMIC_API } from '@/lib/waxConfig';
 import { waxRpcCall } from '@/lib/waxRpcFallback';
+import { preferredIpfsImageUrl } from '@/lib/ipfsGateways';
 
 export interface UserNFT {
   asset_id: string;
@@ -29,20 +30,12 @@ interface CachedNFTData {
 
 const IPFS_GATEWAY = 'https://ipfs.io/ipfs/';
 const CACHE_KEY_PREFIX = 'cheesehub_nfts_';
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 3;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-function getImageUrl(img: string | undefined, isIpfsHash = false): string {
+function getImageUrl(img: string | undefined): string {
   if (!img) return '/placeholder.svg';
-  if (img.startsWith('http')) return img;
-  if (img.startsWith('ipfs://')) {
-    const hash = img.replace('ipfs://', '');
-    return `${IPFS_GATEWAY}${hash}`;
-  }
-  if (img.startsWith('Qm') || img.startsWith('bafy') || img.startsWith('bafk')) {
-    return `${IPFS_GATEWAY}${img}`;
-  }
-  return img || '/placeholder.svg';
+  return preferredIpfsImageUrl(img);
 }
 
 // Helper to extract media URL from NFT data, with video fallback for video-only NFTs
@@ -56,7 +49,12 @@ function getMediaUrl(data: Record<string, string | undefined>): { url: string; i
   // Fallback to video field (common in video-only NFTs)
   const videoField = data.video;
   if (videoField) {
-    return { url: getImageUrl(videoField), isVideo: true };
+    const url = videoField.startsWith('ipfs://')
+      ? `${IPFS_GATEWAY}${videoField.slice(7)}`
+      : /^(Qm|bafy|bafk)/.test(videoField)
+        ? `${IPFS_GATEWAY}${videoField}`
+        : videoField;
+    return { url, isVideo: true };
   }
 
   return { url: '/placeholder.svg', isVideo: false };
