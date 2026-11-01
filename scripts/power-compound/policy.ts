@@ -24,6 +24,9 @@ export interface Voter {
   proxy: string;
   producers: string[];
   last_claim_time: string;
+  unpaid_voteshare_last_updated: string;
+  unpaid_voteshare: string;
+  unpaid_voteshare_change_rate: string;
 }
 
 export function utcMs(value: string): number {
@@ -34,7 +37,13 @@ export function utcMs(value: string): number {
 
 export function claimDue(voter: Voter, now: number): boolean {
   if (voter.owner !== ACCOUNT || !Array.isArray(voter.producers)) throw new Error('Invalid voter row');
-  if (!voter.proxy && voter.producers.length < 16) return false;
+  // Current WAX rewards may retain earned shares even after voting stops.
+  // Do not hardcode an obsolete producer-count threshold (global4 is mutable).
+  if (utcMs(voter.unpaid_voteshare_last_updated) <= 0) return false;
+  const shares = Number(voter.unpaid_voteshare);
+  const rate = Number(voter.unpaid_voteshare_change_rate);
+  if (!Number.isFinite(shares) || !Number.isFinite(rate) || shares < 0 || rate < 0) throw new Error('Invalid vote shares');
+  if (shares === 0 && rate === 0) return false;
   return now - utcMs(voter.last_claim_time) >= CLAIM_GAP_MS;
 }
 

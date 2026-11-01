@@ -15,7 +15,7 @@ async function post<T>(endpoint: string, path: string, body: unknown): Promise<T
 }
 
 export interface Info { chain_id: string; head_block_time: string; last_irreversible_block_num: number }
-export interface Account { account_name: string; core_liquid_balance?: string; permissions: PermissionRow[] }
+export interface Account { account_name: string; core_liquid_balance?: string; permissions: PermissionRow[]; refund_request?: unknown }
 
 export async function connect(): Promise<void> {
   await applyHealthOrder(endpoints, 'chain-api');

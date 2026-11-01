@@ -2,7 +2,8 @@ import { describe, expect, test } from 'bun:test';
 import { ACCOUNT, CLAIM_GAP_MS, claimDue, stakeExcess, stakeAction, validatePermission, waxAsset, waxUnits, type PermissionRow } from './policy';
 import { maintain } from './service';
 
-const voter = { owner: ACCOUNT, proxy: 'bigmikeproxy', producers: [], last_claim_time: '2026-10-30T10:50:43.500' };
+const voter = { owner: ACCOUNT, proxy: 'bigmikeproxy', producers: [], last_claim_time: '2026-10-30T10:50:43.500',
+  unpaid_voteshare_last_updated: '2026-10-30T10:51:09.500', unpaid_voteshare: '100', unpaid_voteshare_change_rate: '1' };
 const last = Date.parse('2026-10-30T10:50:43.500Z');
 
 describe('user maintenance rules', () => {
@@ -53,4 +54,17 @@ test('unconfirmed claim stops before staking', async () => {
   await expect(maintain({ read: async () => ({ balance: '900.00000000 WAX', voter, now: last + CLAIM_GAP_MS }),
     claim: async () => { throw new Error('timeout'); }, stake: async () => { stakes++; }, log: () => {} }, false)).rejects.toThrow('timeout');
   expect(stakes).toBe(0);
+});
+
+test('pending unstake refunds are not consumed by automation', async () => {
+  let stakes = 0;
+  await maintain({ read: async () => ({ balance: '900.00000000 WAX', voter, now: last, hasRefund: true }),
+    claim: async () => {}, stake: async () => { stakes++; }, log: () => {} }, false);
+  expect(stakes).toBe(0);
+});
+
+test('no previous vote or no reward shares means no claim', () => {
+  expect(claimDue({ ...voter, unpaid_voteshare_last_updated: '1970-01-01T00:00:00' }, last + CLAIM_GAP_MS)).toBe(false);
+  expect(claimDue({ ...voter, unpaid_voteshare: '0', unpaid_voteshare_change_rate: '0' }, last + CLAIM_GAP_MS)).toBe(false);
+  expect(claimDue({ ...voter, proxy: '', producers: [] }, last + CLAIM_GAP_MS)).toBe(true);
 });
