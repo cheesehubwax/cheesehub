@@ -6,9 +6,10 @@
 
 - CHEESECrypt edits resolve authenticated followups against an unambiguous content-and-transaction digest within the same sender/conversation; preserve original row identity/time and apply only complete in-window replacements. Voice edits use a flagged extra target part; owner logs derive from decrypted history only for currently public owned rooms, never central storage.
 
-- Crypt orb: source-controlled public image; preview uses its asset pointer (GitHub Pages can't serve Lovable-relative paths).
+- Crypt orb: public source image; preview uses its asset pointer (Pages cannot serve Lovable paths).
 
-- App/recorder token snapshots share a versioned schema/URL; chain-verify precisions, cache no prices, keep unavailable prices unknown to prevent fabricated valuations.
+- App/recorder snapshots share a versioned schema/URL; chain-verify precision, cache no prices, leave unavailable prices unknown.
+- Subdirectories have their own AGENTS.md; read before editing there.
 - CHEESEAir: preserve HMR identities for consumer-shaped memoized context slices; provider owns snapshots/selection/CSV, focused hooks own allocation/costs/run. Stable query fallbacks and per-account memoized row props isolate unrelated edits without freezing changed payouts. Use decimal integer ratios for pro-rata and complete bounded integer RAM plans; surface unsafe plans. Runner gates terms, concurrency, TX IDs and combined CHEESE delivery/resource budgets before any paid action.
 - CHEESEAir LP columns aggregate normalized underlying quantities; USD payout weights stay separate.
 - CHEESEAir suffix unions use timestamp cursors, bounded reads and complete-only cache; stalled providers flag partial results because indexes differ and skip stops at 10,000 rows.
