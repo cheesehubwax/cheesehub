@@ -28,8 +28,8 @@ export const CRYPT_DEFAULT_CONFIG: CryptConfig = {
   part_fee: '0.0100 CHEESE',
   recipient_fee: '0.0001 CHEESE',
   null_percent: 80,
-  max_recipients: 0,
-  max_parts: 0,
+  max_recipients: 49,
+  max_parts: 35,
   paused: false,
 };
 

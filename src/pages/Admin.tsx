@@ -18,6 +18,7 @@ import { useState } from 'react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Link } from 'react-router-dom';
+import { cryptPendingWarn, cryptBalanceWarn, powerzReserveWarn, nextClaimAt, claimOverdue, missingCompoundLinks, POWERZ_RESERVE_WAX } from '@/lib/adminAutomation';
 import { Button } from '@/components/ui/button';
 
 export default function Admin() {
@@ -84,6 +85,23 @@ export default function Admin() {
     : (lowWaxReserve || lowCheesePool || (data?.ramConfig != null && !data.ramConfig.sellEnabled))
       ? 'warn'
       : 'ok';
+
+  const crypt = data?.cryptStatus ?? null;
+  const cryptPending = crypt != null && cryptPendingWarn(crypt);
+  const cryptHolding = crypt != null && cryptBalanceWarn(crypt.cheeseBalance);
+  const cryptStatus: 'ok' | 'warn' | 'critical' = crypt == null
+    ? 'warn'
+    : crypt.config.paused ? 'critical' : (cryptPending || cryptHolding) ? 'warn' : 'ok';
+
+  const auto = data?.powerzAutomation ?? null;
+  const missingLinks = auto ? missingCompoundLinks(auto) : [];
+  const reserveHigh = auto != null && powerzReserveWarn(auto.liquidWax);
+  const overdue = auto != null && claimOverdue(auto.lastClaim, new Date());
+  const nextClaim = auto ? nextClaimAt(auto.lastClaim) : null;
+  const powerzStatus: 'ok' | 'warn' | 'critical' = auto == null
+    ? 'warn'
+    : missingLinks.length > 0 ? 'critical' : (reserveHigh || overdue) ? 'warn' : 'ok';
+  const fmtTime = (d: Date | null) => d ? d.toISOString().replace('T', ' ').slice(0, 16) + ' UTC' : '—';
 
   return (
     <Layout>
@@ -188,6 +206,8 @@ export default function Admin() {
                       ? `${data.deviations.bannadCheese >= 0 ? '+' : ''}${data.deviations.bannadCheese.toFixed(2)}% (informational)`
                       : '—',
                   },
+                  { label: 'Revenue Split', value: '10% burner / 20% powerz / 20% ram.chz / 50% buyback' },
+                  { label: 'Buyback CHEESE', value: '66% nulled / 34% xcheeseliqst' },
                   { label: 'Admins', value: data.bannadAdmins.length },
                 ]}
               >
@@ -204,11 +224,53 @@ export default function Admin() {
               <ContractStatusCard
                 title="cheesepowerz"
                 icon={<Lightning className="h-5 w-5 text-purple-400" />}
-                status="ok"
+                status={powerzStatus}
                 rows={[
                   { label: 'Total Powerups', value: data.powerzStats?.total_powerups?.toLocaleString() ?? '—' },
                   { label: 'WAX Spent', value: data.powerzStats?.total_wax_spent ?? '—' },
                   { label: 'CHEESE Received', value: data.powerzStats?.total_cheese_received ?? '—' },
+                  {
+                    label: `Liquid WAX (reserve ${POWERZ_RESERVE_WAX})`,
+                    value: auto?.liquidWax != null ? `${auto.liquidWax.toFixed(4)} WAX` : '—',
+                    warn: reserveHigh,
+                  },
+                  { label: 'CPU Self-staked', value: auto?.cpuStakedWax != null ? `${auto.cpuStakedWax.toFixed(4)} WAX` : '—' },
+                  { label: 'Last Vote Claim', value: fmtTime(auto?.lastClaim ?? null) },
+                  { label: 'Next Claim (24h 5m)', value: fmtTime(nextClaim), warn: overdue },
+                  {
+                    label: 'compound Key Links',
+                    value: auto == null
+                      ? '—'
+                      : missingLinks.length === 0
+                        ? <Badge className="bg-green-500/20 text-green-400">claimgbmvote + delegatebw</Badge>
+                        : <Badge className="bg-red-500/20 text-red-400">Missing: {missingLinks.join(', ')}</Badge>,
+                    critical: missingLinks.length > 0,
+                  },
+                ]}
+              />
+
+              {/* crypt.cheese */}
+              <ContractStatusCard
+                title="crypt.cheese"
+                icon={<span className="text-lg leading-none">🔐</span>}
+                status={cryptStatus}
+                rows={[
+                  {
+                    label: 'Status',
+                    value: crypt == null
+                      ? <Badge variant="outline">Unavailable</Badge>
+                      : crypt.config.paused
+                        ? <Badge className="bg-red-500/20 text-red-400">Paused</Badge>
+                        : <Badge className="bg-green-500/20 text-green-400">Live</Badge>,
+                    critical: crypt?.config.paused,
+                  },
+                  { label: 'Config', value: crypt == null ? '—' : crypt.usingDefaults ? 'Using built-in defaults (setconfig not run)' : 'On-chain config' },
+                  { label: 'Fee per Part', value: crypt?.config.part_fee ?? '—' },
+                  { label: 'Fee per Recipient', value: crypt?.config.recipient_fee ?? '—' },
+                  { label: 'Split', value: crypt ? `${crypt.config.null_percent}% nulled / ${100 - crypt.config.null_percent}% xcheeseliqst` : '—' },
+                  { label: 'Max Recipients / Parts', value: crypt ? `${crypt.config.max_recipients} / ${crypt.config.max_parts}` : '—' },
+                  { label: 'Pending Payments', value: crypt?.pendingCount ?? '—', warn: cryptPending },
+                  { label: 'CHEESE Held (should be 0)', value: crypt?.cheeseBalance != null ? `${crypt.cheeseBalance.toFixed(4)} CHEESE` : '—', warn: cryptHolding },
                 ]}
               />
 
