@@ -21,6 +21,19 @@ const base = { asset_id: '1099', name: 'Squeak', image: 'https://x/img.png', col
 describe('NFT tiles in CHEESECrypt chats', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it('a sound effect seen for the first time autoplays, and never again after a reload', async () => {
+    h.fetch.mockResolvedValue({ ...base, isSfx: true, tracks: [{ url: 'https://x/s.mp3', label: 'Main' }] });
+    mount(<CryptNftCard assetId="1099" autoplayKey="alice|old-msg:0" />);
+    await screen.findByRole('button', { name: 'Play sound effect Squeak' });
+    expect(h.toggle).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(localStorage.getItem('crypt-sfx-played-v1') || '[]')).toContain('alice|old-msg:0');
+    vi.resetModules();
+    const { CryptNftCard: Reloaded } = await import('@/components/crypt/CryptNftCard');
+    mount(<Reloaded assetId="1099" autoplayKey="alice|old-msg:0" />);
+    await screen.findAllByRole('button', { name: 'Play sound effect Squeak' });
+    expect(h.toggle).toHaveBeenCalledTimes(1);
+  });
+
   it('sound effects play when the picture is clicked and open no larger view', async () => {
     h.fetch.mockResolvedValue({ ...base, isSfx: true, tracks: [{ url: 'https://x/s.mp3', label: 'Main' }] });
     mount(<CryptNftCard assetId="1099" txId="abcdef1234567890" />);
@@ -80,13 +93,15 @@ describe('NFT tiles in CHEESECrypt chats', () => {
     expect(await screen.findByText('📹 Video unavailable')).toBeTruthy();
   });
 
-  it('other NFTs open a larger view with name, collection, asset ID and transaction link', async () => {
+  it('other NFTs open a larger view with name and transaction link but no ID, collection or explorer link', async () => {
     h.fetch.mockResolvedValue({ ...base, name: 'Cheese Wheel', isSfx: false, tracks: [] });
     mount(<CryptNftCard assetId="1099" txId="abcdef1234567890" />);
     fireEvent.click(await screen.findByRole('button', { name: 'View Cheese Wheel larger' }));
     const dialog = await screen.findByRole('dialog');
-    expect(dialog.textContent).toContain('cheesesounds · #7');
-    expect(screen.getByRole('link', { name: 'ID 1099' }).getAttribute('href')).toBe('https://atomichub.io/explorer/asset/wax-mainnet/1099');
+    expect(dialog.textContent).not.toContain('cheesesounds');
+    expect(dialog.textContent).not.toContain('1099');
+    expect(dialog.textContent).not.toContain('#7');
+    expect(dialog.querySelector('a[href*="atomichub"]')).toBeNull();
     expect(screen.getByRole('link', { name: /Transaction abcdef12/ }).getAttribute('href')).toBe('https://waxblock.io/transaction/abcdef1234567890');
   });
 });
