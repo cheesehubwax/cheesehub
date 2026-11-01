@@ -15,6 +15,8 @@ export interface BannerAdStats {
   cheeseBurnt: number;
   waxToCheesepowerz: number;
   waxToCheeseburner: number;
+  /** WAX sent to ram.chz (rentals after the 10/20/20/50 split update) */
+  waxToRamChz: number;
 }
 
 /** Count rented slots from the bannerads table (user !== contract) */
@@ -62,12 +64,13 @@ async function fetchCheeseBurnt(): Promise<number> {
 
 
 export async function fetchBannerAdStats(): Promise<BannerAdStats> {
-  const [totalAdsRented, cheeseBurnt, waxToCheesepowerz, waxToCheeseburner] = await Promise.all([
+  const [totalAdsRented, cheeseBurnt, waxToCheesepowerz, waxToCheeseburner, waxToRamChz] = await Promise.all([
     fetchTotalAdsRented(),
     fetchCheeseBurnt(),
     fetchWaxTransfers('cheesepowerz'),
     fetchWaxTransfers('cheeseburner'),
+    fetchWaxTransfers('ram.chz'),
   ]);
 
-  return { totalAdsRented, cheeseBurnt, waxToCheesepowerz, waxToCheeseburner };
+  return { totalAdsRented, cheeseBurnt, waxToCheesepowerz, waxToCheeseburner, waxToRamChz };
 }
