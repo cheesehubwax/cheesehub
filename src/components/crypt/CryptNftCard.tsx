@@ -60,7 +60,8 @@ function TxLink({ txId }: { txId: string }) {
  * autoplays once when it arrives while the chat is open, no caption, no dialog.
  * Video NFTs: the tile shows a ▶ overlay and the larger view plays the video; a music NFT with an
  * attached music video keeps streaming audio in the bubble and gets a "Watch video" toggle instead.
- * Every other NFT: a tile that opens a larger view with picture, name, collection, asset ID and transaction link.
+ * Every other NFT: a tile that opens a larger view with picture, name, artist and transaction link
+ * (no asset ID, collection, mint number or explorer links are shown).
  * `autoplayKey` is set only for messages that arrived while the chat was open.
  */
 export function CryptNftCard({ assetId, autoplayKey, txId }: { assetId: string; autoplayKey?: string; txId?: string }) {
@@ -84,7 +85,7 @@ export function CryptNftCard({ assetId, autoplayKey, txId }: { assetId: string; 
   const picture = (cls: string) => hasImage ? <IpfsImage src={data!.image} alt={data!.name} className={cls} />
     : <div className="aspect-square w-full flex items-center justify-center text-2xl">{isLoading ? '⏳' : tracks.length ? '🎵' : video ? '🎬' : '🖼️'}</div>;
 
-  if (!data) return <span className="block w-44 my-1 text-xs italic opacity-80">{isLoading ? '⏳ Loading NFT…' : `🖼️ NFT #${assetId} (unavailable)`}</span>;
+  if (!data) return <span className="block w-44 my-1 text-xs italic opacity-80">{isLoading ? '⏳ Loading NFT…' : '🖼️ NFT unavailable'}</span>;
 
   if (data.isSfx) {
     const playing = audioState.key === sfxKey && audioState.playing;
@@ -116,10 +117,8 @@ export function CryptNftCard({ assetId, autoplayKey, txId }: { assetId: string; 
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="max-w-3xl p-4 max-h-[90dvh] overflow-y-auto">
         <DialogTitle className="text-primary">{heading}</DialogTitle>
-        <DialogDescription>
-          {[data.artist, data.collection, data.mint && `#${data.mint}`].filter(Boolean).join(' · ')}{' · '}
-          <a className="underline underline-offset-2" target="_blank" rel="noreferrer"
-            href={`https://atomichub.io/explorer/asset/wax-mainnet/${encodeURIComponent(assetId)}`}>ID {assetId}</a>
+        <DialogDescription className={data.artist ? undefined : 'sr-only'}>
+          {data.artist || `Larger view of ${heading}`}
         </DialogDescription>
         {showVideo
           ? <CryptVideo url={video!} poster={hasImage ? data.image : undefined} label={`Video for ${heading}`} />
