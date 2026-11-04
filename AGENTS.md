@@ -6,7 +6,7 @@
 
 - CHEESECrypt edits resolve authenticated followups against an unambiguous content-and-transaction digest within the same sender/conversation; preserve original row identity/time and apply only complete in-window replacements. Voice edits use a flagged extra target part; owner logs derive from decrypted history only for currently public owned rooms, never central storage.
 
-- Crypt orb: public source image; preview uses its asset pointer (Pages cannot serve Lovable paths).
+- Crypt orb: public image; preview uses asset pointer (Pages can't serve Lovable paths).
 
 - App/recorder snapshots share a versioned schema/URL; chain-verify precision, cache no prices, leave unavailable prices unknown.
 - Subdirectories have their own AGENTS.md; read before editing there.
