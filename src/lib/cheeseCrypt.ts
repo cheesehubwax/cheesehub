@@ -8,6 +8,7 @@
  * original GPKM1: / GPKMKEY1: prefixes so existing messages and published keys keep working.
  * Key file types (gpk-msg-key / gpk-msg-pubkey) are unchanged so backups keep loading.
  */
+import { loadRouterCache, saveRouterTx } from "./cryptRouterCache";
 import nacl from 'tweetnacl';
 import { parseCryptName, saveCryptName } from '@/lib/cryptNames';
 import { CryptAvatar, parseAvatar } from '@/lib/cryptAvatar';
