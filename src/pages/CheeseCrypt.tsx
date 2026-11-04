@@ -571,7 +571,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const oldest = Math.min(...memos.map(m => m.time));
     if ((listedIds.size > 0 && clock - oldest < 72 * 60 * 60 * 1000) || editableConversations.some(m => (m.text?.startsWith('\u0005E1:') || m.voice?.editTarget) && !edited.log.some(e => e.replacement.editTxId === m.txId))) setDepth(d => Math.min(MAX_HISTORY_PAGES, d + 1));
   }, [memos, depth, listedIds, clock, editableConversations, edited]);
-  const conversations = edited.messages;
+  // Reactions are control rows: kept out of chat, unread counts, search and replies.
+  const reactionRows = useMemo(() => edited.messages.filter(m => isReaction(m.text)), [edited.messages]);
+  const conversations = useMemo(() => edited.messages.filter(m => !isReaction(m.text)), [edited.messages]);
   useEffect(() => {
     // Restore retained policies on another device by reading the bounded history window in full.
     if (Object.keys(invites).length && loaded && depth < MAX_HISTORY_PAGES) setDepth(d => d + 1);
@@ -727,9 +729,13 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const recipients = (editingMessage ? originalRecipients : currentRecipients).filter(a => activeModeration?.bans[a] === undefined);
   const missingKeys = activeInvite ? [] : recipients.filter(m => !contacts[m]);
   useEffect(() => { setReplyingTo(null); }, [active]);
-  const thread = activeInvite ? conversations.filter(m => m.igroup === activeInvite.invite.id) : conversations.filter(m => activeGroup
+  const inThread = (m: ConversationEntry) => activeInvite ? m.igroup === activeInvite.invite.id : activeGroup
     ? m.group?.id === activeGroup.id && m.group.members.join(',') === activeGroup.members.join(',')
-    : isDirectMessage(m, account, active));
+    : isDirectMessage(m, account, active);
+  const thread = conversations.filter(inThread);
+  const threadReactions = activeReactions(reactionRows.filter(inThread), new Set(thread.map(m => targetRef(m.from, m.time))));
+  const pillsByTarget = reactionPills(threadReactions, account);
+  const rowForTarget = new Map(thread.map(m => [targetRef(m.from, m.time), { key: m.key, time: m.time }]));
   const searchMatches = useMemo(() => searchOpen ? findMatches(thread, searchQuery, revealed) : [], [searchOpen, thread, searchQuery, revealed]);
   const searchMatchSet = useMemo(() => new Set(searchMatches), [searchMatches]);
   const currentMatch = searchMatches.length ? searchMatches[Math.min(searchIndex, searchMatches.length - 1)] : null;
@@ -799,6 +805,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     const next = { ...readMarks, [active]: time };
     saveReadMarks(account, next); setReadMarks(next);
   });
+  const reactionNavigation = useCryptReactionNavigation(account, active, threadReactions, rowForTarget, resumeAt, listRef);
   // Reports addressed to me in the open room, matched to their message row by author + pre-edit digest.
   const reportedRows = useMemo(() => {
     if (!activeInvite || activeInvite.status !== 'joined') return [] as { report: string; key: string }[];
