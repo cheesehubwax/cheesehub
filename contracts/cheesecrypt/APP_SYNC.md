@@ -38,6 +38,7 @@ or redeployment is required for these paths.
 | Authenticated original sender (`cheeseCrypt.ts`, `cryptGroups.ts`) | REQUIRED new trace adapter: verify sendmsg authority + inline transfer ancestry; normalize sender before decryption/authority replay |
 | TX IDs, Greymass Fuel, success before local state | Keep existing signing requirements; verify router delivery traces and rollback on testnet |
 | Account recovery and tab sync (`cryptRestore.ts`) | Client-only: outgoing authenticated DM proves friendship; matching own join/request proves room consent; listing keys remain scoped; no router change |
+| Emoji reactions (`cryptReactions.ts`) | Client-only: an ordinary encrypted message (`\u0006R1:` control line) to the same recipients; alerts are local receipts; must keep working when fees move into crypt.cheese; no router change |
 | Zero custody: no stored user balances | Payment transfer + `sendmsg` in one atomic transaction; transient `pending` row consumed same-tx, change refunded inline; `reclaim` only for orphaned payments |
 
 Only tables: `config`, `pending` (transient, erased on use). Only explicit actions: `setconfig`,
