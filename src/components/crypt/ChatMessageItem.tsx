@@ -19,12 +19,14 @@ import { messageCost } from '@/lib/cheeseCrypt';
 import type { EditedMessage } from '@/lib/cryptEdits';
 
 /** Pure sound-effect-NFT posts render without the bubble box — sender header, playback and timestamp stay. */
-export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, editable, onEdit, onCollapse, canReveal, revealed, onReveal, badges, onMute, ban, adminToggle, report, reportHighlighted, friend }: {
+export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, searchHit, editable, onEdit, onCollapse, canReveal, revealed, onReveal, badges, onMute, ban, adminToggle, report, reportHighlighted, friend }: {
   m: EditedMessage; account: string; keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>;
   contacts: Record<string, string>; active: string; activeGroup: CryptGroup | null;
   nameFor: (id: string) => string; openedAt: { current: number };
   onReply: (m: ConversationEntry) => void; onOpenQuote: (ref: ReplyRef) => void;
   highlighted: boolean;
+  /** In-chat search: 'current' is the selected match, 'match' any other hit. */
+  searchHit?: 'current' | 'match';
   editable?: boolean; onEdit?: (m: ConversationEntry) => void;
   /** Public-room moderation: collapse action (when allowed) and moderator-only reveal of collapsed rows. */
   onCollapse?: () => void; canReveal?: boolean; revealed?: boolean; onReveal?: () => void;
@@ -57,6 +59,7 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
     <li data-reply-key={m.key} data-reply-highlighted={highlighted || undefined} data-report-highlighted={reportHighlighted || undefined} className={cn('w-fit max-w-[80%] text-sm',
       bare ? (m.from === account ? 'ml-auto py-1' : 'py-1') : m.from === account
         ? 'ml-auto rounded-lg px-3 py-2 bg-cheese/20 border border-cheese/30' : 'rounded-lg px-3 py-2 bg-muted',
+      searchHit === 'match' && 'ring-1 ring-cheese/50', searchHit === 'current' && 'ring-2 ring-cheese bg-cheese/10',
       highlighted && 'ring-2 ring-reply bg-reply/10', reportHighlighted && 'ring-2 ring-report bg-report/10')}>
       <div className="flex items-center gap-2 mb-1">
         <PixelAvatar account={m.from} avatar={m.from === account ? keyAvatar : avatars[m.from]} className="h-6 w-6" />

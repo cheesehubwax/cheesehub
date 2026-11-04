@@ -11,7 +11,8 @@ import { buildProfileNoteBatches, isProfileNote, latestProfiles, profileNoteCost
 import { ProfileShareDialog } from '@/components/crypt/ProfileShareDialog';
 import { addBlocked, loadBlocked, removeBlocked, saveBlocked, withoutBlocked } from '@/lib/cryptBlocklist';
 import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
-import { Eye, EyeOff, Loader2, Upload, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, EyeOff, Loader2, Search, Upload, X } from 'lucide-react';
+import { findMatches } from '@/lib/cryptSearch';
 import { useWax } from '@/context/WaxContext';
 import { useWaxTransaction } from '@/hooks/useWaxTransaction';
 import { useToast } from '@/hooks/use-toast';
@@ -211,6 +212,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [seenReports, setSeenReports] = useState<string[]>(() => loadSeenReports(account));
   const [reportFocus, setReportFocus] = useState<string | null>(null);
   const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
+  /** In-chat keyword search: local only, over decrypted messages already on screen. */
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchIndex, setSearchIndex] = useState(0);
   const [savedControls, setSavedControls] = useState(() => loadModerationMemos(account));
   const [replyingTo, setReplyingTo] = useState<ReplyRef | null>(null);
   const [openQuote, setOpenQuote] = useState<ReplyRef | null>(null);
@@ -725,6 +730,15 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const thread = activeInvite ? conversations.filter(m => m.igroup === activeInvite.invite.id) : conversations.filter(m => activeGroup
     ? m.group?.id === activeGroup.id && m.group.members.join(',') === activeGroup.members.join(',')
     : isDirectMessage(m, account, active));
+  const searchMatches = useMemo(() => searchOpen ? findMatches(thread, searchQuery, revealed) : [], [searchOpen, thread, searchQuery, revealed]);
+  const searchMatchSet = useMemo(() => new Set(searchMatches), [searchMatches]);
+  const currentMatch = searchMatches.length ? searchMatches[Math.min(searchIndex, searchMatches.length - 1)] : null;
+  useEffect(() => { setSearchIndex(Math.max(0, searchMatches.length - 1)); }, [searchQuery, active]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setSearchOpen(false); setSearchQuery(''); }, [active]);
+  useEffect(() => {
+    if (currentMatch) listRef.current?.querySelector<HTMLElement>(`[data-reply-key="${CSS.escape(currentMatch)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [currentMatch]);
+  const stepSearch = (dir: 1 | -1) => { if (searchMatches.length) setSearchIndex(i => (Math.min(i, searchMatches.length - 1) + dir + searchMatches.length) % searchMatches.length); };
 
   // Unread badges: first load on this device marks existing history read; afterwards only newer incoming messages count.
   useEffect(() => {
@@ -1683,6 +1697,20 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 })()}
               </DialogContent>
             </Dialog>
+            <div className="flex items-center gap-2 border-b border-border px-4 py-1.5">
+              {searchOpen ? <>
+                <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                <Input autoFocus value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search this chat…" aria-label="Search this chat"
+                  className="h-7 flex-1 text-xs"
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); stepSearch(e.shiftKey ? 1 : -1); } if (e.key === 'Escape') { setSearchOpen(false); setSearchQuery(''); } }} />
+                <span className="shrink-0 text-[11px] text-muted-foreground" aria-live="polite">
+                  {searchQuery.trim() ? (searchMatches.length ? `${searchMatches.length - Math.min(searchIndex, searchMatches.length - 1)} of ${searchMatches.length}` : 'No matches') : ''}
+                </span>
+                <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Older match" disabled={!searchMatches.length} onClick={() => stepSearch(-1)}><ChevronUp className="h-4 w-4" /></Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Newer match" disabled={!searchMatches.length} onClick={() => stepSearch(1)}><ChevronDown className="h-4 w-4" /></Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Close search" onClick={() => { setSearchOpen(false); setSearchQuery(''); }}><X className="h-4 w-4" /></Button>
+              </> : <Button size="sm" variant="ghost" className="ml-auto h-7 gap-1 text-xs font-normal" onClick={() => setSearchOpen(true)}><Search className="h-3.5 w-3.5" /> Search chat</Button>}
+            </div>
             <div className="relative flex min-h-0 flex-1">
             <ol ref={listRef} aria-label="Chat messages" className="min-h-0 flex-1 overflow-y-auto space-y-2 p-4"
               onScroll={(e) => { const el = e.currentTarget; nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; replyNavigation.inspectVisible(); }}>
@@ -1699,7 +1727,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                   )}
                   <ChatMessageItem m={m} account={account} keyAvatar={key?.avatar} avatars={shownAvatars}
                     contacts={contacts} active={active} activeGroup={activeGroup} nameFor={nameFor}
-                    highlighted={replyNavigation.highlighted.has(m.key)} reportHighlighted={reportFocus === m.key} report={reportAction(m)}
+                    highlighted={replyNavigation.highlighted.has(m.key)} searchHit={searchMatchSet.has(m.key) ? (currentMatch === m.key ? 'current' : 'match') : undefined} reportHighlighted={reportFocus === m.key} report={reportAction(m)}
                     editable={canEdit(m, account, clock) && !busy && !roomRestricted && (!activeInvite || activeInvite.status === 'joined')} onEdit={beginEdit}
                     onReply={(x) => { setEditingMessage(null); setReplyingTo({ author: x.from, time: x.time, quote: quoteOf(x.text, !!x.voice) }); setVoice(null); setTimeout(() => composerRef.current?.focus(), 0); }}
                     canReveal={myRoomRole !== 'member'} revealed={revealed.has(m.key)} onReveal={() => setRevealed(s => new Set(s).add(m.key))}
