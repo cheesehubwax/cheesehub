@@ -17,14 +17,18 @@ import { voiceNoteCost } from '@/lib/cryptVoice';
 import { groupMessageCost, type ConversationEntry, type CryptGroup } from '@/lib/cryptGroups';
 import { messageCost } from '@/lib/cheeseCrypt';
 import type { EditedMessage } from '@/lib/cryptEdits';
+import { REACTION_EMOJIS, type ReactionEmoji, type ReactionPill } from '@/lib/cryptReactions';
 
 /** Pure sound-effect-NFT posts render without the bubble box — sender header, playback and timestamp stay. */
-export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, searchHit, editable, onEdit, onCollapse, canReveal, revealed, onReveal, badges, onMute, ban, adminToggle, report, reportHighlighted, friend }: {
+export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, reactionHighlighted, reactions, onReact, searchHit, editable, onEdit, onCollapse, canReveal, revealed, onReveal, badges, onMute, ban, adminToggle, report, reportHighlighted, friend }: {
   m: EditedMessage; account: string; keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>;
   contacts: Record<string, string>; active: string; activeGroup: CryptGroup | null;
   nameFor: (id: string) => string; openedAt: { current: number };
   onReply: (m: ConversationEntry) => void; onOpenQuote: (ref: ReplyRef) => void;
   highlighted: boolean;
+  /** Landed on via the 🧀 reaction alert button (separate from reply highlights). */
+  reactionHighlighted?: boolean;
+  reactions?: ReactionPill[]; onReact?: (emoji: ReactionEmoji) => void;
   /** In-chat search: 'current' is the selected match, 'match' any other hit. */
   searchHit?: 'current' | 'match';
   editable?: boolean; onEdit?: (m: ConversationEntry) => void;
@@ -60,7 +64,7 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
       bare ? (m.from === account ? 'ml-auto py-1' : 'py-1') : m.from === account
         ? 'ml-auto rounded-lg px-3 py-2 bg-cheese/20 border border-cheese/30' : 'rounded-lg px-3 py-2 bg-muted',
       searchHit === 'match' && 'ring-1 ring-cheese/50', searchHit === 'current' && 'ring-2 ring-cheese bg-cheese/10',
-      highlighted && 'ring-2 ring-reply bg-reply/10', reportHighlighted && 'ring-2 ring-report bg-report/10')}>
+      highlighted && 'ring-2 ring-reply bg-reply/10', reactionHighlighted && 'outline outline-2 outline-offset-2 outline-cheese', reportHighlighted && 'ring-2 ring-report bg-report/10')}>
       <div className="flex items-center gap-2 mb-1">
         <PixelAvatar account={m.from} avatar={m.from === account ? keyAvatar : avatars[m.from]} className="h-6 w-6" />
         <p className="text-[10px] font-semibold opacity-80 break-words">{m.from === account ? `you · ${nameFor(account)}` : nameFor(m.from)}{badges && (badges.owner || badges.admin || badges.founder) && <span className="ml-1 inline-flex items-center gap-1 align-middle">
@@ -80,6 +84,13 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
         {m.voice ? <VoiceNoteBubble note={m.voice} /> : body != null ? parseNftMessage(body).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} autoplayKey={`${account}|${m.key}:${i}`} txId={m.txId} /> : <span key={i} className="block">{splitYoutube(seg.text).map((y, j) => y.type === 'youtube' ? <CryptYoutubeEmbed key={j} link={y.link} /> : <span key={j}>{y.text}</span>)}</span>) : <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
       </div>
       </>}
+      {!hidden && reactions && reactions.length > 0 && <div className="mt-1 flex flex-wrap gap-1">
+        {reactions.map(r => <button key={r.emoji} type="button" disabled={!onReact} onClick={() => onReact?.(r.emoji)}
+          title={r.from.map(nameFor).join(', ')} aria-label={`${r.emoji} ${r.count}${r.mine ? ', including you' : ''}`} aria-pressed={r.mine}
+          className={cn('rounded-full border px-1.5 py-0.5 text-xs leading-none', r.mine ? 'border-cheese bg-cheese/20' : 'border-border bg-background/60', onReact && 'hover:bg-cheese/30')}>
+          {r.emoji} {r.count}
+        </button>)}
+      </div>}
       <p className="text-[10px] opacity-70 mt-1">
         {new Date(m.time).toLocaleString()}{m.editedAt && <span title={new Date(m.editedAt).toLocaleString()}> · (edited)</span>}{m.igroup ? null : ' · '}{m.igroup ? null : m.voice ? `${voiceNoteCost(m.parts, m.group ? m.group.members.length - 1 : 1)} at current rate` : m.group ? `${groupMessageCost(m.parts, m.group.members.length - 1, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))} at current rate` : messageCost(m.parts, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))}
         {m.parts > 1 && ` · ${m.parts} parts`}
@@ -90,6 +101,9 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
     </li>
     </ContextMenuTrigger>
     <ContextMenuContent>
+      {canReply && onReact && <div role="group" aria-label="React" className="flex gap-0.5 px-1 py-1">
+        {REACTION_EMOJIS.map(e => <ContextMenuItem key={e} aria-label={`React ${e}`} className="px-1.5 text-base" onSelect={() => onReact(e)}>{e}</ContextMenuItem>)}
+      </div>}
       {canReply && <ContextMenuItem onSelect={() => onReply(m)}>↩️ Reply</ContextMenuItem>}
       {editable && onEdit && !hidden && <ContextMenuItem onSelect={() => onEdit(m)}>✏️ Edit</ContextMenuItem>}
       {onCollapse && !m.collapsed && <ContextMenuItem onSelect={onCollapse}>🙈 Collapse message</ContextMenuItem>}
