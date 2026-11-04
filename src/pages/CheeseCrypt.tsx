@@ -212,6 +212,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [seenReports, setSeenReports] = useState<string[]>(() => loadSeenReports(account));
   const [reportFocus, setReportFocus] = useState<string | null>(null);
   const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
+  /** In-chat keyword search: local only, over decrypted messages already on screen. */
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchIndex, setSearchIndex] = useState(0);
   const [savedControls, setSavedControls] = useState(() => loadModerationMemos(account));
   const [replyingTo, setReplyingTo] = useState<ReplyRef | null>(null);
   const [openQuote, setOpenQuote] = useState<ReplyRef | null>(null);
