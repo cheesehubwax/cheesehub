@@ -8,6 +8,7 @@
  * original GPKM1: / GPKMKEY1: prefixes so existing messages and published keys keep working.
  * Key file types (gpk-msg-key / gpk-msg-pubkey) are unchanged so backups keep loading.
  */
+import { loadRouterCache, saveRouterTx } from "./cryptRouterCache";
 import nacl from 'tweetnacl';
 import { parseCryptName, saveCryptName } from '@/lib/cryptNames';
 import { CryptAvatar, parseAvatar } from '@/lib/cryptAvatar';
@@ -413,7 +414,7 @@ export function expandRouterActions(txId: string, time: number, actions: unknown
 
 const routerTxCache = new Map<string, ChainMemo[]>();
 async function routerTransaction(txId: string, time: number): Promise<ChainMemo[] | null> {
-  const hit = routerTxCache.get(txId);
+  const hit = routerTxCache.get(txId) ?? (await loadRouterCache()).get(txId);
   if (hit) return hit;
   for (const raw of await resolveEndpoints('hyperion-v2')) {
     const base = normalizeEndpoint(raw);
@@ -427,6 +428,7 @@ async function routerTransaction(txId: string, time: number): Promise<ChainMemo[
       const rows = expandRouterActions(txId, time, j.actions);
       if (routerTxCache.size > 5000) routerTxCache.clear();
       routerTxCache.set(txId, rows);
+      void saveRouterTx(txId, time, rows);
       return rows;
     } catch { benchEndpoint(base); }
   }
@@ -440,8 +442,9 @@ export async function resolveRouterRows(account: string, rows: ChainMemo[]): Pro
   for (const r of rows) if (r.from === CRYPT_ROUTER_ACCOUNT || r.to === CRYPT_ROUTER_ACCOUNT) if (!txs.has(r.txId)) txs.set(r.txId, r.time);
   const entries = [...txs];
   const resolved: ChainMemo[] = [];
-  for (let i = 0; i < entries.length; i += 4) {
-    const batch = await Promise.all(entries.slice(i, i + 4).map(([id, time]) => routerTransaction(id, time)));
+  await loadRouterCache();
+  for (let i = 0; i < entries.length; i += 8) {
+    const batch = await Promise.all(entries.slice(i, i + 8).map(([id, time]) => routerTransaction(id, time)));
     for (const b of batch) if (b) resolved.push(...b.filter(m => m.from === account || m.to === account));
   }
   return direct.concat(resolved);
