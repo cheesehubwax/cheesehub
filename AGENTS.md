@@ -9,7 +9,7 @@
 - Crypt orb: public image; preview uses asset pointer (Pages can't serve Lovable paths).
 
 - App/recorder snapshots share a versioned schema/URL; chain-verify precision, cache no prices, leave unavailable prices unknown.
-- Subdirectories have their own AGENTS.md; read before editing there.
+- Subdirectories have own AGENTS.md; read before editing.
 - CHEESEAir: preserve HMR identities for consumer-shaped memoized context slices; provider owns snapshots/selection/CSV, focused hooks own allocation/costs/run. Stable query fallbacks and per-account memoized row props isolate unrelated edits without freezing changed payouts. Use decimal integer ratios for pro-rata and complete bounded integer RAM plans; surface unsafe plans. Runner gates terms, concurrency, TX IDs and combined CHEESE delivery/resource budgets before any paid action.
 - CHEESEAir LP columns aggregate normalized underlying quantities; USD payout weights stay separate.
 - CHEESEAir suffix unions use timestamp cursors, bounded reads and complete-only cache; stalled providers flag partial results because indexes differ and skip stops at 10,000 rows.
@@ -45,4 +45,4 @@
 - CHEESEFolio UI: pure ledger/cost/format logic lives in lib/folio and components/folio/format; the page composes useFolio, useFolioCurrency and useFolioHoldings with one component per file, keeping figures testable without rendering; holding rows are memoized by displayed values (rows are rebuilt each price tick) with stable callbacks/empty fallbacks so unchanged tokens skip redrawing.
 - Crypt Discover is curated, display-only: only cheesebannad admins' listings show (fail closed, last-good cache) and only admins list. Suppression: CRYPTHIDE1: 0.0001 CHEESE eosio.null memos from cheesebannad admins (managed only on /admin), newest per room/account wins, full admin histories, last-good cache; filters only the Discover list, never owner listing state, membership or chain data. CRYPTREPORT1: room reports use fixed reason codes (no chain free text), one per reporter, owners excluded; notify-only, never auto-hide.
 - CHEESENull's CHEESECrypt row: crypt.cheese nulls plus user eosio.null legs matched by Crypt fee-label constants, counted once.
-- Crypt router lookups persist in IndexedDB only when >5 min old (final).
+- Crypt router lookups persist (IndexedDB) only if >5min old.
