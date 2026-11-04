@@ -1,7 +1,7 @@
 // In-chat keyword search over already-decrypted messages. Runs locally only; nothing is sent or stored.
 import { parseReply } from '@/lib/cryptReply';
 
-type Searchable = { key: string; text: string | null; collapsed?: boolean };
+type Searchable = { key: string; text: string | null; collapsed?: unknown };
 
 /** Human text a message shows: reply body only (not the quote), NFT tokens removed. Voice/no-text → ''. */
 export function searchableText(text: string | null): string {
