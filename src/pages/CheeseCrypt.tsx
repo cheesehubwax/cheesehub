@@ -19,6 +19,8 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { encodeReply, parseReply, quoteOf, type ReplyRef } from '@/lib/cryptReply';
 import { useCryptReplyNavigation } from '@/hooks/useCryptReplyNavigation';
+import { useCryptReactionNavigation } from '@/hooks/useCryptReactionNavigation';
+import { activeReactions, encodeReaction, isReaction, reactionPills, targetRef, type ReactionEmoji } from '@/lib/cryptReactions';
 import { useCryptJoinAlerts } from '@/hooks/useCryptJoinAlerts';
 import { AvatarEditor, WalletAvatarPicker } from '@/components/crypt/AvatarEditor';
 import { CryptNftCard } from '@/components/crypt/CryptNftCard';
@@ -1160,6 +1162,25 @@ export function Messenger({ account, session }: { account: string; session: NonN
     finally { setBusy(false); }
   };
 
+  /** A reaction is a tiny encrypted message to the same recipients; tapping your own pill removes it. */
+  const sendReaction = async (m: ConversationEntry, emoji: ReactionEmoji) => {
+    if (!key || !active || missingKeys.length || busy) return;
+    if (!agreed) { toast({ title: 'Tick the Terms of Use box below the chat first', variant: 'destructive' }); return; }
+    if (activeInvite && (activeInvite.status !== 'joined' || restrictedAt(activeModeration, account, Date.now()))) return;
+    const mine = !!pillsByTarget.get(targetRef(m.from, m.time))?.some(p => p.emoji === emoji && p.mine);
+    const line = encodeReaction({ add: !mine, author: m.from, time: m.time, emoji });
+    setBusy(true);
+    try {
+      const actions = activeInvite ? buildCg2Actions(key, recipients, inviteKeys, encodeGroupText(activeInvite.invite.id, line), [permission], false)
+        : activeGroup ? buildGroupMessageActions(key, activeGroup, line, contacts, [permission], false)
+        : buildSendMessageActions(account, active, splitMessage(line).map(p => encryptMemo(p, contacts[active], key.secretKey)), [permission], false);
+      const r = await executeTransaction(actions, { showSuccessToast: false, showErrorToast: false });
+      if (r.success && r.txId) [2000, 5000, 10000].forEach(ms => setTimeout(poll, ms));
+      else setSendDeclined(r.error?.message ?? 'The transaction could not be confirmed.');
+    } catch (e) { setSendDeclined((e as Error).message); }
+    finally { setBusy(false); }
+  };
+
   /** Signs each batch of up to 30 parts in turn; parts already sent stay on chain if a later one fails. */
   const sendVoice = async () => {
     if (!key || !active || !voice || missingKeys.length || !agreed) return;
@@ -1734,7 +1755,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
                   )}
                   <ChatMessageItem m={m} account={account} keyAvatar={key?.avatar} avatars={shownAvatars}
                     contacts={contacts} active={active} activeGroup={activeGroup} nameFor={nameFor}
-                    highlighted={replyNavigation.highlighted.has(m.key)} searchHit={searchMatchSet.has(m.key) ? (currentMatch === m.key ? 'current' : 'match') : undefined} reportHighlighted={reportFocus === m.key} report={reportAction(m)}
+                    highlighted={replyNavigation.highlighted.has(m.key)} reactionHighlighted={reactionNavigation.highlighted === m.key}
+                    reactions={pillsByTarget.get(targetRef(m.from, m.time))}
+                    onReact={!roomRestricted && (!activeInvite || activeInvite.status === 'joined') && !m.missing ? (emoji) => void sendReaction(m, emoji) : undefined}
+                    searchHit={searchMatchSet.has(m.key) ? (currentMatch === m.key ? 'current' : 'match') : undefined} reportHighlighted={reportFocus === m.key} report={reportAction(m)}
                     editable={canEdit(m, account, clock) && !busy && !roomRestricted && (!activeInvite || activeInvite.status === 'joined')} onEdit={beginEdit}
                     onReply={(x) => { setEditingMessage(null); setReplyingTo({ author: x.from, time: x.time, quote: quoteOf(x.text, !!x.voice) }); setVoice(null); setTimeout(() => composerRef.current?.focus(), 0); }}
                     canReveal={myRoomRole !== 'member'} revealed={revealed.has(m.key)} onReveal={() => setRevealed(s => new Set(s).add(m.key))}
@@ -1751,14 +1775,21 @@ export function Messenger({ account, session }: { account: string; session: NonN
             {pendingReports.length > 0 && <Button size="icon" title="Jump to the earliest reported message"
               aria-label={`Jump to reported message (${pendingReports.length} remaining)`}
               onClick={jumpToReport}
-              className={cn('absolute right-4 h-12 w-12 rounded-full bg-report text-report-foreground hover:bg-report/90 font-bold text-sm ring-2 ring-background', replyNavigation.pending.length > 0 ? 'bottom-[4.5rem]' : 'bottom-3')}>
+              className={cn('absolute right-4 h-12 w-12 rounded-full bg-report text-report-foreground hover:bg-report/90 font-bold text-sm ring-2 ring-background',
+                ['bottom-3', 'bottom-[4.5rem]', 'bottom-[8.25rem]'][(replyNavigation.pending.length > 0 ? 1 : 0) + (reactionNavigation.pending.length > 0 ? 1 : 0)])}>
               🚩{pendingReports.length > 99 ? '99+' : pendingReports.length}
             </Button>}
             {replyNavigation.pending.length > 0 && <Button size="icon" title="Jump to your earliest unseen reply"
               aria-label={`Jump to earliest unseen reply (${replyNavigation.pending.length} remaining)`}
               onClick={replyNavigation.jump}
-              className="absolute bottom-3 right-4 h-12 w-12 rounded-full bg-reply text-reply-foreground hover:bg-reply/90 font-bold text-sm ring-2 ring-background">
+              className={cn('absolute right-4 h-12 w-12 rounded-full bg-reply text-reply-foreground hover:bg-reply/90 font-bold text-sm ring-2 ring-background', reactionNavigation.pending.length > 0 ? 'bottom-[4.5rem]' : 'bottom-3')}>
               @{replyNavigation.pending.length > 99 ? '99+' : replyNavigation.pending.length}
+            </Button>}
+            {reactionNavigation.pending.length > 0 && <Button size="icon" title="Jump to your earliest message with an unseen reaction"
+              aria-label={`Jump to your message with new reactions (${reactionNavigation.pending.length} remaining)`}
+              onClick={reactionNavigation.jump}
+              className="absolute bottom-3 right-4 h-12 w-12 flex-col gap-0 rounded-full bg-cheese text-primary-foreground hover:bg-cheese/90 font-bold text-xs leading-none ring-2 ring-background">
+              <span aria-hidden className="text-base">🧀</span>{reactionNavigation.pending.length > 99 ? '99+' : reactionNavigation.pending.length}
             </Button>}
             </div>
             {roomRestricted ? <p className="text-sm text-muted-foreground p-4 border-t border-border">{roomBanned ? 'You were removed from this room. Your earlier history stays readable.' : `Muted until ${new Date(roomMutedUntil).toLocaleString()}. Messages sent during the mute remain hidden.`}</p> : activeInvite?.status === 'invited' ? (
