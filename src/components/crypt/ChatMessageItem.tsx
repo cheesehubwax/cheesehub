@@ -46,8 +46,6 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
   /** Friend shortcut for another member's message: add (or show a sent request) when not a friend, remove when a friend. */
   friend?: { isFriend: boolean; onAdd?: () => void; onRemove?: () => void; pendingLabel?: string };
 }) {
-  // Reaction control lines are never chat bubbles, even if one slips past upstream filtering.
-  if (isReaction(m.text)) return null;
   const hidden = !!m.collapsed && !revealed;
   const reply = parseReply(m.text);
   const body = reply ? reply.body : m.text;
@@ -59,6 +57,8 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
   });
   const bare = !!soloAssetId && !!data?.isSfx;
   const canReply = (!!m.voice || m.text != null) && !hidden;
+  // Reaction control lines are never chat bubbles, even if one slips past upstream filtering.
+  if (isReaction(m.text)) return null;
   return (
     <ContextMenu>
     <ContextMenuTrigger asChild disabled={!canReply && !onCollapse && !onMute && !ban && !adminToggle && !report && !friend}>
