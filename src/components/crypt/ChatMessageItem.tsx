@@ -17,7 +17,7 @@ import { voiceNoteCost } from '@/lib/cryptVoice';
 import { groupMessageCost, type ConversationEntry, type CryptGroup } from '@/lib/cryptGroups';
 import { messageCost } from '@/lib/cheeseCrypt';
 import type { EditedMessage } from '@/lib/cryptEdits';
-import { REACTION_EMOJIS, type ReactionEmoji, type ReactionPill } from '@/lib/cryptReactions';
+import { REACTION_EMOJIS, isReaction, type ReactionEmoji, type ReactionPill } from '@/lib/cryptReactions';
 
 /** Pure sound-effect-NFT posts render without the bubble box — sender header, playback and timestamp stay. */
 export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, reactionHighlighted, reactions, onReact, searchHit, editable, onEdit, onCollapse, canReveal, revealed, onReveal, badges, onMute, ban, adminToggle, report, reportHighlighted, friend }: {
@@ -46,6 +46,8 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
   /** Friend shortcut for another member's message: add (or show a sent request) when not a friend, remove when a friend. */
   friend?: { isFriend: boolean; onAdd?: () => void; onRemove?: () => void; pendingLabel?: string };
 }) {
+  // Reaction control lines are never chat bubbles, even if one slips past upstream filtering.
+  if (isReaction(m.text)) return null;
   const hidden = !!m.collapsed && !revealed;
   const reply = parseReply(m.text);
   const body = reply ? reply.body : m.text;
