@@ -17,7 +17,7 @@ import { voiceNoteCost } from '@/lib/cryptVoice';
 import { groupMessageCost, type ConversationEntry, type CryptGroup } from '@/lib/cryptGroups';
 import { messageCost } from '@/lib/cheeseCrypt';
 import type { EditedMessage } from '@/lib/cryptEdits';
-import { REACTION_EMOJIS, type ReactionEmoji, type ReactionPill } from '@/lib/cryptReactions';
+import { REACTION_EMOJIS, isReaction, type ReactionEmoji, type ReactionPill } from '@/lib/cryptReactions';
 
 /** Pure sound-effect-NFT posts render without the bubble box — sender header, playback and timestamp stay. */
 export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, reactionHighlighted, reactions, onReact, searchHit, editable, onEdit, onCollapse, canReveal, revealed, onReveal, badges, onMute, ban, adminToggle, report, reportHighlighted, friend }: {
@@ -57,6 +57,8 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
   });
   const bare = !!soloAssetId && !!data?.isSfx;
   const canReply = (!!m.voice || m.text != null) && !hidden;
+  // Reaction control lines are never chat bubbles, even if one slips past upstream filtering.
+  if (isReaction(m.text)) return null;
   return (
     <ContextMenu>
     <ContextMenuTrigger asChild disabled={!canReply && !onCollapse && !onMute && !ban && !adminToggle && !report && !friend}>
