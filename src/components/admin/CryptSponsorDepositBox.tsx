@@ -37,7 +37,7 @@ export function CryptSponsorDepositBox({ funder }: { funder: string | null }) {
         authorization: [{ actor: accountName, permission: 'active' }],
         data: { from: accountName, to: CRYPT_ACCOUNT, quantity, memo: CRYPT_SPONSOR_MEMO },
       }], { successTitle: 'Sponsor Deposit Sent', successDescription: `${quantity} added to free messaging` });
-      if (res) setAmount('');
+      if (res.success) setAmount('');
     } finally { setBusy(false); }
   };
 
