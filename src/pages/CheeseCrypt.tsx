@@ -1153,7 +1153,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     if (activeInvite && (activeInvite.status !== 'joined' || restrictedAt(activeModeration, account, Date.now()))) return;
     if (tipCommand) {
       if (editingMessage) { toast({ title: 'Tips cannot be sent as an edit', variant: 'destructive' }); return; }
-      if (!tipCommand.ok) { toast({ title: 'Invalid tip', description: tipCommand.error, variant: 'destructive' }); return; }
+      if (tipCommand.ok === false) { toast({ title: 'Invalid tip', description: tipCommand.error, variant: 'destructive' }); return; }
       if (!replyingTo) { toast({ title: 'Reply to a message to tip its author', description: 'Right-click a message → Reply, then type /tip 100 cheese great work!', variant: 'destructive' }); return; }
       if (replyingTo.author === account) { toast({ title: "You can't tip yourself", variant: 'destructive' }); return; }
       if (!confirmedTip) {
