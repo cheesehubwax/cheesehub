@@ -47,7 +47,7 @@ it('a cancelled lock after confirmed 500 CHEESE creation retries without chargin
   expect(calls.download).not.toHaveBeenCalled();
   fireEvent.click(retry); await screen.findByRole('button', { name: 'Menu' });
   expect(calls.pay).toHaveBeenCalledTimes(1);
-  expect(calls.pay.mock.calls[0][0].map((a: { data: { quantity: string } }) => a.data.quantity)).toEqual(['80.0000 CHEESE', '20.0000 CHEESE']);
+  expect(calls.pay.mock.calls[0][0].map((a: { data: { quantity: string } }) => a.data.quantity)).toEqual(['400.0000 CHEESE', '100.0000 CHEESE']);
   expect(loadLockedEnvelope('alice')?.version).toBe(2);
   expect(localStorage.getItem('cheesecrypt-key-alice')).toBeNull();
 });
