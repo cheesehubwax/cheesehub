@@ -57,6 +57,36 @@ stranded old tables. Public data already recorded cannot be made private retroac
 | `sendmsg(sender, parts, copies)` | sender | Consumes the payment, pays the shared platform fee, delivers all copies and returns change, atomically |
 | `payfee(payer, fee, memo)` | payer | Consumes exactly `fee` from the payment and splits it 80/20 with `memo` on both legs; a remainder stays pending only for a following `sendmsg` in the same transaction |
 | `reclaim(payer)` | payer | Refunds a payment orphaned by an incomplete transaction flow |
+| token `transfer(funder, contract, qty, "CHEESECrypt sponsor deposit")` | funder | Adds to `budget.sponsor_balance` only (never a pending payment); rejected from any other account |
+| `setbudget(daily_limit, enabled, funder)` | contract | Sets the free-message daily cap (default 200.0000 CHEESE), on/off switch and the only funder |
+| `takesponsor(quantity)` | contract | Returns unspent sponsor funds to the funder |
+| `sendfree(sender, parts, copies)` | sender | Free message: same shape rules as `sendmsg`; pays the platform fee 80/20 from `sponsor_balance` within the daily cap; notifies each recipient (`require_recipient`), no recipient dust |
+
+## Free (sponsored) messages
+- Budget lives in its own `budget` singleton, so the existing `config`/`pending` rows keep their layout and
+  this update can be deployed onto `crypt.cheese` in place.
+- Fixed 24-hour windows on chain time (`current_time_point()`): callers cannot supply or move time. A new
+  window opens only once a full day has passed since the last one opened. Worst case: `daily_limit` per window.
+- Sponsored fees are paid only from `sponsor_balance`, which grows only from the funder's deposits with the
+  exact memo. User in-flight payments (`pending`) can never be spent by `sendfree`.
+- No per-sender rate limit (operator choice): one account can use the whole day's budget; then everyone
+  falls back to the paid `sendmsg` path until the next window.
+- The app switches to `sendfree` automatically only after it reads an enabled, funded `budget` row; voice
+  batches, join requests, tips, key and listing fees stay paid.
+
+### Windows CMD: build, deploy, fund and switch on
+1. Open **Command Prompt** and go to this folder, e.g. `cd C:\cheesehub\contracts\cheesecrypt`
+2. Build the compiler image (once): `docker build -t cheesecrypt-cdt .`
+3. Compile: `docker run --rm -v "%cd%":/work cheesecrypt-cdt cdt-cpp -abigen -I include -contract cheesecrypt -o build/cheesecrypt.wasm src/cheesecrypt.cpp`
+   You should now have `build\cheesecrypt.wasm` and `build\cheesecrypt.abi` (warnings about "ricardian" are normal).
+4. Deploy on waxblock.io: sign in as `crypt.cheese` → **Account** → `crypt.cheese` → **Contract** → **Deploy**,
+   choose both files, sign with `crypt.cheese@active`. (The `eosio.code` permission is already in place.)
+5. Set the budget: waxblock.io → `crypt.cheese` → **Contract → Actions → setbudget**:
+   `daily_limit` = `200.0000 CHEESE`, `enabled` = `false`, `funder` = your funding account (e.g. `dr.cheese`). Sign as `crypt.cheese@active`.
+6. Fund: from the funder account send CHEESE to `crypt.cheese` with memo exactly `CHEESECrypt sponsor deposit`.
+7. Switch on: run `setbudget` again with the same values and `enabled` = `true`. The Admin monitor shows
+   "Free Messaging: On", today's usage and the sponsor balance. Switch off any time with `enabled` = `false`.
+8. To take funds back: `takesponsor` with e.g. `100.0000 CHEESE` (sent to the funder).
 
 The intended transaction is two actions with one signature: `transfer` the exact fee to the
 contract, then `sendmsg`. `copies` is an array of `{to,memo}`. Each distinct recipient must

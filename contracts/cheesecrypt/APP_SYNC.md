@@ -15,6 +15,7 @@ or redeployment is required for these paths.
 
 | App rule / source | Router responsibility / integration status |
 |---|---|
+| Free messages (`cryptSponsor.ts`, `sponsorCryptActions`) | `sendfree` + `budget` singleton (200.0000 CHEESE/24h default, chain-time windows, funder-only `sponsor_balance`, no per-sender limit). App uses it only for exact [payment, sendmsg] routes when the live budget covers parts × 0.0100; voice batches and join requests pass `paid`; tips/payfee never match. History reads `crypt.cheese:sendfree` actions (sender must authorize; one row per copy, quantity 0.0000). Budget-reached errors map to a resend-as-paid message |
 | Router account `crypt.cheese` (`CRYPT_ROUTER_ACCOUNT`, `cheeseCrypt.ts`) | Deploy target; contract uses `get_self()`, no hardcoded name |
 | Uniform 0.0100/part for text, NFT, links and controls (`cheeseCrypt.ts`) | `config.part_fee`, `platform_fee`; no kind parameter, bounded arithmetic |
 | Voice 0.0100 per encrypted part, shared across recipients, up to 30 parts/batch (`cryptVoice.ts`) | Routed by the shared adapter, including metadata/edit-target parts; each batch gets its own atomic payment + sendmsg. Automated history/fee checks; live wallet/resource checks pending |
