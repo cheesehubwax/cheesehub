@@ -7,7 +7,7 @@
  * deployed contract. Before that version is deployed (no table) or while it is switched off, every send
  * stays on the paid `sendmsg` path, so wallets never sign an action the contract does not have.
  */
-import { fetchTable } from './wax';
+import { chainPost } from './chainRequest';
 import { CRYPT_ROUTER_ACCOUNT, FEE_MEMO } from './cheeseCrypt';
 
 export const SPONSOR_WINDOW_SEC = 86400;
@@ -64,8 +64,8 @@ export async function fetchSponsorBudget(force = false): Promise<SponsorBudget |
   if (!force && cached && Date.now() - cached.at < CACHE_MS) return cached.budget;
   let budget: SponsorBudget | null = null;
   try {
-    const rows = await fetchTable<unknown>(CRYPT_ROUTER_ACCOUNT, CRYPT_ROUTER_ACCOUNT, 'budget', { limit: 1 });
-    budget = parseBudget(rows[0]);
+    const r = await chainPost<{ rows?: unknown[] }>('/v1/chain/get_table_rows', { code: CRYPT_ROUTER_ACCOUNT, scope: CRYPT_ROUTER_ACCOUNT, table: 'budget', json: true, limit: 1 });
+    budget = parseBudget(r.rows?.[0]);
   } catch { budget = null; }
   cached = { at: Date.now(), budget };
   return budget;
