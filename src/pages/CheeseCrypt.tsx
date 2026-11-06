@@ -20,6 +20,8 @@ import { cn } from '@/lib/utils';
 import { encodeReply, parseReply, quoteOf, type ReplyRef } from '@/lib/cryptReply';
 import { useCryptReplyNavigation } from '@/hooks/useCryptReplyNavigation';
 import { useCryptReactionNavigation } from '@/hooks/useCryptReactionNavigation';
+import { buildTipTransfer, encodeTip, isTipCommand, parseTipCommand, type Tip } from '@/lib/cryptTips';
+import { fetchSingleTokenBalance } from '@/lib/waxRpcFallback';
 import { activeReactions, encodeReaction, isReaction, reactionPills, targetRef, type ReactionEmoji } from '@/lib/cryptReactions';
 import { useCryptJoinAlerts } from '@/hooks/useCryptJoinAlerts';
 import { AvatarEditor, WalletAvatarPicker } from '@/components/crypt/AvatarEditor';
@@ -108,6 +110,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const executeTransaction = useCallback((actions: unknown[], options?: Parameters<typeof executeDirect>[1]) =>
     executeDirect(CRYPT_ROUTER_ENABLED ? routeCryptActions(actions) : actions, options), [executeDirect]);
   const [sendDeclined, setSendDeclined] = useState<string | null>(null);
+  const [pendingTip, setPendingTip] = useState<{ tip: Tip; balance: number | null } | null>(null);
   const permission = session.permissionLevel;
   const [candidateKey, setKey] = useState<MessagingKey | null>(() => loadKey(account));
   // Wallet-locked envelope of the current key (no secret inside); present once the key's backup is locked.
@@ -1145,15 +1148,29 @@ export function Messenger({ account, session }: { account: string; session: NonN
     finally { setBusy(false); }
   };
 
-  const send = async () => {
+  const send = async (confirmedTip?: Tip) => {
     if (!key || !active || missingKeys.length || !agreed || !text.trim() || tooLong) return;
     if (activeInvite && (activeInvite.status !== 'joined' || restrictedAt(activeModeration, account, Date.now()))) return;
+    if (tipCommand) {
+      if (editingMessage) { toast({ title: 'Tips cannot be sent as an edit', variant: 'destructive' }); return; }
+      if (tipCommand.ok === false) { toast({ title: 'Invalid tip', description: tipCommand.error, variant: 'destructive' }); return; }
+      if (!replyingTo) { toast({ title: 'Reply to a message to tip its author', description: 'Right-click a message → Reply, then type /tip 100 cheese great work!', variant: 'destructive' }); return; }
+      if (replyingTo.author === account) { toast({ title: "You can't tip yourself", variant: 'destructive' }); return; }
+      if (!confirmedTip) {
+        const tip = { recipient: replyingTo.author, amount: tipCommand.amount, note: tipCommand.note };
+        setPendingTip({ tip, balance: null });
+        void fetchSingleTokenBalance(account, 'cheeseburger', 'CHEESE').then(b => setPendingTip(p => p && p.tip === tip ? { ...p, balance: b } : p));
+        return;
+      }
+    }
     if (editingMessage && !canEdit(editingMessage, account)) { toast({ title: 'The 24-hour editing window has ended', variant: 'destructive' }); return; }
     setBusy(true);
     try {
       const actions = activeInvite ? buildCg2Actions(key, recipients, inviteKeys, encodeGroupText(activeInvite.invite.id, outgoing), [permission], hasNft)
         : activeGroup ? buildGroupMessageActions(key, activeGroup, outgoing, contacts, [permission], hasNft)
         : buildSendMessageActions(account, active, splitMessage(outgoing).map(p => encryptMemo(p, contacts[active], key.secretKey)), [permission], hasNft);
+      // Tips: one public wallet-to-wallet transfer signed atomically with the encrypted tip card (direct path, never via crypt.cheese).
+      if (confirmedTip) actions.unshift(buildTipTransfer(account, confirmedTip, [permission]));
       // Success is shown by the message appearing in the chat; only a failure gets a popup.
       const r = await executeTransaction(actions, { showSuccessToast: false, showErrorToast: false });
       if (r.success && r.txId) { setText(''); setReplyingTo(null); if (!editingMessage) nearBottom.current = true; setEditingMessage(null); [2000, 5000, 10000].forEach(ms => setTimeout(poll, ms)); }
@@ -1468,7 +1485,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
   };
 
   const hasNft = parseNftMessage(text).some(seg => seg.type === 'nft');
-  const body = replyingTo && text.trim() ? encodeReply(replyingTo, text) : text;
+  const tipCommand = isTipCommand(text) ? parseTipCommand(text) : null;
+  const tipLine = tipCommand?.ok && replyingTo && replyingTo.author !== account ? encodeTip({ recipient: replyingTo.author, amount: tipCommand.amount, note: tipCommand.note }) : null;
+  const typed = tipLine ?? text;
+  const body = replyingTo && text.trim() ? encodeReply(replyingTo, typed) : typed;
   const outgoing = editingMessage && body.trim() ? encodeEdit(editTarget(editingMessage), body) : body;
   const size = activeInvite ? inviteTextSize(activeInvite.invite.id, outgoing) : activeGroup ? groupMessageSize(activeGroup, outgoing) : { bytes: plaintextBytes(outgoing), parts: partCount(outgoing), maxBytes: MAX_MESSAGE_BYTES };
   const { bytes, parts, maxBytes } = size;
@@ -1521,6 +1541,25 @@ export function Messenger({ account, session }: { account: string; session: NonN
   return (
     <div className="w-full rounded-lg border border-cheese/20 bg-card/80 overflow-hidden flex flex-col md:grid h-[80dvh] min-h-[480px] md:grid-cols-[240px_1fr] md:grid-rows-[auto_1fr]">
       {fileInput}
+      <Dialog open={!!pendingTip} onOpenChange={o => { if (!o) setPendingTip(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="text-center">
+            <div aria-hidden className="mx-auto mb-2 text-4xl">🧀</div>
+            <DialogTitle className="text-center">Send a tip?</DialogTitle>
+            <DialogDescription className="text-center">
+              {pendingTip && <>Send <strong>{pendingTip.tip.amount} CHEESE</strong> from your wallet directly to <strong>{pendingTip.tip.recipient}</strong>, plus the normal message fee.</>}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>Tips go wallet to wallet and are final — they cannot be reversed. The amount, sender and receiver are public on the blockchain; your note stays private inside the encrypted message.</p>
+            {pendingTip && pendingTip.balance !== null && pendingTip.balance < Number(pendingTip.tip.amount) && <p className="text-destructive">Your CHEESE balance ({pendingTip.balance.toFixed(4)}) looks too low for this tip.</p>}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={() => setPendingTip(null)}>Cancel</Button>
+            <Button className="flex-1" disabled={busy} onClick={() => { const t = pendingTip?.tip; setPendingTip(null); if (t) void send(t); }}>Tip & send</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={!!sendDeclined} onOpenChange={o => { if (!o) setSendDeclined(null); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader className="text-center">
@@ -1820,7 +1859,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 replyingTo={replyingTo} setReplyingTo={setReplyingTo} composerRef={composerRef} text={text} setText={setText} voice={voice} setVoice={setVoice}
                 tooLong={tooLong} bytes={bytes} maxBytes={maxBytes} parts={parts} copies={copies} voiceParts={voiceParts} voiceTxs={voiceTxs}
                 setAttachingNft={setAttachingNft} busy={busy} listHidden={listHidden} agreed={agreed} setAgreed={setAgreed}
-                feeInfoOpen={feeInfoOpen} setFeeInfoOpen={setFeeInfoOpen} totalCost={totalCost} send={send} sendVoice={sendVoice}
+                feeInfoOpen={feeInfoOpen} setFeeInfoOpen={setFeeInfoOpen} totalCost={totalCost} send={() => void send()} sendVoice={sendVoice}
                 editing={!!editingMessage} cancelEdit={cancelEdit} editExpired={!!editingMessage && !canEdit(editingMessage, account, clock)} />
             )}
           </>

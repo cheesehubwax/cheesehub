@@ -54,7 +54,7 @@ export function CryptComposer({
           <span className="ml-auto text-muted-foreground">{totalCost}</span>
           {voice
             ? <Button size="sm" disabled={busy || !agreed || editExpired} onClick={sendVoice} className="bg-cheese text-primary-foreground hover:bg-cheese/90">{editing ? 'Save edit' : 'Send voice'}{voiceTxs > 1 ? ` (${voiceTxs} signatures)` : ''}</Button>
-            : <Button size="sm" disabled={busy || !agreed || !text.trim() || tooLong || editExpired} onClick={send}
+            : <Button size="sm" disabled={busy || !agreed || !text.trim() || tooLong || editExpired} onClick={() => send()}
               className="bg-cheese text-primary-foreground hover:bg-cheese/90">{editing ? 'Save edit' : 'Send'}</Button>}
         </div>
         {feeInfoOpen && (

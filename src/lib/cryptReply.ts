@@ -2,6 +2,7 @@
 // the same in DMs, legacy groups and invite groups and costs only the quote's bytes.
 // Wire form: "\u0004R1:<author>:<time base36>:<quote>\n<body>"
 import { parseNftMessage } from '@/lib/cryptNft';
+import { parseTip, tipLabel } from '@/lib/cryptTips';
 
 export const REPLY_MARK = '\u0004R1:';
 export const QUOTE_MAX_CHARS = 60;
@@ -15,6 +16,8 @@ export function quoteOf(text: string | null, voice = false): string {
   if (voice) return '🎙️ Voice note';
   if (text == null) return '';
   const body = parseReply(text)?.body ?? text;
+  const tip = parseTip(body);
+  if (tip) return tipLabel(tip).slice(0, QUOTE_MAX_CHARS);
   const flat = parseNftMessage(body).map(s => s.type === 'nft' ? '🖼️ NFT' : s.text).join(' ').replace(/\s+/g, ' ').trim();
   const chars = Array.from(flat);
   return chars.length > QUOTE_MAX_CHARS ? `${chars.slice(0, QUOTE_MAX_CHARS - 1).join('')}…` : flat;
