@@ -79,8 +79,10 @@ stranded old tables. Public data already recorded cannot be made private retroac
 2. Build the compiler image (once): `docker build -t cheesecrypt-cdt .`
 3. Compile: `docker run --rm -v "%cd%":/work cheesecrypt-cdt cdt-cpp -abigen -I include -contract cheesecrypt -o build/cheesecrypt.wasm src/cheesecrypt.cpp`
    You should now have `build\cheesecrypt.wasm` and `build\cheesecrypt.abi` (warnings about "ricardian" are normal).
-4. Deploy on waxblock.io: sign in as `crypt.cheese` → **Account** → `crypt.cheese` → **Contract** → **Deploy**,
-   choose both files, sign with `crypt.cheese@active`. (The `eosio.code` permission is already in place.)
+4. Deploy both files to `crypt.cheese` the same way it was first deployed (2026-10-31), e.g.
+   `cleos -u https://wax.greymass.com set contract crypt.cheese build cheesecrypt.wasm cheesecrypt.abi`
+   signed by `crypt.cheese@active`. The `eosio.code` permission is already in place. Existing config and
+   pending rows are untouched; the new `budget` table starts empty (free messaging off).
 5. Set the budget: waxblock.io → `crypt.cheese` → **Contract → Actions → setbudget**:
    `daily_limit` = `200.0000 CHEESE`, `enabled` = `false`, `funder` = your funding account (e.g. `dr.cheese`). Sign as `crypt.cheese@active`.
 6. Fund: from the funder account send CHEESE to `crypt.cheese` with memo exactly `CHEESECrypt sponsor deposit`.
