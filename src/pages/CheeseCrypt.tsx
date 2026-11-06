@@ -1539,9 +1539,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const creationDialog = pendingProfile && <Dialog open onOpenChange={open => { if (!open && !busy) setPendingProfile(null); }}>
     <DialogContent className="max-w-md" aria-describedby="crypt-creation-fee" onEscapeKeyDown={e => { if (busy) e.preventDefault(); }} onPointerDownOutside={e => { if (busy) e.preventDefault(); }}>
       <DialogHeader><DialogTitle>🔑 Create your messaging key</DialogTitle></DialogHeader>
-      <p id="crypt-creation-fee" className="text-sm text-muted-foreground">A new key costs {KEY_CREATION_QUANTITY}: 80 CHEESE to eosio.null and 20 CHEESE to xcheeseliqst. After confirmed payment, Anchor asks for two free signatures to lock the key to {account}. These signatures are never broadcast. Only a locked backup is saved; your public key is not published. If signing is cancelled, keep this tab open and retry locking for free. Loading an existing key is free.</p>
+      <p id="crypt-creation-fee" className="text-sm text-muted-foreground">A new key costs {KEY_CREATION_QUANTITY}: 400 CHEESE to eosio.null and 100 CHEESE to xcheeseliqst. After confirmed payment, Anchor asks for two free signatures to lock the key to {account}. These signatures are never broadcast. Only a locked backup is saved; your public key is not published. If signing is cancelled, keep this tab open and retry locking for free. Loading an existing key is free.</p>
       <TermsCheckbox id="crypt-create-terms" checked={creationAgreed} onCheckedChange={setCreationAgreed} />
-      <Button disabled={busy || !creationAgreed || !canLock} onClick={payAndCreateKey}>{busy ? 'Confirming payment…' : 'Pay 100 CHEESE & create key'}</Button>
+      <Button disabled={busy || !creationAgreed || !canLock} onClick={payAndCreateKey}>{busy ? 'Confirming payment…' : 'Pay 500 CHEESE & create key'}</Button>
       <Button variant="ghost" disabled={busy} onClick={() => setPendingProfile(null)}>Cancel</Button>
     </DialogContent>
   </Dialog>;

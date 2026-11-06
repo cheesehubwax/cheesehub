@@ -28,7 +28,7 @@ export const KEY_PUBLISH_TO = 'eosio.null';
 export const CRYPT_ROUTER_ACCOUNT = 'crypt.cheese';
 export const FEE_MEMO = 'CHEESECrypt messaging fee';
 export const KEY_CREATION_MEMO = 'CHEESECrypt key creation fee';
-export const KEY_CREATION_QUANTITY = '100.0000 CHEESE';
+export const KEY_CREATION_QUANTITY = '500.0000 CHEESE';
 export const LIQUIDITY_FEE_TO = 'xcheeseliqst';
 
 export const MESSAGE_RECIPIENT_QUANTITY = '0.0001 CHEESE';

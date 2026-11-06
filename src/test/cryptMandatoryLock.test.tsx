@@ -35,7 +35,7 @@ it('legacy keys cannot enter chat until sealed, and sealing preserves identity a
   expect(calls.download.mock.calls[0][1]).not.toHaveProperty('secretKey');
 });
 
-it('a cancelled lock after confirmed 100 CHEESE creation retries without charging or exporting plaintext', async () => {
+it('a cancelled lock after confirmed 500 CHEESE creation retries without charging or exporting plaintext', async () => {
   calls.sign.mockRejectedValueOnce(new Error('Cancelled'));
   mount(); fireEvent.click(screen.getByRole('button', { name: 'Create a new key' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Use defaults' }));

@@ -346,8 +346,8 @@ const dapps: DApp[] = [
     name: 'CHEESECrypt',
     contracts: ['crypt.cheese'],
     owner: 'CHEESE team',
-    description: 'End-to-end encrypted messaging on WAX. Messages, groups, NFT shares, voice notes and moderation controls are encrypted in the browser with keys locked to the user\'s WAX account; the chain only carries ciphertext. crypt.cheese is a zero-custody fee router: a CHEESE payment and the sendmsg action share one transaction, the fee is split on the spot and any change refunded inline, so the contract never keeps a balance. Standalone fees (100 CHEESE key creation, 100 CHEESE public room listing) go through payfee. reclaim refunds any payment left pending by an incomplete transaction.',
-    pricingNote: 'Contract defaults: 0.0100 CHEESE per message part plus 0.0001 CHEESE per recipient, uniform for text, NFTs, links and controls; 100 CHEESE key creation; 100 CHEESE non-refundable listing fee. Max 49 recipients and 35 parts per send.',
+    description: 'End-to-end encrypted messaging on WAX. Messages, groups, NFT shares, voice notes and moderation controls are encrypted in the browser with keys locked to the user\'s WAX account; the chain only carries ciphertext. crypt.cheese is a zero-custody fee router: a CHEESE payment and the sendmsg action share one transaction, the fee is split on the spot and any change refunded inline, so the contract never keeps a balance. Standalone fees (500 CHEESE key creation, 100 CHEESE public room listing) go through payfee. reclaim refunds any payment left pending by an incomplete transaction.',
+    pricingNote: 'Contract defaults: 0.0100 CHEESE per message part plus 0.0001 CHEESE per recipient, uniform for text, NFTs, links and controls; 500 CHEESE key creation; 100 CHEESE non-refundable listing fee. Max 49 recipients and 35 parts per send.',
     flows: [{ title: 'Fee Flow', steps: cryptFlow }],
   },
   {
