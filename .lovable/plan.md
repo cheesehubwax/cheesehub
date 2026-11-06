@@ -8,7 +8,7 @@ This is a checklist for you to follow on your Windows PC. The app code and the c
 2. Get the code onto your PC:
    - If you already have the folder (for example `C:\cheesehub`), open it, then in GitHub Desktop click **Fetch origin** and then **Pull**.
    - If you don't, go to the GitHub page, click **Code → Download ZIP**, and unzip it to `C:\cheesehub`.
-3. Check that this folder exists: `C:\cheesehub\contracts\cheesecrypt`. It should have `Dockerfile`, `build.sh`, `include`, `src` and `tests` inside.
+3. Copy the **latest** `Dockerfile`, `build.sh`, and the `include`, `src` and `tests` folders from the project's `contracts\cheesecrypt` folder into your folder `C:\Users\User\Desktop\wax contracts\cheesecrypt`. Replace the old files when Windows asks, because the old copies don't include free messaging.
 
 ## Part B: Compile the contract with Docker Desktop
 
@@ -16,8 +16,9 @@ This is a checklist for you to follow on your Windows PC. The app code and the c
 2. Press the Windows key, type `cmd` and press Enter. A black **Command Prompt** window opens.
 3. Go to the contract folder. Type this and press Enter:
    ```
-   cd /d C:\cheesehub\contracts\cheesecrypt
+   cd /d "C:\Users\User\Desktop\wax contracts\cheesecrypt"
    ```
+   Keep the quotes. The folder name "wax contracts" has a space in it.
 4. Make the output folder (if it already exists, you'll see a harmless error):
    ```
    mkdir build
