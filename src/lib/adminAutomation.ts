@@ -1,6 +1,7 @@
 // Read-only monitor data for crypt.cheese and the cheesepowerz reward automation.
 import { chainPost } from './chainRequest';
 import { fetchTable } from './wax';
+import { parseBudget, sponsorRemaining, type SponsorBudget } from './cryptSponsor';
 
 export const CRYPT_CONTRACT = 'crypt.cheese';
 export const POWERZ_ACCOUNT = 'cheesepowerz';
@@ -38,6 +39,8 @@ export interface CryptStatus {
   usingDefaults: boolean;
   pendingCount: number;
   cheeseBalance: number | null;
+  /** Free-message budget row; null before the sponsored version is deployed / setbudget is run. */
+  budget: SponsorBudget | null;
 }
 
 export interface PowerzAutomation {
@@ -61,16 +64,18 @@ async function cheeseBalance(account: string): Promise<number | null> {
 }
 
 export async function fetchCryptStatus(): Promise<CryptStatus> {
-  const [cfgRows, pending, balance] = await Promise.all([
+  const [cfgRows, pending, balance, budgetRows] = await Promise.all([
     fetchTable<CryptConfig>(CRYPT_CONTRACT, CRYPT_CONTRACT, 'config', { limit: 1 }),
     fetchTable<unknown>(CRYPT_CONTRACT, CRYPT_CONTRACT, 'pending', { limit: 100 }),
     cheeseBalance(CRYPT_CONTRACT).catch(() => null),
+    fetchTable<unknown>(CRYPT_CONTRACT, CRYPT_CONTRACT, 'budget', { limit: 1 }).catch(() => []),
   ]);
   return {
     config: cfgRows[0] ?? CRYPT_DEFAULT_CONFIG,
     usingDefaults: cfgRows.length === 0,
     pendingCount: pending.length,
     cheeseBalance: balance,
+    budget: parseBudget(budgetRows[0]),
   };
 }
 
@@ -109,8 +114,22 @@ export function cryptPendingWarn(s: Pick<CryptStatus, 'pendingCount'>): boolean 
   return s.pendingCount > 0;
 }
 
-export function cryptBalanceWarn(balance: number | null): boolean {
-  return balance != null && balance > CRYPT_DUST_CHEESE;
+/** Flags CHEESE on the router beyond the operator's sponsor balance (user funds must never stay there). */
+export function cryptBalanceWarn(balance: number | null, sponsorBalanceUnits = 0): boolean {
+  return balance != null && balance - sponsorBalanceUnits / 10000 > CRYPT_DUST_CHEESE + 1e-9;
+}
+
+/** Sponsor funds low: less than two full days of the daily limit left (only while free messaging is on). */
+export function cryptSponsorLowWarn(b: SponsorBudget | null): boolean {
+  return !!b && b.enabled && b.sponsorBalance < b.dailyLimit * 2;
+}
+
+/** Today's free-message usage (units) and what is still available now. */
+export function cryptSponsorToday(b: SponsorBudget | null, nowSec = Math.floor(Date.now() / 1000)) {
+  if (!b) return null;
+  const remaining = sponsorRemaining(b, nowSec);
+  const fresh = b.windowStart === 0 || nowSec - b.windowStart >= 86400;
+  return { spent: fresh ? 0 : b.spent, limit: b.dailyLimit, remaining, resetsAt: fresh ? null : new Date((b.windowStart + 86400) * 1000) };
 }
 
 export function powerzReserveWarn(liquidWax: number | null): boolean {

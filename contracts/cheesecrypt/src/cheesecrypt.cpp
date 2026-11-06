@@ -60,6 +60,16 @@ void cheesecrypt::ontransfer(name from, name to, asset quantity, string memo) {
    // another account's RAM inside a notification, so the router pays the row's RAM;
    // sendmsg/reclaim erase it, so normal sends use no net router RAM.
    require_auth(from);
+   if (memo == SPONSOR_MEMO) {
+      // Operator top-up: counted only in the sponsor balance, never as a pending payment.
+      auto b = get_budget();
+      check(b.funder != name() && from == b.funder, "only the configured funder can deposit sponsor funds");
+      check(b.sponsor_balance.symbol == quantity.symbol, "budget symbol mismatch");
+      b.sponsor_balance += quantity;
+      budget_singleton bs(get_self(), get_self().value);
+      bs.set(b, get_self());
+      return;
+   }
    pending_t pend(get_self(), get_self().value);
    auto it = pend.find(from.value);
    if (it == pend.end()) pend.emplace(get_self(), [&](auto& p) { p.payer = from; p.funds = quantity; });
@@ -77,10 +87,7 @@ void cheesecrypt::reclaim(name payer) {
    send_token(cfg, payer, refund, "CHEESECrypt payment reclaim");
 }
 
-void cheesecrypt::sendmsg(name sender, uint16_t parts, const vector<copy_t>& copies) {
-   require_auth(sender);
-   const auto cfg = get_config();
-   check(!cfg.paused, "CHEESECrypt contract is paused");
+std::vector<name> cheesecrypt::check_copies(const config& cfg, name sender, uint16_t parts, const vector<copy_t>& copies) const {
    check(crypt_router::batch_shape(parts, copies.size(), cfg.max_parts, cfg.max_recipients),
          "invalid parts or copies (maximum 35 parts and 49 recipients)");
    std::map<uint64_t, uint16_t> counts;
@@ -93,7 +100,76 @@ void cheesecrypt::sendmsg(name sender, uint16_t parts, const vector<copy_t>& cop
       check(count <= parts, "too many copies for one recipient");
    }
    check(counts.size() <= cfg.max_recipients, "too many distinct recipients");
-   for (const auto& count : counts) check(count.second == parts, "each recipient must receive exactly parts copies");
+   std::vector<name> recipients;
+   for (const auto& count : counts) {
+      check(count.second == parts, "each recipient must receive exactly parts copies");
+      recipients.push_back(name(count.first));
+   }
+   return recipients;
+}
+
+cheesecrypt::budget cheesecrypt::get_budget() const {
+   budget_singleton bs(get_self(), get_self().value);
+   return bs.get_or_default(budget{});
+}
+
+void cheesecrypt::setbudget(asset daily_limit, bool enabled, name funder) {
+   require_auth(get_self());
+   const auto cfg = get_config();
+   check(daily_limit.is_valid() && daily_limit.symbol == cfg.token_symbol, "limit must be the configured CHEESE token");
+   check(daily_limit.amount >= 0 && daily_limit.amount <= crypt_router::MAX_FEE_UNITS, "daily limit out of range");
+   check(funder != get_self() && (funder == name() || is_account(funder)), "funder must be an existing external account");
+   check(!enabled || funder != name(), "set a funder before enabling");
+   auto b = get_budget();
+   check(b.sponsor_balance.symbol == cfg.token_symbol, "budget symbol mismatch");
+   b.daily_limit = daily_limit;
+   b.enabled = enabled;
+   b.funder = funder;
+   budget_singleton bs(get_self(), get_self().value);
+   bs.set(b, get_self());
+}
+
+void cheesecrypt::takesponsor(asset quantity) {
+   require_auth(get_self());
+   const auto cfg = get_config();
+   auto b = get_budget();
+   check(b.funder != name(), "no funder set");
+   check(quantity.is_valid() && quantity.symbol == b.sponsor_balance.symbol && quantity.amount > 0, "invalid quantity");
+   check(quantity.amount <= b.sponsor_balance.amount, "more than the unspent sponsor balance");
+   b.sponsor_balance -= quantity;
+   budget_singleton bs(get_self(), get_self().value);
+   bs.set(b, get_self());
+   send_token(cfg, b.funder, quantity, "CHEESECrypt sponsor return");
+}
+
+void cheesecrypt::sendfree(name sender, uint16_t parts, const vector<copy_t>& copies) {
+   require_auth(sender);
+   const auto cfg = get_config();
+   check(!cfg.paused, "CHEESECrypt contract is paused");
+   auto b = get_budget();
+   check(b.enabled, "free messaging is switched off");
+   const auto recipients = check_copies(cfg, sender, parts, copies);
+   const asset fee = platform_fee(cfg, parts);
+   check(fee.symbol == b.spent.symbol && fee.symbol == b.daily_limit.symbol && fee.symbol == b.sponsor_balance.symbol, "budget symbol mismatch");
+   const uint32_t now = current_time_point().sec_since_epoch();
+   const uint32_t start = crypt_router::window_start_at(now, b.window_start);
+   if (start != b.window_start) { b.window_start = start; b.spent.amount = 0; }
+   check(crypt_router::sponsor_allows(b.spent.amount, fee.amount, b.daily_limit.amount, b.sponsor_balance.amount),
+         "free messaging budget reached for today");
+   b.spent += fee;
+   b.sponsor_balance -= fee;
+   budget_singleton bs(get_self(), get_self().value);
+   bs.set(b, get_self());
+   pay_platform(cfg, fee, "CHEESECrypt messaging fee");
+   // Recipients see the action in their history; encrypted copies stay in the action data. No dust.
+   for (const auto& r : recipients) require_recipient(r);
+}
+
+void cheesecrypt::sendmsg(name sender, uint16_t parts, const vector<copy_t>& copies) {
+   require_auth(sender);
+   const auto cfg = get_config();
+   check(!cfg.paused, "CHEESECrypt contract is paused");
+   check_copies(cfg, sender, parts, copies);
    // Inputs and config are bounded before arithmetic, including the total and integer split.
    const asset fee = platform_fee(cfg, parts);
    check(crypt_router::valid_fee(cfg.recipient_fee.amount) && cfg.recipient_fee.amount > 0, "invalid recipient fee");

@@ -412,6 +412,32 @@ export function expandRouterActions(txId: string, time: number, actions: unknown
   return out;
 }
 
+/**
+ * Sponsored deliveries: `crypt.cheese::sendfree` carries the encrypted copies in its own data and notifies
+ * each recipient, so no transaction lookup is needed. The sender comes only from the action data and must
+ * have authorized it (the contract requires it); quantity is zero because no recipient transfer exists.
+ */
+export const SPONSORED_QUANTITY = '0.0000 CHEESE';
+export function expandSponsoredActions(actions: unknown[]): ChainMemo[] {
+  const out: ChainMemo[] = [];
+  const seen = new Set<string>();
+  for (const raw of actions) {
+    const a = raw as { trx_id?: string; act?: { account?: string; name?: string; authorization?: { actor?: string }[]; data?: { sender?: string; copies?: { to?: string; memo?: string }[] } } };
+    const act = a?.act;
+    if (act?.account !== CRYPT_ROUTER_ACCOUNT || act.name !== 'sendfree' || typeof a.trx_id !== 'string') continue;
+    const sender = act.data?.sender, copies = act.data?.copies;
+    if (typeof sender !== 'string' || !act.authorization?.some(x => x?.actor === sender) || !Array.isArray(copies)) continue;
+    // Hyperion returns the same action once per notified account; keep one row per copy.
+    const key = `${a.trx_id}:${JSON.stringify(copies)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const time = actionTime(a);
+    for (const c of copies) if (typeof c?.to === 'string' && typeof c.memo === 'string' && c.to !== sender)
+      out.push({ txId: a.trx_id, time, from: sender, to: c.to, memo: c.memo, quantity: SPONSORED_QUANTITY });
+  }
+  return out;
+}
+
 const routerTxCache = new Map<string, ChainMemo[]>();
 async function routerTransaction(txId: string, time: number): Promise<ChainMemo[] | null> {
   const hit = routerTxCache.get(txId) ?? (await loadRouterCache()).get(txId);
@@ -539,17 +565,25 @@ export const MAX_HISTORY_PAGES = 4;
  * `pages` > 1 reads further back by timestamp, so multi-transaction voice notes are not cut in half.
  */
 export async function fetchMessages(account: string, pages = 1): Promise<ChainMemo[]> {
-  let rows: ChainMemo[] = [];
-  let before: string | null = null;
-  for (let p = 0; p < Math.min(Math.max(1, pages), MAX_HISTORY_PAGES); p++) {
-    const page = await hyperionTransfers(`account=${account}&${FILTER}&sort=desc&limit=${HISTORY_PAGE}${before ? `&before=${encodeURIComponent(before)}` : ''}`);
-    rows = rows.concat(page);
-    if (page.length < HISTORY_PAGE) break;
-    const oldest = Math.min(...page.map(r => r.time).filter(Number.isFinite));
-    if (!Number.isFinite(oldest)) break;
-    before = new Date(oldest).toISOString();
-  }
-  rows = await resolveRouterRows(account, rows);
+  const scan = async (query: string, count: (q: string) => Promise<{ rows: ChainMemo[]; n: number; oldest: number }>) => {
+    let rows: ChainMemo[] = [];
+    let before: string | null = null;
+    for (let p = 0; p < Math.min(Math.max(1, pages), MAX_HISTORY_PAGES); p++) {
+      const page = await count(`${query}&sort=desc&limit=${HISTORY_PAGE}${before ? `&before=${encodeURIComponent(before)}` : ''}`);
+      rows = rows.concat(page.rows);
+      if (page.n < HISTORY_PAGE || !Number.isFinite(page.oldest)) break;
+      before = new Date(page.oldest).toISOString();
+    }
+    return rows;
+  };
+  const transferPage = async (q: string) => { const r = await hyperionTransfers(q); return { rows: r, n: r.length, oldest: Math.min(...r.map(x => x.time).filter(Number.isFinite)) }; };
+  // Paging counts raw actions (one per notified account) so the bound and cursor match Hyperion's.
+  const sponsoredPage = async (q: string) => { const a = await hyperionActions(q); return { rows: expandSponsoredActions(a), n: a.length, oldest: Math.min(...a.map(actionTime).filter(Number.isFinite)) }; };
+  const [transfers, sponsored] = await Promise.all([
+    scan(`account=${account}&${FILTER}`, transferPage),
+    scan(`account=${account}&filter=${CRYPT_ROUTER_ACCOUNT}:sendfree`, sponsoredPage),
+  ]);
+  const rows = (await resolveRouterRows(account, transfers)).concat(sponsored);
   const seen = new Set<string>();
   return rows.filter((r) => {
     if (!msgPrefixOf(r.memo) || (r.from !== account && r.to !== account)) return false;

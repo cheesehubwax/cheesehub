@@ -18,7 +18,7 @@ import { useState } from 'react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Link } from 'react-router-dom';
-import { cryptPendingWarn, cryptBalanceWarn, powerzReserveWarn, nextClaimAt, claimOverdue, missingCompoundLinks, POWERZ_RESERVE_WAX } from '@/lib/adminAutomation';
+import { cryptPendingWarn, cryptBalanceWarn, cryptSponsorLowWarn, cryptSponsorToday, powerzReserveWarn, nextClaimAt, claimOverdue, missingCompoundLinks, POWERZ_RESERVE_WAX } from '@/lib/adminAutomation';
 import { Button } from '@/components/ui/button';
 
 export default function Admin() {
@@ -88,10 +88,13 @@ export default function Admin() {
 
   const crypt = data?.cryptStatus ?? null;
   const cryptPending = crypt != null && cryptPendingWarn(crypt);
-  const cryptHolding = crypt != null && cryptBalanceWarn(crypt.cheeseBalance);
+  const cryptHolding = crypt != null && cryptBalanceWarn(crypt.cheeseBalance, crypt.budget?.sponsorBalance ?? 0);
+  const cryptSponsorLow = crypt != null && cryptSponsorLowWarn(crypt.budget);
+  const sponsorToday = crypt ? cryptSponsorToday(crypt.budget) : null;
+  const cheeseUnits = (u: number) => `${(u / 10000).toFixed(4)} CHEESE`;
   const cryptStatus: 'ok' | 'warn' | 'critical' = crypt == null
     ? 'warn'
-    : crypt.config.paused ? 'critical' : (cryptPending || cryptHolding) ? 'warn' : 'ok';
+    : crypt.config.paused ? 'critical' : (cryptPending || cryptHolding || cryptSponsorLow) ? 'warn' : 'ok';
 
   const auto = data?.powerzAutomation ?? null;
   const missingLinks = auto ? missingCompoundLinks(auto) : [];
@@ -270,7 +273,10 @@ export default function Admin() {
                   { label: 'Split', value: crypt ? `${crypt.config.null_percent}% nulled / ${100 - crypt.config.null_percent}% xcheeseliqst` : '—' },
                   { label: 'Max Recipients / Parts', value: crypt ? `${crypt.config.max_recipients} / ${crypt.config.max_parts}` : '—' },
                   { label: 'Pending Payments', value: crypt?.pendingCount ?? '—', warn: cryptPending },
-                  { label: 'CHEESE Held (should be 0)', value: crypt?.cheeseBalance != null ? `${crypt.cheeseBalance.toFixed(4)} CHEESE` : '—', warn: cryptHolding },
+                  { label: 'CHEESE Held (sponsor funds only)', value: crypt?.cheeseBalance != null ? `${crypt.cheeseBalance.toFixed(4)} CHEESE` : '—', warn: cryptHolding },
+                  { label: 'Free Messaging', value: crypt == null ? '—' : !crypt.budget ? 'Not set up (setbudget not run)' : crypt.budget.enabled ? `On — funder ${crypt.budget.funder}` : 'Off' },
+                  { label: 'Free Budget Today', value: sponsorToday ? `${cheeseUnits(sponsorToday.spent)} of ${cheeseUnits(sponsorToday.limit)} used${sponsorToday.resetsAt ? ` · resets ${sponsorToday.resetsAt.toUTCString().slice(17, 22)} UTC` : ''}` : '—' },
+                  { label: 'Sponsor Balance', value: crypt?.budget ? cheeseUnits(crypt.budget.sponsorBalance) : '—', warn: cryptSponsorLow },
                 ]}
               />
 
