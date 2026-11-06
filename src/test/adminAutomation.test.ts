@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  cryptPendingWarn, cryptBalanceWarn, powerzReserveWarn, nextClaimAt, claimOverdue, missingCompoundLinks,
+  cryptPendingWarn, cryptBalanceWarn, cryptSponsorLowWarn, powerzReserveWarn, nextClaimAt, claimOverdue, missingCompoundLinks,
 } from '@/lib/adminAutomation';
 
 describe('monitor warning rules', () => {
@@ -11,6 +11,16 @@ describe('monitor warning rules', () => {
   it('flags CHEESE held on the router above dust', () => {
     expect(cryptBalanceWarn(0.0001)).toBe(false);
     expect(cryptBalanceWarn(0.0002)).toBe(true);
+  });
+  it('does not flag the operator sponsor balance as held user funds', () => {
+    expect(cryptBalanceWarn(500, 5_000_000)).toBe(false);
+    expect(cryptBalanceWarn(500.0002, 5_000_000)).toBe(true);
+  });
+  it('warns when sponsor funds cover less than two days of the 200 CHEESE limit', () => {
+    const b = { dailyLimit: 2_000_000, windowStart: 0, spent: 0, sponsorBalance: 4_000_000, funder: 'dr.cheese', enabled: true };
+    expect(cryptSponsorLowWarn(b)).toBe(false);
+    expect(cryptSponsorLowWarn({ ...b, sponsorBalance: 3_999_999 })).toBe(true);
+    expect(cryptSponsorLowWarn({ ...b, sponsorBalance: 0, enabled: false })).toBe(false);
   });
   it('flags cheesepowerz liquid WAX above 400', () => {
     expect(powerzReserveWarn(400)).toBe(false);
