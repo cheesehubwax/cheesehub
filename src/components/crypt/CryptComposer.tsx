@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { YoutubeTitleHelper } from '@/components/crypt/YoutubeTitleHelper';
@@ -17,7 +17,7 @@ import { MAX_PARTS, MAX_PLAINTEXT_BYTES, MESSAGE_FEE_QUANTITY, MESSAGE_RECIPIENT
 export function CryptComposer({
   account, active, activeGroup, activeInvite, nameFor, replyingTo, setReplyingTo, composerRef, text, setText, voice, setVoice,
   tooLong, bytes, maxBytes, parts, copies, voiceParts, voiceTxs, setAttachingNft, busy, listHidden, agreed, setAgreed,
-  feeInfoOpen, setFeeInfoOpen, totalCost, send, sendVoice, editing, cancelEdit, editExpired,
+  feeInfoOpen, setFeeInfoOpen, totalCost, send, sendVoice, editing, cancelEdit, editExpired, instantSlot,
 }: {
   account: string; active: string; activeGroup: CryptGroup | undefined; activeInvite: InviteGroupView | undefined; nameFor: (id: string) => string;
   replyingTo: ReplyRef | null; setReplyingTo: (r: ReplyRef | null) => void; composerRef: RefObject<HTMLTextAreaElement>;
@@ -25,7 +25,7 @@ export function CryptComposer({
   tooLong: boolean; bytes: number; maxBytes: number; parts: number; copies: number; voiceParts: number; voiceTxs: number;
   setAttachingNft: (v: boolean) => void; busy: boolean; listHidden: boolean; agreed: boolean; setAgreed: (v: boolean) => void;
   feeInfoOpen: boolean; setFeeInfoOpen: (v: boolean) => void; totalCost: string; send: () => void; sendVoice: () => void;
-  editing?: boolean; cancelEdit?: () => void; editExpired?: boolean;
+  editing?: boolean; cancelEdit?: () => void; editExpired?: boolean; instantSlot?: ReactNode;
 }) {
   return (
     <div className="space-y-2 p-4 border-t border-border">
@@ -52,6 +52,7 @@ export function CryptComposer({
             </CollapsibleTrigger>
           </Collapsible>
           <span className="ml-auto text-muted-foreground">{totalCost}</span>
+          {instantSlot}
           {voice
             ? <Button size="sm" disabled={busy || !agreed || editExpired} onClick={sendVoice} className="bg-cheese text-primary-foreground hover:bg-cheese/90">{editing ? 'Save edit' : 'Send voice'}{voiceTxs > 1 ? ` (${voiceTxs} signatures)` : ''}</Button>
             : <Button size="sm" disabled={busy || !agreed || !text.trim() || tooLong || editExpired} onClick={() => send()}
