@@ -1921,7 +1921,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 setAttachingNft={setAttachingNft} busy={busy} listHidden={listHidden} agreed={agreed} setAgreed={setAgreed}
                 feeInfoOpen={feeInfoOpen} setFeeInfoOpen={setFeeInfoOpen} totalCost={totalCost} send={() => void send()} sendVoice={sendVoice}
                 editing={!!editingMessage} cancelEdit={cancelEdit} editExpired={!!editingMessage && !canEdit(editingMessage, account, clock)}
-                instantSlot={sponsorUnits > 0 && <>
+                instantSlot={(sponsorUnits > 0 || instant.ready || !!instant.status?.exists) && <>
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setInstantOpen(true)}
                     title={instant.ready ? 'Instant Messaging is on' : 'Send free messages without Anchor popups'}>
                     {instant.ready ? '⚡ Instant' : '⚡ Go instant'}
