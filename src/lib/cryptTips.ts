@@ -2,7 +2,7 @@
 // (sender → replied-to author) via cheeseburger::transfer in the SAME transaction as an ordinary encrypted
 // chat message carrying the tip card. crypt.cheese never receives or holds tip funds.
 // Wire form (inside the encrypted reply body): "\u0007T1:<recipient>:<amount 4dp>:<note>"
-import { normalizeEndpoint, resolveEndpoints } from '@/lib/endpointResolver';
+import { normalizeEndpoint, resolveEndpoints } from '@/lib/endpointHealth';
 
 export const TIP_MARK = '\u0007T1:';
 /** Fixed public memo on the transfer — the user's note never goes on chain in plaintext. */
