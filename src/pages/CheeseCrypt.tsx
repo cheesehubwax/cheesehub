@@ -41,6 +41,9 @@ import { PaidActionDialog } from '@/components/crypt/PaidActionDialog';
 import { buildCg2Actions, JOIN_NOTE_MAX, encodeAdmission, encodeMemberAdd, encodeRoomProfiles, MAX_PUBLIC_ROOM_MEMBERS, collectInvites, countFriendRequests, friendRequestResendable, deriveInviteGroups, encodeGroupText, encodeInvite, encodeMeta, encodeNotice, inviteTextSize, invitesSignature, loadDecisions, MAX_INVITE_MEMBERS, loadFriendDecisions, loadInvites, newInviteGroupId, saveDecision, saveInvites, scopedKeys, eventFromMember, ownerLeaveNotices, VOICE_REF_PREFIX, type Cg2Event, type InviteGroup, type InviteGroupView } from '@/lib/cryptInviteGroups';
 import { ShareKeyDialog } from '@/components/crypt/ShareKeyDialog';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
+import { useCryptInstant } from '@/hooks/useCryptInstant';
+import { isInstantAuthFailure } from '@/lib/cryptInstant';
+import { CryptInstantDialog } from '@/components/crypt/CryptInstantDialog';
 import { fetchSponsorBudget, invalidateSponsorBudget, isSponsorRejection, sponsorCryptActions, sponsorRemaining, SPONSOR_PART_UNITS } from '@/lib/cryptSponsor';
 import { buildVoiceBatches, voiceNoteCost, voicePartCount, voiceTransactions, type VoiceClip } from '@/lib/cryptVoice';
 import { baselineMarks, firstUnreadIndex, firstVisitMarks, loadReadMarks, mergeMarks, sameMarks, saveReadMarks, unreadCounts, unreadReplies, type ReadMarks } from '@/lib/cryptUnread';
@@ -119,6 +122,31 @@ export function Messenger({ account, session }: { account: string; session: NonN
       sponsored = free !== out;
       out = free;
     }
+    // Instant Messaging: a lone sendfree from this account is signed by the browser's messaging-only key.
+    if (sponsored && instantRef.current.canSend(out)) {
+      try {
+        const txId = await instantRef.current.send(out);
+        invalidateSponsorBudget();
+        void fetchSponsorBudget(true).then(b => setSponsorUnits(sponsorRemaining(b)));
+        return { success: true, txId };
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'Instant send failed';
+        if (isSponsorRejection(message)) {
+          invalidateSponsorBudget();
+          void fetchSponsorBudget(true).then(b => setSponsorUnits(sponsorRemaining(b)));
+          const error = new Error("Today's free messaging budget is used up. Press Send again to send it as a normal paid message.");
+          if (options?.showErrorToast !== false) toast({ title: 'Message not sent', description: error.message, variant: 'destructive' });
+          return { success: false, txId: null, error };
+        }
+        // Only a rejected browser key (removed or replaced elsewhere) falls back to Anchor, so a send that
+        // may already be on chain is never broadcast twice.
+        if (!isInstantAuthFailure(message)) {
+          if (options?.showErrorToast !== false) toast({ title: 'Message not sent', description: message, variant: 'destructive' });
+          return { success: false, txId: null, error: new Error(message) };
+        }
+        void instantRef.current.refresh();
+      }
+    }
     const r = await executeDirect(out, options);
     if (sponsored) {
       invalidateSponsorBudget();
@@ -127,7 +155,11 @@ export function Messenger({ account, session }: { account: string; session: NonN
         return { ...r, error: new Error("Today's free messaging budget is used up. Press Send again to send it as a normal paid message.") };
     }
     return r;
-  }, [executeDirect]);
+  }, [executeDirect, toast]);
+  const instant = useCryptInstant(account, session, executeDirect);
+  const instantRef = useRef(instant);
+  instantRef.current = instant;
+  const [instantOpen, setInstantOpen] = useState(false);
   useEffect(() => {
     if (!CRYPT_ROUTER_ENABLED) return;
     let live = true;
