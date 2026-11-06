@@ -1859,7 +1859,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 replyingTo={replyingTo} setReplyingTo={setReplyingTo} composerRef={composerRef} text={text} setText={setText} voice={voice} setVoice={setVoice}
                 tooLong={tooLong} bytes={bytes} maxBytes={maxBytes} parts={parts} copies={copies} voiceParts={voiceParts} voiceTxs={voiceTxs}
                 setAttachingNft={setAttachingNft} busy={busy} listHidden={listHidden} agreed={agreed} setAgreed={setAgreed}
-                feeInfoOpen={feeInfoOpen} setFeeInfoOpen={setFeeInfoOpen} totalCost={totalCost} send={send} sendVoice={sendVoice}
+                feeInfoOpen={feeInfoOpen} setFeeInfoOpen={setFeeInfoOpen} totalCost={totalCost} send={() => void send()} sendVoice={sendVoice}
                 editing={!!editingMessage} cancelEdit={cancelEdit} editExpired={!!editingMessage && !canEdit(editingMessage, account, clock)} />
             )}
           </>
