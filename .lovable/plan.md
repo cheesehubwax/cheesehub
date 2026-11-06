@@ -10,7 +10,13 @@ Users send text/NFT/link/control messages with **no token transfer** in their tr
 - Recipients no longer receive 0.0001 CHEESE dust per message.
 
 ## Important consequence (must be accepted)
-Today the encrypted message travels in the **dust transfer memo** to the recipient. Removing dust means the encrypted text must travel in the `sendmsg` action itself (it already carries `copies[].memo`), and the recipient is notified with `require_recipient`. The app must therefore read history from `crypt.cheese::sendmsg` actions as well as legacy transfers. Old messages remain readable unchanged.
+**How messages are delivered today:** each message is a tiny 0.0001 CHEESE payment to the recipient, and the scrambled (encrypted) message text is written in that payment's note. The recipient's app finds their messages by looking through the CHEESE payments their account received.
+
+**What changes:** with no more tiny payments, there is no payment note to carry the text. Instead, the scrambled text is written directly into the "send message" instruction the sender signs with `crypt.cheese`. The blockchain still tags the recipient's account on that instruction (`require_recipient`), so it shows up in their account history just like a payment would.
+
+**What the app must do:** look in two places when loading a chat — the old payment notes (all existing messages) and the new message instructions (all new free messages) — then merge them into one conversation in time order.
+
+**Effect on you:** nothing is lost. Old messages stay exactly where they are and still open. Privacy is the same, because the text is equally scrambled in both places; only who can read it (sender and recipient) can unscramble it.
 
 ## Contract changes (`contracts/cheesecrypt/`)
 1. New separate table `budget` (singleton): `daily_limit` (default 500.0000 CHEESE), `day_start` (UTC seconds), `spent_today`, `sponsor_enabled` (default false). Kept separate from `config` so the existing config layout never changes (avoids the cheesepowerz-style row-format problem).
