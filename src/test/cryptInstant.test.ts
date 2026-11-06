@@ -63,3 +63,13 @@ describe('Instant Messaging RAM check', () => {
     expect(ramTopUpQuantity(config, 0.01)).toMatch(/^\d+\.\d{4} CHEESE$/);
   });
 });
+
+import { isResourceShortage } from '@/lib/cryptInstant';
+describe('CPU shortage detection', () => {
+  it('recognises CPU/NET exhaustion but not auth or budget errors', () => {
+    expect(isResourceShortage('transaction was executing for too long: billed CPU time (1200 us) is greater than the maximum billable CPU time')).toBe(true);
+    expect(isResourceShortage('tx_net_usage_exceeded')).toBe(true);
+    expect(isResourceShortage('missing authority of alice')).toBe(false);
+    expect(isResourceShortage('free messaging budget reached for today')).toBe(false);
+  });
+});
