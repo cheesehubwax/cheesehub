@@ -42,7 +42,9 @@ import { buildCg2Actions, JOIN_NOTE_MAX, encodeAdmission, encodeMemberAdd, encod
 import { ShareKeyDialog } from '@/components/crypt/ShareKeyDialog';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { useCryptInstant } from '@/hooks/useCryptInstant';
-import { isInstantAuthFailure } from '@/lib/cryptInstant';
+import { isInstantAuthFailure, isResourceShortage } from '@/lib/cryptInstant';
+import { useNavigate } from 'react-router-dom';
+import { ToastAction } from '@/components/ui/toast';
 import { CryptInstantDialog } from '@/components/crypt/CryptInstantDialog';
 import { fetchSponsorBudget, invalidateSponsorBudget, isSponsorRejection, sponsorCryptActions, sponsorRemaining, SPONSOR_PART_UNITS } from '@/lib/cryptSponsor';
 import { buildVoiceBatches, voiceNoteCost, voicePartCount, voiceTransactions, type VoiceClip } from '@/lib/cryptVoice';
@@ -110,6 +112,7 @@ const CheeseCrypt = () => {
 export function Messenger({ account, session }: { account: string; session: NonNullable<ReturnType<typeof useWax>['session']> }) {
   const { toast } = useToast();
   const { executeTransaction: executeDirect } = useWaxTransaction(session);
+  const navigate = useNavigate();
   // Every CHEESECrypt transaction that fits the crypt.cheese router shape is sent through it; others stay direct.
   // Exact routed messages become a free crypt.cheese::sendfree while the live sponsor budget covers them;
   // voice batches and join requests pass `paid` and always use the paid path.
@@ -140,6 +143,12 @@ export function Messenger({ account, session }: { account: string; session: NonN
         }
         // Only a rejected browser key (removed or replaced elsewhere) falls back to Anchor, so a send that
         // may already be on chain is never broadcast twice.
+        if (isResourceShortage(message)) {
+          const error = new Error('Your account is out of CPU for this message. Rent CPU with CHEESE on CHEESEUp, then press Send again.');
+          toast({ title: 'Not enough CPU', description: error.message, variant: 'destructive',
+            action: <ToastAction altText="Open CHEESEUp" onClick={() => navigate('/powerup')}>⚡ CHEESEUp</ToastAction> });
+          return { success: false, txId: null, error };
+        }
         if (!isInstantAuthFailure(message)) {
           if (options?.showErrorToast !== false) toast({ title: 'Message not sent', description: message, variant: 'destructive' });
           return { success: false, txId: null, error: new Error(message) };
@@ -155,7 +164,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         return { ...r, error: new Error("Today's free messaging budget is used up. Press Send again to send it as a normal paid message.") };
     }
     return r;
-  }, [executeDirect, toast]);
+  }, [executeDirect, toast, navigate]);
   const instant = useCryptInstant(account, session, executeDirect);
   const instantRef = useRef(instant);
   instantRef.current = instant;
