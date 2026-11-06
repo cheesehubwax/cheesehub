@@ -14,6 +14,8 @@ import type { CryptAvatar } from '@/lib/cryptAvatar';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { voiceNoteCost } from '@/lib/cryptVoice';
+import { parseTip } from '@/lib/cryptTips';
+import { CryptTipCard } from '@/components/crypt/CryptTipCard';
 import { groupMessageCost, type ConversationEntry, type CryptGroup } from '@/lib/cryptGroups';
 import { messageCost } from '@/lib/cheeseCrypt';
 import type { EditedMessage } from '@/lib/cryptEdits';
@@ -49,7 +51,8 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
   const hidden = !!m.collapsed && !revealed;
   const reply = parseReply(m.text);
   const body = reply ? reply.body : m.text;
-  const segments = body != null ? parseNftMessage(body) : null;
+  const tip = parseTip(body);
+  const segments = body != null && !tip ? parseNftMessage(body) : null;
   const soloAssetId = segments && segments.length === 1 && segments[0].type === 'nft' ? segments[0].assetId : null;
   const { data } = useQuery({
     queryKey: ['crypt-nft', soloAssetId], queryFn: () => { if (!soloAssetId) throw new Error('Missing asset'); return fetchAssetById(soloAssetId); },
@@ -83,7 +86,7 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
         <span className="block truncate opacity-80">{reply.quote || '…'}</span>
       </button>}
       <div className="whitespace-pre-wrap break-words">
-        {m.voice ? <VoiceNoteBubble note={m.voice} /> : body != null ? parseNftMessage(body).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} autoplayKey={`${account}|${m.key}:${i}`} txId={m.txId} /> : <span key={i} className="block">{splitYoutube(seg.text).map((y, j) => y.type === 'youtube' ? <CryptYoutubeEmbed key={j} link={y.link} /> : <span key={j}>{y.text}</span>)}</span>) : <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
+        {m.voice ? <VoiceNoteBubble note={m.voice} /> : tip ? <CryptTipCard tip={tip} sender={m.from} txId={m.txId} nameFor={nameFor} /> : body != null ? parseNftMessage(body).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} autoplayKey={`${account}|${m.key}:${i}`} txId={m.txId} /> : <span key={i} className="block">{splitYoutube(seg.text).map((y, j) => y.type === 'youtube' ? <CryptYoutubeEmbed key={j} link={y.link} /> : <span key={j}>{y.text}</span>)}</span>) : <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
       </div>
       </>}
       {!hidden && reactions && reactions.length > 0 && <div className="mt-1 flex flex-wrap gap-1">
