@@ -140,7 +140,7 @@ export async function sendInstant(chain: ChainDefinition, key: InstantKey, actio
   if (!isInstantEligible(actions, key.account)) throw new Error('Only free messages can be sent instantly.');
   const session = new Session({ chain, actor: key.account, permission: INSTANT_PERMISSION, walletPlugin: new WalletPluginPrivateKey(key.privateKey) });
   const auth = [{ actor: key.account, permission: INSTANT_PERMISSION }];
-  const signed = (actions as Act[]).map(a => ({ ...a, authorization: auth }));
+  const signed = (actions as Act[]).map(a => ({ account: String(a.account), name: String(a.name), data: a.data ?? {}, authorization: auth }));
   const result = await session.transact({ actions: signed }, {
     transactPlugins: [new TransactPluginResourceProvider({ endpoints: { [WAX_CHAIN_ID]: 'https://wax.greymass.com' }, allowFees: false })],
   });
