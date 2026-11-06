@@ -32,5 +32,17 @@ int main() {
    assert(valid_standalone_fee(100) && null_units(100, 80) == 80);
    assert(!valid_standalone_fee(0) && !valid_standalone_fee(-5) && !valid_standalone_fee(101));
    assert(!valid_standalone_fee(MAX_FEE_UNITS + 5));
+   // Sponsored budget: fixed 24h windows on chain time; 200.0000 CHEESE = 2000000 units.
+   assert(window_start_at(1000, 0) == 1000);                 // first use opens a window
+   assert(window_start_at(1000 + 86399, 1000) == 1000);      // same window one second before rollover
+   assert(window_start_at(1000 + 86400, 1000) == 87400);     // new window after a full day
+   assert(window_start_at(500, 1000) == 1000);               // an earlier clock never opens a window
+   assert(sponsor_allows(0, 100, 2000000, 5000000));
+   assert(sponsor_allows(1999900, 100, 2000000, 5000000));   // exactly reaches the cap
+   assert(!sponsor_allows(1999901, 100, 2000000, 5000000));  // would exceed 200 CHEESE
+   assert(!sponsor_allows(0, 100, 2000000, 99));             // sponsor balance too small
+   assert(!sponsor_allows(0, 0, 2000000, 5000000) && !sponsor_allows(-1, 100, 2000000, 5000000));
+   assert(!sponsor_allows(2000001, 100, 2000000, 5000000));
+   assert(platform_units(1, 100) == 100 && null_units(100, 80) == 80); // sponsored 1 part: 0.0080 nulled, 0.0020 liquidity
    std::cout << "Router fee and bound tests passed\n";
 }

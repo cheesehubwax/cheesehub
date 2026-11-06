@@ -4,6 +4,7 @@
 #include <eosio/eosio.hpp>
 #include <eosio/asset.hpp>
 #include <eosio/singleton.hpp>
+#include <eosio/system.hpp>
 #include "router_rules.hpp"
 #include <string>
 #include <vector>
