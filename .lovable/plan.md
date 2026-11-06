@@ -1,48 +1,106 @@
-# Sponsored (free) CHEESECrypt text messages — 500 CHEESE/day budget
+# Free CHEESECrypt messages: launch steps from start to finish
 
-## Goal
-Users send text/NFT/link/control messages with **no token transfer** in their transaction. `crypt.cheese` pays the same per-part fee from its own pre-funded balance, still split 80% to `eosio.null` (nulled) and 20% to `xcheeseliqst`. The contract never receives or holds user funds for these messages. Voice notes, key creation, room listings and tips stay user-paid as today.
+This is a checklist for you to follow on your Windows PC. The app code and the contract code are already written. Nothing here changes code. Do the steps in order and don't skip any.
 
-## What changes for users
-- Sending a normal message = one action only (`crypt.cheese::sendmsg`). No CHEESE leaves their wallet.
-- This makes Anchor whitelisting / a messaging-only session key safe later (separate follow-up; Anchor's auto-sign behaviour still to be confirmed by testing).
-- When the day's 500 CHEESE budget is used up, the app shows "Free messaging budget reached for today" and offers to send as a normal paid message (current flow) so chat never stops.
-- Recipients no longer receive 0.0001 CHEESE dust per message.
+## Part A: Get the latest files onto your PC
 
-## Important consequence (must be accepted)
-**How messages are delivered today:** each message is a tiny 0.0001 CHEESE payment to the recipient, and the scrambled (encrypted) message text is written in that payment's note. The recipient's app finds their messages by looking through the CHEESE payments their account received.
+1. Publish or sync the project so GitHub (bewbzz/cheesehub) has the latest code.
+2. Get the code onto your PC:
+   - If you already have the folder (for example `C:\cheesehub`), open it, then in GitHub Desktop click **Fetch origin** and then **Pull**.
+   - If you don't, go to the GitHub page, click **Code → Download ZIP**, and unzip it to `C:\cheesehub`.
+3. Check that this folder exists: `C:\cheesehub\contracts\cheesecrypt`. It should have `Dockerfile`, `build.sh`, `include`, `src` and `tests` inside.
 
-**What changes:** with no more tiny payments, there is no payment note to carry the text. Instead, the scrambled text is written directly into the "send message" instruction the sender signs with `crypt.cheese`. The blockchain still tags the recipient's account on that instruction (`require_recipient`), so it shows up in their account history just like a payment would.
+## Part B: Compile the contract with Docker Desktop
 
-**What the app must do:** look in two places when loading a chat — the old payment notes (all existing messages) and the new message instructions (all new free messages) — then merge them into one conversation in time order.
+1. Open **Docker Desktop** and wait until it says "Engine running" (bottom left, green).
+2. Press the Windows key, type `cmd` and press Enter. A black **Command Prompt** window opens.
+3. Go to the contract folder. Type this and press Enter:
+   ```
+   cd /d C:\cheesehub\contracts\cheesecrypt
+   ```
+4. Make the output folder (if it already exists, you'll see a harmless error):
+   ```
+   mkdir build
+   ```
+5. Build the compiler image. You only need to do this once, and it takes a few minutes:
+   ```
+   docker build -t cheesecrypt-cdt .
+   ```
+   The dot at the end matters. It should finish with "naming to docker.io/library/cheesecrypt-cdt".
+6. Compile:
+   ```
+   docker run --rm -v "%cd%":/work cheesecrypt-cdt cdt-cpp -abigen -I include -contract cheesecrypt -o build/cheesecrypt.wasm src/cheesecrypt.cpp
+   ```
+   You may see warnings about "ricardian". Those are normal. Red "error" lines are not normal: stop and paste them to me.
+7. Check the results:
+   ```
+   dir build
+   ```
+   You should see two files: `cheesecrypt.wasm` and `cheesecrypt.abi`.
+8. Optional extra check (runs the fee and time rule tests):
+   ```
+   docker run --rm -v "%cd%":/work cheesecrypt-cdt bash tests/run.sh
+   ```
+   If this complains that it can't find a compiler (g++), skip it. I already ran these tests on my side and they passed.
 
-**Effect on you:** nothing is lost. Old messages stay exactly where they are and still open. Privacy is the same, because the text is equally scrambled in both places; only who can read it (sender and recipient) can unscramble it.
+## Part C: Before deploying
 
-## Contract changes (`contracts/cheesecrypt/`)
-1. New separate table `budget` (singleton): `daily_limit` (default 500.0000 CHEESE), `day_start` (UTC seconds), `spent_today`, `sponsor_enabled` (default false). Kept separate from `config` so the existing config layout never changes (avoids the cheesepowerz-style row-format problem).
-2. New owner action `setbudget(daily_limit, sponsor_enabled)` — `crypt.cheese@active` only.
-3. New action `sendfree(sender, parts, copies)`:
-   - `require_auth(sender)`, not paused, same shape/recipient/memo checks as `sendmsg`.
-   - Anti-spam: per-sender cooldown table (`lastsend`, sender pays own RAM row? No — contract pays; tiny row, bounded) with minimum gap (config value, default 2 s) and per-sender daily part cap (default 500 parts).
-   - Rolls the 24h window, checks `spent_today + fee <= daily_limit`, else fails with a clear "budget reached" error.
-   - Calls existing `pay_platform` (80/20) from contract balance; `require_recipient` once per distinct recipient; no token sent to recipients.
-4. `sendmsg` (paid path) unchanged so voice notes and fallback keep working.
-5. Native tests in `tests/router_rules_test.cpp` for window rollover, budget ceiling, cooldown and integer 80/20 split.
-6. `APP_SYNC.md` + `README.md`: new actions, tables, budget rules, Windows CMD Docker build + deploy + `setbudget` steps (literal, step-by-step).
+1. Make sure `crypt.cheese` has enough RAM. The new code is bigger, and the new `budget` table needs a small amount of extra RAM.
+   - On waxblock.io, look up `crypt.cheese` and check RAM. Aim for at least 50 KB free beyond the current usage.
+   - If it's short, buy RAM for `crypt.cheese` from any account (about 1 to 2 WAX is usually enough).
+2. Have the wallet that controls `crypt.cheese@active` ready in Anchor.
 
-## App changes
-- `cheeseCrypt.ts` send path: if sponsorship live (read `budget` table, switch on) and message is text/NFT/control → build single `sendfree` action; otherwise current paid path. Voice always paid.
-- History readers: add Hyperion query for `crypt.cheese::sendfree` actions where the account is sender or notified recipient; decrypt `copies[].memo` exactly like transfer memos; attribute only to the authorising `sender`. Merge/dedupe with existing transfer history; router IndexedDB cache reused.
-- Composer: small "Free message" indicator; budget-reached fallback prompt.
-- Admin monitor: crypt.cheese card shows today's budget used / limit, contract CHEESE balance, low-balance warning (< 2 days of budget).
-- About/Guide text updated; Crypt fee memory updated.
-- Tests: send-path selection, history decode of sponsored actions, budget-reached fallback.
+## Part D: Deploy the update to crypt.cheese
 
-## Flags (legal / risk)
-- Non-custodial: you fund your own account, users never send it funds — low money-transmission risk.
-- Sponsoring free messages means you pay for third-party content distribution; content is encrypted and you cannot moderate it on-chain. Keep Terms wording that users are responsible for content.
-- Treasury drain is capped at 500 CHEESE/day worst case; spam across many accounts can exhaust the daily budget early (denial of free service, not loss beyond the cap).
-- CPU/NET is still paid by the sender's own account.
+Use the same method you used for the first deploy on 31 Oct. Two common ways:
 
-## Rollout
-1. Build & deploy contract (Docker CMD steps). 2. Fund `crypt.cheese` with CHEESE. 3. Run `setbudget 500.0000 CHEESE, true`. 4. App detects switch and starts using free sends; can be turned off instantly with `setbudget ..., false`.
+- **Web tool (easiest):** Open a WAX contract deploy page that works with Anchor (for example the "Deploy Contract" tool on wax.bloks.io under Wallet). Log in as `crypt.cheese` with the **active** permission. Upload `build\cheesecrypt.wasm` and `build\cheesecrypt.abi`, then approve in Anchor.
+- **cleos (command line):**
+  `cleos -u https://wax.greymass.com set contract crypt.cheese build cheesecrypt.wasm cheesecrypt.abi`
+
+You don't need to redo the `eosio.code` permission, because it's already set. Your existing settings and in-progress payments stay the same. Free messaging stays **off** until Part F.
+
+Then check it worked: on waxblock.io, open `crypt.cheese` → **Contract → Actions**. You should now see `setbudget`, `takesponsor` and `sendfree`. Under **Tables** you should see `budget`.
+
+## Part E: Tell the contract who funds it, then fund it
+
+1. waxblock.io → `crypt.cheese` → **Contract → Actions → setbudget**. Log in as `crypt.cheese` (active).
+   - `daily_limit`: `200.0000 CHEESE` (exactly 4 decimals, with a space before CHEESE)
+   - `enabled`: `false`
+   - `funder`: the account you'll pay from (for example `dr.cheese`)
+   - Click Submit and approve in Anchor.
+2. Log in as the **funder** account. Send CHEESE (token contract `cheeseburger`) to `crypt.cheese`:
+   - Amount: as much as you want available (for example `1400.0000 CHEESE` covers about a week at the full limit)
+   - Memo: exactly `CHEESECrypt sponsor deposit` (capitals and spaces must match)
+   - If the account or memo is wrong, the transfer is rejected and nothing is lost.
+3. Check: **Tables → budget** should show `sponsor_balance` equal to what you sent.
+
+## Part F: Switch it on and test
+
+1. Run `setbudget` again with the same values, but `enabled` = `true`.
+2. Open CHEESEHub → Admin. The crypt.cheese card should show "Free Messaging: On", today's spend and the sponsor balance.
+3. Open CHEESECrypt and send a text message to a friend:
+   - The composer should show "Free message".
+   - Anchor should ask you to approve a `crypt.cheese::sendfree` action with **no CHEESE transfer** in it.
+   - The friend receives it, and old messages still load.
+4. Send a voice note. It should still be a normal paid message.
+
+## Everyday controls
+
+- **Turn off:** `setbudget` with `enabled` = `false`. Messages fall back to paid automatically.
+- **Top up:** repeat Part E step 2.
+- **Take money back:** `takesponsor`, for example `100.0000 CHEESE`, signed by `crypt.cheese@active`. It goes back to the funder.
+- **Change daily amount:** `setbudget` with a new `daily_limit`.
+
+## If something goes wrong
+
+- Docker says "cannot connect": Docker Desktop isn't running. Start it and wait for the green "Engine running".
+- Compile errors, or deploy says "insufficient ram": paste the message to me (for RAM, buy more as in Part C).
+- Deposit rejected: check the funder account in `setbudget` and the exact memo.
+
+## Risks (flagged)
+
+- There's no per-person limit. One spammer can use up the whole 200 for the day, and after that everyone pays normally. Your most you can lose is 200 CHEESE per day.
+- You're paying to deliver encrypted content you can't see. Keep the Terms rule that users are responsible for what they send.
+- Whether Anchor can approve messages without a pop-up (whitelisting) is still untested. You can only test it once this is live.
+- The contract has not been audited. Testing on testnet first is safest.
