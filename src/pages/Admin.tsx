@@ -8,6 +8,7 @@ import { FailedTransactionLog } from '@/components/admin/FailedTransactionLog';
 import { NodeHealthPanel } from '@/components/admin/NodeHealthPanel';
 import { CryptRoomModerationPanel } from '@/components/admin/CryptRoomModerationPanel';
 import { AddBannerSlotsCard } from '@/components/admin/AddBannerSlotsCard';
+import { CryptSponsorDepositBox } from '@/components/admin/CryptSponsorDepositBox';
 import { parseAssetAmount, getDeviationSeverity } from '@/lib/adminData';
 import { DropPurchaseLog } from '@/components/admin/DropPurchaseLog';
 import { useDropPurchases } from '@/hooks/useDropPurchases';
@@ -278,7 +279,9 @@ export default function Admin() {
                   { label: 'Free Budget Today', value: sponsorToday ? `${cheeseUnits(sponsorToday.spent)} of ${cheeseUnits(sponsorToday.limit)} used${sponsorToday.resetsAt ? ` · resets ${sponsorToday.resetsAt.toUTCString().slice(17, 22)} UTC` : ''}` : '—' },
                   { label: 'Sponsor Balance', value: crypt?.budget ? cheeseUnits(crypt.budget.sponsorBalance) : '—', warn: cryptSponsorLow },
                 ]}
-              />
+              >
+                <CryptSponsorDepositBox funder={crypt?.budget?.funder || null} />
+              </ContractStatusCard>
 
               {/* ram.chz */}
               <ContractStatusCard

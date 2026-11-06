@@ -89,8 +89,11 @@ export async function fetchPowerzStats(): Promise<PowerzStats | null> {
   return rows[0] ?? null;
 }
 
+/** Extra accounts allowed into the /admin dashboard only (not cheesebannad on-chain admin authority). */
+export const EXTRA_ADMIN_ACCOUNTS: readonly string[] = ['cheesepromoz'];
+
 export async function fetchIsAdmin(account: string): Promise<boolean> {
-  if (account === CHEESEBANNAD) return true;
+  if (account === CHEESEBANNAD || EXTRA_ADMIN_ACCOUNTS.includes(account)) return true;
   const rows = await fetchTable<BannadAdmin>(
     CHEESEBANNAD, CHEESEBANNAD, 'admins',
     { lower_bound: account, upper_bound: account, limit: 1 }
