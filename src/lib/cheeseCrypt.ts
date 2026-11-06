@@ -565,8 +565,7 @@ export const MAX_HISTORY_PAGES = 4;
  * `pages` > 1 reads further back by timestamp, so multi-transaction voice notes are not cut in half.
  */
 export async function fetchMessages(account: string, pages = 1): Promise<ChainMemo[]> {
-  const scan = async (query: string, read: (q: string) => Promise<ChainMemo[]>, count: (q: string) => Promise<{ rows: ChainMemo[]; n: number; oldest: number }>) => {
-    void read;
+  const scan = async (query: string, count: (q: string) => Promise<{ rows: ChainMemo[]; n: number; oldest: number }>) => {
     let rows: ChainMemo[] = [];
     let before: string | null = null;
     for (let p = 0; p < Math.min(Math.max(1, pages), MAX_HISTORY_PAGES); p++) {
@@ -581,11 +580,10 @@ export async function fetchMessages(account: string, pages = 1): Promise<ChainMe
   // Paging counts raw actions (one per notified account) so the bound and cursor match Hyperion's.
   const sponsoredPage = async (q: string) => { const a = await hyperionActions(q); return { rows: expandSponsoredActions(a), n: a.length, oldest: Math.min(...a.map(actionTime).filter(Number.isFinite)) }; };
   const [transfers, sponsored] = await Promise.all([
-    scan(`account=${account}&${FILTER}`, hyperionTransfers, transferPage),
-    scan(`account=${account}&filter=${CRYPT_ROUTER_ACCOUNT}:sendfree`, hyperionTransfers, sponsoredPage),
+    scan(`account=${account}&${FILTER}`, transferPage),
+    scan(`account=${account}&filter=${CRYPT_ROUTER_ACCOUNT}:sendfree`, sponsoredPage),
   ]);
-  let rows = transfers;
-  rows = (await resolveRouterRows(account, rows)).concat(sponsored);
+  const rows = (await resolveRouterRows(account, transfers)).concat(sponsored);
   const seen = new Set<string>();
   return rows.filter((r) => {
     if (!msgPrefixOf(r.memo) || (r.from !== account && r.to !== account)) return false;
