@@ -1920,7 +1920,15 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 tooLong={tooLong} bytes={bytes} maxBytes={maxBytes} parts={parts} copies={copies} voiceParts={voiceParts} voiceTxs={voiceTxs}
                 setAttachingNft={setAttachingNft} busy={busy} listHidden={listHidden} agreed={agreed} setAgreed={setAgreed}
                 feeInfoOpen={feeInfoOpen} setFeeInfoOpen={setFeeInfoOpen} totalCost={totalCost} send={() => void send()} sendVoice={sendVoice}
-                editing={!!editingMessage} cancelEdit={cancelEdit} editExpired={!!editingMessage && !canEdit(editingMessage, account, clock)} />
+                editing={!!editingMessage} cancelEdit={cancelEdit} editExpired={!!editingMessage && !canEdit(editingMessage, account, clock)}
+                instantSlot={sponsorUnits > 0 && <>
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setInstantOpen(true)}
+                    title={instant.ready ? 'Instant Messaging is on' : 'Send free messages without Anchor popups'}>
+                    {instant.ready ? '⚡ Instant' : '⚡ Go instant'}
+                  </Button>
+                  <CryptInstantDialog open={instantOpen} onOpenChange={setInstantOpen} account={account} ready={instant.ready} status={instant.status}
+                    quoteRam={instant.quoteRam} enable={instant.enable} revoke={instant.revoke} />
+                </>} />
             )}
           </>
         )}
