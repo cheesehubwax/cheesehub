@@ -147,6 +147,10 @@ export async function sendInstant(chain: ChainDefinition, key: InstantKey, actio
   return result.resolved?.transaction.id?.toString() || null;
 }
 
+/** Chain rejections meaning the account ran out of CPU or NET (Fuel did not cover the message). */
+export const isResourceShortage = (message: string | undefined) =>
+  !!message && /(billed cpu|cpu usage|tx_cpu_usage_exceeded|deadline exceeded|insufficient cpu|net usage|tx_net_usage_exceeded|ram_usage_exceeded|leeway_deadline)/i.test(message);
+
 /** Chain rejections meaning the browser key no longer matches the account's permission (revoked elsewhere). */
 export const isInstantAuthFailure = (message: string | undefined) =>
   !!message && /(missing (required )?auth|irrelevant (signature|authority)|unsatisfied_authorization|does not have signatures|permission .* not found|unknown key)/i.test(message);
