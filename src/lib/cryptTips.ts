@@ -42,6 +42,9 @@ export function parseTip(text: string | null | undefined): Tip | null {
   return m ? { recipient: m[1], amount: m[2], note: m[3] } : null;
 }
 
+/** Plain one-line label for quotes and search. */
+export const tipLabel = (t: Tip) => `🧀 Tip ${t.amount.replace(/\.?0+$/, '')} CHEESE${t.note ? ` — ${t.note}` : ''}`;
+
 /** The public wallet-to-wallet leg prepended to the message actions. */
 export function buildTipTransfer(from: string, tip: Tip, auth: unknown[]) {
   return { account: 'cheeseburger', name: 'transfer', authorization: auth, data: { from, to: tip.recipient, quantity: `${tip.amount} CHEESE`, memo: TIP_MEMO } };

@@ -1,5 +1,6 @@
 // In-chat keyword search over already-decrypted messages. Runs locally only; nothing is sent or stored.
 import { parseReply } from '@/lib/cryptReply';
+import { parseTip, tipLabel } from '@/lib/cryptTips';
 
 type Searchable = { key: string; text: string | null; collapsed?: unknown };
 
@@ -7,6 +8,8 @@ type Searchable = { key: string; text: string | null; collapsed?: unknown };
 export function searchableText(text: string | null): string {
   if (!text) return '';
   const body = parseReply(text)?.body ?? text;
+  const tip = parseTip(body);
+  if (tip) return tipLabel(tip);
   return body.replace(/\[nft:\d+\]/gi, ' ').trim();
 }
 
