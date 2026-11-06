@@ -21,7 +21,7 @@ or redeployment is required for these paths.
 | Voice 0.0100 per encrypted part, shared across recipients, up to 30 parts/batch (`cryptVoice.ts`) | Routed by the shared adapter, including metadata/edit-target parts; each batch gets its own atomic payment + sendmsg. Automated history/fee checks; live wallet/resource checks pending |
 | Recipient 0.0001 per part | `recipient_fee` per copy; exact `parts` copies per distinct recipient |
 | Shared 80% eosio.null / 20% xcheeseliqst | `pay_platform` integer split; `setconfig` requires 80 |
-| Key creation 100 CHEESE, publishing fee 0.0100 | `payfee` with the original memo (gated by `CRYPT_PAYFEE_LIVE`); key lookup reads payer-authorized `payfee` actions plus legacy direct legs |
+| Key creation 500 CHEESE, publishing fee 0.0100 | `payfee` with the original memo (gated by `CRYPT_PAYFEE_LIVE`); key lookup reads payer-authorized `payfee` actions plus legacy direct legs |
 | Mandatory Anchor-locked keys; legacy upgrade before use; locked-only backups | Client-only seal/unlock verification; no router changes; creation fee unchanged |
 | Private 8 / public 50; only owner admits (`cryptInviteGroups.ts`) | Client-only authenticated envelopes; router bounds 49 recipients per action, not total membership |
 | 35 membership parts, usual text 20 | Router hard bound 35; client keeps content-specific bounds |

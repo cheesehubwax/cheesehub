@@ -30,7 +30,7 @@ beforeEach(async () => {
 });
 async function payCreation() {
   expect(loadKey('alice')).toBeNull();
-  const pay = await screen.findByRole('button', { name: 'Pay 100 CHEESE & create key' });
+  const pay = await screen.findByRole('button', { name: 'Pay 500 CHEESE & create key' });
   expect(pay).toBeDisabled();
   fireEvent.click(screen.getByRole('checkbox'));
   calls.transact.mockResolvedValueOnce({ success: true, txId: 'confirmed-create-tx' });
@@ -127,11 +127,11 @@ describe('profile-first key setup', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Use defaults' }));
     fireEvent.click(screen.getByRole('checkbox'));
     calls.transact.mockResolvedValueOnce(result);
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Pay 100 CHEESE & create key' })); });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Pay 500 CHEESE & create key' })); });
     expect(loadKey('alice')).toBeNull();
     expect(calls.transact.mock.calls[0][0].map((a: { data: unknown }) => a.data)).toEqual([
-      { from: 'alice', to: 'eosio.null', quantity: '80.0000 CHEESE', memo: 'CHEESECrypt key creation fee' },
-      { from: 'alice', to: 'xcheeseliqst', quantity: '20.0000 CHEESE', memo: 'CHEESECrypt key creation fee' },
+      { from: 'alice', to: 'eosio.null', quantity: '400.0000 CHEESE', memo: 'CHEESECrypt key creation fee' },
+      { from: 'alice', to: 'xcheeseliqst', quantity: '100.0000 CHEESE', memo: 'CHEESECrypt key creation fee' },
     ]);
   });
   it('loads an existing private key for free', async () => {
@@ -153,11 +153,11 @@ describe('profile-first key setup', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
     fireEvent.click(screen.getByRole('checkbox'));
     calls.transact.mockRejectedValueOnce(new Error('Wallet rejected'));
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Pay 100 CHEESE & create key' })); });
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Pay 500 CHEESE & create key' })); });
     expect(loadKey('alice')).toBeNull();
     let confirmPayment: ((value: { success: boolean; txId: string }) => void) | undefined;
     calls.transact.mockImplementationOnce(() => new Promise(resolve => { confirmPayment = resolve; }));
-    fireEvent.click(screen.getByRole('button', { name: 'Pay 100 CHEESE & create key' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pay 500 CHEESE & create key' }));
     expect(screen.getByRole('button', { name: 'Confirming payment…' })).toBeDisabled();
     expect(calls.transact).toHaveBeenCalledTimes(2);
     await act(async () => { confirmPayment?.({ success: true, txId: 'confirmed' }); });

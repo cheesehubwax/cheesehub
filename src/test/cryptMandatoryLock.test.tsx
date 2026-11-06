@@ -40,7 +40,7 @@ it('a cancelled lock after confirmed 500 CHEESE creation retries without chargin
   mount(); fireEvent.click(screen.getByRole('button', { name: 'Create a new key' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Use defaults' }));
   fireEvent.click(screen.getByRole('checkbox'));
-  fireEvent.click(screen.getByRole('button', { name: 'Pay 100 CHEESE & create key' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Pay 500 CHEESE & create key' }));
   const retry = await screen.findByRole('button', { name: 'Lock key to continue' });
   await waitFor(() => expect(retry).toBeEnabled());
   expect(loadKey('alice')).toBeNull(); expect(loadLockedEnvelope('alice')).toBeNull();
