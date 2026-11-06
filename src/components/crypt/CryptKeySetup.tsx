@@ -42,7 +42,7 @@ export function CryptKeySetup({ account, fileInput, profileEditor, creationDialo
       </div>
       <div className="rounded-lg border border-border bg-card/80 p-4 space-y-2 text-left">
         <p className="font-semibold text-sm">I'm new here</p>
-        <p className="text-xs text-muted-foreground">Choose your name and avatar first, then pay 100 CHEESE and lock your key to this WAX account with two free Anchor signatures. Only wallet-locked backups are saved. Restoring an existing key is free. A new key cannot read messages sent to an older one.</p>
+        <p className="text-xs text-muted-foreground">Choose your name and avatar first, then pay 500 CHEESE and lock your key to this WAX account with two free Anchor signatures. Only wallet-locked backups are saved. Restoring an existing key is free. A new key cannot read messages sent to an older one.</p>
         {!canCreate && <p className="text-xs text-destructive">Sign in with Anchor to create or unlock your messaging key.</p>}
         <Button className="w-full" variant="outline" disabled={!canCreate} onClick={makeKey}>Create a new key</Button>
       </div>

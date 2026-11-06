@@ -111,7 +111,7 @@ cost 0.3000 platform fees, or 0.3030 total for one recipient. No cross-action fl
 is needed. Join/rejoin requests cost the ordinary 0.0101 total, without an owner surcharge.
 Both paths remain direct until authenticated router history and practical resource limits are verified;
 request-carried keys and ciphertext sizes still distinguish some requests. No source/ABI change is required.
-Standalone fees use `payfee`: key creation (100.0000, memo `CHEESECrypt key creation fee`), key
+Standalone fees use `payfee`: key creation (500.0000, memo `CHEESECrypt key creation fee`), key
 publishing (0.0100, memo = the key), a one-time non-refundable room listing fee (100.0000, memo =
 `CRYPTROOM1:` listing), listing updates and unlisting (0.0100). The fee must be positive, at most the
 arithmetic ceiling and a multiple of 0.0005 so the 80/20 split is exact; memos are 1–256 bytes. A room

@@ -34,10 +34,10 @@ describe('CHEESECrypt', () => {
     expect(actions[0].data).toEqual({ from: 'alice.wam', to: 'eosio.null', quantity: '0.0080 CHEESE', memo: keyMemo(a.publicKey) });
     expect(actions[1].data).toMatchObject({ to: 'xcheeseliqst', quantity: '0.0020 CHEESE', memo: keyMemo(a.publicKey) });
   });
-  it('charges 100 CHEESE for key creation without publishing a key', () => {
+  it('charges 500 CHEESE for key creation without publishing a key', () => {
     expect(buildCreateKeyActions('alice', []).map(a => a.data)).toEqual([
-      { from: 'alice', to: 'eosio.null', quantity: '80.0000 CHEESE', memo: 'CHEESECrypt key creation fee' },
-      { from: 'alice', to: 'xcheeseliqst', quantity: '20.0000 CHEESE', memo: 'CHEESECrypt key creation fee' },
+      { from: 'alice', to: 'eosio.null', quantity: '400.0000 CHEESE', memo: 'CHEESECrypt key creation fee' },
+      { from: 'alice', to: 'xcheeseliqst', quantity: '100.0000 CHEESE', memo: 'CHEESECrypt key creation fee' },
     ]);
   });
   it('accepts original key files and rejects mismatched private keys', () => {

@@ -19,11 +19,11 @@ describe('crypt.cheese payfee routing', () => {
     expect(routeCryptActions(a, { payfee: false })).toBe(a);
   });
 
-  it('key creation: one 100.0000 CHEESE payment to crypt.cheese plus payfee with the creation memo', () => {
+  it('key creation: one 500.0000 CHEESE payment to crypt.cheese plus payfee with the creation memo', () => {
     const out = route(buildCreateKeyActions('alice', auth));
     expect(out).toHaveLength(2);
-    expect(out[0]).toMatchObject({ account: 'cheeseburger', name: 'transfer', data: { from: 'alice', to: 'crypt.cheese', quantity: '100.0000 CHEESE' } });
-    expect(out[1]).toMatchObject({ account: 'crypt.cheese', name: 'payfee', data: { payer: 'alice', fee: '100.0000 CHEESE', memo: 'CHEESECrypt key creation fee' } });
+    expect(out[0]).toMatchObject({ account: 'cheeseburger', name: 'transfer', data: { from: 'alice', to: 'crypt.cheese', quantity: '500.0000 CHEESE' } });
+    expect(out[1]).toMatchObject({ account: 'crypt.cheese', name: 'payfee', data: { payer: 'alice', fee: '500.0000 CHEESE', memo: 'CHEESECrypt key creation fee' } });
   });
 
   it('key publishing: 0.0100 CHEESE payfee carrying the key memo, still found by key lookup', () => {

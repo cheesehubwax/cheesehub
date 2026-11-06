@@ -27,8 +27,9 @@ int main() {
    assert(!valid_fee(MAX_FEE_UNITS + 1) && !valid_fee(-1));
    assert(platform_units(35, MAX_FEE_UNITS) == 3500000000LL);
    assert(null_units(3500000000LL, 80) == 2800000000LL);
-   // Standalone fees: 100.0000 CHEESE key creation/listing and 0.0100 CHEESE publish/update/unlist.
+   // Standalone fees: 500.0000 CHEESE key creation, 100.0000 CHEESE listing and 0.0100 CHEESE publish/update/unlist.
    assert(valid_standalone_fee(1000000) && null_units(1000000, 80) == 800000);
+   assert(valid_standalone_fee(5000000) && null_units(5000000, 80) == 4000000);
    assert(valid_standalone_fee(100) && null_units(100, 80) == 80);
    assert(!valid_standalone_fee(0) && !valid_standalone_fee(-5) && !valid_standalone_fee(101));
    assert(!valid_standalone_fee(MAX_FEE_UNITS + 5));

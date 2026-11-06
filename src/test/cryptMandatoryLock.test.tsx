@@ -35,19 +35,19 @@ it('legacy keys cannot enter chat until sealed, and sealing preserves identity a
   expect(calls.download.mock.calls[0][1]).not.toHaveProperty('secretKey');
 });
 
-it('a cancelled lock after confirmed 100 CHEESE creation retries without charging or exporting plaintext', async () => {
+it('a cancelled lock after confirmed 500 CHEESE creation retries without charging or exporting plaintext', async () => {
   calls.sign.mockRejectedValueOnce(new Error('Cancelled'));
   mount(); fireEvent.click(screen.getByRole('button', { name: 'Create a new key' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Use defaults' }));
   fireEvent.click(screen.getByRole('checkbox'));
-  fireEvent.click(screen.getByRole('button', { name: 'Pay 100 CHEESE & create key' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Pay 500 CHEESE & create key' }));
   const retry = await screen.findByRole('button', { name: 'Lock key to continue' });
   await waitFor(() => expect(retry).toBeEnabled());
   expect(loadKey('alice')).toBeNull(); expect(loadLockedEnvelope('alice')).toBeNull();
   expect(calls.download).not.toHaveBeenCalled();
   fireEvent.click(retry); await screen.findByRole('button', { name: 'Menu' });
   expect(calls.pay).toHaveBeenCalledTimes(1);
-  expect(calls.pay.mock.calls[0][0].map((a: { data: { quantity: string } }) => a.data.quantity)).toEqual(['80.0000 CHEESE', '20.0000 CHEESE']);
+  expect(calls.pay.mock.calls[0][0].map((a: { data: { quantity: string } }) => a.data.quantity)).toEqual(['400.0000 CHEESE', '100.0000 CHEESE']);
   expect(loadLockedEnvelope('alice')?.version).toBe(2);
   expect(localStorage.getItem('cheesecrypt-key-alice')).toBeNull();
 });
