@@ -41,6 +41,7 @@ import { PaidActionDialog } from '@/components/crypt/PaidActionDialog';
 import { buildCg2Actions, JOIN_NOTE_MAX, encodeAdmission, encodeMemberAdd, encodeRoomProfiles, MAX_PUBLIC_ROOM_MEMBERS, collectInvites, countFriendRequests, friendRequestResendable, deriveInviteGroups, encodeGroupText, encodeInvite, encodeMeta, encodeNotice, inviteTextSize, invitesSignature, loadDecisions, MAX_INVITE_MEMBERS, loadFriendDecisions, loadInvites, newInviteGroupId, saveDecision, saveInvites, scopedKeys, eventFromMember, ownerLeaveNotices, VOICE_REF_PREFIX, type Cg2Event, type InviteGroup, type InviteGroupView } from '@/lib/cryptInviteGroups';
 import { ShareKeyDialog } from '@/components/crypt/ShareKeyDialog';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
+import { fetchSponsorBudget, invalidateSponsorBudget, isSponsorRejection, sponsorCryptActions, sponsorRemaining, SPONSOR_PART_UNITS } from '@/lib/cryptSponsor';
 import { buildVoiceBatches, voiceNoteCost, voicePartCount, voiceTransactions, type VoiceClip } from '@/lib/cryptVoice';
 import { baselineMarks, firstUnreadIndex, firstVisitMarks, loadReadMarks, mergeMarks, sameMarks, saveReadMarks, unreadCounts, unreadReplies, type ReadMarks } from '@/lib/cryptUnread';
 import { readKeyFileJson } from '@/lib/cryptKeyFileText';
@@ -107,8 +108,34 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const { toast } = useToast();
   const { executeTransaction: executeDirect } = useWaxTransaction(session);
   // Every CHEESECrypt transaction that fits the crypt.cheese router shape is sent through it; others stay direct.
-  const executeTransaction = useCallback((actions: unknown[], options?: Parameters<typeof executeDirect>[1]) =>
-    executeDirect(CRYPT_ROUTER_ENABLED ? routeCryptActions(actions) : actions, options), [executeDirect]);
+  // Exact routed messages become a free crypt.cheese::sendfree while the live sponsor budget covers them;
+  // voice batches and join requests pass `paid` and always use the paid path.
+  const [sponsorUnits, setSponsorUnits] = useState(0);
+  const executeTransaction = useCallback(async (actions: unknown[], options?: Parameters<typeof executeDirect>[1], opts?: { paid?: boolean }) => {
+    let out = CRYPT_ROUTER_ENABLED ? routeCryptActions(actions) : actions;
+    let sponsored = false;
+    if (CRYPT_ROUTER_ENABLED && !opts?.paid && out !== actions) {
+      const free = sponsorCryptActions(out, sponsorRemaining(await fetchSponsorBudget()));
+      sponsored = free !== out;
+      out = free;
+    }
+    const r = await executeDirect(out, options);
+    if (sponsored) {
+      invalidateSponsorBudget();
+      void fetchSponsorBudget(true).then(b => setSponsorUnits(sponsorRemaining(b)));
+      if (!r.success && isSponsorRejection(r.error?.message))
+        return { ...r, error: new Error("Today's free messaging budget is used up. Press Send again to send it as a normal paid message.") };
+    }
+    return r;
+  }, [executeDirect]);
+  useEffect(() => {
+    if (!CRYPT_ROUTER_ENABLED) return;
+    let live = true;
+    const read = () => void fetchSponsorBudget().then(b => { if (live) setSponsorUnits(sponsorRemaining(b)); });
+    read();
+    const t = setInterval(read, 60_000);
+    return () => { live = false; clearInterval(t); };
+  }, []);
   const [sendDeclined, setSendDeclined] = useState<string | null>(null);
   const [pendingTip, setPendingTip] = useState<{ tip: Tip; balance: number | null } | null>(null);
   const permission = session.permissionLevel;
@@ -1211,7 +1238,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
       for (let i = 0; i < batches.length; i++) {
         if (activeInvite && restrictedAt(activeModeration, account, Date.now())) throw new Error('You are muted or removed from this room.');
         if (editingMessage && !canEdit(editingMessage, account)) throw new Error('The 24-hour editing window has ended.');
-        const r = await executeTransaction(batches[i], { showSuccessToast: false, showErrorToast: false });
+        const r = await executeTransaction(batches[i], { showSuccessToast: false, showErrorToast: false }, { paid: true });
         if (!r.success || !r.txId) { if (!sent) setSendDeclined(r.error?.message ?? 'The transaction could not be confirmed.'); break; }
         sent++;
       }
@@ -1339,7 +1366,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
     // The request carries my public key, so no published key is needed; only the creator can read the request.
     setBusy(true);
     try {
-      const r = await executeTransaction(buildJoinRequestActions(key, l.creator, l.publicKey, l.id, [permission], joinNote), { successTitle: `Request sent to ${l.creator}` });
+      const r = await executeTransaction(buildJoinRequestActions(key, l.creator, l.publicKey, l.id, [permission], joinNote), { successTitle: `Request sent to ${l.creator}` }, { paid: true });
       if (!r.success) return false;
       [2000, 5000, 10000].forEach(ms => setTimeout(poll, ms));
     } catch (e) { toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' }); return false; }
@@ -1498,6 +1525,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const voiceTxs = voiceTransactions(voiceParts);
   const totalCost = voice
     ? voiceNoteCost(voiceParts, copies)
+    : sponsorUnits >= (parts || 1) * SPONSOR_PART_UNITS && !text.trim().startsWith('/tip') ? 'Free message'
     : activeGroup || activeInvite ? groupMessageCost(parts || 1, copies, hasNft) : messageCost(parts || 1, hasNft);
   const fileInput = (
     <input ref={fileRef} type="file" className="hidden"
