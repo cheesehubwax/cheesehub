@@ -2,6 +2,8 @@
 
 Open tasks only. Completed work lives in git history.
 
+- [ ] CHEESECrypt tips: preserve the direct tip transfer beside paid router delivery; test public-room message/readback and same-transaction verification. Live wallet confirmation requires the user's Anchor signature.
+
 - [ ] CHEESEPower: activate and verify one signed reward claim / CPU stake — runner, tests and setup instructions are ready; requires the user's dedicated compound permission, GitHub secret and enable variable.
 
 - [ ] CHEESEAir: verify one signed airdrop and chain readback — requires the user's Anchor signatures. Phases 1–3 safety/render checks pass, and live 500-row snapshot/edit/selection checks pass without sending funds; remaining audit findings are recorded in `.lovable/cheeseair-audit.md` for later stages.
