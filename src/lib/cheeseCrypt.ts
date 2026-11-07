@@ -13,7 +13,8 @@ import nacl from 'tweetnacl';
 import { parseCryptName, saveCryptName } from '@/lib/cryptNames';
 import { CryptAvatar, parseAvatar } from '@/lib/cryptAvatar';
 import { decodeBase64, encodeBase64, decodeUTF8, encodeUTF8 } from 'tweetnacl-util';
-import { benchEndpoint, normalizeEndpoint, resolveEndpoints } from '@/lib/endpointHealth';
+import { benchEndpoint, normalizeEndpoint } from '@/lib/endpointHealth';
+import { cryptHistoryEndpoints } from '@/lib/cryptNetworkPrivacy';
 
 export const MSG_PREFIX = 'CRYPT1:';
 /** Padded messages: plaintext is ISO/IEC 7816-4 padded (0x80 then zeros) so every memo has the same length. */
@@ -469,7 +470,7 @@ const routerTxCache = new Map<string, ChainMemo[]>();
 async function routerTransaction(txId: string, time: number): Promise<ChainMemo[] | null> {
   const hit = routerTxCache.get(txId) ?? (await loadRouterCache()).get(txId);
   if (hit) return hit;
-  for (const raw of await resolveEndpoints('hyperion-v2')) {
+  for (const raw of await cryptHistoryEndpoints()) {
     const base = normalizeEndpoint(raw);
     try {
       const ctl = new AbortController();
@@ -512,7 +513,7 @@ export interface ChainMemo { txId: string; time: number; from: string; to: strin
 
 async function hyperionActions(query: string): Promise<any[]> {
   let lastErr: unknown = null;
-  for (const raw of await resolveEndpoints('hyperion-v2')) {
+  for (const raw of await cryptHistoryEndpoints()) {
     const base = normalizeEndpoint(raw);
     try {
       const ctl = new AbortController();
@@ -619,6 +620,68 @@ export async function fetchMessages(account: string, pages = 1): Promise<ChainMe
     seen.add(id);
     return true;
   });
+}
+
+/**
+ * Contract-stream reads name only `crypt.cheese`, the same request every CHEESECrypt user makes, so the
+ * history server cannot tell which account this browser watches. Filtering happens here, on the device.
+ * Rows use the same authentication as account reads: sendfree via expandSponsoredActions, sendmsg via
+ * expandRouterActions (sender must have authorized the action); memo-only claims are never trusted.
+ */
+export const STREAM_FILTER = `filter=${CRYPT_ROUTER_ACCOUNT}:sendfree,${CRYPT_ROUTER_ACCOUNT}:sendmsg`;
+export const STREAM_PAGE = 100;
+export const STREAM_MAX_PAGES = 5;
+/** Re-read this far behind the cursor: late-indexed actions are caught, duplicates are merged away. */
+export const STREAM_OVERLAP_MS = 30_000;
+
+export function streamRows(account: string, actions: any[]): ChainMemo[] {
+  const rows = expandSponsoredActions(actions);
+  for (const a of actions) if (a?.act?.name === 'sendmsg' && typeof a.trx_id === 'string')
+    rows.push(...expandRouterActions(a.trx_id, actionTime(a), [a]));
+  return rows.filter(r => !!msgPrefixOf(r.memo) && (r.from === account || r.to === account));
+}
+
+export interface StreamResult { rows: ChainMemo[]; cursor: number; complete: boolean }
+
+/** New crypt.cheese actions since `cursor` (ms). `complete` is false when the page cap was hit. */
+export async function fetchContractStream(account: string, cursor: number, fetchPage: (q: string) => Promise<any[]> = hyperionActions): Promise<StreamResult> {
+  let after = Math.max(0, cursor - STREAM_OVERLAP_MS);
+  let newest = cursor;
+  const rows: ChainMemo[] = [];
+  for (let p = 0; p < STREAM_MAX_PAGES; p++) {
+    const page = await fetchPage(`account=${CRYPT_ROUTER_ACCOUNT}&${STREAM_FILTER}&sort=asc&after=${encodeURIComponent(new Date(after).toISOString())}&limit=${STREAM_PAGE}`);
+    rows.push(...streamRows(account, page));
+    const times = page.map(actionTime).filter(Number.isFinite);
+    if (times.length) newest = Math.max(newest, ...times);
+    if (page.length < STREAM_PAGE) return { rows, cursor: newest, complete: true };
+    const last = Math.max(...times);
+    // A whole page sharing one timestamp cannot advance safely; let the caller fall back.
+    if (!Number.isFinite(last) || last <= after) break;
+    after = last;
+  }
+  return { rows, cursor: newest, complete: false };
+}
+
+/** Recent contract history (newest first) without naming the account; used by Maximum privacy. */
+export async function fetchStreamHistory(account: string, pages = MAX_HISTORY_PAGES, fetchPage: (q: string) => Promise<any[]> = hyperionActions): Promise<ChainMemo[]> {
+  const rows: ChainMemo[] = [];
+  let before: string | null = null;
+  for (let p = 0; p < Math.max(1, pages); p++) {
+    const page = await fetchPage(`account=${CRYPT_ROUTER_ACCOUNT}&${STREAM_FILTER}&sort=desc&limit=${HISTORY_PAGE}${before ? `&before=${encodeURIComponent(before)}` : ''}`);
+    rows.push(...streamRows(account, page));
+    const oldest = Math.min(...page.map(actionTime).filter(Number.isFinite));
+    if (page.length < HISTORY_PAGE || !Number.isFinite(oldest)) break;
+    before = new Date(oldest).toISOString();
+  }
+  return mergeMemos([], rows);
+}
+
+/** Union by `txId:memo`, newest first; existing rows keep their identity. */
+export function mergeMemos(prev: ChainMemo[], incoming: ChainMemo[]): ChainMemo[] {
+  const seen = new Set(prev.map(r => `${r.txId}:${r.memo}`));
+  const add = incoming.filter(r => { const id = `${r.txId}:${r.memo}`; if (seen.has(id)) return false; seen.add(id); return true; });
+  if (!add.length) return prev;
+  return [...prev, ...add].sort((a, b) => b.time - a.time);
 }
 
 export const ROOM_SCAN_PAGES = 4;
