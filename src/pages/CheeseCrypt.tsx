@@ -106,12 +106,11 @@ const CheeseCrypt = () => {
   const { accountName, isConnected, login, logout, session } = useWax();
   const [lockNonce, setLockNonce] = useState(0);
   const navigate = useNavigate();
-  /** Remounts the messenger, then applies the optional wallet disconnect and stealth redirect. */
+  /** Remounts the messenger, then always disconnects the wallet and stealth-redirects home. */
   const onLocked = useCallback(() => {
     setLockNonce(n => n + 1);
-    const h = loadHardening();
-    if (h.disconnect) void logout().catch(() => {});
-    if (h.stealth) navigate('/', { replace: true });
+    void logout().catch(() => {});
+    navigate('/', { replace: true });
   }, [logout, navigate]);
 
   return (
@@ -147,8 +146,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     const h = loadHardening();
     forgetSessionKey(account);
     forgetInstantKey(account);
-    if (h.stealth) toast({ title: 'Signed out' });
-    else toast({ title: '🔒 Locked', description: h.cold ? 'Load your key file to continue.' : 'Unlock with Anchor to continue.' });
+    toast({ title: 'Signed out' });
     if (!h.cold) { onLocked?.(); return; }
     // Cold lock: drop this device's locked key copy and remembered folder before redrawing, so nothing re-finds it.
     clearLockedEnvelope(account);
