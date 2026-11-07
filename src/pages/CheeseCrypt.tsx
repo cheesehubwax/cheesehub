@@ -1378,7 +1378,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
       const actions = activeInvite ? buildCg2Actions(key, recipients, inviteKeys, encodeGroupText(activeInvite.invite.id, outgoing), [permission], hasNft)
         : activeGroup ? buildGroupMessageActions(key, activeGroup, outgoing, contacts, [permission], hasNft)
         : buildSendMessageActions(account, active, splitMessage(outgoing).map(p => encryptMemo(p, contacts[active], key.secretKey)), [permission], hasNft);
-      // Tips: one public wallet-to-wallet transfer signed atomically with the encrypted tip card (direct path, never via crypt.cheese).
+      // Tips stay wallet-to-wallet; only the encrypted card and its message fee go through crypt.cheese.
       const notices = activeInvite ? { list: [], actions: [] } : rotationNotices(recipients);
       actions.unshift(...notices.actions);
       if (confirmedTip) actions.unshift(buildTipTransfer(account, confirmedTip, [permission]));
