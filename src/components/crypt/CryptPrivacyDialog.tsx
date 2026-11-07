@@ -71,7 +71,7 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
             </div>
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={shieldOn} onChange={e => setShieldOn(e.target.checked)} />
-              Blur messages when I switch tabs or windows
+              Blur messages when I switch tabs or minimise
             </label>
           </section>
           <section className="space-y-2">
