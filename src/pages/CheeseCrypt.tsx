@@ -1,5 +1,7 @@
 // CHEESECrypt — encrypted on-chain messages paid in CHEESE.
 // Intentionally not linked from the header or menus: reachable at /crypt only.
+import { loadVerified, setVerified, verifyState } from '@/lib/cryptSafety';
+import { SafetyNumberDialog } from '@/components/crypt/SafetyNumberDialog';
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -267,6 +269,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [joinDeclines, setJoinDeclines] = useState(() => loadJoinDeclines(account));
   const [feeInfoOpen, setFeeInfoOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
+  const [verifiedKeys, setVerifiedKeys] = useState<Record<string, string>>(() => loadVerified(account));
+  useEffect(() => { setVerifiedKeys(loadVerified(account)); }, [account]);
+  const [safetyOpen, setSafetyOpen] = useState(false);
   const [listHidden, setListHidden] = useState(() => { try { return localStorage.getItem(`cheesecrypt-sidebar-collapsed-${account}`) === '1'; } catch { return false; } });
   const toggleList = () => setListHidden(v => {
     try { localStorage.setItem(`cheesecrypt-sidebar-collapsed-${account}`, v ? '0' : '1'); } catch { /* storage unavailable */ }
@@ -1796,7 +1801,13 @@ export function Messenger({ account, session }: { account: string; session: NonN
         setEditingInvite={setEditingInvite} setEditingFriend={setEditingFriend} saveFriend={saveFriend} blockAccount={blockAccount}
         admins={activeModeration?.admins ?? []}
         onReportRoom={activeListing && activeListing.creator !== account ? () => setReportingRoom(activeListing) : undefined}
+        verify={active ? verifyState(verifiedKeys, active, contacts[active]) : undefined}
+        onVerify={active && contacts[active] && !activeGroup && !activeInvite ? () => setSafetyOpen(true) : undefined}
         />
+      {active && contacts[active] && !activeGroup && !activeInvite && <SafetyNumberDialog open={safetyOpen} onOpenChange={setSafetyOpen}
+        me={{ account, publicKey: key.publicKey }} partner={{ account: active, publicKey: contacts[active] }} partnerName={nameFor(active)}
+        state={verifyState(verifiedKeys, active, contacts[active])}
+        onMark={v => { setVerifiedKeys(setVerified(account, active, v ? contacts[active] : null)); if (v) setSafetyOpen(false); }} />}
 
       <div className={cn('flex flex-1 min-h-0 md:row-start-2', listHidden ? 'md:col-start-1 md:col-span-2' : 'md:col-start-2')}>
       {listHidden && <CryptAvatarRail active={active} setActive={setActive} sections={[
