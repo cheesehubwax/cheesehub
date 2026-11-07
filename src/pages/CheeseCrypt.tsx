@@ -50,6 +50,8 @@ import { isInstantAuthFailure, isResourceShortage } from '@/lib/cryptInstant';
 import { ToastAction } from '@/components/ui/toast';
 import { CryptInstantDialog } from '@/components/crypt/CryptInstantDialog';
 import { CryptPrivacyDialog } from '@/components/crypt/CryptPrivacyDialog';
+import { DeviceTransferSendDialog } from '@/components/crypt/DeviceTransferSendDialog';
+import { DeviceTransferReceiveDialog } from '@/components/crypt/DeviceTransferReceiveDialog';
 import { loadPrivacyMode, savePrivacyMode, type PrivacyMode } from '@/lib/cryptNetworkPrivacy';
 import { fetchSponsorBudget, invalidateSponsorBudget, isSponsorRejection, sponsorCryptActions, sponsorRemaining, SPONSOR_PART_UNITS } from '@/lib/cryptSponsor';
 import { buildVoiceBatches, voiceNoteCost, voicePartCount, voiceTransactions, type VoiceClip } from '@/lib/cryptVoice';
@@ -176,6 +178,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
   instantRef.current = instant;
   const [instantOpen, setInstantOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [receiveOpen, setReceiveOpen] = useState(false);
   const [privacyMode, setPrivacyModeState] = useState<PrivacyMode>(loadPrivacyMode);
   const setPrivacyMode = useCallback((m: PrivacyMode) => { savePrivacyMode(m); setPrivacyModeState(m); }, []);
   useEffect(() => {
@@ -1627,23 +1631,28 @@ export function Messenger({ account, session }: { account: string; session: NonN
     </DialogContent>
   </Dialog>;
 
+  const receiveBar = <div className="flex justify-end px-2 pb-2">
+    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setReceiveOpen(true)}>📷 Receive from another device</Button>
+    <DeviceTransferReceiveDialog open={receiveOpen} onOpenChange={setReceiveOpen} account={account} onImported={() => window.location.reload()} />
+  </div>;
+
   if (!candidateKey && lockedFile) {
-    return <>{fileInput}<CryptLockGate account={account} busy={busy} canLock={canLock} unlock
+    return <>{fileInput}{receiveBar}<CryptLockGate account={account} busy={busy} canLock={canLock} unlock
       restoring={searchingVault} onRestore={() => fileRef.current?.click()} onLock={() => {
         setBusy(true);
         void unlockFile(lockedFile).catch(e => toast({ title: 'Could not unlock your key', description: (e as Error).message, variant: 'destructive' })).finally(() => setBusy(false));
       }} /></>;
   }
   if (candidateKey && !key) {
-    return <>{fileInput}<CryptLockGate account={account} busy={busy} canLock={canLock}
+    return <>{fileInput}{receiveBar}<CryptLockGate account={account} busy={busy} canLock={canLock}
       restoring={searchingVault} onLock={() => void lockKey()} onRestore={() => fileRef.current?.click()} /></>;
   }
   if (!key) {
-    return (
+    return (<>{receiveBar}
       <CryptKeySetup account={account} fileInput={fileInput} profileEditor={profileEditor} creationDialog={creationDialog}
         fileRef={fileRef} searchingVault={searchingVault} hasSavedVault={!!vault} canCreate={canLock}
         openSavedFolder={() => void openVaultFolder(false)} pickFolder={() => void openVaultFolder(true)} makeKey={makeKey} />
-    );
+    </>);
   }
 
 
@@ -1979,6 +1988,10 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 instantSlot={<>
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setPrivacyOpen(true)} title="Network privacy settings">🛡️ Privacy</Button>
                   <CryptPrivacyDialog open={privacyOpen} onOpenChange={setPrivacyOpen} mode={privacyMode} setMode={setPrivacyMode} loadFullHistory={loadFullHistory} />
+                  {lockedFile && <>
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setMoveOpen(true)} title="Move your key and friends to another device by QR code">📲 Move device</Button>
+                  <DeviceTransferSendDialog open={moveOpen} onOpenChange={setMoveOpen} account={account} lockedKey={lockedFile} />
+                  </>}
                   {(sponsorUnits > 0 || instant.ready || !!instant.status?.exists) && <>
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setInstantOpen(true)}
                     title={instant.ready ? 'Instant Messaging is on' : 'Send free messages without Anchor popups'}>
