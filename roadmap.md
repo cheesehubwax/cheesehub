@@ -2,7 +2,7 @@
 
 Open tasks only. Completed work lives in git history.
 
-- [ ] CHEESECrypt tips: preserve the direct tip transfer beside paid router delivery; test public-room message/readback and same-transaction verification. Live wallet confirmation requires the user's Anchor signature.
+- [ ] CHEESECrypt tips: verify one real public-room tip with Anchor and chat readback — direct tip + paid router delivery and sender/all-recipient encrypted readback/verification pass automated tests; requires the user's wallet signature.
 
 - [ ] CHEESEPower: activate and verify one signed reward claim / CPU stake — runner, tests and setup instructions are ready; requires the user's dedicated compound permission, GitHub secret and enable variable.
 
