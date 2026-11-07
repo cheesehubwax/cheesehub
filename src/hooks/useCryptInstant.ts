@@ -3,7 +3,7 @@ import type { Session } from '@wharfkit/session';
 import { fetchCheeseRamConfig, fetchRamPricePerByte } from '@/lib/cheeseRam';
 import {
   buildEnableActions, buildRevokeActions, fetchInstantStatus, forgetInstantKey, generateInstantKey, instantReady,
-  isInstantEligible, loadInstantKey, needsRam, ramTopUpQuantity, saveInstantKey, sendInstant,
+  isInstantEligible, loadInstantKey, markInstantActive, needsRam, ramTopUpQuantity, saveInstantKey, sendInstant,
   type InstantKey, type InstantStatus,
 } from '@/lib/cryptInstant';
 
@@ -22,6 +22,29 @@ export function useCryptInstant(account: string, session: Session, executeDirect
     finally { setChecking(false); }
   }, [account]);
   useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => { setKey(loadInstantKey(account)); }, [account]);
+
+  // Inactivity auto-lock: activity refreshes the timestamp (throttled); a periodic check drops the key once idle.
+  useEffect(() => {
+    if (!key) return;
+    let lastWrite = 0;
+    const onActivity = () => {
+      const now = Date.now();
+      if (now - lastWrite < 30_000) return;
+      lastWrite = now;
+      markInstantActive(account, now);
+    };
+    const check = () => { if (!loadInstantKey(account)) setKey(null); };
+    const events = ['keydown', 'pointerdown', 'touchstart', 'wheel'] as const;
+    events.forEach(e => window.addEventListener(e, onActivity, { passive: true }));
+    document.addEventListener('visibilitychange', check);
+    const timer = window.setInterval(check, 60_000);
+    return () => {
+      events.forEach(e => window.removeEventListener(e, onActivity));
+      document.removeEventListener('visibilitychange', check);
+      window.clearInterval(timer);
+    };
+  }, [key, account]);
 
   /** RAM top-up quote for setup when the account is short (null = not needed or ram.chz unavailable). */
   const quoteRam = useCallback(async (s: InstantStatus | null) => {
@@ -67,9 +90,11 @@ export function useCryptInstant(account: string, session: Session, executeDirect
   const ready = instantReady(status, key);
   const canSend = useCallback((actions: unknown[]) => ready && isInstantEligible(actions, account), [ready, account]);
   const send = useCallback(async (actions: unknown[]) => {
-    if (!key) throw new Error('Instant Messaging is off.');
-    return sendInstant(session.chain, key, actions);
-  }, [key, session]);
+    const live = loadInstantKey(account);
+    if (!key || !live) { setKey(null); throw new Error('Instant Messaging is off.'); }
+    markInstantActive(account);
+    return sendInstant(session.chain, live, actions);
+  }, [key, session, account]);
 
   return { key, status, checking, ready, refresh, quoteRam, enable, revoke, canSend, send };
 }
