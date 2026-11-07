@@ -1942,7 +1942,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
                     </li>
                   )}
                   <ChatMessageItem m={m} account={account} delivery={m.from === account && m.txId ? (m.time < clock - DELIVERY_SETTLED_MS ? 'permanent' : deliveryState(m.time, libTime)) : undefined} keyAvatar={key?.avatar} avatars={shownAvatars}
-                    contacts={contacts} active={active} activeGroup={activeGroup} nameFor={nameFor}
+                    contacts={contacts} active={active} activeGroup={activeGroup} nameFor={nameFor} trust={!!(activeGroup || activeInvite)}
                     highlighted={replyNavigation.highlighted.has(m.key)} reactionHighlighted={reactionNavigation.highlighted === m.key}
                     reactions={pillsByTarget.get(targetRef(m.from, m.time))}
                     onReact={!roomRestricted && (!activeInvite || activeInvite.status === 'joined') && !m.missing ? (emoji) => void sendReaction(m, emoji) : undefined}

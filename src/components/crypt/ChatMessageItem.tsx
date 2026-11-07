@@ -12,6 +12,7 @@ import { fetchAssetById } from '@/services/atomicApi';
 import { parseNftMessage } from '@/lib/cryptNft';
 import type { CryptAvatar } from '@/lib/cryptAvatar';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
+import { CryptTrustBadge } from '@/components/crypt/CryptTrustBadge';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { voiceNoteCost } from '@/lib/cryptVoice';
 import { parseTip } from '@/lib/cryptTips';
@@ -22,7 +23,7 @@ import type { EditedMessage } from '@/lib/cryptEdits';
 import { REACTION_EMOJIS, isReaction, type ReactionEmoji, type ReactionPill } from '@/lib/cryptReactions';
 
 /** Pure sound-effect-NFT posts render without the bubble box — sender header, playback and timestamp stay. */
-export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, reactionHighlighted, reactions, onReact, searchHit, editable, onEdit, onCollapse, canReveal, revealed, onReveal, badges, onMute, ban, adminToggle, report, reportHighlighted, friend, delivery }: {
+export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, reactionHighlighted, reactions, onReact, searchHit, editable, onEdit, onCollapse, canReveal, revealed, onReveal, badges, onMute, ban, adminToggle, report, reportHighlighted, friend, delivery, trust }: {
   m: EditedMessage; account: string; keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>;
   contacts: Record<string, string>; active: string; activeGroup: CryptGroup | null;
   nameFor: (id: string) => string; openedAt: { current: number };
@@ -49,6 +50,8 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
   friend?: { isFriend: boolean; onAdd?: () => void; onRemove?: () => void; pendingLabel?: string };
   /** My own messages: ✔ in a block, ✔✔ irreversible. */
   delivery?: 'sent' | 'permanent';
+  /** Group/room chats: show the author's strength badge beside their name. */
+  trust?: boolean;
 }) {
   const hidden = !!m.collapsed && !revealed;
   const reply = parseReply(m.text);
@@ -78,7 +81,7 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
           {badges.owner && <span title="Room owner" aria-label="Room owner">👑</span>}
           {badges.admin && <span title="Room admin" aria-label="Room admin">🛡️</span>}
           {badges.founder && <span title="Founding member" className="rounded border border-cheese/40 px-1 text-[9px] font-semibold text-cheese">Founder</span>}
-        </span>}{nameFor(m.from) !== m.from && <span className="block font-normal">{m.from}</span>}</p>
+        </span>}{trust && m.from !== account && <CryptTrustBadge account={m.from} className="ml-1 h-4 align-middle" />}{nameFor(m.from) !== m.from && <span className="block font-normal">{m.from}</span>}</p>
       </div>
       {hidden ? <p className="italic opacity-70">🙈 Message collapsed by a moderator{canReveal && onReveal && <> · <button type="button" className="not-italic font-semibold text-cheese underline underline-offset-2" onClick={onReveal}>Show</button></>}</p> : <>
       {m.collapsed && <p className="mb-1 text-[10px] text-muted-foreground">🙈 Collapsed by {nameFor(m.collapsed.by)} · visible to moderators</p>}
