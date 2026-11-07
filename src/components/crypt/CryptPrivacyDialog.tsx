@@ -5,19 +5,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   type PrivacyMode, loadCustomEndpoint, loadCustomOnly, saveCustomEndpoint, testHistoryEndpoint, validateCustomEndpoint,
 } from '@/lib/cryptNetworkPrivacy';
-import { IDLE_OPTIONS, type IdleMinutes } from '@/lib/cryptPanicLock';
+import { COLD_LOCK_WARNING, IDLE_OPTIONS, type IdleMinutes, type LockHardening } from '@/lib/cryptPanicLock';
+import { CryptConfirmDialog } from './CryptConfirmDialog';
+import type { CryptConfirm } from './CryptConfirmDialog';
 
 /** Network privacy settings. Presentational: the mode lives in the Messenger, the server setting on this device. */
-export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFullHistory, idleMinutes, setIdleMinutes, shieldOn, setShieldOn }: {
+export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFullHistory, idleMinutes, setIdleMinutes, shieldOn, setShieldOn, hardening, setHardening }: {
   open: boolean; onOpenChange: (v: boolean) => void; mode: PrivacyMode; setMode: (m: PrivacyMode) => void;
   loadFullHistory: () => Promise<void>;
   idleMinutes: IdleMinutes; setIdleMinutes: (m: IdleMinutes) => void; shieldOn: boolean; setShieldOn: (on: boolean) => void;
+  hardening: LockHardening; setHardening: (h: LockHardening) => void;
 }) {
   const [url, setUrl] = useState('');
   const [only, setOnly] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<CryptConfirm | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -73,6 +77,22 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
               <input type="checkbox" checked={shieldOn} onChange={e => setShieldOn(e.target.checked)} />
               Blur messages when I switch tabs or minimise
             </label>
+            <p className="text-foreground pt-1">When locking, also:</p>
+            <label className="flex items-start gap-2">
+              <input type="checkbox" className="mt-1" checked={hardening.stealth} onChange={e => setHardening({ ...hardening, stealth: e.target.checked })} />
+              <span>Jump to the CHEESEHub home page <span className="block text-xs">Back won't return to the unlock screen.</span></span>
+            </label>
+            <label className="flex items-start gap-2">
+              <input type="checkbox" className="mt-1" checked={hardening.disconnect} onChange={e => setHardening({ ...hardening, disconnect: e.target.checked })} />
+              <span>Disconnect my wallet <span className="block text-xs">This signs you out of the whole site, not just Crypt.</span></span>
+            </label>
+            <label className="flex items-start gap-2">
+              <input type="checkbox" className="mt-1" checked={hardening.cold} onChange={e => {
+                if (!e.target.checked) { setHardening({ ...hardening, cold: false }); return; }
+                setConfirm({ title: '🧊 Turn on cold lock?', body: COLD_LOCK_WARNING, okLabel: 'I have my backup — turn on', run: () => setHardening({ ...hardening, cold: true }) });
+              }} />
+              <span>Cold lock: forget the saved key on this device <span className="block text-xs">Friends, nicknames, avatars and settings stay. {COLD_LOCK_WARNING}</span></span>
+            </label>
           </section>
           <section className="space-y-2 rounded-md border border-border p-3">
             <h3 className="font-semibold text-foreground">Your own history server (optional)</h3>
@@ -95,6 +115,7 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
           </div>
         </div>
       </DialogContent>
+      <CryptConfirmDialog confirm={confirm} onClose={() => setConfirm(null)} />
     </Dialog>
   );
 }
