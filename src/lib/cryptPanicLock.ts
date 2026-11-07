@@ -33,3 +33,17 @@ export function createDoubleEscDetector() {
     return false;
   };
 }
+
+/** Optional hardening applied on every lock; all default off. */
+export type LockHardening = { stealth: boolean; disconnect: boolean; cold: boolean };
+const HARDEN_STORE = 'cheesecrypt-lock-hardening';
+export const DEFAULT_HARDENING: LockHardening = { stealth: false, disconnect: false, cold: false };
+export function loadHardening(): LockHardening {
+  try {
+    const v = JSON.parse(localStorage.getItem(HARDEN_STORE) || 'null');
+    if (!v || typeof v !== 'object') return { ...DEFAULT_HARDENING };
+    return { stealth: v.stealth === true, disconnect: v.disconnect === true, cold: v.cold === true };
+  } catch { return { ...DEFAULT_HARDENING }; }
+}
+export const saveHardening = (h: LockHardening) => { try { localStorage.setItem(HARDEN_STORE, JSON.stringify(h)); } catch { /* ignore */ } };
+export const COLD_LOCK_WARNING = "You will need your key backup file (or QR transfer) to get back in. Without it, your messages can't be read.";

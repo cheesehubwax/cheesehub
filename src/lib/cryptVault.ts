@@ -340,3 +340,13 @@ export async function forgetVault(h: DirHandle): Promise<void> {
     });
   } catch { /* nothing remembered */ }
 }
+
+/** Cold lock: forgets the remembered folder for this account and the shared slot, unconditionally. */
+export async function forgetVaultForAccount(account: string): Promise<void> {
+  if (typeof indexedDB === 'undefined') return;
+  const d = await db();
+  await new Promise<void>((res, rej) => {
+    const t = d.transaction(STORE, 'readwrite'); const s = t.objectStore(STORE); s.delete(SHARED); s.delete(account);
+    t.oncomplete = () => res(); t.onerror = () => rej(t.error);
+  });
+}
