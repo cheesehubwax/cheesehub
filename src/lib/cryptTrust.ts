@@ -87,7 +87,15 @@ export function markFor(total: number, newAccount: boolean): TrustMark {
 }
 
 export const MARK_LABEL: Record<TrustMark, string> = {
-  warning: '⚠️ Warning', low: '🟡 No Respect', moderate: '🟢 Little Respect', good: '🔷 Much Respect', strong: '🛡️ Big Respect',
+  warning: '🪤 Warning', low: '🥛 No Respect', moderate: '🧀 Little Respect', good: '🫕 Much Respect', strong: 'Big Respect',
+};
+
+/** Emoji per mark; null means the CHEESE token logo image is shown instead. */
+export const MARK_ICON: Record<TrustMark, string | null> = {
+  warning: '🪤', low: '🥛', moderate: '🧀', good: '🫕', strong: null,
+};
+export const MARK_NAME: Record<TrustMark, string> = {
+  warning: 'Warning', low: 'No Respect', moderate: 'Little Respect', good: 'Much Respect', strong: 'Big Respect',
 };
 
 const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 4 });
