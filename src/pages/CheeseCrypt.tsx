@@ -214,6 +214,8 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const keyLocked = !!lockedFile && !!candidateKey && lockedFile.account === account && lockedFile.publicKey === candidateKey.publicKey && isVerifiedKey(candidateKey);
   const canLock = isAnchorSession(session) && String(session.actor) === account;
   const key = keyLocked && canLock ? candidateKey : null;
+  const away = useCryptAutoLock(!!key, idleMinutes, panicLock);
+  const shielded = shieldOn && away;
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const currentSession = useRef(session);
@@ -1672,7 +1674,8 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
 
 
   return (
-    <div className="w-full rounded-lg border border-cheese/20 bg-card/80 overflow-hidden flex flex-col md:grid h-[80dvh] min-h-[480px] md:grid-cols-[240px_1fr] md:grid-rows-[auto_1fr]">
+    <div className={cn('w-full rounded-lg border border-cheese/20 bg-card/80 overflow-hidden flex flex-col md:grid h-[80dvh] min-h-[480px] md:grid-cols-[240px_1fr] md:grid-rows-[auto_1fr]', shielded && 'blur-xl select-none pointer-events-none')}
+      aria-hidden={shielded || undefined}>
       {fileInput}
       <Dialog open={!!pendingTip} onOpenChange={o => { if (!o) setPendingTip(null); }}>
         <DialogContent className="sm:max-w-md">
@@ -2002,7 +2005,9 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
                 editing={!!editingMessage} cancelEdit={cancelEdit} editExpired={!!editingMessage && !canEdit(editingMessage, account, clock)}
                 instantSlot={<>
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setPrivacyOpen(true)} title="Network privacy settings">🛡️ Privacy</Button>
-                  <CryptPrivacyDialog open={privacyOpen} onOpenChange={setPrivacyOpen} mode={privacyMode} setMode={setPrivacyMode} loadFullHistory={loadFullHistory} />
+                  <CryptPrivacyDialog open={privacyOpen} onOpenChange={setPrivacyOpen} mode={privacyMode} setMode={setPrivacyMode} loadFullHistory={loadFullHistory}
+                    idleMinutes={idleMinutes} setIdleMinutes={setIdleMinutes} shieldOn={shieldOn} setShieldOn={setShieldOn} />
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={panicLock} title="Lock now: clear the screen (Esc Esc or Ctrl/Cmd+Shift+L)">🔒 Lock now</Button>
                   {lockedFile && <>
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setMoveOpen(true)} title="Move your key and friends to another device by QR code">📲 Move device</Button>
                   <DeviceTransferSendDialog open={moveOpen} onOpenChange={setMoveOpen} account={account} lockedKey={lockedFile} />

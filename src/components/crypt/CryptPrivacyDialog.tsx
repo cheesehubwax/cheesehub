@@ -5,11 +5,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   type PrivacyMode, loadCustomEndpoint, loadCustomOnly, saveCustomEndpoint, testHistoryEndpoint, validateCustomEndpoint,
 } from '@/lib/cryptNetworkPrivacy';
+import { IDLE_OPTIONS, type IdleMinutes } from '@/lib/cryptPanicLock';
 
 /** Network privacy settings. Presentational: the mode lives in the Messenger, the server setting on this device. */
-export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFullHistory }: {
+export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFullHistory, idleMinutes, setIdleMinutes, shieldOn, setShieldOn }: {
   open: boolean; onOpenChange: (v: boolean) => void; mode: PrivacyMode; setMode: (m: PrivacyMode) => void;
   loadFullHistory: () => Promise<void>;
+  idleMinutes: IdleMinutes; setIdleMinutes: (m: IdleMinutes) => void; shieldOn: boolean; setShieldOn: (on: boolean) => void;
 }) {
   const [url, setUrl] = useState('');
   const [only, setOnly] = useState(false);
@@ -55,6 +57,22 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
                 Load older history once (tells the server your account)
               </Button>
             )}
+          </section>
+          <section className="space-y-2">
+            <h3 className="font-semibold text-foreground">🔒 Screen shield &amp; panic lock</h3>
+            <p>Press 🔒 Lock now, Esc twice quickly, or Ctrl/Cmd+Shift+L to clear the screen instantly. Unlocking again is one free Anchor signature.</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-foreground">Auto-lock after</span>
+              {IDLE_OPTIONS.map(m => (
+                <Button key={m} size="sm" variant={idleMinutes === m ? 'default' : 'outline'} aria-pressed={idleMinutes === m} onClick={() => setIdleMinutes(m)}>
+                  {m === 0 ? 'Off' : m === 60 ? '1 hour' : `${m} min`}
+                </Button>
+              ))}
+            </div>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={shieldOn} onChange={e => setShieldOn(e.target.checked)} />
+              Blur messages when I switch tabs or windows
+            </label>
           </section>
           <section className="space-y-2">
             <h3 className="font-semibold text-foreground">Your own history server (optional)</h3>
