@@ -2,7 +2,7 @@
 
 Open tasks only. Completed work lives in git history.
 
-- [ ] CHEESECrypt Phase 1: isolated vodozemac Olm foundation and 256-byte framing tested in Node and Chromium; per-chat keep-encrypted/forget-on-close consent rules implemented. Sending remains disabled. Remaining: authenticated request/accept, wallet-wrapped atomic storage/outbox, separate UI and binding/release security review; real two-wallet verification requires Anchor approval. Ordinary chats/rooms unchanged; epoch rotation later. Details: `.lovable/crypt-secret-chats.md`.
+- [ ] Remove the shelved Secret Chats prototype, its unused dependency, tests and active planning references; verify ordinary encrypted messaging regressions.
 
 - [ ] CHEESEPower: activate and verify one signed reward claim / CPU stake — runner, tests and setup instructions are ready; requires the user's dedicated compound permission, GitHub secret and enable variable.
 
