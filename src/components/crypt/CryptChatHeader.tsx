@@ -8,13 +8,14 @@ import type { CryptAvatar } from '@/lib/cryptAvatar';
 import type { CryptGroup } from '@/lib/cryptGroups';
 import { declineFriendRequest, type InviteGroupView } from '@/lib/cryptInviteGroups';
 import { FRIENDS_DIR } from '@/lib/cryptVault';
+import type { VerifyState } from '@/lib/cryptSafety';
 
 type Notice = { kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'profile'; id: string; to?: string };
 
 /** Chat title bar: friend or group title, Members dropdown and per-chat actions. State lives in Messenger. */
 export function CryptChatHeader({
   account, active, activeGroup, activeInvite, keyAvatar, avatars, contacts, blocked, friendDeclines, setFriendDeclines,
-  nameFor, membersOpen, setMembersOpen, setPendingNotice, setEditingInvite, setEditingFriend, saveFriend, blockAccount, admins = [], onReportRoom,
+  nameFor, membersOpen, setMembersOpen, setPendingNotice, setEditingInvite, setEditingFriend, saveFriend, blockAccount, admins = [], onReportRoom, verify, onVerify,
 }: {
   account: string; active: string | null; activeGroup: CryptGroup | undefined; activeInvite: InviteGroupView | undefined;
   keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>; contacts: Record<string, string>; blocked: string[];
@@ -26,6 +27,8 @@ export function CryptChatHeader({
   admins?: string[];
   /** Report this public room to CHEESEHub moderators (covers owner/admin misconduct). */
   onReportRoom?: () => void;
+  /** Safety-number state for the open direct chat (needs the friend's key). */
+  verify?: VerifyState; onVerify?: () => void;
 }) {
   const memberLine = (member: string, status?: string, action?: ReactNode) => (
     <li key={member} className="flex items-center gap-2 min-w-0">
@@ -88,6 +91,8 @@ export function CryptChatHeader({
               {membersDropdown(activeGroup.members, undefined, member => member !== account && <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" aria-label={`Edit nickname for ${member}`} title={`Edit nickname for ${member}`} onClick={() => setEditingFriend(member)}><Pencil className="h-3 w-3" /></Button>)}
             </span> : <><PixelAvatar account={active} avatar={avatars[active]} /><span className="min-w-0 break-words">{nameFor(active)}{nameFor(active) !== active && <span className="block text-xs text-muted-foreground">{active}</span>}</span><Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label={`Edit nickname for ${active}`} title={`Edit nickname for ${active}`} onClick={() => setEditingFriend(active)}><Pencil className="h-3 w-3" /></Button></>}
             {!activeGroup && !activeInvite && <span className="ml-auto flex items-center gap-1">
+              {contacts[active] && onVerify && <Button size="sm" variant="ghost" className={cn('h-7 text-xs font-normal', verify === 'changed' && 'text-destructive hover:text-destructive')} onClick={onVerify}
+                title="Compare safety numbers to confirm nobody swapped your keys">{verify === 'verified' ? '✅ Verified' : verify === 'changed' ? '⚠️ Key changed' : '🔐 Verify'}</Button>}
               {contacts[active] && <Button size="sm" variant="ghost" className="h-7 text-xs font-normal" onClick={() => saveFriend(active, true)}>💾 Save to {FRIENDS_DIR}</Button>}
               <Button size="sm" variant="ghost" className="h-7 text-xs font-normal text-destructive hover:text-destructive" aria-label={`Block ${active}`}
                 onClick={() => { if (window.confirm(`Block ${active}? Their messages will be hidden on this device.`)) blockAccount(active); }}><Ban className="h-3.5 w-3.5" /> Block</Button>
