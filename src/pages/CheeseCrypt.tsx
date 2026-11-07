@@ -1867,7 +1867,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
               </> : <Button size="sm" variant="ghost" className="ml-auto h-7 gap-1 text-xs font-normal" onClick={() => setSearchOpen(true)}><Search className="h-3.5 w-3.5" /> Search chat</Button>}
             </div>
             <div className="relative flex min-h-0 flex-1">
-            <ol ref={listRef} aria-label="Chat messages" className="min-h-0 flex-1 overflow-y-auto space-y-2 p-4"
+            <ol ref={listRef} aria-label="Chat messages" className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden space-y-2 p-4"
               onScroll={(e) => { const el = e.currentTarget; nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; replyNavigation.inspectVisible(); }}>
               {thread.map((m, i) => (
                 <Fragment key={m.key}>

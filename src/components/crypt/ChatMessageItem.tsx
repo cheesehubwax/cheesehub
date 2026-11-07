@@ -67,7 +67,7 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
   return (
     <ContextMenu>
     <ContextMenuTrigger asChild disabled={!canReply && !onCollapse && !onMute && !ban && !adminToggle && !report && !friend}>
-    <li data-reply-key={m.key} data-reply-highlighted={highlighted || undefined} data-report-highlighted={reportHighlighted || undefined} className={cn('w-fit max-w-[80%] text-sm',
+    <li data-reply-key={m.key} data-reply-highlighted={highlighted || undefined} data-report-highlighted={reportHighlighted || undefined} className={cn('w-fit max-w-[80%] min-w-0 text-sm',
       bare ? (m.from === account ? 'ml-auto py-1' : 'py-1') : m.from === account
         ? 'ml-auto rounded-lg px-3 py-2 bg-cheese/20 border border-cheese/30' : 'rounded-lg px-3 py-2 bg-muted',
       searchHit === 'match' && 'ring-1 ring-cheese/50', searchHit === 'current' && 'ring-2 ring-cheese bg-cheese/10',
@@ -87,7 +87,7 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
         <span className="block font-semibold text-reply">↩️ {reply.author === account ? 'you' : nameFor(reply.author)}</span>
         <span className="block truncate opacity-80">{reply.quote || '…'}</span>
       </button>}
-      <div className="whitespace-pre-wrap break-words">
+      <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
         {m.voice ? <VoiceNoteBubble note={m.voice} /> : tip ? <CryptTipCard tip={tip} sender={m.from} txId={m.txId} nameFor={nameFor} /> : body != null ? parseNftMessage(body).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} autoplayKey={`${account}|${m.key}:${i}`} txId={m.txId} /> : <span key={i} className="block">{splitYoutube(seg.text).map((y, j) => y.type === 'youtube' ? <CryptYoutubeEmbed key={j} link={y.link} /> : <span key={j}>{y.text}</span>)}</span>) : <em className="opacity-70">{contacts[active] ? "Can't read this one: it was sent with a different key." : `Can't read yet: load ${active}'s public key first.`}</em>}
       </div>
       </>}
