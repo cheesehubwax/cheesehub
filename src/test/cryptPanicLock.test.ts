@@ -4,16 +4,16 @@ import { forgetSessionKey, generateKey, loadKey, saveKey } from '@/lib/cheeseCry
 
 describe('panic lock', () => {
   beforeEach(() => localStorage.clear());
-  it('defaults to 30 minutes and expires exactly then', () => {
-    expect(DEFAULT_IDLE_MINUTES).toBe(30);
-    expect(loadIdleMinutes()).toBe(30);
-    expect(idleExpired(0, 30, 30 * 60_000 - 1)).toBe(false);
-    expect(idleExpired(0, 30, 30 * 60_000)).toBe(true);
+  it('defaults to 4 hours (matching the instant session key) and expires exactly then', () => {
+    expect(DEFAULT_IDLE_MINUTES).toBe(240);
+    expect(loadIdleMinutes()).toBe(240);
+    expect(idleExpired(0, 240, 240 * 60_000 - 1)).toBe(false);
+    expect(idleExpired(0, 240, 240 * 60_000)).toBe(true);
   });
   it('Off never expires and invalid stored values fall back', () => {
     expect(idleExpired(0, 0, 10 ** 12)).toBe(false);
     saveIdleMinutes(0); expect(loadIdleMinutes()).toBe(0);
-    localStorage.setItem('cheesecrypt-autolock-minutes', '7'); expect(loadIdleMinutes()).toBe(30);
+    localStorage.setItem('cheesecrypt-autolock-minutes', '7'); expect(loadIdleMinutes()).toBe(240);
   });
   it('double Esc within 600ms locks, slower does not', () => {
     const d = createDoubleEscDetector();

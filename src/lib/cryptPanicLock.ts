@@ -1,7 +1,7 @@
 /** Screen Shield & Panic Lock: device-local settings and pure helpers. */
-export const IDLE_OPTIONS = [0, 15, 30, 60] as const; // minutes; 0 = off
+export const IDLE_OPTIONS = [0, 15, 30, 60, 240] as const; // minutes; 0 = off
 export type IdleMinutes = typeof IDLE_OPTIONS[number];
-export const DEFAULT_IDLE_MINUTES: IdleMinutes = 30;
+export const DEFAULT_IDLE_MINUTES: IdleMinutes = 240; // matches the 4h instant session key lifetime
 export const DOUBLE_ESC_MS = 600;
 
 const IDLE_STORE = 'cheesecrypt-autolock-minutes';
