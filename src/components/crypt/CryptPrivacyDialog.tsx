@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -10,11 +10,11 @@ import { CryptConfirmDialog } from './CryptConfirmDialog';
 import type { CryptConfirm } from './CryptConfirmDialog';
 
 /** Network privacy settings. Presentational: the mode lives in the Messenger, the server setting on this device. */
-export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFullHistory, idleMinutes, setIdleMinutes, shieldOn, setShieldOn, hardening, setHardening }: {
+export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFullHistory, idleMinutes, setIdleMinutes, shieldOn, setShieldOn, hardening, setHardening, rotationSlot }: {
   open: boolean; onOpenChange: (v: boolean) => void; mode: PrivacyMode; setMode: (m: PrivacyMode) => void;
   loadFullHistory: () => Promise<void>;
   idleMinutes: IdleMinutes; setIdleMinutes: (m: IdleMinutes) => void; shieldOn: boolean; setShieldOn: (on: boolean) => void;
-  hardening: LockHardening; setHardening: (h: LockHardening) => void;
+  hardening: LockHardening; setHardening: (h: LockHardening) => void; rotationSlot?: ReactNode;
 }) {
   const [url, setUrl] = useState('');
   const [only, setOnly] = useState(false);
@@ -86,6 +86,7 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
               <span>Cold lock: forget the saved key on this device <span className="block text-xs">Friends, nicknames, avatars and settings stay. {COLD_LOCK_WARNING}</span></span>
             </label>
           </section>
+          {rotationSlot}
           <section className="space-y-2 rounded-md border border-border p-3">
             <h3 className="font-semibold text-foreground">Your own history server (optional)</h3>
             <p className="text-xs">The settings above save as soon as you tap them. The button below is only for this server box.</p>

@@ -1,6 +1,6 @@
 import nacl from 'tweetnacl';
 import {
-  assembleMessages, buildSendMessageActions, bytesToText, ChainMemo, decryptMemoBytes, encryptMemo, type AssembledMessage, type DecodedMemo,
+  assembleMessages, buildSendMessageActions, bytesToText, ChainMemo, decryptMemoBytesAny, encryptMemo, type AssembledMessage, type DecodedMemo,
   MAX_MESSAGE_BYTES, MESSAGE_FEE_QUANTITY, MESSAGE_RECIPIENT_QUANTITY, NFT_FEE_QUANTITY, MessagingKey, partCount, plaintextBytes, splitMessage,
 } from '@/lib/cheeseCrypt';
 import { assembleVoice, parseVoicePart, type VoiceNote, type VoicePartMemo } from '@/lib/cryptVoice';
@@ -97,7 +97,7 @@ export function isDirectMessage(m: ConversationEntry, account: string, other: st
  * `scoped` keys (introduced by invite groups) are tried only when the partner's contact key cannot open a memo,
  * and whatever they open must be invite-group traffic for exactly that group — never a direct message.
  */
-export function decodeConversations(memos: ChainMemo[], key: MessagingKey, contacts: Record<string, string>, now = Date.now(), scoped: ScopedKey[] = []): ConversationEntry[] {
+export function decodeConversations(memos: ChainMemo[], key: MessagingKey, contacts: Record<string, string>, now = Date.now(), scoped: ScopedKey[] = [], previous: Record<string, string[]> = {}): ConversationEntry[] {
   // Decrypt once; bucket by which key opened the memo ('' = the contact key).
   const buckets = new Map<string, { usedKey: string | null; groupId: string | null; text: DecodedMemo[]; voice: VoicePartMemo[] }>();
   const bucket = (id: string, usedKey: string | null, groupId: string | null) => {
@@ -108,12 +108,20 @@ export function decodeConversations(memos: ChainMemo[], key: MessagingKey, conta
   for (const m of memos) {
     if (m.from !== key.account && m.to !== key.account) continue;
     const partner = m.from === key.account ? m.to : m.from;
-    let bytes = contacts[partner] ? decryptMemoBytes(m.memo, contacts[partner], key.secretKey) : null;
+    let bytes = contacts[partner] ? decryptMemoBytesAny(m.memo, contacts[partner], key) : null;
     let b = bucket(`c:${partner}`, contacts[partner] ?? null, null);
+    if (!bytes && contacts[partner]) {
+      // A friend's keys from before their rotation still open past chats (bucketed by the key that opened them).
+      for (const pub of previous[partner] ?? []) {
+        if (pub === contacts[partner]) continue;
+        const opened = decryptMemoBytesAny(m.memo, pub, key);
+        if (opened) { bytes = opened; b = bucket(`p:${pub}:${partner}`, pub, null); break; }
+      }
+    }
     if (!bytes) {
       for (const s of scoped) {
         if (s.account !== partner || s.publicKey === contacts[partner]) continue;
-        const opened = decryptMemoBytes(m.memo, s.publicKey, key.secretKey);
+        const opened = decryptMemoBytesAny(m.memo, s.publicKey, key);
         if (opened) { bytes = opened; b = bucket(`s:${s.groupId}:${partner}`, s.publicKey, s.groupId); break; }
       }
     }
@@ -142,7 +150,7 @@ export function decodeConversations(memos: ChainMemo[], key: MessagingKey, conta
         continue;
       }
       if (b.groupId) continue; // group-introduced keys never unlock direct or legacy-group messages
-      if (!m.text?.startsWith(PREFIX)) { texts.push({ ...m, group: null as CryptGroup | null }); continue; }
+      if (!m.text?.startsWith(PREFIX)) { texts.push({ ...m, group: null as CryptGroup | null, ...(b.usedKey ? { usedKey: b.usedKey } : {}) }); continue; }
       if (m.missing) continue; // partial metadata is never accepted as a group definition
       try {
         const raw = JSON.parse(m.text.slice(PREFIX.length));

@@ -1,4 +1,4 @@
-import { assembleMessages, bytesToText, decryptMemoBytes, type ChainMemo, type MessagingKey } from '@/lib/cheeseCrypt';
+import { assembleMessages, bytesToText, decryptMemoBytesAny, type ChainMemo, type MessagingKey } from '@/lib/cheeseCrypt';
 
 export const MAX_INBOX_KEY_LOOKUPS = 10;
 const ACCOUNT = /^[a-z1-5.]{1,12}$/;
@@ -40,7 +40,7 @@ export function decodeInboxRequests(memos: ChainMemo[], key: MessagingKey, publi
   for (const m of memos) {
     const pub = published[m.from];
     if (!pub || m.to !== key.account || m.from === key.account) continue;
-    const bytes = decryptMemoBytes(m.memo, pub, key.secretKey);
+    const bytes = decryptMemoBytesAny(m.memo, pub, key);
     // Voice is byte-headed 0x03 and is never assembled or played in requests.
     if (!bytes || bytes[0] === 3) continue;
     const text = bytesToText(bytes);

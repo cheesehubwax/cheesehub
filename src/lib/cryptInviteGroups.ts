@@ -6,6 +6,7 @@ import nacl from 'tweetnacl';
 import { decodeBase64, decodeUTF8 } from 'tweetnacl-util';
 import {
   buildSendMessageActions, encryptMemo, MAX_MESSAGE_BYTES, MAX_PARTS, partCount, plaintextBytes, splitMessage, type MessagingKey,
+  senderKey,
 } from '@/lib/cheeseCrypt';
 import { parseAvatar, type CryptAvatar } from '@/lib/cryptAvatar';
 import { parseCryptName } from '@/lib/cryptNames';
@@ -268,10 +269,13 @@ export function authenticatedAdmission(e: Cg2Event, events: readonly Cg2Event[],
  * I asked to join, with that listing's key), and list my real key.
  * Sent (I'm the creator): it must list my real key and the recipient.
  */
-export function inviteAcceptable(e: Cg2Event, me: string, myPublicKey: string, contacts: Record<string, string>, rooms: Record<string, RoomInviter> = {}): boolean {
+/** My active public key, or every key of my ring (active + retired), so rooms pinned to a retired key keep working. */
+export type MyKeys = string | readonly string[];
+const isMine = (mine: MyKeys, k: string | undefined) => !!k && (typeof mine === 'string' ? mine === k : mine.includes(k));
+export function inviteAcceptable(e: Cg2Event, me: string, myPublicKey: MyKeys, contacts: Record<string, string>, rooms: Record<string, RoomInviter> = {}): boolean {
   if (e.control.kind !== 'invite' && e.control.kind !== 'admission') return false;
   const g = e.control.invite;
-  if (e.from !== g.creator || memberKey(g, me) !== myPublicKey || !memberKey(g, e.to)) return false;
+  if (e.from !== g.creator || !isMine(myPublicKey, memberKey(g, me)) || !memberKey(g, e.to)) return false;
   if (e.to === me) {
     if (memberKey(g, e.from) !== e.usedKey) return false;
     if (!!contacts[e.from] && contacts[e.from] === e.usedKey) return true;
@@ -286,11 +290,11 @@ export function inviteAcceptable(e: Cg2Event, me: string, myPublicKey: string, c
  * with the same key, and the copy opened with the creator's key from the group I already hold (or, for my own
  * sent copies, the recipient's key in the update). Nobody can be removed or have their key swapped.
  */
-export function inviteUpdateAcceptable(e: Cg2Event, current: InviteGroup, me: string, myPublicKey: string): boolean {
+export function inviteUpdateAcceptable(e: Cg2Event, current: InviteGroup, me: string, myPublicKey: MyKeys): boolean {
   if (e.control.kind !== 'invite' && e.control.kind !== 'admission') return false;
   const g = e.control.invite;
   if (g.id !== current.id || g.creator !== current.creator || g.created !== current.created || g.name !== current.name || e.from !== current.creator) return false;
-  if (g.members.length <= current.members.length || memberKey(g, me) !== myPublicKey || !memberKey(g, e.to)) return false;
+  if (g.members.length <= current.members.length || !isMine(myPublicKey, memberKey(g, me)) || !memberKey(g, e.to)) return false;
   if (current.members.some(m => memberKey(g, m.account) !== m.publicKey)) return false;
   if (e.to === me) return memberKey(current, e.from) === e.usedKey;
   return e.from === me && memberKey(g, e.to) === e.usedKey;
@@ -309,7 +313,7 @@ export function eventFromMember(e: Cg2Event, invites: Record<string, InviteGroup
  * First valid invite per id wins (earliest chain time). A later copy only counts when it is the creator adding
  * members (inviteUpdateAcceptable); any other conflicting copy is ignored. Updates keep the stored name/picture.
  */
-export function collectInvites(events: Cg2Event[], me: string, myPublicKey: string, contacts: Record<string, string>, stored: Record<string, InviteGroup>, rooms: Record<string, RoomInviter> = {}): Record<string, InviteGroup> {
+export function collectInvites(events: Cg2Event[], me: string, myPublicKey: MyKeys, contacts: Record<string, string>, stored: Record<string, InviteGroup>, rooms: Record<string, RoomInviter> = {}): Record<string, InviteGroup> {
   const out: Record<string, InviteGroup> = { ...stored };
   const protectedRosters: Record<string, string[]> = {};
   for (const e of [...events].sort((a, b) => a.time - b.time)) {
@@ -483,7 +487,9 @@ export function inviteTextSize(id: string, text: string) {
  * One transaction: an encrypted copy of `payload` for every recipient, each copy paying 0.0001 CHEESE per part;
  * the platform fee (80% eosio.null / 20% xcheeseliqst) is paid once per part, on the first recipient's copy only.
  */
-export function buildCg2Actions(key: MessagingKey, recipients: string[], keys: Record<string, string>, payload: string, auth: unknown[], hasNft = false) {
+export function buildCg2Actions(ringKey: MessagingKey, recipients: string[], keys: Record<string, string>, payload: string, auth: unknown[], hasNft = false) {
+  // When `keys` is a room roster it also holds my pinned key; room traffic must come from that (possibly retired) pair.
+  const key = senderKey(ringKey, keys[ringKey.account]);
   if (!recipients.length) throw new Error('Nobody to send to yet.');
   if (new Set(recipients).size !== recipients.length || recipients.includes(key.account)) throw new Error('Invalid recipients.');
   if (recipients.some(r => !keys[r])) throw new Error('A member key is missing.');

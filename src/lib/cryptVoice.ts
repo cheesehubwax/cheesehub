@@ -8,7 +8,7 @@
  * 0x03 is used because 0x01 marks multipart text and 0x02 starts the group text envelope.
  */
 import nacl from 'tweetnacl';
-import { buildCryptFeeActions, buildSendMessageActions, encryptBytesMemo, MAX_PLAINTEXT_BYTES, MESSAGE_FEE_QUANTITY, MESSAGE_RECIPIENT_QUANTITY, type MessagingKey } from '@/lib/cheeseCrypt';
+import { buildCryptFeeActions, buildSendMessageActions, encryptBytesMemo, MAX_PLAINTEXT_BYTES, MESSAGE_FEE_QUANTITY, MESSAGE_RECIPIENT_QUANTITY, senderKey, type MessagingKey } from '@/lib/cheeseCrypt';
 
 export const VOICE_MARK = 0x03;
 export const VOICE_HEADER_BYTES = 12;
@@ -177,8 +177,10 @@ export function voiceNoteCost(parts: number, recipients = 1): string {
  * Transactions to sign, in order. Each carries up to 30 parts; every recipient gets its own encrypted
  * copy of each part paid 0.0001 CHEESE. Every part pays the ordinary shared platform split in its own batch.
  */
-export function buildVoiceBatches(key: MessagingKey, recipients: string[], group: VoiceGroupRef | null, clip: VoiceClip,
+export function buildVoiceBatches(ringKey: MessagingKey, recipients: string[], group: VoiceGroupRef | null, clip: VoiceClip,
   contacts: Record<string, string>, auth: unknown[], id?: string, editTarget?: string): unknown[][] {
+  // Room rosters include my pinned key; room notes must come from that (possibly retired) pair.
+  const key = senderKey(ringKey, contacts[ringKey.account]);
   if (!recipients.length) throw new Error('No recipients');
   if (new Set(recipients).size !== recipients.length || recipients.includes(key.account)) throw new Error('Invalid recipients');
   if (recipients.some(r => !contacts[r])) throw new Error('Load every recipient’s public key before sending.');

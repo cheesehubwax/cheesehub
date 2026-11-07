@@ -46,3 +46,4 @@
 - Crypt Discover is curated, display-only: only cheesebannad admins' listings show (fail closed, last-good cache) and only admins list. Suppression: CRYPTHIDE1: 0.0001 CHEESE eosio.null memos from cheesebannad admins (managed only on /admin), newest per room/account wins, full admin histories, last-good cache; filters only the Discover list, never owner listing state, membership or chain data. CRYPTREPORT1: room reports use fixed reason codes (no chain free text), one per reporter, owners excluded; notify-only, never auto-hide.
 - CHEESENull's CHEESECrypt row: crypt.cheese nulls plus user eosio.null legs matched by Crypt fee-label constants, counted once.
 - Crypt router lookups persist (IndexedDB) only if >5min old.
+
