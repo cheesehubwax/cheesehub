@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createDoubleEscDetector, idleExpired } from '@/lib/cryptPanicLock';
 
-/** Locks on inactivity, double-Esc or Ctrl/Cmd+Shift+L; reports whether the tab is hidden/blurred (for the shield). Window blur is ignored: embedded players take focus without the user leaving.. */
+/** Locks on inactivity, double-Esc or Ctrl/Cmd+Shift+L; reports whether the tab is hidden (for the shield). Window blur is ignored: embedded players take focus without the user leaving. */
 export function useCryptAutoLock(enabled: boolean, idleMinutes: number, onLock: () => void) {
   const lockRef = useRef(onLock);
   lockRef.current = onLock;
