@@ -17,6 +17,7 @@ Open tasks only. Completed work lives in git history.
 - [ ] CHEESECrypt: confirm recovery for bum.gpk with its original key in the user's wallet session; automated recovery/reload/account-switch/tab tests pass, but that private key is unavailable here.
 
 - [ ] CHEESECrypt: verify 50-member admissions/delivery and CPU/NET feasibility, room mutes/removals, admins and message collapsing, message edits, owner edit logs, group send/reply, invite groups, public rooms, public inbox, profile notes, replies and Anchor key lock/unlock on WAX — requires connected wallets and signing approval.
+- [ ] CHEESECrypt key rotation: verify one real rotation (two Anchor lock signatures, backup save, paid friend notices) and a friend switching keys — needs the user's Anchor wallet. Room owner rekey (swapping a member's pinned key) is a later step; until then rooms keep the old key.
 - [ ] CHEESECrypt: verify owned-NFT avatar sharing and the OS folder picker in a real session.
 - [ ] CHEESEFolio (/folio, hidden): verify live prices and portfolios with a real connected wallet.
 - [ ] CHEESECrypt atomic blind router: deployed on mainnet with user-confirmed message delivery and 80/20 split; still verify underpayment rejection, change/refund/reclaim, rollback and maximum resources with the user's Anchor signatures. Authenticated sender decoding is integrated. `payfee` (key creation/publishing, listings) is written and tested; deployed on mainnet (ABI verified) and `CRYPT_PAYFEE_LIVE` is on; still verify one signed key publish and listing.
