@@ -16,7 +16,8 @@ A small badge that shows a "strength mark" for strangers and room join requests,
 4. CHEESE staked in the faucet (`cheesecheese`): 100-4,999 **+8**, 5k-19,999 **+16**, 20k-49,999 **+24**, 50k+ **+32**
 5. Liquidity provider, measured by total CHEESE held across all Alcor CHEESE pools: under 100 **+2**, 100-999 **+8**, 1k-4,999 **+16**, 5k-19,999 **+24**, 20k-49,999 **+32**, 50k+ **+40**. Add **+5** if the CHEESE sits in 2 or more different pools.
 6. CHEESE NFT collector (`cheesenftwax` collection): 1-4 **+4**, 5-19 **+10**, 20-49 **+18**, 50+ **+25**
-7. Local context (no network calls): published CHEESECrypt key **+10**, shared rooms **+5** each (up to +15), past conversation with you **+5**
+7. CHEESECrypt key age, measured from the account's first published key (a small reward for early users): under 30 days **+0**, 30 days-6 months **+3**, 6-12 months **+6**, 1 year or more **+10**. A key that was replaced keeps its first date. The key must still be published.
+8. Local context (no network calls): published CHEESECrypt key **+10**, shared rooms **+5** each (up to +15), past conversation with you **+5**
 
 ## Strength marks
 - Warning (under 10 points, or account under 7 days old)
@@ -47,6 +48,7 @@ If a signal can't be read (for example a node is down), it shows as "unknown" an
   - faucet stake from the `cheesecheese::staketable` row for the account
   - Alcor CHEESE amounts per pool from the existing pooled-position helpers (owner index on the per-pool `positions` table, amounts sized from the pool's current price), summed across pools with the distinct pool count
   - NFT count from the AtomicAssets accounts API filtered by collection
+  - key age from the earliest `CRYPTKEY1:` (or legacy `GPKMKEY1:`) memo the account authorized in its history (cache 24 hours)
   - local context from Messenger state
 - `src/components/crypt/CryptTrustBadge.tsx` (compact badge) and `CryptTrustBreakdown.tsx` (popover), shown in `PublicInbox.tsx`, `PublicRooms.tsx` join requests and `CryptChatHeader.tsx`.
 - A "Trust strength" entry in `CryptAbout.tsx` listing the weights.
