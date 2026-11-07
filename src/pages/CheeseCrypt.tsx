@@ -49,6 +49,8 @@ import { useCryptInstant } from '@/hooks/useCryptInstant';
 import { isInstantAuthFailure, isResourceShortage } from '@/lib/cryptInstant';
 import { ToastAction } from '@/components/ui/toast';
 import { CryptInstantDialog } from '@/components/crypt/CryptInstantDialog';
+import { CryptPrivacyDialog } from '@/components/crypt/CryptPrivacyDialog';
+import { loadPrivacyMode, savePrivacyMode, type PrivacyMode } from '@/lib/cryptNetworkPrivacy';
 import { fetchSponsorBudget, invalidateSponsorBudget, isSponsorRejection, sponsorCryptActions, sponsorRemaining, SPONSOR_PART_UNITS } from '@/lib/cryptSponsor';
 import { buildVoiceBatches, voiceNoteCost, voicePartCount, voiceTransactions, type VoiceClip } from '@/lib/cryptVoice';
 import { baselineMarks, firstUnreadIndex, firstVisitMarks, loadReadMarks, mergeMarks, sameMarks, saveReadMarks, unreadCounts, unreadReplies, type ReadMarks } from '@/lib/cryptUnread';
@@ -60,7 +62,7 @@ import {
   findPrivateKey, readFriendKeys, readVaultMarks, recallVault, vaultStatus, writeVaultMarks, rememberVault, replaceWithLocked, vaultSupported, vaultWritable, writeFriendKey, writeOwnPublicKey,
 } from '@/lib/cryptVault';
 import type { PublicKeyFile } from '@/lib/cheeseCrypt';
-import { ChainMemo, MessagingKey, MAX_MESSAGE_BYTES, MAX_HISTORY_PAGES, MAX_PARTS, messageCost, partCount, splitMessage, buildCreateKeyActions, KEY_CREATION_QUANTITY, buildPublishKeyActions, buildSendMessageActions, CRYPT_ROUTER_ENABLED, routeCryptActions, encryptMemo, fetchMessages, generateKey, loadContacts, loadContactAvatars, loadKey, loadRemovedContacts, removeContact, lookupPublishedKey, parseKeyFile, plaintextBytes, saveContact, saveKey, toPublicFile } from '@/lib/cheeseCrypt';
+import { ChainMemo, MessagingKey, MAX_MESSAGE_BYTES, MAX_HISTORY_PAGES, MAX_PARTS, messageCost, partCount, splitMessage, buildCreateKeyActions, KEY_CREATION_QUANTITY, buildPublishKeyActions, buildSendMessageActions, CRYPT_ROUTER_ENABLED, routeCryptActions, encryptMemo, fetchMessages, fetchContractStream, fetchStreamHistory, mergeMemos, generateKey, loadContacts, loadContactAvatars, loadKey, loadRemovedContacts, removeContact, lookupPublishedKey, parseKeyFile, plaintextBytes, saveContact, saveKey, toPublicFile } from '@/lib/cheeseCrypt';
 import { download } from '@/components/crypt/cryptDownload';
 import { ChatMessageItem } from '@/components/crypt/ChatMessageItem';
 import { EditedMessagesDialog } from '@/components/crypt/EditedMessagesDialog';
@@ -173,6 +175,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const instantRef = useRef(instant);
   instantRef.current = instant;
   const [instantOpen, setInstantOpen] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
+  const [privacyMode, setPrivacyModeState] = useState<PrivacyMode>(loadPrivacyMode);
+  const setPrivacyMode = useCallback((m: PrivacyMode) => { savePrivacyMode(m); setPrivacyModeState(m); }, []);
   useEffect(() => {
     if (!CRYPT_ROUTER_ENABLED) return;
     let live = true;
@@ -443,20 +448,42 @@ export function Messenger({ account, session }: { account: string; session: NonN
       return prev.length === next.length && sig(prev) === sig(next) ? prev : next;
     });
   }, []);
+  // Live checks read the shared crypt.cheese stream from this cursor; full account reads only on load
+  // (Standard), when the stream overflows its page cap, or on an explicit request.
+  const streamCursor = useRef(0);
+  const fullRead = useCallback(async (maximum: boolean) => {
+    const started = Date.now();
+    const rows = maximum ? await fetchStreamHistory(account, depth) : await fetchMessages(account, depth);
+    if (maximum) setMemos(prev => mergeMemos(prev, rows)); else applyMemos(rows);
+    streamCursor.current = Math.max(streamCursor.current, started);
+    setLoaded(true);
+  }, [account, depth, applyMemos]);
+  useEffect(() => { streamCursor.current = 0; }, [account]);
   const refresh = useCallback(async () => {
     setLoading(true);
     inFlight.current = true;
-    try { applyMemos(await fetchMessages(account, depth)); setLoaded(true); }
+    try { await fullRead(privacyMode === 'maximum'); }
     catch { toast({ title: 'Could not load messages', description: 'History servers did not answer. Try again shortly.', variant: 'destructive' }); }
     finally { setLoading(false); inFlight.current = false; }
-  }, [account, toast, applyMemos, depth]);
+  }, [toast, fullRead, privacyMode]);
+  const loadFullHistory = useCallback(async () => {
+    inFlight.current = true;
+    try { const rows = await fetchMessages(account, MAX_HISTORY_PAGES); setMemos(prev => mergeMemos(prev, rows)); }
+    catch { toast({ title: 'Could not load history', description: 'History servers did not answer. Try again shortly.', variant: 'destructive' }); }
+    finally { inFlight.current = false; }
+  }, [account, toast]);
   // Background check: no spinner, no error toast — a missed poll is retried on the next tick.
   const poll = useCallback(async () => {
-    if (inFlight.current) return;
+    if (inFlight.current || !streamCursor.current) return;
     inFlight.current = true;
-    try { applyMemos(await fetchMessages(account, depth)); setLoaded(true); } catch { /* retry next tick */ }
+    try {
+      const r = await fetchContractStream(account, streamCursor.current);
+      setMemos(prev => mergeMemos(prev, r.rows));
+      if (r.complete) streamCursor.current = r.cursor;
+      else await fullRead(privacyMode === 'maximum');
+    } catch { /* retry next tick */ }
     finally { inFlight.current = false; }
-  }, [account, applyMemos, depth]);
+  }, [account, fullRead, privacyMode]);
 
   useEffect(() => { if (key) refresh(); }, [key, refresh]);
   useEffect(() => {
@@ -1949,13 +1976,17 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 setAttachingNft={setAttachingNft} busy={busy} listHidden={listHidden} agreed={agreed} setAgreed={setAgreed}
                 feeInfoOpen={feeInfoOpen} setFeeInfoOpen={setFeeInfoOpen} totalCost={totalCost} send={() => void send()} sendVoice={sendVoice}
                 editing={!!editingMessage} cancelEdit={cancelEdit} editExpired={!!editingMessage && !canEdit(editingMessage, account, clock)}
-                instantSlot={(sponsorUnits > 0 || instant.ready || !!instant.status?.exists) && <>
+                instantSlot={<>
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setPrivacyOpen(true)} title="Network privacy settings">🛡️ Privacy</Button>
+                  <CryptPrivacyDialog open={privacyOpen} onOpenChange={setPrivacyOpen} mode={privacyMode} setMode={setPrivacyMode} loadFullHistory={loadFullHistory} />
+                  {(sponsorUnits > 0 || instant.ready || !!instant.status?.exists) && <>
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setInstantOpen(true)}
                     title={instant.ready ? 'Instant Messaging is on' : 'Send free messages without Anchor popups'}>
                     {instant.ready ? '⚡ Instant' : '⚡ Go instant'}
                   </Button>
                   <CryptInstantDialog open={instantOpen} onOpenChange={setInstantOpen} account={account} ready={instant.ready} status={instant.status}
                     quoteRam={instant.quoteRam} enable={instant.enable} revoke={instant.revoke} />
+                  </>}
                 </>} />
             )}
           </>

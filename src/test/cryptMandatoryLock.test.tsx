@@ -8,7 +8,7 @@ import { Messenger } from '@/pages/CheeseCrypt';
 
 const calls = vi.hoisted(() => ({ pay: vi.fn(), sign: vi.fn(), download: vi.fn(), fetch: vi.fn() }));
 vi.mock('@/hooks/useWaxTransaction', () => ({ useWaxTransaction: () => ({ executeTransaction: calls.pay }) }));
-vi.mock('@/lib/cheeseCrypt', async original => ({ ...await original<typeof import('@/lib/cheeseCrypt')>(), fetchMessages: calls.fetch }));
+vi.mock('@/lib/cheeseCrypt', async original => ({ ...await original<typeof import('@/lib/cheeseCrypt')>(), fetchMessages: calls.fetch, fetchContractStream: async (a: string, c: number) => ({ rows: await calls.fetch(a), cursor: c, complete: true }) }));
 vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import('@/lib/cryptVault')>(), recallVault: async () => null }));
 vi.mock('@/components/crypt/cryptDownload', () => ({ download: calls.download }));
 const session = { actor: 'alice', permission: 'active', permissionLevel: { actor: 'alice', permission: 'active' }, walletPlugin: { id: 'anchor' }, transact: calls.sign } as unknown as Session;

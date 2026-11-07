@@ -12,7 +12,7 @@ const calls = vi.hoisted(() => ({ fetch: vi.fn(), lookup: vi.fn(), transact: vi.
 vi.mock('sonner', () => ({ toast: Object.assign(calls.notify, { dismiss: calls.dismiss }) }));
 vi.mock('@/context/WaxContext', () => ({ useWax: vi.fn() }));
 vi.mock('@/hooks/useWaxTransaction', () => ({ useWaxTransaction: () => ({ executeTransaction: calls.transact }) }));
-vi.mock('@/lib/cheeseCrypt', async original => ({ ...await original<typeof import('@/lib/cheeseCrypt')>(), fetchMessages: calls.fetch, lookupPublishedKey: calls.lookup, fetchRoomMemos: calls.rooms }));
+vi.mock('@/lib/cheeseCrypt', async original => ({ ...await original<typeof import('@/lib/cheeseCrypt')>(), fetchMessages: calls.fetch, fetchContractStream: async (a: string, c: number) => ({ rows: await calls.fetch(a), cursor: c, complete: true }), lookupPublishedKey: calls.lookup, fetchRoomMemos: calls.rooms }));
 vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import('@/lib/cryptVault')>(), recallVault: async () => null }));
 
 const alice = generateKey('alice'), bob = generateKey('bob'), carol = generateKey('carol');

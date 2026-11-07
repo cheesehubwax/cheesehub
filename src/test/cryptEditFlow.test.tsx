@@ -13,7 +13,7 @@ import { Messenger } from '@/pages/CheeseCrypt';
 const calls = vi.hoisted(() => ({ fetch: vi.fn(), rooms: vi.fn(), transact: vi.fn() }));
 vi.mock('@/context/WaxContext', () => ({ useWax: vi.fn() }));
 vi.mock('@/hooks/useWaxTransaction', () => ({ useWaxTransaction: () => ({ executeTransaction: calls.transact }) }));
-vi.mock('@/lib/cheeseCrypt', async original => ({ ...await original<typeof import('@/lib/cheeseCrypt')>(), fetchMessages: calls.fetch, fetchRoomMemos: calls.rooms, lookupPublishedKey: async () => null }));
+vi.mock('@/lib/cheeseCrypt', async original => ({ ...await original<typeof import('@/lib/cheeseCrypt')>(), fetchMessages: calls.fetch, fetchContractStream: async (a: string, c: number) => ({ rows: await calls.fetch(a), cursor: c, complete: true }), fetchRoomMemos: calls.rooms, lookupPublishedKey: async () => null }));
 vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import('@/lib/cryptVault')>(), recallVault: async () => null }));
 const alice = generateKey('alice'), bob = generateKey('bob');
 const ID = '0123456789abcdef';
