@@ -47,4 +47,4 @@
 - CHEESENull's CHEESECrypt row: crypt.cheese nulls plus user eosio.null legs matched by Crypt fee-label constants, counted once.
 - Crypt router lookups persist (IndexedDB) only if >5min old.
 
-- Crypt key rotation: stealth by default (no public key post unless opted in); friends accept rotate notices only when opened with their current key for me, keep previous keys for history and never revert to them. Retired keys stay sealed inside the locked file under the active secret (one unlock opens the ring); room traffic uses the roster-pinned pair and pinned keys are never destroyed; shredding waits for every friend to be told. Owner-side CG2 rekey is not built yet.
+- Crypt rotation: stealth default; notices count only via the friend's current key; ring sealed under active secret; rooms keep pinned keys.
