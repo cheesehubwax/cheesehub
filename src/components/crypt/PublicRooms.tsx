@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 import { MAX_PUBLIC_ROOM_MEMBERS } from '@/lib/cryptInviteGroups';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
+import { CryptTrustBadge } from '@/components/crypt/CryptTrustBadge';
 import type { CryptAvatar } from '@/lib/cryptAvatar';
 import {
   cleanRoomName, cleanRoomTopic, cleanTags, encodeListing, LISTING_FEE_QUANTITY, MAX_ROOM_NAME, MAX_ROOM_TOPIC, ROOM_FEE_QUANTITY, searchListings,
@@ -153,6 +154,7 @@ export function JoinRequests({ requests, roomName, roomFull, nameFor, onAccept, 
       const full = roomFull(r.groupId, r.from);
       return <div key={`${r.groupId}:${r.from}`} className="space-y-1.5 px-1">
         <p className="text-xs break-words"><span className="font-semibold">{nameFor(r.from)}</span>{nameFor(r.from) !== r.from && <span className="font-mono text-muted-foreground"> ({r.from})</span>} wants to {isRejoin(r) ? 'rejoin' : 'join'} <span className="font-semibold">{roomName(r.groupId)}</span></p>
+        <CryptTrustBadge account={r.from} />
         {r.note && <p className="text-xs italic text-muted-foreground break-words">“{r.note}”</p>}
         <div className="flex gap-1">
           <Button size="sm" className="h-7 flex-1 bg-cheese text-primary-foreground hover:bg-cheese/90" disabled={full} title={full ? 'This room is full' : 'Sends the updated invite to everyone in the room'} onClick={() => onAccept(r)}>{full ? 'Full' : 'Accept'}</Button>
