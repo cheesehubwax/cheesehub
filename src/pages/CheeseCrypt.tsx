@@ -1661,7 +1661,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     setBusy(true);
     try {
       // Encrypted to the key carried in the request, so a requester who never published can still read it.
-      const res = await executeTransaction(buildCg2Actions(key, [r.from], { [r.from]: r.publicKey, ...(viewById(r.groupId)?.invite.members.filter(m => m.account === account).map(m => ({ [account]: m.publicKey }))[0] ?? {}) }, declinePayload(r), [permission]), { successTitle: `Declined ${r.from}` });
+      const res = await executeTransaction(buildCg2Actions(key, [r.from], { [r.from]: r.publicKey, [account]: viewById(r.groupId)?.invite.members.find(m => m.account === account)?.publicKey ?? key.publicKey }, declinePayload(r), [permission]), { successTitle: `Declined ${r.from}` });
       if (!res.success || !res.txId) return false;
     } catch (e) { toast({ title: 'Could not decline', description: (e as Error).message, variant: 'destructive' }); return false; }
     finally { setBusy(false); }
