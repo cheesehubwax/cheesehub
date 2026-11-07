@@ -56,6 +56,8 @@ import svg54 from 'openmoji/color/svg/1F501.svg';
 import svg55 from 'openmoji/color/svg/2139.svg';
 import svg56 from 'openmoji/color/svg/1F480.svg';
 import svg57 from 'openmoji/color/svg/1F5DD.svg';
+import mousetrap from 'openmoji/color/svg/1FAA4.svg';
+import fondue from 'openmoji/color/svg/1FAD5.svg';
 
 export const openMojiMap: Record<string, string> = {
   "🏠": svg1,
@@ -115,6 +117,8 @@ export const openMojiMap: Record<string, string> = {
   "ℹ": svg55,
   "💀": svg56,
   "🗝": svg57,
+  "🪤": mousetrap,
+  "🫕": fondue,
 };
 
 export interface OpenMojiIconProps {
