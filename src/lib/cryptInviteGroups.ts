@@ -483,7 +483,9 @@ export function inviteTextSize(id: string, text: string) {
  * One transaction: an encrypted copy of `payload` for every recipient, each copy paying 0.0001 CHEESE per part;
  * the platform fee (80% eosio.null / 20% xcheeseliqst) is paid once per part, on the first recipient's copy only.
  */
-export function buildCg2Actions(key: MessagingKey, recipients: string[], keys: Record<string, string>, payload: string, auth: unknown[], hasNft = false) {
+export function buildCg2Actions(ringKey: MessagingKey, recipients: string[], keys: Record<string, string>, payload: string, auth: unknown[], hasNft = false) {
+  // When `keys` is a room roster it also holds my pinned key; room traffic must come from that (possibly retired) pair.
+  const key = senderKey(ringKey, keys[ringKey.account]);
   if (!recipients.length) throw new Error('Nobody to send to yet.');
   if (new Set(recipients).size !== recipients.length || recipients.includes(key.account)) throw new Error('Invalid recipients.');
   if (recipients.some(r => !keys[r])) throw new Error('A member key is missing.');
