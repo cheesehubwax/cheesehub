@@ -58,7 +58,7 @@ export function verifyTip(sender: string, tip: Tip, actions: unknown[]): boolean
     const a = (raw as RawAction)?.act;
     const d = a?.data;
     if (a?.account !== 'cheeseburger' || a.name !== 'transfer' || !d) return false;
-    if (!a.authorization?.some(x => x.actor === sender)) return false;
+    if (!a.authorization?.some((x: any) => String(x?.actor) === sender)) return false;
     const qty = d.quantity ?? (d.amount != null && d.symbol ? `${Number(d.amount).toFixed(4)} ${d.symbol}` : '');
     return d.from === sender && d.to === tip.recipient && qty === `${tip.amount} CHEESE` && d.memo === TIP_MEMO;
   });
