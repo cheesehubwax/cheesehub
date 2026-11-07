@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Session, SerializedSession } from '@wharfkit/session';
 import { sessionKit, closeWharfkitModals, setLoginInProgress, getTransactPlugins } from '@/lib/wharfKit';
-import { CHEESE_CONFIG, WAX_CHAIN, NFTHIVE_CONFIG } from '@/lib/waxConfig';
+import { CHEESE_CONFIG, NFTHIVE_CONFIG } from '@/lib/waxConfig';
+import { chainPost } from '@/lib/chainRequest';
 import { useToast } from '@/hooks/use-toast';
 
 interface WaxContextType {
@@ -61,28 +62,12 @@ export function WaxProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const endpoints = WAX_CHAIN.rpcUrls || [WAX_CHAIN.url];
-
-    for (const endpoint of endpoints) {
       try {
-        const response = await fetch(
-          `${endpoint}/v1/chain/get_currency_balance`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              code: CHEESE_CONFIG.tokenContract,
-              account: session.actor.toString(),
-              symbol: CHEESE_CONFIG.tokenSymbol,
-            }),
-          }
-        );
-
-        if (!response.ok) {
-          continue; // Try next endpoint
-        }
-
-        const balances = await response.json();
+        const balances = await chainPost<string[]>('/v1/chain/get_currency_balance', {
+          code: CHEESE_CONFIG.tokenContract,
+          account: session.actor.toString(),
+          symbol: CHEESE_CONFIG.tokenSymbol,
+        }, { timeoutMs: 3_500 });
         if (balances && balances.length > 0) {
           const balance = parseFloat(balances[0].split(' ')[0]);
           setCheeseBalance(balance);
@@ -92,14 +77,9 @@ export function WaxProvider({ children }: { children: ReactNode }) {
           return;
         }
       } catch (error) {
-        console.error(`Failed to fetch CHEESE balance from ${endpoint}:`, error);
-        // Continue to next endpoint
+        console.error('Failed to fetch CHEESE balance:', error);
       }
-    }
-
-    // All endpoints failed
-    console.error('All RPC endpoints failed for CHEESE balance');
-    setCheeseBalance(0);
+    // Keep the last known balance on an outage rather than inventing a zero.
   }, [session]);
 
   // Refresh all stored sessions

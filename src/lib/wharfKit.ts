@@ -17,7 +17,7 @@ export const WAX_CHAIN_ID = '1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d1
 const waxChain = ChainDefinition.from({
   id: WAX_CHAIN_ID,
   url: cachedEndpoints('chain-api')[0],
-}, { fetch: walletRpcFetch });
+});
 
 // Create SessionKit WITHOUT Fuel resource provider by default
 // Fuel only works with Anchor wallet - Cloud Wallet doesn't support the co-signing flow
@@ -29,7 +29,7 @@ export const sessionKit = new SessionKit({
     patchAnchorForLockSigning(new WalletPluginAnchor()),
     new WalletPluginCloudWallet(),
   ],
-});
+}, { fetch: walletRpcFetch });
 
 // Helper to check if session is from Anchor wallet (supports Fuel co-signing)
 export function isAnchorSession(session: Session): boolean {

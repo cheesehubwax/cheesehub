@@ -5,7 +5,7 @@ export const WALLET_RPC_WRITE_TIMEOUT_MS = 15_000;
 const MAX_READ_ATTEMPTS = 4;
 
 /** Transport-only fallback: never restart transact, re-sign, or retry a broadcast. */
-export function createWalletRpcFetch(nativeFetch: typeof fetch = (...args) => globalThis.fetch(...args)): typeof fetch {
+export function createWalletRpcFetch(nativeFetch: typeof fetch = (input, init) => globalThis.fetch(input, init)): typeof fetch {
   const origins = new Set(STATIC_ENDPOINTS['chain-api'].map((host) => new URL(host).origin));
   return async (input, init) => {
     // WharfKit FetchProvider uses URL strings. Other services (including Fuel)
