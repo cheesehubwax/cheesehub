@@ -69,7 +69,7 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
               <span className="text-foreground">Auto-lock after</span>
               {IDLE_OPTIONS.map(m => (
                 <Button key={m} size="sm" variant={idleMinutes === m ? 'default' : 'outline'} aria-pressed={idleMinutes === m} onClick={() => setIdleMinutes(m)}>
-                  {m === 0 ? 'Off' : m === 60 ? '1 hour' : `${m} min`}
+                  {m === 0 ? 'Off' : m === 60 ? '1 hour' : m === 240 ? '4 hours' : `${m} min`}
                 </Button>
               ))}
             </div>
