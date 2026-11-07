@@ -1,64 +1,54 @@
-# CHEESECrypt Trust Badge (multi-signal)
+# CHEESECrypt: Trust Strength Badges
 
-## Goal
-When a stranger messages you, a join request arrives, or you open a chat with a non-friend, show a small trust card. It gives a strength mark (e.g. Low / Some / Good / Strong) and a list of the reasons. Every reason is a public fact you can check on-chain. The card informs you and never blocks anyone.
+A small badge that shows a "strength mark" for strangers and room join requests, built from public on-chain signals. It helps you decide whether to accept someone. It never claims to verify who a person is.
 
-## Where it shows
-- Public inbox stranger requests (next to Accept / Decline / Block)
-- Room join requests (owner/admin alert, toast and chat card)
-- Direct chat header banner for non-friends
-- Compact badge (mark + emoji) beside names; click it for the full card
+## Where it appears
+- Public inbox request cards (strangers)
+- Room join requests (owners and admins)
+- Direct chat header when the other person is not a friend
+- Tapping the badge opens a breakdown showing each signal, its points, and a disclaimer
 
-## Signals (points)
-Your idea:
-- 🧀 **CHEESE premium name**: the account is a `.cheese` / `.chz` name (only you can create these, so it is a strong signal). Highest weight.
+## Signals and weights
 
-Extra ideas:
-1. ⏳ **Account age**: tiered (under 7 days is a red flag, then 30 days, 1 year, 3+ years).
-2. 🔐 **Anchor key-lock**: a published CHEESECrypt key that is locked and verified.
-3. 🤝 **Mutual friends**: how many of your friends have this account in their own friends lists, if your local data shows it. Otherwise it counts the groups you share.
-4. 👥 **Shared groups/rooms**: the number of CG2 rooms you are both members of.
-5. 💬 **Your history**: past conversations between you, and how many messages you have exchanged.
-6. 🧀 **CHEESE holder**: holds CHEESE, tiered by balance.
-7. 🔒 **Long-term commitment**: has CHEESE locks or vesting (CHEESELock / CHEESEDrip).
-8. 🗳️ **CHEESEDao participation**: has voted or made proposals.
-9. 🔥 **Nulled CHEESE**: has nulled CHEESE or paid Crypt fees (it costs money to fake).
-10. 🏠 **Room founder**: owns a public room that appears on Discover (curated).
-11. 🖼️ **NFT collector**: owns NFTs from CHEESE collections.
-12. ⚡ **Resource staker**: has WAX staked or powered up, meaning a real, active account.
-13. 📅 **On-chain activity**: total actions or days active, which separates real accounts from fresh accounts made for a single message.
-14. 🛡️ **Admin-vouched**: a cheesebannad admin publishes a public `CRYPTVOUCH1:` memo on the eosio.null fee leg. It works the same way as Discover curation. Newest memo wins and it can be revoked.
+1. Premium CHEESE name (`.cheese` / `.chz` account): **+40**
+2. Account age: under 7 days **-15**, 7-30 days **+3**, 30 days-1 year **+8**, 1-3 years **+16**, 3-5 years **+24**, 5 years or more **+32**
+3. CHEESE wallet balance: 1-99 **+2**, 100-999 **+6**, 1k-9,999 **+12**, 10k-49,999 **+20**, 50k+ **+30**
+4. CHEESE staked in the faucet (`cheesecheese`): 100-4,999 **+8**, 5k-19,999 **+16**, 20k-49,999 **+24**, 50k+ **+32**
+5. Liquidity provider, measured by total CHEESE held across all Alcor CHEESE pools: under 100 **+2**, 100-999 **+8**, 1k-4,999 **+16**, 5k-19,999 **+24**, 20k-49,999 **+32**, 50k+ **+40**. Add **+5** if the CHEESE sits in 2 or more different pools.
+6. CHEESE NFT collector (`cheesenftwax` collection): 1-4 **+4**, 5-19 **+10**, 20-49 **+18**, 50+ **+25**
+7. Local context (no network calls): published CHEESECrypt key **+10**, shared rooms **+5** each (up to +15), past conversation with you **+5**
 
-Negative flags (shown in red, which subtract points):
-- Account is younger than 7 days
-- You blocked them before, or they are in your blocked list
-- Banned from a room you share, by that room's owner
-- Reported by CRYPTREPORT1: room reports, counted only (no free text)
-- A key change was recently published (safety number changed)
+## Strength marks
+- Warning (under 10 points, or account under 7 days old)
+- Low: 10-29
+- Moderate: 30-59
+- Good: 60-89
+- Strong: 90+
 
-## Scoring
-- Fixed, published weights with no hidden algorithm. The card shows every line item and how many points it adds.
-- Thresholds set the mark. The weights live in one file so you can tune them later.
-- A premium .cheese/.chz name or an admin vouch alone can reach "Good". Getting to "Strong" needs age plus at least one other signal.
+If a signal can't be read (for example a node is down), it shows as "unknown" and is left out of the score. It is never counted as zero, and the badge says the score is partial.
 
-## Data and performance
-- All data is read-only chain lookups through resolveEndpoints() with fallbacks, cached through react-query (24h for age and name, 1h for balances and activity).
-- Lookups are lazy: they run only when a card or badge becomes visible. A signal that can't be fetched shows as "unknown" and never counts as zero or negative.
-- Nothing about the user is stored centrally and nothing new is written on-chain, apart from the optional admin vouch memos.
+## Wording and legal safety
+- Use "strength" and "signals". Never use "verified", "trusted identity" or "safe".
+- The breakdown always says: "Based on public blockchain data only. It does not confirm who someone is. Use your own judgement."
+- No negative labels based on reports. This avoids defamation risk.
+- The scores and weights are fixed and published in About, so nobody can claim the scoring is hidden or arbitrary.
+- Nothing is stored centrally or put on-chain. Each viewer's device works out the score.
 
-## Legal and liability notes (flagged)
-- Wording: use "signals" and "strength", never "verified identity", "safe" or "trusted person". That avoids an implied guarantee and any KYC/identity-verification claims.
-- A negative flag based on reports could be read as reputational labelling (defamation risk). Show only counts, with fixed wording ("reported N times by room members"), and no public scoreboard. The card appears only on the viewer's own screen.
-- Admin vouching is a public endorsement made by you. Add a disclaimer that it is not a guarantee. Consider skipping it if you'd rather not be the one vouching.
-- A full disclaimer goes in the About/Terms.
+## Performance
+- Signals load only when a badge is on screen.
+- Cache times: name and age 24 hours; balance, stake, liquidity and NFTs 1 hour.
+- All lookups use the existing endpoint-health ordering and fallback.
 
 ## Technical details
-- `src/lib/cryptTrust.ts`: pure signal collection and scoring (weights, thresholds, unknown handling). Unit tests cover premium-name detection (`.cheese`/`.chz` suffix), the age tiers, the cap where unknown never counts as negative, and the mark thresholds.
-- `src/hooks/useCryptTrust.ts`: per-account react-query fetchers (get_account `created`, CHEESE balance, lock and vesting tables, Hyperion action counts, DAO votes, AtomicAssets collections).
-- `src/components/crypt/TrustBadge.tsx` and `TrustCard.tsx`: presentational only. Messenger supplies local signals (friends, groups, blocks, history).
-- Optional `CRYPTVOUCH1:` reader, which reuses the CRYPTHIDE1 admin-memo pipeline, plus a management page on /admin.
-- AGENTS.md rule and memory entry for the trust badge.
-
-## Questions to confirm during build
-- Should the admin vouch (#14) be included?
-- Should the negative report flag be included?
+- `src/lib/cryptTrust.ts`: pure scoring functions with the tier tables above, plus `scoreTrust(signals)` that returns the total, the mark, a per-signal breakdown and a partial flag.
+- `src/hooks/useCryptTrust.ts`: react-query fetchers:
+  - age from `get_account.created`
+  - balance from `cheeseburger::accounts` via `get_currency_balance`
+  - faucet stake from the `cheesecheese::staketable` row for the account
+  - Alcor CHEESE amounts per pool from the existing pooled-position helpers (owner index on the per-pool `positions` table, amounts sized from the pool's current price), summed across pools with the distinct pool count
+  - NFT count from the AtomicAssets accounts API filtered by collection
+  - local context from Messenger state
+- `src/components/crypt/CryptTrustBadge.tsx` (compact badge) and `CryptTrustBreakdown.tsx` (popover), shown in `PublicInbox.tsx`, `PublicRooms.tsx` join requests and `CryptChatHeader.tsx`.
+- A "Trust strength" entry in `CryptAbout.tsx` listing the weights.
+- `src/test/cryptTrust.test.ts`: checks the tier edges for each signal (for example 99 vs 100 CHEESE, a 7-day-old account, 49,999 vs 50k pooled), the +5 bonus for 2 pools, the mark thresholds, that unknown signals are left out and set the partial flag, and the under-7-days Warning override.
+- A rule added to `src/components/crypt/AGENTS.md` and a memory entry recording the weights.
