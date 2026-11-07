@@ -85,7 +85,10 @@ import { CryptComposer } from '@/components/crypt/CryptComposer';
 import { DiscoverRoomsDialog, JoinRequests, RoomSettingsDialog } from '@/components/crypt/PublicRooms';
 import { ReportRoomDialog } from '@/components/crypt/ReportRoomDialog';
 import { buildReportAction, type ReportReason } from '@/lib/cryptRoomReports';
-import { fetchRoomMemos } from '@/lib/cheeseCrypt';
+import { fetchRoomMemos, forgetSessionKey } from '@/lib/cheeseCrypt';
+import { forgetInstantKey } from '@/lib/cryptInstant';
+import { loadIdleMinutes, loadShield, saveIdleMinutes, saveShield, type IdleMinutes } from '@/lib/cryptPanicLock';
+import { useCryptAutoLock } from '@/hooks/useCryptAutoLock';
 import {
   JOIN_REQUEST_COST, LISTING_FEE_QUANTITY, ROOM_FEE_QUANTITY, buildJoinRequestActions, buildRoomActions, collectJoinRequests, collectListings, decodeRoomEvents, declineJoin, removeRoomRequest, roomRequestOutcomes, roomRequestNotes, encodeListing, encodeUnlist, listedRoomIds, loadJoinDeclines,
   loadLocalListings, loadRoomInfo, loadRoomRequests, ROOM_PREFIX, saveLocalListing, saveRoomInfo, saveRoomRequest, type JoinRequest, type RoomListing,
@@ -97,6 +100,7 @@ const LIVE_POLL_MS = 6000;
 
 const CheeseCrypt = () => {
   const { accountName, isConnected, login, session } = useWax();
+  const [lockNonce, setLockNonce] = useState(0);
 
   return (
     <Layout>
@@ -109,7 +113,7 @@ const CheeseCrypt = () => {
             <Button onClick={login} className="bg-cheese text-primary-foreground hover:bg-cheese/90">Connect wallet</Button>
           </div>
         ) : (
-          <Messenger key={accountName} account={accountName} session={session} />
+          <Messenger key={`${accountName}:${lockNonce}`} account={accountName} session={session} onLocked={() => setLockNonce(n => n + 1)} />
         )}
       </div>
     </Layout>
@@ -118,8 +122,19 @@ const CheeseCrypt = () => {
 
 /** Older than this, a WAX block is long past irreversibility (finality lags ~3 minutes). */
 const DELIVERY_SETTLED_MS = 15 * 60 * 1000;
-export function Messenger({ account, session }: { account: string; session: NonNullable<ReturnType<typeof useWax>['session']> }) {
+export function Messenger({ account, session, onLocked }: { account: string; session: NonNullable<ReturnType<typeof useWax>['session']>; onLocked?: () => void }) {
   const { toast } = useToast();
+  const [idleMinutes, setIdleMinutesState] = useState<IdleMinutes>(loadIdleMinutes);
+  const setIdleMinutes = useCallback((m: IdleMinutes) => { saveIdleMinutes(m); setIdleMinutesState(m); }, []);
+  const [shieldOn, setShieldOnState] = useState(loadShield);
+  const setShieldOn = useCallback((on: boolean) => { saveShield(on); setShieldOnState(on); }, []);
+  /** Panic lock: forget the unlocked key and this tab's instant key, then remount to discard all decrypted state. */
+  const panicLock = useCallback(() => {
+    forgetSessionKey(account);
+    forgetInstantKey(account);
+    toast({ title: '🔒 Locked', description: 'Unlock with Anchor to continue.' });
+    onLocked?.();
+  }, [account, onLocked, toast]);
   const { executeTransaction: executeDirect } = useWaxTransaction(session);
   // Every CHEESECrypt transaction that fits the crypt.cheese router shape is sent through it; others stay direct.
   // Exact routed messages become a free crypt.cheese::sendfree while the live sponsor budget covers them;
