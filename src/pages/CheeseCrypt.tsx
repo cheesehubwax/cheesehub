@@ -112,7 +112,6 @@ const CheeseCrypt = () => {
 export function Messenger({ account, session }: { account: string; session: NonNullable<ReturnType<typeof useWax>['session']> }) {
   const { toast } = useToast();
   const { executeTransaction: executeDirect } = useWaxTransaction(session);
-  const navigate = useNavigate();
   // Every CHEESECrypt transaction that fits the crypt.cheese router shape is sent through it; others stay direct.
   // Exact routed messages become a free crypt.cheese::sendfree while the live sponsor budget covers them;
   // voice batches and join requests pass `paid` and always use the paid path.
@@ -146,7 +145,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         if (isResourceShortage(message)) {
           const error = new Error('Your account is out of CPU for this message. Rent CPU with CHEESE on CHEESEUp, then press Send again.');
           toast({ title: 'Not enough CPU', description: error.message, variant: 'destructive',
-            action: <ToastAction altText="Open CHEESEUp" onClick={() => navigate('/powerup')}>⚡ CHEESEUp</ToastAction> });
+            action: <ToastAction altText="Open CHEESEUp" onClick={() => { window.location.assign(`${import.meta.env.BASE_URL.replace(/\/$/, '')}/powerup`); }}>⚡ CHEESEUp</ToastAction> });
           return { success: false, txId: null, error };
         }
         if (!isInstantAuthFailure(message)) {
@@ -164,7 +163,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         return { ...r, error: new Error("Today's free messaging budget is used up. Press Send again to send it as a normal paid message.") };
     }
     return r;
-  }, [executeDirect, toast, navigate]);
+  }, [executeDirect, toast]);
   const instant = useCryptInstant(account, session, executeDirect);
   const instantRef = useRef(instant);
   instantRef.current = instant;
