@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useDebounce } from "@/hooks/useDebounce";
-import { resolveEndpoints } from "@/lib/endpointHealth";
+import { chainPost } from "@/lib/chainRequest";
 
 export interface PowerUpEstimate {
   cheesePriceInWax: number;
@@ -60,14 +60,6 @@ interface PowerUpStateRow {
   min_powerup_fee: string;
 }
 
-const WAX_FALLBACK = [
-  "https://wax.hivebp.io",
-  "https://api.wax.alohaeos.com",
-  "https://wax.eosusa.io",
-  "https://api.waxsweden.org",
-  "https://wax.greymass.com",
-];
-
 const POWERUP_FRAC = 1e15;
 
 const CPU_MS_PER_FRAC = 78.45 / 3.45e9;
@@ -79,30 +71,15 @@ export const parsePriceWax = (priceStr: string): number => {
 };
 
 export async function fetchPowerupState(): Promise<PowerUpStateRow | null> {
-  for (const baseUrl of await resolveEndpoints("chain-api", WAX_FALLBACK)) {
-    try {
-      const response = await fetch(`${baseUrl}/v1/chain/get_table_rows`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code: "eosio",
-          scope: "0",
-          table: "powup.state",
-          json: true,
-          limit: 1,
-        }),
-      });
-      if (!response.ok) continue;
-      const data = await response.json();
-      if (data.rows && data.rows.length > 0) {
-        return data.rows[0] as PowerUpStateRow;
-      }
-    } catch (err) {
-      console.error(`Failed to fetch powerup state from ${baseUrl}:`, err);
-      continue;
-    }
+  try {
+    const data = await chainPost<{ rows: PowerUpStateRow[] }>("/v1/chain/get_table_rows", {
+      code: "eosio", scope: "0", table: "powup.state", json: true, limit: 1,
+    }, { timeoutMs: 3_500 });
+    return data.rows[0] ?? null;
+  } catch (error) {
+    console.error("Failed to fetch powerup state:", error);
+    return null;
   }
-  return null;
 }
 
 const estimatePowerupFee = (

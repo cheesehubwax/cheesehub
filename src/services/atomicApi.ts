@@ -4,6 +4,7 @@ import { fetchWithFallback } from '@/lib/fetchWithFallback';
 import { resolveEndpoints } from '@/lib/endpointHealth';
 import { fetchActionsUnion, sumAssetField } from '@/lib/hyperionHistory';
 import { fetchTableRows } from '@/lib/waxRpcFallback';
+import { chainPost } from '@/lib/chainRequest';
 import type { NFTDrop, AtomicSale, AtomicTemplate, AtomicDrop, NFTHiveDrop, DropPrice } from '@/types/drop';
 
 
@@ -234,10 +235,7 @@ async function fetchDropPrices(dropId: string | number): Promise<DropPrice[]> {
   try {
     const numericDropId = typeof dropId === 'string' ? parseInt(dropId) : dropId;
     
-    const response = await fetch('https://wax.eosusa.io/v1/chain/get_table_rows', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const data = await chainPost<{ rows: OnChainDropPrice[] }>('/v1/chain/get_table_rows', {
         json: true,
         code: 'nfthivedrops',
         scope: 'nfthivedrops',
@@ -245,10 +243,7 @@ async function fetchDropPrices(dropId: string | number): Promise<DropPrice[]> {
         lower_bound: numericDropId.toString(),
         upper_bound: numericDropId.toString(),
         limit: 1,
-      }),
-    });
-    
-    const data = await response.json();
+    }, { timeoutMs: 3_500 });
     const rows: OnChainDropPrice[] = data.rows || [];
     
     if (!rows.length || rows[0].drop_id !== numericDropId) return [];

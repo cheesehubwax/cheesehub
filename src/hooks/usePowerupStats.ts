@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { resolveEndpoints } from "@/lib/endpointHealth";
+import { chainPost } from "@/lib/chainRequest";
 
 export interface PowerupStats {
   totalPowerups: number;
@@ -13,14 +13,6 @@ interface UsePowerupStatsResult {
   error: string | null;
   refetch: () => void;
 }
-
-const WAX_FALLBACK = [
-  "https://wax.hivebp.io",
-  "https://api.wax.alohaeos.com",
-  "https://wax.eosusa.io",
-  "https://api.waxsweden.org",
-  "https://wax.greymass.com",
-];
 
 const parseAsset = (assetStr: string): number => {
   if (!assetStr) return 0;
@@ -37,23 +29,10 @@ export const usePowerupStats = (): UsePowerupStatsResult => {
     setIsLoading(true);
     setError(null);
 
-    for (const base of await resolveEndpoints("chain-api", WAX_FALLBACK)) {
-      try {
-        const response = await fetch(`${base}/v1/chain/get_table_rows`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            code: "cheesepowerz",
-            scope: "cheesepowerz",
-            table: "stats",
-            json: true,
-            limit: 1,
-          }),
-        });
-
-        if (!response.ok) continue;
-
-        const data = await response.json();
+    try {
+        const data = await chainPost<{ rows: { total_powerups: number; total_wax_spent: string; total_cheese_received: string }[] }>("/v1/chain/get_table_rows", {
+          code: "cheesepowerz", scope: "cheesepowerz", table: "stats", json: true, limit: 1,
+        }, { timeoutMs: 3_500 });
 
         if (data.rows && data.rows.length > 0) {
           const row = data.rows[0];
@@ -70,9 +49,7 @@ export const usePowerupStats = (): UsePowerupStatsResult => {
           return;
         }
       } catch (err) {
-        console.error(`Failed to fetch from ${base}:`, err);
-        continue;
-      }
+        console.error("Failed to fetch contract stats:", err);
     }
 
     setError("Failed to fetch contract stats");

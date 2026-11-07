@@ -37,23 +37,23 @@ export const DEAD_ENDPOINTS = ['https://wax.pink.gg', 'https://wax.blokcrafters.
  */
 export const STATIC_ENDPOINTS: Record<EndpointFeature, string[]> = {
   'chain-api': [
-    'https://wax.eosusa.io',
-    'https://api.waxsweden.org',
     'https://wax.greymass.com',
+    'https://api.waxsweden.org',
     'https://wax.eosdac.io',
     'https://api.wax.alohaeos.com',
     'https://wax.eosphere.io',
+    'https://wax.eosusa.io',
   ],
   'hyperion-v2': [
-    'https://wax.eosusa.io',
     'https://api.waxsweden.org',
     'https://wax.eosphere.io',
     'https://wax.eosdac.io',
+    'https://wax.eosusa.io',
   ],
   'history-v1': [
     'https://api.waxsweden.org',
-    'https://wax.eosusa.io',
     'https://wax.eosphere.io',
+    'https://wax.eosusa.io',
   ],
   'atomic-assets-api': [
     'https://wax.api.atomicassets.io',

@@ -104,27 +104,33 @@ async function attempt<T>(
   } catch (error) {
     // Timeout, network failure or CORS rejection: bench it hard.
     benchEndpoint(host, BENCH_MS.network);
+    clearTimeout(timer);
+    throw error;
+  }
+
+  try {
+    if (!response.ok) {
+      const mapped = options.onStatus?.(response.status);
+      if (mapped) {
+        clearBench(host);
+        return { data: mapped.value, host };
+      }
+      benchEndpoint(
+        host,
+        response.status === 420 || response.status === 429 ? BENCH_MS.rateLimited : BENCH_MS.error,
+      );
+      throw new HttpStatusError(response.status, host);
+    }
+
+    const data = (await response.json()) as T;
+    clearBench(host);
+    return { data, host };
+  } catch (error) {
+    if (!(error instanceof HttpStatusError)) benchEndpoint(host, BENCH_MS.network);
     throw error;
   } finally {
     clearTimeout(timer);
   }
-
-  if (!response.ok) {
-    const mapped = options.onStatus?.(response.status);
-    if (mapped) {
-      clearBench(host);
-      return { data: mapped.value, host };
-    }
-    benchEndpoint(
-      host,
-      response.status === 420 || response.status === 429 ? BENCH_MS.rateLimited : BENCH_MS.error,
-    );
-    throw new HttpStatusError(response.status, host);
-  }
-
-  const data = (await response.json()) as T;
-  clearBench(host);
-  return { data, host };
 }
 
 /**

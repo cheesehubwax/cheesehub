@@ -4,7 +4,7 @@
 // (HerdCheck's live node health), with the caller's own list kept as the
 // offline fallback, so a dead node is never queued ahead of a healthy one.
 
-import { resolveEndpoints, type EndpointFeature } from './endpointHealth';
+import { BENCH_MS, benchEndpoint, clearBench, resolveEndpoints, type EndpointFeature } from './endpointHealth';
 
 /** Guess which HerdCheck feature a request path belongs to. */
 export function featureForPath(path: string): EndpointFeature {
@@ -26,26 +26,38 @@ export async function fetchWithFallback(
   const ordered = await resolveEndpoints(feature, endpoints);
 
   for (const baseUrl of ordered) {
+    const controller = new AbortController();
+    const abort = () => controller.abort(options?.signal?.reason);
+    if (options?.signal?.aborted) throw options.signal.reason ?? new DOMException('Aborted', 'AbortError');
+    options?.signal?.addEventListener('abort', abort, { once: true });
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
-
+      const headers = new Headers(options?.headers);
+      if (path.startsWith('/v1/chain/') && options?.body != null) headers.set('Content-Type', 'text/plain;charset=UTF-8');
       const response = await fetch(`${baseUrl}${path}`, {
         ...options,
+        headers,
         signal: controller.signal,
       });
-
-      clearTimeout(timeoutId);
+      const text = await response.text();
 
       if (response.ok) {
-        return response;
+        clearBench(baseUrl);
+        return new Response(response.status === 204 ? null : text, { status: response.status, statusText: response.statusText, headers: response.headers });
       }
+
+      benchEndpoint(baseUrl, response.status === 420 || response.status === 429 ? BENCH_MS.rateLimited : BENCH_MS.error);
 
       // If response is not ok, try next endpoint
       console.warn(`Endpoint ${baseUrl} returned ${response.status}, trying next...`);
     } catch (error) {
+      if (options?.signal?.aborted) throw error;
+      benchEndpoint(baseUrl, BENCH_MS.network);
       lastError = error as Error;
       console.warn(`Endpoint ${baseUrl} failed:`, (error as Error).message);
+    } finally {
+      clearTimeout(timeoutId);
+      options?.signal?.removeEventListener('abort', abort);
     }
   }
 
