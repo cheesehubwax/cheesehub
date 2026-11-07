@@ -8,7 +8,7 @@ import nacl from 'tweetnacl';
 import { decodeBase64, encodeBase64, decodeUTF8 } from 'tweetnacl-util';
 import { parseAvatar, type CryptAvatar } from '@/lib/cryptAvatar';
 import { parseCryptName } from '@/lib/cryptNames';
-import type { MessagingKey } from '@/lib/cheeseCrypt';
+import type { MessagingKey, RetiredKey } from '@/lib/cheeseCrypt';
 
 export const LOCK_SCHEME = 'cheesecrypt-anchor-sig-v1';
 const DOMAIN = 'CHEESECrypt-keylock-v1';
@@ -28,6 +28,49 @@ export const clearVerifiedKeys = () => verifiedKeys.clear();
 
 export interface KeyLock { scheme: typeof LOCK_SCHEME; salt: string; nonce: string; ciphertext: string }
 
+/**
+ * A retired key inside a locked file. Its secret is sealed with a key derived from the ACTIVE secret, which is
+ * itself sealed by Anchor, so one unlock opens the whole ring and nothing extra is ever signed.
+ */
+export interface SealedRetiredKey { publicKey: string; nonce: string; box: string; retiredAt: string; expiresAt: string | null }
+const RETIRED_DOMAIN = 'CHEESECrypt-retired-v1';
+const retiredSealKey = (activeSecretB64: string) => {
+  const d = decodeUTF8(RETIRED_DOMAIN), s = decodeBase64(activeSecretB64);
+  const buf = new Uint8Array(d.length + s.length); buf.set(d); buf.set(s, d.length);
+  return nacl.hash(buf).slice(0, nacl.secretbox.keyLength);
+};
+export function sealRetired(retired: RetiredKey[], activeSecretB64: string): SealedRetiredKey[] {
+  const k = retiredSealKey(activeSecretB64);
+  return retired.map(r => {
+    const nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
+    return { publicKey: r.publicKey, nonce: encodeBase64(nonce), box: encodeBase64(nacl.secretbox(decodeBase64(r.secretKey), nonce, k)), retiredAt: r.retiredAt, expiresAt: r.expiresAt };
+  });
+}
+/** Opens every retired entry; throws if any is damaged or does not match its public key. */
+export function openRetired(sealed: SealedRetiredKey[], activeSecretB64: string): RetiredKey[] {
+  const k = retiredSealKey(activeSecretB64);
+  return sealed.map(r => {
+    let secret: Uint8Array | null = null;
+    try { secret = nacl.secretbox.open(decodeBase64(r.box), decodeBase64(r.nonce), k); } catch { secret = null; }
+    if (!secret || secret.length !== nacl.box.secretKeyLength || encodeBase64(nacl.box.keyPair.fromSecretKey(secret).publicKey) !== r.publicKey)
+      throw new Error('Key file is damaged: a retired key does not open');
+    return { publicKey: r.publicKey, secretKey: encodeBase64(secret), retiredAt: r.retiredAt, expiresAt: r.expiresAt };
+  });
+}
+const isoOrNull = (v: unknown) => v === null || (typeof v === 'string' && !Number.isNaN(Date.parse(v)));
+function parseSealedRetired(raw: unknown): SealedRetiredKey[] | null {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw) || raw.length > 64) return null;
+  const out: SealedRetiredKey[] = [];
+  for (const v of raw) {
+    const r = v as Record<string, unknown> | null;
+    if (!r || !b64Len(r.publicKey, 32) || !b64Len(r.nonce, nacl.secretbox.nonceLength) || !b64Len(r.box, 32 + nacl.secretbox.overheadLength)) return null;
+    if (typeof r.retiredAt !== 'string' || Number.isNaN(Date.parse(r.retiredAt)) || !isoOrNull(r.expiresAt)) return null;
+    out.push({ publicKey: r.publicKey as string, nonce: r.nonce as string, box: r.box as string, retiredAt: r.retiredAt, expiresAt: (r.expiresAt as string | null) ?? null });
+  }
+  return out;
+}
+
 /** Version 2 private key file: the secret is sealed to the owning WAX account's wallet. */
 export interface LockedKeyFile {
   type: 'gpk-msg-key';
@@ -38,6 +81,8 @@ export interface LockedKeyFile {
   created: string;
   avatar?: CryptAvatar;
   displayName?: string;
+  /** Older key pairs kept for reading; absent in files that never rotated. */
+  retired?: SealedRetiredKey[];
 }
 
 /** Deterministic transaction the wallet signs; zero amount + 2020 expiry make it doubly unbroadcastable. */
