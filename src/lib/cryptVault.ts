@@ -119,6 +119,23 @@ export async function replaceWithLocked(root: DirHandle, locked: LockedKeyFile, 
   await stagedWrite(file, locked);
 }
 
+/**
+ * After a rotation or key shredding: replaces this account's backup with the updated locked ring, only when the
+ * existing file holds this ring's active key or one of its retired keys. Anything else is left untouched and throws.
+ */
+export async function replaceWithRing(root: DirHandle, ring: LockedKeyFile, extraKnown: readonly string[] = []) {
+  const known = new Set([ring.publicKey, ...(ring.retired ?? []).map(r => r.publicKey), ...extraKnown]);
+  const dir = await root.getDirectoryHandle(PRIVATE_DIR, { create: true });
+  const name = privateKeyName(ring.account);
+  if (!(await exists(dir, name))) { await writeNew(dir, name, ring, `${VAULT_DIR}/${PRIVATE_DIR}/${name}`); return; }
+  const file = await dir.getFileHandle(name);
+  if (!file.getFile) throw new Error('Cannot verify existing backup');
+  const raw = JSON.parse(await (await file.getFile()).text());
+  const existing = parseKeyFile(raw) ?? parseLockedKeyFile(raw);
+  if (!existing || existing.type !== 'gpk-msg-key' || existing.account !== ring.account || !known.has(existing.publicKey)) throw new Error('Existing backup does not match this key');
+  await stagedWrite(file, ring);
+}
+
 /** Saves a friend's public key. `replace` (explicit user save) refreshes an existing file for that friend. */
 export async function writeFriendKey(root: DirHandle, file: PublicKeyFile, replace = false) {
   const name = friendKeyName(file.account);
