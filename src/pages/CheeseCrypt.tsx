@@ -1870,7 +1870,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                       <span className="h-px flex-1 bg-border" />
                     </li>
                   )}
-                  <ChatMessageItem m={m} account={account} keyAvatar={key?.avatar} avatars={shownAvatars}
+                  <ChatMessageItem m={m} account={account} delivery={m.from === account && m.txId ? (m.time < clock - DELIVERY_SETTLED_MS ? 'permanent' : deliveryState(m.time, libTime)) : undefined} keyAvatar={key?.avatar} avatars={shownAvatars}
                     contacts={contacts} active={active} activeGroup={activeGroup} nameFor={nameFor}
                     highlighted={replyNavigation.highlighted.has(m.key)} reactionHighlighted={reactionNavigation.highlighted === m.key}
                     reactions={pillsByTarget.get(targetRef(m.from, m.time))}
