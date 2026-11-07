@@ -38,7 +38,7 @@ export function CryptChatHeader({
         <span className="block truncate text-xs font-semibold">{nameFor(member)}{member === account && ' (you)'}</span>
         <span className="block truncate font-mono text-[10px] text-muted-foreground">{member}</span>
       </span>
-      <CryptTrustBadge account={member} />
+      <CryptTrustBadge account={member} variant="inline" />
       {status && <span className={cn('shrink-0 text-[10px]', status.endsWith('joined') ? 'text-cheese' : 'text-muted-foreground')}>{status}</span>}
       {action}
     </li>

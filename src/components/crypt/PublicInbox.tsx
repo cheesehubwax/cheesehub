@@ -42,7 +42,7 @@ export function MessageRequests({ requests, onAccept, onDecline, onBlock }: { re
   return <section className="space-y-3 border-b border-border pb-3" aria-label="Message requests">
     <h2 className="px-2 text-xs font-bold text-cheese">📥 Message requests ({requests.length})</h2>
     {requests.map(r => <div key={r.from} className="space-y-2 px-2">
-      <div className="flex items-center gap-2"><PixelAvatar account={r.from} /><div className="min-w-0"><p className="flex flex-wrap items-center gap-1 break-words text-xs font-semibold">{r.from}<CryptTrustBadge account={r.from} /></p><p className="text-[10px] text-muted-foreground">{r.messages.length} message{r.messages.length === 1 ? '' : 's'}</p></div></div>
+      <div className="flex items-center gap-2"><PixelAvatar account={r.from} /><div className="min-w-0"><p className="flex flex-wrap items-center gap-1 break-words text-xs font-semibold">{r.from}<CryptTrustBadge account={r.from} variant="inline" /></p><p className="text-[10px] text-muted-foreground">{r.messages.length} message{r.messages.length === 1 ? '' : 's'}</p></div></div>
       {r.messages.slice(-3).map(m => <p key={m.key} className="line-clamp-2 whitespace-pre-wrap break-words text-xs text-muted-foreground">{parseNftMessage(parseReply(m.text)?.body ?? m.text ?? '').map(s => s.type === 'nft' ? '🖼️ Sent an NFT' : s.text).join(' ')}</p>)}
       <div className="flex flex-wrap gap-1">
         <Button size="sm" className="h-7 px-2 text-xs" aria-label={`Accept request from ${r.from}`} onClick={() => onAccept(r.from)}>Accept</Button>
