@@ -12,7 +12,7 @@ const calls = vi.hoisted(() => ({ update: vi.fn(), recall: vi.fn(), writable: vi
 vi.mock('@/hooks/useWaxTransaction', () => ({ useWaxTransaction: () => ({ executeTransaction: calls.transact }) }));
 vi.mock('@/context/WaxContext', () => ({ useWax: vi.fn() }));
 vi.mock('@/components/Layout', () => ({ Layout: ({ children }: { children: React.ReactNode }) => children }));
-vi.mock('@/lib/cheeseCrypt', async original => ({ ...await original<typeof import('@/lib/cheeseCrypt')>(), fetchMessages: async () => [] }));
+vi.mock('@/lib/cheeseCrypt', async original => ({ ...await original<typeof import('@/lib/cheeseCrypt')>(), fetchMessages: async () => [], fetchContractStream: async (_a: string, c: number) => ({ rows: [], cursor: c, complete: true }) }));
 vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import('@/lib/cryptVault')>(), recallVault: calls.recall, vaultWritable: calls.writable, replaceWithLocked: calls.update, rememberVault: async () => {} }));
 vi.mock('@/components/crypt/VaultPrompt', () => ({ VaultPrompt: ({ cryptKey, onSaved, onDownload }: { cryptKey: unknown; onSaved: (root: unknown) => void; onDownload: () => void }) => <div><button onClick={() => { calls.backup(cryptKey); onSaved({}); }}>Save backup</button><button onClick={() => { calls.backup(cryptKey); onDownload(); }}>Download backup</button></div> }));
 
