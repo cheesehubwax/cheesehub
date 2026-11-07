@@ -77,15 +77,7 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
               <input type="checkbox" checked={shieldOn} onChange={e => setShieldOn(e.target.checked)} />
               Blur messages when I switch tabs or minimise
             </label>
-            <p className="text-foreground pt-1">When locking, also:</p>
-            <label className="flex items-start gap-2">
-              <input type="checkbox" className="mt-1" checked={hardening.stealth} onChange={e => setHardening({ ...hardening, stealth: e.target.checked })} />
-              <span>Jump to the CHEESEHub home page <span className="block text-xs">Back won't return to the unlock screen.</span></span>
-            </label>
-            <label className="flex items-start gap-2">
-              <input type="checkbox" className="mt-1" checked={hardening.disconnect} onChange={e => setHardening({ ...hardening, disconnect: e.target.checked })} />
-              <span>Disconnect my wallet <span className="block text-xs">This signs you out of the whole site, not just Crypt.</span></span>
-            </label>
+            <p>Locking always jumps to the CHEESEHub home page (Back won't return to the unlock screen) and signs your wallet out of the whole site, so a locked screen never hints at Crypt.</p>
             <label className="flex items-start gap-2">
               <input type="checkbox" className="mt-1" checked={hardening.cold} onChange={e => {
                 if (!e.target.checked) { setHardening({ ...hardening, cold: false }); return; }

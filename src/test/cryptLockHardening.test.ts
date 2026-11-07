@@ -3,15 +3,15 @@ import { loadHardening, saveHardening } from '@/lib/cryptPanicLock';
 
 describe('lock hardening settings', () => {
   beforeEach(() => localStorage.clear());
-  it('all three options default to off', () => {
-    expect(loadHardening()).toEqual({ stealth: false, disconnect: false, cold: false });
+  it('cold lock defaults to off (stealth redirect and wallet disconnect are always on, not stored)', () => {
+    expect(loadHardening()).toEqual({ cold: false });
   });
-  it('saves and reloads each switch independently', () => {
-    saveHardening({ stealth: true, disconnect: false, cold: true });
-    expect(loadHardening()).toEqual({ stealth: true, disconnect: false, cold: true });
+  it('saves and reloads the cold lock switch', () => {
+    saveHardening({ cold: true });
+    expect(loadHardening()).toEqual({ cold: true });
   });
-  it('treats corrupted or non-boolean values as off', () => {
-    localStorage.setItem('cheesecrypt-lock-hardening', '{"stealth":"yes","cold":1}');
-    expect(loadHardening()).toEqual({ stealth: false, disconnect: false, cold: false });
+  it('treats corrupted or legacy values as off', () => {
+    localStorage.setItem('cheesecrypt-lock-hardening', '{"stealth":true,"cold":1}');
+    expect(loadHardening()).toEqual({ cold: false });
   });
 });
