@@ -102,7 +102,7 @@ export function generateCode(): string {
   return Array.from(bytes, b => CODE_ALPHABET[b & 31]).join('');
 }
 export const formatCode = (c: string) => c.match(/.{1,4}/g)?.join('-') ?? c;
-export const normalizeCode = (c: string) => c.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/O/g, '0').replace(/[I1]/g, 'L');
+export const normalizeCode = (c: string) => c.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
 // ---- crypto ----
 const enc = new TextEncoder();
