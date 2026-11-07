@@ -1,11 +1,12 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Session, SerializedSession } from '@wharfkit/session';
 import { sessionKit, closeWharfkitModals, setLoginInProgress, getTransactPlugins } from '@/lib/wharfKit';
 import { CHEESE_CONFIG, NFTHIVE_CONFIG } from '@/lib/waxConfig';
 import { chainPost } from '@/lib/chainRequest';
 import { useToast } from '@/hooks/use-toast';
+import { WaxContext } from './waxContextState';
 
-interface WaxContextType {
+export interface WaxContextType {
   session: Session | null;
   isConnected: boolean;
   isLoading: boolean;
@@ -43,8 +44,6 @@ interface WaxContextType {
   removeAccount: (session: SerializedSession) => Promise<void>;
   refreshSessions: () => Promise<void>;
 }
-
-const WaxContext = createContext<WaxContextType | undefined>(undefined);
 
 export function WaxProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
