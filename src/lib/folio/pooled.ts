@@ -130,6 +130,14 @@ async function readAlcor(account: string, out: Map<TokenKey, PooledToken>): Prom
   }));
 }
 
+/** CHEESE the account holds across Alcor pools right now, and how many distinct pools hold it. Throws if any pool can't be read. */
+export async function fetchAlcorCheese(account: string): Promise<{ cheese: number; pools: number }> {
+  const out = new Map<TokenKey, PooledToken>();
+  await readAlcor(account, out);
+  const t = out.get('cheeseburger:CHEESE');
+  return { cheese: t?.qty ?? 0, pools: new Set((t?.parts ?? []).filter(p => p.qty > 0).map(p => p.pair)).size };
+}
+
 /** Underlying amounts for share tokens of one Taco/Defibox venue. */
 export function shareAmounts(shares: ShareBalance[], pools: AnyAmmPool[], venue: 'taco' | 'defibox', out: Map<TokenKey, PooledToken>): void {
   const bySymbol = new Map(pools.map((p) => [p.shareSymbol.toUpperCase(), p]));
