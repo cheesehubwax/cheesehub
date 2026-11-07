@@ -85,7 +85,11 @@ import { CryptComposer } from '@/components/crypt/CryptComposer';
 import { DiscoverRoomsDialog, JoinRequests, RoomSettingsDialog } from '@/components/crypt/PublicRooms';
 import { ReportRoomDialog } from '@/components/crypt/ReportRoomDialog';
 import { buildReportAction, type ReportReason } from '@/lib/cryptRoomReports';
-import { fetchRoomMemos, forgetSessionKey } from '@/lib/cheeseCrypt';
+import { fetchRoomMemos, forgetSessionKey, loadPreviousKeys, applyContactRotation, senderKey } from '@/lib/cheeseCrypt';
+import { isRotateNotice, loadRotation, markAnnounced, noticeMemos, pendingContactRotations, unannouncedFriends } from '@/lib/cryptKeyRing';
+import { PROFILE_RECIPIENTS_PER_TX } from '@/lib/cryptProfileNotes';
+import { useCryptKeyRotation } from '@/hooks/useCryptKeyRotation';
+import { CryptKeyAgeBanner } from '@/components/crypt/CryptKeyAgeBanner';
 import { forgetInstantKey } from '@/lib/cryptInstant';
 import { loadHardening, loadIdleMinutes, loadShield, saveHardening, saveIdleMinutes, saveShield, type IdleMinutes, type LockHardening } from '@/lib/cryptPanicLock';
 import { clearLockedEnvelope } from '@/lib/cryptKeyLock';
@@ -253,6 +257,9 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     return opened;
   }, [canLock, signer, account]);
   const [contacts, setContacts] = useState<Record<string, string>>(() => loadContacts(account));
+  // Friends' keys from before they rotated: they still open past chats but are never used to send.
+  const [previousKeys, setPreviousKeys] = useState(() => loadPreviousKeys(account));
+  const [rotation, setRotation] = useState(() => loadRotation(account));
   const [removedContacts, setRemovedContacts] = useState(() => loadRemovedContacts(account));
   const [avatars, setAvatars] = useState(() => loadContactAvatars(account));
   const [names, setNames] = useState(() => loadCryptNames(account));
@@ -370,6 +377,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
         update(setLockedFile, loadLockedEnvelope(account, currentKey?.publicKey));
       }
       update(setContacts, loadContacts(account)); update(setRemovedContacts, loadRemovedContacts(account));
+      update(setPreviousKeys, loadPreviousKeys(account)); update(setRotation, loadRotation(account));
       update(setAvatars, loadContactAvatars(account)); update(setNames, loadCryptNames(account));
       update(setNicknames, loadCryptNames(account, 'nicknames')); update(setRoomProfiles, loadRoomProfiles(account));
       update(setGroups, loadGroups(account)); update(setHiddenGroups, loadHiddenGroups(account));
@@ -569,7 +577,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
 
   // Keys introduced by invite groups decrypt only that group's traffic (never DMs, never the Friends list).
   const scoped = useMemo(() => scopedKeys(inviteStore, account), [inviteStore, account]);
-  const decoded = useMemo(() => key ? decodeConversations(visibleMemos, key, contacts, clock, scoped) : [], [visibleMemos, key, contacts, clock, scoped]);
+  const decoded = useMemo(() => key ? decodeConversations(visibleMemos, key, contacts, clock, scoped, previousKeys) : [], [visibleMemos, key, contacts, clock, scoped, previousKeys]);
   const cg2Events = useMemo<Cg2Event[]>(() => decoded.flatMap(c => c.control && c.usedKey && !c.voice
     ? [{ key: c.key, txId: c.txId, time: c.time, from: c.from, to: c.to, control: c.control, usedKey: c.usedKey }] : []), [decoded]);
   // Creators of public rooms I asked to join: their listing key reads only their invite to that room.
@@ -612,7 +620,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const roomInviteEvents = useMemo(() => key ? recoveredRoomEvents(visibleMemos, key, restoredRequests) : [],
     [visibleMemos, key, restoredRequests]);
   const allGroupEvents = useMemo(() => [...new Map([...cg2Events, ...roomInviteEvents].map(e => [e.key, e])).values()], [cg2Events, roomInviteEvents]);
-  const invites = useMemo(() => key ? collectInvites(allGroupEvents, account, key.publicKey, contacts, inviteStore, restoredRequests) : inviteStore,
+  const invites = useMemo(() => key ? collectInvites(allGroupEvents, account, [key.publicKey, ...(key.retired ?? []).map(r => r.publicKey)], contacts, inviteStore, restoredRequests) : inviteStore,
     [allGroupEvents, account, key, contacts, inviteStore, restoredRequests]);
   useEffect(() => {
     // Compares member keys too, so a creator adding members to a known group is saved.
@@ -697,7 +705,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   // Profile notes and group notices update state and never appear as chat messages or unread badges.
   // Invite-group messages/voice show only when they come from a member with that member's invite key.
   const editableConversations = useMemo(() => decoded.filter(c => {
-    if (isProfileNote(c.text)) return false;
+    if (isProfileNote(c.text) || isRotateNotice(c.text)) return false;
     if (!c.igroup) return !!c.group || !!contacts[c.from === account ? c.to : c.from];
     if (c.control && c.control.kind !== 'msg') return false;
     if (!c.usedKey) return false;
@@ -793,6 +801,24 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     }
     if (changed) { setAvatars(loadContactAvatars(account)); setNames(loadCryptNames(account)); }
   }, [profileNotes, contacts, names, avatars, account]);
+  // A friend's key rotation: accepted only from a complete notice opened with their CURRENT key.
+  useEffect(() => {
+    const changes = pendingContactRotations(decoded, account, contacts, previousKeys);
+    let changed = false;
+    for (const c of changes) if (applyContactRotation(account, c.from, c.publicKey)) changed = true;
+    if (changed) { setContacts(loadContacts(account)); setPreviousKeys(loadPreviousKeys(account)); }
+  }, [decoded, contacts, previousKeys, account]);
+  // My rotation: friends not yet told my new key get a notice (from my old key) inside their next message.
+  const pendingFriends = useMemo(() => key ? unannouncedFriends(key, contacts, rotation, blocked) : [], [key, contacts, rotation, blocked]);
+  const rotationNotices = (to: string[]) => {
+    const list = key ? to.filter(r => pendingFriends.includes(r) && contacts[r]) : [];
+    const now = Date.now();
+    return { list, actions: key ? list.flatMap((r, i) => buildSendMessageActions(account, r, noticeMemos(key, contacts[r], now), [permission], false, i === 0)) : [] };
+  };
+  const noteAnnounced = (list: string[]) => {
+    if (!key || !list.length) return;
+    markAnnounced(account, key.publicKey, list); setRotation(loadRotation(account));
+  };
   // A voice note spans several transactions; if one is unfinished right at the oldest loaded memo,
   // its earlier parts are probably on the next history page, so read one page further (bounded).
   useEffect(() => {
@@ -869,9 +895,9 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const originalRecipients = useMemo(() => {
     if (!editingMessage || !key) return [];
     const candidates = [...new Set(visibleMemos.filter(m => m.from === account && m.txId === editingMessage.txId).map(m => m.to))];
-    return candidates.filter(to => decodeConversations(visibleMemos.filter(m => m.from === account && m.to === to), key, contacts, clock, scoped)
+    return candidates.filter(to => decodeConversations(visibleMemos.filter(m => m.from === account && m.to === to), key, contacts, clock, scoped, previousKeys)
       .some(m => m.igroup === editingMessage.igroup && m.group?.id === editingMessage.group?.id && editTarget(m) === editTarget(editingMessage)));
-  }, [editingMessage, key, visibleMemos, account, contacts, clock, scoped]);
+  }, [editingMessage, key, visibleMemos, account, contacts, clock, scoped, previousKeys]);
   const recipients = (editingMessage ? originalRecipients : currentRecipients).filter(a => activeModeration?.bans[a] === undefined);
   const missingKeys = activeInvite ? [] : recipients.filter(m => !contacts[m]);
   useEffect(() => { setReplyingTo(null); }, [active]);
@@ -1054,8 +1080,10 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
       const batches = buildProfileNoteBatches(key, to, contacts, [permission]);
       total = batches.length;
       for (let i = 0; i < batches.length; i++) {
-        const r = await executeTransaction(batches[i], { successTitle: total > 1 ? `Profile update ${i + 1} of ${total} sent` : 'Profile update sent' });
+        const notices = rotationNotices(to.slice(i * PROFILE_RECIPIENTS_PER_TX, (i + 1) * PROFILE_RECIPIENTS_PER_TX));
+        const r = await executeTransaction([...notices.actions, ...batches[i]], { successTitle: total > 1 ? `Profile update ${i + 1} of ${total} sent` : 'Profile update sent' });
         if (!r.success) break;
+        noteAnnounced(notices.list);
         sent++;
       }
     } catch (e) { toast({ title: 'Could not send profile update', description: (e as Error).message, variant: 'destructive' }); }
@@ -1317,9 +1345,12 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
         : activeGroup ? buildGroupMessageActions(key, activeGroup, outgoing, contacts, [permission], hasNft)
         : buildSendMessageActions(account, active, splitMessage(outgoing).map(p => encryptMemo(p, contacts[active], key.secretKey)), [permission], hasNft);
       // Tips: one public wallet-to-wallet transfer signed atomically with the encrypted tip card (direct path, never via crypt.cheese).
+      const notices = activeInvite ? { list: [], actions: [] } : rotationNotices(recipients);
+      actions.unshift(...notices.actions);
       if (confirmedTip) actions.unshift(buildTipTransfer(account, confirmedTip, [permission]));
       // Success is shown by the message appearing in the chat; only a failure gets a popup.
       const r = await executeTransaction(actions, { showSuccessToast: false, showErrorToast: false });
+      if (r.success && r.txId) noteAnnounced(notices.list);
       if (r.success && r.txId) { setText(''); setReplyingTo(null); if (!editingMessage) nearBottom.current = true; setEditingMessage(null); [2000, 5000, 10000].forEach(ms => setTimeout(poll, ms)); }
       else setSendDeclined(r.error?.message ?? 'The transaction could not be confirmed.');
     } catch (e) { setSendDeclined((e as Error).message); }
@@ -1338,7 +1369,10 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
       const actions = activeInvite ? buildCg2Actions(key, recipients, inviteKeys, encodeGroupText(activeInvite.invite.id, line), [permission], false)
         : activeGroup ? buildGroupMessageActions(key, activeGroup, line, contacts, [permission], false)
         : buildSendMessageActions(account, active, splitMessage(line).map(p => encryptMemo(p, contacts[active], key.secretKey)), [permission], false);
+      const notices = activeInvite ? { list: [], actions: [] } : rotationNotices(recipients);
+      actions.unshift(...notices.actions);
       const r = await executeTransaction(actions, { showSuccessToast: false, showErrorToast: false });
+      if (r.success && r.txId) noteAnnounced(notices.list);
       if (r.success && r.txId) [2000, 5000, 10000].forEach(ms => setTimeout(poll, ms));
       else setSendDeclined(r.error?.message ?? 'The transaction could not be confirmed.');
     } catch (e) { setSendDeclined((e as Error).message); }
@@ -1355,11 +1389,14 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     try {
       const batches = buildVoiceBatches(key, recipients, activeInvite ? { id: `${VOICE_REF_PREFIX}${activeInvite.invite.id}`, members: ['-'] } : activeGroup ?? null, voice, activeInvite ? inviteKeys : contacts, [permission], undefined, editingMessage ? editTarget(editingMessage) : undefined);
       total = batches.length;
+      const notices = activeInvite ? { list: [], actions: [] } : rotationNotices(recipients);
+      if (batches.length) batches[0] = [...notices.actions, ...batches[0]];
       for (let i = 0; i < batches.length; i++) {
         if (activeInvite && restrictedAt(activeModeration, account, Date.now())) throw new Error('You are muted or removed from this room.');
         if (editingMessage && !canEdit(editingMessage, account)) throw new Error('The 24-hour editing window has ended.');
         const r = await executeTransaction(batches[i], { showSuccessToast: false, showErrorToast: false }, { paid: true });
         if (!r.success || !r.txId) { if (!sent) setSendDeclined(r.error?.message ?? 'The transaction could not be confirmed.'); break; }
+        if (i === 0) noteAnnounced(notices.list);
         sent++;
       }
     } catch (e) { setSendDeclined((e as Error).message); }
@@ -1486,7 +1523,9 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     // The request carries my public key, so no published key is needed; only the creator can read the request.
     setBusy(true);
     try {
-      const r = await executeTransaction(buildJoinRequestActions(key, l.creator, l.publicKey, l.id, [permission], joinNote), { successTitle: `Request sent to ${l.creator}` }, { paid: true });
+      // A rejoin must come from the key the room still holds for me (it may be a retired one).
+      const retainedKey = viewById(l.id)?.invite.members.find(m => m.account === account)?.publicKey;
+      const r = await executeTransaction(buildJoinRequestActions(senderKey(key, retainedKey), l.creator, l.publicKey, l.id, [permission], joinNote), { successTitle: `Request sent to ${l.creator}` }, { paid: true });
       if (!r.success) return false;
       [2000, 5000, 10000].forEach(ms => setTimeout(poll, ms));
     } catch (e) { toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' }); return false; }
@@ -1500,7 +1539,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     const v = viewById(id);
     if (!key || !v || !v.isCreator) return false;
     let memo: string;
-    try { memo = encodeListing({ id, ...info, publicKey: key.publicKey, creatorName: key.displayName, members: Math.max(1, v.joined.length), ...(v.avatar ? { avatar: v.avatar.pixels } : {}) }); saveRoomInfo(account, id, info); }
+    try { memo = encodeListing({ id, ...info, publicKey: keysOf(v.invite)[account] ?? key.publicKey, creatorName: key.displayName, members: Math.max(1, v.joined.length), ...(v.avatar ? { avatar: v.avatar.pixels } : {}) }); saveRoomInfo(account, id, info); }
     catch (e) { toast({ title: (e as Error).message, variant: 'destructive' }); return false; }
     // Publish the immutable protected roster privately to every member in the same paid transaction.
     const protectedMembers = moderation[id]?.protected ?? v.invite.members.map(m => m.account);
@@ -1622,7 +1661,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     setBusy(true);
     try {
       // Encrypted to the key carried in the request, so a requester who never published can still read it.
-      const res = await executeTransaction(buildCg2Actions(key, [r.from], { [r.from]: r.publicKey }, declinePayload(r), [permission]), { successTitle: `Declined ${r.from}` });
+      const res = await executeTransaction(buildCg2Actions(key, [r.from], { [r.from]: r.publicKey, ...(viewById(r.groupId)?.invite.members.filter(m => m.account === account).map(m => ({ [account]: m.publicKey }))[0] ?? {}) }, declinePayload(r), [permission]), { successTitle: `Declined ${r.from}` });
       if (!res.success || !res.txId) return false;
     } catch (e) { toast({ title: 'Could not decline', description: (e as Error).message, variant: 'destructive' }); return false; }
     finally { setBusy(false); }
@@ -1754,7 +1793,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
         const saved = loadRoomInfo(account)[v.invite.id];
         const fee = (q: string) => `${(parseFloat(q) + policyCost).toFixed(4)} CHEESE`;
         return <RoomSettingsDialog groupId={v.invite.id} groupName={editingInvite.name} groupAvatar={editingInvite.avatar}
-          members={Math.max(1, v.joined.length)} publicKey={key.publicKey} creatorName={key.displayName} listed={isListed} canList={canListRooms} busy={busy}
+          members={Math.max(1, v.joined.length)} publicKey={keysOf(v.invite)[account] ?? key.publicKey} creatorName={key.displayName} listed={isListed} canList={canListRooms} busy={busy}
           metaCost={metaCost} onNameChange={name => setEditingInvite({ ...editingInvite, name })} onPaint={() => setPaintingInvite(true)} onUpdateMeta={confirmMeta}
           listCost={fee(LISTING_FEE_QUANTITY)} updateCost={fee(ROOM_FEE_QUANTITY)} unlistCost={fee(ROOM_FEE_QUANTITY)}
           initialName={current?.name ?? v.name} initialTopic={(current ?? saved)?.topic ?? ''} initialTags={(current ?? saved)?.tags ?? []}
