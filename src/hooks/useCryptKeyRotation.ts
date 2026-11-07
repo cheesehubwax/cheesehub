@@ -3,7 +3,7 @@ import { generateKey, saveKey, toPublicFile, type MessagingKey } from '@/lib/che
 import { saveLockedEnvelope, sealKey, withRetired, type LockedKeyFile } from '@/lib/cryptKeyLock';
 import {
   buildRotateBatches, DAY_MS, expiryFor, keyAgeDays, loadRetention, loadRotation, loadSnooze, markAnnounced, noticeSources,
-  rotateCost, rotatedRing, saveRetention, saveRotation, saveSnooze, shouldNudge, shreddable, SNOOZE_DAYS, withoutRetired,
+  rotateCost, rotatedRing, ROTATE_RECIPIENTS_PER_TX, saveRetention, saveRotation, saveSnooze, shouldNudge, shreddable, SNOOZE_DAYS, withoutRetired,
   type Retention, type RotationState,
 } from '@/lib/cryptKeyRing';
 import { privateKeyName, replaceWithRing, vaultWritable, writeOwnPublicKey, type DirHandle } from '@/lib/cryptVault';
@@ -77,12 +77,11 @@ export function useCryptKeyRotation(o: {
     const to = pendingFriends.filter(f => contacts[f]);
     if (!to.length && !publishPublicly) return true;
     const batches = buildRotateBatches(key, to, contacts, [permission], Date.now(), publishPublicly);
-    const per = Math.ceil(to.length / Math.max(1, batches.length));
     let sent = 0;
     for (let i = 0; i < batches.length; i++) {
       const r = await executeTransaction(batches[i], { successTitle: batches.length > 1 ? `Key notices ${i + 1} of ${batches.length} sent` : 'New key sent to your friends' });
       if (!r.success) break;
-      markAnnounced(account, key.publicKey, to.slice(i * per, (i + 1) * per));
+      markAnnounced(account, key.publicKey, to.slice(i * ROTATE_RECIPIENTS_PER_TX, (i + 1) * ROTATE_RECIPIENTS_PER_TX));
       sent++;
     }
     setRotation(loadRotation(account));
