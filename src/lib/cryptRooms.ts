@@ -7,7 +7,7 @@
 import { decodeBase64 } from 'tweetnacl-util';
 import { parseCryptName } from '@/lib/cryptNames';
 import {
-  assembleMessages, bytesToText, buildCryptFeeActions, CRYPT_ROUTER_ACCOUNT, buildSendMessageActions, decryptMemoBytes, encryptMemo, plaintextCapacity, KEY_PUBLISH_TO, MEMO_MAX_BYTES, MESSAGE_FEE_QUANTITY,
+  assembleMessages, bytesToText, buildCryptFeeActions, CRYPT_ROUTER_ACCOUNT, buildSendMessageActions, decryptMemoBytesAny, encryptMemo, plaintextCapacity, KEY_PUBLISH_TO, MEMO_MAX_BYTES, MESSAGE_FEE_QUANTITY,
   messageCost, msgPrefixOf, type ChainMemo, type MessagingKey,
 } from '@/lib/cheeseCrypt';
 import { encodeNotice, JOIN_NOTE_MAX, isCg2, MAX_PUBLIC_ROOM_MEMBERS, parseCg2, type Cg2Event, type RoomInviter } from '@/lib/cryptInviteGroups';
@@ -183,7 +183,7 @@ export function decodeRoomEvents(memos: ChainMemo[], key: MessagingKey, peers: R
     const carried = m.to === key.account ? joinMemoKey(m.memo) : null;
     for (const pub of carried && carried !== peers[partner] ? [peers[partner], carried] : [peers[partner]]) {
       if (!pub) continue;
-      const bytes = decryptMemoBytes(m.memo, pub, key.secretKey);
+      const bytes = decryptMemoBytesAny(m.memo, pub, key);
       if (!bytes || bytes[0] === 3) continue;
       const text = bytesToText(bytes);
       if (text === null) continue;
