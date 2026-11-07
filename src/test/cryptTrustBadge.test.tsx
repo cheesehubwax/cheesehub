@@ -22,13 +22,14 @@ describe('Own Respect badge opens the points checklist', () => {
     expect(await screen.findByText('Your Respect')).toBeTruthy();
   });
 
-  it('opens the breakdown from inside an open Members dropdown (nested popover)', async () => {
+  it('opens the breakdown from inside the Members dropdown without closing it (nested popover)', async () => {
     render(<CryptTrustContext.Provider value="alice">
-      <Popover open>
+      <Popover>
         <PopoverTrigger asChild><button type="button">👥 Members</button></PopoverTrigger>
         <PopoverContent><ul><li><CryptTrustBadge account="alice" variant="inline" /></li></ul></PopoverContent>
       </Popover>
     </CryptTrustContext.Provider>);
+    await userEvent.click(screen.getByRole('button', { name: '👥 Members' }));
     await userEvent.click(screen.getByRole('button', { name: 'Your Respect breakdown' }));
     expect(await screen.findByText('Your Respect')).toBeTruthy();
   });
