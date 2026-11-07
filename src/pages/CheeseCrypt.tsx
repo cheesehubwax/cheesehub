@@ -2,8 +2,6 @@
 // Intentionally not linked from the header or menus: reachable at /crypt only.
 import { deliveryState } from '@/lib/cryptDelivery';
 import { useCryptLib } from '@/hooks/useCryptLib';
-/** Older than this, a WAX block is long past irreversibility (finality lags ~3 minutes). */
-const DELIVERY_SETTLED_MS = 15 * 60 * 1000;
 import { loadVerified, setVerified, verifyState } from '@/lib/cryptSafety';
 import { SafetyNumberDialog } from '@/components/crypt/SafetyNumberDialog';
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -114,6 +112,8 @@ const CheeseCrypt = () => {
   );
 };
 
+/** Older than this, a WAX block is long past irreversibility (finality lags ~3 minutes). */
+const DELIVERY_SETTLED_MS = 15 * 60 * 1000;
 export function Messenger({ account, session }: { account: string; session: NonNullable<ReturnType<typeof useWax>['session']> }) {
   const { toast } = useToast();
   const { executeTransaction: executeDirect } = useWaxTransaction(session);
