@@ -119,7 +119,9 @@ export function parseKeyFile(raw: unknown): MessagingKey | PublicKeyFile | null 
     // the public key must belong to the secret key
     const derived = nacl.box.keyPair.fromSecretKey(decodeBase64(o.secretKey));
     if (encodeBase64(derived.publicKey) !== o.publicKey) return null;
-    return { ...o, avatar: parseAvatar(o.avatar), displayName: parseCryptName(o.displayName) } as unknown as MessagingKey;
+    // Plain key files never carry retired keys; those only live sealed inside locked files.
+    const { retired: _retired, ...plain } = o;
+    return { ...plain, avatar: parseAvatar(o.avatar), displayName: parseCryptName(o.displayName) } as unknown as MessagingKey;
   }
   if (o.type === 'gpk-msg-pubkey') return { ...o, avatar: parseAvatar(o.avatar), displayName: parseCryptName(o.displayName) } as unknown as PublicKeyFile;
   return null;
