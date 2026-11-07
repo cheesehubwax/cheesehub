@@ -1,5 +1,9 @@
 // CHEESECrypt — encrypted on-chain messages paid in CHEESE.
 // Intentionally not linked from the header or menus: reachable at /crypt only.
+import { deliveryState } from '@/lib/cryptDelivery';
+import { useCryptLib } from '@/hooks/useCryptLib';
+/** Older than this, a WAX block is long past irreversibility (finality lags ~3 minutes). */
+const DELIVERY_SETTLED_MS = 15 * 60 * 1000;
 import { loadVerified, setVerified, verifyState } from '@/lib/cryptSafety';
 import { SafetyNumberDialog } from '@/components/crypt/SafetyNumberDialog';
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -809,6 +813,12 @@ export function Messenger({ account, session }: { account: string; session: NonN
     ? m.group?.id === activeGroup.id && m.group.members.join(',') === activeGroup.members.join(',')
     : isDirectMessage(m, account, active);
   const thread = conversations.filter(inThread);
+  // Delivery ticks: poll the irreversible block time only while one of my recent messages is still reversible.
+  const [libSeen, setLibSeen] = useState<number | null>(null);
+  const deliveryPending = thread.some(m => m.from === account && !!m.txId && m.time >= clock - DELIVERY_SETTLED_MS && deliveryState(m.time, libSeen) === 'sent');
+  const libPolled = useCryptLib(deliveryPending);
+  useEffect(() => { if (libPolled != null) setLibSeen(p => (p == null || libPolled > p ? libPolled : p)); }, [libPolled]);
+  const libTime = libSeen;
   const threadReactions = activeReactions(reactionRows.filter(inThread), new Set(thread.map(m => targetRef(m.from, m.time))));
   const pillsByTarget = reactionPills(threadReactions, account);
   const rowForTarget = new Map(thread.map(m => [targetRef(m.from, m.time), { key: m.key, time: m.time }]));
