@@ -110,7 +110,7 @@ const b64u = (b: Uint8Array) => btoa(String.fromCharCode(...b)).replace(/\+/g, '
 const unb64u = (s: string) => { const bin = atob(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - s.length % 4) % 4)); return Uint8Array.from(bin, c => c.charCodeAt(0)); };
 async function pipe(data: Uint8Array, stream: CompressionStream | DecompressionStream) {
   const writer = stream.writable.getWriter();
-  void writer.write(data).then(() => writer.close()).catch(() => {});
+  void writer.write(data as Uint8Array<ArrayBuffer>).then(() => writer.close()).catch(() => {});
   const reader = stream.readable.getReader(), chunks: Uint8Array[] = [];
   for (;;) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); }
   const out = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
@@ -119,7 +119,7 @@ async function pipe(data: Uint8Array, stream: CompressionStream | DecompressionS
 }
 async function deriveKey(code: string, salt: Uint8Array, iterations: number) {
   const base = await crypto.subtle.importKey('raw', enc.encode(normalizeCode(code)), 'PBKDF2', false, ['deriveKey']);
-  return crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt: salt as Uint8Array<ArrayBuffer>, iterations }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
 }
 const aad = (id: string, account: string) => enc.encode(`${TRANSFER_PREFIX}:${id}:${account}`);
 
@@ -127,7 +127,7 @@ export async function encryptBundle(b: TransferBundle, code: string, iterations 
   const id = Array.from(crypto.getRandomValues(new Uint8Array(4)), x => x.toString(16).padStart(2, '0')).join('');
   const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
   const packed = await pipe(enc.encode(JSON.stringify(b)), new CompressionStream('deflate-raw'));
-  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad(id, b.account) }, await deriveKey(code, salt, iterations), packed));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad(id, b.account) }, await deriveKey(code, salt, iterations), packed as Uint8Array<ArrayBuffer>));
   const blob = new Uint8Array(salt.length + iv.length + ct.length);
   blob.set(salt); blob.set(iv, 16); blob.set(ct, 28);
   const data = b64u(blob);
@@ -167,7 +167,7 @@ export async function decryptFrames(frames: readonly string[], code: string, acc
   if (blob.length < 29) throw new Error('The transfer is damaged.');
   let plain: Uint8Array;
   try {
-    plain = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: blob.slice(16, 28), additionalData: aad(c.id!, account) }, await deriveKey(code, blob.slice(0, 16), iterations), blob.slice(28)));
+    plain = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: blob.slice(16, 28) as Uint8Array<ArrayBuffer>, additionalData: aad(c.id!, account) }, await deriveKey(code, blob.slice(0, 16), iterations), blob.slice(28) as Uint8Array<ArrayBuffer>));
   } catch { throw new Error('Wrong code, or the transfer was changed.'); }
   const bundle = validBundle(JSON.parse(new TextDecoder().decode(await pipe(plain, new DecompressionStream('deflate-raw')))), account);
   if (!bundle) throw new Error('The transfer contents are not valid.');
