@@ -171,9 +171,35 @@ export function removeContact(account: string, contact: string) {
   saveCryptName(account, contact, '', 'nicknames');
   localStorage.setItem(`cheesecrypt-removed-contacts-${account}`, JSON.stringify([...new Set([...loadRemovedContacts(account), contact])]));
 }
+/** Keys a friend has rotated away from (oldest first). They still open past chats but never become current again. */
+const previousStore = (a: string) => `cheesecrypt-previous-keys-${a}`;
+export function loadPreviousKeys(account: string): Record<string, string[]> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(previousStore(account)) || '{}') as Record<string, unknown>;
+    const out: Record<string, string[]> = {};
+    for (const [name, list] of Object.entries(raw || {})) {
+      if (Array.isArray(list)) { const keys = list.filter((k): k is string => typeof k === 'string' && validKey(k, 32)); if (keys.length) out[name] = keys; }
+    }
+    return out;
+  } catch { return {}; }
+}
+/** Records a friend's verified key change: the old key moves to their previous keys. */
+export function applyContactRotation(account: string, contact: string, newPublicKey: string) {
+  const c = loadContacts(account);
+  const old = c[contact];
+  if (!old || old === newPublicKey || !validKey(newPublicKey, 32)) return false;
+  const prev = loadPreviousKeys(account);
+  if (prev[contact]?.includes(newPublicKey)) return false;
+  prev[contact] = [...(prev[contact] ?? []).filter(k => k !== old), old];
+  localStorage.setItem(previousStore(account), JSON.stringify(prev));
+  c[contact] = newPublicKey;
+  localStorage.setItem(contactStore(account), JSON.stringify(c));
+  return true;
+}
 export function saveContact(account: string, contact: string, publicKey: string, avatar?: CryptAvatar, displayName?: string) {
   const c = loadContacts(account);
-  c[contact] = publicKey;
+  // A key the friend has already rotated away from (e.g. an old friends/ file or listing) never replaces the current one.
+  if (!(c[contact] && loadPreviousKeys(account)[contact]?.includes(publicKey))) c[contact] = publicKey;
   localStorage.setItem(contactStore(account), JSON.stringify(c));
   localStorage.setItem(`cheesecrypt-removed-contacts-${account}`, JSON.stringify(loadRemovedContacts(account).filter(name => name !== contact)));
   if (displayName !== undefined) saveCryptName(account, contact, displayName);
