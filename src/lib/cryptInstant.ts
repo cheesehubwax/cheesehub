@@ -35,18 +35,54 @@ export interface InstantStatus {
 }
 
 const storeKey = (account: string) => `cheesecrypt-instant:${account}`;
+const activityKey = (account: string) => `cheesecrypt-instant-active:${account}`;
 
-export function loadInstantKey(account: string): InstantKey | null {
+/** After this long with no typing, clicking, touching or scrolling, the browser key is dropped. */
+export const INSTANT_IDLE_LIMIT_MS = 4 * 60 * 60 * 1000;
+
+/** True when the last activity is older than the idle limit (unknown activity counts as expired). */
+export const instantIdleExpired = (lastActive: number | null, now: number) =>
+  lastActive == null || !Number.isFinite(lastActive) || now - lastActive >= INSTANT_IDLE_LIMIT_MS;
+
+const ss = () => { try { return window.sessionStorage; } catch { return null; } };
+
+/** Removes keys left by older versions that kept the key in long-lived localStorage. */
+export function purgeLegacyInstantKey(account: string) {
+  try { localStorage.removeItem(storeKey(account)); } catch { /* storage unavailable */ }
+}
+
+export function markInstantActive(account: string, now = Date.now()) {
+  ss()?.setItem(activityKey(account), String(now));
+}
+
+/**
+ * The key lives only in this tab's sessionStorage (gone when the tab closes, unreadable from other tabs)
+ * and is dropped once the tab has been idle past INSTANT_IDLE_LIMIT_MS.
+ */
+export function loadInstantKey(account: string, now = Date.now()): InstantKey | null {
+  purgeLegacyInstantKey(account);
+  const store = ss();
+  if (!store) return null;
   try {
-    const raw = JSON.parse(localStorage.getItem(storeKey(account)) || 'null');
+    const raw = JSON.parse(store.getItem(storeKey(account)) || 'null');
     if (!raw || raw.account !== account || typeof raw.privateKey !== 'string') return null;
+    const last = Number(store.getItem(activityKey(account)));
+    if (instantIdleExpired(store.getItem(activityKey(account)) == null ? null : last, now)) { forgetInstantKey(account); return null; }
     const pk = PrivateKey.from(raw.privateKey);
     const publicKey = pk.toPublic().toString();
     return { account, privateKey: pk.toString(), publicKey, createdAt: Number(raw.createdAt) || 0 };
   } catch { return null; }
 }
-export const saveInstantKey = (k: InstantKey) => localStorage.setItem(storeKey(k.account), JSON.stringify(k));
-export const forgetInstantKey = (account: string) => localStorage.removeItem(storeKey(account));
+export const saveInstantKey = (k: InstantKey) => {
+  purgeLegacyInstantKey(k.account);
+  ss()?.setItem(storeKey(k.account), JSON.stringify(k));
+  markInstantActive(k.account);
+};
+export const forgetInstantKey = (account: string) => {
+  purgeLegacyInstantKey(account);
+  ss()?.removeItem(storeKey(account));
+  ss()?.removeItem(activityKey(account));
+};
 
 export function generateInstantKey(account: string): InstantKey {
   const pk = PrivateKey.generate('K1');
