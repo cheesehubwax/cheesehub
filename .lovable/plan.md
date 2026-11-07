@@ -1,107 +1,49 @@
-# Free CHEESECrypt messages: launch steps from start to finish
+# CHEESECrypt privacy pack: Fixed-Length Padding, Delivery Ticks, Safety Numbers
 
-This is a checklist for you to follow on your Windows PC. The app code and the contract code are already written. Nothing here changes code. Do the steps in order and don't skip any.
+All three are app-only changes. **No smart contract update is needed** (the router is blind to memo contents and charges per part, not per byte). Fees do not change.
 
-## Part A: Get the latest files onto your PC
+## 1. Fixed-length padding (hides message length)
 
-1. Publish or sync the project so GitHub (bewbzz/cheesehub) has the latest code.
-2. Get the code onto your PC:
-   - If you already have the folder (for example `C:\cheesehub`), open it, then in GitHub Desktop click **Fetch origin** and then **Pull**.
-   - If you don't, go to the GitHub page, click **Code → Download ZIP**, and unzip it to `C:\cheesehub`.
-3. Copy the **latest** `Dockerfile`, `build.sh`, and the `include`, `src` and `tests` folders from the project's `contracts\cheesecrypt` folder into your folder `C:\Users\User\Desktop\wax contracts\cheesecrypt`. Replace the old files when Windows asks, because the old copies don't include free messaging.
+What users see: nothing changes. What the chain sees: every encrypted part is the same size, so a "ok" looks identical to a full-length message.
 
-## Part B: Compile the contract with Docker Desktop
+- New messages pad each part's plaintext up to the full single-part capacity before encrypting, and the receiver strips it after decrypting.
+- Padded messages use a new marker `CRYPT2:` (instead of `CRYPT1:`). This avoids guessing: old `CRYPT1:` messages are read exactly as today, so all history stays readable.
+- Padding scheme: one `0x80` byte then zeros (standard ISO/IEC 7816-4), applied to the raw bytes, so it works for text, multi-part messages, replies, reactions, edits, NFT shares, group/room controls and voice note parts alike.
+- Multi-part: every part, including the last short one, is padded, so the part count is the only length signal left (unavoidable without extra paid parts).
+- Anything that compares or fingerprints content (edit targets, reply quotes, report digests, search) works on the unpadded plaintext, so edits/reports of new messages keep matching.
 
-1. Open **Docker Desktop** and wait until it says "Engine running" (bottom left, green).
-2. Press the Windows key, type `cmd` and press Enter. A black **Command Prompt** window opens.
-3. Go to the contract folder. Type this and press Enter:
-   ```
-   cd /d "C:\Users\User\Desktop\wax contracts\cheesecrypt"
-   ```
-   Keep the quotes. The folder name "wax contracts" has a space in it.
-4. Make the output folder (if it already exists, you'll see a harmless error):
-   ```
-   mkdir build
-   ```
-5. Build the compiler image. You only need to do this once, and it takes a few minutes:
-   ```
-   docker build -t cheesecrypt-cdt .
-   ```
-   The dot at the end matters. It should finish with "naming to docker.io/library/cheesecrypt-cdt".
-6. Compile:
-   ```
-   docker run --rm -v "%cd%":/work cheesecrypt-cdt cdt-cpp -abigen -I include -contract cheesecrypt -o build/cheesecrypt.wasm src/cheesecrypt.cpp
-   ```
-   You may see warnings about "ricardian". Those are normal. Red "error" lines are not normal: stop and paste them to me.
-7. Check the results:
-   ```
-   dir build
-   ```
-   You should see two files: `cheesecrypt.wasm` and `cheesecrypt.abi`.
-8. Optional extra check (runs the fee and time rule tests):
-   ```
-   docker run --rm -v "%cd%":/work cheesecrypt-cdt bash tests/run.sh
-   ```
-   If this complains that it can't find a compiler (g++), skip it. I already ran these tests on my side and they passed.
+Rollout caveat: a browser tab still running the old app version cannot read `CRYPT2:` messages until it refreshes. Since the app is a single website, this resolves itself on reload; I'll show "Refresh to read this message" instead of a blank for any unreadable `CRYPT2:` memo.
 
-## Part C: Before deploying
+## 2. Delivery ticks
 
-1. Make sure `crypt.cheese` has enough RAM. The new code is bigger, and the new `budget` table needs a small amount of extra RAM.
-   - On waxblock.io, look up `crypt.cheese` and check RAM. Aim for at least 50 KB free beyond the current usage.
-   - If it's short, buy RAM for `crypt.cheese` from any account (about 1 to 2 WAX is usually enough).
-2. Have the wallet that controls `crypt.cheese@active` ready in Anchor.
+- After sending, your message shows **one tick** ("Sent — in a block") as soon as the transaction ID is confirmed.
+- It changes to **two ticks** ("Permanent") once that block is irreversible on WAX (typically a few minutes).
+- Shown only on your own messages; hover/tap explains the meaning. Messages loaded from history that are already old show two ticks immediately.
+- Checks are light: one shared poll of the chain's latest irreversible block every ~15s while any of your messages is still pending, stopping when none are.
 
-## Part D: Deploy the update to crypt.cheese
+## 3. Safety numbers
 
-Use the same method you used for the first deploy on 31 Oct. Two common ways:
+- New "Verify" option in the chat header for direct chats (and on each room member).
+- Shows a 60-digit safety number (12 groups of 5) plus a QR code, computed from both accounts' CHEESECrypt public keys and account names. Both people see the same number.
+- Instructions: compare in person or over a call; if they match, nobody has swapped keys.
+- You can mark a contact "Verified" (stored only in your browser and in your friends backup). If that contact's key later changes, the badge drops and a warning appears in the chat.
+- Nothing is sent on chain; no fee.
 
-- **Web tool (easiest):** Open a WAX contract deploy page that works with Anchor (for example the "Deploy Contract" tool on wax.bloks.io under Wallet). Log in as `crypt.cheese` with the **active** permission. Upload `build\cheesecrypt.wasm` and `build\cheesecrypt.abi`, then approve in Anchor.
-- **cleos (command line):**
-  `cleos -u https://wax.greymass.com set contract crypt.cheese build cheesecrypt.wasm cheesecrypt.abi`
+## Also updated
 
-You don't need to redo the `eosio.code` permission, because it's already set. Your existing settings and in-progress payments stay the same. Free messaging stays **off** until Part F.
+- About section: short entries on padding, ticks and safety numbers.
+- Agent rules and APP_SYNC notes recording "padding/ticks/safety numbers: client-only, no contract change".
 
-Then check it worked: on waxblock.io, open `crypt.cheese` → **Contract → Actions**. You should now see `setbudget`, `takesponsor` and `sendfree`. Under **Tables** you should see `budget`.
+## Technical details
 
-## Part E: Tell the contract who funds it, then fund it
+- `src/lib/cheeseCrypt.ts`: add `MSG_PREFIX_V2 = 'CRYPT2:'`; `msgPrefixOf` accepts it; `encryptBytesMemo` pads to `MAX_PLAINTEXT_BYTES - 1` content + marker and writes V2; `decryptMemoBytes` strips padding only for V2 and rejects malformed padding (returns null). Recompute `MAX_PLAINTEXT_BYTES` so a V2 padded memo still fits the 256-byte memo limit (capacity drops by 1 byte for the pad marker); `PART_BODY_BYTES` follows. Router/sponsor shape check (line ~364) already uses `msgPrefixOf`, so V2 memos stay eligible for free `sendfree`.
+- Audit every `encryptMemo`/`encryptBytesMemo` caller (voice, groups, invites, rooms, moderation, edits, reactions, tips, inbox) to confirm none hard-codes `CRYPT1:` or memo length; key-file prefixes (`CRYPTKEY1:`) and plaintext room listings are untouched.
+- New `src/lib/cryptDelivery.ts` + hook: tracks `{txId, blockNum}` per sent message, polls `get_info.last_irreversible_block_num` through the existing endpoint resolver.
+- New `src/lib/cryptSafety.ts`: SHA-512 iterated fingerprint (Signal-style) over sorted `(account, publicKey)` pairs, rendered as 60 digits; QR via existing or lightweight QR library; verified map keyed by account + key.
+- New `SafetyNumberDialog.tsx`; tick indicator inside `ChatMessageItem.tsx`; Verify entry in `CryptChatHeader.tsx`.
+- Tests: padding round-trip for 1-byte, max-size and multi-part messages; every V2 memo has identical length; legacy `CRYPT1:` still decrypts; malformed padding rejected; V2 memos still convert to `sendfree`; safety number identical from both sides and changes when a key changes; tick turns permanent only when irreversible block ≥ tx block.
 
-1. waxblock.io → `crypt.cheese` → **Contract → Actions → setbudget**. Log in as `crypt.cheese` (active).
-   - `daily_limit`: `200.0000 CHEESE` (exactly 4 decimals, with a space before CHEESE)
-   - `enabled`: `false`
-   - `funder`: the account you'll pay from (for example `dr.cheese`)
-   - Click Submit and approve in Anchor.
-2. Log in as the **funder** account. Send CHEESE (token contract `cheeseburger`) to `crypt.cheese`:
-   - Amount: as much as you want available (for example `1400.0000 CHEESE` covers about a week at the full limit)
-   - Memo: exactly `CHEESECrypt sponsor deposit` (capitals and spaces must match)
-   - If the account or memo is wrong, the transfer is rejected and nothing is lost.
-3. Check: **Tables → budget** should show `sponsor_balance` equal to what you sent.
+## Risks / notes
 
-## Part F: Switch it on and test
-
-1. Run `setbudget` again with the same values, but `enabled` = `true`.
-2. Open CHEESEHub → Admin. The crypt.cheese card should show "Free Messaging: On", today's spend and the sponsor balance.
-3. Open CHEESECrypt and send a text message to a friend:
-   - The composer should show "Free message".
-   - Anchor should ask you to approve a `crypt.cheese::sendfree` action with **no CHEESE transfer** in it.
-   - The friend receives it, and old messages still load.
-4. Send a voice note. It should still be a normal paid message.
-
-## Everyday controls
-
-- **Turn off:** `setbudget` with `enabled` = `false`. Messages fall back to paid automatically.
-- **Top up:** repeat Part E step 2.
-- **Take money back:** `takesponsor`, for example `100.0000 CHEESE`, signed by `crypt.cheese@active`. It goes back to the funder.
-- **Change daily amount:** `setbudget` with a new `daily_limit`.
-
-## If something goes wrong
-
-- Docker says "cannot connect": Docker Desktop isn't running. Start it and wait for the green "Engine running".
-- Compile errors, or deploy says "insufficient ram": paste the message to me (for RAM, buy more as in Part C).
-- Deposit rejected: check the funder account in `setbudget` and the exact memo.
-
-## Risks (flagged)
-
-- There's no per-person limit. One spammer can use up the whole 200 for the day, and after that everyone pays normally. Your most you can lose is 200 CHEESE per day.
-- You're paying to deliver encrypted content you can't see. Keep the Terms rule that users are responsible for what they send.
-- Whether Anchor can approve messages without a pop-up (whitelisting) is still untested. You can only test it once this is live.
-- The contract has not been audited. Testing on testnet first is safest.
+- No legal grey area: padding and safety numbers are standard privacy practice (Signal, WhatsApp). Sender authentication on chain is unchanged, so CHEESECrypt is not a mixer.
+- Padding hides length within a part, not timing, sender, recipients or part count — those stay public on chain.
