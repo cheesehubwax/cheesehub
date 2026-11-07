@@ -109,7 +109,7 @@ const enc = new TextEncoder();
 const b64u = (b: Uint8Array) => btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const unb64u = (s: string) => { const bin = atob(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - s.length % 4) % 4)); return Uint8Array.from(bin, c => c.charCodeAt(0)); };
 async function pipe(data: Uint8Array, stream: CompressionStream | DecompressionStream) {
-  return new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(stream)).arrayBuffer());
+  return new Uint8Array(await new Response(new Response(data).body!.pipeThrough(stream)).arrayBuffer());
 }
 async function deriveKey(code: string, salt: Uint8Array, iterations: number) {
   const base = await crypto.subtle.importKey('raw', enc.encode(normalizeCode(code)), 'PBKDF2', false, ['deriveKey']);
