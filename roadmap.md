@@ -2,7 +2,7 @@
 
 Open tasks only. Completed work lives in git history.
 
-- [ ] CHEESEHub node resilience: health-ordered wallet transport, bounded read fallback, restored-session coverage, and outage regression/browser checks; real Anchor unlock/power-up requires the user's signatures.
+- [ ] CHEESEHub node resilience: verify real Anchor unlock/power-up with the user's signatures; health-ordered wallet transport and bounded reads are implemented, outage regression tests pass, and live WAX reads/PowerUp state succeed with eosusa and greymass unavailable. Never auto-rebroadcast payments.
 
 - [ ] CHEESECrypt tips: verify one real public-room tip with Anchor and chat readback — direct tip + paid router delivery and sender/all-recipient encrypted readback/verification pass automated tests; requires the user's wallet signature.
 

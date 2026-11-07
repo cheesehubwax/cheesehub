@@ -110,17 +110,17 @@ async function attempt<T>(
 
   try {
     if (!response.ok) {
-    const mapped = options.onStatus?.(response.status);
-    if (mapped) {
-      clearBench(host);
-      return { data: mapped.value, host };
+      const mapped = options.onStatus?.(response.status);
+      if (mapped) {
+        clearBench(host);
+        return { data: mapped.value, host };
+      }
+      benchEndpoint(
+        host,
+        response.status === 420 || response.status === 429 ? BENCH_MS.rateLimited : BENCH_MS.error,
+      );
+      throw new HttpStatusError(response.status, host);
     }
-    benchEndpoint(
-      host,
-      response.status === 420 || response.status === 429 ? BENCH_MS.rateLimited : BENCH_MS.error,
-    );
-    throw new HttpStatusError(response.status, host);
-  }
 
     const data = (await response.json()) as T;
     clearBench(host);
