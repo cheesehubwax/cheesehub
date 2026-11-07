@@ -22,10 +22,10 @@ function Art({ mark }: { mark: TrustMark }) {
       <path d="M14 7.5 L16 4.5 L18 7.5 Z" fill={c('destructive')} />
     </g>;
     case 'low': return <g>
-      <path d="M10 7 H22 L20.5 26 H11.5 Z" fill={c('background', 0.35)} stroke={ink} strokeWidth="1" strokeLinejoin="round" />
-      <path d="M10.6 12 Q13 13 16 12 T21.4 12 L20.5 26 H11.5 Z" fill={c('background')} />
+      <path d="M10 7 H22 L20.5 26 H11.5 Z" fill="hsl(200 30% 90% / 0.25)" stroke={ink} strokeWidth="1" strokeLinejoin="round" />
+      <path d="M10.6 12 Q13 13 16 12 T21.4 12 L20.5 26 H11.5 Z" fill="hsl(40 30% 97%)" />
       <path d="M10.6 12 Q13 13 16 12 T21.4 12" fill="none" stroke={ink} strokeWidth="0.7" />
-      <line x1="13" y1="15" x2="13.5" y2="23" stroke={c('foreground', 0.15)} strokeWidth="1.2" strokeLinecap="round" />
+      <line x1="13" y1="15" x2="13.5" y2="23" stroke="hsl(200 20% 80%)" strokeWidth="1.2" strokeLinecap="round" />
     </g>;
     case 'moderate': return <g>
       <path d="M5 22 L26 11 L27 22 Z" fill={c('cheese')} stroke={ink} strokeWidth="1" strokeLinejoin="round" />
