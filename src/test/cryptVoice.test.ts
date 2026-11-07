@@ -16,8 +16,8 @@ const toMemos = (batches: unknown[][], to: string) => batches.flatMap((actions, 
   .filter(x => x.data.to === to).map((x, i) => ({ txId: `tx${t}`, time: 1000 + t * 1000 + i, from: x.data.from, to, memo: x.data.memo, quantity: x.data.quantity })));
 
 describe('CHEESECrypt memo prefixes', () => {
-  it('new messages and key publications use CRYPT1: and CRYPTKEY1:', () => {
-    expect(encryptMemo('hi', b.publicKey, a.secretKey).startsWith('CRYPT1:')).toBe(true);
+  it('new messages use padded CRYPT2: and key publications CRYPTKEY1:', () => {
+    expect(encryptMemo('hi', b.publicKey, a.secretKey).startsWith('CRYPT2:')).toBe(true);
     expect(buildPublishKeyActions('alice.wam', a.publicKey, [])[0].data.memo).toBe(`CRYPTKEY1:${a.publicKey}`);
     expect(keyMemo(a.publicKey).startsWith('CRYPTKEY1:')).toBe(true);
   });
@@ -31,9 +31,9 @@ describe('CHEESECrypt memo prefixes', () => {
     expect(newestPublishedKey('alice.wam', [row(`GPKMKEY1:${a.publicKey}`)])).toBe(a.publicKey);
     expect(newestPublishedKey('alice.wam', [row(`CRYPTKEY1:${b.publicKey}`), row(`GPKMKEY1:${a.publicKey}`)])).toBe(b.publicKey);
   });
-  it('one-part limit stays 146 bytes and fits the memo', () => {
-    expect(MAX_PLAINTEXT_BYTES).toBe(146);
-    expect(new TextEncoder().encode(encryptMemo('x'.repeat(146), b.publicKey, a.secretKey)).length).toBeLessThanOrEqual(MEMO_MAX_BYTES);
+  it('one-part limit is 145 bytes (one byte reserved for padding) and fits the memo', () => {
+    expect(MAX_PLAINTEXT_BYTES).toBe(145);
+    expect(new TextEncoder().encode(encryptMemo('x'.repeat(145), b.publicKey, a.secretKey)).length).toBeLessThanOrEqual(MEMO_MAX_BYTES);
   });
 });
 

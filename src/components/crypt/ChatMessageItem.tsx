@@ -22,7 +22,7 @@ import type { EditedMessage } from '@/lib/cryptEdits';
 import { REACTION_EMOJIS, isReaction, type ReactionEmoji, type ReactionPill } from '@/lib/cryptReactions';
 
 /** Pure sound-effect-NFT posts render without the bubble box — sender header, playback and timestamp stay. */
-export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, reactionHighlighted, reactions, onReact, searchHit, editable, onEdit, onCollapse, canReveal, revealed, onReveal, badges, onMute, ban, adminToggle, report, reportHighlighted, friend }: {
+export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, reactionHighlighted, reactions, onReact, searchHit, editable, onEdit, onCollapse, canReveal, revealed, onReveal, badges, onMute, ban, adminToggle, report, reportHighlighted, friend, delivery }: {
   m: EditedMessage; account: string; keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>;
   contacts: Record<string, string>; active: string; activeGroup: CryptGroup | null;
   nameFor: (id: string) => string; openedAt: { current: number };
@@ -47,6 +47,8 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
   reportHighlighted?: boolean;
   /** Friend shortcut for another member's message: add (or show a sent request) when not a friend, remove when a friend. */
   friend?: { isFriend: boolean; onAdd?: () => void; onRemove?: () => void; pendingLabel?: string };
+  /** My own messages: ✔ in a block, ✔✔ irreversible. */
+  delivery?: 'sent' | 'permanent';
 }) {
   const hidden = !!m.collapsed && !revealed;
   const reply = parseReply(m.text);
@@ -97,6 +99,9 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
         </button>)}
       </div>}
       <p className="text-[10px] opacity-70 mt-1">
+        {delivery && <span className={cn('mr-1 font-semibold', delivery === 'permanent' && 'text-cheese')} role="img"
+          aria-label={delivery === 'permanent' ? 'Permanent on chain' : 'Sent, in a block'}
+          title={delivery === 'permanent' ? 'Permanent: this block can no longer be undone' : 'Sent: in a block, becoming permanent in a few minutes'}>{delivery === 'permanent' ? '✔✔' : '✔'}</span>}
         {new Date(m.time).toLocaleString()}{m.editedAt && <span title={new Date(m.editedAt).toLocaleString()}> · (edited)</span>}{m.igroup ? null : ' · '}{m.igroup ? null : m.voice ? `${voiceNoteCost(m.parts, m.group ? m.group.members.length - 1 : 1)} at current rate` : m.group ? `${groupMessageCost(m.parts, m.group.members.length - 1, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))} at current rate` : messageCost(m.parts, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))}
         {m.parts > 1 && ` · ${m.parts} parts`}
         {m.missing > 0 && !m.voice && <span className="text-destructive"> · {m.missing} part{m.missing > 1 ? 's' : ''} not loaded</span>}

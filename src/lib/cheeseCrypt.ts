@@ -16,11 +16,13 @@ import { decodeBase64, encodeBase64, decodeUTF8, encodeUTF8 } from 'tweetnacl-ut
 import { benchEndpoint, normalizeEndpoint, resolveEndpoints } from '@/lib/endpointHealth';
 
 export const MSG_PREFIX = 'CRYPT1:';
+/** Padded messages: plaintext is ISO/IEC 7816-4 padded (0x80 then zeros) so every memo has the same length. */
+export const MSG_PREFIX_V2 = 'CRYPT2:';
 export const KEY_PREFIX = 'CRYPTKEY1:';
 export const LEGACY_MSG_PREFIX = 'GPKM1:';
 export const LEGACY_KEY_PREFIX = 'GPKMKEY1:';
 /** The message prefix a memo carries (new or legacy), or null if it is not a message. */
-export const msgPrefixOf = (memo: string) => memo.startsWith(MSG_PREFIX) ? MSG_PREFIX : memo.startsWith(LEGACY_MSG_PREFIX) ? LEGACY_MSG_PREFIX : null;
+export const msgPrefixOf = (memo: string) => memo.startsWith(MSG_PREFIX_V2) ? MSG_PREFIX_V2 : memo.startsWith(MSG_PREFIX) ? MSG_PREFIX : memo.startsWith(LEGACY_MSG_PREFIX) ? LEGACY_MSG_PREFIX : null;
 export const keyPrefixOf = (memo: string) => memo.startsWith(KEY_PREFIX) ? KEY_PREFIX : memo.startsWith(LEGACY_KEY_PREFIX) ? LEGACY_KEY_PREFIX : null;
 export const MEMO_MAX_BYTES = 256;
 export const KEY_PUBLISH_TO = 'eosio.null';
@@ -153,40 +155,65 @@ export function saveContact(account: string, contact: string, publicKey: string,
 
 const utf8Len = (s: string) => new TextEncoder().encode(s).length;
 
-/** Largest plaintext (UTF-8 bytes) that fits one memo. */
-export const MAX_PLAINTEXT_BYTES = (() => {
+/** Largest raw box input (bytes) whose memo fits `budget` bytes. */
+function rawCapacity(budget: number): number {
   // memo = prefix + b64(nonce 24) + ':' + b64(len + 16)
   for (let n = 256; n > 0; n--) {
-    const len = MSG_PREFIX.length + 32 + 1 + 4 * Math.ceil((n + 16) / 3);
-    if (len <= MEMO_MAX_BYTES) return n;
+    const len = MSG_PREFIX_V2.length + 32 + 1 + 4 * Math.ceil((n + 16) / 3);
+    if (len <= budget) return n;
   }
   return 0;
-})();
+}
+
+/** Largest plaintext (bytes) that fits one memo; one byte is reserved for the padding marker. */
+export const MAX_PLAINTEXT_BYTES = rawCapacity(MEMO_MAX_BYTES) - 1;
+
+/** Content capacity of a memo that must leave `reserved` bytes free after the ciphertext. */
+export const plaintextCapacity = (reserved: number) => rawCapacity(MEMO_MAX_BYTES - reserved) - 1;
 
 export const plaintextBytes = utf8Len;
 
-/** Encrypt raw bytes (at most MAX_PLAINTEXT_BYTES) into a CRYPT1: memo. */
-export function encryptBytesMemo(bytes: Uint8Array, theirPublic: string, mySecret: string): string {
+/** Pad to exactly `size + 1` bytes: content, 0x80, zeros. */
+export function padPlaintext(bytes: Uint8Array, size = MAX_PLAINTEXT_BYTES): Uint8Array {
+  if (bytes.length > size) throw new Error(`Message is longer than ${size} bytes`);
+  const out = new Uint8Array(size + 1);
+  out.set(bytes);
+  out[bytes.length] = 0x80;
+  return out;
+}
+
+/** Strip 7816-4 padding; null when it is malformed. */
+export function unpadPlaintext(bytes: Uint8Array): Uint8Array | null {
+  let i = bytes.length - 1;
+  while (i >= 0 && bytes[i] === 0) i--;
+  if (i < 0 || bytes[i] !== 0x80) return null;
+  return bytes.slice(0, i);
+}
+
+/** Encrypt raw bytes (at most `size`) into a padded CRYPT2: memo whose length depends only on `size`. */
+export function encryptBytesMemo(bytes: Uint8Array, theirPublic: string, mySecret: string, size = MAX_PLAINTEXT_BYTES): string {
   if (!bytes.length) throw new Error('Message is empty');
-  if (bytes.length > MAX_PLAINTEXT_BYTES) throw new Error(`Message is longer than ${MAX_PLAINTEXT_BYTES} bytes`);
+  if (bytes.length > size) throw new Error(`Message is longer than ${size} bytes`);
   const nonce = nacl.randomBytes(24);
-  const box = nacl.box(bytes, nonce, decodeBase64(theirPublic), decodeBase64(mySecret));
-  return `${MSG_PREFIX}${encodeBase64(nonce)}:${encodeBase64(box)}`;
+  const box = nacl.box(padPlaintext(bytes, size), nonce, decodeBase64(theirPublic), decodeBase64(mySecret));
+  return `${MSG_PREFIX_V2}${encodeBase64(nonce)}:${encodeBase64(box)}`;
 }
 
-export function encryptMemo(text: string, theirPublic: string, mySecret: string): string {
+export function encryptMemo(text: string, theirPublic: string, mySecret: string, size = MAX_PLAINTEXT_BYTES): string {
   if (!text) throw new Error('Message is empty');
-  if (utf8Len(text) > MAX_PLAINTEXT_BYTES) throw new Error(`Message is longer than ${MAX_PLAINTEXT_BYTES} bytes`);
-  return encryptBytesMemo(decodeUTF8(text), theirPublic, mySecret);
+  if (utf8Len(text) > size) throw new Error(`Message is longer than ${size} bytes`);
+  return encryptBytesMemo(decodeUTF8(text), theirPublic, mySecret, size);
 }
 
-/** Decrypt a CRYPT1: or legacy GPKM1: memo to raw bytes; null if it is not readable with these keys. */
+/** Decrypt a CRYPT2: (padded), CRYPT1: or legacy GPKM1: memo to raw bytes; null if it is not readable with these keys. */
 export function decryptMemoBytes(memo: string, theirPublic: string, mySecret: string): Uint8Array | null {
   const prefix = msgPrefixOf(memo);
   if (!prefix) return null;
   const [n, c] = memo.slice(prefix.length).split(':');
   try {
-    return nacl.box.open(decodeBase64(c), decodeBase64(n), decodeBase64(theirPublic), decodeBase64(mySecret)) || null;
+    const opened = nacl.box.open(decodeBase64(c), decodeBase64(n), decodeBase64(theirPublic), decodeBase64(mySecret));
+    if (!opened) return null;
+    return prefix === MSG_PREFIX_V2 ? unpadPlaintext(opened) : opened;
   } catch { return null; }
 }
 

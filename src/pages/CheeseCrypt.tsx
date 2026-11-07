@@ -1,5 +1,9 @@
 // CHEESECrypt — encrypted on-chain messages paid in CHEESE.
 // Intentionally not linked from the header or menus: reachable at /crypt only.
+import { deliveryState } from '@/lib/cryptDelivery';
+import { useCryptLib } from '@/hooks/useCryptLib';
+import { loadVerified, setVerified, verifyState } from '@/lib/cryptSafety';
+import { SafetyNumberDialog } from '@/components/crypt/SafetyNumberDialog';
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -43,7 +47,6 @@ import { ShareKeyDialog } from '@/components/crypt/ShareKeyDialog';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { useCryptInstant } from '@/hooks/useCryptInstant';
 import { isInstantAuthFailure, isResourceShortage } from '@/lib/cryptInstant';
-import { useNavigate } from 'react-router-dom';
 import { ToastAction } from '@/components/ui/toast';
 import { CryptInstantDialog } from '@/components/crypt/CryptInstantDialog';
 import { fetchSponsorBudget, invalidateSponsorBudget, isSponsorRejection, sponsorCryptActions, sponsorRemaining, SPONSOR_PART_UNITS } from '@/lib/cryptSponsor';
@@ -109,10 +112,11 @@ const CheeseCrypt = () => {
   );
 };
 
+/** Older than this, a WAX block is long past irreversibility (finality lags ~3 minutes). */
+const DELIVERY_SETTLED_MS = 15 * 60 * 1000;
 export function Messenger({ account, session }: { account: string; session: NonNullable<ReturnType<typeof useWax>['session']> }) {
   const { toast } = useToast();
   const { executeTransaction: executeDirect } = useWaxTransaction(session);
-  const navigate = useNavigate();
   // Every CHEESECrypt transaction that fits the crypt.cheese router shape is sent through it; others stay direct.
   // Exact routed messages become a free crypt.cheese::sendfree while the live sponsor budget covers them;
   // voice batches and join requests pass `paid` and always use the paid path.
@@ -146,7 +150,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         if (isResourceShortage(message)) {
           const error = new Error('Your account is out of CPU for this message. Rent CPU with CHEESE on CHEESEUp, then press Send again.');
           toast({ title: 'Not enough CPU', description: error.message, variant: 'destructive',
-            action: <ToastAction altText="Open CHEESEUp" onClick={() => navigate('/powerup')}>⚡ CHEESEUp</ToastAction> });
+            action: <ToastAction altText="Open CHEESEUp" onClick={() => { window.location.assign(`${import.meta.env.BASE_URL.replace(/\/$/, '')}/powerup`); }}>⚡ CHEESEUp</ToastAction> });
           return { success: false, txId: null, error };
         }
         if (!isInstantAuthFailure(message)) {
@@ -164,7 +168,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
         return { ...r, error: new Error("Today's free messaging budget is used up. Press Send again to send it as a normal paid message.") };
     }
     return r;
-  }, [executeDirect, toast, navigate]);
+  }, [executeDirect, toast]);
   const instant = useCryptInstant(account, session, executeDirect);
   const instantRef = useRef(instant);
   instantRef.current = instant;
@@ -269,6 +273,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const [joinDeclines, setJoinDeclines] = useState(() => loadJoinDeclines(account));
   const [feeInfoOpen, setFeeInfoOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
+  const [verifiedKeys, setVerifiedKeys] = useState<Record<string, string>>(() => loadVerified(account));
+  useEffect(() => { setVerifiedKeys(loadVerified(account)); }, [account]);
+  const [safetyOpen, setSafetyOpen] = useState(false);
   const [listHidden, setListHidden] = useState(() => { try { return localStorage.getItem(`cheesecrypt-sidebar-collapsed-${account}`) === '1'; } catch { return false; } });
   const toggleList = () => setListHidden(v => {
     try { localStorage.setItem(`cheesecrypt-sidebar-collapsed-${account}`, v ? '0' : '1'); } catch { /* storage unavailable */ }
@@ -806,6 +813,12 @@ export function Messenger({ account, session }: { account: string; session: NonN
     ? m.group?.id === activeGroup.id && m.group.members.join(',') === activeGroup.members.join(',')
     : isDirectMessage(m, account, active);
   const thread = conversations.filter(inThread);
+  // Delivery ticks: poll the irreversible block time only while one of my recent messages is still reversible.
+  const [libSeen, setLibSeen] = useState<number | null>(null);
+  const deliveryPending = thread.some(m => m.from === account && !!m.txId && m.time >= clock - DELIVERY_SETTLED_MS && deliveryState(m.time, libSeen) === 'sent');
+  const libPolled = useCryptLib(deliveryPending);
+  useEffect(() => { if (libPolled != null) setLibSeen(p => (p == null || libPolled > p ? libPolled : p)); }, [libPolled]);
+  const libTime = libSeen;
   const threadReactions = activeReactions(reactionRows.filter(inThread), new Set(thread.map(m => targetRef(m.from, m.time))));
   const pillsByTarget = reactionPills(threadReactions, account);
   const rowForTarget = new Map(thread.map(m => [targetRef(m.from, m.time), { key: m.key, time: m.time }]));
@@ -1798,7 +1811,13 @@ export function Messenger({ account, session }: { account: string; session: NonN
         setEditingInvite={setEditingInvite} setEditingFriend={setEditingFriend} saveFriend={saveFriend} blockAccount={blockAccount}
         admins={activeModeration?.admins ?? []}
         onReportRoom={activeListing && activeListing.creator !== account ? () => setReportingRoom(activeListing) : undefined}
+        verify={active ? verifyState(verifiedKeys, active, contacts[active]) : undefined}
+        onVerify={active && contacts[active] && !activeGroup && !activeInvite ? () => setSafetyOpen(true) : undefined}
         />
+      {active && contacts[active] && !activeGroup && !activeInvite && <SafetyNumberDialog open={safetyOpen} onOpenChange={setSafetyOpen}
+        me={{ account, publicKey: key.publicKey }} partner={{ account: active, publicKey: contacts[active] }} partnerName={nameFor(active)}
+        state={verifyState(verifiedKeys, active, contacts[active])}
+        onMark={v => { setVerifiedKeys(setVerified(account, active, v ? contacts[active] : null)); if (v) setSafetyOpen(false); }} />}
 
       <div className={cn('flex flex-1 min-h-0 md:row-start-2', listHidden ? 'md:col-start-1 md:col-span-2' : 'md:col-start-2')}>
       {listHidden && <CryptAvatarRail active={active} setActive={setActive} sections={[
@@ -1861,7 +1880,7 @@ export function Messenger({ account, session }: { account: string; session: NonN
                       <span className="h-px flex-1 bg-border" />
                     </li>
                   )}
-                  <ChatMessageItem m={m} account={account} keyAvatar={key?.avatar} avatars={shownAvatars}
+                  <ChatMessageItem m={m} account={account} delivery={m.from === account && m.txId ? (m.time < clock - DELIVERY_SETTLED_MS ? 'permanent' : deliveryState(m.time, libTime)) : undefined} keyAvatar={key?.avatar} avatars={shownAvatars}
                     contacts={contacts} active={active} activeGroup={activeGroup} nameFor={nameFor}
                     highlighted={replyNavigation.highlighted.has(m.key)} reactionHighlighted={reactionNavigation.highlighted === m.key}
                     reactions={pillsByTarget.get(targetRef(m.from, m.time))}
