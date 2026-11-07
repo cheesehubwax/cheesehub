@@ -7,7 +7,7 @@
 import { decodeBase64 } from 'tweetnacl-util';
 import { parseCryptName } from '@/lib/cryptNames';
 import {
-  assembleMessages, bytesToText, buildCryptFeeActions, CRYPT_ROUTER_ACCOUNT, buildSendMessageActions, decryptMemoBytes, encryptMemo, KEY_PUBLISH_TO, MEMO_MAX_BYTES, MESSAGE_FEE_QUANTITY,
+  assembleMessages, bytesToText, buildCryptFeeActions, CRYPT_ROUTER_ACCOUNT, buildSendMessageActions, decryptMemoBytes, encryptMemo, plaintextCapacity, KEY_PUBLISH_TO, MEMO_MAX_BYTES, MESSAGE_FEE_QUANTITY,
   messageCost, msgPrefixOf, type ChainMemo, type MessagingKey,
 } from '@/lib/cheeseCrypt';
 import { encodeNotice, JOIN_NOTE_MAX, isCg2, MAX_PUBLIC_ROOM_MEMBERS, parseCg2, type Cg2Event, type RoomInviter } from '@/lib/cryptInviteGroups';
@@ -222,8 +222,15 @@ export function joinMemoKey(memo: string): string | null {
   try { return decodeBase64(fields[2]).length === 32 ? fields[2] : null; } catch { return null; }
 }
 
+/** Join notice capacity: the memo must still fit ':' + a 44-character base64 public key. */
+export const JOIN_PLAINTEXT_BYTES = plaintextCapacity(45);
+
 export function encodeJoinMemo(key: MessagingKey, roomId: string, creatorPublicKey: string, note?: string): string {
-  const memo = `${encryptMemo(encodeNotice('join', roomId, note), creatorPublicKey, key.secretKey)}:${key.publicKey}`;
+  const notice = encodeNotice('join', roomId, note);
+  // Padded to the largest size that still leaves room for ':' + the carried public key.
+  const size = JOIN_PLAINTEXT_BYTES;
+  if (new TextEncoder().encode(notice).length > size) throw new Error(`Join request note is too long — shorten it (up to ${JOIN_NOTE_MAX} plain characters; emoji take more room)`);
+  const memo = `${encryptMemo(notice, creatorPublicKey, key.secretKey, size)}:${key.publicKey}`;
   if (new TextEncoder().encode(memo).length > MEMO_MAX_BYTES) throw new Error(`Join request note is too long — shorten it (up to ${JOIN_NOTE_MAX} plain characters; emoji take more room)`);
   return memo;
 }
