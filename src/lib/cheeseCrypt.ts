@@ -50,6 +50,32 @@ export interface MessagingKey {
   created: string;
   avatar?: CryptAvatar;
   displayName?: string;
+  /** Session-only: retired key pairs still kept for reading (sealed inside the locked file, never stored plain). */
+  retired?: RetiredKey[];
+}
+/** A retired key pair. `expiresAt` null = kept until destroyed by hand. */
+export interface RetiredKey { publicKey: string; secretKey: string; retiredAt: string; expiresAt: string | null }
+
+/** Every secret this key ring can read with: the active one first, then retired ones. */
+export const keySecrets = (k: Pick<MessagingKey, 'secretKey' | 'retired'>) => [k.secretKey, ...(k.retired ?? []).map(r => r.secretKey)];
+
+/** Tries the active secret, then every retired one. */
+export function decryptMemoBytesAny(memo: string, theirPublic: string, key: Pick<MessagingKey, 'secretKey' | 'retired'>): Uint8Array | null {
+  for (const s of keySecrets(key)) {
+    const out = decryptMemoBytes(memo, theirPublic, s);
+    if (out) return out;
+  }
+  return null;
+}
+
+/**
+ * The key pair others know me by. Invite rooms pin my public key in their roster, so traffic to a room must
+ * keep using that (possibly retired) pair; anything else uses the active key.
+ */
+export function senderKey(key: MessagingKey, pinnedPublicKey?: string): MessagingKey {
+  if (!pinnedPublicKey || pinnedPublicKey === key.publicKey) return key;
+  const r = key.retired?.find(x => x.publicKey === pinnedPublicKey);
+  return r ? { ...key, publicKey: r.publicKey, secretKey: r.secretKey } : key;
 }
 export interface PublicKeyFile {
   type: 'gpk-msg-pubkey';
