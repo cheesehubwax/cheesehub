@@ -81,7 +81,7 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
           {badges.owner && <span title="Room owner" aria-label="Room owner">👑</span>}
           {badges.admin && <span title="Room admin" aria-label="Room admin">🛡️</span>}
           {badges.founder && <span title="Founding member" className="rounded border border-cheese/40 px-1 text-[9px] font-semibold text-cheese">Founder</span>}
-        </span>}{trust && <CryptTrustBadge account={m.from} className="ml-1 h-4 align-middle" />}{nameFor(m.from) !== m.from && <span className="block font-normal">{m.from}</span>}</p>
+        </span>}{trust && <CryptTrustBadge account={m.from} variant="inline" className="ml-1" />}{nameFor(m.from) !== m.from && <span className="block font-normal">{m.from}</span>}</p>
       </div>
       {hidden ? <p className="italic opacity-70">🙈 Message collapsed by a moderator{canReveal && onReveal && <> · <button type="button" className="not-italic font-semibold text-cheese underline underline-offset-2" onClick={onReveal}>Show</button></>}</p> : <>
       {m.collapsed && <p className="mb-1 text-[10px] text-muted-foreground">🙈 Collapsed by {nameFor(m.collapsed.by)} · visible to moderators</p>}

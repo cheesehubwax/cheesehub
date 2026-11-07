@@ -1,4 +1,5 @@
-import { CryptRespectMark } from './CryptRespectMark';
+import { CryptRespectArt } from './CryptRespectArt';
+import { MARK_NAME } from '@/lib/cryptTrust';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useCryptTrust } from '@/hooks/useCryptTrust';
@@ -18,7 +19,7 @@ const MARK_CLASS = {
 } as const;
 
 /** Compact Respect badge; loads public signals only once on screen. Others see only the mark and total. */
-export function CryptTrustBadge({ account, className }: { account: string; className?: string }) {
+export function CryptTrustBadge({ account, className, variant = 'stacked' }: { account: string; className?: string; variant?: 'inline' | 'stacked' }) {
   const ref = useRef<HTMLElement>(null);
   const [visible, setVisible] = useState(false);
   useEffect(() => {
@@ -31,8 +32,16 @@ export function CryptTrustBadge({ account, className }: { account: string; class
   const signals = useCryptTrust(account, visible);
   const self = useContext(CryptTrustContext) === account;
   const score = useMemo(() => signals ? scoreTrust(signals) : null, [signals]);
-  const cls = cn('inline-flex h-5 shrink-0 items-center gap-1 rounded-full border px-1.5 text-[10px] font-normal', score ? MARK_CLASS[score.mark] : 'border-border text-muted-foreground', className);
-  const text = score ? <><CryptRespectMark mark={score.mark} /> {score.total}{score.partial && '*'}</> : '… Respect';
+  const tone = score ? MARK_CLASS[score.mark] : 'border-border text-muted-foreground';
+  const pts = score ? <span className="font-mono">{score.total}{score.partial && '*'}</span> : '…';
+  const cls = variant === 'inline'
+    ? cn('inline-flex shrink-0 items-center gap-0.5 align-middle text-[10px] font-semibold', tone.split(' ').filter(t => t.startsWith('text-')).join(' '), className)
+    : cn('inline-flex w-[4.75rem] shrink-0 flex-col items-center gap-0.5 rounded-lg border bg-card/60 px-1 py-1 text-center leading-none font-normal', tone, className);
+  const text = variant === 'inline'
+    ? <>{score ? <CryptRespectArt mark={score.mark} size={20} /> : <span className="inline-block h-5 w-5 rounded-full border border-border" />}{pts}</>
+    : <>{score ? <CryptRespectArt mark={score.mark} size={32} /> : <span className="inline-block h-8 w-8 rounded-full border border-border" />}
+      <span className="text-[9px] font-semibold uppercase tracking-wide">{score ? MARK_NAME[score.mark] : 'Respect'}</span>
+      <span className="text-[9px] text-muted-foreground">{pts} pts</span></>;
   if (!self) return <span ref={ref as React.RefObject<HTMLSpanElement>} className={cls} aria-label={`Respect for ${account}`}
     title={score?.partial ? 'Some public signals could not be read' : 'Respect: based on public blockchain data only'}>{text}</span>;
   return <Popover>
