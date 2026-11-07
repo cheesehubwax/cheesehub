@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { generateKey, decryptMemo, messageCost, MSG_PREFIX } from '@/lib/cheeseCrypt';
+import { generateKey, decryptMemo, messageCost, MSG_PREFIX_V2 } from '@/lib/cheeseCrypt';
 import { buildGroupMessageActions, createGroup, decodeConversations, groupMessageCost, groupMessageSize, parseGroup } from '@/lib/cryptGroups';
 
 const alice = generateKey('alice'), bob = generateKey('bob'), carol = generateKey('carol'), eve = generateKey('eve');
 const group = createGroup('alice', ['bob', 'carol']);
 const contacts = { bob: bob.publicKey, carol: carol.publicKey };
-const history = (text: string) => buildGroupMessageActions(alice, group, text, contacts, []).filter(a => a.data.memo.startsWith(MSG_PREFIX)).map(a => ({
+const history = (text: string) => buildGroupMessageActions(alice, group, text, contacts, []).filter(a => a.data.memo.startsWith(MSG_PREFIX_V2)).map(a => ({
   txId: 'tx', time: 1, ...a.data,
 }));
 
