@@ -6,8 +6,9 @@ import { toast } from 'sonner';
 import { fetchWithFallback } from '@/lib/fetchWithFallback';
 import { cn } from '@/lib/utils';
 import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
+import { STATIC_ENDPOINTS } from '@/lib/endpointHealth';
 
-const WAX_ENDPOINTS = ['https://wax.eosusa.io', 'https://api.wax.alohaeos.com', 'https://wax.cryptolions.io'];
+const WAX_ENDPOINTS = STATIC_ENDPOINTS['chain-api'];
 
 interface VoteRewardsManagerProps {
   onTransactionComplete?: () => void;
@@ -75,13 +76,13 @@ export function VoteRewardsManager({ onTransactionComplete, onTransactionSuccess
       // Fetch voter info and global state in parallel
       const [voterResponse, globalResponse] = await Promise.all([
         fetchWithFallback(WAX_ENDPOINTS, '/v1/chain/get_table_rows', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
           body: JSON.stringify({ code: 'eosio', scope: 'eosio', table: 'voters', lower_bound: accountName, upper_bound: accountName, limit: 1, json: true }),
-        }),
+        }, 3_500),
         fetchWithFallback(WAX_ENDPOINTS, '/v1/chain/get_table_rows', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
           body: JSON.stringify({ code: 'eosio', scope: 'eosio', table: 'global', limit: 1, json: true }),
-        }),
+        }, 3_500),
       ]);
 
       const [voterData, globalData] = await Promise.all([

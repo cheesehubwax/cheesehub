@@ -1,16 +1,12 @@
+import { STATIC_ENDPOINTS } from './endpointHealth';
+
 // WAX Mainnet Configuration
 export const WAX_CHAIN = {
   id: '1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4',
   url: 'https://wax.greymass.com',
   // Fallback RPC order. Live ordering comes from src/lib/endpointHealth.ts;
   // this list is only used before/without a health read.
-  rpcUrls: [
-    'https://wax.eosusa.io',
-    'https://api.waxsweden.org',
-    'https://wax.greymass.com',
-    'https://api.wax.alohaeos.com',
-    'https://wax.eosphere.io',
-  ],
+  rpcUrls: STATIC_ENDPOINTS['chain-api'],
 };
 
 // Your CHEESE project configuration

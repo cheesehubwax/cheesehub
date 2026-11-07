@@ -4,6 +4,8 @@ import { WalletPluginAnchor } from '@wharfkit/wallet-plugin-anchor';
 import { WalletPluginCloudWallet } from '@wharfkit/wallet-plugin-cloudwallet';
 import { TransactPluginResourceProvider } from '@wharfkit/transact-plugin-resource-provider';
 import { patchAnchorForLockSigning } from './anchorLockSigning';
+import { cachedEndpoints } from './endpointHealth';
+import { walletRpcFetch } from './walletRpcFetch';
 
 // Initialize the WebRenderer for wallet selection UI
 const webRenderer = new WebRenderer();
@@ -14,8 +16,8 @@ export const WAX_CHAIN_ID = '1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d1
 // Define WAX mainnet with a more reliable primary RPC endpoint
 const waxChain = ChainDefinition.from({
   id: WAX_CHAIN_ID,
-  url: 'https://wax.eosusa.io',
-});
+  url: cachedEndpoints('chain-api')[0],
+}, { fetch: walletRpcFetch });
 
 // Create SessionKit WITHOUT Fuel resource provider by default
 // Fuel only works with Anchor wallet - Cloud Wallet doesn't support the co-signing flow
