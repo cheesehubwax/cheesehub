@@ -85,7 +85,10 @@ import { CryptComposer } from '@/components/crypt/CryptComposer';
 import { DiscoverRoomsDialog, JoinRequests, RoomSettingsDialog } from '@/components/crypt/PublicRooms';
 import { ReportRoomDialog } from '@/components/crypt/ReportRoomDialog';
 import { buildReportAction, type ReportReason } from '@/lib/cryptRoomReports';
-import { fetchRoomMemos } from '@/lib/cheeseCrypt';
+import { fetchRoomMemos, forgetSessionKey } from '@/lib/cheeseCrypt';
+import { forgetInstantKey } from '@/lib/cryptInstant';
+import { loadIdleMinutes, loadShield, saveIdleMinutes, saveShield, type IdleMinutes } from '@/lib/cryptPanicLock';
+import { useCryptAutoLock } from '@/hooks/useCryptAutoLock';
 import {
   JOIN_REQUEST_COST, LISTING_FEE_QUANTITY, ROOM_FEE_QUANTITY, buildJoinRequestActions, buildRoomActions, collectJoinRequests, collectListings, decodeRoomEvents, declineJoin, removeRoomRequest, roomRequestOutcomes, roomRequestNotes, encodeListing, encodeUnlist, listedRoomIds, loadJoinDeclines,
   loadLocalListings, loadRoomInfo, loadRoomRequests, ROOM_PREFIX, saveLocalListing, saveRoomInfo, saveRoomRequest, type JoinRequest, type RoomListing,
@@ -97,6 +100,7 @@ const LIVE_POLL_MS = 6000;
 
 const CheeseCrypt = () => {
   const { accountName, isConnected, login, session } = useWax();
+  const [lockNonce, setLockNonce] = useState(0);
 
   return (
     <Layout>
@@ -109,7 +113,7 @@ const CheeseCrypt = () => {
             <Button onClick={login} className="bg-cheese text-primary-foreground hover:bg-cheese/90">Connect wallet</Button>
           </div>
         ) : (
-          <Messenger key={accountName} account={accountName} session={session} />
+          <Messenger key={`${accountName}:${lockNonce}`} account={accountName} session={session} onLocked={() => setLockNonce(n => n + 1)} />
         )}
       </div>
     </Layout>
@@ -118,8 +122,19 @@ const CheeseCrypt = () => {
 
 /** Older than this, a WAX block is long past irreversibility (finality lags ~3 minutes). */
 const DELIVERY_SETTLED_MS = 15 * 60 * 1000;
-export function Messenger({ account, session }: { account: string; session: NonNullable<ReturnType<typeof useWax>['session']> }) {
+export function Messenger({ account, session, onLocked }: { account: string; session: NonNullable<ReturnType<typeof useWax>['session']>; onLocked?: () => void }) {
   const { toast } = useToast();
+  const [idleMinutes, setIdleMinutesState] = useState<IdleMinutes>(loadIdleMinutes);
+  const setIdleMinutes = useCallback((m: IdleMinutes) => { saveIdleMinutes(m); setIdleMinutesState(m); }, []);
+  const [shieldOn, setShieldOnState] = useState(loadShield);
+  const setShieldOn = useCallback((on: boolean) => { saveShield(on); setShieldOnState(on); }, []);
+  /** Panic lock: forget the unlocked key and this tab's instant key, then remount to discard all decrypted state. */
+  const panicLock = useCallback(() => {
+    forgetSessionKey(account);
+    forgetInstantKey(account);
+    toast({ title: '🔒 Locked', description: 'Unlock with Anchor to continue.' });
+    onLocked?.();
+  }, [account, onLocked, toast]);
   const { executeTransaction: executeDirect } = useWaxTransaction(session);
   // Every CHEESECrypt transaction that fits the crypt.cheese router shape is sent through it; others stay direct.
   // Exact routed messages become a free crypt.cheese::sendfree while the live sponsor budget covers them;
@@ -199,6 +214,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
   const keyLocked = !!lockedFile && !!candidateKey && lockedFile.account === account && lockedFile.publicKey === candidateKey.publicKey && isVerifiedKey(candidateKey);
   const canLock = isAnchorSession(session) && String(session.actor) === account;
   const key = keyLocked && canLock ? candidateKey : null;
+  const away = useCryptAutoLock(!!key, idleMinutes, panicLock);
+  const shielded = shieldOn && away;
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const currentSession = useRef(session);
@@ -1657,7 +1674,8 @@ export function Messenger({ account, session }: { account: string; session: NonN
 
 
   return (
-    <div className="w-full rounded-lg border border-cheese/20 bg-card/80 overflow-hidden flex flex-col md:grid h-[80dvh] min-h-[480px] md:grid-cols-[240px_1fr] md:grid-rows-[auto_1fr]">
+    <div className={cn('w-full rounded-lg border border-cheese/20 bg-card/80 overflow-hidden flex flex-col md:grid h-[80dvh] min-h-[480px] md:grid-cols-[240px_1fr] md:grid-rows-[auto_1fr]', shielded && 'blur-xl select-none pointer-events-none')}
+      aria-hidden={shielded || undefined}>
       {fileInput}
       <Dialog open={!!pendingTip} onOpenChange={o => { if (!o) setPendingTip(null); }}>
         <DialogContent className="sm:max-w-md">
@@ -1987,7 +2005,9 @@ export function Messenger({ account, session }: { account: string; session: NonN
                 editing={!!editingMessage} cancelEdit={cancelEdit} editExpired={!!editingMessage && !canEdit(editingMessage, account, clock)}
                 instantSlot={<>
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setPrivacyOpen(true)} title="Network privacy settings">🛡️ Privacy</Button>
-                  <CryptPrivacyDialog open={privacyOpen} onOpenChange={setPrivacyOpen} mode={privacyMode} setMode={setPrivacyMode} loadFullHistory={loadFullHistory} />
+                  <CryptPrivacyDialog open={privacyOpen} onOpenChange={setPrivacyOpen} mode={privacyMode} setMode={setPrivacyMode} loadFullHistory={loadFullHistory}
+                    idleMinutes={idleMinutes} setIdleMinutes={setIdleMinutes} shieldOn={shieldOn} setShieldOn={setShieldOn} />
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={panicLock} title="Lock now: clear the screen (Esc Esc or Ctrl/Cmd+Shift+L)">🔒 Lock now</Button>
                   {lockedFile && <>
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setMoveOpen(true)} title="Move your key and friends to another device by QR code">📲 Move device</Button>
                   <DeviceTransferSendDialog open={moveOpen} onOpenChange={setMoveOpen} account={account} lockedKey={lockedFile} />

@@ -64,6 +64,8 @@ const keyStore = (a: string) => `cheesecrypt-key-${a}`;
 // Unsealed keys are session-only. Old browser copies remain readable for explicit migration.
 const sessionKeys = new Map<string, MessagingKey>();
 export const clearSessionKeys = () => sessionKeys.clear();
+/** Panic lock: drops the unlocked key from memory (the wallet-locked envelope stays for re-unlock). */
+export const forgetSessionKey = (account: string) => { sessionKeys.delete(account); };
 const contactStore = (a: string) => `cheesecrypt-contacts-${a}`;
 
 export function generateKey(account: string, profile: { avatar?: CryptAvatar; displayName?: string } = {}): MessagingKey {
