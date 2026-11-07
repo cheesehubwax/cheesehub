@@ -224,6 +224,8 @@ export async function sealKey(sign: (publicKey: string) => Promise<string>, key:
   if (first !== second) throw new Error("Your wallet gave two different signatures, so it can't lock keys. Nothing was locked.");
   const file = toLockedFile(key, await lockSecret(key.secretKey, first));
   if ((await unlockSecret(file.lock, second, file.publicKey)) !== key.secretKey) throw new Error('Lock check failed. Nothing was locked.');
+  const reopened = file.retired ? openRetired(file.retired, key.secretKey) : [];
+  if (reopened.length !== (key.retired?.length ?? 0) || reopened.some((r, i) => r.secretKey !== key.retired![i].secretKey)) throw new Error('Lock check failed. Nothing was locked.');
   verifiedKeys.set(account, { publicKey: key.publicKey, secretKey: key.secretKey });
   return file;
 }
