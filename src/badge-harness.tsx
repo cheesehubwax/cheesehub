@@ -2,6 +2,7 @@ import './index.css';
 import { createRoot } from 'react-dom/client';
 import { CryptTrustBadge, CryptTrustContext } from '@/components/crypt/CryptTrustBadge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 
 /** Temporary harness: own Respect badge inside a Members-style dropdown, plus standalone. */
 function App() {
@@ -17,6 +18,17 @@ function App() {
         </PopoverContent>
       </Popover>
       <div id="standalone"><CryptTrustBadge account="alice" variant="inline" /></div>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <li id="msg-row" className="w-fit max-w-[80%] list-none rounded-lg border px-3 py-2 text-sm">
+            <div className="mb-1 flex items-center gap-2">
+              <p className="text-[10px] font-semibold opacity-80">you · alice<CryptTrustBadge account="alice" variant="inline" className="ml-1" /></p>
+            </div>
+            <div>hello room</div>
+          </li>
+        </ContextMenuTrigger>
+        <ContextMenuContent><ContextMenuItem>Reply</ContextMenuItem></ContextMenuContent>
+      </ContextMenu>
     </div>
   </CryptTrustContext.Provider>;
 }
