@@ -43,7 +43,6 @@ import { ShareKeyDialog } from '@/components/crypt/ShareKeyDialog';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { useCryptInstant } from '@/hooks/useCryptInstant';
 import { isInstantAuthFailure, isResourceShortage } from '@/lib/cryptInstant';
-import { useNavigate } from 'react-router-dom';
 import { ToastAction } from '@/components/ui/toast';
 import { CryptInstantDialog } from '@/components/crypt/CryptInstantDialog';
 import { fetchSponsorBudget, invalidateSponsorBudget, isSponsorRejection, sponsorCryptActions, sponsorRemaining, SPONSOR_PART_UNITS } from '@/lib/cryptSponsor';
