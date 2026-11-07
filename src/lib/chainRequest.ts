@@ -104,12 +104,12 @@ async function attempt<T>(
   } catch (error) {
     // Timeout, network failure or CORS rejection: bench it hard.
     benchEndpoint(host, BENCH_MS.network);
-    throw error;
-  } finally {
     clearTimeout(timer);
+    throw error;
   }
 
-  if (!response.ok) {
+  try {
+    if (!response.ok) {
     const mapped = options.onStatus?.(response.status);
     if (mapped) {
       clearBench(host);
@@ -122,9 +122,15 @@ async function attempt<T>(
     throw new HttpStatusError(response.status, host);
   }
 
-  const data = (await response.json()) as T;
-  clearBench(host);
-  return { data, host };
+    const data = (await response.json()) as T;
+    clearBench(host);
+    return { data, host };
+  } catch (error) {
+    if (!(error instanceof HttpStatusError)) benchEndpoint(host, BENCH_MS.network);
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**

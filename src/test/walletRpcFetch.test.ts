@@ -87,4 +87,16 @@ describe('wallet RPC resilience', () => {
     await expect(createWalletRpcFetch(native)(`${oldUrl}/v1/chain/get_info`, { signal: controller.signal })).rejects.toBeDefined();
     expect(native).not.toHaveBeenCalled();
   });
+
+  it('does not retry a nodeos contract error returned with HTTP 500', async () => {
+    const native = vi.fn().mockResolvedValue(new Response('{"error":{"details":[{"message":"invalid account"}]}}', { status: 500 }));
+    expect((await createWalletRpcFetch(native)(`${oldUrl}/v1/chain/get_account`)).status).toBe(500);
+    expect(native).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails over malformed successful read responses', async () => {
+    const native = vi.fn().mockResolvedValueOnce(new Response('<html>gateway</html>')).mockResolvedValueOnce(new Response('{"ok":true}'));
+    expect(await (await createWalletRpcFetch(native)(`${oldUrl}/v1/chain/get_info`)).json()).toEqual({ ok: true });
+    expect(native).toHaveBeenCalledTimes(2);
+  });
 });
