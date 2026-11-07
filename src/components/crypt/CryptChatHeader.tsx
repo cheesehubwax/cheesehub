@@ -35,12 +35,16 @@ export function CryptChatHeader({
     <li key={member} className="flex items-center gap-2 min-w-0">
       <PixelAvatar account={member} avatar={member === account ? keyAvatar : avatars[member]} className="h-9 w-9 shrink-0" />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-xs font-semibold">{nameFor(member)}{member === account && ' (you)'}</span>
-        <span className="block truncate font-mono text-[10px] text-muted-foreground">{member}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="min-w-0 truncate text-xs font-semibold" title={nameFor(member)}>{nameFor(member)}{member === account && ' (you)'}</span>
+          <CryptTrustBadge account={member} variant="inline" />
+        </span>
+        <span className="flex min-w-0 items-center gap-1.5 text-[10px]">
+          <span className="min-w-0 truncate font-mono text-muted-foreground" title={member}>{member}</span>
+          {status && <span className={cn('shrink-0', status.endsWith('joined') ? 'text-cheese' : 'text-muted-foreground')}>{status}</span>}
+        </span>
       </span>
-      <CryptTrustBadge account={member} variant="inline" />
-      {status && <span className={cn('shrink-0 text-[10px]', status.endsWith('joined') ? 'text-cheese' : 'text-muted-foreground')}>{status}</span>}
-      {action}
+      {action && <span className="shrink-0">{action}</span>}
     </li>
   );
   const membersDropdown = (members: string[], status?: (member: string) => string | undefined, action?: (member: string) => ReactNode) => (
@@ -50,7 +54,7 @@ export function CryptChatHeader({
           👥 Members ({members.length}) <ChevronDown className={cn('h-3 w-3 transition', !membersOpen && '-rotate-90')} />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="crypt-members-pop w-72 p-2">
+      <PopoverContent align="start" className="crypt-members-pop w-80 max-w-[calc(100vw-2rem)] p-2">
         <ul className="max-h-60 space-y-1 overflow-y-auto">{members.map(member => memberLine(member, status?.(member), action?.(member)))}</ul>
       </PopoverContent>
     </Popover>
