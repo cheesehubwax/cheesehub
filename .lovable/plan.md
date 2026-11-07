@@ -1,37 +1,38 @@
-# Harden the Panic Lock (no PIN)
+# CHEESECrypt Key Rotation (with optional crypto-shredding)
 
-Today "Lock now" / Esc Esc / Ctrl+Shift+L / idle auto-lock forget the unlocked key and redraw the messenger, but leave the "Unlock saved key with Anchor" button one tap away. Three optional extras will be added, each a separate switch in the Privacy dialog's "Screen shield & panic lock" section. All default to off, so nothing changes until the user turns them on.
+## Honest privacy summary
+Rotation only improves privacy when old keys are eventually destroyed. Messages are always decrypted live from the chain, so whoever holds an old key (a stolen device, an old backup file) can read everything that key ever received. Destroying a retired key makes those old messages permanent gibberish for everyone, including you. That is the real gain, and it is also the real cost.
 
-## 1. Stealth redirect
-- When on, locking jumps straight to the CHEESEHub home page (replacing the history entry, so Back doesn't land on a ready-to-unlock Crypt screen).
-- Toast becomes neutral (no "Locked / Unlock with Anchor" wording) so the screen gives nothing away.
+Legal note: this is standard key hygiene with no custody, mixing or anonymity changes. One limit to state plainly in the app: destroying a key only covers copies the app controls. Backup files you downloaded earlier still hold the old key until you delete them.
 
-## 2. Disconnect wallet on lock
-- When on, locking also signs the WAX wallet out of CHEESEHub, so unlocking needs a fresh Anchor sign-in plus approval.
-- Note shown beside the switch: this signs you out of the whole site, not just Crypt.
+## What the user sees
+- **Privacy dialog → "🔄 Key rotation" card** shows key age ("Your key is 112 days old"), a **Rotate key** button and a **"Keep old keys for"** setting: Destroy now / 7 days / 30 days (default) / 90 days / Forever.
+- **Banner after 90 days**: "Your key is over 90 days old. Rotate it?" with Rotate and Remind me later (30 days).
+- **Rotation confirm** lists the exact CHEESE cost (publishing the key plus one notice per friend and room), the chats that will go unreadable when the old key is destroyed, and a "Download new backup" step that has to finish before the paid step.
+- **Retired keys list**: the date each one expires, plus "Destroy now" (with a confirmation).
+- Friends and groups stay. Your Respect key-age points still count from your first key, so early users keep their reward.
 
-## 3. Cold lock (forget saved key on this device)
-- When on, locking also deletes this device's saved, Anchor-locked key copy and forgets the remembered key/vault folder, so the screen falls back to the first-time "load your key file" setup. Nothing is visible to a snooper beyond that.
-- Friends, nicknames, avatars and settings stay; only the locked key copy goes.
-- Safety: the switch can only be turned on after a warning confirmation: "You will need your key backup file (or QR transfer) to get back in. Without it, your messages can't be read." Shown again in the switch's help text.
-- Nothing on-chain changes; the published key and message history are untouched.
+## How it works
+1. **Key ring.** The locked key file holds the active key plus retired keys, each with a retirement and expiry date, all still sealed by Anchor. Decryption tries the active key, then any unexpired retired keys.
+2. **Rotation transaction** (one Anchor approval, fees through crypt.cheese, never sponsored):
+   - publish the new public key on chain (the existing Publish key fee);
+   - send each friend a **rotate notice** encrypted with the OLD key that carries the new public key. Only the real holder of the old key could have written it, so friends can trust it.
+3. **Friends receiving a notice** switch to your new key for future messages. They keep your old public key so they can still read past chats with you. A plain on-chain key change with no matching notice still uses today's behaviour.
+4. **Rooms (invite groups)** pin each member's key in the roster. The rotating member sends the owner an authenticated rotate notice. The owner's app then sends a CG2 **rekey** control that swaps just that one key, checked against chain order and the roster digest. Founder protection, bans and mutes carry over by account. Until the owner applies it, your old key stays alive for that room, and it shows as "Waiting for owner".
+5. **Legacy 2–5 person groups** have fixed rosters and can't update a key. The confirm screen warns that new messages in them will stop working once the old key is destroyed.
+6. **Shredding.** When a retired key expires, the app deletes it from the ring, reseals the vault and refreshes verified matching backups. It also says clearly which older chats can no longer be read.
 
-## Order of a lock
-```text
-forget unlocked key + instant key
--> (cold lock) delete saved locked key + remembered folder
--> (disconnect) wallet sign-out
--> (stealth) go to home page, neutral toast
-   else: redraw Crypt locked screen (current behaviour)
-```
-Each step runs even if a later one fails; sign-out errors are swallowed so the lock never stalls.
+## Out of scope
+- Automatic rotation without the user's approval (every rotation needs a paid signature).
+- Any change to the router contract (notices reuse the existing payment+sendmsg shapes).
 
 ## Technical details
-- `src/lib/cryptPanicLock.ts`: add `loadLockOptions/saveLockOptions` (`{ stealth, disconnect, cold }`, device-local, defaults false) plus a pure `lockSteps(options)` helper returning the ordered step list.
-- `src/pages/CheeseCrypt.tsx`: `panicLock` in `Messenger` reads options; cold uses `clearLockedEnvelope(account)` from `cryptKeyLock.ts` and the existing remembered-handle forget helper; disconnect calls `useWax().logout()`; stealth uses `navigate('/', { replace: true })`.
-- `src/components/crypt/CryptPrivacyDialog.tsx`: three switches with help text; cold lock switch gated by `CryptConfirmDialog`.
-- `CryptAbout.tsx` and `mem://features/crypt-panic-lock` updated.
-- Tests in `src/test/`: option load/save defaults, `lockSteps` ordering for each combination, cold lock removes the envelope but keeps contacts.
-
-## Liability note
-All local-device only; no new data stored or sent anywhere, so no new legal exposure. The main risk is user lockout from cold lock, handled by the confirmation warning.
+- `src/lib/cryptKeyRing.ts` (new, pure): ring type, `activeKey`, `decryptCandidates`, `expireRetired(now, retention)`, retention settings (load/save, default 30d), `keyAgeDays`, `shouldNudge(now, created, snoozedUntil)` at 90 days.
+- `cryptKeyLock.ts`: v2 file gains an optional `retired: [{publicKey, lock, retiredAt, expiresAt}]`. Older files still parse the same way and the signed bytes don't change.
+- `cheeseCrypt.ts`: `buildRotateActions` = publish + one notice per recipient, routed through `routeCryptActions` in the exact router shapes. New authenticated `CP1` rotate payload `{k: newPub, t: time}`.
+- Decrypt paths (`cryptGroups.ts`, `cryptRooms.ts`, `cryptPublicInbox.ts`, the DM path) loop over every candidate secret × every known public key for the partner (current plus the history stored per contact).
+- Contacts gain `previousKeys[account]: string[]`. Lookups of the newest published key stay the same.
+- `cryptInviteGroups.ts`: CG2 `rekey` control (owner/admin authority checked against send-time role), roster digest re-derived; the first-public roster rule kept by account, with only the key swapped through an authenticated rekey chain.
+- UI: `CryptKeyRotationCard.tsx`, `CryptRotateDialog.tsx` and `CryptKeyAgeBanner.tsx`, one component per file. State lives in Messenger.
+- Tests: retention expiry maths, the 90-day nudge, the old-key-authenticated notice being accepted and a forged one rejected, decrypting through retired keys, rekey authority and digest, and ring files round-tripping without breaking older files.
+- Update AGENTS.md (one rule for the key ring and rotation authority), APP_SYNC.md and the memory notes on fees and key rotation.
