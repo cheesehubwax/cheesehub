@@ -145,21 +145,34 @@ export function parseLockedKeyFile(raw: unknown): LockedKeyFile | null {
   const l = o.lock as Record<string, unknown> | null;
   if (!l || l.scheme !== LOCK_SCHEME || !b64Len(l.salt, 16) || !b64Len(l.nonce, nacl.secretbox.nonceLength) || typeof l.ciphertext !== 'string' || !b64Len(l.ciphertext, 32 + nacl.secretbox.overheadLength)) return null;
   const avatar = parseAvatar(o.avatar), displayName = parseCryptName(o.displayName);
+  const retired = parseSealedRetired(o.retired);
+  if (!retired || retired.some(r => r.publicKey === o.publicKey)) return null;
   return {
     type: 'gpk-msg-key', version: 2, account: o.account, publicKey: o.publicKey as string,
     lock: { scheme: LOCK_SCHEME, salt: l.salt as string, nonce: l.nonce as string, ciphertext: l.ciphertext },
     created: typeof o.created === 'string' ? o.created : '',
     ...(avatar ? { avatar } : {}), ...(displayName ? { displayName } : {}),
+    ...(retired.length ? { retired } : {}),
   };
 }
 
 export function toLockedFile(k: MessagingKey, lock: KeyLock): LockedKeyFile {
   const displayName = parseCryptName(k.displayName);
-  return { type: 'gpk-msg-key', version: 2, account: k.account, publicKey: k.publicKey, lock, created: k.created, ...(k.avatar ? { avatar: k.avatar } : {}), ...(displayName ? { displayName } : {}) };
+  const retired = k.retired?.length ? sealRetired(k.retired, k.secretKey) : [];
+  return { type: 'gpk-msg-key', version: 2, account: k.account, publicKey: k.publicKey, lock, created: k.created, ...(k.avatar ? { avatar: k.avatar } : {}), ...(displayName ? { displayName } : {}), ...(retired.length ? { retired } : {}) };
 }
 
 export function fromLockedFile(f: LockedKeyFile, secretKey: string): MessagingKey {
-  return { type: 'gpk-msg-key', version: 1, account: f.account, publicKey: f.publicKey, secretKey, created: f.created, avatar: f.avatar, displayName: f.displayName };
+  const retired = f.retired?.length ? openRetired(f.retired, secretKey) : [];
+  return { type: 'gpk-msg-key', version: 1, account: f.account, publicKey: f.publicKey, secretKey, created: f.created, avatar: f.avatar, displayName: f.displayName, ...(retired.length ? { retired } : {}) };
+}
+
+/** Re-seals the retired list of an unlocked key onto its locked file (no signature needed; the Anchor seal is unchanged). */
+export function withRetired(f: LockedKeyFile, k: MessagingKey): LockedKeyFile {
+  if (f.account !== k.account || f.publicKey !== k.publicKey) throw new Error('Locked file does not match this key');
+  const { retired: _r, ...rest } = f;
+  const retired = k.retired?.length ? sealRetired(k.retired, k.secretKey) : [];
+  return { ...rest, ...(retired.length ? { retired } : {}) };
 }
 
 /** Copies the current (unsealed) profile fields onto a locked envelope; the sealed secret never changes. */
