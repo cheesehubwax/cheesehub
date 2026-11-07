@@ -80,9 +80,9 @@ export function keyAgePoints(ageMs: number): number {
 
 export function markFor(total: number, newAccount: boolean): TrustMark {
   if (newAccount || total < 10) return 'warning';
-  if (total < 30) return 'low';
-  if (total < 60) return 'moderate';
-  if (total < 90) return 'good';
+  if (total < 40) return 'low';
+  if (total < 100) return 'moderate';
+  if (total < 150) return 'good';
   return 'strong';
 }
 
