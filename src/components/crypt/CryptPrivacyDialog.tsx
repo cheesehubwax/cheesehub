@@ -74,8 +74,9 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
               Blur messages when I switch tabs or minimise
             </label>
           </section>
-          <section className="space-y-2">
+          <section className="space-y-2 rounded-md border border-border p-3">
             <h3 className="font-semibold text-foreground">Your own history server (optional)</h3>
+            <p className="text-xs">The settings above save as soon as you tap them. The button below is only for this server box.</p>
             <p>If you run your own WAX Hyperion server, or reach one through your own VPN or Tor setup, enter it here. It is stored only in this browser; nothing goes through CHEESEHub.</p>
             <Input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://my-node.example.com" aria-label="Custom history server" />
             <label className="flex items-center gap-2">
@@ -83,12 +84,15 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
               Use only this server (no public servers if it fails)
             </label>
             <div className="flex gap-2">
-              <Button size="sm" onClick={() => void save()} disabled={busy || !url.trim()}>{busy ? 'Testing…' : 'Test & save'}</Button>
+              <Button size="sm" onClick={() => void save()} disabled={busy || !url.trim()}>{busy ? 'Testing…' : 'Test & connect server'}</Button>
               {saved && <Button size="sm" variant="outline" onClick={clear} disabled={busy}>Remove</Button>}
             </div>
             {note && <p role="status" className="text-foreground">{note}</p>}
           </section>
           <p className="text-xs">Servers still see your internet address. A VPN or Tor hides it. Sending, looking up a friend's key, and the public record of who messaged whom still show your account.</p>
+          <div className="flex justify-end">
+            <Button onClick={() => onOpenChange(false)} disabled={busy}>Done</Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
