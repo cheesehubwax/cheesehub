@@ -15,6 +15,7 @@ import { CryptAvatar, parseAvatar } from '@/lib/cryptAvatar';
 import { decodeBase64, encodeBase64, decodeUTF8, encodeUTF8 } from 'tweetnacl-util';
 import { benchEndpoint, normalizeEndpoint } from '@/lib/endpointHealth';
 import { cryptHistoryEndpoints } from '@/lib/cryptNetworkPrivacy';
+import { TIP_MEMO } from '@/lib/cryptTips';
 
 export const MSG_PREFIX = 'CRYPT1:';
 /** Padded messages: plaintext is ISO/IEC 7816-4 padded (0x80 then zeros) so every memo has the same length. */
@@ -424,7 +425,9 @@ export const CRYPT_PAYFEE_LIVE = true;
  * untouched; the router never gets a content-type parameter.
  * Only exact shapes convert: every action a CHEESE transfer from one sender; messaging fees (FEE_MEMO)
  * exactly 0.0100 per part, 80/20, only with copies; every recipient the same `parts` copies of 0.0001;
- * every other fee memo an exact 80/20 pair. Anything else is returned unchanged (direct path).
+ * every other fee memo an exact 80/20 pair. One sender-authorized fixed-memo tip may accompany
+ * message copies; that transfer stays direct and is never included in the router payment.
+ * Anything else is returned unchanged (direct path).
  */
 export function routeCryptActions<T>(actions: T[], opts: { payfee?: boolean } = {}): T[] | Record<string, unknown>[] {
   const payfee = opts.payfee ?? CRYPT_PAYFEE_LIVE;
@@ -434,11 +437,18 @@ export function routeCryptActions<T>(actions: T[], opts: { payfee?: boolean } = 
   if (!list.every(a => a?.account === 'cheeseburger' && a.name === 'transfer' && a.data && a.data.from === first.data.from
     && JSON.stringify(a.authorization) === JSON.stringify(first.authorization))) return actions;
   const sender = first.data.from;
+  const tips: TransferAction[] = [];
   const copies: { to: string; memo: string }[] = [];
   const fees = new Map<string, { nulled: number; liquidity: number }>();
   for (const a of list) {
     const { to, quantity, memo } = a.data;
-    if (to === KEY_PUBLISH_TO || to === LIQUIDITY_FEE_TO) {
+    if (memo === TIP_MEMO) {
+      const q = /^\d+\.\d{4} CHEESE$/.test(quantity) ? units(quantity) : NaN;
+      if (tips.length || !Number.isSafeInteger(q) || q <= 0 || q > 10_000_000_000_000
+        || !/^[a-z1-5.]{1,12}$/.test(to) || to === CRYPT_ROUTER_ACCOUNT || to === sender
+        || !Array.isArray(a.authorization) || !a.authorization.some(x => x?.actor === sender)) return actions;
+      tips.push(a);
+    } else if (to === KEY_PUBLISH_TO || to === LIQUIDITY_FEE_TO) {
       const q = /^\d+\.\d{4} CHEESE$/.test(quantity) ? units(quantity) : NaN;
       if (!Number.isSafeInteger(q) || q <= 0 || !memo || new TextEncoder().encode(memo).length > MEMO_MAX_BYTES) return actions;
       const f = fees.get(memo) ?? { nulled: 0, liquidity: 0 };
@@ -456,6 +466,7 @@ export function routeCryptActions<T>(actions: T[], opts: { payfee?: boolean } = 
   if (standalone.length && !payfee) return actions;
   if (standalone.some(f => f.fee % 5 !== 0 || f.nulled * 5 !== f.fee * 4)) return actions;
   if (!copies.length && !standalone.length) return actions;
+  if (tips.length && !copies.length) return actions;
   let parts = 0;
   const msgFee = messaging ? messaging.nulled + messaging.liquidity : 0;
   if (copies.length) {
@@ -468,6 +479,7 @@ export function routeCryptActions<T>(actions: T[], opts: { payfee?: boolean } = 
   const total = standalone.reduce((n, f) => n + f.fee, 0) + msgFee + copies.length * units(MESSAGE_RECIPIENT_QUANTITY);
   const cheese = (u: number) => `${(u / 10000).toFixed(4)} CHEESE`;
   return [
+    ...tips,
     { account: 'cheeseburger', name: 'transfer', authorization: first.authorization, data: { from: sender, to: CRYPT_ROUTER_ACCOUNT, quantity: cheese(total), memo: FEE_MEMO } },
     // payfee runs first and leaves the rest pending for sendmsg, which refunds any change.
     ...standalone.map(f => ({ account: CRYPT_ROUTER_ACCOUNT, name: 'payfee', authorization: first.authorization, data: { payer: sender, fee: cheese(f.fee), memo: f.memo } })),
