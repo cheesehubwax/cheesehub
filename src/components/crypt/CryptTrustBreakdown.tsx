@@ -5,7 +5,7 @@ export function CryptTrustBreakdown({ account, score }: { account: string; score
   return <div className="space-y-2 text-xs">
     <p className="font-semibold">Your Respect <span className="font-mono">({account})</span></p>
     {!score ? <p className="text-muted-foreground">Loading public signals…</p> : <>
-      <p><span className="font-semibold">{MARK_LABEL[score.mark]}</span> · {score.total} Respect{score.partial && <span className="text-muted-foreground"> (partial: some signals couldn’t be read)</span>}</p>
+      <p><span className="font-semibold">{MARK_LABEL[score.mark]}</span> · {score.total} points{score.partial && <span className="text-muted-foreground"> (partial: some signals couldn’t be read)</span>}</p>
       <ul className="space-y-1">
         {score.lines.map(l => <li key={l.id} className="flex items-baseline justify-between gap-2">
           <span className="min-w-0"><span>{l.label}</span> <span className="text-muted-foreground">{l.detail}</span></span>
