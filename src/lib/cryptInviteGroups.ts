@@ -6,6 +6,7 @@ import nacl from 'tweetnacl';
 import { decodeBase64, decodeUTF8 } from 'tweetnacl-util';
 import {
   buildSendMessageActions, encryptMemo, MAX_MESSAGE_BYTES, MAX_PARTS, partCount, plaintextBytes, splitMessage, type MessagingKey,
+  senderKey,
 } from '@/lib/cheeseCrypt';
 import { parseAvatar, type CryptAvatar } from '@/lib/cryptAvatar';
 import { parseCryptName } from '@/lib/cryptNames';
