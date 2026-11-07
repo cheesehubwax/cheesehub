@@ -87,7 +87,10 @@ import { ReportRoomDialog } from '@/components/crypt/ReportRoomDialog';
 import { buildReportAction, type ReportReason } from '@/lib/cryptRoomReports';
 import { fetchRoomMemos, forgetSessionKey } from '@/lib/cheeseCrypt';
 import { forgetInstantKey } from '@/lib/cryptInstant';
-import { loadIdleMinutes, loadShield, saveIdleMinutes, saveShield, type IdleMinutes } from '@/lib/cryptPanicLock';
+import { loadHardening, loadIdleMinutes, loadShield, saveHardening, saveIdleMinutes, saveShield, type IdleMinutes, type LockHardening } from '@/lib/cryptPanicLock';
+import { clearLockedEnvelope } from '@/lib/cryptKeyLock';
+import { forgetVaultForAccount } from '@/lib/cryptVault';
+import { useNavigate } from 'react-router-dom';
 import { useCryptAutoLock } from '@/hooks/useCryptAutoLock';
 import { CryptTrustContext } from '@/components/crypt/CryptTrustBadge';
 import {
@@ -100,8 +103,16 @@ const ACCOUNT_RE = /^[a-z1-5.]{1,12}$/;
 const LIVE_POLL_MS = 6000;
 
 const CheeseCrypt = () => {
-  const { accountName, isConnected, login, session } = useWax();
+  const { accountName, isConnected, login, logout, session } = useWax();
   const [lockNonce, setLockNonce] = useState(0);
+  const navigate = useNavigate();
+  /** Remounts the messenger, then applies the optional wallet disconnect and stealth redirect. */
+  const onLocked = useCallback(() => {
+    setLockNonce(n => n + 1);
+    const h = loadHardening();
+    if (h.disconnect) void logout().catch(() => {});
+    if (h.stealth) navigate('/', { replace: true });
+  }, [logout, navigate]);
 
   return (
     <Layout>
@@ -114,7 +125,7 @@ const CheeseCrypt = () => {
             <Button onClick={login} className="bg-cheese text-primary-foreground hover:bg-cheese/90">Connect wallet</Button>
           </div>
         ) : (
-          <Messenger key={`${accountName}:${lockNonce}`} account={accountName} session={session} onLocked={() => setLockNonce(n => n + 1)} />
+          <Messenger key={`${accountName}:${lockNonce}`} account={accountName} session={session} onLocked={onLocked} />
         )}
       </div>
     </Layout>
@@ -130,11 +141,19 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const [shieldOn, setShieldOnState] = useState(loadShield);
   const setShieldOn = useCallback((on: boolean) => { saveShield(on); setShieldOnState(on); }, []);
   /** Panic lock: forget the unlocked key and this tab's instant key, then remount to discard all decrypted state. */
+  const [hardening, setHardeningState] = useState<LockHardening>(loadHardening);
+  const setHardening = useCallback((h: LockHardening) => { saveHardening(h); setHardeningState(h); }, []);
   const panicLock = useCallback(() => {
+    const h = loadHardening();
     forgetSessionKey(account);
     forgetInstantKey(account);
-    toast({ title: '🔒 Locked', description: 'Unlock with Anchor to continue.' });
-    onLocked?.();
+    if (h.stealth) toast({ title: 'Signed out' });
+    else toast({ title: '🔒 Locked', description: h.cold ? 'Load your key file to continue.' : 'Unlock with Anchor to continue.' });
+    if (!h.cold) { onLocked?.(); return; }
+    // Cold lock: drop this device's locked key copy and remembered folder before redrawing, so nothing re-finds it.
+    clearLockedEnvelope(account);
+    const forget = forgetVaultForAccount(account).catch(() => {});
+    void Promise.race([forget, new Promise(r => setTimeout(r, 1500))]).then(() => onLocked?.());
   }, [account, onLocked, toast]);
   const { executeTransaction: executeDirect } = useWaxTransaction(session);
   // Every CHEESECrypt transaction that fits the crypt.cheese router shape is sent through it; others stay direct.
@@ -2013,7 +2032,8 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
                 instantSlot={<>
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setPrivacyOpen(true)} title="Network privacy settings">🛡️ Privacy</Button>
                   <CryptPrivacyDialog open={privacyOpen} onOpenChange={setPrivacyOpen} mode={privacyMode} setMode={setPrivacyMode} loadFullHistory={loadFullHistory}
-                    idleMinutes={idleMinutes} setIdleMinutes={setIdleMinutes} shieldOn={shieldOn} setShieldOn={setShieldOn} />
+                    idleMinutes={idleMinutes} setIdleMinutes={setIdleMinutes} shieldOn={shieldOn} setShieldOn={setShieldOn}
+                    hardening={hardening} setHardening={setHardening} />
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={panicLock} title="Lock now: clear the screen (Esc Esc or Ctrl/Cmd+Shift+L)">🔒 Lock now</Button>
                   {lockedFile && <>
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setMoveOpen(true)} title="Move your key and friends to another device by QR code">📲 Move device</Button>
