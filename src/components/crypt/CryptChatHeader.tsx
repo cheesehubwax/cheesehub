@@ -3,6 +3,7 @@ import { Ban, ChevronDown, Pencil, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
+import { CryptTrustBadge } from '@/components/crypt/CryptTrustBadge';
 import { cn } from '@/lib/utils';
 import type { CryptAvatar } from '@/lib/cryptAvatar';
 import type { CryptGroup } from '@/lib/cryptGroups';
@@ -89,7 +90,7 @@ export function CryptChatHeader({
               <span aria-hidden>👥</span>
               <span className="break-words">Group</span>
               {membersDropdown(activeGroup.members, undefined, member => member !== account && <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" aria-label={`Edit nickname for ${member}`} title={`Edit nickname for ${member}`} onClick={() => setEditingFriend(member)}><Pencil className="h-3 w-3" /></Button>)}
-            </span> : <><PixelAvatar account={active} avatar={avatars[active]} /><span className="min-w-0 break-words">{nameFor(active)}{nameFor(active) !== active && <span className="block text-xs text-muted-foreground">{active}</span>}</span><Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label={`Edit nickname for ${active}`} title={`Edit nickname for ${active}`} onClick={() => setEditingFriend(active)}><Pencil className="h-3 w-3" /></Button></>}
+            </span> : <><PixelAvatar account={active} avatar={avatars[active]} /><span className="min-w-0 break-words">{nameFor(active)}{nameFor(active) !== active && <span className="block text-xs text-muted-foreground">{active}</span>}</span>{!contacts[active] && <CryptTrustBadge account={active} />}<Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label={`Edit nickname for ${active}`} title={`Edit nickname for ${active}`} onClick={() => setEditingFriend(active)}><Pencil className="h-3 w-3" /></Button></>}
             {!activeGroup && !activeInvite && <span className="ml-auto flex items-center gap-1">
               {contacts[active] && onVerify && <Button size="sm" variant="ghost" className={cn('h-7 text-xs font-normal', verify === 'changed' && 'text-destructive hover:text-destructive')} onClick={onVerify}
                 title="Compare safety numbers to confirm nobody swapped your keys">{verify === 'verified' ? '✅ Verified' : verify === 'changed' ? '⚠️ Key changed' : '🔐 Verify'}</Button>}

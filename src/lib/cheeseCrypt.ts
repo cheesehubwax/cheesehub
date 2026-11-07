@@ -576,6 +576,21 @@ export async function lookupPublishedKey(account: string): Promise<string | null
   return newestPublishedKey(account, newestFirst([...direct, ...routed]));
 }
 
+/** Time (ms) of the account's earliest valid key publication (direct or router), or null if none. */
+export async function lookupFirstKeyTime(account: string): Promise<number | null> {
+  const [direct, routed] = await Promise.all([
+    hyperionTransfers(`account=${account}&${FILTER}&transfer.to=${KEY_PUBLISH_TO}&sort=asc&limit=100`),
+    hyperionActions(`account=${account}&${PAYFEE_FILTER}&sort=asc&limit=100`).then(expandPayfeeActions),
+  ]);
+  let first: number | null = null;
+  for (const r of [...direct, ...routed]) {
+    const prefix = keyPrefixOf(r.memo);
+    if (r.from !== account || !prefix || !Number.isFinite(r.time) || !validKey(r.memo.slice(prefix.length).trim(), 32)) continue;
+    if (first == null || r.time < first) first = r.time;
+  }
+  return first;
+}
+
 /** Rows are newest first; the first valid key memo from the account wins, whichever prefix it uses. */
 export function newestPublishedKey(account: string, rows: ChainMemo[]): string | null {
   for (const r of rows) {
