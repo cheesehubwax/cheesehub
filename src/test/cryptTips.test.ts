@@ -107,3 +107,17 @@ describe('public-room tip delivery regression', () => {
     ]) expect(routeCryptActions(actions)).toBe(actions);
   });
 });
+
+describe('wallet Name authorizations', () => {
+  it('routes a tip signed with WharfKit Name actors through sendmsg (no legacy direct copies)', async () => {
+    const { Name, PermissionLevel } = await import('@wharfkit/session');
+    const { buildTipTransfer } = await import('@/lib/cryptTips');
+    const { buildSendMessageActions, routeCryptActions } = await import('@/lib/cheeseCrypt');
+    const auth = [PermissionLevel.from({ actor: Name.from('alice'), permission: Name.from('active') })];
+    const actions = [buildTipTransfer('alice', { recipient: 'bob', amount: '2.0000', note: 'x' }, auth as any), ...buildSendMessageActions('alice', 'bob', 'CRYPT1:test', auth as any)];
+    const routed = routeCryptActions(actions) as any[];
+    expect(routed.map(a => a.name)).toEqual(['transfer', 'transfer', 'sendmsg']);
+    expect(routed[0].data.to).toBe('bob');
+    expect(routed[1].data.to).toBe('crypt.cheese');
+  });
+});
