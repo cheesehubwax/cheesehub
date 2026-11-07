@@ -34,15 +34,15 @@ export function createDoubleEscDetector() {
   };
 }
 
-/** Optional hardening applied on every lock; all default off. */
-export type LockHardening = { stealth: boolean; disconnect: boolean; cold: boolean };
+/** Optional hardening applied on every lock. Stealth redirect and wallet disconnect are always on; only cold lock is a choice (default off). */
+export type LockHardening = { cold: boolean };
 const HARDEN_STORE = 'cheesecrypt-lock-hardening';
-export const DEFAULT_HARDENING: LockHardening = { stealth: false, disconnect: false, cold: false };
+export const DEFAULT_HARDENING: LockHardening = { cold: false };
 export function loadHardening(): LockHardening {
   try {
     const v = JSON.parse(localStorage.getItem(HARDEN_STORE) || 'null');
     if (!v || typeof v !== 'object') return { ...DEFAULT_HARDENING };
-    return { stealth: v.stealth === true, disconnect: v.disconnect === true, cold: v.cold === true };
+    return { cold: v.cold === true };
   } catch { return { ...DEFAULT_HARDENING }; }
 }
 export const saveHardening = (h: LockHardening) => { try { localStorage.setItem(HARDEN_STORE, JSON.stringify(h)); } catch { /* ignore */ } };
