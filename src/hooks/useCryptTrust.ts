@@ -65,7 +65,7 @@ async function readKey(account: string): Promise<{ published: boolean; firstAt: 
   return { published: !!current, firstAt: current ? firstAt : null };
 }
 
-export async function loadTrustSignals(account: string): Promise<Omit<TrustSignals, 'local'>> {
+export async function loadTrustSignals(account: string): Promise<TrustSignals> {
   const [createdAt, cheese, staked, pooled, nfts, key] = await Promise.all([
     cached(`age:${account}`, DAY_MS, () => readCreated(account)),
     cached(`cheese:${account}`, HOUR_MS, () => readCheese(account)),
@@ -79,7 +79,7 @@ export async function loadTrustSignals(account: string): Promise<Omit<TrustSigna
 
 /** Loads signals once `enabled` (the badge is on screen). */
 export function useCryptTrust(account: string, enabled: boolean) {
-  const [signals, setSignals] = useState<Omit<TrustSignals, 'local'> | null>(null);
+  const [signals, setSignals] = useState<TrustSignals | null>(null);
   useEffect(() => {
     if (!enabled || !account) return;
     let live = true;

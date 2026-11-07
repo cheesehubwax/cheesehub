@@ -1,6 +1,6 @@
 /**
- * CHEESECrypt trust strength: a published, fixed-weight score built only from public chain
- * signals plus local context. It is a decision aid, never identity verification.
+ * CHEESECrypt Respect: a published, fixed-weight score built only from public chain
+ * signals. It is a decision aid, never identity verification.
  * Unknown signals (a read failed) are left out of the total and mark the score partial; they never count as zero.
  */
 
@@ -20,8 +20,6 @@ export interface TrustSignals {
   nfts: number | null;
   /** Earliest key publication (ms) and whether a key is currently published; null = unknown. */
   key: { published: boolean; firstAt: number | null } | null;
-  /** Local context; undefined = not available here (not counted, not partial). */
-  local?: { sharedRooms: number; pastChat: boolean };
 }
 
 export interface TrustLine { id: string; label: string; points: number | null; detail: string }
@@ -116,10 +114,6 @@ export function scoreTrust(s: TrustSignals, now = Date.now()): TrustScore {
     lines.push({ id: 'key', label: '🔑 Published key', points: s.key.published ? 10 : 0, detail: s.key.published ? 'Published on chain' : 'Not published' });
     const ka = s.key.published && s.key.firstAt != null ? now - s.key.firstAt : null;
     lines.push({ id: 'keyage', label: '🗝️ CHEESECrypt key age', points: ka == null ? 0 : keyAgePoints(ka), detail: ka == null ? 'No key' : span(ka) });
-  }
-  if (s.local) {
-    lines.push({ id: 'rooms', label: '👥 Shared rooms', points: Math.min(15, 5 * Math.max(0, s.local.sharedRooms)), detail: `${s.local.sharedRooms}` });
-    lines.push({ id: 'chat', label: '💬 Past chat with you', points: s.local.pastChat ? 5 : 0, detail: s.local.pastChat ? 'Yes' : 'No' });
   }
   const total = lines.reduce((t, l) => t + (l.points ?? 0), 0);
   const partial = lines.some(l => l.points == null);
