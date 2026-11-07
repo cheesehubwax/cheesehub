@@ -47,4 +47,3 @@
 - CHEESENull's CHEESECrypt row: crypt.cheese nulls plus user eosio.null legs matched by Crypt fee-label constants, counted once.
 - Crypt router lookups persist (IndexedDB) only if >5min old.
 
-- Crypt rotation: stealth default; notices count only via the friend's current key; ring sealed under active secret; rooms keep pinned keys.
