@@ -1,5 +1,6 @@
 /** Isolated Olm prototype. No wallet, transport, persistence, or production send path. */
 import type { Account, Session } from '@kinsh/vodozemac-wasm';
+import secretWasmUrl from '../../node_modules/@kinsh/vodozemac-wasm/pkg-web/kinsh_vodozemac_wasm_bg.wasm?url';
 
 export const SECRET_CHAT_LIVE = false;
 export const SECRET_ENGINE_VERSION = 'vodozemac-wasm-0.4.2-olm-v1';
@@ -12,7 +13,7 @@ let enginePromise: Promise<Engine> | undefined;
 export function loadSecretEngine(): Promise<Engine> {
   if (!enginePromise) {
     enginePromise = import('@kinsh/vodozemac-wasm').then(async module => {
-      if ('default' in module && typeof module.default === 'function') await module.default();
+      if ('default' in module && typeof module.default === 'function') await module.default({ module_or_path: secretWasmUrl });
       return module;
     }).catch(error => { enginePromise = undefined; throw error; });
   }
