@@ -87,7 +87,7 @@ export function markFor(total: number, newAccount: boolean): TrustMark {
 }
 
 export const MARK_LABEL: Record<TrustMark, string> = {
-  warning: '⚠️ Warning', low: '🟡 Low', moderate: '🟢 Moderate', good: '🔷 Good', strong: '🛡️ Strong',
+  warning: '⚠️ Warning', low: '🟡 No Respect', moderate: '🟢 Little Respect', good: '🔷 Much Respect', strong: '🛡️ Big Respect',
 };
 
 const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 4 });
