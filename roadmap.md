@@ -2,6 +2,8 @@
 
 Open tasks only. Completed work lives in git history.
 
+- [ ] CHEESECrypt Phase 1: design and implement opt-in, separate one-to-one Secret Chats with forward secrecy; select a reviewed browser-compatible protocol, confirm history/recovery semantics, and verify handshake, out-of-order delivery, retries, session deletion and legacy isolation before enabling real sends. Standard chats and rooms remain unchanged; epoch rotation is out of scope for Phase 1.
+
 - [ ] CHEESEPower: activate and verify one signed reward claim / CPU stake — runner, tests and setup instructions are ready; requires the user's dedicated compound permission, GitHub secret and enable variable.
 
 - [ ] CHEESEAir: verify one signed airdrop and chain readback — requires the user's Anchor signatures. Phases 1–3 safety/render checks pass, and live 500-row snapshot/edit/selection checks pass without sending funds; remaining audit findings are recorded in `.lovable/cheeseair-audit.md` for later stages.
