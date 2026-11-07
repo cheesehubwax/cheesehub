@@ -446,7 +446,7 @@ export function routeCryptActions<T>(actions: T[], opts: { payfee?: boolean } = 
       const q = /^\d+\.\d{4} CHEESE$/.test(quantity) ? units(quantity) : NaN;
       if (tips.length || !Number.isSafeInteger(q) || q <= 0 || q > 10_000_000_000_000
         || !/^[a-z1-5.]{1,12}$/.test(to) || to === CRYPT_ROUTER_ACCOUNT || to === sender
-        || !Array.isArray(a.authorization) || !a.authorization.some(x => x?.actor === sender)) return actions;
+        || !Array.isArray(a.authorization) || !a.authorization.some(x => String(x?.actor) === sender)) return actions;
       tips.push(a);
     } else if (to === KEY_PUBLISH_TO || to === LIQUIDITY_FEE_TO) {
       const q = /^\d+\.\d{4} CHEESE$/.test(quantity) ? units(quantity) : NaN;
@@ -499,7 +499,7 @@ export function expandRouterActions(txId: string, time: number, actions: unknown
     if (act?.account !== CRYPT_ROUTER_ACCOUNT || act.name !== 'sendmsg') continue;
     const sender = act.data?.sender;
     const copies = act.data?.copies;
-    if (!sender || !act.authorization?.some(a => a.actor === sender) || !Array.isArray(copies)) continue;
+    if (!sender || !act.authorization?.some((a: any) => String(a?.actor) === sender) || !Array.isArray(copies)) continue;
     for (const c of copies) {
       if (typeof c?.to === 'string' && typeof c.memo === 'string' && c.to !== sender)
         out.push({ txId, time, from: sender, to: c.to, memo: c.memo, quantity: MESSAGE_RECIPIENT_QUANTITY });
@@ -522,7 +522,7 @@ export function expandSponsoredActions(actions: unknown[]): ChainMemo[] {
     const act = a?.act;
     if (act?.account !== CRYPT_ROUTER_ACCOUNT || act.name !== 'sendfree' || typeof a.trx_id !== 'string') continue;
     const sender = act.data?.sender, copies = act.data?.copies;
-    if (typeof sender !== 'string' || !act.authorization?.some(x => x?.actor === sender) || !Array.isArray(copies)) continue;
+    if (typeof sender !== 'string' || !act.authorization?.some((x: any) => String(x?.actor) === sender) || !Array.isArray(copies)) continue;
     // Hyperion returns the same action once per notified account; keep one row per copy.
     const key = `${a.trx_id}:${JSON.stringify(copies)}`;
     if (seen.has(key)) continue;
@@ -617,7 +617,7 @@ export function expandPayfeeActions(actions: any[]): ChainMemo[] {
     if (act?.account !== CRYPT_ROUTER_ACCOUNT || act.name !== 'payfee') continue;
     const payer = act.data?.payer, fee = act.data?.fee, memo = act.data?.memo;
     if (typeof payer !== 'string' || typeof memo !== 'string' || !memo || typeof fee !== 'string') continue;
-    if (!Array.isArray(act.authorization) || !act.authorization.some((x: { actor?: string }) => x?.actor === payer)) continue;
+    if (!Array.isArray(act.authorization) || !act.authorization.some((x: any) => String(x?.actor) === payer)) continue;
     if (!/^\d+\.\d{4} CHEESE$/.test(fee)) continue;
     const u = units(fee);
     if (!Number.isSafeInteger(u) || u <= 0 || u % 5 !== 0) continue;
