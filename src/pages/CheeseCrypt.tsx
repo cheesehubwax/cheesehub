@@ -90,6 +90,8 @@ import { isRotateNotice, loadRotation, markAnnounced, noticeMemos, pendingContac
 import { PROFILE_RECIPIENTS_PER_TX } from '@/lib/cryptProfileNotes';
 import { useCryptKeyRotation } from '@/hooks/useCryptKeyRotation';
 import { CryptKeyAgeBanner } from '@/components/crypt/CryptKeyAgeBanner';
+import { CryptKeyRotationCard } from '@/components/crypt/CryptKeyRotationCard';
+import { CryptRotateDialog } from '@/components/crypt/CryptRotateDialog';
 import { forgetInstantKey } from '@/lib/cryptInstant';
 import { loadHardening, loadIdleMinutes, loadShield, saveHardening, saveIdleMinutes, saveShield, type IdleMinutes, type LockHardening } from '@/lib/cryptPanicLock';
 import { clearLockedEnvelope } from '@/lib/cryptKeyLock';
@@ -818,6 +820,38 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const noteAnnounced = (list: string[]) => {
     if (!key || !list.length) return;
     markAnnounced(account, key.publicKey, list); setRotation(loadRotation(account));
+  };
+  // My key as pinned by each room roster (any room not declined): those keys are kept so the rooms keep working.
+  const roomKeys = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const v of inviteViews) {
+      if (v.status === 'declined') continue;
+      const mine = v.invite.members.find(m => m.account === account)?.publicKey;
+      if (mine) out[mine] = (out[mine] ?? 0) + 1;
+    }
+    return out;
+  }, [inviteViews, account]);
+  const rot = useCryptKeyRotation({ account, key, lockedFile, setKey, setLockedFile, signer, vault, contacts, pendingFriends, roomKeys,
+    setRotation, executeTransaction, permission, toast, clock });
+  const [rotateStep, setRotateStep] = useState<'create' | 'announce' | null>(null);
+  const startRotation = () => {
+    if (!canLock) { toast({ title: 'Anchor needed', description: ANCHOR_REQUIRED, variant: 'destructive' }); return; }
+    setPrivacyOpen(false); setRotateStep('create');
+  };
+  const confirmRotateCreate = async () => {
+    setBusy(true);
+    try {
+      const r = await rot.createRotatedKey();
+      toast({ title: 'New key locked', description: r.savedToFolder ? 'Your key folder backup was updated.' : 'An updated backup file was downloaded. Keep it safe and never share it.' });
+      setRotateStep('announce');
+    } catch (e) { toast({ title: 'Key not rotated', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
+  const confirmRotateAnnounce = async (publish: boolean) => {
+    setBusy(true);
+    try { if (await rot.announce(publish)) setRotateStep(null); }
+    catch (e) { toast({ title: 'Could not send', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
   };
   // A voice note spans several transactions; if one is unfinished right at the oldest loaded memo,
   // its earlier parts are probably on the next history page, so read one page further (bounded).
@@ -1764,6 +1798,9 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
           <Button onClick={() => setSendDeclined(null)} className="w-full">OK</Button>
         </DialogContent>
       </Dialog>
+      {rotateStep && <CryptRotateDialog step={rotateStep} friends={rotateStep === 'announce' ? rot.pendingFriends.length : Object.keys(contacts).filter(c => !blocked.includes(c)).length}
+        roomCount={Object.values(roomKeys).reduce((a, b) => a + b, 0)} busy={busy} costFor={rot.announceCost}
+        onCreate={() => void confirmRotateCreate()} onAnnounce={p => void confirmRotateAnnounce(p)} onClose={() => setRotateStep(null)} />}
       {backupKey && <VaultPrompt cryptKey={backupKey} onSaved={backupSaved} onDownload={backupDownloaded} />}
       {creatingGroup && <CreateGroupDialog contacts={contacts} avatars={avatars} nameFor={nameFor} busy={busy} onClose={() => setCreatingGroup(false)}
         onCreate={createInviteGroup}
@@ -1898,6 +1935,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
         backupFile={lockedFile} keyLocked={keyLocked} friendRequests={friendRequestCount} joinRequestCount={joinRequests.length}
         pendingRequests={Object.keys(roomRequests).map(requestRow).filter(Boolean)}
         joinRequestsPanel={<>
+          {rot.nudge && rot.ageDays !== null && lockedFile && <CryptKeyAgeBanner ageDays={rot.ageDays} onRotate={startRotation} onSnooze={rot.snooze} />}
           {joinRequestPanel(joinRequests)}
           {(() => {
             // Unanswered invites (including owner-approved rejoins) sit with join requests so they can't be missed.
@@ -2065,7 +2103,10 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setPrivacyOpen(true)} title="Network privacy settings">🛡️ Privacy</Button>
                   <CryptPrivacyDialog open={privacyOpen} onOpenChange={setPrivacyOpen} mode={privacyMode} setMode={setPrivacyMode} loadFullHistory={loadFullHistory}
                     idleMinutes={idleMinutes} setIdleMinutes={setIdleMinutes} shieldOn={shieldOn} setShieldOn={setShieldOn}
-                    hardening={hardening} setHardening={setHardening} />
+                    hardening={hardening} setHardening={setHardening}
+                    rotationSlot={lockedFile ? <CryptKeyRotationCard ageDays={rot.ageDays} retention={rot.retention} setRetention={rot.setRetention}
+                      retired={rot.retired} pendingFriends={rot.pendingFriends.length} onRotate={startRotation}
+                      onAnnounce={() => { setPrivacyOpen(false); setRotateStep('announce'); }} onDestroy={pub => void rot.destroyNow(pub)} /> : undefined} />
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={panicLock} title="Lock now: clear the screen (Esc Esc or Ctrl/Cmd+Shift+L)">🔒 Lock now</Button>
                   {lockedFile && <>
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setMoveOpen(true)} title="Move your key and friends to another device by QR code">📲 Move device</Button>
