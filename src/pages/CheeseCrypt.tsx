@@ -720,11 +720,6 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   // Reactions are control rows: kept out of chat, unread counts, search and replies.
   const reactionRows = useMemo(() => edited.messages.filter(m => isReaction(m.text)), [edited.messages]);
   const conversations = useMemo(() => edited.messages.filter(m => !isReaction(m.text)), [edited.messages]);
-  // Local strength context: rooms we have both joined and whether I have messaged them.
-  const trustLocal = useCallback((other: string) => ({
-    sharedRooms: inviteViews.filter(v => v.status === 'joined' && v.joined.includes(other) && !v.left.includes(other)).length,
-    pastChat: visibleMemos.some(m => m.from === account && m.to === other),
-  }), [inviteViews, visibleMemos, account]);
   useEffect(() => {
     // Restore retained policies on another device by reading the bounded history window in full.
     if (Object.keys(invites).length && loaded && depth < MAX_HISTORY_PAGES) setDepth(d => d + 1);
@@ -1697,7 +1692,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
 
 
   return (
-    <CryptTrustContext.Provider value={trustLocal}>
+    <CryptTrustContext.Provider value={account}>
     <div className={cn('w-full rounded-lg border border-cheese/20 bg-card/80 overflow-hidden flex flex-col md:grid h-[80dvh] min-h-[480px] md:grid-cols-[240px_1fr] md:grid-rows-[auto_1fr]', shielded && 'blur-xl select-none pointer-events-none')}
       aria-hidden={shielded || undefined}>
       {fileInput}

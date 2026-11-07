@@ -58,9 +58,10 @@ describe('crypt trust strength', () => {
     expect(s.total).toBe(16);
     expect(s.lines.find(l => l.id === 'cheese')?.points).toBeNull();
   });
-  it('key age counts only while a key is published; local context caps rooms at +15', () => {
-    const k = scoreTrust({ ...base, key: { published: true, firstAt: NOW - 2 * YEAR }, local: { sharedRooms: 5, pastChat: true } }, NOW);
-    expect(k.total).toBe(16 + 10 + 10 + 15 + 5);
+  it('key age counts only while a key is published; no shared-room or past-chat points', () => {
+    const k = scoreTrust({ ...base, key: { published: true, firstAt: NOW - 2 * YEAR } }, NOW);
+    expect(k.total).toBe(16 + 10 + 10);
+    expect(k.lines.some(l => l.id === 'rooms' || l.id === 'chat')).toBe(false);
     expect(scoreTrust({ ...base, key: { published: false, firstAt: NOW - 2 * YEAR } }, NOW).total).toBe(16);
   });
 });
