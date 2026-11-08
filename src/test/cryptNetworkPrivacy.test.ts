@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { fetchContractStream, mergeMemos, streamRows, STREAM_PAGE, type ChainMemo } from '@/lib/cheeseCrypt';
-import { checkHistoryEndpoint, fetchCryptHistoryJson, historyTimeoutMs, orderWithCustom, saveCustomEndpoint, validateCustomEndpoint } from '@/lib/cryptNetworkPrivacy';
+import { checkHistoryEndpoint, fetchCryptHistoryJson, historyTimeoutMs, loadCustomEndpoint, loadCustomOnly, orderWithCustom, saveCustomEndpoint, validateCustomEndpoint } from '@/lib/cryptNetworkPrivacy';
 
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); localStorage.clear(); });
 
@@ -71,6 +71,15 @@ describe('custom history server', () => {
     expect(historyTimeoutMs('https://node.example.com')).toBe(10000);
     saveCustomEndpoint('https://node.example.com', true);
     expect(historyTimeoutMs('https://node.example.com')).toBe(40000);
+  });
+  it('persists the only-this-server toggle instantly on an already-saved server', () => {
+    saveCustomEndpoint('http://localhost:8088', false);
+    expect(loadCustomOnly()).toBe(false);
+    // The dialog's instant-save path: toggle writes straight to storage, no re-test.
+    saveCustomEndpoint(loadCustomEndpoint(), true);
+    expect(loadCustomOnly()).toBe(true);
+    saveCustomEndpoint(loadCustomEndpoint(), false);
+    expect(loadCustomOnly()).toBe(false);
   });
   it('keeps the timeout active while reading a stalled response body', async () => {
     vi.useFakeTimers();
