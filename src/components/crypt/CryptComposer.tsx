@@ -40,7 +40,7 @@ export function CryptComposer({
         {!text.trim() && <VoiceRecorder clip={voice} onChange={setVoice} disabled={busy} />}
       </div>
       {/* Bottom line: Terms on the left; price, Instant and Send on the right. */}
-      <div className="flex flex-wrap items-center gap-2 gap-y-1 text-xs">
+      <div className="flex flex-wrap items-center gap-2 gap-y-1 pr-6 text-xs">
         <TermsCheckbox checked={agreed} onCheckedChange={setAgreed} />
         <span className="ml-auto text-muted-foreground">{totalCost}</span>
         {instantSlot}
