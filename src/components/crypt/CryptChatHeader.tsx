@@ -16,7 +16,7 @@ type Notice = { kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'profile'; i
 /** Chat title bar: friend or group title, Members dropdown and per-chat actions. State lives in Messenger. */
 export function CryptChatHeader({
   account, active, activeGroup, activeInvite, keyAvatar, avatars, contacts, blocked, friendDeclines, setFriendDeclines,
-  nameFor, membersOpen, setMembersOpen, setPendingNotice, setEditingInvite, setEditingFriend, saveFriend, blockAccount, admins = [], onReportRoom, verify, onVerify, onOpenProfile,
+  nameFor, membersOpen, setMembersOpen, setPendingNotice, setEditingInvite, setEditingFriend, saveFriend, blockAccount, admins = [], onReportRoom, verify, onVerify, onOpenProfile, lockSlot,
 }: {
   account: string; active: string | null; activeGroup: CryptGroup | undefined; activeInvite: InviteGroupView | undefined;
   keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>; contacts: Record<string, string>; blocked: string[];
@@ -32,6 +32,8 @@ export function CryptChatHeader({
   verify?: VerifyState; onVerify?: () => void;
   /** Opens a member's public profile from their name or picture. */
   onOpenProfile?: (account: string) => void;
+  /** Panic lock button, shown at the right of every open chat's header. */
+  lockSlot?: ReactNode;
 }) {
   const memberLine = (member: string, status?: string, action?: ReactNode) => (
     <li key={member} className="flex items-center gap-2 min-w-0">
@@ -109,6 +111,7 @@ export function CryptChatHeader({
               <Button size="sm" variant="ghost" className="h-7 text-xs font-normal text-destructive hover:text-destructive" aria-label={`Block ${active}`}
                 onClick={() => { if (window.confirm(`Block ${active}? Their messages will be hidden on this device.`)) blockAccount(active); }}><Ban className="h-3.5 w-3.5" /> Block</Button>
             </span>}</>}
+      {active && lockSlot && <span className="ml-auto shrink-0">{lockSlot}</span>}
     </div>
   );
 }
