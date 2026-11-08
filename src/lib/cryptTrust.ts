@@ -31,6 +31,17 @@ const YEAR = 365 * DAY;
 export const isPremiumName = (account: string) => /\.(cheese|chz)$/.test(account);
 export const PREMIUM_POINTS = 40;
 
+/** Maximum points each signal can earn, so the checklist can show progress as points/max. */
+export const MAX_AGE_POINTS = 32;
+export const MAX_BALANCE_POINTS = 30;
+export const MAX_STAKE_POINTS = 32;
+export const MAX_POOL_POINTS = 45; // 40 base + 5 multi-pool bonus
+export const MAX_NFT_POINTS = 25;
+export const MAX_KEY_POINTS = 10;
+export const MAX_KEY_AGE_POINTS = 10;
+export const MAX_TOTAL_POINTS = PREMIUM_POINTS + MAX_AGE_POINTS + MAX_BALANCE_POINTS + MAX_STAKE_POINTS
+  + MAX_POOL_POINTS + MAX_NFT_POINTS + MAX_KEY_POINTS + MAX_KEY_AGE_POINTS;
+
 export function agePoints(ageMs: number): number {
   if (ageMs < 7 * DAY) return -15;
   if (ageMs < 30 * DAY) return 3;
