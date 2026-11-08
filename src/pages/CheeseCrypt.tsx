@@ -327,7 +327,6 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const [localListings, setLocalListings] = useState(() => loadLocalListings(account));
   const [roomRequests, setRoomRequests] = useState(() => loadRoomRequests(account));
   const [joinDeclines, setJoinDeclines] = useState(() => loadJoinDeclines(account));
-  const [feeInfoOpen, setFeeInfoOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   const [verifiedKeys, setVerifiedKeys] = useState<Record<string, string>>(() => loadVerified(account));
   useEffect(() => { setVerifiedKeys(loadVerified(account)); }, [account]);
@@ -2117,10 +2116,10 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
                 replyingTo={replyingTo} setReplyingTo={setReplyingTo} composerRef={composerRef} text={text} setText={setText} voice={voice} setVoice={setVoice}
                 tooLong={tooLong} bytes={bytes} maxBytes={maxBytes} parts={parts} copies={copies} voiceParts={voiceParts} voiceTxs={voiceTxs}
                 setAttachingNft={setAttachingNft} busy={busy} listHidden={listHidden} agreed={agreed} setAgreed={setAgreed}
-                feeInfoOpen={feeInfoOpen} setFeeInfoOpen={setFeeInfoOpen} totalCost={totalCost} send={() => void send()} sendVoice={sendVoice}
+                totalCost={totalCost} send={() => void send()} sendVoice={sendVoice}
                 editing={!!editingMessage} cancelEdit={cancelEdit} editExpired={!!editingMessage && !canEdit(editingMessage, account, clock)}
+                lockSlot={<Button variant="outline" className="h-9 px-4 text-sm" onClick={panicLock} title="Lock now: clear the screen (Esc Esc or Ctrl/Cmd+Shift+L)">🔒 Lock now</Button>}
                 instantSlot={<>
-                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={panicLock} title="Lock now: clear the screen (Esc Esc or Ctrl/Cmd+Shift+L)">🔒 Lock now</Button>
                   {(sponsorUnits > 0 || instant.ready || !!instant.status?.exists) && <>
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setInstantOpen(true)}
                     title={instant.ready ? 'Instant Messaging is on' : 'Send free messages without Anchor popups'}>
