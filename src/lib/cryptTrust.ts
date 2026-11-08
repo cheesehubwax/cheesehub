@@ -4,7 +4,7 @@
  * Unknown signals (a read failed) are left out of the total and mark the score partial; they never count as zero.
  */
 
-export type TrustMark = 'warning' | 'low' | 'moderate' | 'good' | 'strong';
+export type TrustMark = 'warning' | 'low' | 'moderate' | 'good' | 'strong' | 'huge';
 
 export interface TrustSignals {
   account: string;
@@ -94,19 +94,20 @@ export function markFor(total: number, newAccount: boolean): TrustMark {
   if (total < 40) return 'low';
   if (total < 100) return 'moderate';
   if (total < 150) return 'good';
-  return 'strong';
+  if (total < 200) return 'strong';
+  return 'huge';
 }
 
 export const MARK_LABEL: Record<TrustMark, string> = {
-  warning: '🪤 Warning', low: '🥛 No Respect', moderate: '🧀 Little Respect', good: '🫕 Much Respect', strong: 'Big Respect',
+  warning: '🪤 Warning', low: '🥛 No Respect', moderate: '🧀 Little Respect', good: '🫕 Much Respect', strong: 'Big Respect', huge: '🏆 Huge Respect',
 };
 
 /** Emoji per mark; null means the CHEESE token logo image is shown instead. */
 export const MARK_ICON: Record<TrustMark, string | null> = {
-  warning: '🪤', low: '🥛', moderate: '🧀', good: '🫕', strong: null,
+  warning: '🪤', low: '🥛', moderate: '🧀', good: '🫕', strong: null, huge: '🏆',
 };
 export const MARK_NAME: Record<TrustMark, string> = {
-  warning: 'Warning', low: 'No Respect', moderate: 'Little Respect', good: 'Much Respect', strong: 'Big Respect',
+  warning: 'Warning', low: 'No Respect', moderate: 'Little Respect', good: 'Much Respect', strong: 'Big Respect', huge: 'Huge Respect',
 };
 
 const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 4 });

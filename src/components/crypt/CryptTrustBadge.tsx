@@ -16,6 +16,7 @@ const MARK_CLASS = {
   moderate: 'border-border text-foreground',
   good: 'border-primary/50 text-primary',
   strong: 'border-primary text-primary',
+  huge: 'border-2 border-cheese text-cheese',
 } as const;
 
 /** Compact Respect badge; loads public signals only once on screen. Others see only the mark and total. */

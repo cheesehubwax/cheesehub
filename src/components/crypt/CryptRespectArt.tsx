@@ -2,12 +2,12 @@ import type { TrustMark } from '@/lib/cryptTrust';
 
 /**
  * Custom illustrated Respect emblems (inline SVG, theme tokens only).
- * Mousetrap → Milk → Wedge → Fondue → Golden CHEESE wheel.
+ * Mousetrap → Milk → Wedge → Fondue → Golden CHEESE wheel → Laurelled double-crowned wheel.
  */
 const c = (v: string, a?: number) => a == null ? `hsl(var(--${v}))` : `hsl(var(--${v}) / ${a})`;
 
 const RING: Record<TrustMark, string> = {
-  warning: c('destructive'), low: c('muted-foreground'), moderate: c('cheese-dark'), good: c('accent'), strong: c('cheese'),
+  warning: c('destructive'), low: c('muted-foreground'), moderate: c('cheese-dark'), good: c('accent'), strong: c('cheese'), huge: c('cheese-light'),
 };
 
 function Art({ mark }: { mark: TrustMark }) {
@@ -54,12 +54,37 @@ function Art({ mark }: { mark: TrustMark }) {
       <path d="M10 9.5 L11.5 5 L14 8 L16 4 L18 8 L20.5 5 L22 9.5 Z" fill={c('cheese-light')} stroke={ink} strokeWidth="0.8" strokeLinejoin="round" />
       <path d="M24.5 6 l0.6 1.4 1.4 0.6 -1.4 0.6 -0.6 1.4 -0.6 -1.4 -1.4 -0.6 1.4 -0.6 z" fill={c('cheese-light')} />
     </g>;
+    case 'huge': {
+      const leaf = c('accent');
+      const leaves = (side: 1 | -1) => [0, 1, 2, 3].map(i => {
+        const y = 24 - i * 3.6, x = 16 + side * (10.6 - i * 0.6);
+        return <ellipse key={i} cx={x} cy={y} rx="1.1" ry="2.1" fill={leaf} stroke={ink} strokeWidth="0.4" transform={`rotate(${side * (35 - i * 12)} ${x} ${y})`} />;
+      });
+      return <g>
+        <path d="M7.5 26 Q4.5 17 8.5 9.5 M24.5 26 Q27.5 17 23.5 9.5" fill="none" stroke={leaf} strokeWidth="0.9" strokeLinecap="round" />
+        {leaves(-1)}{leaves(1)}
+        <ellipse cx="16" cy="23" rx="7" ry="3" fill={c('cheese-dark')} stroke={ink} strokeWidth="0.9" />
+        <rect x="9" y="19" width="14" height="4" fill={c('cheese-dark')} />
+        <ellipse cx="16" cy="19" rx="7" ry="3" fill={c('cheese')} stroke={ink} strokeWidth="0.9" />
+        <line x1="9" y1="19" x2="9" y2="23" stroke={ink} strokeWidth="0.9" />
+        <line x1="23" y1="19" x2="23" y2="23" stroke={ink} strokeWidth="0.9" />
+        <ellipse cx="14" cy="18.7" rx="1.1" ry="0.55" fill={c('cheese-dark')} />
+        <ellipse cx="18.5" cy="19.6" rx="0.8" ry="0.4" fill={c('cheese-dark')} />
+        <path d="M11 15.5 L11.8 12 L13.8 14 L16 10.8 L18.2 14 L20.2 12 L21 15.5 Z" fill={c('cheese')} stroke={ink} strokeWidth="0.7" strokeLinejoin="round" />
+        <path d="M12.5 11 L13.2 7.6 L14.8 9.4 L16 6.6 L17.2 9.4 L18.8 7.6 L19.5 11 Z" fill={c('cheese-light')} stroke={ink} strokeWidth="0.7" strokeLinejoin="round" />
+        <circle cx="16" cy="13.9" r="0.75" fill={c('destructive')} />
+        <circle cx="16" cy="9.9" r="0.6" fill={c('accent')} />
+        <path d="M16 2.6 l0.5 1.2 1.2 0.5 -1.2 0.5 -0.5 1.2 -0.5 -1.2 -1.2 -0.5 1.2 -0.5 z" fill={c('cheese-light')} />
+        <path d="M8.5 5.5 l0.4 0.9 0.9 0.4 -0.9 0.4 -0.4 0.9 -0.4 -0.9 -0.9 -0.4 0.9 -0.4 z" fill={c('cheese-light')} />
+        <path d="M23.5 5.5 l0.4 0.9 0.9 0.4 -0.9 0.4 -0.4 0.9 -0.4 -0.9 -0.9 -0.4 0.9 -0.4 z" fill={c('cheese-light')} />
+      </g>;
+    }
   }
 }
 
 export function CryptRespectArt({ mark, size = 32, className }: { mark: TrustMark; size?: number; className?: string }) {
   return <svg viewBox="0 0 32 32" width={size} height={size} aria-hidden className={className}>
-    <circle cx="16" cy="16" r="15" fill={c('card')} stroke={RING[mark]} strokeWidth="1.6" />
+    <circle cx="16" cy="16" r="15" fill={c('card')} stroke={RING[mark]} strokeWidth={mark === 'huge' ? 2.2 : 1.6} />
     <Art mark={mark} />
   </svg>;
 }
