@@ -78,9 +78,9 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
       <div className="flex items-center gap-2 mb-1">
         <PixelAvatar account={m.from} avatar={m.from === account ? keyAvatar : avatars[m.from]} className="h-6 w-6" />
         <p className="text-[10px] font-semibold opacity-80 break-words">{m.from === account ? `you · ${nameFor(account)}` : nameFor(m.from)}{badges && (badges.owner || badges.admin || badges.founder) && <span className="ml-1 inline-flex items-center gap-1 align-middle">
-          {badges.owner && <span title="Room owner" aria-label="Room owner">👑</span>}
-          {badges.admin && <span title="Room admin" aria-label="Room admin">🛡️</span>}
-          {badges.founder && <span title="Founding member" className="rounded border border-cheese/40 px-1 text-[9px] font-semibold text-cheese">Founder</span>}
+          {badges.owner && <RoleChip icon="👑" label="Owner" title="Room owner" />}
+          {badges.admin && <RoleChip icon="🛡️" label="Admin" title="Room admin" />}
+          {badges.founder && <RoleChip icon="⭐" label="Founder" title="Founding member" />}
         </span>}{trust && <CryptTrustBadge account={m.from} variant="inline" className="ml-1" />}{nameFor(m.from) !== m.from && <span className="block font-normal">{m.from}</span>}</p>
       </div>
       {hidden ? <p className="italic opacity-70">🙈 Message collapsed by a moderator{canReveal && onReveal && <> · <button type="button" className="not-italic font-semibold text-cheese underline underline-offset-2" onClick={onReveal}>Show</button></>}</p> : <>
