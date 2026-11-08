@@ -72,6 +72,15 @@ describe('custom history server', () => {
     saveCustomEndpoint('https://node.example.com', true);
     expect(historyTimeoutMs('https://node.example.com')).toBe(40000);
   });
+  it('persists the only-this-server toggle instantly on an already-saved server', () => {
+    saveCustomEndpoint('http://localhost:8088', false);
+    expect(loadCustomOnly()).toBe(false);
+    // The dialog's instant-save path: toggle writes straight to storage, no re-test.
+    saveCustomEndpoint(loadCustomEndpoint(), true);
+    expect(loadCustomOnly()).toBe(true);
+    saveCustomEndpoint(loadCustomEndpoint(), false);
+    expect(loadCustomOnly()).toBe(false);
+  });
   it('keeps the timeout active while reading a stalled response body', async () => {
     vi.useFakeTimers();
     vi.stubGlobal('fetch', vi.fn().mockImplementation((_url, opts) => Promise.resolve({
