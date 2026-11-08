@@ -69,7 +69,7 @@ export function CryptChatHeader({
   );
 
   return (
-    <div className={cn('relative min-w-0 px-4 py-3 border-b border-border font-semibold flex flex-wrap items-center gap-2 md:col-start-2 md:row-start-1', !active && 'hidden md:flex', active && lockSlot && 'pr-28')}>
+    <div className={cn('relative min-w-0 px-4 py-3 border-b border-border font-semibold flex flex-wrap items-center gap-2 md:col-start-2 md:row-start-1', !active && 'hidden md:flex', active && lockSlot && 'pt-9')}>
       {active && <>
             {activeInvite ? <div className="w-full space-y-2">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -111,7 +111,7 @@ export function CryptChatHeader({
               <Button size="sm" variant="ghost" className="h-7 text-xs font-normal text-destructive hover:text-destructive" aria-label={`Block ${active}`}
                 onClick={() => { if (window.confirm(`Block ${active}? Their messages will be hidden on this device.`)) blockAccount(active); }}><Ban className="h-3.5 w-3.5" /> Block</Button>
             </span>}</>}
-      {active && lockSlot && <span className="absolute right-2 top-2">{lockSlot}</span>}
+      {active && lockSlot && <span className="absolute right-2 top-1.5">{lockSlot}</span>}
     </div>
   );
 }
