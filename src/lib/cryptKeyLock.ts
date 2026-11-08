@@ -7,7 +7,7 @@
 import nacl from 'tweetnacl';
 import { decodeBase64, encodeBase64, decodeUTF8 } from 'tweetnacl-util';
 import { parseAvatar, type CryptAvatar } from '@/lib/cryptAvatar';
-import { parseCryptName } from '@/lib/cryptNames';
+import { parseCryptBio, parseCryptName } from '@/lib/cryptNames';
 import type { MessagingKey, RetiredKey } from '@/lib/cheeseCrypt';
 
 export const LOCK_SCHEME = 'cheesecrypt-anchor-sig-v1';
@@ -81,6 +81,7 @@ export interface LockedKeyFile {
   created: string;
   avatar?: CryptAvatar;
   displayName?: string;
+  bio?: string;
   /** Older key pairs kept for reading; absent in files that never rotated. */
   retired?: SealedRetiredKey[];
 }
