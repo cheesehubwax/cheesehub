@@ -2,7 +2,7 @@
 
 Open tasks only. Completed work lives in git history.
 
-- [ ] CHEESECrypt Tor helper: fix repeated Test & connect failure, test the SOCKS/TLS transport and bounded fallback, and provide Windows replacement commands.
+- [ ] CHEESECrypt Tor helper: confirm v1.1 replacement and browser local-network permission on the user's Windows PC; Tor-only HTTPS/certificate/timeouts tests and the real Tor-backed Privacy dialog save pass here, and Windows replacement commands are in the plan.
 
 - [ ] CHEESEHub node resilience: verify real Anchor unlock/power-up with the user's signatures; health-ordered wallet transport and bounded reads are implemented, outage regression tests pass, and live WAX reads/PowerUp state succeed with eosusa and greymass unavailable. Never auto-rebroadcast payments.
 
