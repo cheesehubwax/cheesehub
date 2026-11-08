@@ -51,6 +51,8 @@ describe('crypt trust strength', () => {
   it('mark thresholds and the new-account override', () => {
     expect([markFor(9, false), markFor(10, false), markFor(40, false), markFor(100, false), markFor(150, false)]).toEqual(['warning', 'low', 'moderate', 'good', 'strong']);
     expect([markFor(39, false), markFor(99, false), markFor(149, false)]).toEqual(['low', 'moderate', 'good']);
+    expect([markFor(199, false), markFor(200, false), markFor(224, false)]).toEqual(['strong', 'huge', 'huge']);
+    expect(markFor(220, true)).toBe('warning');
     expect(scoreTrust({ ...base, account: 'new.cheese', createdAt: NOW - 3 * DAY, cheese: 100_000 }, NOW).mark).toBe('warning');
   });
   it('unknown signals are left out and mark the score partial', () => {
