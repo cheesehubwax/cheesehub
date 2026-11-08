@@ -1,13 +1,14 @@
-import { fetchTableRows } from './waxRpcFallback';
 import { chainPost } from './chainRequest';
+import { buildReservePrices, isCheeseLeg, valueReserves, type ReserveLeg, type TvlToken } from './tvlPricing';
 
 const CHEESE_CONTRACT = 'cheeseburger';
 const CHEESE_SYMBOL = 'CHEESE';
 
 interface AlcorPool {
   id: number;
-  tokenA: { contract: string; symbol: string; quantity: string };
-  tokenB: { contract: string; symbol: string; quantity: string };
+  active?: boolean | number;
+  tokenA: { contract: string; symbol: string; quantity: string | number };
+  tokenB: { contract: string; symbol: string; quantity: string | number };
   tvlUSD: number;
 }
 
@@ -39,13 +40,14 @@ interface TacoPair {
 }
 
 export interface TVLData {
-  alcorSwap: number;
-  alcorSpot: number;
-  defibox: number;
-  taco: number;
-  nefty: number;
+  alcorSwap: number | null;
+  alcorSpot: number | null;
+  defibox: number | null;
+  taco: number | null;
+  nefty: number | null;
   totalUSD: number;
   totalWAX: number;
+  partial: boolean;
 }
 
 function parseQuantity(quantity: string): { amount: number; symbol: string } {
@@ -72,15 +74,40 @@ async function fetchWithTimeout<T>(url: string, init?: RequestInit): Promise<T> 
   }
 }
 
-function isCheesePool(pool: AlcorPool): boolean {
-  return (
-    (pool.tokenA.contract === CHEESE_CONTRACT && pool.tokenA.symbol.includes(CHEESE_SYMBOL)) ||
-    (pool.tokenB.contract === CHEESE_CONTRACT && pool.tokenB.symbol.includes(CHEESE_SYMBOL))
-  );
+type VenueValue = { usd: number; complete: boolean };
+
+function sumPools(pools: ReserveLeg[][], prices: ReadonlyMap<string, number>): VenueValue {
+  let usd = 0;
+  let complete = true;
+  for (const legs of pools) {
+    if (!legs.some(isCheeseLeg)) continue;
+    const value = valueReserves(legs, prices);
+    usd += value.usd;
+    complete &&= value.complete;
+  }
+  return { usd, complete };
 }
 
-export async function fetchAlcorSwapCheeseTVL(): Promise<number> {
-  try {
+/** A bounded, complete table read. Never call a truncated page a whole venue. */
+async function readPairs<T>(code: string): Promise<T[]> {
+  const rows: T[] = [];
+  let lower = '';
+  for (let page = 0; page < 40; page++) {
+    const data = await chainPost<{ rows: T[]; more?: boolean | string; next_key?: string }>(
+      '/v1/chain/get_table_rows',
+      { code, scope: code, table: 'pairs', json: true, limit: 1000, ...(lower ? { lower_bound: lower } : {}) },
+      { timeoutMs: SOURCE_TIMEOUT_MS },
+    );
+    rows.push(...data.rows);
+    if (!data.more) return rows;
+    const next = data.next_key || (typeof data.more === 'string' ? data.more : '');
+    if (!next || next === lower) throw new Error(`${code} pairs cursor stalled`);
+    lower = next;
+  }
+  throw new Error(`${code} pairs exceeded read limit`);
+}
+
+export async function fetchAlcorSwapCheeseTVL(prices: ReadonlyMap<string, number>): Promise<VenueValue> {
     // Alcor filters server-side by either side of the pair: ~60 KB in two
     // requests instead of the ~11 MB full pool list. Both must answer, so a
     // half-read never shows up as a lower TVL.
@@ -89,17 +116,15 @@ export async function fetchAlcorSwapCheeseTVL(): Promise<number> {
       fetchWithTimeout<AlcorPool[]>(`${ALCOR_API}/swap/pools?tokenB=cheese-cheeseburger`),
     ]);
     const byId = new Map<number, AlcorPool>();
-    for (const pool of [...asA, ...asB]) if (isCheesePool(pool)) byId.set(pool.id, pool);
-    let total = 0;
-    for (const pool of byId.values()) total += pool.tvlUSD || 0;
-    return total;
-  } catch (error) {
-    console.warn('Failed to fetch Alcor Swap CHEESE TVL:', error);
-    return 0;
-  }
+    for (const pool of [...asA, ...asB]) {
+      if (pool.active !== false && pool.active !== 0) byId.set(pool.id, pool);
+    }
+    return sumPools([...byId.values()].map(pool => [pool.tokenA, pool.tokenB].map(token => ({
+      symbol: token.symbol, contract: token.contract, quantity: Number(token.quantity),
+    }))), prices);
 }
 
-export async function fetchAlcorSpotCheeseTVL(waxUsdPrice: number): Promise<number> {
+export async function fetchAlcorSpotCheeseTVL(waxUsdPrice: number): Promise<number | null> {
   try {
     // Only the CHEESE/WAX spot market is counted, so read just that one.
     const market = await fetchWithTimeout<AlcorTicker>(
@@ -108,82 +133,26 @@ export async function fetchAlcorSpotCheeseTVL(waxUsdPrice: number): Promise<numb
     return (market?.target_volume || 0) * waxUsdPrice;
   } catch (error) {
     console.warn('Failed to fetch Alcor Spot CHEESE TVL:', error);
-    return 0;
+    return null;
   }
 }
 
-export async function fetchDefiboxCheeseTVL(waxUsdPrice: number): Promise<number> {
-  try {
-    const response = await fetchTableRows<DefiboxPair>({
-      code: 'swap.box',
-      scope: 'swap.box',
-      table: 'pairs',
-      limit: 500,
-    });
-
-    // Filter for CHEESE pairs
-    const cheesePairs = response.rows.filter(pair =>
-      pair.token0.contract === CHEESE_CONTRACT || pair.token1.contract === CHEESE_CONTRACT
-    );
-
-    let totalTVL = 0;
-
-    for (const pair of cheesePairs) {
-      const reserve0 = parseQuantity(pair.reserve0);
-      const reserve1 = parseQuantity(pair.reserve1);
-
-      // Calculate TVL - both sides of the pair
-      // If one side is WAX, use WAX price to get USD value
-      if (pair.token0.contract === 'eosio.token' && pair.token0.symbol === '8,WAX') {
-        totalTVL += reserve0.amount * waxUsdPrice * 2; // Multiply by 2 for both sides
-      } else if (pair.token1.contract === 'eosio.token' && pair.token1.symbol === '8,WAX') {
-        totalTVL += reserve1.amount * waxUsdPrice * 2;
-      }
-    }
-
-    return totalTVL;
-  } catch (error) {
-    console.warn('Failed to fetch Defibox CHEESE TVL:', error);
-    return 0;
-  }
+export async function fetchDefiboxCheeseTVL(prices: ReadonlyMap<string, number>): Promise<VenueValue> {
+  const pairs = await readPairs<DefiboxPair>('swap.box');
+  return sumPools(pairs.map(pair => [
+    { ...pair.token0, quantity: parseQuantity(pair.reserve0).amount },
+    { ...pair.token1, quantity: parseQuantity(pair.reserve1).amount },
+  ]), prices);
 }
 
-export async function fetchTacoCheeseTVL(waxUsdPrice: number): Promise<number> {
-  try {
-    const response = await fetchTableRows<TacoPair>({
-      code: 'swap.taco',
-      scope: 'swap.taco',
-      table: 'pairs',
-      limit: 500,
-    });
-
-    // Filter for CHEESE pairs
-    const cheesePairs = response.rows.filter(pair =>
-      pair.pool1.contract === CHEESE_CONTRACT || pair.pool2.contract === CHEESE_CONTRACT
-    );
-
-    let totalTVL = 0;
-
-    for (const pair of cheesePairs) {
-      const pool1 = parseQuantity(pair.pool1.quantity);
-      const pool2 = parseQuantity(pair.pool2.quantity);
-
-      // If one side is WAX, use WAX price to get USD value
-      if (pair.pool1.contract === 'eosio.token' && pool1.symbol === 'WAX') {
-        totalTVL += pool1.amount * waxUsdPrice * 2;
-      } else if (pair.pool2.contract === 'eosio.token' && pool2.symbol === 'WAX') {
-        totalTVL += pool2.amount * waxUsdPrice * 2;
-      }
-    }
-
-    return totalTVL;
-  } catch (error) {
-    console.warn('Failed to fetch Taco CHEESE TVL:', error);
-    return 0;
-  }
+export async function fetchTacoCheeseTVL(prices: ReadonlyMap<string, number>): Promise<VenueValue> {
+  const pairs = await readPairs<TacoPair>('swap.taco');
+  return sumPools(pairs.map(pair => [pair.pool1, pair.pool2].map(leg => ({
+    ...parseQuantity(leg.quantity), contract: leg.contract, quantity: parseQuantity(leg.quantity).amount,
+  }))), prices);
 }
 
-export async function fetchNeftyCheeseTVL(cheeseUsdPrice: number): Promise<number> {
+export async function fetchNeftyCheeseTVL(cheeseUsdPrice: number): Promise<number | null> {
   try {
     // CHEESE balance held by swap.nefty, via the shared backup-node reader.
     const balances = await chainPost<string[]>('/v1/chain/get_currency_balance', {
@@ -198,29 +167,38 @@ export async function fetchNeftyCheeseTVL(cheeseUsdPrice: number): Promise<numbe
     return amount * cheeseUsdPrice * 2;
   } catch (error) {
     console.warn('Failed to fetch Nefty CHEESE TVL:', error);
-    return 0;
+    return null;
   }
 }
 
 export async function fetchCheeseTotalTVL(waxUsdPrice: number, cheeseUsdPrice: number): Promise<TVLData> {
+  const prices = buildReservePrices(await fetchWithTimeout<TvlToken[]>(`${ALCOR_API}/tokens`));
+  if (!(prices.get('WAX-eosio.token') && prices.get('CHEESE-cheeseburger'))) {
+    throw new Error('Live liquidity prices unavailable');
+  }
+  const readVenue = async (read: () => Promise<VenueValue>): Promise<VenueValue | null> => {
+    try { return await read(); }
+    catch (error) { console.warn('Liquidity venue unavailable:', error); return null; }
+  };
   const [alcorSwap, alcorSpot, defibox, taco, nefty] = await Promise.all([
-    fetchAlcorSwapCheeseTVL(),
+    readVenue(() => fetchAlcorSwapCheeseTVL(prices)),
     fetchAlcorSpotCheeseTVL(waxUsdPrice),
-    fetchDefiboxCheeseTVL(waxUsdPrice),
-    fetchTacoCheeseTVL(waxUsdPrice),
+    readVenue(() => fetchDefiboxCheeseTVL(prices)),
+    readVenue(() => fetchTacoCheeseTVL(prices)),
     fetchNeftyCheeseTVL(cheeseUsdPrice),
   ]);
 
-  const totalUSD = alcorSwap + alcorSpot + defibox + taco + nefty;
+  const totalUSD = (alcorSwap?.usd ?? 0) + (alcorSpot ?? 0) + (defibox?.usd ?? 0) + (taco?.usd ?? 0) + (nefty ?? 0);
   const totalWAX = waxUsdPrice > 0 ? totalUSD / waxUsdPrice : 0;
 
   return {
-    alcorSwap,
+    alcorSwap: alcorSwap?.usd ?? null,
     alcorSpot,
-    defibox,
-    taco,
+    defibox: defibox?.usd ?? null,
+    taco: taco?.usd ?? null,
     nefty,
     totalUSD,
     totalWAX,
+    partial: !alcorSwap?.complete || !defibox?.complete || !taco?.complete || alcorSpot === null || nefty === null,
   };
 }
