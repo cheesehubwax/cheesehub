@@ -144,27 +144,27 @@ export function parseLockedKeyFile(raw: unknown): LockedKeyFile | null {
   if ('secretKey' in o) return null;
   const l = o.lock as Record<string, unknown> | null;
   if (!l || l.scheme !== LOCK_SCHEME || !b64Len(l.salt, 16) || !b64Len(l.nonce, nacl.secretbox.nonceLength) || typeof l.ciphertext !== 'string' || !b64Len(l.ciphertext, 32 + nacl.secretbox.overheadLength)) return null;
-  const avatar = parseAvatar(o.avatar), displayName = parseCryptName(o.displayName);
+  const avatar = parseAvatar(o.avatar), displayName = parseCryptName(o.displayName), bio = parseCryptBio(o.bio);
   const retired = parseSealedRetired(o.retired);
   if (!retired || retired.some(r => r.publicKey === o.publicKey)) return null;
   return {
     type: 'gpk-msg-key', version: 2, account: o.account, publicKey: o.publicKey as string,
     lock: { scheme: LOCK_SCHEME, salt: l.salt as string, nonce: l.nonce as string, ciphertext: l.ciphertext },
     created: typeof o.created === 'string' ? o.created : '',
-    ...(avatar ? { avatar } : {}), ...(displayName ? { displayName } : {}),
+    ...(avatar ? { avatar } : {}), ...(displayName ? { displayName } : {}), ...(bio ? { bio } : {}),
     ...(retired.length ? { retired } : {}),
   };
 }
 
 export function toLockedFile(k: MessagingKey, lock: KeyLock): LockedKeyFile {
-  const displayName = parseCryptName(k.displayName);
+  const displayName = parseCryptName(k.displayName), bio = parseCryptBio(k.bio);
   const retired = k.retired?.length ? sealRetired(k.retired, k.secretKey) : [];
-  return { type: 'gpk-msg-key', version: 2, account: k.account, publicKey: k.publicKey, lock, created: k.created, ...(k.avatar ? { avatar: k.avatar } : {}), ...(displayName ? { displayName } : {}), ...(retired.length ? { retired } : {}) };
+  return { type: 'gpk-msg-key', version: 2, account: k.account, publicKey: k.publicKey, lock, created: k.created, ...(k.avatar ? { avatar: k.avatar } : {}), ...(displayName ? { displayName } : {}), ...(bio ? { bio } : {}), ...(retired.length ? { retired } : {}) };
 }
 
 export function fromLockedFile(f: LockedKeyFile, secretKey: string): MessagingKey {
   const retired = f.retired?.length ? openRetired(f.retired, secretKey) : [];
-  return { type: 'gpk-msg-key', version: 1, account: f.account, publicKey: f.publicKey, secretKey, created: f.created, avatar: f.avatar, displayName: f.displayName, ...(retired.length ? { retired } : {}) };
+  return { type: 'gpk-msg-key', version: 1, account: f.account, publicKey: f.publicKey, secretKey, created: f.created, avatar: f.avatar, displayName: f.displayName, ...(f.bio ? { bio: f.bio } : {}), ...(retired.length ? { retired } : {}) };
 }
 
 /** Re-seals the retired list of an unlocked key onto its locked file (no signature needed; the Anchor seal is unchanged). */
@@ -176,10 +176,10 @@ export function withRetired(f: LockedKeyFile, k: MessagingKey): LockedKeyFile {
 }
 
 /** Copies the current (unsealed) profile fields onto a locked envelope; the sealed secret never changes. */
-export const withProfile = (f: LockedKeyFile, k: Pick<MessagingKey, 'avatar' | 'displayName'>): LockedKeyFile => {
-  const { avatar: _a, displayName: _d, ...rest } = f;
-  const displayName = parseCryptName(k.displayName);
-  return { ...rest, ...(k.avatar ? { avatar: k.avatar } : {}), ...(displayName ? { displayName } : {}) };
+export const withProfile = (f: LockedKeyFile, k: Pick<MessagingKey, 'avatar' | 'displayName' | 'bio'>): LockedKeyFile => {
+  const { avatar: _a, displayName: _d, bio: _b, ...rest } = f;
+  const displayName = parseCryptName(k.displayName), bio = parseCryptBio(k.bio);
+  return { ...rest, ...(k.avatar ? { avatar: k.avatar } : {}), ...(displayName ? { displayName } : {}), ...(bio ? { bio } : {}) };
 };
 
 // The browser remembers the locked envelope (no secret inside) so Back up hands out the locked file.
