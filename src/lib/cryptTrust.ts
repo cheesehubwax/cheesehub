@@ -22,7 +22,7 @@ export interface TrustSignals {
   key: { published: boolean; firstAt: number | null } | null;
 }
 
-export interface TrustLine { id: string; label: string; points: number | null; detail: string }
+export interface TrustLine { id: string; label: string; points: number | null; detail: string; max: number }
 export interface TrustScore { total: number; mark: TrustMark; partial: boolean; lines: TrustLine[] }
 
 const DAY = 86_400_000;
@@ -30,6 +30,17 @@ const YEAR = 365 * DAY;
 
 export const isPremiumName = (account: string) => /\.(cheese|chz)$/.test(account);
 export const PREMIUM_POINTS = 40;
+
+/** Maximum points each signal can earn, so the checklist can show progress as points/max. */
+export const MAX_AGE_POINTS = 32;
+export const MAX_BALANCE_POINTS = 30;
+export const MAX_STAKE_POINTS = 32;
+export const MAX_POOL_POINTS = 45; // 40 base + 5 multi-pool bonus
+export const MAX_NFT_POINTS = 25;
+export const MAX_KEY_POINTS = 10;
+export const MAX_KEY_AGE_POINTS = 10;
+export const MAX_TOTAL_POINTS = PREMIUM_POINTS + MAX_AGE_POINTS + MAX_BALANCE_POINTS + MAX_STAKE_POINTS
+  + MAX_POOL_POINTS + MAX_NFT_POINTS + MAX_KEY_POINTS + MAX_KEY_AGE_POINTS;
 
 export function agePoints(ageMs: number): number {
   if (ageMs < 7 * DAY) return -15;
@@ -104,24 +115,24 @@ const span = (ms: number) => ms >= YEAR ? `${Math.floor(ms / YEAR)} yr` : `${Mat
 export function scoreTrust(s: TrustSignals, now = Date.now()): TrustScore {
   const lines: TrustLine[] = [];
   const premium = isPremiumName(s.account);
-  lines.push({ id: 'name', label: '🧀 Premium CHEESE name', points: premium ? PREMIUM_POINTS : 0, detail: premium ? s.account : 'No .cheese or .chz name' });
-  lines.push(s.createdAt == null ? { id: 'age', label: '⏳ Account age', points: null, detail: 'Unknown' }
-    : { id: 'age', label: '⏳ Account age', points: agePoints(now - s.createdAt), detail: span(now - s.createdAt) });
-  lines.push(s.cheese == null ? { id: 'cheese', label: '🧀 CHEESE held', points: null, detail: 'Unknown' }
-    : { id: 'cheese', label: '🧀 CHEESE held', points: balancePoints(s.cheese), detail: `${fmt(s.cheese)} CHEESE` });
-  lines.push(s.staked == null ? { id: 'stake', label: '🚰 Faucet stake', points: null, detail: 'Unknown' }
-    : { id: 'stake', label: '🚰 Faucet stake', points: stakePoints(s.staked), detail: `${fmt(s.staked)} CHEESE` });
-  lines.push(s.pooled == null ? { id: 'pool', label: '💧 Liquidity', points: null, detail: 'Unknown' }
-    : { id: 'pool', label: '💧 Liquidity', points: poolPoints(s.pooled.cheese, s.pooled.pools), detail: `${fmt(s.pooled.cheese)} CHEESE in ${s.pooled.pools} pool${s.pooled.pools === 1 ? '' : 's'}` });
-  lines.push(s.nfts == null ? { id: 'nft', label: '🖼️ CHEESE NFTs', points: null, detail: 'Unknown' }
-    : { id: 'nft', label: '🖼️ CHEESE NFTs', points: nftPoints(s.nfts), detail: `${s.nfts}` });
+  lines.push({ id: 'name', label: '🧀 Premium CHEESE name', points: premium ? PREMIUM_POINTS : 0, detail: premium ? s.account : 'No .cheese or .chz name', max: PREMIUM_POINTS });
+  lines.push(s.createdAt == null ? { id: 'age', label: '⏳ Account age', points: null, detail: 'Unknown', max: MAX_AGE_POINTS }
+    : { id: 'age', label: '⏳ Account age', points: agePoints(now - s.createdAt), detail: span(now - s.createdAt), max: MAX_AGE_POINTS });
+  lines.push(s.cheese == null ? { id: 'cheese', label: '🧀 CHEESE held', points: null, detail: 'Unknown', max: MAX_BALANCE_POINTS }
+    : { id: 'cheese', label: '🧀 CHEESE held', points: balancePoints(s.cheese), detail: `${fmt(s.cheese)} CHEESE`, max: MAX_BALANCE_POINTS });
+  lines.push(s.staked == null ? { id: 'stake', label: '🚰 Faucet stake', points: null, detail: 'Unknown', max: MAX_STAKE_POINTS }
+    : { id: 'stake', label: '🚰 Faucet stake', points: stakePoints(s.staked), detail: `${fmt(s.staked)} CHEESE`, max: MAX_STAKE_POINTS });
+  lines.push(s.pooled == null ? { id: 'pool', label: '💧 Liquidity', points: null, detail: 'Unknown', max: MAX_POOL_POINTS }
+    : { id: 'pool', label: '💧 Liquidity', points: poolPoints(s.pooled.cheese, s.pooled.pools), detail: `${fmt(s.pooled.cheese)} CHEESE in ${s.pooled.pools} pool${s.pooled.pools === 1 ? '' : 's'}`, max: MAX_POOL_POINTS });
+  lines.push(s.nfts == null ? { id: 'nft', label: '🖼️ CHEESE NFTs', points: null, detail: 'Unknown', max: MAX_NFT_POINTS }
+    : { id: 'nft', label: '🖼️ CHEESE NFTs', points: nftPoints(s.nfts), detail: `${s.nfts}`, max: MAX_NFT_POINTS });
   if (s.key == null) {
-    lines.push({ id: 'key', label: '🔑 Published key', points: null, detail: 'Unknown' });
-    lines.push({ id: 'keyage', label: '🗝️ CHEESECrypt key age', points: null, detail: 'Unknown' });
+    lines.push({ id: 'key', label: '🔑 Published key', points: null, detail: 'Unknown', max: MAX_KEY_POINTS });
+    lines.push({ id: 'keyage', label: '🗝️ CHEESECrypt key age', points: null, detail: 'Unknown', max: MAX_KEY_AGE_POINTS });
   } else {
-    lines.push({ id: 'key', label: '🔑 Published key', points: s.key.published ? 10 : 0, detail: s.key.published ? 'Published on chain' : 'Not published' });
+    lines.push({ id: 'key', label: '🔑 Published key', points: s.key.published ? MAX_KEY_POINTS : 0, detail: s.key.published ? 'Published on chain' : 'Not published', max: MAX_KEY_POINTS });
     const ka = s.key.published && s.key.firstAt != null ? now - s.key.firstAt : null;
-    lines.push({ id: 'keyage', label: '🗝️ CHEESECrypt key age', points: ka == null ? 0 : keyAgePoints(ka), detail: ka == null ? 'No key' : span(ka) });
+    lines.push({ id: 'keyage', label: '🗝️ CHEESECrypt key age', points: ka == null ? 0 : keyAgePoints(ka), detail: ka == null ? 'No key' : span(ka), max: MAX_KEY_AGE_POINTS });
   }
   const total = lines.reduce((t, l) => t + (l.points ?? 0), 0);
   const partial = lines.some(l => l.points == null);
