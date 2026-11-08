@@ -15,11 +15,9 @@ import {
 } from "@/components/ui/select";
 import { Lock, Calendar, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getTokenLogoUrl } from "@/lib/tokenLogos";
+import { TokenLogo } from "@/components/TokenLogo";
 import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 import { getTokenPrecision, formatAssetAmount, floorToPrecision, padAmountDisplay } from "@/lib/tokenPrecision";
-
-const TOKEN_LOGO_PLACEHOLDER = '/placeholder.svg';
 
 interface TokenBalance {
   symbol: string;
@@ -227,12 +225,7 @@ export function CreateLock() {
                     value={`${token.contract}:${token.symbol}`}
                   >
                     <span className="flex items-center gap-2">
-                      <img
-                        src={getTokenLogoUrl(token.contract, token.symbol)}
-                        alt={token.symbol}
-                        className="h-4 w-4 rounded-full"
-                        onError={(e) => { e.currentTarget.src = TOKEN_LOGO_PLACEHOLDER; }}
-                      />
+                      <TokenLogo contract={token.contract} symbol={token.symbol} size="sm" />
                       {token.symbol} - {token.amount}
                     </span>
                   </SelectItem>

@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Droplets, Calendar, AlertCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getTokenLogoUrl } from "@/lib/tokenLogos";
+import { TokenLogo } from "@/components/TokenLogo";
 import { setDripName } from "@/lib/dripNames";
 import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 import {
@@ -19,8 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-const TOKEN_LOGO_PLACEHOLDER = '/placeholder.svg';
 
 const HOUR_PRESETS = [
   { label: "1h", value: 1 },
@@ -277,12 +275,7 @@ export function CreateDrip() {
                   value={`${token.contract}:${token.symbol}`}
                 >
                   <span className="flex items-center gap-2">
-                    <img
-                      src={getTokenLogoUrl(token.contract, token.symbol)}
-                      alt={token.symbol}
-                      className="h-4 w-4 rounded-full"
-                      onError={e => { e.currentTarget.src = TOKEN_LOGO_PLACEHOLDER; }}
-                    />
+                    <TokenLogo contract={token.contract} symbol={token.symbol} size="sm" />
                     {token.symbol} - {token.balance.toFixed(token.precision)}
                   </span>
                 </SelectItem>
