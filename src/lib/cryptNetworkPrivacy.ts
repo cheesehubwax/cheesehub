@@ -66,7 +66,8 @@ export async function checkHistoryEndpoint(url: string): Promise<{ ok: boolean; 
     return Array.isArray(j?.actions) ? { ok: true } : { ok: false, error: 'The server answered, but did not return WAX history actions. Nothing was saved.' };
   } catch (e) {
     const local = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(?=[:/]|$)/.test(url);
-    const error = e instanceof Error && e.name === 'AbortError'
+    const aborted = typeof e === 'object' && e !== null && 'name' in e && e.name === 'AbortError';
+    const error = aborted
       ? 'The connection timed out. Keep Tor Browser connected and the updated helper running, then try again.'
       : e instanceof TypeError && local
         ? 'Cannot reach the local helper. Keep its terminal open, check http://127.0.0.1:8088, and allow local-network access if your browser asks.'
