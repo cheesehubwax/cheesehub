@@ -2,7 +2,30 @@
 
 Folder: `C:\Users\User\Desktop\crypt-tor-proxy`
 
-You don't need any project changes. These are steps for you to follow on your PC.
+Use the updated **v1.1** helper. The earlier download had a Tor connection bug; these steps replace it on your PC.
+
+## Replace the old helper first
+
+1. In the PowerShell window running the helper, press **Ctrl+C**.
+2. Refresh CHEESEHub, go to **CHEESECrypt → Menu → Privacy**, open the Tor guide and download the helper again.
+3. In PowerShell, run these commands. The copy replaces the old file; use the new download's actual filename if your browser added `(1)`.
+
+```powershell
+Set-Location "C:\Users\User\Desktop\crypt-tor-proxy"
+Copy-Item "$env:USERPROFILE\Downloads\cheesecrypt-tor-proxy.mjs" ".\cheesecrypt-tor-proxy.mjs" -Force
+node .\cheesecrypt-tor-proxy.mjs
+```
+
+4. Confirm the window says **helper v1.1**. Keep Tor Browser connected and this window open.
+5. In a second PowerShell window, check the actual history request:
+
+```powershell
+curl.exe --max-time 40 "http://127.0.0.1:8088/v2/history/get_actions?account=crypt.cheese&limit=1"
+```
+
+6. A JSON response containing an **actions array** means the request worked (it can be empty). An `error` response explains what failed.
+7. Refresh CHEESEHub so it uses the updated connection test. Enter **http://127.0.0.1:8088**, tick **Use only this server** to prevent direct history fallback, and press **Test & connect server**. Allow local-network access if your browser asks. Wait up to 40 seconds.
+8. If it fails, provide the message from the app and the result of the command above; do not send key files or wallet secrets.
 
 ## Step 1 - Check Node.js is installed
 
@@ -43,9 +66,9 @@ node cheesecrypt-tor-proxy.mjs
 
 You should see:
 ```text
-CHEESECrypt Tor helper is running
+CHEESECrypt Tor helper v1.1 is running
    Address for CHEESECrypt: http://localhost:8088
-   Tor found on port 9150
+   Tor port 9150 is open (connection verified on first request)
    Leave this window open. Press Ctrl+C to stop.
 ```
 
@@ -55,15 +78,15 @@ Keep this PowerShell window open while you chat.
 
 Open a **second** PowerShell window and run:
 ```
-curl.exe "http://localhost:8088/v2/history/get_actions?account=crypt.cheese&limit=1"
+curl.exe --max-time 40 "http://127.0.0.1:8088/v2/history/get_actions?account=crypt.cheese&limit=1"
 ```
 
-A long block of text starting with `{"query_time_ms"` means it works. The first request can take up to 30 seconds while Tor sets up its route.
+A JSON response containing an `actions` array means it works. Requests can take up to 40 seconds while slow servers are skipped. A port-open message alone does not prove that requests work through Tor.
 
 ## Step 6 - Connect CHEESECrypt
 
 1. In CHEESECrypt, go to Menu, then Privacy, then **Your own history server**.
-2. Enter `http://localhost:8088`.
+2. Enter `http://127.0.0.1:8088`.
 3. Optional: tick **Use only this server** if you never want CHEESECrypt to contact public servers directly. Without the helper running, history checks will then stop.
 4. Click **Test & connect server**. You should see "Saved. CHEESECrypt now asks this server first."
 
@@ -87,10 +110,11 @@ A long block of text starting with `{"query_time_ms"` means it works. The first 
 | `Cannot find module ...cheesecrypt-tor-proxy.mjs` | The file isn't in the folder. Run `dir` to check, then redo Step 3. |
 | "Every public history server failed through Tor" | Wait a minute and try again. Tor will pick a new route. |
 | Test & connect fails in CHEESECrypt | Make sure the PowerShell window is still open, then run the Step 5 check. |
-| Windows Firewall pop-up | You can click Cancel. The helper only talks to your own PC. |
+| Browser local-network prompt | Allow access for CHEESEHub if you want it to reach your local helper. |
 
 ## What this does and doesn't protect
 
 - Public WAX servers see a Tor address instead of your home IP when CHEESECrypt checks for messages.
 - Sending messages still goes through Anchor and your wallet, not Tor.
-- Your internet provider can see that you use Tor, but not what you do over it.
+- Other CHEESEHub requests do not automatically use this helper; it is not complete anonymity. Your provider may see that you connect to Tor; HTTPS protects the history request from the Tor exit, but the history server sees the requested blockchain data.
+- Tor client use is permitted in many jurisdictions, but restrictions and circumstances vary; this is not legal advice or a guarantee of zero liability.
