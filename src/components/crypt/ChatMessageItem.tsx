@@ -22,6 +22,14 @@ import { messageCost } from '@/lib/cheeseCrypt';
 import type { EditedMessage } from '@/lib/cryptEdits';
 import { REACTION_EMOJIS, isReaction, type ReactionEmoji, type ReactionPill } from '@/lib/cryptReactions';
 
+/** Room role badge: icon centred above a tiny label. */
+function RoleChip({ icon, label, title }: { icon: string; label: string; title: string }) {
+  return <span title={title} aria-label={title} className="inline-flex flex-col items-center rounded border border-cheese/40 bg-cheese/10 px-1 py-px leading-none text-cheese">
+    <span aria-hidden className="text-[11px] leading-none">{icon}</span>
+    <span aria-hidden className="mt-px text-[7px] font-semibold uppercase tracking-wide leading-none">{label}</span>
+  </span>;
+}
+
 /** Pure sound-effect-NFT posts render without the bubble box — sender header, playback and timestamp stay. */
 export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, reactionHighlighted, reactions, onReact, searchHit, editable, onEdit, onCollapse, canReveal, revealed, onReveal, badges, onMute, ban, adminToggle, report, reportHighlighted, friend, delivery, trust }: {
   m: EditedMessage; account: string; keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>;
@@ -78,9 +86,9 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
       <div className="flex items-center gap-2 mb-1">
         <PixelAvatar account={m.from} avatar={m.from === account ? keyAvatar : avatars[m.from]} className="h-6 w-6" />
         <p className="text-[10px] font-semibold opacity-80 break-words">{m.from === account ? `you · ${nameFor(account)}` : nameFor(m.from)}{badges && (badges.owner || badges.admin || badges.founder) && <span className="ml-1 inline-flex items-center gap-1 align-middle">
-          {badges.owner && <span title="Room owner" aria-label="Room owner">👑</span>}
-          {badges.admin && <span title="Room admin" aria-label="Room admin">🛡️</span>}
-          {badges.founder && <span title="Founding member" className="rounded border border-cheese/40 px-1 text-[9px] font-semibold text-cheese">Founder</span>}
+          {badges.owner && <RoleChip icon="👑" label="Owner" title="Room owner" />}
+          {badges.admin && <RoleChip icon="🛡️" label="Admin" title="Room admin" />}
+          {badges.founder && <RoleChip icon="⭐" label="Founder" title="Founding member" />}
         </span>}{trust && <CryptTrustBadge account={m.from} variant="inline" className="ml-1" />}{nameFor(m.from) !== m.from && <span className="block font-normal">{m.from}</span>}</p>
       </div>
       {hidden ? <p className="italic opacity-70">🙈 Message collapsed by a moderator{canReveal && onReveal && <> · <button type="button" className="not-italic font-semibold text-cheese underline underline-offset-2" onClick={onReveal}>Show</button></>}</p> : <>
