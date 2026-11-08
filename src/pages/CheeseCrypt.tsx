@@ -1975,6 +1975,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
         onReportRoom={activeListing && activeListing.creator !== account ? () => setReportingRoom(activeListing) : undefined}
         verify={active ? verifyState(verifiedKeys, active, contacts[active]) : undefined}
         onVerify={active && contacts[active] && !activeGroup && !activeInvite ? () => setSafetyOpen(true) : undefined}
+        onOpenProfile={setProfileOf}
         />
       {active && contacts[active] && !activeGroup && !activeInvite && <SafetyNumberDialog open={safetyOpen} onOpenChange={setSafetyOpen}
         me={{ account, publicKey: key.publicKey }} partner={{ account: active, publicKey: contacts[active] }} partnerName={nameFor(active)}

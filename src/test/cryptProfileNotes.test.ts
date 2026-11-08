@@ -46,3 +46,25 @@ describe('CHEESECrypt profile notes', () => {
     expect(batches[1].some(a => a.data.to === 'eosio.null' || a.data.to === 'xcheeseliqst')).toBe(false);
   });
 });
+
+import { parseCryptBio, MAX_CRYPT_BIO_LENGTH } from '@/lib/cryptNames';
+import { profileNotePayload as bioPayload, parseProfileNote as parseBioNote } from '@/lib/cryptProfileNotes';
+import { accountAvatar } from '@/lib/cryptAvatar';
+describe('profile bio', () => {
+  it('allows up to 500 characters with line breaks', () => {
+    expect(MAX_CRYPT_BIO_LENGTH).toBe(500);
+    expect(parseCryptBio('a'.repeat(500))).toBe('a'.repeat(500));
+    expect(parseCryptBio('a'.repeat(501))).toBeUndefined();
+    expect(parseCryptBio('line one\r\nline two')).toBe('line one\nline two');
+  });
+  it('rejects bidirectional overrides and invisible characters', () => {
+    expect(parseCryptBio('hi \u202e there')).toBeUndefined();
+    expect(parseCryptBio('hi\u200bthere')).toBeUndefined();
+  });
+  it('round-trips through the encrypted profile note and drops notes with invalid bios', () => {
+    const avatar = accountAvatar('alice');
+    const note = parseBioNote(bioPayload({ avatar, displayName: 'Alice', bio: 'To be or not to be' }));
+    expect(note?.bio).toBe('To be or not to be');
+    expect(parseBioNote('\u0002CP1:' + JSON.stringify({ avatar, bio: 'x'.repeat(501) }))).toBeNull();
+  });
+});
