@@ -148,7 +148,7 @@ export function CheesePriceBar() {
       <div className="flex items-center gap-2 bg-gradient-to-br from-cheese/10 via-background to-cheese-dark/10 border border-cheese/20 rounded-lg px-4 py-2">
         <img src={tvlUrl} alt="TVL" className="w-7 h-7 object-contain" />
         <div className="flex flex-col">
-          <span className="text-xs text-muted-foreground">TVL (All DEXs)</span>
+          <span className="text-xs text-muted-foreground">TVL (All DEXs){tvlData?.partial ? ' · partial' : ''}</span>
           {tvlLoading || !tvlData ? (
             <Skeleton className="h-5 w-24" />
           ) : (
