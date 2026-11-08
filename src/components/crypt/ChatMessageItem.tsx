@@ -85,11 +85,14 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
       highlighted && 'ring-2 ring-reply bg-reply/10', reactionHighlighted && 'outline outline-2 outline-offset-2 outline-cheese', reportHighlighted && 'ring-2 ring-report bg-report/10')}>
       <div className="flex items-center gap-2 mb-1">
         <PixelAvatar account={m.from} avatar={m.from === account ? keyAvatar : avatars[m.from]} className="h-6 w-6" />
-        <p className="text-[10px] font-semibold opacity-80 break-words">{m.from === account ? `you · ${nameFor(account)}` : nameFor(m.from)}{badges && (badges.owner || badges.admin || badges.founder) && <span className="ml-1 inline-flex items-center gap-1 align-middle">
+        <div className="min-w-0">
+        <p className="flex flex-wrap items-center gap-x-1 text-xs font-semibold leading-tight break-words"><span>{m.from === account ? `you · ${nameFor(account)}` : nameFor(m.from)}</span>{badges && (badges.owner || badges.admin || badges.founder) && <span className="inline-flex items-center gap-1">
           {badges.owner && <RoleChip icon="👑" label="Owner" title="Room owner" />}
           {badges.admin && <RoleChip icon="🛡️" label="Admin" title="Room admin" />}
           {badges.founder && <RoleChip icon="⭐" label="Founder" title="Founding member" />}
-        </span>}{trust && <CryptTrustBadge account={m.from} variant="inline" className="ml-1" />}{nameFor(m.from) !== m.from && <span className="block font-normal">{m.from}</span>}</p>
+        </span>}{trust && <CryptTrustBadge account={m.from} variant="inline" />}</p>
+        {nameFor(m.from) !== m.from && <p className="text-[9px] font-normal leading-none text-muted-foreground break-words">{m.from}</p>}
+        </div>
       </div>
       {hidden ? <p className="italic opacity-70">🙈 Message collapsed by a moderator{canReveal && onReveal && <> · <button type="button" className="not-italic font-semibold text-cheese underline underline-offset-2" onClick={onReveal}>Show</button></>}</p> : <>
       {m.collapsed && <p className="mb-1 text-[10px] text-muted-foreground">🙈 Collapsed by {nameFor(m.collapsed.by)} · visible to moderators</p>}
