@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { fetchContractStream, mergeMemos, streamRows, STREAM_PAGE, type ChainMemo } from '@/lib/cheeseCrypt';
-import { checkHistoryEndpoint, fetchCryptHistoryJson, historyTimeoutMs, orderWithCustom, saveCustomEndpoint, validateCustomEndpoint } from '@/lib/cryptNetworkPrivacy';
+import { checkHistoryEndpoint, fetchCryptHistoryJson, historyTimeoutMs, loadCustomEndpoint, loadCustomOnly, orderWithCustom, saveCustomEndpoint, validateCustomEndpoint } from '@/lib/cryptNetworkPrivacy';
 
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); localStorage.clear(); });
 
