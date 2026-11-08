@@ -24,7 +24,7 @@ import { REACTION_EMOJIS, isReaction, type ReactionEmoji, type ReactionPill } fr
 
 /** Room role badge: icon centred above a tiny label. */
 function RoleChip({ icon, label, title }: { icon: string; label: string; title: string }) {
-  return <span title={title} aria-label={title} className="inline-flex flex-col items-center rounded border border-cheese/40 bg-cheese/10 px-1 py-px leading-none text-cheese">
+  return <span title={title} aria-label={title} className="inline-flex flex-col items-center px-0.5 leading-none text-cheese">
     <span aria-hidden className="text-[11px] leading-none">{icon}</span>
     <span aria-hidden className="mt-px text-[7px] font-semibold uppercase tracking-wide leading-none">{label}</span>
   </span>;
