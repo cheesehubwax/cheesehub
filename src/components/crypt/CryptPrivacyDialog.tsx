@@ -93,7 +93,17 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
             <p>If you run your own WAX Hyperion server, or reach one through your own VPN or Tor setup, enter it here. It is stored only in this browser; nothing goes through CHEESEHub.</p>
             <Input value={url} onChange={e => setUrl(e.target.value)} disabled={busy} placeholder="https://my-node.example.com" aria-label="Custom history server" />
             <label className="flex items-center gap-2">
-              <input type="checkbox" checked={only} disabled={busy} onChange={e => setOnly(e.target.checked)} />
+              <input type="checkbox" checked={only} disabled={busy} onChange={e => {
+                const on = e.target.checked;
+                setOnly(on);
+                // A saved server is already tested, so the toggle saves instantly with no re-test.
+                if (saved) {
+                  saveCustomEndpoint(saved, on);
+                  setNote(on
+                    ? 'Saved. Only your server is used; if it is off, nothing is read until it is back.'
+                    : 'Saved. Your server is asked first, with public servers as backup.');
+                }
+              }} />
               Use only this server (no public servers if it fails)
             </label>
             <div className="flex gap-2">
