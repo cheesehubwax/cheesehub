@@ -1934,7 +1934,14 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
         <JoinNoteField value={joinNote} onChange={setJoinNote} disabled={busy} placeholder="e.g. Sorry mate" />
       </PaidActionDialog>}
       <PublicInboxDialog enabled={publicInbox} onChange={enabled => { savePublicInbox(account, enabled); setPublicInbox(enabled); }} open={inboxOpen} onOpenChange={setInboxOpen} />
-      <CryptSidebar account={account} cryptKey={key} loading={loading} refresh={refresh} setEditingAvatar={setEditingAvatar}
+                  <CryptPrivacyDialog open={privacyOpen} onOpenChange={setPrivacyOpen} mode={privacyMode} setMode={setPrivacyMode} loadFullHistory={loadFullHistory}
+                    idleMinutes={idleMinutes} setIdleMinutes={setIdleMinutes} shieldOn={shieldOn} setShieldOn={setShieldOn}
+                    hardening={hardening} setHardening={setHardening}
+                    rotationSlot={lockedFile ? <CryptKeyRotationCard ageDays={rot.ageDays} retention={rot.retention} setRetention={rot.setRetention}
+                      retired={rot.retired} pendingFriends={rot.pendingFriends.length} onRotate={startRotation}
+                      onAnnounce={() => { setPrivacyOpen(false); setRotateStep('announce'); }} onDestroy={pub => void rot.destroyNow(pub)} /> : undefined} />
+      {lockedFile && <DeviceTransferSendDialog open={moveOpen} onOpenChange={setMoveOpen} account={account} lockedKey={lockedFile} />}
+      <CryptSidebar onOpenPrivacy={() => setPrivacyOpen(true)} onMoveDevice={lockedFile ? () => setMoveOpen(true) : undefined} account={account} cryptKey={key} loading={loading} refresh={refresh} setEditingAvatar={setEditingAvatar}
         menuOpen={menuOpen} setMenuOpen={setMenuOpen} fileRef={fileRef} sharePublicKey={sharePublicKey} busy={busy} publish={async () => { setPublishAgreed(false); setShowPublishPrompt(true); }}
         blocked={blocked} setShowBlocked={setShowBlocked} makeKey={makeKey} publicInbox={publicInbox} setInboxOpen={setInboxOpen}
         toggleList={toggleList} listHidden={listHidden} hiddenUnread={hiddenUnread} hiddenReplies={hiddenReplies}
@@ -2113,18 +2120,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
                 feeInfoOpen={feeInfoOpen} setFeeInfoOpen={setFeeInfoOpen} totalCost={totalCost} send={() => void send()} sendVoice={sendVoice}
                 editing={!!editingMessage} cancelEdit={cancelEdit} editExpired={!!editingMessage && !canEdit(editingMessage, account, clock)}
                 instantSlot={<>
-                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setPrivacyOpen(true)} title="Network privacy settings">🛡️ Privacy</Button>
-                  <CryptPrivacyDialog open={privacyOpen} onOpenChange={setPrivacyOpen} mode={privacyMode} setMode={setPrivacyMode} loadFullHistory={loadFullHistory}
-                    idleMinutes={idleMinutes} setIdleMinutes={setIdleMinutes} shieldOn={shieldOn} setShieldOn={setShieldOn}
-                    hardening={hardening} setHardening={setHardening}
-                    rotationSlot={lockedFile ? <CryptKeyRotationCard ageDays={rot.ageDays} retention={rot.retention} setRetention={rot.setRetention}
-                      retired={rot.retired} pendingFriends={rot.pendingFriends.length} onRotate={startRotation}
-                      onAnnounce={() => { setPrivacyOpen(false); setRotateStep('announce'); }} onDestroy={pub => void rot.destroyNow(pub)} /> : undefined} />
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={panicLock} title="Lock now: clear the screen (Esc Esc or Ctrl/Cmd+Shift+L)">🔒 Lock now</Button>
-                  {lockedFile && <>
-                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setMoveOpen(true)} title="Move your key and friends to another device by QR code">📲 Move device</Button>
-                  <DeviceTransferSendDialog open={moveOpen} onOpenChange={setMoveOpen} account={account} lockedKey={lockedFile} />
-                  </>}
                   {(sponsorUnits > 0 || instant.ready || !!instant.status?.exists) && <>
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setInstantOpen(true)}
                     title={instant.ready ? 'Instant Messaging is on' : 'Send free messages without Anchor popups'}>

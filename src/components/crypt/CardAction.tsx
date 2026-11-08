@@ -3,7 +3,12 @@ import { Button, type ButtonProps } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 /** Profile tile: icon over a short visible label so every action is readable without hovering. */
-export function CardAction({ icon, label, className, ...props }: ButtonProps & { icon: ReactNode; label: string }) {
+export function CardAction({ icon, label, className, row, ...props }: ButtonProps & { icon: ReactNode; label: string; row?: boolean }) {
+  if (row) return (
+    <Button variant="ghost" className={cn('h-8 w-full justify-start gap-2 rounded-md px-2 text-xs font-semibold text-muted-foreground hover:text-cheese', className)} {...props}>
+      {icon}<span className="truncate">{label}</span>
+    </Button>
+  );
   return (
     <Button
       variant="ghost"
