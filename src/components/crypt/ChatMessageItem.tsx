@@ -22,6 +22,14 @@ import { messageCost } from '@/lib/cheeseCrypt';
 import type { EditedMessage } from '@/lib/cryptEdits';
 import { REACTION_EMOJIS, isReaction, type ReactionEmoji, type ReactionPill } from '@/lib/cryptReactions';
 
+/** Room role badge: icon centred above a tiny label. */
+function RoleChip({ icon, label, title }: { icon: string; label: string; title: string }) {
+  return <span title={title} aria-label={title} className="inline-flex flex-col items-center rounded border border-cheese/40 bg-cheese/10 px-1 py-px leading-none text-cheese">
+    <span aria-hidden className="text-[11px] leading-none">{icon}</span>
+    <span aria-hidden className="mt-px text-[7px] font-semibold uppercase tracking-wide leading-none">{label}</span>
+  </span>;
+}
+
 /** Pure sound-effect-NFT posts render without the bubble box — sender header, playback and timestamp stay. */
 export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, reactionHighlighted, reactions, onReact, searchHit, editable, onEdit, onCollapse, canReveal, revealed, onReveal, badges, onMute, ban, adminToggle, report, reportHighlighted, friend, delivery, trust }: {
   m: EditedMessage; account: string; keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>;
