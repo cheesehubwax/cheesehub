@@ -49,7 +49,7 @@ export function CryptSidebar({
       <CryptConfirmDialog confirm={confirm} onClose={() => setConfirm(null)} />
       <div className="flex flex-col justify-center gap-2 p-3 border-b border-border md:border-r md:col-start-1 md:row-start-1">
         <button type="button" className="group flex w-full min-w-0 items-center gap-3 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label="Edit profile" title="Edit name and avatar" onClick={() => setEditingAvatar(true)}>
+          aria-label="Edit profile" title="Edit profile: name, quote and avatar" onClick={() => setEditingAvatar(true)}>
           <span className="relative shrink-0">
             <PixelAvatar account={account} avatar={key.avatar} className="h-11 w-11" />
             <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-card text-muted-foreground opacity-0 transition group-hover:opacity-100 group-hover:text-cheese group-focus-visible:opacity-100">

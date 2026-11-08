@@ -35,7 +35,8 @@ import { activeHides, cachedCurators, cachedHides, curatorSet, fetchRoomCurators
 import { nftToken, parseNftMessage } from '@/lib/cryptNft';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { FriendNameDialog } from '@/components/crypt/FriendNameDialog';
-import { cryptDisplayName, loadCryptNames, saveCryptName } from '@/lib/cryptNames';
+import { cryptDisplayName, loadCryptBios, loadCryptNames, saveCryptName } from '@/lib/cryptNames';
+import { CryptProfileDialog } from '@/components/crypt/CryptProfileDialog';
 import { deriveRoomProfiles, encodeSelfRoomProfile, isSelfRoomProfile, loadRoomProfiles, mergeRoomProfiles, roomProfileEntries, saveRoomProfiles } from '@/lib/cryptRoomProfiles';
 import { accountAvatar, parseAvatar, type CryptAvatar } from '@/lib/cryptAvatar';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
@@ -269,10 +270,12 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   // Display-only names/pictures of public-room members, from owners' admission directories.
   const [roomProfiles, setRoomProfiles] = useState(() => loadRoomProfiles(account));
   const [editingFriend, setEditingFriend] = useState<string | null>(null);
+  const [bios, setBios] = useState(() => loadCryptBios(account));
+  const [profileOf, setProfileOf] = useState<string | null>(null);
   const nameFor = (id: string) => id === account ? key?.displayName ?? account : cryptDisplayName(id, shownNames, nicknames);
   const [editingAvatar, setEditingAvatar] = useState(false);
   const [settingUpProfile, setSettingUpProfile] = useState(false);
-  const [pendingProfile, setPendingProfile] = useState<{ avatar: CryptAvatar; displayName?: string } | null>(null);
+  const [pendingProfile, setPendingProfile] = useState<{ avatar: CryptAvatar; displayName?: string; bio?: string } | null>(null);
   const [creationAgreed, setCreationAgreed] = useState(false);
   const creatingKey = useRef(false);
   const [showSharePrompt, setShowSharePrompt] = useState(false);
@@ -381,7 +384,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
       update(setContacts, loadContacts(account)); update(setRemovedContacts, loadRemovedContacts(account));
       update(setPreviousKeys, loadPreviousKeys(account)); update(setRotation, loadRotation(account));
       update(setAvatars, loadContactAvatars(account)); update(setNames, loadCryptNames(account));
-      update(setNicknames, loadCryptNames(account, 'nicknames')); update(setRoomProfiles, loadRoomProfiles(account));
+      update(setNicknames, loadCryptNames(account, 'nicknames')); update(setBios, loadCryptBios(account)); update(setRoomProfiles, loadRoomProfiles(account));
       update(setGroups, loadGroups(account)); update(setHiddenGroups, loadHiddenGroups(account));
       update(setInviteStore, loadInvites(account)); update(setDecisions, loadDecisions(account));
       update(setFriendDeclines, loadFriendDecisions(account)); update(setBlockedState, loadBlocked(account));
@@ -482,9 +485,9 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
       let changed = false;
       for (const f of files) {
         if (f.account === account || removed.includes(f.account)) continue;
-        saveContact(account, f.account, f.publicKey, f.avatar, f.displayName); changed = true;
+        saveContact(account, f.account, f.publicKey, f.avatar, f.displayName, f.bio); changed = true;
       }
-      if (changed && !cancelled) { setContacts(loadContacts(account)); setAvatars(loadContactAvatars(account)); setNames(loadCryptNames(account)); }
+      if (changed && !cancelled) { setContacts(loadContacts(account)); setAvatars(loadContactAvatars(account)); setNames(loadCryptNames(account)); setBios(loadCryptBios(account)); }
     })();
     return () => { cancelled = true; };
   }, [vault, account]);
@@ -798,11 +801,11 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     let changed = false;
     for (const [from, note] of Object.entries(profileNotes)) {
       if (!contacts[from]) continue;
-      if ((names[from] ?? '') === (note.displayName ?? '') && avatars[from]?.pixels === note.avatar.pixels) continue;
-      saveContact(account, from, contacts[from], note.avatar, note.displayName ?? ''); changed = true;
+      if ((names[from] ?? '') === (note.displayName ?? '') && avatars[from]?.pixels === note.avatar.pixels && (bios[from] ?? '') === (note.bio ?? '')) continue;
+      saveContact(account, from, contacts[from], note.avatar, note.displayName ?? '', note.bio ?? ''); changed = true;
     }
-    if (changed) { setAvatars(loadContactAvatars(account)); setNames(loadCryptNames(account)); }
-  }, [profileNotes, contacts, names, avatars, account]);
+    if (changed) { setAvatars(loadContactAvatars(account)); setNames(loadCryptNames(account)); setBios(loadCryptBios(account)); }
+  }, [profileNotes, contacts, names, avatars, bios, account]);
   // A friend's key rotation: accepted only from a complete notice opened with their CURRENT key.
   useEffect(() => {
     const changes = pendingContactRotations(decoded, account, contacts, previousKeys);
@@ -1081,14 +1084,14 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     setSettingUpProfile(true); setEditingAvatar(true);
   };
 
-  const completeProfile = async (avatar: CryptAvatar, displayName?: string) => {
+  const completeProfile = async (avatar: CryptAvatar, displayName?: string, bio?: string) => {
     setEditingAvatar(false);
     if (settingUpProfile) {
-      setPendingProfile({ avatar, displayName }); setCreationAgreed(false); setSettingUpProfile(false);
+      setPendingProfile({ avatar, displayName, bio }); setCreationAgreed(false); setSettingUpProfile(false);
       return;
     }
     if (!key || !lockedFile) return;
-    const updated = { ...key, avatar, displayName };
+    const updated = { ...key, avatar, displayName, bio };
     saveKey(updated); setKey(updated);
     // Profile fields sit outside the seal, so a locked backup refreshes without a new signature.
     const lockedNow = withProfile(lockedFile, updated);
@@ -1097,7 +1100,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
       if (!vault || !(await vaultWritable(vault, true))) throw new Error('Folder access unavailable');
       await replaceWithLocked(vault, lockedNow, updated);
       await writeOwnPublicKey(vault, toPublicFile(updated)).catch(() => {});
-      toast({ title: 'Profile and private backup updated', description: 'Share your updated public key file so friends see your name and avatar.' });
+      toast({ title: 'Profile and private backup updated', description: 'Share your updated public key file so friends see your name, quote and avatar.' });
     } catch {
       download(privateKeyName(account), lockedNow);
       toast({ title: 'Profile saved; refreshed backup downloaded', description: 'The existing disk file was not replaced. Keep this refreshed file safe; share only your public key.' });
@@ -1284,7 +1287,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   };
 
   /** Right-click friend shortcut on another member's room message. */
-  const friendAction = (m: ConversationEntry) => {
+  const friendAction = (m: Pick<ConversationEntry, 'from'>) => {
     if (m.from === account || (!activeInvite && !activeGroup) || blocked.includes(m.from)) return undefined;
     if (contacts[m.from]) return { isFriend: true, onRemove: () => { if (window.confirm(`Remove ${nameFor(m.from)} from your friends? Chat history and rooms are kept.`)) removeFriend(m.from); } };
     if (!activeInvite || activeInvite.status !== 'joined' || !activeInvite.invite.members.some(x => x.account === m.from)) return undefined;
@@ -1296,7 +1299,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const removeFriend = (name: string) => {
     removeContact(account, name);
     setContacts(loadContacts(account)); setRemovedContacts(loadRemovedContacts(account));
-    setAvatars(loadContactAvatars(account)); setNames(loadCryptNames(account)); setNicknames(loadCryptNames(account, 'nicknames'));
+    setAvatars(loadContactAvatars(account)); setNames(loadCryptNames(account)); setNicknames(loadCryptNames(account, 'nicknames')); setBios(loadCryptBios(account));
     if (active === name) { setActive(null); setText(''); }
     if (editingFriend === name) setEditingFriend(null);
     toast({ title: 'Friend removed', description: 'Saved public key, name, nickname and avatar cleared from this browser. Messages and downloaded files are unchanged.' });
@@ -1343,7 +1346,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
         toast({ title: 'Lock your existing key to continue', description: 'No payment is needed. Your original key, friends and rooms are kept.' });
       } else {
         if (parsed.account === account) { toast({ title: 'That is your own public key' }); return; }
-        saveContact(account, parsed.account, parsed.publicKey, parsed.avatar, parsed.displayName ?? ''); setContacts(loadContacts(account)); setRemovedContacts(loadRemovedContacts(account)); setAvatars(loadContactAvatars(account)); setNames(loadCryptNames(account)); setActive(parsed.account); saveFriend(parsed.account, false);
+        saveContact(account, parsed.account, parsed.publicKey, parsed.avatar, parsed.displayName ?? '', parsed.bio ?? ''); setContacts(loadContacts(account)); setRemovedContacts(loadRemovedContacts(account)); setAvatars(loadContactAvatars(account)); setNames(loadCryptNames(account)); setBios(loadCryptBios(account)); setActive(parsed.account); saveFriend(parsed.account, false);
         toast({ title: `Added ${parsed.account}` });
       }
     } catch { toast({ title: 'Not a messaging key file', variant: 'destructive' }); }
@@ -1725,9 +1728,17 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
       onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }} />
   );
   const profileEditor = editingAvatar && <AvatarEditor account={account} avatar={settingUpProfile ? undefined : key?.avatar}
-    displayName={settingUpProfile ? undefined : key?.displayName} initialSetup={settingUpProfile}
+    displayName={settingUpProfile ? undefined : key?.displayName} bio={settingUpProfile ? undefined : key?.bio} initialSetup={settingUpProfile}
     onClose={() => { if (settingUpProfile) void completeProfile(accountAvatar(account)); else setEditingAvatar(false); }}
-    onSave={() => {}} onSaveProfile={(avatar, displayName) => void completeProfile(avatar, displayName)} />;
+    onSave={() => {}} onSaveProfile={(avatar, displayName, bio) => void completeProfile(avatar, displayName, bio)} />;
+  const profileDialog = profileOf && <CryptProfileDialog account={profileOf} self={profileOf === account} name={nameFor(profileOf)}
+    sharedName={profileOf === account ? key?.displayName : shownNames[profileOf]} nickname={nicknames[profileOf]}
+    avatar={profileOf === account ? key?.avatar : shownAvatars[profileOf]} bio={profileOf === account ? key?.bio : bios[profileOf]}
+    onClose={() => setProfileOf(null)} onEditProfile={() => setEditingAvatar(true)}
+    onMessage={contacts[profileOf] && !blocked.includes(profileOf) ? () => { setActive(profileOf); setText(''); } : undefined}
+    onEditNickname={profileOf !== account ? () => setEditingFriend(profileOf) : undefined}
+    friend={friendAction({ from: profileOf })}
+    onBlock={profileOf !== account && !blocked.includes(profileOf) ? () => { if (window.confirm(`Block ${profileOf}? Their messages will be hidden on this device.`)) blockAccount(profileOf); } : undefined} />;
 
   const creationDialog = pendingProfile && <Dialog open onOpenChange={open => { if (!open && !busy) setPendingProfile(null); }}>
     <DialogContent className="max-w-md" aria-describedby="crypt-creation-fee" onEscapeKeyDown={e => { if (busy) e.preventDefault(); }} onPointerDownOutside={e => { if (busy) e.preventDefault(); }}>
@@ -1874,6 +1885,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
         </DialogContent>
       </Dialog>}
       {profileEditor}
+      {profileDialog}
       {creationDialog}
       {(showSharePrompt || showPublishPrompt) && key && <ShareKeyDialog account={account} publishOnly={showPublishPrompt} busy={busy} agreed={publishAgreed} onAgreedChange={setPublishAgreed} onClose={() => { setShowSharePrompt(false); setShowPublishPrompt(false); setPublishAgreed(false); }}
         onDownload={() => { void sharePublicKey(); setShowSharePrompt(false); }}
@@ -1963,6 +1975,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
         onReportRoom={activeListing && activeListing.creator !== account ? () => setReportingRoom(activeListing) : undefined}
         verify={active ? verifyState(verifiedKeys, active, contacts[active]) : undefined}
         onVerify={active && contacts[active] && !activeGroup && !activeInvite ? () => setSafetyOpen(true) : undefined}
+        onOpenProfile={setProfileOf}
         />
       {active && contacts[active] && !activeGroup && !activeInvite && <SafetyNumberDialog open={safetyOpen} onOpenChange={setSafetyOpen}
         me={{ account, publicKey: key.publicKey }} partner={{ account: active, publicKey: contacts[active] }} partnerName={nameFor(active)}
@@ -2041,7 +2054,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
                     canReveal={myRoomRole !== 'member'} revealed={revealed.has(m.key)} onReveal={() => setRevealed(s => new Set(s).add(m.key))}
                     onCollapse={collapseTarget(m) && activeInvite ? () => setPendingModeration({ id: activeInvite.invite.id, member: m.from, action: 'collapse', target: collapseTarget(m)! }) : undefined}
                     badges={activeInvite ? { owner: m.from === activeInvite.invite.creator, admin: m.from !== activeInvite.invite.creator && !!moderation[activeInvite.invite.id]?.admins.includes(m.from), founder: founderBadges(moderation[activeInvite.invite.id], activeInvite.invite, listedIds.has(activeInvite.invite.id)).includes(m.from) } : undefined}
-                    friend={friendAction(m)} {...authorModeration(m)} onOpenQuote={setOpenQuote} openedAt={acceptedRequestMessages.current.has(m.key) ? { current: Infinity } : openedAt} />
+                    friend={friendAction(m)} onOpenProfile={setProfileOf} {...authorModeration(m)} onOpenQuote={setOpenQuote} openedAt={acceptedRequestMessages.current.has(m.key) ? { current: Infinity } : openedAt} />
                 </Fragment>
               ))}
               {leaveNotices.filter(n => !thread.length || n.time > thread[thread.length - 1].time).map(n => <LeavePill key={n.key} name={nameFor(n.from)} account={n.from} />)}

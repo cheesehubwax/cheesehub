@@ -28,3 +28,26 @@ export function saveCryptName(account: string, contact: string, value: unknown, 
 export function cryptDisplayName(account: string, names: Record<string, string>, nicknames: Record<string, string>): string {
   return parseCryptName(nicknames[account]) ?? parseCryptName(names[account]) ?? account;
 }
+/** Profile bio / quote: presentation-only, up to 500 characters, line breaks allowed. */
+export const MAX_CRYPT_BIO_LENGTH = 500;
+// Invisible formatting and bidirectional overrides could spoof the UI; tabs/other controls are rejected too.
+const BIO_FORBIDDEN = /[\u0000-\u0009\u000b-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/u;
+export function parseCryptBio(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const bio = value.replace(/\r\n?/g, '\n').trim();
+  return bio && [...bio].length <= MAX_CRYPT_BIO_LENGTH && !BIO_FORBIDDEN.test(bio) && !/\n{3,}/.test(bio) ? bio : undefined;
+}
+const bioStore = (account: string) => `cheesecrypt-bios-${account}`;
+export function loadCryptBios(account: string): Record<string, string> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(bioStore(account)) || '{}');
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+    return Object.fromEntries(Object.entries(raw).flatMap(([id, v]) => { const b = parseCryptBio(v); return b ? [[id, b]] : []; }));
+  } catch { return {}; }
+}
+export function saveCryptBio(account: string, contact: string, value: unknown) {
+  const bios = loadCryptBios(account);
+  const bio = parseCryptBio(value);
+  if (bio) bios[contact] = bio; else delete bios[contact];
+  localStorage.setItem(bioStore(account), JSON.stringify(bios));
+}

@@ -31,7 +31,7 @@ function RoleChip({ icon, label, title }: { icon: string; label: string; title: 
 }
 
 /** Pure sound-effect-NFT posts render without the bubble box — sender header, playback and timestamp stay. */
-export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, reactionHighlighted, reactions, onReact, searchHit, editable, onEdit, onCollapse, canReveal, revealed, onReveal, badges, onMute, ban, adminToggle, report, reportHighlighted, friend, delivery, trust }: {
+export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, reactionHighlighted, reactions, onReact, searchHit, editable, onEdit, onCollapse, canReveal, revealed, onReveal, badges, onMute, ban, adminToggle, report, reportHighlighted, friend, delivery, trust, onOpenProfile }: {
   m: EditedMessage; account: string; keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>;
   contacts: Record<string, string>; active: string; activeGroup: CryptGroup | null;
   nameFor: (id: string) => string; openedAt: { current: number };
@@ -60,6 +60,8 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
   delivery?: 'sent' | 'permanent';
   /** Group/room chats: show the author's strength badge beside their name. */
   trust?: boolean;
+  /** Opens the author's public profile from their name or picture. */
+  onOpenProfile?: (account: string) => void;
 }) {
   const hidden = !!m.collapsed && !revealed;
   const reply = parseReply(m.text);
@@ -84,9 +86,11 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
       searchHit === 'match' && 'ring-1 ring-cheese/50', searchHit === 'current' && 'ring-2 ring-cheese bg-cheese/10',
       highlighted && 'ring-2 ring-reply bg-reply/10', reactionHighlighted && 'outline outline-2 outline-offset-2 outline-cheese', reportHighlighted && 'ring-2 ring-report bg-report/10')}>
       <div className="flex items-center gap-2 mb-1">
-        <PixelAvatar account={m.from} avatar={m.from === account ? keyAvatar : avatars[m.from]} className="h-6 w-6" />
+        {onOpenProfile ? <button type="button" onClick={() => onOpenProfile(m.from)} aria-label={`Open ${nameFor(m.from)}'s profile`} className="shrink-0 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <PixelAvatar account={m.from} avatar={m.from === account ? keyAvatar : avatars[m.from]} className="h-6 w-6" />
+        </button> : <PixelAvatar account={m.from} avatar={m.from === account ? keyAvatar : avatars[m.from]} className="h-6 w-6" />}
         <div className="min-w-0">
-        <p className="flex flex-wrap items-center gap-x-1 text-xs font-semibold leading-tight break-words"><span>{m.from === account ? `you · ${nameFor(account)}` : nameFor(m.from)}</span>{badges && (badges.owner || badges.admin || badges.founder) && <span className="inline-flex items-center gap-1">
+        <p className="flex flex-wrap items-center gap-x-1 text-xs font-semibold leading-tight break-words">{onOpenProfile ? <button type="button" onClick={() => onOpenProfile(m.from)} title="Open profile" className="text-left hover:underline focus-visible:outline-none focus-visible:underline">{m.from === account ? `you · ${nameFor(account)}` : nameFor(m.from)}</button> : <span>{m.from === account ? `you · ${nameFor(account)}` : nameFor(m.from)}</span>}{badges && (badges.owner || badges.admin || badges.founder) && <span className="inline-flex items-center gap-1">
           {badges.owner && <RoleChip icon="👑" label="Owner" title="Room owner" />}
           {badges.admin && <RoleChip icon="🛡️" label="Admin" title="Room admin" />}
           {badges.founder && <RoleChip icon="⭐" label="Founder" title="Founding member" />}

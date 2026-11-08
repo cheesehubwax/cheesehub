@@ -3,19 +3,19 @@
 import { buildSendMessageActions, encryptMemo, MessagingKey, splitMessage, partCount } from '@/lib/cheeseCrypt';
 import { groupMessageCost } from '@/lib/cryptGroups';
 import { parseAvatar, type CryptAvatar } from '@/lib/cryptAvatar';
-import { parseCryptName } from '@/lib/cryptNames';
+import { parseCryptBio, parseCryptName } from '@/lib/cryptNames';
 
 export const PROFILE_PREFIX = '\u0002CP1:';
 /** Recipient transfers per transaction; the shared platform fee rides in the first one. */
 export const PROFILE_RECIPIENTS_PER_TX = 15;
 
-export interface ProfileNote { displayName?: string; avatar: CryptAvatar }
+export interface ProfileNote { displayName?: string; bio?: string; avatar: CryptAvatar }
 
-export function profileNotePayload(key: Pick<MessagingKey, 'avatar' | 'displayName'>): string {
+export function profileNotePayload(key: Pick<MessagingKey, 'avatar' | 'displayName' | 'bio'>): string {
   const avatar = parseAvatar(key.avatar);
   if (!avatar) throw new Error('Choose an avatar first.');
-  const displayName = parseCryptName(key.displayName);
-  return PROFILE_PREFIX + JSON.stringify(displayName ? { displayName, avatar } : { avatar });
+  const displayName = parseCryptName(key.displayName), bio = parseCryptBio(key.bio);
+  return PROFILE_PREFIX + JSON.stringify({ ...(displayName ? { displayName } : {}), avatar, ...(bio ? { bio } : {}) });
 }
 
 export const isProfileNote = (text: string | null | undefined) => !!text && text.startsWith(PROFILE_PREFIX);
@@ -27,8 +27,9 @@ export function parseProfileNote(text: string | null | undefined): ProfileNote |
     const avatar = parseAvatar(raw?.avatar);
     if (!avatar) return null;
     if (raw.displayName !== undefined && !parseCryptName(raw.displayName)) return null;
-    const displayName = parseCryptName(raw.displayName);
-    return displayName ? { displayName, avatar } : { avatar };
+    if (raw.bio !== undefined && !parseCryptBio(raw.bio)) return null;
+    const displayName = parseCryptName(raw.displayName), bio = parseCryptBio(raw.bio);
+    return { ...(displayName ? { displayName } : {}), avatar, ...(bio ? { bio } : {}) };
   } catch { return null; }
 }
 
@@ -49,7 +50,7 @@ export function profileRecipients(account: string, contacts: Record<string, stri
   return [...set].filter(a => a !== account && contacts[a] && !exclude.includes(a)).sort();
 }
 
-export function profileNoteParts(key: Pick<MessagingKey, 'avatar' | 'displayName'>) {
+export function profileNoteParts(key: Pick<MessagingKey, 'avatar' | 'displayName' | 'bio'>) {
   return partCount(profileNotePayload(key));
 }
 

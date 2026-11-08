@@ -77,7 +77,7 @@ export async function updatePrivateKeyProfile(root: DirHandle, key: MessagingKey
   let next: unknown;
   if (existing && existing.type === 'gpk-msg-key' && existing.account === incoming.account
     && existing.publicKey === incoming.publicKey && existing.secretKey === incoming.secretKey) {
-    next = { ...existing, avatar: incoming.avatar, displayName: incoming.displayName };
+    next = { ...existing, avatar: incoming.avatar, displayName: incoming.displayName, bio: incoming.bio };
   } else if (locked && locked.account === incoming.account && locked.publicKey === incoming.publicKey) {
     // Profile fields sit outside the seal; the locked secret is copied unchanged.
     next = withProfile(locked, incoming);

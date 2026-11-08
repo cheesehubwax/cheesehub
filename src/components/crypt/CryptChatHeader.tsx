@@ -16,7 +16,7 @@ type Notice = { kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'profile'; i
 /** Chat title bar: friend or group title, Members dropdown and per-chat actions. State lives in Messenger. */
 export function CryptChatHeader({
   account, active, activeGroup, activeInvite, keyAvatar, avatars, contacts, blocked, friendDeclines, setFriendDeclines,
-  nameFor, membersOpen, setMembersOpen, setPendingNotice, setEditingInvite, setEditingFriend, saveFriend, blockAccount, admins = [], onReportRoom, verify, onVerify,
+  nameFor, membersOpen, setMembersOpen, setPendingNotice, setEditingInvite, setEditingFriend, saveFriend, blockAccount, admins = [], onReportRoom, verify, onVerify, onOpenProfile,
 }: {
   account: string; active: string | null; activeGroup: CryptGroup | undefined; activeInvite: InviteGroupView | undefined;
   keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>; contacts: Record<string, string>; blocked: string[];
@@ -30,13 +30,19 @@ export function CryptChatHeader({
   onReportRoom?: () => void;
   /** Safety-number state for the open direct chat (needs the friend's key). */
   verify?: VerifyState; onVerify?: () => void;
+  /** Opens a member's public profile from their name or picture. */
+  onOpenProfile?: (account: string) => void;
 }) {
   const memberLine = (member: string, status?: string, action?: ReactNode) => (
     <li key={member} className="flex items-center gap-2 min-w-0">
-      <PixelAvatar account={member} avatar={member === account ? keyAvatar : avatars[member]} className="h-9 w-9 shrink-0" />
+      {onOpenProfile ? <button type="button" className="shrink-0 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Open ${nameFor(member)}'s profile`} onClick={() => { setMembersOpen(false); onOpenProfile(member); }}>
+        <PixelAvatar account={member} avatar={member === account ? keyAvatar : avatars[member]} className="h-9 w-9" />
+      </button> : <PixelAvatar account={member} avatar={member === account ? keyAvatar : avatars[member]} className="h-9 w-9 shrink-0" />}
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 items-center gap-1.5">
-          <span className="min-w-0 truncate text-xs font-semibold" title={nameFor(member)}>{nameFor(member)}{member === account && ' (you)'}</span>
+          {onOpenProfile
+            ? <button type="button" className="min-w-0 truncate text-left text-xs font-semibold hover:underline focus-visible:outline-none focus-visible:underline" title={`Open ${nameFor(member)}'s profile`} onClick={() => { setMembersOpen(false); onOpenProfile(member); }}>{nameFor(member)}{member === account && ' (you)'}</button>
+            : <span className="min-w-0 truncate text-xs font-semibold" title={nameFor(member)}>{nameFor(member)}{member === account && ' (you)'}</span>}
           <CryptTrustBadge account={member} variant="inline" />
         </span>
         <span className="flex min-w-0 items-center gap-1.5 text-[10px]">

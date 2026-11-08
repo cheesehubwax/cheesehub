@@ -10,7 +10,7 @@
  */
 import { loadRouterCache, saveRouterTx } from "./cryptRouterCache";
 import nacl from 'tweetnacl';
-import { parseCryptName, saveCryptName } from '@/lib/cryptNames';
+import { parseCryptBio, parseCryptName, saveCryptBio, saveCryptName } from '@/lib/cryptNames';
 import { CryptAvatar, parseAvatar } from '@/lib/cryptAvatar';
 import { decodeBase64, encodeBase64, decodeUTF8, encodeUTF8 } from 'tweetnacl-util';
 import { benchEndpoint, normalizeEndpoint } from '@/lib/endpointHealth';
@@ -51,6 +51,8 @@ export interface MessagingKey {
   created: string;
   avatar?: CryptAvatar;
   displayName?: string;
+  /** Profile quote/bio, up to 500 characters. */
+  bio?: string;
   /** Session-only: retired key pairs still kept for reading (sealed inside the locked file, never stored plain). */
   retired?: RetiredKey[];
 }
@@ -85,6 +87,7 @@ export interface PublicKeyFile {
   publicKey: string;
   avatar?: CryptAvatar;
   displayName?: string;
+  bio?: string;
 }
 
 const keyStore = (a: string) => `cheesecrypt-key-${a}`;
@@ -95,7 +98,7 @@ export const clearSessionKeys = () => sessionKeys.clear();
 export const forgetSessionKey = (account: string) => { sessionKeys.delete(account); };
 const contactStore = (a: string) => `cheesecrypt-contacts-${a}`;
 
-export function generateKey(account: string, profile: { avatar?: CryptAvatar; displayName?: string } = {}): MessagingKey {
+export function generateKey(account: string, profile: { avatar?: CryptAvatar; displayName?: string; bio?: string } = {}): MessagingKey {
   const kp = nacl.box.keyPair();
   return {
     type: 'gpk-msg-key', version: 1, account,
@@ -104,6 +107,7 @@ export function generateKey(account: string, profile: { avatar?: CryptAvatar; di
     created: new Date().toISOString(),
     avatar: parseAvatar(profile.avatar),
     displayName: parseCryptName(profile.displayName),
+    bio: parseCryptBio(profile.bio),
   };
 }
 
@@ -122,14 +126,14 @@ export function parseKeyFile(raw: unknown): MessagingKey | PublicKeyFile | null 
     if (encodeBase64(derived.publicKey) !== o.publicKey) return null;
     // Plain key files never carry retired keys; those only live sealed inside locked files.
     const { retired: _retired, ...plain } = o;
-    return { ...plain, avatar: parseAvatar(o.avatar), displayName: parseCryptName(o.displayName) } as unknown as MessagingKey;
+    return { ...plain, avatar: parseAvatar(o.avatar), displayName: parseCryptName(o.displayName), bio: parseCryptBio(o.bio) } as unknown as MessagingKey;
   }
-  if (o.type === 'gpk-msg-pubkey') return { ...o, avatar: parseAvatar(o.avatar), displayName: parseCryptName(o.displayName) } as unknown as PublicKeyFile;
+  if (o.type === 'gpk-msg-pubkey') return { ...o, avatar: parseAvatar(o.avatar), displayName: parseCryptName(o.displayName), bio: parseCryptBio(o.bio) } as unknown as PublicKeyFile;
   return null;
 }
 
 export const toPublicFile = (k: MessagingKey): PublicKeyFile =>
-  ({ type: 'gpk-msg-pubkey', version: 1, account: k.account, publicKey: k.publicKey, ...(k.avatar ? { avatar: k.avatar } : {}), ...(parseCryptName(k.displayName) ? { displayName: parseCryptName(k.displayName) } : {}) });
+  ({ type: 'gpk-msg-pubkey', version: 1, account: k.account, publicKey: k.publicKey, ...(k.avatar ? { avatar: k.avatar } : {}), ...(parseCryptName(k.displayName) ? { displayName: parseCryptName(k.displayName) } : {}), ...(parseCryptBio(k.bio) ? { bio: parseCryptBio(k.bio) } : {}) });
 
 export function loadKey(account: string): MessagingKey | null {
   const current = sessionKeys.get(account);
@@ -170,6 +174,7 @@ export function removeContact(account: string, contact: string) {
   localStorage.setItem(`cheesecrypt-avatars-${account}`, JSON.stringify(avatars));
   saveCryptName(account, contact, '');
   saveCryptName(account, contact, '', 'nicknames');
+  saveCryptBio(account, contact, '');
   localStorage.setItem(`cheesecrypt-removed-contacts-${account}`, JSON.stringify([...new Set([...loadRemovedContacts(account), contact])]));
 }
 /** Keys a friend has rotated away from (oldest first). They still open past chats but never become current again. */
@@ -197,13 +202,14 @@ export function applyContactRotation(account: string, contact: string, newPublic
   localStorage.setItem(contactStore(account), JSON.stringify(c));
   return true;
 }
-export function saveContact(account: string, contact: string, publicKey: string, avatar?: CryptAvatar, displayName?: string) {
+export function saveContact(account: string, contact: string, publicKey: string, avatar?: CryptAvatar, displayName?: string, bio?: string) {
   const c = loadContacts(account);
   // A key the friend has already rotated away from (e.g. an old friends/ file or listing) never replaces the current one.
   if (!(c[contact] && loadPreviousKeys(account)[contact]?.includes(publicKey))) c[contact] = publicKey;
   localStorage.setItem(contactStore(account), JSON.stringify(c));
   localStorage.setItem(`cheesecrypt-removed-contacts-${account}`, JSON.stringify(loadRemovedContacts(account).filter(name => name !== contact)));
   if (displayName !== undefined) saveCryptName(account, contact, displayName);
+  if (bio !== undefined) saveCryptBio(account, contact, bio);
   if (avatar) {
     const avatars = loadContactAvatars(account);
     avatars[contact] = avatar;
