@@ -1885,6 +1885,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
         </DialogContent>
       </Dialog>}
       {profileEditor}
+      {profileDialog}
       {creationDialog}
       {(showSharePrompt || showPublishPrompt) && key && <ShareKeyDialog account={account} publishOnly={showPublishPrompt} busy={busy} agreed={publishAgreed} onAgreedChange={setPublishAgreed} onClose={() => { setShowSharePrompt(false); setShowPublishPrompt(false); setPublishAgreed(false); }}
         onDownload={() => { void sharePublicKey(); setShowSharePrompt(false); }}
