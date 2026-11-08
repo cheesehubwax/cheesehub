@@ -46,14 +46,36 @@ export async function cryptHistoryEndpoints(): Promise<string[]> {
   return orderWithCustom(await resolveEndpoints('hyperion-v2'), custom, false);
 }
 
-/** One test request so a typo is caught before saving. */
-export async function testHistoryEndpoint(url: string): Promise<boolean> {
+/** Custom Tor reads can try four bounded 8s upstreams; include body parsing. */
+export const historyTimeoutMs = (url: string): number => url === loadCustomEndpoint() || /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(?=[:/]|$)/.test(url) ? 40000 : 10000;
+
+export async function fetchCryptHistoryJson(url: string, path: string): Promise<any> {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), historyTimeoutMs(url));
   try {
-    const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), 10000);
-    const r = await fetch(`${url}/v2/history/get_actions?account=crypt.cheese&limit=1`, { signal: ctl.signal }).finally(() => clearTimeout(t));
-    if (!r.ok) return false;
+    const r = await fetch(`${url}${path}`, { signal: ctl.signal });
     const j = await r.json();
-    return Array.isArray(j?.actions);
-  } catch { return false; }
+    if (!r.ok) throw new Error(typeof j?.error === 'string' ? j.error.slice(0, 300) : `Server returned HTTP ${r.status}.`);
+    return j;
+  } finally { clearTimeout(t); }
+}
+
+export async function checkHistoryEndpoint(url: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const j = await fetchCryptHistoryJson(url, '/v2/history/get_actions?account=crypt.cheese&limit=1');
+    return Array.isArray(j?.actions) ? { ok: true } : { ok: false, error: 'The server answered, but did not return WAX history actions. Nothing was saved.' };
+  } catch (e) {
+    const local = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(?=[:/]|$)/.test(url);
+    const error = e instanceof Error && e.name === 'AbortError'
+      ? 'The connection timed out. Keep Tor Browser connected and the updated helper running, then try again.'
+      : e instanceof TypeError && local
+        ? 'Cannot reach the local helper. Keep its terminal open, check http://127.0.0.1:8088, and allow local-network access if your browser asks.'
+        : e instanceof Error ? e.message : 'Connection failed.';
+    return { ok: false, error: `${error} Nothing was saved.` };
+  }
+}
+
+/** Compatibility for callers expecting a boolean. */
+export async function testHistoryEndpoint(url: string): Promise<boolean> {
+  return (await checkHistoryEndpoint(url)).ok;
 }

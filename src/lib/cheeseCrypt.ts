@@ -14,7 +14,7 @@ import { parseCryptBio, parseCryptName, saveCryptBio, saveCryptName } from '@/li
 import { CryptAvatar, parseAvatar } from '@/lib/cryptAvatar';
 import { decodeBase64, encodeBase64, decodeUTF8, encodeUTF8 } from 'tweetnacl-util';
 import { benchEndpoint, normalizeEndpoint } from '@/lib/endpointHealth';
-import { cryptHistoryEndpoints } from '@/lib/cryptNetworkPrivacy';
+import { cryptHistoryEndpoints, fetchCryptHistoryJson } from '@/lib/cryptNetworkPrivacy';
 import { TIP_MEMO } from '@/lib/cryptTips';
 
 export const MSG_PREFIX = 'CRYPT1:';
@@ -547,11 +547,7 @@ async function routerTransaction(txId: string, time: number): Promise<ChainMemo[
   for (const raw of await cryptHistoryEndpoints()) {
     const base = normalizeEndpoint(raw);
     try {
-      const ctl = new AbortController();
-      const t = setTimeout(() => ctl.abort(), 10000);
-      const r = await fetch(`${base}/v2/history/get_transaction?id=${encodeURIComponent(txId)}`, { signal: ctl.signal }).finally(() => clearTimeout(t));
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const j = await r.json();
+      const j = await fetchCryptHistoryJson(base, `/v2/history/get_transaction?id=${encodeURIComponent(txId)}`);
       if (!Array.isArray(j.actions) || !j.actions.length) throw new Error('Transaction not indexed yet');
       const rows = expandRouterActions(txId, time, j.actions);
       if (routerTxCache.size > 5000) routerTxCache.clear();
@@ -590,12 +586,9 @@ async function hyperionActions(query: string): Promise<any[]> {
   for (const raw of await cryptHistoryEndpoints()) {
     const base = normalizeEndpoint(raw);
     try {
-      const ctl = new AbortController();
-      const t = setTimeout(() => ctl.abort(), 10000);
-      const r = await fetch(`${base}/v2/history/get_actions?${query}`, { signal: ctl.signal }).finally(() => clearTimeout(t));
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const j = await r.json();
-      return Array.isArray(j.actions) ? j.actions : [];
+      const j = await fetchCryptHistoryJson(base, `/v2/history/get_actions?${query}`);
+      if (!Array.isArray(j.actions)) throw new Error('History server returned no actions array');
+      return j.actions;
     } catch (e) { lastErr = e; benchEndpoint(base); }
   }
   throw lastErr instanceof Error ? lastErr : new Error('History lookup failed');
