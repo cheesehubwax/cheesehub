@@ -38,18 +38,17 @@ export function CryptComposer({
         </span>
         {!voice && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setAttachingNft(true); }}>🖼️ Attach NFT</Button>}
         {!text.trim() && <VoiceRecorder clip={voice} onChange={setVoice} disabled={busy} />}
-        {listHidden && <TermsCheckbox checked={agreed} onCheckedChange={setAgreed} className="ml-2" />}
-        {/* Price, Instant and Send stay together on the top line, pushed right. */}
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <span className="text-muted-foreground">{totalCost}</span>
-          {instantSlot}
-          {voice
-            ? <Button size="sm" disabled={busy || !agreed || editExpired} onClick={sendVoice} className="bg-cheese text-primary-foreground hover:bg-cheese/90">{editing ? 'Save edit' : 'Send voice'}{voiceTxs > 1 ? ` (${voiceTxs} signatures)` : ''}</Button>
-            : <Button size="sm" disabled={busy || !agreed || !text.trim() || tooLong || editExpired} onClick={() => send()}
-              className="bg-cheese text-primary-foreground hover:bg-cheese/90">{editing ? 'Save edit' : 'Send'}</Button>}
-        </div>
       </div>
-      {!listHidden && <div className="text-xs"><TermsCheckbox checked={agreed} onCheckedChange={setAgreed} /></div>}
+      {/* Bottom line: Terms on the left; price, Instant and Send on the right. */}
+      <div className="flex flex-wrap items-center gap-2 gap-y-1 text-xs">
+        <TermsCheckbox checked={agreed} onCheckedChange={setAgreed} />
+        <span className="ml-auto text-muted-foreground">{totalCost}</span>
+        {instantSlot}
+        {voice
+          ? <Button size="sm" disabled={busy || !agreed || editExpired} onClick={sendVoice} className="bg-cheese text-primary-foreground hover:bg-cheese/90">{editing ? 'Save edit' : 'Send voice'}{voiceTxs > 1 ? ` (${voiceTxs} signatures)` : ''}</Button>
+          : <Button size="sm" disabled={busy || !agreed || !text.trim() || tooLong || editExpired} onClick={() => send()}
+            className="bg-cheese text-primary-foreground hover:bg-cheese/90">{editing ? 'Save edit' : 'Send'}</Button>}
+      </div>
     </div>
   );
 }
