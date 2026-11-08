@@ -22,7 +22,7 @@ export interface TrustSignals {
   key: { published: boolean; firstAt: number | null } | null;
 }
 
-export interface TrustLine { id: string; label: string; points: number | null; detail: string }
+export interface TrustLine { id: string; label: string; points: number | null; detail: string; max: number }
 export interface TrustScore { total: number; mark: TrustMark; partial: boolean; lines: TrustLine[] }
 
 const DAY = 86_400_000;
