@@ -2,6 +2,8 @@
 
 Open tasks only. Completed work lives in git history.
 
+- [ ] Homepage live liquidity: value all CHEESE pool reserves including HOLE and other non-WAX pairs; test unknown-price handling and verify the live homepage total.
+
 - [ ] CHEESEHub node resilience: verify real Anchor unlock/power-up with the user's signatures; health-ordered wallet transport and bounded reads are implemented, outage regression tests pass, and live WAX reads/PowerUp state succeed with eosusa and greymass unavailable. Never auto-rebroadcast payments.
 
 - [ ] CHEESECrypt tips: verify one real public-room tip with Anchor and chat readback — direct tip + paid router delivery and sender/all-recipient encrypted readback/verification pass automated tests; requires the user's wallet signature.
