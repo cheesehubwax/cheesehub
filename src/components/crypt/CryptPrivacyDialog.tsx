@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  type PrivacyMode, loadCustomEndpoint, loadCustomOnly, saveCustomEndpoint, testHistoryEndpoint, validateCustomEndpoint,
+  type PrivacyMode, loadCustomEndpoint, loadCustomOnly, saveCustomEndpoint, checkHistoryEndpoint, validateCustomEndpoint,
 } from '@/lib/cryptNetworkPrivacy';
 import { COLD_LOCK_WARNING, IDLE_OPTIONS, type IdleMinutes, type LockHardening } from '@/lib/cryptPanicLock';
 import { CryptConfirmDialog } from './CryptConfirmDialog';
@@ -33,9 +33,9 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
     const v = validateCustomEndpoint(url);
     if (!v) { setNote('Use an https:// address (or http://localhost for a server on this computer).'); return; }
     setBusy(true); setNote(null);
-    const ok = await testHistoryEndpoint(v);
+    const result = await checkHistoryEndpoint(v);
     setBusy(false);
-    if (!ok) { setNote('That server did not answer like a WAX history (Hyperion) server. Nothing was saved.'); return; }
+    if (!result.ok) { setNote(result.error ?? 'Connection failed. Nothing was saved.'); return; }
     saveCustomEndpoint(v, only); setSaved(v); setNote('Saved. CHEESECrypt now asks this server first.');
   };
   const clear = () => { saveCustomEndpoint(null, false); setSaved(null); setUrl(''); setOnly(false); setNote('Removed. Public servers are used again.'); };
@@ -91,9 +91,9 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
             <h3 className="font-semibold text-foreground">Your own history server (optional)</h3>
             <p className="text-xs">The settings above save as soon as you tap them. The button below is only for this server box.</p>
             <p>If you run your own WAX Hyperion server, or reach one through your own VPN or Tor setup, enter it here. It is stored only in this browser; nothing goes through CHEESEHub.</p>
-            <Input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://my-node.example.com" aria-label="Custom history server" />
+            <Input value={url} onChange={e => setUrl(e.target.value)} disabled={busy} placeholder="https://my-node.example.com" aria-label="Custom history server" />
             <label className="flex items-center gap-2">
-              <input type="checkbox" checked={only} onChange={e => setOnly(e.target.checked)} />
+              <input type="checkbox" checked={only} disabled={busy} onChange={e => setOnly(e.target.checked)} />
               Use only this server (no public servers if it fails)
             </label>
             <div className="flex gap-2">
@@ -112,7 +112,7 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
                   <li>Open a terminal in the folder you saved it to (Windows: right-click the folder → Open in Terminal) and run: <code className="rounded bg-muted px-1 text-foreground">node cheesecrypt-tor-proxy.mjs</code></li>
                   <li>Enter <code className="rounded bg-muted px-1 text-foreground">http://localhost:8088</code> in the box above and press Test &amp; connect. Tick "Use only this server" if you never want public servers used directly.</li>
                 </ol>
-                <p>Keep the terminal window open while you chat; press Ctrl+C to stop. Tor adds a second or two of delay. Using Tor as a client is legal in most countries, but check your local rules. Sending messages still goes through your wallet, not Tor.</p>
+                <p>If you downloaded an older helper, stop it with Ctrl+C and replace the file with this download (v1.1). Keep the terminal window open while you chat; press Ctrl+C to stop. Testing can take up to 40 seconds while slow servers are skipped. If localhost fails, try http://127.0.0.1:8088 and allow local-network access if your browser asks. Tor protects these history requests only, not all CHEESEHub traffic. Using Tor as a client is legal in many countries, but rules and restrictions vary; this is not legal advice. Sending messages still goes through your wallet, not this helper.</p>
               </div>
             </details>
           </section>

@@ -1,6 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { fetchContractStream, mergeMemos, streamRows, STREAM_PAGE, type ChainMemo } from '@/lib/cheeseCrypt';
-import { orderWithCustom, validateCustomEndpoint } from '@/lib/cryptNetworkPrivacy';
+import { checkHistoryEndpoint, fetchCryptHistoryJson, historyTimeoutMs, orderWithCustom, saveCustomEndpoint, validateCustomEndpoint } from '@/lib/cryptNetworkPrivacy';
+
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); localStorage.clear(); });
 
 const memo = 'CRYPT2:' + 'a'.repeat(20);
 const act = (name: string, trx: string, sender: string, to: string, ts = '2026-11-07T01:00:00.000', actor = sender) => ({
@@ -45,6 +47,47 @@ describe('fetchContractStream', () => {
 });
 
 describe('custom history server', () => {
+  it('accepts a complete history response and never names the user in its probe', async () => {
+    const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ actions: [] }) });
+    vi.stubGlobal('fetch', fetcher);
+    expect(await checkHistoryEndpoint('http://localhost:8088')).toEqual({ ok: true });
+    expect(fetcher.mock.calls[0][0]).toBe('http://localhost:8088/v2/history/get_actions?account=crypt.cheese&limit=1');
+  });
+  it('does not accept a non-Hyperion JSON response', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ status: 'ok' }) }));
+    expect((await checkHistoryEndpoint('http://localhost:8088')).ok).toBe(false);
+  });
+  it('shows the helper error instead of disguising it as a wrong server', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503, json: async () => ({ error: 'Tor is not running.' }) }));
+    expect((await checkHistoryEndpoint('http://localhost:8088')).error).toContain('Tor is not running.');
+  });
+  it('gives local-access guidance on a browser fetch failure', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+    expect((await checkHistoryEndpoint('http://localhost:8088')).error).toContain('allow local-network access');
+  });
+  it('gives Tor/custom history 40s but keeps ordinary public reads at 10s', () => {
+    expect(historyTimeoutMs('http://localhost:8088')).toBe(40000);
+    expect(historyTimeoutMs('http://127.0.0.1:8088')).toBe(40000);
+    expect(historyTimeoutMs('https://node.example.com')).toBe(10000);
+    saveCustomEndpoint('https://node.example.com', true);
+    expect(historyTimeoutMs('https://node.example.com')).toBe(40000);
+  });
+  it('keeps the timeout active while reading a stalled response body', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((_url, opts) => Promise.resolve({
+      ok: true, json: () => new Promise((_resolve, reject) => opts.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))),
+    })));
+    const result = checkHistoryEndpoint('http://localhost:8088');
+    await vi.advanceTimersByTimeAsync(39999);
+    expect(vi.getTimerCount()).toBe(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect((await result).error).toContain('timed out');
+    expect(vi.getTimerCount()).toBe(0);
+  });
+  it('rejects broken history JSON rather than reporting an empty history', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => { throw new SyntaxError('Invalid JSON'); } }));
+    await expect(fetchCryptHistoryJson('http://localhost:8088', '/v2/history/get_actions')).rejects.toThrow('Invalid JSON');
+  });
   it('accepts https and localhost http, rejects others', () => {
     expect(validateCustomEndpoint('https://node.example.com/')).toBe('https://node.example.com');
     expect(validateCustomEndpoint('http://localhost:7000')).toBe('http://localhost:7000');
