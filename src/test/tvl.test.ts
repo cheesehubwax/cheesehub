@@ -37,7 +37,7 @@ describe('live reserve pricing', () => {
   });
   it('values HOLE pool 11051 despite tvlUSD zero, deduplicating both query sides and fee tiers', async () => {
     const pool = { id: 11051, active: true, tokenA: cheese, tokenB: hole, tvlUSD: 0 };
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify([
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify([
       pool, { ...pool, id: 11052 }, { ...pool, id: 11053, active: false },
       { ...pool, id: 11054, tokenA: { ...cheese, contract: 'fake.token' } },
     ]))));
