@@ -1,5 +1,5 @@
 import { CryptRespectMark } from './CryptRespectMark';
-import { TRUST_DISCLAIMER, type TrustScore } from '@/lib/cryptTrust';
+import { MAX_TOTAL_POINTS, TRUST_DISCLAIMER, type TrustScore } from '@/lib/cryptTrust';
 
 /** Per-signal breakdown of a Respect score (shown only for your own account). Presentational only. */
 export function CryptTrustBreakdown({ account, score }: { account: string; score: TrustScore | null }) {
