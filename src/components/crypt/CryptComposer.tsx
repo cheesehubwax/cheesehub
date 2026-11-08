@@ -9,11 +9,11 @@ import type { VoiceClip } from '@/lib/cryptVoice';
 import type { CryptGroup } from '@/lib/cryptGroups';
 import type { InviteGroupView } from '@/lib/cryptInviteGroups';
 
-/** Message composer: reply bar, text box and footer (counter, NFT, voice, Terms, price, Instant, Send, Lock). State lives in Messenger. */
+/** Message composer: reply bar, text box and footer (counter, NFT, voice, Terms, price, Instant, Send). State lives in Messenger. */
 export function CryptComposer({
   account, active, activeGroup, activeInvite, nameFor, replyingTo, setReplyingTo, composerRef, text, setText, voice, setVoice,
   tooLong, bytes, maxBytes, parts, copies, voiceParts, voiceTxs, setAttachingNft, busy, listHidden, agreed, setAgreed,
-  totalCost, send, sendVoice, editing, cancelEdit, editExpired, instantSlot, lockSlot,
+  totalCost, send, sendVoice, editing, cancelEdit, editExpired, instantSlot,
 }: {
   account: string; active: string; activeGroup: CryptGroup | undefined; activeInvite: InviteGroupView | undefined; nameFor: (id: string) => string;
   replyingTo: ReplyRef | null; setReplyingTo: (r: ReplyRef | null) => void; composerRef: RefObject<HTMLTextAreaElement>;
@@ -21,7 +21,7 @@ export function CryptComposer({
   tooLong: boolean; bytes: number; maxBytes: number; parts: number; copies: number; voiceParts: number; voiceTxs: number;
   setAttachingNft: (v: boolean) => void; busy: boolean; listHidden: boolean; agreed: boolean; setAgreed: (v: boolean) => void;
   totalCost: string; send: () => void; sendVoice: () => void;
-  editing?: boolean; cancelEdit?: () => void; editExpired?: boolean; instantSlot?: ReactNode; lockSlot?: ReactNode;
+  editing?: boolean; cancelEdit?: () => void; editExpired?: boolean; instantSlot?: ReactNode;
 }) {
   return (
     <div className="space-y-2 p-4 border-t border-border">
@@ -49,11 +49,7 @@ export function CryptComposer({
               className="bg-cheese text-primary-foreground hover:bg-cheese/90">{editing ? 'Save edit' : 'Send'}</Button>}
         </div>
       </div>
-      {/* Terms (compressed chat) on the left; Lock kept well away from Send, bottom right. */}
-      <div className="flex items-center gap-2 pt-2 text-xs">
-        {!listHidden && <TermsCheckbox checked={agreed} onCheckedChange={setAgreed} />}
-        {lockSlot && <div className="ml-auto">{lockSlot}</div>}
-      </div>
+      {!listHidden && <div className="text-xs"><TermsCheckbox checked={agreed} onCheckedChange={setAgreed} /></div>}
     </div>
   );
 }
