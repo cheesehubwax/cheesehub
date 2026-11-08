@@ -101,6 +101,20 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
               {saved && <Button size="sm" variant="outline" onClick={clear} disabled={busy}>Remove</Button>}
             </div>
             {note && <p role="status" className="text-foreground">{note}</p>}
+            <details className="rounded-md border border-border p-2">
+              <summary className="cursor-pointer font-semibold text-foreground">🧅 How to use Tor with CHEESECrypt (free helper)</summary>
+              <div className="mt-2 space-y-2 text-xs">
+                <p>A small open-source helper that runs only on your computer. It sends CHEESECrypt's history checks through Tor, so public WAX servers see a Tor address instead of your home IP. It is not a Tor relay, only accepts connections from your own computer, only forwards history reads, and keeps no logs. CHEESEHub never sees your traffic.</p>
+                <ol className="list-decimal space-y-1 pl-4">
+                  <li>Install <a className="text-cheese underline" href="https://nodejs.org" target="_blank" rel="noopener noreferrer">Node.js</a> (version 18 or newer) and <a className="text-cheese underline" href="https://www.torproject.org/download/" target="_blank" rel="noopener noreferrer">Tor Browser</a>.</li>
+                  <li>Open Tor Browser and press Connect. Leave it open.</li>
+                  <li><a className="text-cheese underline" href={`${import.meta.env.BASE_URL}downloads/cheesecrypt-tor-proxy.mjs`} download="cheesecrypt-tor-proxy.mjs">Download the helper</a> (one file, no installs needed). You can open it in any text editor to read it first.</li>
+                  <li>Open a terminal in the folder you saved it to (Windows: right-click the folder → Open in Terminal) and run: <code className="rounded bg-muted px-1 text-foreground">node cheesecrypt-tor-proxy.mjs</code></li>
+                  <li>Enter <code className="rounded bg-muted px-1 text-foreground">http://localhost:8088</code> in the box above and press Test &amp; connect. Tick "Use only this server" if you never want public servers used directly.</li>
+                </ol>
+                <p>Keep the terminal window open while you chat; press Ctrl+C to stop. Tor adds a second or two of delay. Using Tor as a client is legal in most countries, but check your local rules. Sending messages still goes through your wallet, not Tor.</p>
+              </div>
+            </details>
           </section>
           <p className="text-xs">Servers still see your internet address. A VPN or Tor hides it. Sending, looking up a friend's key, and the public record of who messaged whom still show your account.</p>
           <div className="flex justify-end">
