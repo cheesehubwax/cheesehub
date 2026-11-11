@@ -1,120 +1,26 @@
-# Run the CHEESECrypt Tor helper on Windows
+# CHEESEFarm: Claim All Rewards
 
-Folder: `C:\Users\User\Desktop\crypt-tor-proxy`
+## What you will get
+- A **"🧀 Claim All"** button at the top of Browse Farms (visible when signed in and you have staked NFTs in any farm).
+- Clicking it opens a preview window listing every farm you are staked in that has rewards ready, each with a tick box and its reward amounts (e.g. "120.5 CHEESE, 3.2 WAX"), plus the combined total.
+- Farms with nothing to claim are shown greyed out and are skipped automatically, so one empty farm can't make the whole claim fail.
+- Confirm sends the claims in small groups (5 farms per signing). A progress bar shows "Batch 2 of 4", and each finished batch shows its transaction link. If one batch fails, the others still go through and the failed farms stay ticked so you can retry them.
+- Terms of Use tick box is not required (claiming is not a lock, create or deposit), matching the existing single Claim button.
 
-Use the updated **v1.1** helper. The earlier download had a Tor connection bug; these steps replace it on your PC.
+## How it works
+1. One chain lookup finds all farms you are staked in, with their claimable balances (the farm contract keeps a per-user list).
+2. Only farms with a claimable balance above zero, that are still open, are pre-ticked.
+3. Each batch is one wallet signature containing several standard `claim` actions, sent with Greymass Fuel, and the transaction ID is verified before marking it done.
+4. After finishing, farm cards and claim totals refresh.
 
-## Replace the old helper first
+## Things to know
+- Amounts shown are what the contract reports as ready; the final amount paid can be slightly higher because rewards keep accruing until the moment you sign.
+- Users with many farms will sign more than once (one prompt per 5 farms) to stay within WAX CPU limits.
+- No legal concerns: it only bundles claims the user could already make one by one; nothing is held or routed by CHEESEHub.
 
-1. In the PowerShell window running the helper, press **Ctrl+C**.
-2. Refresh CHEESEHub, go to **CHEESECrypt → Menu → Privacy**, open the Tor guide and download the helper again.
-3. In PowerShell, run these commands. The copy replaces the old file; use the new download's actual filename if your browser added `(1)`.
-
-```powershell
-Set-Location "C:\Users\User\Desktop\crypt-tor-proxy"
-Copy-Item "$env:USERPROFILE\Downloads\cheesecrypt-tor-proxy.mjs" ".\cheesecrypt-tor-proxy.mjs" -Force
-node .\cheesecrypt-tor-proxy.mjs
-```
-
-4. Confirm the window says **helper v1.1**. Keep Tor Browser connected and this window open.
-5. In a second PowerShell window, check the actual history request:
-
-```powershell
-curl.exe --max-time 40 "http://127.0.0.1:8088/v2/history/get_actions?account=crypt.cheese&limit=1"
-```
-
-6. A JSON response containing an **actions array** means the request worked (it can be empty). An `error` response explains what failed.
-7. Refresh CHEESEHub so it uses the updated connection test. Enter **http://127.0.0.1:8088**, tick **Use only this server** to prevent direct history fallback, and press **Test & connect server**. Allow local-network access if your browser asks. Wait up to 40 seconds.
-8. If it fails, provide the message from the app and the result of the command above; do not send key files or wallet secrets.
-
-## Step 1 - Check Node.js is installed
-
-1. Press the Windows key, type `PowerShell` and open it.
-2. Run:
-   ```
-   node -v
-   ```
-3. If it shows `v18` or higher (for example `v20.11.0`), go to Step 2.
-4. If it shows an error or a version below 18, install the LTS version from https://nodejs.org. Then close PowerShell, open it again and repeat this step.
-
-## Step 2 - Start Tor
-
-1. Install Tor Browser from https://www.torproject.org/download/ if you don't have it.
-2. Open Tor Browser and click **Connect**.
-3. Wait until the Tor start page loads. You can minimise the window, but keep it open the whole time you use the helper.
-
-## Step 3 - Put the helper file in your folder
-
-1. In CHEESEHub, go to CHEESECrypt, then Menu, then Privacy.
-2. Open **"How to use Tor with CHEESECrypt"** and click **Download the helper**.
-3. Move `cheesecrypt-tor-proxy.mjs` from your Downloads folder into `C:\Users\User\Desktop\crypt-tor-proxy`.
-
-Or move it with this command in PowerShell:
-```
-Move-Item "$env:USERPROFILE\Downloads\cheesecrypt-tor-proxy.mjs" "C:\Users\User\Desktop\crypt-tor-proxy\"
-```
-
-If you already made `proxy.mjs`, `package.json` or a `node_modules` folder from my earlier instructions, delete them. That earlier script had bugs, and the new helper needs no installs.
-
-## Step 4 - Run the helper
-
-In PowerShell, run:
-```
-cd "C:\Users\User\Desktop\crypt-tor-proxy"
-node cheesecrypt-tor-proxy.mjs
-```
-
-You should see:
-```text
-CHEESECrypt Tor helper v1.1 is running
-   Address for CHEESECrypt: http://localhost:8088
-   Tor port 9150 is open (connection verified on first request)
-   Leave this window open. Press Ctrl+C to stop.
-```
-
-Keep this PowerShell window open while you chat.
-
-## Step 5 - Check it works (optional)
-
-Open a **second** PowerShell window and run:
-```
-curl.exe --max-time 40 "http://127.0.0.1:8088/v2/history/get_actions?account=crypt.cheese&limit=1"
-```
-
-A JSON response containing an `actions` array means it works. Requests can take up to 40 seconds while slow servers are skipped. A port-open message alone does not prove that requests work through Tor.
-
-## Step 6 - Connect CHEESECrypt
-
-1. In CHEESECrypt, go to Menu, then Privacy, then **Your own history server**.
-2. Enter `http://127.0.0.1:8088`.
-3. Optional: tick **Use only this server** if you never want CHEESECrypt to contact public servers directly. Without the helper running, history checks will then stop.
-4. Click **Test & connect server**. You should see "Saved. CHEESECrypt now asks this server first."
-
-## Every time you use it
-
-1. Open Tor Browser and click Connect.
-2. Open PowerShell and run:
-   ```
-   cd "C:\Users\User\Desktop\crypt-tor-proxy"
-   node cheesecrypt-tor-proxy.mjs
-   ```
-3. When you're done, press `Ctrl+C` in that window to stop it.
-
-## If something goes wrong
-
-| Message | Fix |
-|---|---|
-| `node is not recognized` | Install Node.js (Step 1), then reopen PowerShell. |
-| `Tor not found yet` | Open Tor Browser and click Connect. |
-| `Port 8088 is already in use` | The helper is already running in another window. Close that window or use it. |
-| `Cannot find module ...cheesecrypt-tor-proxy.mjs` | The file isn't in the folder. Run `dir` to check, then redo Step 3. |
-| "Every public history server failed through Tor" | Wait a minute and try again. Tor will pick a new route. |
-| Test & connect fails in CHEESECrypt | Make sure the PowerShell window is still open, then run the Step 5 check. |
-| Browser local-network prompt | Allow access for CHEESEHub if you want it to reach your local helper. |
-
-## What this does and doesn't protect
-
-- Public WAX servers see a Tor address instead of your home IP when CHEESECrypt checks for messages.
-- Sending messages still goes through Anchor and your wallet, not Tor.
-- Other CHEESEHub requests do not automatically use this helper; it is not complete anonymity. Your provider may see that you connect to Tor; HTTPS protects the history request from the Tor exit, but the history server sees the requested blockchain data.
-- Tor client use is permitted in many jurisdictions, but restrictions and circumstances vary; this is not legal advice or a guarantee of zero liability.
+## Technical details
+- `src/lib/farm.ts`: add `fetchUserClaimables(account)` using `stakers` index 2 (name, bounded limit, paginated to completion; flag partial if incomplete) returning `{ farmName, claimable_balances, asset_ids }`; add pure `planClaimBatches(rows, size=5)` that drops zero/empty balances and chunks.
+- New `src/components/farm/useClaimableFarms.ts` (react-query, resolveEndpoints via existing fetchTableRows) and `src/components/farm/ClaimAllFarmsDialog.tsx` (selection, totals per token contract+symbol using integer asset math, sequential batch runner reusing existing transact/Fuel helper and `buildClaimRewardsAction`, per-batch TX verification, retry of failures).
+- `BrowseFarms.tsx`: add button in the filter bar, open dialog, invalidate farm/stake/claim-total queries on completion.
+- Tests `src/test/farmClaimAll.test.ts`: zero-balance farms excluded; 12 ready farms → batches of 5,5,2; totals sum per token without float rounding.
+- Verify in preview with a signed-in session that the dialog lists staked farms (signing itself can't be exercised here).
