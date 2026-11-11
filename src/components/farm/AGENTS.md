@@ -1,0 +1,1 @@
+- Claim All: exact integer reward units (stored + rate × completed periods), skip empty farms, sequential 5-farm batches so one failure never blocks the rest.
