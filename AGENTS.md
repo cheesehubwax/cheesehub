@@ -47,3 +47,4 @@
 - CHEESENull's CHEESECrypt row: crypt.cheese nulls plus user eosio.null legs matched by Crypt fee-label constants, counted once.
 - Crypt router lookups persist (IndexedDB) only if >5min old.
 
+- CHEESEFarm Claim All computes ready rewards with exact integer units (stored + rate × completed periods), skips empty farms and signs sequential 5-farm batches so one failure never blocks the rest.
