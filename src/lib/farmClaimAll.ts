@@ -101,3 +101,14 @@ export async function fetchUserStakerRows(account: string): Promise<{ rows: Stak
   }
   return { rows, partial: true };
 }
+
+/** Split staked rows into farms with rewards ready now and farms with nothing to claim. Unknown farms count as empty. */
+export function splitReadyFarms(rows: StakerRow[], timingByFarm: Map<string, FarmTiming>, nowSec: number): { ready: ReadyFarm[]; empty: string[] } {
+  const ready: ReadyFarm[] = []; const empty: string[] = [];
+  for (const row of rows) {
+    const t = timingByFarm.get(row.farmName);
+    const rewards = t ? readyRewards(row, t, nowSec) : [];
+    if (rewards.length) ready.push({ farmName: row.farmName, rewards }); else empty.push(row.farmName);
+  }
+  return { ready, empty };
+}

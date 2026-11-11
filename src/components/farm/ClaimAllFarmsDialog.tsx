@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { buildClaimRewardsAction, type FarmInfo } from "@/lib/farm";
-import { fetchUserStakerRows, formatUnits, planClaimBatches, readyRewards, sumRewards, type ReadyFarm } from "@/lib/farmClaimAll";
+import { fetchUserStakerRows, formatUnits, planClaimBatches, splitReadyFarms, sumRewards, type ReadyFarm } from "@/lib/farmClaimAll";
 import { applyClaimToAccount } from "@/lib/farmClaimHistory";
 import { WAX_EXPLORER } from "@/lib/waxConfig";
 
@@ -16,7 +16,10 @@ const BATCH_SIZE = 5;
 
 interface Props { open: boolean; onOpenChange: (o: boolean) => void; farms: FarmInfo[] }
 
-const fmtList = (r: ReadyFarm["rewards"]) => r.map(x => `${formatUnits(x)} ${x.symbol}`).join(", ");
+export const farmTimings = (farms: FarmInfo[]) =>
+  new Map(farms.map(f => [f.farm_name, { payoutInterval: f.payout_interval, expiration: f.expiration, isActive: f.is_active }]));
+
+export const fmtList = (r: ReadyFarm["rewards"]) => r.map(x => `${formatUnits(x)} ${x.symbol}`).join(", ");
 
 export function ClaimAllFarmsDialog({ open, onOpenChange, farms }: Props) {
   const { accountName, session } = useWax();
@@ -34,17 +37,9 @@ export function ClaimAllFarmsDialog({ open, onOpenChange, farms }: Props) {
     staleTime: 0,
   });
 
-  const { ready, empty } = useMemo(() => {
-    const byName = new Map(farms.map(f => [f.farm_name, f]));
-    const now = Math.floor(Date.now() / 1000);
-    const ready: ReadyFarm[] = []; const empty: string[] = [];
-    for (const row of data?.rows ?? []) {
-      const f = byName.get(row.farmName);
-      const rewards = f ? readyRewards(row, { payoutInterval: f.payout_interval, expiration: f.expiration, isActive: f.is_active }, now) : [];
-      if (rewards.length) ready.push({ farmName: row.farmName, rewards }); else empty.push(row.farmName);
-    }
-    return { ready, empty };
-  }, [data, farms]);
+  const { ready, empty } = useMemo(
+    () => splitReadyFarms(data?.rows ?? [], farmTimings(farms), Math.floor(Date.now() / 1000)),
+    [data, farms]);
 
   useEffect(() => { if (open) { setSelected(new Set(ready.map(r => r.farmName))); } }, [open, ready]);
   useEffect(() => { if (!open) { setResults([]); setProgress({ done: 0, total: 0 }); } }, [open]);

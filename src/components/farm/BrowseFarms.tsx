@@ -11,6 +11,7 @@ import { useWax } from "@/context/WaxContext";
 import { useQuery } from "@tanstack/react-query";
 import { FarmCard } from "./FarmCard";
 import { ClaimAllFarmsDialog } from "./ClaimAllFarmsDialog";
+import { ClaimAllButton } from "./ClaimAllButton";
 import { Button } from "@/components/ui/button";
 import { useFarmClaimTotals } from "@/hooks/useFarmClaimTotals";
 
@@ -103,7 +104,7 @@ export function BrowseFarms() {
           )}
 
           {accountName && (
-            <Button size="sm" onClick={() => setClaimAllOpen(true)}>🧀 Claim All</Button>
+            <ClaimAllButton account={accountName} farms={farms} onClick={() => setClaimAllOpen(true)} />
           )}
 
           <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
