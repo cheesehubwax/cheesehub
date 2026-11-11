@@ -10,6 +10,8 @@ import { fetchAllFarms, FarmInfo, fetchUserGlobalStakes } from "@/lib/farm";
 import { useWax } from "@/context/WaxContext";
 import { useQuery } from "@tanstack/react-query";
 import { FarmCard } from "./FarmCard";
+import { ClaimAllFarmsDialog } from "./ClaimAllFarmsDialog";
+import { Button } from "@/components/ui/button";
 import { useFarmClaimTotals } from "@/hooks/useFarmClaimTotals";
 
 type SortOption = "newest" | "staked" | "name";
@@ -21,6 +23,7 @@ export function BrowseFarms() {
   const [activeOnly, setActiveOnly] = useState(true);
   const [stakedOnly, setStakedOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>("staked");
+  const [claimAllOpen, setClaimAllOpen] = useState(false);
 
   const { data: farms = [], isLoading } = useQuery({
     queryKey: ["farms"],
@@ -99,6 +102,10 @@ export function BrowseFarms() {
             </div>
           )}
 
+          {accountName && (
+            <Button size="sm" onClick={() => setClaimAllOpen(true)}>🧀 Claim All</Button>
+          )}
+
           <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
             <SelectTrigger className="w-[140px]">
               <SelectValue />
@@ -111,6 +118,10 @@ export function BrowseFarms() {
           </Select>
         </div>
       </div>
+
+      {accountName && (
+        <ClaimAllFarmsDialog open={claimAllOpen} onOpenChange={setClaimAllOpen} farms={farms} />
+      )}
 
       {/* Results */}
       {isLoading ? (
