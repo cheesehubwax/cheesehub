@@ -22,3 +22,14 @@ describe("claim all", () => {
     expect(formatUnits(r[0])).toBe("7.0000");
   });
 });
+
+import { splitReadyFarms } from "@/lib/farmClaimAll";
+describe("claim all hover summary", () => {
+  it("counts only farms with rewards ready; unknown farms are empty", () => {
+    const row = (farmName: string, claimable: string) => ({ farmName, claimable: [{ quantity: claimable, contract: "cheeseburger" }], rates: [], lastStateChange: 0 });
+    const timing = new Map([["a", { payoutInterval: 3600, expiration: 0, isActive: true }], ["b", { payoutInterval: 3600, expiration: 0, isActive: true }]]);
+    const { ready, empty } = splitReadyFarms([row("a", "1.0000 CHEESE"), row("b", "0.0000 CHEESE"), row("x", "5.0000 CHEESE")], timing, 10_000);
+    expect(ready.map(r => r.farmName)).toEqual(["a"]);
+    expect(empty).toEqual(["b", "x"]);
+  });
+});
