@@ -17,8 +17,8 @@ describe("claim all", () => {
     expect(formatUnits(total[0])).toBe("0.0003");
   });
   it("adds only completed payout periods", () => {
-    const row = { farmName: "x", claimable: [{ quantity: "1.0000 CHEESE", contract: "cheeseburger" }], rates: [{ quantity: "2.0000 CHEESE", contract: "cheeseburger" }], lastStateChange: 0 };
-    const r = readyRewards(row, { payoutInterval: 3600, expiration: 0, isActive: true }, 3600 * 3 + 1000);
+    const row = { farmName: "x", claimable: [{ quantity: "1.0000 CHEESE", contract: "cheeseburger" }], rates: [{ quantity: "2.0000 CHEESE", contract: "cheeseburger" }], lastStateChange: 1000 };
+    const r = readyRewards(row, { payoutInterval: 3600, expiration: 0, isActive: true }, 1000 + 3600 * 3 + 500);
     expect(formatUnits(r[0])).toBe("7.0000");
   });
 });
