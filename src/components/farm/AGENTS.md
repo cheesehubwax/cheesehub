@@ -1,2 +1,3 @@
 - Claim All: exact integer reward units (stored + rate × completed periods), skip empty farms, sequential 5-farm batches so one failure never blocks the rest.
 - Claim All hover summary shares the dialog's cached stake read and ready/empty split so button counts and dialog never disagree.
+- farms.waxdao stakers secondary indexes: 3 = user, 4 = farmname (2 returns nothing); verified on chain.

@@ -22,7 +22,7 @@ export async function fetchUserGlobalStakes(account: string): Promise<GlobalStak
         code: FARM_CONTRACT,
         scope: FARM_CONTRACT,
         table: 'stakers',
-        index_position: 2,
+        index_position: 3,
         key_type: 'name',
         lower_bound: account,
         upper_bound: account,
@@ -895,13 +895,13 @@ export async function fetchUserStakes(account: string, farmName: string): Promis
   try {
     console.log("Querying staking data for", account, "in farm", farmName);
 
-    // Strategy 0: Query 'stakers' table by USER (index 2), filter by farmname
+    // Strategy 0: Query 'stakers' table by USER (index 3), filter by farmname
     try {
       const userIndexData = await fetchTableRows({
         code: FARM_CONTRACT,
         scope: FARM_CONTRACT,
         table: "stakers",
-        index_position: 2,
+        index_position: 3,
         key_type: "name",
         lower_bound: account,
         upper_bound: account,
@@ -1283,12 +1283,12 @@ export interface PendingReward {
 
 export async function fetchPendingRewards(account: string, farmName: string): Promise<PendingReward[]> {
   try {
-    // Strategy 1: Query stakers table by farmname index
+    // Strategy 1: Query stakers table by farmname index (4; index 3 is user)
     const data = await fetchTableRows({
       code: FARM_CONTRACT,
       scope: FARM_CONTRACT,
       table: "stakers",
-      index_position: 3,
+      index_position: 4,
       key_type: "name",
       lower_bound: farmName,
       upper_bound: farmName,
@@ -1316,7 +1316,7 @@ export async function fetchPendingRewards(account: string, farmName: string): Pr
       code: FARM_CONTRACT,
       scope: FARM_CONTRACT,
       table: "stakers",
-      index_position: 2,
+      index_position: 3,
       key_type: "name",
       lower_bound: account,
       upper_bound: account,

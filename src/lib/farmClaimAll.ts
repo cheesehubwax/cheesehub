@@ -81,8 +81,9 @@ export async function fetchUserStakerRows(account: string): Promise<{ rows: Stak
   let lower = account;
   for (let i = 0; i < 10; i++) {
     const res = await fetchTableRows<Record<string, unknown>>({
+      // farms.waxdao stakers: secondary index 3 = user, 4 = farmname (index 2 returns nothing).
       code: FARM_CONTRACT, scope: FARM_CONTRACT, table: "stakers",
-      index_position: 2, key_type: "name", lower_bound: lower, upper_bound: account, limit: 100,
+      index_position: 3, key_type: "name", lower_bound: lower, upper_bound: account, limit: 100,
     });
     for (const r of res.rows || []) {
       if ((r.user as string) && r.user !== account) continue;
