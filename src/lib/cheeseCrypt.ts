@@ -675,14 +675,15 @@ export const MAX_HISTORY_PAGES = 4;
  * Encrypted messages sent or received by the account (newest first, deduped).
  * `pages` > 1 reads further back by timestamp, so multi-transaction voice notes are not cut in half.
  */
-export async function fetchMessages(account: string, pages = 1, requireComplete = false): Promise<ChainMemo[]> {
+export async function fetchMessages(account: string, pages = 1, requireComplete = false, pageSize = HISTORY_PAGE): Promise<ChainMemo[]> {
+  const limit = Math.min(HISTORY_PAGE, Math.max(1, Math.floor(pageSize)));
   const scan = async (query: string, count: (q: string) => Promise<{ rows: ChainMemo[]; n: number; oldest: number }>) => {
     let rows: ChainMemo[] = [];
     let before: string | null = null;
     for (let p = 0; p < Math.min(Math.max(1, pages), MAX_HISTORY_PAGES); p++) {
-      const page = await count(`${query}&sort=desc&limit=${HISTORY_PAGE}${before ? `&before=${encodeURIComponent(before)}` : ''}`);
+      const page = await count(`${query}&sort=desc&limit=${limit}${before ? `&before=${encodeURIComponent(before)}` : ''}`);
       rows = rows.concat(page.rows);
-      if (page.n < HISTORY_PAGE || !Number.isFinite(page.oldest)) break;
+      if (page.n < limit || !Number.isFinite(page.oldest)) break;
       before = new Date(page.oldest).toISOString();
     }
     return rows;
@@ -757,10 +758,10 @@ export async function fetchContractStream(account: string, cursor: number, fetch
   for (let p = 0; p < STREAM_MAX_PAGES; p++) {
     const page = await fetchPage(`account=${CRYPT_ROUTER_ACCOUNT}&${STREAM_FILTER}&sort=asc&after=${encodeURIComponent(new Date(after).toISOString())}&limit=${STREAM_PAGE}&skip=${p * STREAM_PAGE}`);
     rows.push(...streamRows(account, page));
+    if (page.some(a => !Number.isFinite(actionTime(a)))) throw new Error('History action has no valid timestamp');
     const times = page.map(actionTime).filter(Number.isFinite);
     if (times.length) newest = Math.max(newest, ...times);
     if (page.length < STREAM_PAGE) return { rows, cursor: Math.max(newest, started), complete: true };
-    if (page.some(a => !Number.isFinite(actionTime(a)))) throw new Error('History action has no valid timestamp');
   }
   return { rows, cursor: newest, complete: false };
 }

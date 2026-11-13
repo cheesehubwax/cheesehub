@@ -498,6 +498,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const currentHistoryScope = useRef(historyScope);
   currentHistoryScope.current = historyScope;
   const hydratedScope = useRef('');
+  const cacheAllowed = useRef(true);
   const loadedDepth = useRef(0);
   const [checkpoint, setCheckpoint] = useState(0);
   // Only replace the list when something changed, so a quiet poll never re-renders the chat.
@@ -513,7 +514,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const fullRead = useCallback(async (maximum: boolean) => {
     const scope = currentHistoryScope.current;
     const started = Date.now();
-    const rows = maximum ? await fetchStreamHistory(account, depth) : await fetchMessages(account, depth, true);
+    const rows = maximum ? await fetchStreamHistory(account, depth) : await fetchMessages(account, depth, true, depth === 1 ? 100 : 500);
     if (!alive.current || currentHistoryScope.current !== scope) return;
     setMemos(prev => mergeMemos(prev, rows));
     loadedDepth.current = Math.max(loadedDepth.current, depth);
@@ -522,7 +523,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     setLoaded(true);
   }, [account, depth]);
   useEffect(() => {
-    if (key && checkpoint > 0 && hydratedScope.current === historyScope && privacyMode === 'standard') void saveHistory(account, privacyMode, memos, checkpoint, Math.max(1, loadedDepth.current));
+    if (key && checkpoint > 0 && hydratedScope.current === historyScope && cacheAllowed.current) void saveHistory(account, privacyMode, memos, checkpoint, Math.max(1, loadedDepth.current));
   }, [account, privacyMode, key, memos, checkpoint]);
   const refresh = useCallback(async () => {
     if (!key || inFlight.current) return;
@@ -534,6 +535,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
         const cached = await loadHistory(account, privacyMode);
         if (!alive.current || currentHistoryScope.current !== scope) return;
         hydratedScope.current = scope;
+        cacheAllowed.current = true;
         if (cached) {
           applyMemos(cached.rows);
           loadedDepth.current = cached.depth;
@@ -567,6 +569,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
       if (!alive.current || currentHistoryScope.current !== scope) return;
       setMemos(prev => mergeMemos(prev, rows)); loadedDepth.current = MAX_HISTORY_PAGES;
       // Explicit account-history consent in Maximum must not change its stream-only cache.
+      if (privacyMode === 'maximum') cacheAllowed.current = false;
       if (privacyMode === 'standard') { streamCursor.current = started; setCheckpoint(started); }
     }
     catch { toast({ title: 'Could not load history', description: 'History servers did not answer. Try again shortly.', variant: 'destructive' }); }
