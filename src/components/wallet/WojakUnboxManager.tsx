@@ -6,7 +6,6 @@ import { useWaxTransaction } from '@/hooks/useWaxTransaction';
 import { useWojakPacks, useInvalidateWojakPacks, WojakPack } from '@/hooks/useWojakPacks';
 import { buildUnboxAction, WAXDAO_UNBOX_CONTRACT, WOJAK_UNBOX_POOL_ID, WOJAK_PACK_COLLECTION } from '@/lib/wojakUnbox';
 import { getImageUrl } from '@/services/atomicApi';
-import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 import { toast } from 'sonner';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
@@ -22,7 +21,7 @@ export function WojakUnboxManager({ onTransactionComplete, onTransactionSuccess 
   const { data: packs = [], isLoading, refetch, isFetching } = useWojakPacks(accountName);
   const invalidatePacks = useInvalidateWojakPacks();
 
-  const [termsAgreed, setTermsAgreed] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(true);
   const [openingAssetId, setOpeningAssetId] = useState<string | null>(null);
 
   const handleOpen = async (pack: WojakPack) => {
@@ -184,8 +183,6 @@ export function WojakUnboxManager({ onTransactionComplete, onTransactionSuccess 
         </div>
       )}
 
-      {/* Terms gate */}
-      <TermsCheckbox id="terms-wojak-unbox" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
     </div>
   );
 }

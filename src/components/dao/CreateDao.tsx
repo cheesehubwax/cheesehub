@@ -27,7 +27,6 @@ import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useToast } from "@/hooks/use-toast";
 import { FeePaymentSelector } from "@/components/shared/FeePaymentSelector";
-import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
@@ -56,7 +55,7 @@ export function CreateDao() {
   const cheesePricing = useCheeseFeePricing();
   const waxdaoPricing = useWaxdaoFeePricing();
   const [loading, setLoading] = useState(false);
-  const [termsAgreed, setTermsAgreed] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(true);
   const { toast } = useToast();
 
   const [daoName, setDaoName] = useState("");
@@ -752,7 +751,6 @@ export function CreateDao() {
           </p>
         </div>
 
-        <TermsCheckbox id="terms-dao" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
 
         {/* Submit */}
         <Button onClick={handleCreate} disabled={loading || !paymentMethod || !termsAgreed} className="w-full bg-primary text-primary-foreground" size="lg">

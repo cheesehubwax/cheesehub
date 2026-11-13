@@ -2,7 +2,6 @@ import type { ReactNode, RefObject } from 'react';
 import { Button } from '@/components/ui/button';
 import { YoutubeTitleHelper } from '@/components/crypt/YoutubeTitleHelper';
 import { Textarea } from '@/components/ui/textarea';
-import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 import { VoiceRecorder } from '@/components/crypt/VoiceRecorder';
 import type { ReplyRef } from '@/lib/cryptReply';
 import type { VoiceClip } from '@/lib/cryptVoice';
@@ -41,7 +40,6 @@ export function CryptComposer({
       </div>
       {/* Bottom line: Terms on the left; price, Instant and Send on the right. */}
       <div className="flex flex-wrap items-center gap-2 gap-y-1 pr-6 text-xs">
-        <TermsCheckbox checked={agreed} onCheckedChange={setAgreed} />
         <span className="ml-auto text-muted-foreground">{totalCost}</span>
         {instantSlot}
         {voice

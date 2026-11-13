@@ -5,7 +5,6 @@ import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { formatBytes } from '@/components/wallet/WalletResources';
 import { refreshResourceGauges } from '@/components/shared/ResourceGauges';
@@ -42,7 +41,7 @@ export function AirSellRamCard() {
   const { data: cheesePrice } = useCheesePriceData();
 
   const [kbInput, setKbInput] = useState('');
-  const [termsAgreed, setTermsAgreed] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(true);
   const [isTransacting, setIsTransacting] = useState(false);
   const [unconfirmed, setUnconfirmed] = useState<UnconfirmedState | null>(null);
 
@@ -113,7 +112,7 @@ export function AirSellRamCard() {
       txId,
     );
     setKbInput('');
-    setTermsAgreed(false);
+    setTermsAgreed(true);
     setUnconfirmed(null);
     refreshStaggered();
   };
@@ -331,11 +330,6 @@ export function AirSellRamCard() {
         <UnconfirmedNotice state={unconfirmed} onAcknowledge={() => setUnconfirmed(null)} />
       )}
 
-      <TermsCheckbox
-        id="air-terms-sell-ram"
-        checked={termsAgreed}
-        onCheckedChange={setTermsAgreed}
-      />
 
       <Button
         onClick={handleSell}

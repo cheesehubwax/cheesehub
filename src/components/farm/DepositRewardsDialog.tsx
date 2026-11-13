@@ -8,7 +8,6 @@ import { FarmInfo, buildAddRewardsAction } from "@/lib/farm";
 import { TokenLogo } from "@/components/TokenLogo";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
-import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface DepositRewardsDialogProps {
   farm: FarmInfo;
@@ -23,7 +22,7 @@ export function DepositRewardsDialog({ farm, open, onOpenChange, onSuccess, isCr
   const { executeTransaction } = useWaxTransaction(session);
   const [loading, setLoading] = useState(false);
   const [amounts, setAmounts] = useState<Record<number, string>>({});
-  const [termsAgreed, setTermsAgreed] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(true);
 
   const handleDeposit = async () => {
     if (!accountName) return;
@@ -46,7 +45,7 @@ export function DepositRewardsDialog({ farm, open, onOpenChange, onSuccess, isCr
       });
       if (result.success) {
         setAmounts({});
-        setTermsAgreed(false);
+        setTermsAgreed(true);
         onOpenChange(false);
         onSuccess();
       }
@@ -97,7 +96,6 @@ export function DepositRewardsDialog({ farm, open, onOpenChange, onSuccess, isCr
               </div>
             </div>
           ))}
-          <TermsCheckbox id="terms-deposit-rewards" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>

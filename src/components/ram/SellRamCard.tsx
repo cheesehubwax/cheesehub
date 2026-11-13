@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { TermsDialog } from '@/components/shared/TermsDialog';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { formatBytes } from '@/components/wallet/WalletResources';
 import { useWax } from '@/context/WaxContext';
@@ -45,7 +44,7 @@ export function SellRamCard({
   const { session, isConnected, login, refreshBalance } = useWax();
   const { showSuccess } = useTransactionSuccess();
   const [bytesInput, setBytesInput] = useState('');
-  const [termsAgreed, setTermsAgreed] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(true);
   const [isTransacting, setIsTransacting] = useState(false);
   const [unconfirmed, setUnconfirmed] = useState<UnconfirmedState | null>(null);
 
@@ -84,7 +83,7 @@ export function SellRamCard({
       txId,
     );
     setBytesInput('');
-    setTermsAgreed(false);
+    setTermsAgreed(true);
     setUnconfirmed(null);
     refreshBalance?.();
     onComplete?.();
@@ -275,18 +274,6 @@ export function SellRamCard({
       {unconfirmed && (
         <UnconfirmedNotice state={unconfirmed} onAcknowledge={() => setUnconfirmed(null)} />
       )}
-
-      <div className="flex items-start gap-2">
-        <Checkbox
-          id="terms-sell-ram"
-          checked={termsAgreed}
-          onCheckedChange={(v) => setTermsAgreed(v === true)}
-          className="mt-0.5"
-        />
-        <label htmlFor="terms-sell-ram" className="text-xs text-muted-foreground leading-relaxed">
-          I have read and agree to the <TermsDialog />
-        </label>
-      </div>
 
       <Button
         onClick={handleSell}

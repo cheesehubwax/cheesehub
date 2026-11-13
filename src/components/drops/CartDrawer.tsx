@@ -8,7 +8,6 @@ import { useWax } from "@/context/WaxContext";
 import { usePurchaseDrop } from "@/hooks/usePurchaseDrop";
 import { useTransactionSuccess } from "@/context/TransactionSuccessContext";
 import { useToast } from "@/hooks/use-toast";
-import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 export function CartDrawer() {
   const { items, removeFromCart, clearCart, isOpen, setIsOpen, totalItems } = useCart();
@@ -16,7 +15,7 @@ export function CartDrawer() {
   const { purchaseDrop, purchasing } = usePurchaseDrop();
   const { showSuccess } = useTransactionSuccess();
   const { toast } = useToast();
-  const [termsAgreed, setTermsAgreed] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(true);
 
   const handlePurchaseAll = async () => {
     let lastTxId: string | undefined;
@@ -85,7 +84,6 @@ export function CartDrawer() {
                   <p className="text-sm text-muted-foreground text-center">Connect wallet to purchase</p>
                 ) : (
                   <>
-                    <TermsCheckbox id="terms-cart" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
                     <Button
                       className="w-full bg-primary text-primary-foreground"
                       onClick={handlePurchaseAll}

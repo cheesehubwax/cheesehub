@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 
 /**
  * Two steps. 1 (free): make the new key, lock it with Anchor together with the old one, and save the backup.
@@ -12,7 +11,7 @@ export function CryptRotateDialog({ step, friends, roomCount, busy, costFor, onC
   onCreate: () => void; onAnnounce: (publish: boolean) => void; onClose: () => void;
 }) {
   const [publish, setPublish] = useState(false);
-  const [agreed, setAgreed] = useState(false);
+  const [agreed, setAgreed] = useState(true);
   return <Dialog open onOpenChange={o => { if (!o && !busy) onClose(); }}>
     <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
       <DialogHeader>
@@ -33,7 +32,6 @@ export function CryptRotateDialog({ step, friends, roomCount, busy, costFor, onC
             <span>Also post my new key publicly so new people can find me <span className="block text-xs">Off keeps it private. People who look you up later only find your old key, and their messages stop opening once that key is destroyed.</span></span>
           </label>
           <p className="text-xs">Cost: {costFor(publish)}. Platform fees split 80% to eosio.null and 20% to xcheeseliqst; 0.0001 CHEESE per part goes to each friend.</p>
-          <TermsCheckbox id="crypt-rotate-terms" checked={agreed} onCheckedChange={setAgreed} />
         </>}
       </div>
       <DialogFooter>
