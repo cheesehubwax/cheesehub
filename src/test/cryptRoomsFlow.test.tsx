@@ -44,7 +44,6 @@ describe('public rooms', () => {
     const owner = mount();
     const panel = await screen.findByRole('region', { name: 'Room join requests' });
     fireEvent.click(within(panel).getByRole('button', { name: 'Accept' }));
-    fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(screen.getByRole('button', { name: 'Pay & invite' }));
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
     const actions = calls.transact.mock.calls[0][0] as { data: { from: string; to: string; quantity: string; memo: string } }[];
@@ -60,7 +59,6 @@ describe('public rooms', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Invited by cheeseplum/ }));
     expect(screen.queryByPlaceholderText('Message group')).not.toBeInTheDocument();
     fireEvent.click(within(screen.getByRole('region', { name: 'Group invites' })).getByRole('button', { name: /^Join$/ }));
-    fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(screen.getByRole('button', { name: 'Pay & join' }));
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(2));
     expect(await screen.findByPlaceholderText('Message group')).toBeInTheDocument();
@@ -77,8 +75,7 @@ describe('public rooms', () => {
     } else fireEvent.click(await screen.findByRole('button', { name: /Cheese club/ }));
     fireEvent.click(await screen.findByRole('button', { name: entry === 'chat' ? 'Ask owner to rejoin' : /Ask to rejoin/ }));
     const pay = await screen.findByRole('button', { name: 'Pay & ask' });
-    expect(pay).toBeDisabled();
-    fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(pay);
+    fireEvent.click(pay);
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
     expect(loadDecisions('bob')[ID]?.status).toBe('left');
     const actions = calls.transact.mock.calls[0][0] as { data: { to: string; quantity: string; memo: string } }[];
@@ -97,8 +94,6 @@ describe('public rooms', () => {
 
     fireEvent.click(within(panel).getByRole('button', { name: 'Accept' }));
     const pay = await screen.findByRole('button', { name: 'Pay & invite' });
-    expect(pay).toBeDisabled();
-    fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(pay);
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
     const actions = calls.transact.mock.calls[0][0] as { data: { to: string; quantity: string } }[];
@@ -119,8 +114,6 @@ describe('public rooms', () => {
     const panel = await screen.findByRole('region', { name: 'Room join requests' });
     fireEvent.click(within(panel).getByRole('button', { name: 'Decline' }));
     const pay = await screen.findByRole('button', { name: 'Pay & decline' });
-    expect(pay).toBeDisabled();
-    fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(pay);
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
     const actions = calls.transact.mock.calls[0][0] as { data: { to: string; quantity: string } }[];
@@ -162,7 +155,6 @@ describe('public rooms', () => {
     const ownerView = mount();
     const panel = await screen.findByRole('region', { name: 'Room join requests' });
     fireEvent.click(within(panel).getByRole('button', { name: 'Accept' }));
-    fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(screen.getByRole('button', { name: 'Pay & invite' }));
     await waitFor(() => expect(loadInvites('alice')[ID].members).toHaveLength(9));
     const actions = calls.transact.mock.calls[0][0] as { data: { from: string; to: string; quantity: string; memo: string } }[];
@@ -175,8 +167,6 @@ describe('public rooms', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Invited by alice/ }));
     fireEvent.click(within(await screen.findByRole('region', { name: 'Group invites' })).getByRole('button', { name: /^Join$/ }));
     const pay = await screen.findByRole('button', { name: 'Pay & join' });
-    expect(pay).toBeDisabled();
-    fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(pay);
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(2));
     expect(await screen.findByPlaceholderText('Message group')).toBeInTheDocument();
@@ -191,8 +181,6 @@ describe('public rooms', () => {
     const settings = await screen.findByRole('dialog', { name: '✏️ Room settings' });
     expect(within(settings).getByText(/public messaging key are published on chain/)).toBeInTheDocument();
     const pay = within(settings).getByRole('button', { name: /^Pay & list room/ });
-    expect(pay).toBeDisabled();
-    fireEvent.click(within(settings).getByRole('checkbox'));
     fireEvent.click(pay);
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
     const actions = calls.transact.mock.calls[0][0] as { data: { to: string; quantity: string; memo?: string } }[];
