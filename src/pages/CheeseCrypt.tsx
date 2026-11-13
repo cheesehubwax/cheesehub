@@ -522,7 +522,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     setLoaded(true);
   }, [account, depth]);
   useEffect(() => {
-    if (key && checkpoint > 0) void saveHistory(account, privacyMode, memos, checkpoint, Math.max(1, loadedDepth.current));
+    if (key && checkpoint > 0 && hydratedScope.current === historyScope && privacyMode === 'standard') void saveHistory(account, privacyMode, memos, checkpoint, Math.max(1, loadedDepth.current));
   }, [account, privacyMode, key, memos, checkpoint]);
   const refresh = useCallback(async () => {
     if (!key || inFlight.current) return;
@@ -537,10 +537,10 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
         if (cached) {
           applyMemos(cached.rows);
           loadedDepth.current = cached.depth;
-          streamCursor.current = cached.cursor;
+          streamCursor.current = cached.cursor; setCheckpoint(0);
           setLoaded(true);
         } else {
-          applyMemos([]); loadedDepth.current = 0; streamCursor.current = 0;
+          applyMemos([]); loadedDepth.current = 0; streamCursor.current = 0; setCheckpoint(0);
         }
       }
       if (!streamCursor.current || depth > loadedDepth.current) await fullRead(privacyMode === 'maximum');
@@ -551,7 +551,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
         if (!alive.current || currentHistoryScope.current !== scope) return;
         setMemos(prev => mergeMemos(prev, result.rows));
         if (result.complete) { streamCursor.current = result.cursor; setCheckpoint(result.cursor); }
-        else await fullRead(privacyMode === 'maximum');
+        else throw new Error('History catch-up is incomplete; its saved checkpoint was retained.');
       }
     }
     catch { toast({ title: 'Could not load messages', description: 'History servers did not answer. Try again shortly.', variant: 'destructive' }); }
@@ -583,7 +583,8 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
       if (!alive.current || currentHistoryScope.current !== scope) return;
       setMemos(prev => mergeMemos(prev, r.rows));
       if (r.complete) { streamCursor.current = r.cursor; setCheckpoint(r.cursor); }
-      else await fullRead(privacyMode === 'maximum');
+      // Never skip an offline gap by replacing its cursor with a bounded recent-window read.
+      // The explicit refresh catches up Standard history; Maximum retains its safe cursor.
     } catch { /* retry next tick */ }
     finally { inFlight.current = false; }
   }, [account, key, depth, refresh, fullRead, privacyMode]);
@@ -638,7 +639,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     ? [{ key: c.key, txId: c.txId, time: c.time, from: c.from, to: c.to, control: c.control, usedKey: c.usedKey }] : []), [decoded]);
   // Creators of public rooms I asked to join: their listing key reads only their invite to that room.
   const { data: roomMemos, isFetching: roomsLoading, refetch: refetchRooms } = useQuery({
-    queryKey: ['crypt-rooms'], enabled: !!key && loaded && (roomsOpen || Object.keys(roomRequests).length > 0 || Object.values(inviteStore).some(g => g.creator === account)), queryFn: () => fetchRoomMemos(ROOM_PREFIX),
+    queryKey: ['crypt-rooms'], enabled: !!key && loaded && (roomsOpen || Object.keys(roomRequests).length > 0 || Object.keys(inviteStore).length > 0), queryFn: () => fetchRoomMemos(ROOM_PREFIX),
     staleTime: 30 * 60_000, refetchInterval: () => (roomsOpen && document.visibilityState === 'visible' ? 60_000 : false), retry: false,
   });
   const listings = useMemo(() => collectListings(roomMemos ?? []).filter(l => !blocked.includes(l.creator)), [roomMemos, blocked]);

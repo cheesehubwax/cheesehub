@@ -751,19 +751,16 @@ export interface StreamResult { rows: ChainMemo[]; cursor: number; complete: boo
 /** New crypt.cheese actions since `cursor` (ms). `complete` is false when the page cap was hit. */
 export async function fetchContractStream(account: string, cursor: number, fetchPage: (q: string) => Promise<any[]> = hyperionActions): Promise<StreamResult> {
   const started = Date.now();
-  let after = Math.max(0, cursor - STREAM_OVERLAP_MS);
+  const after = Math.max(0, cursor - STREAM_OVERLAP_MS);
   let newest = cursor;
   const rows: ChainMemo[] = [];
   for (let p = 0; p < STREAM_MAX_PAGES; p++) {
-    const page = await fetchPage(`account=${CRYPT_ROUTER_ACCOUNT}&${STREAM_FILTER}&sort=asc&after=${encodeURIComponent(new Date(after).toISOString())}&limit=${STREAM_PAGE}`);
+    const page = await fetchPage(`account=${CRYPT_ROUTER_ACCOUNT}&${STREAM_FILTER}&sort=asc&after=${encodeURIComponent(new Date(after).toISOString())}&limit=${STREAM_PAGE}&skip=${p * STREAM_PAGE}`);
     rows.push(...streamRows(account, page));
     const times = page.map(actionTime).filter(Number.isFinite);
     if (times.length) newest = Math.max(newest, ...times);
     if (page.length < STREAM_PAGE) return { rows, cursor: Math.max(newest, started), complete: true };
-    const last = Math.max(...times);
-    // A whole page sharing one timestamp cannot advance safely; let the caller fall back.
-    if (!Number.isFinite(last) || last <= after) break;
-    after = last;
+    if (page.some(a => !Number.isFinite(actionTime(a)))) throw new Error('History action has no valid timestamp');
   }
   return { rows, cursor: newest, complete: false };
 }
