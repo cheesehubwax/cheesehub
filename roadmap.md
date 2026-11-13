@@ -2,7 +2,7 @@
 
 Open tasks only. Completed work lives in git history.
 
-- [ ] CHEESECrypt loading: restore ciphertext locally after unlock, sync complete timestamp deltas, defer Discover scans, and verify restart/privacy/moderation regressions.
+- [ ] CHEESECrypt loading: verify real Anchor-unlocked restart speed through the user's Tor helper; encrypted local restore/new-message/restart readback and 63 security/history tests pass, but the user's wallet and local Tor connection are unavailable here.
 
 - [ ] CHEESECrypt Tor helper: confirm v1.1 replacement and browser local-network permission on the user's Windows PC; Tor-only HTTPS/certificate/timeouts tests and the real Tor-backed Privacy dialog save pass here, and Windows replacement commands are in the plan.
 

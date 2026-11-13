@@ -499,6 +499,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   currentHistoryScope.current = historyScope;
   const hydratedScope = useRef('');
   const cacheAllowed = useRef(true);
+  const catchupPending = useRef(false);
   const loadedDepth = useRef(0);
   const [checkpoint, setCheckpoint] = useState(0);
   // Only replace the list when something changed, so a quiet poll never re-renders the chat.
@@ -536,6 +537,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
         if (!alive.current || currentHistoryScope.current !== scope) return;
         hydratedScope.current = scope;
         cacheAllowed.current = true;
+        catchupPending.current = !!cached;
         if (cached) {
           applyMemos(cached.rows);
           loadedDepth.current = cached.depth;
@@ -552,7 +554,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
           : await fetchMessageDelta(account, streamCursor.current);
         if (!alive.current || currentHistoryScope.current !== scope) return;
         setMemos(prev => mergeMemos(prev, result.rows));
-        if (result.complete) { streamCursor.current = result.cursor; setCheckpoint(result.cursor); }
+        if (result.complete) { catchupPending.current = false; streamCursor.current = result.cursor; setCheckpoint(result.cursor); }
         else throw new Error('History catch-up is incomplete; its saved checkpoint was retained.');
       }
     }
@@ -578,7 +580,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   // Background check: no spinner, no error toast — a missed poll is retried on the next tick.
   const poll = useCallback(async () => {
     if (inFlight.current || !key) return;
-    if (!streamCursor.current || depth > loadedDepth.current) { await refresh(); return; }
+    if (catchupPending.current || !streamCursor.current || depth > loadedDepth.current) { await refresh(); return; }
     const scope = currentHistoryScope.current;
     inFlight.current = true;
     try {
@@ -586,6 +588,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
       if (!alive.current || currentHistoryScope.current !== scope) return;
       setMemos(prev => mergeMemos(prev, r.rows));
       if (r.complete) { streamCursor.current = r.cursor; setCheckpoint(r.cursor); }
+      else catchupPending.current = true;
       // Never skip an offline gap by replacing its cursor with a bounded recent-window read.
       // The explicit refresh catches up Standard history; Maximum retains its safe cursor.
     } catch { /* retry next tick */ }
