@@ -4,7 +4,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { Copy } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
+import { RiskAcknowledgement } from "@/components/shared/RiskAcknowledgement";
 import { fetchDepositAddress, formatRawUnits } from "@/lib/alcorBridge";
 
 /** Permanent personal deposit address (Ethereum, BSC, Polygon) paying out to the WAX account. */
@@ -25,7 +25,7 @@ export function DepositAddressPanel({ account, idSuffix = "page" }: { account: s
   if (!q.data) {
     return (
       <div className="space-y-3">
-        <TermsCheckbox id={`bridge-terms-${idSuffix}`} checked={agreed} onCheckedChange={setAgreed} />
+        <RiskAcknowledgement kind="bridge" id={`bridge-terms-${idSuffix}`} checked={agreed} onCheckedChange={setAgreed} />
         <Button disabled={!agreed || q.isFetching} onClick={() => setRequested(true)} className="w-full">
           {q.isFetching ? "Getting address…" : "Show my deposit address"}
         </Button>

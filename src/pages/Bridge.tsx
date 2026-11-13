@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { OpenMojiIcon } from "@/components/OpenMojiIcon";
 import { DappAbout, aboutGuides } from "@/components/about/DappAbout";
-import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
+import { RiskAcknowledgement } from "@/components/shared/RiskAcknowledgement";
 import { BridgeWidget } from "@/components/bridge/BridgeWidget";
 import { BridgeRoutesCard } from "@/components/bridge/BridgeRoutesCard";
 import { BridgeTransfersCard } from "@/components/bridge/BridgeTransfersCard";
@@ -62,7 +62,7 @@ export default function Bridge() {
                   <Card className="max-w-[480px] mx-auto bg-card/80 border-border/50">
                     <CardContent className="pt-6 space-y-3 text-sm">
                       <p>The bridge is operated by Alcor, a third party. CHEESEHub never holds, routes or signs your funds. Check the network, token and amount before signing in your wallet.</p>
-                      <TermsCheckbox id="bridge-terms-widget" checked={agreed} onCheckedChange={setAgreed} />
+                      <RiskAcknowledgement kind="bridge" id="bridge-terms-widget" checked={agreed} onCheckedChange={setAgreed} />
                     </CardContent>
                   </Card>
                 )}
