@@ -145,7 +145,6 @@ describe('group creation and signing gate', () => {
     mount(<Messenger {...props} />);
     fireEvent.click(screen.getByRole('button', { name: /Best friend/ }));
     fireEvent.change(screen.getByPlaceholderText('Message Best friend'), { target: { value: 'reply' } });
-    fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(screen.getByRole('button', { name: /^Send$/ }));
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
     expect(calls.transact.mock.calls[0][0][0].data.to).toBe('bob');
@@ -163,8 +162,7 @@ describe('group creation and signing gate', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'bob' }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'carol' }));
     const create = screen.getByRole('button', { name: 'Create & send invites' });
-    expect(create).toBeDisabled();
-    fireEvent.click(document.getElementById('crypt-group-terms')!);
+    
     fireEvent.click(create);
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
     const actions = calls.transact.mock.calls[0][0] as { data: { to: string; quantity: string } }[];
@@ -183,7 +181,6 @@ describe('group creation and signing gate', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Menu' })); fireEvent.click(await screen.findByRole('button', { name: 'Refresh messages' }));
     const box = await screen.findByPlaceholderText('Message group');
     fireEvent.change(box, { target: { value: 'hello group' } });
-    fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(screen.getByRole('button', { name: /^Send$/ }));
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(2));
     expect((calls.transact.mock.calls[1][0] as { data: { to: string } }[]).map(a => a.data.to)).toEqual(['bob', 'eosio.null', 'xcheeseliqst']);
@@ -203,8 +200,7 @@ describe('group creation and signing gate', () => {
     expect(screen.queryByRole('button', { name: /^carol/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Join' }));
     const pay = screen.getByRole('button', { name: 'Pay & join' });
-    expect(pay).toBeDisabled();
-    fireEvent.click(document.getElementById('crypt-paid-terms')!);
+    
     fireEvent.click(pay);
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
     expect((calls.transact.mock.calls[0][0] as { data: { to: string } }[]).map(a => a.data.to)).toEqual(['alice', 'eosio.null', 'xcheeseliqst', 'carol']);

@@ -40,7 +40,7 @@ it('owner mutes for 15 minutes from the message menu and muted messages disappea
   fireEvent.click(await screen.findByRole('menuitem', { name: '15 minutes' }));
   const payDialog = await screen.findByRole('dialog', { name: '🔇 Mute carol' });
   const pay = within(payDialog).getByRole('button', { name: 'Pay & mute' });
-  expect(pay).toBeDisabled(); fireEvent.click(within(payDialog).getByRole('checkbox')); fireEvent.click(pay);
+   fireEvent.click(pay);
   await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
   await waitFor(() => expect(calls.fetch.mock.calls.length).toBeGreaterThan(1));
   expect(within(screen.getByRole('list', { name: 'Chat messages', hidden: true })).queryByText('muted content')).not.toBeInTheDocument();
@@ -80,8 +80,8 @@ it.each([
   fireEvent.click(within(menu).getByRole('menuitem', { name: admin ? '🚩 Report to owner' : '🚩 Report to admins' }));
   const dialog = await screen.findByRole('dialog', { name: /Report carol/ });
   const pay = within(dialog).getByRole('button', { name: 'Pay & report' });
-  expect(pay).toBeDisabled();
-  fireEvent.click(within(dialog).getByRole('checkbox')); fireEvent.click(pay);
+  
+  fireEvent.click(pay);
   await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
   const actions = calls.transact.mock.calls[0][0] as { data: { from: string; to: string } }[];
   expect([...new Set(actions.map(a => a.data.to).filter(to => to !== 'eosio.null' && to !== 'xcheeseliqst'))]).toEqual(recipients);

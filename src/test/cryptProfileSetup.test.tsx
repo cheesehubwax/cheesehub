@@ -31,8 +31,7 @@ beforeEach(async () => {
 async function payCreation() {
   expect(loadKey('alice')).toBeNull();
   const pay = await screen.findByRole('button', { name: 'Pay 500 CHEESE & create key' });
-  expect(pay).toBeDisabled();
-  fireEvent.click(screen.getByRole('checkbox'));
+  
   calls.transact.mockResolvedValueOnce({ success: true, txId: 'confirmed-create-tx' });
   await act(async () => { fireEvent.click(pay); });
   await screen.findByRole('button', { name: 'Save backup' });
@@ -48,13 +47,9 @@ describe('profile-first key setup', () => {
     };
     let dialog = await openPublish();
     expect(calls.transact).not.toHaveBeenCalled();
-    expect(dialog.getByRole('button', { name: 'Publish my key on chain' })).toBeDisabled();
-    fireEvent.click(dialog.getByRole('checkbox'));
+    
     fireEvent.click(dialog.getByRole('button', { name: 'Cancel' }));
     dialog = await openPublish();
-    expect(dialog.getByRole('checkbox')).not.toBeChecked();
-    expect(dialog.getByRole('button', { name: 'Publish my key on chain' })).toBeDisabled();
-    fireEvent.click(dialog.getByRole('checkbox'));
     await act(async () => { fireEvent.click(dialog.getByRole('button', { name: 'Publish my key on chain' })); });
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(calls.transact).toHaveBeenCalledTimes(1);
@@ -125,7 +120,6 @@ describe('profile-first key setup', () => {
     render(<Messenger {...props} />);
     fireEvent.click(screen.getByRole('button', { name: 'Create a new key' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Use defaults' }));
-    fireEvent.click(screen.getByRole('checkbox'));
     calls.transact.mockResolvedValueOnce(result);
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Pay 500 CHEESE & create key' })); });
     expect(loadKey('alice')).toBeNull();
@@ -151,7 +145,6 @@ describe('profile-first key setup', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create a new key' }));
     fireEvent.change(await screen.findByLabelText('CHEESECrypt name'), { target: { value: 'Alice Cheese' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save profile' }));
-    fireEvent.click(screen.getByRole('checkbox'));
     calls.transact.mockRejectedValueOnce(new Error('Wallet rejected'));
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Pay 500 CHEESE & create key' })); });
     expect(loadKey('alice')).toBeNull();
@@ -198,8 +191,7 @@ describe('profile-first key setup', () => {
     await payCreation();
     fireEvent.click(screen.getByRole('button', { name: 'Save backup' }));
     const publish = screen.getByRole('button', { name: 'Publish my key on chain' });
-    expect(publish).toBeDisabled();
-    fireEvent.click(screen.getByRole('checkbox'));
+    
     fireEvent.click(publish);
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(2));
     expect(await screen.findByText('📣 Share your public key')).toBeInTheDocument();

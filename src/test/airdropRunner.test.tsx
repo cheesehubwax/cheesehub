@@ -70,11 +70,10 @@ describe('CHEESEAir sending runner', () => {
     mocks.invalidate.mockResolvedValue(undefined);
   });
   afterEach(() => vi.useRealTimers());
-  it('enforces terms before any resource purchase or delivery', async () => {
+  it('needs no per-run Terms box because Terms are accepted at sign-in', () => {
     const { result } = renderHook(() => useAirdropRunner(input()));
-    await act(async () => { await result.current.runAirdrop(); });
-    expect(mocks.execute).not.toHaveBeenCalled();
-    expect(result.current.canRun).toBe(false);
+    expect(result.current.termsAccepted).toBe(true);
+    expect(result.current.canRun).toBe(true);
   });
   it('prevents error-blocked and unsigned runs from sending', async () => {
     await run({ hasError: true });
