@@ -20,6 +20,7 @@ import { CreateAccountManager } from "./CreateAccountManager";
 import { AlcorFarmManager } from "./AlcorFarmManager";
 import { WojakUnboxManager } from "./WojakUnboxManager";
 import { TransactionSuccessDialog } from "./TransactionSuccessDialog";
+import { BridgeDepositDialog } from "@/components/bridge/BridgeDepositDialog";
 import { TokenLogo } from "@/components/TokenLogo";
 import { closeWharfkitModals } from "@/lib/wharfKit";
 import cheeseLogo from "@/assets/cheese-logo.png";
@@ -232,11 +233,13 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
     }
   };
 
+  const [bridgeOpen, setBridgeOpen] = useState(false);
   const topItems = SIDEBAR_ITEMS.filter((i) => !i.bottom);
   const bottomItems = SIDEBAR_ITEMS.filter((i) => i.bottom);
 
   return (
     <>
+      <BridgeDepositDialog open={bridgeOpen} onOpenChange={setBridgeOpen} account={accountName} />
       <Dialog open={open} onOpenChange={handleClose}>
         <DialogContent
           hideClose
@@ -257,14 +260,19 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                 </span>
               )}
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => handleClose(false)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setBridgeOpen(true)}>
+                🌉 Bridge In
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => handleClose(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
           <div className="flex flex-1 min-h-0">
