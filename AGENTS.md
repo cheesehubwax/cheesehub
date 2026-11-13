@@ -47,3 +47,4 @@
 - CHEESENull's CHEESECrypt row: crypt.cheese nulls plus user eosio.null legs matched by Crypt fee-label constants, counted once.
 - Crypt router lookups persist (IndexedDB) only if >5min old.
 
+- Terms acceptance lives in the wallet provider (one versioned gate before login/restore); forms never re-ask, except shared RiskAcknowledgement for specific irreversible or liability-bearing actions.
