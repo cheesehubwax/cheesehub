@@ -97,6 +97,7 @@ export default {
         script: ['"Dancing Script"', 'cursive'],
       },
       keyframes: {
+        "glow-pulse": { "0%, 100%": { boxShadow: "0 0 0 0 hsl(var(--foreground) / 0)" }, "50%": { boxShadow: "0 0 0 2px hsl(var(--foreground) / 0.85), 0 0 12px 2px hsl(var(--accent) / 0.6)" } },
         "accordion-down": {
           from: { height: "0" },
           to: { height: "var(--radix-accordion-content-height)" },
@@ -115,6 +116,7 @@ export default {
         },
       },
       animation: {
+        "glow-pulse": "glow-pulse 3s ease-in-out infinite",
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "pulse-glow": "pulse-glow 2s ease-in-out infinite",
