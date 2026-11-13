@@ -8,7 +8,7 @@ import type { VoiceClip } from '@/lib/cryptVoice';
 import type { CryptGroup } from '@/lib/cryptGroups';
 import type { InviteGroupView } from '@/lib/cryptInviteGroups';
 
-/** Message composer: reply bar, text box and footer (counter, NFT, voice, Terms, price, Instant, Send). State lives in Messenger. */
+/** Message composer: reply bar, text box and footer (counter, NFT, voice, price, Instant, Send). State lives in Messenger. */
 export function CryptComposer({
   account, active, activeGroup, activeInvite, nameFor, replyingTo, setReplyingTo, composerRef, text, setText, voice, setVoice,
   tooLong, bytes, maxBytes, parts, copies, voiceParts, voiceTxs, setAttachingNft, busy, listHidden, agreed, setAgreed,
@@ -38,7 +38,7 @@ export function CryptComposer({
         {!voice && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setAttachingNft(true); }}>🖼️ Attach NFT</Button>}
         {!text.trim() && <VoiceRecorder clip={voice} onChange={setVoice} disabled={busy} />}
       </div>
-      {/* Bottom line: Terms on the left; price, Instant and Send on the right. */}
+      {/* Bottom line: price, Instant and Send on the right. */}
       <div className="flex flex-wrap items-center gap-2 gap-y-1 pr-6 text-xs">
         <span className="ml-auto text-muted-foreground">{totalCost}</span>
         {instantSlot}
