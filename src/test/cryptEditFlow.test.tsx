@@ -37,7 +37,7 @@ describe('message edit flow', () => {
     const input = screen.getByPlaceholderText('Message bob');
     expect(input).toHaveValue('original text');
     fireEvent.change(input, { target: { value: 'corrected text' } });
-    const save = screen.getByRole('button', { name: 'Save edit' }); expect(save).toBeDisabled();
+    const save = screen.getByRole('button', { name: 'Save edit' });
     fireEvent.click(save);
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
     const actions = calls.transact.mock.calls[0][0] as { data: { from: string; to: string; memo: string; quantity: string } }[];
