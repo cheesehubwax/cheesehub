@@ -22,7 +22,7 @@ export default function Bridge() {
         <div className="container relative z-10">
           <div className="flex flex-col items-center gap-8">
             <div className="h-32 w-32 animate-float cheese-bubble rounded-full flex items-center justify-center">
-              <OpenMojiIcon emoji="🌉" size={72} />
+              <span className="text-6xl" aria-hidden>🌉</span>
             </div>
             <div className="text-center space-y-2">
               <DappAbout {...aboutGuides.bridge}>
