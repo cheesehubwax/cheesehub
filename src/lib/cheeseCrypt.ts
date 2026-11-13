@@ -560,7 +560,7 @@ async function routerTransaction(txId: string, time: number): Promise<ChainMemo[
 }
 
 /** Replaces router-delivered rows with their authenticated sender rows; unresolved ones are dropped until a later poll. */
-export async function resolveRouterRows(account: string, rows: ChainMemo[]): Promise<ChainMemo[]> {
+export async function resolveRouterRows(account: string, rows: ChainMemo[], requireComplete = false): Promise<ChainMemo[]> {
   const direct = rows.filter(r => r.from !== CRYPT_ROUTER_ACCOUNT && r.to !== CRYPT_ROUTER_ACCOUNT);
   const txs = new Map<string, number>();
   for (const r of rows) if (r.from === CRYPT_ROUTER_ACCOUNT || r.to === CRYPT_ROUTER_ACCOUNT) if (!txs.has(r.txId)) txs.set(r.txId, r.time);
@@ -569,6 +569,7 @@ export async function resolveRouterRows(account: string, rows: ChainMemo[]): Pro
   await loadRouterCache();
   for (let i = 0; i < entries.length; i += 8) {
     const batch = await Promise.all(entries.slice(i, i + 8).map(([id, time]) => routerTransaction(id, time)));
+    if (requireComplete && batch.some(b => b === null)) throw new Error('Message transactions are not fully indexed yet');
     for (const b of batch) if (b) resolved.push(...b.filter(m => m.from === account || m.to === account));
   }
   return direct.concat(resolved);
@@ -674,7 +675,7 @@ export const MAX_HISTORY_PAGES = 4;
  * Encrypted messages sent or received by the account (newest first, deduped).
  * `pages` > 1 reads further back by timestamp, so multi-transaction voice notes are not cut in half.
  */
-export async function fetchMessages(account: string, pages = 1): Promise<ChainMemo[]> {
+export async function fetchMessages(account: string, pages = 1, requireComplete = false): Promise<ChainMemo[]> {
   const scan = async (query: string, count: (q: string) => Promise<{ rows: ChainMemo[]; n: number; oldest: number }>) => {
     let rows: ChainMemo[] = [];
     let before: string | null = null;
@@ -693,7 +694,7 @@ export async function fetchMessages(account: string, pages = 1): Promise<ChainMe
     scan(`account=${account}&${FILTER}`, transferPage),
     scan(`account=${account}&filter=${CRYPT_ROUTER_ACCOUNT}:sendfree`, sponsoredPage),
   ]);
-  const rows = (await resolveRouterRows(account, transfers)).concat(sponsored);
+  const rows = (await resolveRouterRows(account, transfers, requireComplete)).concat(sponsored);
   const seen = new Set<string>();
   return rows.filter((r) => {
     if (!msgPrefixOf(r.memo) || (r.from !== account && r.to !== account)) return false;
@@ -716,6 +717,28 @@ export const STREAM_MAX_PAGES = 5;
 /** Re-read this far behind the cursor: late-indexed actions are caught, duplicates are merged away. */
 export const STREAM_OVERLAP_MS = 30_000;
 
+/** Restart catch-up includes legacy direct transfers. Offset paging retains equal-timestamp actions.
+ * Never advance the saved checkpoint on overflow or an unresolved router transaction. */
+export async function fetchMessageDelta(account: string, cursor: number, fetchPage: (q: string) => Promise<any[]> = hyperionActions): Promise<StreamResult> {
+  const started = Date.now();
+  const after = encodeURIComponent(new Date(Math.max(0, cursor - STREAM_OVERLAP_MS)).toISOString());
+  const scan = async (filter: string) => {
+    const actions: any[] = [];
+    for (let p = 0; p < STREAM_MAX_PAGES; p++) {
+      const page = await fetchPage(`account=${account}&filter=${filter}&sort=asc&after=${after}&limit=${STREAM_PAGE}&skip=${p * STREAM_PAGE}`);
+      actions.push(...page);
+      if (page.length < STREAM_PAGE) return { actions, complete: true };
+    }
+    return { actions, complete: false };
+  };
+  const [direct, sponsored] = await Promise.all([scan('eosio.token:transfer,cheeseburger:transfer'), scan(`${CRYPT_ROUTER_ACCOUNT}:sendfree`)]);
+  const transfers = direct.actions.map(a => ({ txId: a.trx_id, time: actionTime(a), from: a.act?.data?.from, to: a.act?.data?.to, memo: a.act?.data?.memo || '', quantity: a.act?.data?.quantity || '' }));
+  const rows = (await resolveRouterRows(account, transfers, true)).concat(expandSponsoredActions(sponsored.actions))
+    .filter(r => !!msgPrefixOf(r.memo) && (r.from === account || r.to === account));
+  const complete = direct.complete && sponsored.complete;
+  return { rows: mergeMemos([], rows), cursor: complete ? started : cursor, complete };
+}
+
 export function streamRows(account: string, actions: any[]): ChainMemo[] {
   const rows = expandSponsoredActions(actions);
   for (const a of actions) if (a?.act?.name === 'sendmsg' && typeof a.trx_id === 'string')
@@ -727,6 +750,7 @@ export interface StreamResult { rows: ChainMemo[]; cursor: number; complete: boo
 
 /** New crypt.cheese actions since `cursor` (ms). `complete` is false when the page cap was hit. */
 export async function fetchContractStream(account: string, cursor: number, fetchPage: (q: string) => Promise<any[]> = hyperionActions): Promise<StreamResult> {
+  const started = Date.now();
   let after = Math.max(0, cursor - STREAM_OVERLAP_MS);
   let newest = cursor;
   const rows: ChainMemo[] = [];
@@ -735,7 +759,7 @@ export async function fetchContractStream(account: string, cursor: number, fetch
     rows.push(...streamRows(account, page));
     const times = page.map(actionTime).filter(Number.isFinite);
     if (times.length) newest = Math.max(newest, ...times);
-    if (page.length < STREAM_PAGE) return { rows, cursor: newest, complete: true };
+    if (page.length < STREAM_PAGE) return { rows, cursor: Math.max(newest, started), complete: true };
     const last = Math.max(...times);
     // A whole page sharing one timestamp cannot advance safely; let the caller fall back.
     if (!Number.isFinite(last) || last <= after) break;
