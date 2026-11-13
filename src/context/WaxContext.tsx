@@ -1,4 +1,6 @@
-import React, { useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import { TermsGateDialog } from '@/components/shared/TermsGateDialog';
+import { acceptTerms, hasAcceptedTerms } from '@/lib/termsAcceptance';
 import { Session, SerializedSession } from '@wharfkit/session';
 import { sessionKit, closeWharfkitModals, setLoginInProgress, getTransactPlugins } from '@/lib/wharfKit';
 import { CHEESE_CONFIG, NFTHIVE_CONFIG } from '@/lib/waxConfig';
@@ -51,6 +53,24 @@ export function WaxProvider({ children }: { children: ReactNode }) {
   const [cheeseBalance, setCheeseBalance] = useState(0);
   const [allSessions, setAllSessions] = useState<SerializedSession[]>([]);
   const { toast } = useToast();
+  const [termsGateOpen, setTermsGateOpen] = useState(false);
+  const termsResolver = useRef<((ok: boolean) => void) | null>(null);
+
+  /** Resolves true once the current Terms version is accepted in this browser. */
+  const ensureTerms = useCallback((): Promise<boolean> => {
+    if (hasAcceptedTerms()) return Promise.resolve(true);
+    termsResolver.current?.(false);
+    setTermsGateOpen(true);
+    return new Promise<boolean>((resolve) => { termsResolver.current = resolve; });
+  }, []);
+
+  const settleTerms = (ok: boolean) => {
+    if (ok) acceptTerms();
+    setTermsGateOpen(false);
+    const resolve = termsResolver.current;
+    termsResolver.current = null;
+    resolve?.(ok);
+  };
 
   const accountName = session?.actor?.toString() || null;
   const isConnected = !!session;
@@ -98,6 +118,8 @@ export function WaxProvider({ children }: { children: ReactNode }) {
         const restored = await sessionKit.restore();
         if (restored) {
           setSession(restored);
+          // A restored session from before the current Terms must accept before signing anything.
+          if (!(await ensureTerms())) setSession(null);
         }
         await refreshSessions();
       } catch (error) {
@@ -105,7 +127,7 @@ export function WaxProvider({ children }: { children: ReactNode }) {
       }
     };
     restoreSession();
-  }, [refreshSessions]);
+  }, [refreshSessions, ensureTerms]);
 
   // Initial balance refresh on session change
   useEffect(() => {
@@ -124,6 +146,7 @@ export function WaxProvider({ children }: { children: ReactNode }) {
   }, [session, refreshBalance]);
 
   const login = async () => {
+    if (!(await ensureTerms())) return;
     setIsLoading(true);
     setLoginInProgress(true);
     try {
@@ -178,6 +201,7 @@ export function WaxProvider({ children }: { children: ReactNode }) {
 
   // Add another account without logging out current one
   const addAccount = async () => {
+    if (!(await ensureTerms())) return;
     setIsLoading(true);
     setLoginInProgress(true);
     try {
@@ -632,6 +656,7 @@ export function WaxProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
+      <TermsGateDialog open={termsGateOpen} onAccept={() => settleTerms(true)} onDecline={() => settleTerms(false)} />
     </WaxContext.Provider>
   );
 }
