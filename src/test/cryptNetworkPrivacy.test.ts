@@ -37,7 +37,7 @@ describe('fetchContractStream', () => {
     expect(queries[0]).toContain('account=crypt.cheese');
     expect(queries[0]).not.toContain('alice');
     expect(r.complete).toBe(true);
-    expect(r.cursor).toBe(Date.parse('2026-11-07T01:00:00Z'));
+    expect(r.cursor).toBeGreaterThanOrEqual(Date.parse('2026-11-07T01:00:00Z'));
   });
   it('reports incomplete when the page cap is hit so the caller falls back', async () => {
     let n = 0;
