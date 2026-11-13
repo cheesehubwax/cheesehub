@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 import { useWax } from '@/context/WaxContext';
 import { useToast } from '@/hooks/use-toast';
 import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
@@ -24,7 +23,7 @@ export function CryptRoomModerationPanel() {
   const [q, setQ] = useState('');
   const [wholeAccount, setWholeAccount] = useState('');
   const [pending, setPending] = useState<Pending | null>(null);
-  const [agreed, setAgreed] = useState(false);
+  const [agreed, setAgreed] = useState(true);
   const [busy, setBusy] = useState(false);
 
   const rooms = useQuery({ queryKey: ['admin-crypt-rooms'], queryFn: async () => collectListings(await fetchRoomMemos(ROOM_PREFIX)), staleTime: 60_000, retry: false });
@@ -46,7 +45,7 @@ export function CryptRoomModerationPanel() {
       const txId = result.resolved?.transaction.id?.toString();
       if (!txId) throw new Error('No transaction ID returned');
       toast({ title: pending.hidden ? 'Room hidden' : 'Room restored', description: `TX ${txId.slice(0, 10)}… It may take a minute to show for everyone.` });
-      setPending(null); setAgreed(false); setWholeAccount('');
+      setPending(null); setAgreed(true); setWholeAccount('');
       setTimeout(() => void qc.invalidateQueries({ queryKey: ['crypt-room-hides'] }), 4000);
     } catch (e) {
       closeWharfkitModals();
@@ -131,7 +130,7 @@ export function CryptRoomModerationPanel() {
         </ul>}
       </div>
     </CardContent>
-    {pending && <Dialog open onOpenChange={o => { if (!o && !busy) { setPending(null); setAgreed(false); } }}>
+    {pending && <Dialog open onOpenChange={o => { if (!o && !busy) { setPending(null); setAgreed(true); } }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{pending.hidden ? '🛡️ Hide' : '👁️ Restore'} {pending.label}</DialogTitle>
@@ -139,9 +138,8 @@ export function CryptRoomModerationPanel() {
             {pending.hidden ? 'It will stop appearing in the CHEESECrypt directory for everyone.' : 'It will appear in the CHEESECrypt directory again.'} This sends {HIDE_QUANTITY} to eosio.null with a public note. Your admin account and this decision are permanently visible on the blockchain.
           </DialogDescription>
         </DialogHeader>
-        <TermsCheckbox checked={agreed} onCheckedChange={setAgreed} />
         <DialogFooter>
-          <Button variant="outline" disabled={busy} onClick={() => { setPending(null); setAgreed(false); }}>Cancel</Button>
+          <Button variant="outline" disabled={busy} onClick={() => { setPending(null); setAgreed(true); }}>Cancel</Button>
           <Button variant={pending.hidden ? 'destructive' : 'default'} disabled={!agreed || busy} onClick={() => void submit()}>
             {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Pay & {pending.hidden ? 'hide' : 'restore'}
           </Button>

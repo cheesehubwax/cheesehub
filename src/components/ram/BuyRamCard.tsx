@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CheeseInput } from '@/components/powerup/CheeseInput';
 import { RecipientInput } from '@/components/powerup/RecipientInput';
-import { TermsDialog } from '@/components/shared/TermsDialog';
 import { formatBytes } from '@/components/wallet/WalletResources';
 import { useWax } from '@/context/WaxContext';
 import { useTransactionSuccess } from '@/context/TransactionSuccessContext';
@@ -47,7 +45,7 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
   const [amount, setAmount] = useState('');
   const [bytesInput, setBytesInput] = useState('');
   const [recipient, setRecipient] = useState(accountName || '');
-  const [termsAgreed, setTermsAgreed] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(true);
   const [isTransacting, setIsTransacting] = useState(false);
   const [unconfirmed, setUnconfirmed] = useState<UnconfirmedState | null>(null);
 
@@ -100,7 +98,7 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
     );
     setAmount('');
     setBytesInput('');
-    setTermsAgreed(false);
+    setTermsAgreed(true);
     setUnconfirmed(null);
     refreshBalance?.();
     onComplete?.();
@@ -366,18 +364,6 @@ export function BuyRamCard({ config, pricePerByte, liveWaxPerCheese, onComplete 
       {unconfirmed && (
         <UnconfirmedNotice state={unconfirmed} onAcknowledge={() => setUnconfirmed(null)} />
       )}
-
-      <div className="flex items-start gap-2">
-        <Checkbox
-          id="terms-buy-ram"
-          checked={termsAgreed}
-          onCheckedChange={(v) => setTermsAgreed(v === true)}
-          className="mt-0.5"
-        />
-        <label htmlFor="terms-buy-ram" className="text-xs text-muted-foreground leading-relaxed">
-          I have read and agree to the <TermsDialog />
-        </label>
-      </div>
 
       <Button
         onClick={handleBuy}

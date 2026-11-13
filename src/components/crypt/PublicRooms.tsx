@@ -3,7 +3,6 @@ import { Globe, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 import { MAX_PUBLIC_ROOM_MEMBERS } from '@/lib/cryptInviteGroups';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { CryptTrustBadge } from '@/components/crypt/CryptTrustBadge';
@@ -86,7 +85,7 @@ export function RoomSettingsDialog({ groupId, groupName, groupAvatar, members, p
   const [name, setName] = useState(cleanRoomName(initialName ?? groupName));
   const [topic, setTopic] = useState(initialTopic);
   const [tags, setTags] = useState(initialTags.join(' '));
-  const [agreed, setAgreed] = useState(false);
+  const [agreed, setAgreed] = useState(true);
   const info = { name: cleanRoomName(name), topic: cleanRoomTopic(topic), tags: cleanTags(tags) };
   let error = '';
   if (!info.name) error = 'Give the room a name';
@@ -133,7 +132,6 @@ export function RoomSettingsDialog({ groupId, groupName, groupAvatar, members, p
         </>}
       </section>
       {onEditLog && <Button variant="outline" size="sm" onClick={onEditLog}>✏️ Edited messages</Button>}
-      <TermsCheckbox id="crypt-room-settings-terms" checked={agreed} onCheckedChange={setAgreed} />
       <DialogFooter>
         <Button variant="outline" disabled={busy} onClick={onClose}>Close</Button>
       </DialogFooter>

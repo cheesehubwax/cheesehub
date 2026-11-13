@@ -23,7 +23,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Lock, Calendar, AlertCircle, Droplets } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
+import { RiskAcknowledgement } from "@/components/shared/RiskAcknowledgement";
 import { getTokenPrecision, formatAssetAmount, floorToPrecision, padAmountDisplay } from "@/lib/tokenPrecision";
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
@@ -328,7 +328,7 @@ export function CreateLiquidityLock() {
           </div>
         </div>
 
-        <TermsCheckbox id="terms-liqlock" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
+        <RiskAcknowledgement kind="lock" id="terms-liqlock" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
 
         <Button
           onClick={handleCreate}

@@ -28,7 +28,6 @@ import {
 } from "@/lib/cheeseFees";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
-import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 import { useCheeseFeePricing } from "@/hooks/useCheeseFeePricing";
 import { useWaxdaoFeePricing } from "@/hooks/useWaxdaoFeePricing";
 import { useToast } from "@/hooks/use-toast";
@@ -88,7 +87,7 @@ export function CreateFarm() {
   const { accountName, isConnected, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const cheesePricing = useCheeseFeePricing();
-  const [termsAgreed, setTermsAgreed] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(true);
   const waxdaoPricing = useWaxdaoFeePricing();
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -669,7 +668,6 @@ export function CreateFarm() {
               </span>
             </div>
 
-            <TermsCheckbox id="terms-farm" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
 
             {/* Submit Button */}
             <Button

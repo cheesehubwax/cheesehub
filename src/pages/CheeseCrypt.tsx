@@ -16,7 +16,6 @@ import { decodeInboxRequests, declineRequest, inboxCandidates, loadPublicInbox, 
 import { buildProfileNoteBatches, isProfileNote, latestProfiles, profileNoteCost, profileNoteParts, profileRecipients } from '@/lib/cryptProfileNotes';
 import { ProfileShareDialog } from '@/components/crypt/ProfileShareDialog';
 import { addBlocked, loadBlocked, removeBlocked, saveBlocked, withoutBlocked } from '@/lib/cryptBlocklist';
-import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 import { ChevronDown, ChevronUp, Eye, EyeOff, Loader2, Search, Upload, X } from 'lucide-react';
 import { findMatches } from '@/lib/cryptSearch';
 import { useWax } from '@/context/WaxContext';
@@ -278,11 +277,11 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const [editingAvatar, setEditingAvatar] = useState(false);
   const [settingUpProfile, setSettingUpProfile] = useState(false);
   const [pendingProfile, setPendingProfile] = useState<{ avatar: CryptAvatar; displayName?: string; bio?: string } | null>(null);
-  const [creationAgreed, setCreationAgreed] = useState(false);
+  const [creationAgreed, setCreationAgreed] = useState(true);
   const creatingKey = useRef(false);
   const [showSharePrompt, setShowSharePrompt] = useState(false);
   const [showPublishPrompt, setShowPublishPrompt] = useState(false);
-  const [publishAgreed, setPublishAgreed] = useState(false);
+  const [publishAgreed, setPublishAgreed] = useState(true);
   const [active, setActive] = useState<string | null>(null);
   const [groups, setGroups] = useState(() => loadGroups(account));
   const [hiddenGroups, setHiddenGroups] = useState(() => loadHiddenGroups(account));
@@ -367,7 +366,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   useEffect(() => { const id = window.setInterval(() => setClock(Date.now()), 30_000); return () => clearInterval(id); }, []);
   useEffect(() => { setVoice(null); }, [active]);
   const [busy, setBusy] = useState(false);
-  const [agreed, setAgreed] = useState(false);
+  const [agreed, setAgreed] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLLIElement>(null);
   const [backupKey, setBackupKey] = useState<LockedKeyFile | null>(null);
@@ -1145,7 +1144,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const completeProfile = async (avatar: CryptAvatar, displayName?: string, bio?: string) => {
     setEditingAvatar(false);
     if (settingUpProfile) {
-      setPendingProfile({ avatar, displayName, bio }); setCreationAgreed(false); setSettingUpProfile(false);
+      setPendingProfile({ avatar, displayName, bio }); setCreationAgreed(true); setSettingUpProfile(false);
       return;
     }
     if (!key || !lockedFile) return;
@@ -1199,7 +1198,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
       if (!alive.current) return;
       const created = generateKey(account, pendingProfile);
       // Keep the paid key in memory if signing fails; the mandatory gate retries without another fee.
-      setKey(created); setLockedFile(null); setPendingProfile(null); setCreationAgreed(false); setAgreed(false);
+      setKey(created); setLockedFile(null); setPendingProfile(null); setCreationAgreed(true); setAgreed(true);
       const file = await sealKey(signer, created, account);
       if (!alive.current) return;
       saveLockedEnvelope(file); saveKey(created); setLockedFile(file); setBackupKey(file);
@@ -1802,7 +1801,6 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     <DialogContent className="max-w-md" aria-describedby="crypt-creation-fee" onEscapeKeyDown={e => { if (busy) e.preventDefault(); }} onPointerDownOutside={e => { if (busy) e.preventDefault(); }}>
       <DialogHeader><DialogTitle>🔑 Create your messaging key</DialogTitle></DialogHeader>
       <p id="crypt-creation-fee" className="text-sm text-muted-foreground">A new key costs {KEY_CREATION_QUANTITY}: 400 CHEESE to eosio.null and 100 CHEESE to xcheeseliqst. After confirmed payment, Anchor asks for two free signatures to lock the key to {account}. These signatures are never broadcast. Only a locked backup is saved; your public key is not published. If signing is cancelled, keep this tab open and retry locking for free. Loading an existing key is free.</p>
-      <TermsCheckbox id="crypt-create-terms" checked={creationAgreed} onCheckedChange={setCreationAgreed} />
       <Button disabled={busy || !creationAgreed || !canLock} onClick={payAndCreateKey}>{busy ? 'Confirming payment…' : 'Pay 500 CHEESE & create key'}</Button>
       <Button variant="ghost" disabled={busy} onClick={() => setPendingProfile(null)}>Cancel</Button>
     </DialogContent>
@@ -1945,9 +1943,9 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
       {profileEditor}
       {profileDialog}
       {creationDialog}
-      {(showSharePrompt || showPublishPrompt) && key && <ShareKeyDialog account={account} publishOnly={showPublishPrompt} busy={busy} agreed={publishAgreed} onAgreedChange={setPublishAgreed} onClose={() => { setShowSharePrompt(false); setShowPublishPrompt(false); setPublishAgreed(false); }}
+      {(showSharePrompt || showPublishPrompt) && key && <ShareKeyDialog account={account} publishOnly={showPublishPrompt} busy={busy} agreed={publishAgreed} onAgreedChange={setPublishAgreed} onClose={() => { setShowSharePrompt(false); setShowPublishPrompt(false); setPublishAgreed(true); }}
         onDownload={() => { void sharePublicKey(); setShowSharePrompt(false); }}
-        onPublish={async () => { if (await publish()) { setShowSharePrompt(false); setShowPublishPrompt(false); setPublishAgreed(false); } }} />}
+        onPublish={async () => { if (await publish()) { setShowSharePrompt(false); setShowPublishPrompt(false); setPublishAgreed(true); } }} />}
       {sharingProfile && key && (() => {
         const to = profileRecipients(account, contacts, groups.map(g => g.members), [...blocked, ...removedContacts]);
         const parts = profileNoteParts(key);
@@ -2000,7 +1998,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
                       onAnnounce={() => { setPrivacyOpen(false); setRotateStep('announce'); }} onDestroy={pub => void rot.destroyNow(pub)} /> : undefined} />
       {lockedFile && <DeviceTransferSendDialog open={moveOpen} onOpenChange={setMoveOpen} account={account} lockedKey={lockedFile} />}
       <CryptSidebar onOpenPrivacy={() => setPrivacyOpen(true)} onMoveDevice={lockedFile ? () => setMoveOpen(true) : undefined} account={account} cryptKey={key} loading={loading} refresh={refresh} setEditingAvatar={setEditingAvatar}
-        menuOpen={menuOpen} setMenuOpen={setMenuOpen} fileRef={fileRef} sharePublicKey={sharePublicKey} busy={busy} publish={async () => { setPublishAgreed(false); setShowPublishPrompt(true); }}
+        menuOpen={menuOpen} setMenuOpen={setMenuOpen} fileRef={fileRef} sharePublicKey={sharePublicKey} busy={busy} publish={async () => { setPublishAgreed(true); setShowPublishPrompt(true); }}
         blocked={blocked} setShowBlocked={setShowBlocked} makeKey={makeKey} publicInbox={publicInbox} setInboxOpen={setInboxOpen}
         toggleList={toggleList} listHidden={listHidden} hiddenUnread={hiddenUnread} hiddenReplies={hiddenReplies}
         messageRequests={messageRequests} acceptRequest={acceptRequest} dismissRequest={dismissRequest} blockAccount={blockAccount}

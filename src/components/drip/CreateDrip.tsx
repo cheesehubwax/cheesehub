@@ -11,7 +11,6 @@ import { Droplets, Calendar, AlertCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { TokenLogo } from "@/components/TokenLogo";
 import { setDripName } from "@/lib/dripNames";
-import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 import {
   Select,
   SelectContent,
@@ -33,7 +32,7 @@ export function CreateDrip() {
   const { session, accountName, isConnected } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const { toast } = useToast();
-  const [termsAgreed, setTermsAgreed] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(true);
   const { tokens: allTokens, isLoading: loading } = useAllTokenBalances(accountName || undefined);
   const [creating, setCreating] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
@@ -407,8 +406,6 @@ export function CreateDrip() {
           </div>
         </div>
 
-        {/* Terms checkbox */}
-        <TermsCheckbox id="terms-drip" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
 
         {/* Submit Button */}
         <Button

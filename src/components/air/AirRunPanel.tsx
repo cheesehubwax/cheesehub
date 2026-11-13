@@ -2,7 +2,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
-import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 import { formatCheese } from '@/lib/airdropResources';
 import { CHEESE_SYMBOL, MIN_RAM_PURCHASE_CHEESE, txLink } from '@/lib/airdropCheese';
 import { useAirRun } from '@/components/air/AirdropContext';
@@ -62,12 +61,6 @@ export function AirRunPanel() {
           </div>
         )}
 
-        <TermsCheckbox
-          id="air-terms"
-          checked={termsAccepted}
-          onCheckedChange={setTermsAccepted}
-          className="mb-3"
-        />
 
         <div className="flex flex-wrap gap-2">
           {runState !== 'running' ? (

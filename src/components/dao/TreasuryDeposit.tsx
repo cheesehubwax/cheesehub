@@ -11,7 +11,6 @@ import {
 import { TokenLogo } from "@/components/TokenLogo";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { Loader2, ArrowDownToLine, Wallet } from "lucide-react";
-import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
 
 interface TreasuryDepositProps {
   daoName: string;
@@ -37,7 +36,7 @@ const CUSTOM_TOKEN_VALUE = "__custom__";
 export function TreasuryDeposit({ daoName, onDeposited }: TreasuryDepositProps) {
   const { accountName, session, isConnected } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
-  const [termsAgreed, setTermsAgreed] = useState(false);
+  const [termsAgreed, setTermsAgreed] = useState(true);
 
   const [loading, setLoading] = useState(false);
   const [amount, setAmount] = useState("");
@@ -237,7 +236,6 @@ export function TreasuryDeposit({ daoName, onDeposited }: TreasuryDepositProps) 
         </span>
       </div>
 
-      <TermsCheckbox id="terms-treasury" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
 
       <Button
         onClick={handleDeposit}

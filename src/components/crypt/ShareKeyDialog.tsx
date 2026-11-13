@@ -1,7 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MESSAGE_FEE_QUANTITY } from '@/lib/cheeseCrypt';
-import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 
 interface ShareKeyDialogProps {
   account: string;
@@ -56,7 +55,6 @@ export const ShareKeyDialog = ({ account, publishOnly = false, busy, agreed, onA
             automatically if they publish theirs. Publishing costs {MESSAGE_FEE_QUANTITY}: 0.0080 CHEESE nulled
             and 0.0020 CHEESE to xcheeseliqst.
           </p>
-          <TermsCheckbox id="crypt-publish-terms" checked={agreed} onCheckedChange={onAgreedChange} />
           <Button size="sm" variant="outline" className="w-full" disabled={busy || !agreed} onClick={onPublish}>
             {busy ? 'Publishing…' : 'Publish my key on chain'}
           </Button>

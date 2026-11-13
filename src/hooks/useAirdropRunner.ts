@@ -34,7 +34,7 @@ export function useAirdropRunner({ session, actor, cheeseBalance, isRam, isNft, 
   const { showSuccess } = useTransactionSuccess();
   const queryClient = useQueryClient();
   // ---- Run state --------------------------------------------------------
-  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [runState, setRunState] = useState<'idle' | 'running' | 'done'>('idle');
   const [runError, setRunError] = useState<string | null>(null);

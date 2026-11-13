@@ -7,7 +7,6 @@ import { useWax } from '@/context/WaxContext';
 import { toast } from 'sonner';
 import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
 import { TokenLogo } from '@/components/TokenLogo';
-import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 import { Checkbox } from '@/components/ui/checkbox';
 import { buildClaimRewardsAction, buildIncreaseLiquidityAction, fetchPoolSlot, AlcorFarmPosition } from '@/lib/alcorFarms';
 import type { PoolSlot } from '@/lib/alcorV3Amounts';
@@ -159,7 +158,7 @@ export function CompoundAllDialog({
 }: CompoundAllDialogProps) {
   const { session, accountName } = useWax();
   const [stage, setStage] = useState<Stage>('confirm');
-  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(true);
   const [plan, setPlan] = useState<CompoundPlan | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [claimTxId, setClaimTxId] = useState<string | null>(null);
@@ -181,7 +180,7 @@ export function CompoundAllDialog({
 
   useEffect(() => {
     if (!open) return;
-    setTermsAccepted(false);
+    setTermsAccepted(true);
     setError(null);
     setRechecking(false);
     setDeselectedIds(new Set());
@@ -524,7 +523,6 @@ export function CompoundAllDialog({
               </Alert>
             )}
 
-            <TermsCheckbox id="compound-terms" checked={termsAccepted} onCheckedChange={setTermsAccepted} />
 
             <Button
               className="w-full bg-cheese hover:bg-cheese-dark text-primary-foreground"

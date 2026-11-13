@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 import { INSTANT_MIN_FREE_RAM, INSTANT_PERMISSION, needsRam, type InstantStatus } from '@/lib/cryptInstant';
 
 /** Instant Messaging setup/removal dialog. Presentational: state and transactions live in useCryptInstant. */
@@ -11,7 +10,7 @@ export function CryptInstantDialog({ open, onOpenChange, account, ready, status,
   quoteRam: (s: InstantStatus | null) => Promise<{ needed: boolean; quantity: string | null }>;
   enable: (ramQuantity: string | null) => Promise<boolean>; revoke: () => Promise<boolean>;
 }) {
-  const [agreed, setAgreed] = useState(false);
+  const [agreed, setAgreed] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ram, setRam] = useState<{ needed: boolean; quantity: string | null } | null>(null);
@@ -64,7 +63,6 @@ export function CryptInstantDialog({ open, onOpenChange, account, ready, status,
                 <Link to="/ram" className="text-cheese underline" onClick={() => onOpenChange(false)}>Or top up RAM on CHEESERam first</Link>
               </div>
             )}
-            <TermsCheckbox id="crypt-instant-terms" checked={agreed} onCheckedChange={setAgreed} />
             {error && <p className="text-destructive text-xs">{error}</p>}
             <Button disabled={busy || !agreed || ramBlocked || !status} onClick={() => run(() => enable(ram?.quantity ?? null))}
               className="bg-cheese text-primary-foreground hover:bg-cheese/90">

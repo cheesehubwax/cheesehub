@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 import { REPORT_EMAIL, REPORT_QUANTITY, REPORT_REASONS, REPORT_TELEGRAM, reportEmailHref, type ReportReason } from '@/lib/cryptRoomReports';
 
 /** Report a public room listing to CHEESEHub (not the room's owner). The Messenger signs the in-app report. */
@@ -11,7 +10,7 @@ export function ReportRoomDialog({ room, busy, onReport, onClose }: {
   onReport: (reason: ReportReason) => void; onClose: () => void;
 }) {
   const [reason, setReason] = useState<ReportReason | null>(null);
-  const [agreed, setAgreed] = useState(false);
+  const [agreed, setAgreed] = useState(true);
   return <Dialog open onOpenChange={o => { if (!o && !busy) onClose(); }}>
     <DialogContent className="max-w-md max-h-[85dvh] overflow-y-auto">
       <DialogHeader>
@@ -28,7 +27,6 @@ export function ReportRoomDialog({ room, busy, onReport, onClose }: {
           })}
         </div>
         <p className="text-xs text-muted-foreground">Sends {REPORT_QUANTITY} to eosio.null with only the room and the reason above, so it appears straight away in the CHEESEHub admin reports list. Your WAX account and the report are public on the blockchain. Reporting doesn't hide the room by itself; a CHEESEHub admin reviews it.</p>
-        <TermsCheckbox checked={agreed} onCheckedChange={setAgreed} />
         <Button className="w-full bg-cheese text-primary-foreground hover:bg-cheese/90" disabled={!reason || !agreed || busy} onClick={() => reason && onReport(reason)}>
           {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Pay {REPORT_QUANTITY} & report
         </Button>

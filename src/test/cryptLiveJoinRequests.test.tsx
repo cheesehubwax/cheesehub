@@ -69,7 +69,6 @@ describe('live owner request alerts', () => {
       : screen.getByRole('region', { name: 'Room join requests' });
     fireEvent.click(within(panel).getAllByRole('button', { name: entry === 'sidebar accept' ? 'Accept' : entry === 'chat decline' ? 'Decline' : 'Block' })[entry === 'chat decline' ? 0 : 1]);
     if (entry !== 'rail block') {
-      fireEvent.click(screen.getByRole('checkbox'));
       fireEvent.click(screen.getByRole('button', { name: entry === 'sidebar accept' ? 'Pay & invite' : 'Pay & decline' }));
     }
     await waitFor(() => expect(calls.pending.size).toBe(1));
@@ -94,7 +93,6 @@ describe('live owner request alerts', () => {
     expect(calls.pending.size).toBe(2);
     calls.transact.mockResolvedValue({ success: false });
     fireEvent.click(within(screen.getByRole('region', { name: 'Chat request from bob' })).getByRole('button', { name: 'Decline' }));
-    fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(screen.getByRole('button', { name: 'Pay & decline' }));
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
     expect(calls.pending.size).toBe(2);

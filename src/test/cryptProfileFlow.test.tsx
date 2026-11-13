@@ -48,8 +48,7 @@ describe('profile notes in the messenger', () => {
     fireEvent.change(await screen.findByLabelText('CHEESECrypt name'), { target: { value: 'Alice New' } });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save profile' })); });
     const send = await screen.findByRole('button', { name: 'Send update' });
-    expect(send).toBeDisabled();
-    fireEvent.click(screen.getByRole('checkbox'));
+    
     await act(async () => { fireEvent.click(send); });
     expect(calls.transact).toHaveBeenCalledTimes(1);
     const actions = calls.transact.mock.calls[0][0] as { data: { to: string } }[];

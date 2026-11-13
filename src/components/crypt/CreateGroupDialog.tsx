@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { AvatarEditor } from '@/components/crypt/AvatarEditor';
-import { TermsCheckbox } from '@/components/shared/TermsCheckbox';
 import { MAX_INVITE_MEMBERS } from '@/lib/cryptInviteGroups';
 import { parseCryptName } from '@/lib/cryptNames';
 import type { CryptAvatar } from '@/lib/cryptAvatar';
@@ -25,7 +24,7 @@ export function CreateGroupDialog({ contacts, avatars, nameFor = account => acco
   const [tags, setTags] = useState('');
   const [avatar, setAvatar] = useState<CryptAvatar | undefined>();
   const [painting, setPainting] = useState(false);
-  const [agreed, setAgreed] = useState(false);
+  const [agreed, setAgreed] = useState(true);
   const max = MAX_INVITE_MEMBERS - 1;
   const validName = parseCryptName(name);
   const cost = validName && selected.length ? costFor?.(validName, selected, avatar) ?? '' : '';
@@ -53,7 +52,6 @@ export function CreateGroupDialog({ contacts, avatars, nameFor = account => acco
           {!Object.keys(contacts).length && <p className="text-sm text-muted-foreground">Add friends’ public keys first.</p>}
         </div>
         {cost && <p className="text-xs text-muted-foreground">Invites cost {cost}: 0.0100 CHEESE per part platform fee (80% eosio.null, 20% xcheeseliqst) plus 0.0001 CHEESE per part to each invited friend, in one transaction.</p>}
-        <TermsCheckbox id="crypt-group-terms" checked={agreed} onCheckedChange={setAgreed} />
         <DialogFooter>
           <Button variant="outline" disabled={busy} onClick={onClose}>Cancel</Button>
           <Button disabled={busy || !agreed || !validName || selected.length < 1} onClick={() => { if (validName) void onCreate(validName, selected, avatar, info); }}>

@@ -16,7 +16,7 @@ import {
 import { Lock, Calendar, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { TokenLogo } from "@/components/TokenLogo";
-import { TermsCheckbox } from "@/components/shared/TermsCheckbox";
+import { RiskAcknowledgement } from "@/components/shared/RiskAcknowledgement";
 import { getTokenPrecision, formatAssetAmount, floorToPrecision, padAmountDisplay } from "@/lib/tokenPrecision";
 
 interface TokenBalance {
@@ -299,7 +299,7 @@ export function CreateLock() {
           </div>
         </div>
 
-        <TermsCheckbox id="terms-lock" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
+        <RiskAcknowledgement kind="lock" id="terms-lock" checked={termsAgreed} onCheckedChange={setTermsAgreed} />
 
         <Button
           onClick={handleCreate}
