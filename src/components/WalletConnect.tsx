@@ -27,6 +27,7 @@ import { WalletTransferDialog } from "./wallet/WalletTransferDialog";
 import { CheeseAmpDialog } from "./music/CheeseAmpDialog";
 import { CheeseAmpMiniPlayer } from "./music/CheeseAmpMiniPlayer";
 import { CheeseSwapDialog } from "./swap/CheeseSwapDialog";
+import { AlcorBridgeDialog, OPEN_ALCOR_BRIDGE_EVENT } from "./bridge/AlcorBridgeDialog";
 import { useCheeseAmpAutoAdvance } from "@/hooks/useCheeseAmpAutoAdvance";
 import { getAudioPlayer } from "@/lib/musicPlayer";
 import { useCheeseAmpStore } from "@/stores/cheeseAmpStore";
@@ -51,6 +52,7 @@ export function WalletConnect() {
   const [walletOpen, setWalletOpen] = useState(false);
   const [cheeseAmpOpen, setCheeseAmpOpen] = useState(false);
   const [swapOpen, setSwapOpen] = useState(false);
+  const [bridgeOpen, setBridgeOpen] = useState(false);
   const cheeseAmpMinimized = useCheeseAmpStore((state) => state.isMinimized);
   const setCheeseAmpMinimized = useCheeseAmpStore((state) => state.setMinimized);
 
@@ -99,6 +101,16 @@ export function WalletConnect() {
     };
     window.addEventListener('open-cheese-swap', handleOpenCheeseSwap);
     return () => window.removeEventListener('open-cheese-swap', handleOpenCheeseSwap);
+  }, [isConnected]);
+
+  // Listen for custom event to open ALCORBridge
+  useEffect(() => {
+    const handleOpenBridge = () => {
+      if (isConnected) setBridgeOpen(true);
+      else setOpen(true);
+    };
+    window.addEventListener(OPEN_ALCOR_BRIDGE_EVENT, handleOpenBridge);
+    return () => window.removeEventListener(OPEN_ALCOR_BRIDGE_EVENT, handleOpenBridge);
   }, [isConnected]);
 
   // Close mini player when user logs out
@@ -189,6 +201,10 @@ export function WalletConnect() {
             <OpenMojiIcon emoji="🔄" size={16} className="mr-2 text-base leading-none" />
             <span><span className="text-cheese">CHEESE</span>Swap</span>
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setBridgeOpen(true)} className="cursor-pointer">
+            <OpenMojiIcon emoji="🌉" size={16} className="mr-2 text-base leading-none" />
+            <span><span className="text-cheese">ALCOR</span>Bridge</span>
+          </DropdownMenuItem>
           
           {/* Account Switching Submenu */}
           {allSessions.length > 0 && (
@@ -249,6 +265,7 @@ export function WalletConnect() {
       </DropdownMenu>
       <WalletTransferDialog open={walletOpen} onOpenChange={setWalletOpen} />
       <CheeseSwapDialog open={swapOpen} onOpenChange={setSwapOpen} />
+      <AlcorBridgeDialog open={bridgeOpen} onOpenChange={setBridgeOpen} />
       <CheeseAmpDialog 
         open={cheeseAmpOpen} 
         onOpenChange={setCheeseAmpOpen} 

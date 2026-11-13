@@ -1,1 +1,2 @@
+- ALCORBridge is a global modal (AlcorBridgeDialog, opened via the open-alcor-bridge event from the wallet menu and CHEESEWallet); /bridge only redirects to it.
 - ALCORBridge embeds Alcor's iframe (not their remote script) with the read-only bridge API; iframe postMessages are accepted only from alcor.exchange and that iframe's window.
