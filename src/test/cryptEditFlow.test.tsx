@@ -42,7 +42,8 @@ describe('message edit flow', () => {
     expect(actions.filter(a => a.data.to === 'eosio.null').every(a => a.data.quantity === '0.0080 CHEESE')).toBe(true);
     const confirmed = actions.filter(a => a.data.to === 'bob').map(a => ({ ...a.data, txId: 'new-edit', time: sentAt + 1000 }));
     calls.fetch.mockResolvedValue([...history('original text', 'root', sentAt), ...confirmed]);
-    fireEvent.click(screen.getByRole('button', { name: 'Menu' })); fireEvent.click(await screen.findByRole('button', { name: 'Refresh messages' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Refresh messages' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'OK' }));
     await screen.findByText('corrected text');
     expect(screen.queryByText('original text')).not.toBeInTheDocument();
     expect(within(screen.getByRole('list', { name: 'Chat messages' })).getAllByText(/you · alice/)).toHaveLength(1);

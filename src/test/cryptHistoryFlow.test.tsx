@@ -25,7 +25,7 @@ it('opens saved ciphertext before a stalled network, merges a new message and re
   let complete: ((r: { rows: ReturnType<typeof memo>[]; cursor: number; complete: boolean }) => void) | undefined;
   calls.delta.mockImplementation(() => new Promise(resolve => { complete = resolve; }));
   const first = mount();
-  fireEvent.click(await screen.findByRole('button', { name: /^cachebob$/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /^cachebob/ }));
   expect(await screen.findByText('saved conversation')).toBeInTheDocument();
   expect(calls.full).not.toHaveBeenCalled();
   expect(calls.rooms).not.toHaveBeenCalled();
@@ -39,7 +39,7 @@ it('opens saved ciphertext before a stalled network, merges a new message and re
   first.unmount();
   calls.delta.mockImplementation(() => new Promise(() => {}));
   mount();
-  fireEvent.click(await screen.findByRole('button', { name: /^cachebob$/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /^cachebob/ }));
   expect(await screen.findByText('saved conversation')).toBeInTheDocument();
   expect(await screen.findByText('new conversation')).toBeInTheDocument();
   expect(calls.full).not.toHaveBeenCalled();
