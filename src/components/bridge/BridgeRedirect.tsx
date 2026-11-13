@@ -4,6 +4,8 @@ import { openAlcorBridge } from "./AlcorBridgeDialog";
 
 /** Old /bridge links go home and open the ALCORBridge modal. */
 export function BridgeRedirect() {
-  useEffect(() => { const t = setTimeout(openAlcorBridge, 300); return () => clearTimeout(t); }, []);
+  // No cleanup: the redirect unmounts this component, and cancelling the
+  // timer here would swallow the open event before the home page mounts.
+  useEffect(() => { setTimeout(openAlcorBridge, 300); }, []);
   return <Navigate to="/" replace />;
 }
