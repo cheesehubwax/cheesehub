@@ -28,6 +28,8 @@ beforeEach(async () => {
 });
 describe('message edit flow', () => {
   it('opens Edit, pays only with Terms, and reads the confirmed replacement back in the same row', async () => {
+    const originalRows = history('original text', 'root', sentAt);
+    calls.fetch.mockResolvedValue(originalRows);
     mount(); fireEvent.click(screen.getByRole('button', { name: /^bob/ }));
     const original = await screen.findByText('original text');
     fireEvent.contextMenu(original);
@@ -41,7 +43,7 @@ describe('message edit flow', () => {
     const actions = calls.transact.mock.calls[0][0] as { data: { from: string; to: string; memo: string; quantity: string } }[];
     expect(actions.filter(a => a.data.to === 'eosio.null').every(a => a.data.quantity === '0.0080 CHEESE')).toBe(true);
     const confirmed = actions.filter(a => a.data.to === 'bob').map(a => ({ ...a.data, txId: 'new-edit', time: sentAt + 1000 }));
-    calls.fetch.mockResolvedValue([...history('original text', 'root', sentAt), ...confirmed]);
+    calls.fetch.mockResolvedValue([...originalRows, ...confirmed]);
     fireEvent.click(await screen.findByRole('button', { name: 'Refresh messages' }));
     fireEvent.click(await screen.findByRole('button', { name: 'OK' }));
     await screen.findByText('corrected text');
