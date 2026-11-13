@@ -99,6 +99,15 @@ export const aboutGuides = {
       { title: 'Costs and responsibility', body: 'Proposal and creation actions can require WAX fees. Voting power and rules vary by DAO, so review the specific settings and proposal details before signing.' },
     ],
   },
+  bridge: {
+    title: 'ALCORBridge',
+    introduction: 'Bring tokens onto WAX from Ethereum, BNB Smart Chain and Polygon, or send them back out, using Alcor\'s bridge.',
+    sections: [
+      { title: 'Two ways in', body: 'Use the Bridge tab with an EVM wallet such as MetaMask, or open Deposit Address to get your own permanent address. Anything sent there on a listed network arrives at your WAX account, even straight from an exchange.' },
+      { title: 'Follow your transfers', body: 'Your transfers shows each bridge journey and its progress. Route status lists which tokens and networks are open and their minimum and maximum amounts.' },
+      { title: 'Who runs it', body: 'Alcor operates the bridge. CHEESEHub never holds, routes or signs your funds and cannot recover tokens sent on the wrong network or a token not listed.' },
+    ],
+  },
   drip: {
     title: 'CHEESEDrip',
     introduction: 'Schedule token payments over time for payroll, vesting or recurring distributions.',
