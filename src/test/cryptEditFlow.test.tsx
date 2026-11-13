@@ -38,7 +38,7 @@ describe('message edit flow', () => {
     expect(input).toHaveValue('original text');
     fireEvent.change(input, { target: { value: 'corrected text' } });
     const save = screen.getByRole('button', { name: 'Save edit' }); expect(save).toBeDisabled();
-    fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(save);
+    fireEvent.click(save);
     await waitFor(() => expect(calls.transact).toHaveBeenCalledTimes(1));
     const actions = calls.transact.mock.calls[0][0] as { data: { from: string; to: string; memo: string; quantity: string } }[];
     expect(actions.filter(a => a.data.to === 'eosio.null').every(a => a.data.quantity === '0.0080 CHEESE')).toBe(true);

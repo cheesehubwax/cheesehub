@@ -1,0 +1,1 @@
+- Terms acceptance lives in the wallet provider (one versioned gate before login/restore); forms never re-ask, except RiskAcknowledgement for specific irreversible or liability-bearing actions.
