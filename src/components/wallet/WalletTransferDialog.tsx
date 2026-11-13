@@ -20,7 +20,7 @@ import { CreateAccountManager } from "./CreateAccountManager";
 import { AlcorFarmManager } from "./AlcorFarmManager";
 import { WojakUnboxManager } from "./WojakUnboxManager";
 import { TransactionSuccessDialog } from "./TransactionSuccessDialog";
-import { BridgeDepositDialog } from "@/components/bridge/BridgeDepositDialog";
+import { openAlcorBridge } from "@/components/bridge/AlcorBridgeDialog";
 import { TokenLogo } from "@/components/TokenLogo";
 import { closeWharfkitModals } from "@/lib/wharfKit";
 import cheeseLogo from "@/assets/cheese-logo.png";
@@ -233,13 +233,11 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
     }
   };
 
-  const [bridgeOpen, setBridgeOpen] = useState(false);
   const topItems = SIDEBAR_ITEMS.filter((i) => !i.bottom);
   const bottomItems = SIDEBAR_ITEMS.filter((i) => i.bottom);
 
   return (
     <>
-      <BridgeDepositDialog open={bridgeOpen} onOpenChange={setBridgeOpen} account={accountName} />
       <Dialog open={open} onOpenChange={handleClose}>
         <DialogContent
           hideClose
@@ -261,7 +259,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
               )}
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setBridgeOpen(true)}>
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={openAlcorBridge}>
                 🌉 Bridge In
               </Button>
               <Button

@@ -20,7 +20,7 @@ import Drip from "./pages/Drip";
 import Air from "./pages/Air";
 import CheeseAnal from "./pages/CheeseAnal";
 import Folio from "./pages/Folio";
-import Bridge from "./pages/Bridge";
+import { BridgeRedirect } from "./components/bridge/BridgeRedirect";
 import CheeseCrypt from "./pages/CheeseCrypt";
 import BannerAds from "./pages/BannerAds";
 import Disclaimer from "./pages/Disclaimer";
@@ -68,7 +68,7 @@ const App = () => {
                 <Route path="/anal" element={<CheeseAnal />} />
                 {/* CHEESEFolio — in testing, intentionally not linked anywhere */}
                 <Route path="/folio" element={<Folio />} />
-                <Route path="/bridge" element={<Bridge />} />
+                <Route path="/bridge" element={<BridgeRedirect />} />
                 {/* CHEESECrypt — encrypted messaging, intentionally not linked anywhere */}
                 <Route path="/crypt" element={<CheeseCrypt />} />
                 <Route path="/bannerads" element={<BannerAds />} />
