@@ -1,6 +1,8 @@
 // CHEESECrypt — encrypted on-chain messages paid in CHEESE.
 // Intentionally not linked from the header or menus: reachable at /crypt only.
 import { deliveryState } from '@/lib/cryptDelivery';
+import { loadHistory, saveHistory } from '@/lib/cryptHistoryCache';
+import { fetchMessageDelta } from '@/lib/cheeseCrypt';
 import { useCryptLib } from '@/hooks/useCryptLib';
 import { loadVerified, setVerified, verifyState } from '@/lib/cryptSafety';
 import { SafetyNumberDialog } from '@/components/crypt/SafetyNumberDialog';
@@ -357,7 +359,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const [voice, setVoice] = useState<VoiceClip | null>(null);
   /** History pages to read; grows only when a voice note touches the edge of the loaded window. */
-  const [depth, setDepth] = useState(MAX_HISTORY_PAGES);
+  const [depth, setDepth] = useState(1);
   /** Ticks so a stalled voice note moves from "loading" to "incomplete" without new history. */
   /** Only messages newer than this page visit may autoplay sound effects; older history stays silent. */
   const openedAt = useRef(Date.now());
@@ -492,6 +494,14 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   }, [vault, account]);
 
   const inFlight = useRef(false);
+  const historyScope = `${account}:${privacyMode}:${key?.publicKey ?? ''}`;
+  const currentHistoryScope = useRef(historyScope);
+  currentHistoryScope.current = historyScope;
+  const hydratedScope = useRef('');
+  const cacheAllowed = useRef(true);
+  const catchupPending = useRef(false);
+  const loadedDepth = useRef(0);
+  const [checkpoint, setCheckpoint] = useState(0);
   // Only replace the list when something changed, so a quiet poll never re-renders the chat.
   const applyMemos = useCallback((next: Awaited<ReturnType<typeof fetchMessages>>) => {
     setMemos(prev => {
@@ -503,38 +513,87 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   // (Standard), when the stream overflows its page cap, or on an explicit request.
   const streamCursor = useRef(0);
   const fullRead = useCallback(async (maximum: boolean) => {
+    const scope = currentHistoryScope.current;
     const started = Date.now();
-    const rows = maximum ? await fetchStreamHistory(account, depth) : await fetchMessages(account, depth);
-    if (maximum) setMemos(prev => mergeMemos(prev, rows)); else applyMemos(rows);
+    const rows = maximum ? await fetchStreamHistory(account, depth) : await fetchMessages(account, depth, true, depth === 1 ? 100 : 500);
+    if (!alive.current || currentHistoryScope.current !== scope) return;
+    setMemos(prev => mergeMemos(prev, rows));
+    loadedDepth.current = Math.max(loadedDepth.current, depth);
     streamCursor.current = Math.max(streamCursor.current, started);
+    setCheckpoint(streamCursor.current);
     setLoaded(true);
-  }, [account, depth, applyMemos]);
-  useEffect(() => { streamCursor.current = 0; }, [account]);
+  }, [account, depth]);
+  useEffect(() => {
+    if (key && checkpoint > 0 && hydratedScope.current === historyScope && cacheAllowed.current) void saveHistory(account, privacyMode, memos, checkpoint, Math.max(1, loadedDepth.current));
+  }, [account, privacyMode, key, memos, checkpoint]);
   const refresh = useCallback(async () => {
+    if (!key || inFlight.current) return;
+    const scope = currentHistoryScope.current;
     setLoading(true);
     inFlight.current = true;
-    try { await fullRead(privacyMode === 'maximum'); }
+    try {
+      if (hydratedScope.current !== scope) {
+        const cached = await loadHistory(account, privacyMode);
+        if (!alive.current || currentHistoryScope.current !== scope) return;
+        hydratedScope.current = scope;
+        cacheAllowed.current = true;
+        catchupPending.current = !!cached;
+        if (cached) {
+          applyMemos(cached.rows);
+          loadedDepth.current = cached.depth;
+          streamCursor.current = cached.cursor; setCheckpoint(0);
+          setLoaded(true);
+        } else {
+          applyMemos([]); loadedDepth.current = 0; streamCursor.current = 0; setCheckpoint(0);
+        }
+      }
+      if (!streamCursor.current || depth > loadedDepth.current) await fullRead(privacyMode === 'maximum');
+      else {
+        const result = privacyMode === 'maximum'
+          ? await fetchContractStream(account, streamCursor.current)
+          : await fetchMessageDelta(account, streamCursor.current);
+        if (!alive.current || currentHistoryScope.current !== scope) return;
+        setMemos(prev => mergeMemos(prev, result.rows));
+        if (result.complete) { catchupPending.current = false; streamCursor.current = result.cursor; setCheckpoint(result.cursor); }
+        else throw new Error('History catch-up is incomplete; its saved checkpoint was retained.');
+      }
+    }
     catch { toast({ title: 'Could not load messages', description: 'History servers did not answer. Try again shortly.', variant: 'destructive' }); }
-    finally { setLoading(false); inFlight.current = false; }
-  }, [toast, fullRead, privacyMode]);
+    finally { if (alive.current && currentHistoryScope.current === scope) setLoading(false); inFlight.current = false; }
+  }, [key, account, depth, toast, fullRead, privacyMode, applyMemos]);
   const loadFullHistory = useCallback(async () => {
+    if (!key || inFlight.current) return;
+    const scope = currentHistoryScope.current;
     inFlight.current = true;
-    try { const rows = await fetchMessages(account, MAX_HISTORY_PAGES); setMemos(prev => mergeMemos(prev, rows)); }
+    try {
+      const started = Date.now();
+      const rows = await fetchMessages(account, MAX_HISTORY_PAGES, true);
+      if (!alive.current || currentHistoryScope.current !== scope) return;
+      setMemos(prev => mergeMemos(prev, rows)); loadedDepth.current = MAX_HISTORY_PAGES;
+      // Explicit account-history consent in Maximum must not change its stream-only cache.
+      if (privacyMode === 'maximum') cacheAllowed.current = false;
+      if (privacyMode === 'standard') { streamCursor.current = started; setCheckpoint(started); }
+    }
     catch { toast({ title: 'Could not load history', description: 'History servers did not answer. Try again shortly.', variant: 'destructive' }); }
     finally { inFlight.current = false; }
-  }, [account, toast]);
+  }, [account, key, privacyMode, toast]);
   // Background check: no spinner, no error toast — a missed poll is retried on the next tick.
   const poll = useCallback(async () => {
-    if (inFlight.current || !streamCursor.current) return;
+    if (inFlight.current || !key) return;
+    if (catchupPending.current || !streamCursor.current || depth > loadedDepth.current) { await refresh(); return; }
+    const scope = currentHistoryScope.current;
     inFlight.current = true;
     try {
       const r = await fetchContractStream(account, streamCursor.current);
+      if (!alive.current || currentHistoryScope.current !== scope) return;
       setMemos(prev => mergeMemos(prev, r.rows));
-      if (r.complete) streamCursor.current = r.cursor;
-      else await fullRead(privacyMode === 'maximum');
+      if (r.complete) { streamCursor.current = r.cursor; setCheckpoint(r.cursor); }
+      else catchupPending.current = true;
+      // Never skip an offline gap by replacing its cursor with a bounded recent-window read.
+      // The explicit refresh catches up Standard history; Maximum retains its safe cursor.
     } catch { /* retry next tick */ }
     finally { inFlight.current = false; }
-  }, [account, fullRead, privacyMode]);
+  }, [account, key, depth, refresh, fullRead, privacyMode]);
 
   useEffect(() => { if (key) refresh(); }, [key, refresh]);
   useEffect(() => {
@@ -586,15 +645,15 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     ? [{ key: c.key, txId: c.txId, time: c.time, from: c.from, to: c.to, control: c.control, usedKey: c.usedKey }] : []), [decoded]);
   // Creators of public rooms I asked to join: their listing key reads only their invite to that room.
   const { data: roomMemos, isFetching: roomsLoading, refetch: refetchRooms } = useQuery({
-    queryKey: ['crypt-rooms'], enabled: !!key, queryFn: () => fetchRoomMemos(ROOM_PREFIX),
-    staleTime: 60_000, refetchInterval: () => (document.visibilityState === 'visible' ? 60_000 : false), retry: false,
+    queryKey: ['crypt-rooms'], enabled: !!key && loaded && (roomsOpen || Object.keys(roomRequests).length > 0 || Object.keys(inviteStore).length > 0), queryFn: () => fetchRoomMemos(ROOM_PREFIX),
+    staleTime: 30 * 60_000, refetchInterval: () => (roomsOpen && document.visibilityState === 'visible' ? 60_000 : false), retry: false,
   });
   const listings = useMemo(() => collectListings(roomMemos ?? []).filter(l => !blocked.includes(l.creator)), [roomMemos, blocked]);
   // CHEESEHub admins hide rooms on chain from /admin; display-only, the last good read is kept during outages.
-  const { data: hideRecords } = useQuery({ queryKey: ['crypt-room-hides'], enabled: !!key, queryFn: fetchRoomHides, staleTime: 5 * 60_000, retry: false });
+  const { data: hideRecords } = useQuery({ queryKey: ['crypt-room-hides'], enabled: !!key && roomsOpen, queryFn: fetchRoomHides, staleTime: 5 * 60_000, retry: false });
   const roomHides = useMemo(() => hideRecords ? activeHides(hideRecords) : cachedHides(), [hideRecords]);
   // Curated directory: only CHEESEHub admins can list public rooms; everyone else keeps private rooms.
-  const { data: curatorList } = useQuery({ queryKey: ['crypt-room-curators'], enabled: !!key, queryFn: fetchRoomCurators, staleTime: 5 * 60_000, retry: false });
+  const { data: curatorList } = useQuery({ queryKey: ['crypt-room-curators'], enabled: !!key && loaded, queryFn: fetchRoomCurators, staleTime: 5 * 60_000, retry: false });
   const curators = useMemo(() => curatorSet(curatorList ?? cachedCurators()), [curatorList]);
   const canListRooms = curators.has(account);
   const directoryListings = useMemo(() => filterVisibleListings(filterCuratedListings(listings, curators), roomHides), [listings, curators, roomHides]);
@@ -734,7 +793,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const conversations = useMemo(() => edited.messages.filter(m => !isReaction(m.text)), [edited.messages]);
   useEffect(() => {
     // Restore retained policies on another device by reading the bounded history window in full.
-    if (Object.keys(invites).length && loaded && depth < MAX_HISTORY_PAGES) setDepth(d => d + 1);
+    if (Object.keys(invites).length && loaded && depth < MAX_HISTORY_PAGES) setDepth(d => Math.max(d + 1, loadedDepth.current));
   }, [invites, loaded, depth]);
   const cancelEdit = () => { setEditingMessage(null); setText(''); setVoice(null); setReplyingTo(null); };
   useEffect(() => { setEditingMessage(null); setText(''); }, [active]);
@@ -1909,7 +1968,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
           <Button variant="outline" onClick={() => { setAddingFriend(false); fileRef.current?.click(); }}><Upload className="h-4 w-4" /> Import public key file</Button>
         </DialogContent>
       </Dialog>}
-      <DiscoverRoomsDialog open={roomsOpen} onOpenChange={o => { setRoomsOpen(o); if (o) void refetchRooms(); }} listings={directoryListings} loading={roomsLoading}
+      <DiscoverRoomsDialog open={roomsOpen} onOpenChange={setRoomsOpen} listings={directoryListings} loading={roomsLoading}
         refresh={() => void refetchRooms()} account={account} nameFor={nameFor} roomStatus={roomStatus} joinCost={roomJoinCost} onAsk={l => { setRoomsOpen(false); setJoinNote(''); setAskingRoom(l); }}
         onReport={l => { setRoomsOpen(false); setReportingRoom(l); }} />
       {reportingRoom && <ReportRoomDialog room={reportingRoom} busy={reportBusy} onReport={reason => void reportRoom(reportingRoom, reason)} onClose={() => setReportingRoom(null)} />}
@@ -2038,7 +2097,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
             </div>
             <div className="relative flex min-h-0 flex-1">
             <ol ref={listRef} aria-label="Chat messages" className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden space-y-2 p-4"
-              onScroll={(e) => { const el = e.currentTarget; nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; replyNavigation.inspectVisible(); }}>
+              onScroll={(e) => { const el = e.currentTarget; nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; replyNavigation.inspectVisible(); if (el.scrollTop < 40 && loaded && !inFlight.current && depth < MAX_HISTORY_PAGES) setDepth(d => Math.min(MAX_HISTORY_PAGES, d + 1)); }}>
               {thread.map((m, i) => (
                 <Fragment key={m.key}>
                   {leaveNotices.filter(n => n.time <= m.time && (i === 0 || n.time > thread[i - 1].time)).map(n => <LeavePill key={n.key} name={nameFor(n.from)} account={n.from} />)}

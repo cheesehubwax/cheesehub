@@ -13,7 +13,7 @@ import { Messenger } from '@/pages/CheeseCrypt';
 const calls = vi.hoisted(() => ({ fetch: vi.fn(), rooms: vi.fn(), transact: vi.fn() }));
 vi.mock('@/context/WaxContext', () => ({ useWax: vi.fn() }));
 vi.mock('@/hooks/useWaxTransaction', () => ({ useWaxTransaction: () => ({ executeTransaction: calls.transact }) }));
-vi.mock('@/lib/cheeseCrypt', async original => ({ ...await original<typeof import('@/lib/cheeseCrypt')>(), fetchMessages: calls.fetch, fetchContractStream: async (a: string, c: number) => ({ rows: await calls.fetch(a), cursor: c, complete: true }), fetchRoomMemos: calls.rooms, lookupPublishedKey: async () => null }));
+vi.mock('@/lib/cheeseCrypt', async original => ({ ...await original<typeof import('@/lib/cheeseCrypt')>(), fetchMessages: calls.fetch, fetchMessageDelta: async (a: string, c: number) => ({ rows: await calls.fetch(a), cursor: c, complete: true }), fetchContractStream: async (a: string, c: number) => ({ rows: await calls.fetch(a), cursor: c, complete: true }), fetchRoomMemos: calls.rooms, lookupPublishedKey: async () => null }));
 vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import('@/lib/cryptVault')>(), recallVault: async () => null }));
 const alice = generateKey('alice'), bob = generateKey('bob');
 const ID = '0123456789abcdef';
@@ -28,6 +28,8 @@ beforeEach(async () => {
 });
 describe('message edit flow', () => {
   it('opens Edit, pays only with Terms, and reads the confirmed replacement back in the same row', async () => {
+    const originalRows = history('original text', 'root', sentAt);
+    calls.fetch.mockResolvedValue(originalRows);
     mount(); fireEvent.click(screen.getByRole('button', { name: /^bob/ }));
     const original = await screen.findByText('original text');
     fireEvent.contextMenu(original);
@@ -41,8 +43,9 @@ describe('message edit flow', () => {
     const actions = calls.transact.mock.calls[0][0] as { data: { from: string; to: string; memo: string; quantity: string } }[];
     expect(actions.filter(a => a.data.to === 'eosio.null').every(a => a.data.quantity === '0.0080 CHEESE')).toBe(true);
     const confirmed = actions.filter(a => a.data.to === 'bob').map(a => ({ ...a.data, txId: 'new-edit', time: sentAt + 1000 }));
-    calls.fetch.mockResolvedValue([...history('original text', 'root', sentAt), ...confirmed]);
-    fireEvent.click(screen.getByRole('button', { name: 'Menu' })); fireEvent.click(await screen.findByRole('button', { name: 'Refresh messages' }));
+    calls.fetch.mockResolvedValue([...originalRows, ...confirmed]);
+    fireEvent.click(await screen.findByRole('button', { name: 'Refresh messages' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'OK' }));
     await screen.findByText('corrected text');
     expect(screen.queryByText('original text')).not.toBeInTheDocument();
     expect(within(screen.getByRole('list', { name: 'Chat messages' })).getAllByText(/you · alice/)).toHaveLength(1);
