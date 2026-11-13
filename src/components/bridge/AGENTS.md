@@ -1,0 +1,1 @@
+- ALCORBridge embeds Alcor's iframe (not their remote script) with the read-only bridge API; iframe postMessages are accepted only from alcor.exchange and that iframe's window.

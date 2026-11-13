@@ -47,4 +47,3 @@
 - CHEESENull's CHEESECrypt row: crypt.cheese nulls plus user eosio.null legs matched by Crypt fee-label constants, counted once.
 - Crypt router lookups persist (IndexedDB) only if >5min old.
 
-- ALCORBridge uses Alcor's iframe embed (not their remote script) and read-only bridge API; accept iframe postMessages only from alcor.exchange and the iframe's own window.
