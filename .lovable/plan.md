@@ -1,12 +1,12 @@
-# CHEESEBridge (Option 3): /bridge page + CHEESEWallet deposit
+# ALCORBridge (Option 3): /bridge page + CHEESEWallet deposit
 
 ## What you will get
-1. **New CHEESEBridge page (`/bridge`)** in the usual CHEESE style (emoji heading, BETA tag, floating orb).
+1. **New ALCORBridge page (`/bridge`)** in the usual CHEESE style (emoji heading, BETA tag, floating orb).
    - Alcor's official two-way bridge widget, pre-filled with the signed-in WAX account as recipient and WAX as destination.
    - "Route status" card: which networks are online, minimum/maximum amounts, typical arrival time.
    - "Your transfers" card (signed in): in-flight and delivered bridge transfers with a progress bar, auto-refreshing while something is in flight.
 2. **CHEESEWallet "Bridge In / Deposit" button**: shows your personal deposit address (one address for Ethereum, BSC and Polygon), copy button, QR code, supported tokens and minimums, plus "Open full bridge".
-3. **Navigation**: CHEESEBridge added to the dApp menu next to the other modules.
+3. **Navigation**: ALCORBridge added to the dApp menu next to the other modules.
 4. **Terms gate**: mandatory Terms of Use checkbox before the widget or deposit address is shown.
 
 ## Legal / liability flags (please read)
