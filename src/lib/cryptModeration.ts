@@ -1,6 +1,6 @@
 import type { ChainMemo } from '@/lib/cheeseCrypt';
 import type { ConversationEntry } from '@/lib/cryptGroups';
-import { eventFromMember, policySnapshotValid, roomPolicyValid, type Cg2Event, type InviteGroup } from '@/lib/cryptInviteGroups';
+import { MAX_INVITE_MEMBERS, eventFromMember, policySnapshotValid, roomPolicyValid, type Cg2Event, type InviteGroup } from '@/lib/cryptInviteGroups';
 import { encodeReply, parseReply } from '@/lib/cryptReply';
 import { editTarget } from '@/lib/cryptEdits';
 
@@ -12,6 +12,8 @@ export interface RoomModeration {
   /** `${author}:${editTarget}` → first valid collapse. */
   collapses: Record<string, { by: string; at: number }>;
 }
+/** Founder rosters travel in fixed-size room/policy controls, so grants stop at this total (owner included). */
+export const MAX_FOUNDERS = MAX_INVITE_MEMBERS;
 export type ModRole = 'owner' | 'admin' | 'member';
 /** Owner: mute, ban (not founders), collapse anything, appoint admins. Admin: mute anyone but the owner;
  * collapse only post-public members' messages; never ban or appoint. Muted/removed admins act as members. */
@@ -39,7 +41,7 @@ export function deriveModeration(events: Cg2Event[], invites: Record<string, Inv
     const g = eventFromMember(e, invites, me);
     if (!g) continue;
     const c = e.control;
-    if (c.kind !== 'room' && c.kind !== 'mute' && c.kind !== 'ban' && c.kind !== 'policy' && c.kind !== 'admin' && c.kind !== 'collapse') continue;
+    if (c.kind !== 'room' && c.kind !== 'mute' && c.kind !== 'ban' && c.kind !== 'policy' && c.kind !== 'admin' && c.kind !== 'collapse' && c.kind !== 'founder') continue;
     // Only mutes and collapses may come from an admin; everything else is owner-only.
     if (e.from !== g.creator && c.kind !== 'mute' && c.kind !== 'collapse') continue;
     const fingerprint = `${g.id}:${e.txId}:${JSON.stringify(c)}`;
@@ -54,6 +56,7 @@ export function deriveModeration(events: Cg2Event[], invites: Record<string, Inv
       if (state || myInvites.some(x => x.time < e.time)) {
         if (!readmission || (state && !roomPolicyValid({ kind: 'room', id: g.id, listed: true, protected: c.protected }, g, state.protected))) continue;
         if (state) {
+          for (const a of c.protected) if (!state.protected.includes(a) && state.bans[a] === undefined && !c.bans.includes(a)) state.protected.push(a);
           state.admins = [...c.admins];
           for (const a of c.bans) state.bans[a] ??= e.time;
           for (const [a, from, until] of c.mutes) if (!state.mutes[a]?.some(m => m.from === from && m.until === until)) state.mutes[a] = [...(state.mutes[a] ?? []), { from, until }];
@@ -74,7 +77,10 @@ export function deriveModeration(events: Cg2Event[], invites: Record<string, Inv
       const before = events.filter(x => (x.control.kind === 'invite' || x.control.kind === 'admission') && x.control.invite.id === g.id && x.from === g.creator && x.time <= e.time && x.txId !== e.txId && eventInviteTrusted(x, g, me));
       if (!state && before.some(x => (x.control.kind === 'invite' || x.control.kind === 'admission') && x.control.invite.members.some(m => !c.protected.includes(m.account)))) continue;
       if (!state) { state = { listed: c.listed, protected: [...c.protected], bans: {}, mutes: {}, admins: [], collapses: {} }; out[g.id] = state; }
-      else state.listed = c.listed;
+      else {
+        state.listed = c.listed;
+        for (const a of c.protected) if (!state.protected.includes(a) && state.bans[a] === undefined) state.protected.push(a);
+      }
       continue;
     }
     if (!state?.listed || !g.members.some(m => m.account === c.member)) continue;
@@ -84,6 +90,10 @@ export function deriveModeration(events: Cg2Event[], invites: Record<string, Inv
       continue;
     }
     if (c.member === g.creator) continue;
+    if (c.kind === 'founder') {
+      if (state.bans[c.member] === undefined && !state.protected.includes(c.member) && state.protected.length < MAX_FOUNDERS) state.protected.push(c.member);
+      continue;
+    }
     if (c.kind === 'admin') {
       if (c.on && state.bans[c.member] === undefined && !state.admins.includes(c.member)) state.admins.push(c.member);
       if (!c.on) state.admins = state.admins.filter(a => a !== c.member);

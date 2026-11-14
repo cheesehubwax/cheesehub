@@ -25,7 +25,7 @@ export interface InviteMember { account: string; publicKey: string }
 export interface InviteGroup { id: string; name: string; creator: string; created: number; members: InviteMember[]; avatar?: CryptAvatar; publicRoom?: boolean }
 export const MUTE_MINUTES = [15, 60, 360, 1440] as const;
 export type MuteMinutes = typeof MUTE_MINUTES[number];
-export type Cg2Kind = 'invite' | 'admission' | 'add' | 'readmit' | 'msg' | 'joined' | 'leave' | 'meta' | 'friend' | 'friend-ok' | 'join' | 'join-no' | 'room' | 'mute' | 'ban' | 'policy' | 'admin' | 'collapse' | 'report' | 'profiles';
+export type Cg2Kind = 'invite' | 'admission' | 'add' | 'readmit' | 'msg' | 'joined' | 'leave' | 'meta' | 'friend' | 'friend-ok' | 'join' | 'join-no' | 'room' | 'mute' | 'ban' | 'policy' | 'admin' | 'collapse' | 'report' | 'profiles' | 'founder';
 export type Cg2 =
   | { kind: 'invite'; invite: InviteGroup }
   /** `note`: optional short text from the creator when accepting a join request. */
@@ -39,6 +39,7 @@ export type Cg2 =
   | { kind: 'policy'; id: string; protected: string[]; bans: string[]; mutes: [string, number, number][]; admins: string[]; left: string[] }
   /** Owner-only: appoint (`on`) or dismiss a public-room admin. */
   | { kind: 'admin'; id: string; member: string; on: boolean }
+  | { kind: 'founder'; id: string; member: string }
   /** Owner/admin: collapse the message by `member` whose edit digest (cryptEdits.editTarget) is `target`. */
   | { kind: 'collapse'; id: string; member: string; target: string }
   /** Notification only: a member reports to moderators (`admin`), an admin escalates to the owner for a ban (`owner`). */
@@ -142,6 +143,11 @@ export function encodeAdmin(id: string, member: string, on: boolean) {
   if (!ACCOUNT.test(member)) throw new Error('Invalid admin');
   return wire('admin', { i: checkId(id), a: member, e: on });
 }
+/** Owner-granted permanent founder status (ban/admin-collapse immunity); never revocable. */
+export function encodeFounder(id: string, member: string) {
+  if (!ACCOUNT.test(member)) throw new Error('Invalid founder');
+  return wire('founder', { i: checkId(id), a: member });
+}
 export function encodeCollapse(id: string, author: string, target: string) {
   if (!ACCOUNT.test(author) || !/^[a-f0-9]{64}$/.test(target)) throw new Error('Invalid collapse');
   return wire('collapse', { i: checkId(id), a: author, h: target });
@@ -213,6 +219,7 @@ export function parseCg2(text: string | null | undefined): Cg2 | null {
     return { kind, id, listed: body.l, protected: body.p as string[] };
   }
   if (kind === 'admin') return typeof body.a === 'string' && ACCOUNT.test(body.a) && typeof body.e === 'boolean' ? { kind, id, member: body.a, on: body.e } : null;
+  if (kind === 'founder') return typeof body.a === 'string' && ACCOUNT.test(body.a) ? { kind, id, member: body.a } : null;
   if (kind === 'collapse') return typeof body.a === 'string' && ACCOUNT.test(body.a) && typeof body.h === 'string' && /^[a-f0-9]{64}$/.test(body.h) ? { kind, id, member: body.a, target: body.h } : null;
   if (kind === 'report') return typeof body.a === 'string' && ACCOUNT.test(body.a) && typeof body.h === 'string' && /^[a-f0-9]{64}$/.test(body.h) && (body.l === 'admin' || body.l === 'owner') ? { kind, id, member: body.a, target: body.h, level: body.l } : null;
   if (kind === 'ban' || kind === 'mute') {
@@ -249,8 +256,9 @@ export interface RoomInviter { creator: string; publicKey: string }
 export function policySnapshotValid(c: Extract<Cg2, { kind: 'policy' }>, g: InviteGroup, at: number) {
   return c.protected.length <= MAX_INVITE_MEMBERS && c.protected.includes(g.creator) && c.protected.every(a => !!memberKey(g, a)) && c.bans.every(a => !!memberKey(g, a)) && c.mutes.every(([a, start]) => a !== g.creator && start <= at && !!memberKey(g, a)) && c.admins.every(a => a !== g.creator && !!memberKey(g, a)) && c.left.every(a => a !== g.creator && !!memberKey(g, a));
 }
+/** A later roster may only grow (owner-granted founders), never drop a held founder. */
 export function roomPolicyValid(c: Extract<Cg2, { kind: 'room' }>, g: InviteGroup, protectedMembers: string[]) {
-  return c.protected.includes(g.creator) && c.protected.length === protectedMembers.length && protectedMembers.every(a => c.protected.includes(a)) && c.protected.every(a => !!memberKey(g, a));
+  return c.protected.includes(g.creator) && protectedMembers.every(a => c.protected.includes(a)) && c.protected.every(a => !!memberKey(g, a));
 }
 
 /** A complete owner bootstrap, authenticated against retained member keys and its atomic policy. */
