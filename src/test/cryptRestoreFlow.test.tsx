@@ -41,11 +41,11 @@ beforeEach(async () => {
 
 describe('recovery through the messenger', () => {
   it('restores an encrypted folder roster after reset and preserves leave consent through automatic saving', async () => {
-    let text = '';
+    let text = '', writes = 0;
     const root: DirHandle = { name: 'cheesecrypt', getDirectoryHandle: async () => { throw new DOMException('Missing', 'NotFoundError'); }, getFileHandle: async (name, options) => {
       if (!name.endsWith('-groups.json') || (!text && !options?.create)) throw new DOMException('Missing', 'NotFoundError');
       return { getFile: async () => ({ text: async () => text }), createWritable: async () => {
-        let staged = ''; return { write: async v => { staged = v; }, close: async () => { text = staged; } };
+        let staged = ''; return { write: async v => { staged = v; }, close: async () => { text = staged; writes++; } };
       } };
     } };
     await writeGroupBackup(root, me, { invites: { [id]: group }, decisions: { [id]: { status: 'left', at: 100 } }, requests: {}, controls: admission });
@@ -53,6 +53,7 @@ describe('recovery through the messenger', () => {
     const first = mount();
     await waitFor(() => expect(loadInvites('bob')[id]?.members).toHaveLength(2));
     expect(await screen.findByRole('button', { name: /Recovery club.*left/ })).toBeInTheDocument();
+    await waitFor(() => expect(writes).toBeGreaterThan(1));
     await waitFor(async () => expect((await readGroupBackup(root, me))?.decisions[id]).toEqual({ status: 'left', at: 100 }));
     first.unmount(); localStorage.clear(); await saveKey(me); mount();
     expect(await screen.findByRole('button', { name: /Recovery club.*left/ })).toBeInTheDocument();
