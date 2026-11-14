@@ -49,7 +49,16 @@ export function AlcorBridgeDialog({ open, onOpenChange }: { open: boolean; onOpe
           </DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3 sm:p-4">
+        <div className="relative isolate min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3 sm:p-4">
+          {tab === "bridge" && (
+            <img
+              src={alcorIcon.url}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              className="pointer-events-none absolute left-1/2 top-1/2 -z-10 aspect-square w-[85%] max-w-[720px] -translate-x-1/2 -translate-y-1/2 select-none object-contain opacity-10"
+            />
+          )}
           <Tabs value={tab} onValueChange={setTab}>
             <div className="mb-4 flex justify-center">
               <TabsList className="bg-card/80 border border-border/50 h-10">
