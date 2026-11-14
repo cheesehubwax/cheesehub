@@ -31,9 +31,9 @@ export function BridgeWidget({ recipient }: { recipient: string | null }) {
         referrerPolicy="strict-origin-when-cross-origin"
       />
       <p className="text-xs text-center text-muted-foreground">
-        Widget not loading?{" "}
+        Bridging out of WAX or Widget not loading?{" "}
         <a href={widgetUrl({ recipient }).replace("/embed/bridge", "/v/wax/bridge")} target="_blank" rel="noopener noreferrer" className="text-cheese hover:underline">
-          Open the bridge on Alcor
+          Open the full two-way bridge on Alcor ↗
         </a>
       </p>
     </div>
