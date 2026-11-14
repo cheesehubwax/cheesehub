@@ -24,7 +24,7 @@ import { openAlcorBridge } from "@/components/bridge/AlcorBridgeDialog";
 import { TokenLogo } from "@/components/TokenLogo";
 import { closeWharfkitModals } from "@/lib/wharfKit";
 import cheeseLogo from "@/assets/cheese-logo.png";
-import alcorIcon from "@/assets/alcor-icon.svg.asset.json";
+import alcorIconUrl from "@/assets/alcor-icon.svg";
 import {
   Wallet,
   Send,
@@ -261,7 +261,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
             </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" className="h-7 text-xs" onClick={openAlcorBridge}>
-                <img src={alcorIcon.url} alt="" aria-hidden="true" className="mr-1.5 h-4 w-4 shrink-0 object-contain" /> Bridge In
+                <img src={alcorIconUrl} alt="" aria-hidden="true" className="mr-1.5 h-4 w-4 shrink-0 object-contain" /> Bridge In
               </Button>
               <Button
                 variant="ghost"

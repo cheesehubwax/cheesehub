@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { STATUS_LABEL, chainName, fetchHops, formatRawUnits, hopPercent, isInFlight } from "@/lib/alcorBridge";
 import { TokenLogo } from "@/components/TokenLogo";
-import alcorIcon from "@/assets/alcor-icon.svg.asset.json";
+import alcorIconUrl from "@/assets/alcor-icon.svg";
 
 export function BridgeTransfersCard({ account }: { account: string | null }) {
   const q = useQuery({
@@ -17,7 +17,7 @@ export function BridgeTransfersCard({ account }: { account: string | null }) {
 
   return (
     <Card className="alcor-panel rounded-lg border-border font-sans">
-      <CardHeader className="p-4 pb-2"><CardTitle className="flex items-center gap-2 text-base font-semibold"><img src={alcorIcon.url} alt="" aria-hidden="true" className="h-5 w-5 shrink-0 object-contain" />Your transfers</CardTitle></CardHeader>
+      <CardHeader className="p-4 pb-2"><CardTitle className="flex items-center gap-2 text-base font-semibold"><img src={alcorIconUrl} alt="" aria-hidden="true" className="h-5 w-5 shrink-0 object-contain" />Your transfers</CardTitle></CardHeader>
       <CardContent className="space-y-3 p-4 pt-0">
         {!account && <p className="text-sm text-muted-foreground">Connect your wallet to see your bridge transfers.</p>}
         {account && q.isLoading && <p className="text-sm text-muted-foreground">Loading transfers…</p>}
