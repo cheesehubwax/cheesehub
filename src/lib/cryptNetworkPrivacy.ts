@@ -26,10 +26,13 @@ export function validateCustomEndpoint(input: string): string | null {
 }
 
 export const loadCustomEndpoint = (): string | null => { const v = read(NODE_KEY); return v ? validateCustomEndpoint(v) : null; };
-export const loadCustomOnly = (): boolean => read(ONLY_KEY) === '1' && !!loadCustomEndpoint();
+/** Remember the checkbox independently; routing activates it only with a saved server. */
+export const loadCustomOnlyPreference = (): boolean => read(ONLY_KEY) === '1';
+export const saveCustomOnlyPreference = (only: boolean) => write(ONLY_KEY, only ? '1' : null);
+export const loadCustomOnly = (): boolean => loadCustomOnlyPreference() && !!loadCustomEndpoint();
 export function saveCustomEndpoint(url: string | null, only: boolean) {
   write(NODE_KEY, url);
-  write(ONLY_KEY, url && only ? '1' : null);
+  saveCustomOnlyPreference(!!url && only);
 }
 
 /** Pure ordering: custom server first; with `only`, nothing else. */
