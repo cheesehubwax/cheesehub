@@ -7,16 +7,16 @@ const ALCOR_LOGO_BASE = 'https://wax.alcor.exchange/api/v2/tokens';
 // and immune to transient remote failures being cached as "missing".
 import cheeseTokenLogo from '@/assets/cheese-token-logo.png';
 import waxSealLogo from '@/assets/wax-seal.png';
-import bnbTokenLogo from '@/assets/bnb-token-logo.png.asset.json';
-import polTokenLogo from '@/assets/pol-token-logo.png.asset.json';
+import bnbTokenLogo from '@/assets/bnb-token-logo.png';
+import polTokenLogo from '@/assets/pol-token-logo.png';
 
 const LOCAL_LOGOS: Record<string, string> = {
   'cheeseburger:cheese': cheeseTokenLogo,
   'eosio.token:wax': waxSealLogo,
   // Alcor's WAX logo repo has no entries for the native EVM bridge
   // currencies, so bundle the official BNB and Polygon logos locally.
-  'wrap.alcor:bnb': bnbTokenLogo.url,
-  'wrap.alcor:pol': polTokenLogo.url,
+  'wrap.alcor:bnb': bnbTokenLogo,
+  'wrap.alcor:pol': polTokenLogo,
 };
 
 /**
