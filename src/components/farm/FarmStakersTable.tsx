@@ -1,3 +1,4 @@
+import { explorerAccount, explorerAsset } from '@/lib/explorer';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,7 +35,7 @@ function Thumb({ assetId, meta }: { assetId: string; meta?: StakerAssetMeta }) {
     <HoverCard openDelay={120} closeDelay={60}>
       <HoverCardTrigger asChild>
         <a
-          href={`https://waxblock.io/asset/${assetId}`}
+          href={explorerAsset(assetId)}
           target="_blank"
           rel="noopener noreferrer"
           className="block w-8 h-8 rounded bg-muted overflow-hidden shrink-0 hover:ring-2 hover:ring-cheese transition"
@@ -139,7 +140,7 @@ const StakerRow = ({
       className={`grid ${ROW_GRID} gap-2 items-start p-2 border-b border-border/40 hover:bg-muted/30 transition-colors`}
     >
       <a
-        href={`https://waxblock.io/account/${user}`}
+        href={explorerAccount(user)}
         target="_blank"
         rel="noopener noreferrer"
         className="text-xs font-mono text-primary hover:underline truncate"
@@ -197,11 +198,11 @@ const StakerRow = ({
         )}
       </div>
       <a
-        href={`https://waxblock.io/account/${user}`}
+        href={explorerAccount(user)}
         target="_blank"
         rel="noopener noreferrer"
         className="inline-flex items-center text-xs text-muted-foreground hover:text-primary"
-        aria-label={`Open ${user} on waxblock`}
+        aria-label={`Open ${user} on Alcor Explorer`}
       >
         <ExternalLink className="h-3.5 w-3.5" />
       </a>

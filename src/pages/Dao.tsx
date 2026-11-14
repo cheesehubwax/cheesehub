@@ -1,3 +1,4 @@
+import { explorerAccount } from '@/lib/explorer';
 import { useParams, useNavigate } from "react-router-dom";
 import { Layout } from "@/components/Layout";
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
@@ -89,11 +90,11 @@ const Dao = () => {
         <div className="text-center text-sm text-muted-foreground mt-8">
           <p>
             Powered by{" "}
-            <a href="https://waxblock.io/account/dao.waxdao" target="_blank" rel="noopener noreferrer" className="text-cheese hover:underline">
+            <a href={explorerAccount('dao.waxdao')} target="_blank" rel="noopener noreferrer" className="text-cheese hover:underline">
               DAO.WAXDAO
             </a>{" "}
             &{" "}
-            <a href="https://waxblock.io/account/cheesefeefee" target="_blank" rel="noopener noreferrer" className="text-cheese hover:underline">
+            <a href={explorerAccount('cheesefeefee')} target="_blank" rel="noopener noreferrer" className="text-cheese hover:underline">
               CHEESEFEEFEE
             </a>{" "}
             smart contracts

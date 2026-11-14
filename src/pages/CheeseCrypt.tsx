@@ -1,3 +1,4 @@
+import { explorerTx } from '@/lib/explorer';
 // CHEESECrypt — encrypted on-chain messages paid in CHEESE.
 // Intentionally not linked from the header or menus: reachable at /crypt only.
 import { deliveryState } from '@/lib/cryptDelivery';
@@ -2068,7 +2069,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
                   return <>
                     <DialogHeader>
                       <DialogTitle>↩️ {openQuote.author === account ? 'Your message' : nameFor(openQuote.author)}</DialogTitle>
-                      <DialogDescription>{new Date(openQuote.time).toLocaleString()}{original?.txId && <> · <a href={`https://waxblock.io/transaction/${encodeURIComponent(original.txId)}`} target="_blank" rel="noreferrer" className="font-semibold text-cheese underline underline-offset-2">Tx</a></>}</DialogDescription>
+                      <DialogDescription>{new Date(openQuote.time).toLocaleString()}{original?.txId && <> · <a href={explorerTx(original.txId)} target="_blank" rel="noreferrer" className="font-semibold text-cheese underline underline-offset-2">Tx</a></>}</DialogDescription>
                     </DialogHeader>
                     <div className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words text-sm">
                       {quoteHidden ? null : original?.voice ? <VoiceNoteBubble note={original.voice} />

@@ -95,7 +95,7 @@ export function FundWaxPoolCard({ onComplete }: FundWaxPoolCardProps) {
           finishSuccess(match.txId);
         } else {
           toast.warning('Claim not confirmed', {
-            description: `Your claim was signed but we could not confirm it. Check ${CHEESE_RAM_CONTRACT} on waxblock.io before trying again.`,
+            description: `Your claim was signed but we could not confirm it. Check ${CHEESE_RAM_CONTRACT} on Alcor Explorer before trying again.`,
             duration: 15000,
           });
           refetch();

@@ -17,7 +17,7 @@ const sections = [
   },
   {
     title: 'Review and run the airdrop',
-    body: 'Check the recipient table and estimated CHEESE, RAM, CPU and NET needs before starting. Large drops are divided into batches, with one wallet approval per batch. You can stop after the current batch, follow each result on WAXBlock, and download a CSV of the snapshot or completed results.\n\nCHEESEAir never holds your assets or wallet keys.',
+    body: 'Check the recipient table and estimated CHEESE, RAM, CPU and NET needs before starting. Large drops are divided into batches, with one wallet approval per batch. You can stop after the current batch, follow each result on Alcor Explorer, and download a CSV of the snapshot or completed results.\n\nCHEESEAir never holds your assets or wallet keys.',
   },
   {
     title: 'Airdrop RAM directly',

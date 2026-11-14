@@ -102,6 +102,6 @@ describe('NFT tiles in CHEESECrypt chats', () => {
     expect(dialog.textContent).not.toContain('1099');
     expect(dialog.textContent).not.toContain('#7');
     expect(dialog.querySelector('a[href*="atomichub"]')).toBeNull();
-    expect(screen.getByRole('link', { name: /Transaction abcdef12/ }).getAttribute('href')).toBe('https://waxblock.io/transaction/abcdef1234567890');
+    expect(screen.getByRole('link', { name: /Transaction abcdef12/ }).getAttribute('href')).toBe('https://explorer.alcor.exchange/wax/transaction/abcdef1234567890');
   });
 });

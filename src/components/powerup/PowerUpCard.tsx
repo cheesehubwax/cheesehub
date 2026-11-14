@@ -179,7 +179,7 @@ export const PowerUpCard = ({
       const txId = result.resolved?.transaction.id?.toString();
       if (!txId) {
         toast.error("Transaction may not have confirmed", {
-          description: "The wallet signed the transaction but it may not have been broadcast. Please check your account on waxblock.io.",
+          description: "The wallet signed the transaction but it may not have been broadcast. Please check your account on Alcor Explorer.",
           duration: 10000,
         });
         return;

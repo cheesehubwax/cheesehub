@@ -1,3 +1,4 @@
+import { explorerTx } from '@/lib/explorer';
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from '@/components/ui/context-menu';
@@ -123,7 +124,7 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
         {new Date(m.time).toLocaleString()}{m.editedAt && <span title={new Date(m.editedAt).toLocaleString()}> · (edited)</span>}{m.igroup ? null : ' · '}{m.igroup ? null : m.voice ? `${voiceNoteCost(m.parts, m.group ? m.group.members.length - 1 : 1)} at current rate` : m.group ? `${groupMessageCost(m.parts, m.group.members.length - 1, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))} at current rate` : messageCost(m.parts, !!m.text && parseNftMessage(m.text).some(x => x.type === 'nft'))}
         {m.parts > 1 && ` · ${m.parts} parts`}
         {m.missing > 0 && !m.voice && <span className="text-destructive"> · {m.missing} part{m.missing > 1 ? 's' : ''} not loaded</span>}
-        {m.txId && <> · <a href={`https://waxblock.io/transaction/${encodeURIComponent(m.txId)}`} target="_blank" rel="noreferrer"
+        {m.txId && <> · <a href={explorerTx(m.txId)} target="_blank" rel="noreferrer"
           className="font-semibold text-cheese underline underline-offset-2 hover:text-cheese/80">Tx</a></>}
       </p>
     </li>

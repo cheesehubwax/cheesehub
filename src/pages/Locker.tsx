@@ -1,3 +1,4 @@
+import { explorerAccount } from '@/lib/explorer';
 import { Layout } from "@/components/Layout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreateLock } from "@/components/locker/CreateLock";
@@ -70,7 +71,7 @@ const Locker = () => {
         <div className="text-center text-sm text-muted-foreground mt-8">
           <p>
             Powered by{" "}
-            <a href="https://waxblock.io/account/waxdaolocker" target="_blank" rel="noopener noreferrer" className="text-cheese hover:underline">
+            <a href={explorerAccount('waxdaolocker')} target="_blank" rel="noopener noreferrer" className="text-cheese hover:underline">
               WAXDAOLOCKER
             </a>{" "}
             smart contract

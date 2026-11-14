@@ -1,3 +1,4 @@
+import { explorerTx } from '@/lib/explorer';
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -10,7 +11,6 @@ import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { buildClaimRewardsAction, type FarmInfo } from "@/lib/farm";
 import { fetchUserStakerRows, formatUnits, planClaimBatches, splitReadyFarms, sumRewards, type ReadyFarm } from "@/lib/farmClaimAll";
 import { applyClaimToAccount } from "@/lib/farmClaimHistory";
-import { WAX_EXPLORER } from "@/lib/waxConfig";
 
 const BATCH_SIZE = 5;
 
@@ -128,7 +128,7 @@ export function ClaimAllFarmsDialog({ open, onOpenChange, farms }: Props) {
             {results.map((r, i) => (
               <p key={i} className="text-xs">
                 {r.txId
-                  ? <a href={`${WAX_EXPLORER}${r.txId}`} target="_blank" rel="noopener noreferrer" className="text-cheese underline">✅ Batch {i + 1}: {r.txId.slice(0, 10)}…</a>
+                  ? <a href={explorerTx(r.txId)} target="_blank" rel="noopener noreferrer" className="text-cheese underline">✅ Batch {i + 1}: {r.txId.slice(0, 10)}…</a>
                   : <span className="text-destructive">❌ Batch {i + 1} failed ({r.farms.join(", ")}) — still ticked to retry</span>}
               </p>
             ))}

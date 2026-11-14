@@ -290,7 +290,7 @@ export function parseTransactError(error: unknown): TransactErrorInfo {
     type: 'unconfirmed',
     title: 'Transaction not confirmed',
     description:
-      'Your transaction was signed and may already be on-chain. We could not confirm it. Check your account on waxblock.io before retrying — retrying may repeat the transaction.',
+      'Your transaction was signed and may already be on-chain. We could not confirm it. Check your account on Alcor Explorer before retrying — retrying may repeat the transaction.',
     duration: 15000,
     txId,
   };

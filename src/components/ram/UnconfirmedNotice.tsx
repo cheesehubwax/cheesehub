@@ -1,3 +1,4 @@
+import { explorerAccount } from '@/lib/explorer';
 import { AlertTriangle, ExternalLink, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -32,7 +33,7 @@ export function UnconfirmedNotice({ state, onAcknowledge }: UnconfirmedNoticePro
           <p className="text-xs text-muted-foreground leading-relaxed">
             {state.checking
               ? 'Your transaction was signed but we lost the reply. Looking it up on-chain before you do anything else.'
-              : `Your transaction was signed and may already be on-chain — we could not confirm it. ${state.detail} Check your account on waxblock.io before retrying, because retrying may repeat it.`}
+              : `Your transaction was signed and may already be on-chain — we could not confirm it. ${state.detail} Check your account on Alcor Explorer before retrying, because retrying may repeat it.`}
           </p>
         </div>
       </div>
@@ -40,12 +41,12 @@ export function UnconfirmedNotice({ state, onAcknowledge }: UnconfirmedNoticePro
       {!state.checking && (
         <div className="flex flex-wrap items-center gap-2">
           <a
-            href={`https://waxblock.io/account/${state.account}`}
+            href={explorerAccount(state.account)}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
           >
-            View {state.account} on waxblock.io
+            View {state.account} on Alcor Explorer
             <ExternalLink className="h-3 w-3" />
           </a>
           <Button

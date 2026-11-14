@@ -21,14 +21,14 @@ const makeRow = (): HoldingRow => ({
 });
 
 describe('CHEESEFolio gift list dialog', () => {
-  it('shows each gift with date, sender, amount, memo and a waxblock link', () => {
+  it('shows each gift with date, sender, amount, memo and an Alcor Explorer link', () => {
     render(<GiftListDialog row={makeRow()} events={events} onClose={() => {}} />);
     expect(screen.getByText('2025-01-02 03:04')).toBeTruthy();
     expect(screen.getByText('friendacct12')).toBeTruthy();
     expect(screen.getByText('happy birthday')).toBeTruthy();
     expect(screen.getByText(/50\s*TEST/)).toBeTruthy();
     const link = screen.getByText('abc123de').closest('a');
-    expect(link?.href).toBe('https://waxblock.io/transaction/abc123def4567890');
+    expect(link?.href).toBe('https://explorer.alcor.exchange/wax/transaction/abc123def4567890');
   });
 
   it('opens from the gifted number in the holdings table', () => {

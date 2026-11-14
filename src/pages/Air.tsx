@@ -1,3 +1,4 @@
+import { explorerAccount } from '@/lib/explorer';
 // CHEESEAir page — token and NFT airdrops on WAX, paid for in $CHEESE.
 import { Layout } from '@/components/Layout';
 import { ResourceGauges } from '@/components/shared/ResourceGauges';
@@ -96,7 +97,7 @@ const Air = () => (
           <p>
             Non-custodial: every transfer is signed in your own wallet. Resource purchases use the{' '}
             <a
-              href="https://waxblock.io/account/ram.chz"
+              href={explorerAccount('ram.chz')}
               target="_blank"
               rel="noopener noreferrer"
               className="text-cheese hover:underline"
@@ -105,7 +106,7 @@ const Air = () => (
             </a>{' '}
             and{' '}
             <a
-              href="https://waxblock.io/account/cheesepowerz"
+              href={explorerAccount('cheesepowerz')}
               target="_blank"
               rel="noopener noreferrer"
               className="text-cheese hover:underline"

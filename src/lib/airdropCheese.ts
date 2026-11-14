@@ -1,3 +1,4 @@
+import { explorerTx } from '@/lib/explorer';
 /**
  * CHEESEAir resource-purchase constants.
  * The CHEESE token and RAM contract come from the existing CheeseHub config so
@@ -45,5 +46,5 @@ export function ramMemo(account: string, self: boolean): string {
 
 /** Explorer link for a transaction id. */
 export function txLink(txId: string): string {
-  return `https://waxblock.io/transaction/${txId}`;
+  return explorerTx(txId);
 }

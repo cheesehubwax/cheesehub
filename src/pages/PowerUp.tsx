@@ -1,3 +1,4 @@
+import { explorerAccount } from '@/lib/explorer';
 // PowerUp page
 import { Layout } from "@/components/Layout";
 import { PowerUpCard } from "@/components/powerup/PowerUpCard";
@@ -83,7 +84,7 @@ const PowerUp = () => {
           <p>
             Powered by the{" "}
             <a
-              href="https://waxblock.io/account/cheesepowerz"
+              href={explorerAccount('cheesepowerz')}
               target="_blank"
               rel="noopener noreferrer"
               className="text-cheese hover:underline"
