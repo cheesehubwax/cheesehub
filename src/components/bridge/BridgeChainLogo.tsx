@@ -1,13 +1,13 @@
-import ethereum from '@/assets/ethereum-chain-logo.svg.asset.json';
-import bnb from '@/assets/bnb-chain-logo.svg.asset.json';
-import polygon from '@/assets/polygon-chain-logo.svg.asset.json';
+import ethereum from '@/assets/ethereum-chain-logo.svg';
+import bnb from '@/assets/bnb-chain-logo.svg';
+import polygon from '@/assets/polygon-chain-logo.svg';
 
 const logos: Record<string, string> = {
-  mainnet: ethereum.url,
-  ethereum: ethereum.url,
-  bsc: bnb.url,
-  bnb: bnb.url,
-  polygon: polygon.url,
+  mainnet: ethereum,
+  ethereum,
+  bsc: bnb,
+  bnb,
+  polygon,
 };
 
 export function BridgeChainLogo({ chain }: { chain: string }) {

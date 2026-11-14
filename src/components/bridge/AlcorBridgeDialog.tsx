@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import alcorIcon from "@/assets/alcor-icon.svg.asset.json";
+import alcorIconUrl from "@/assets/alcor-icon.svg";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { RiskAcknowledgement } from "@/components/shared/RiskAcknowledgement";
 import { useWax } from "@/context/WaxContext";
@@ -36,7 +36,7 @@ export function AlcorBridgeDialog({ open, onOpenChange }: { open: boolean; onOpe
         <DialogHeader className="shrink-0 border-b border-border/50 bg-background p-3 pr-10 sm:p-4 sm:pb-3 sm:pr-10">
           <div className="flex items-center gap-3">
             <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-              <img src={alcorIcon.url} alt="" aria-hidden="true" className="h-6 w-6 shrink-0 object-contain" />
+              <img src={alcorIconUrl} alt="" aria-hidden="true" className="h-6 w-6 shrink-0 object-contain" />
               <span><span className="text-cheese">ALCOR</span><span className="text-foreground">Bridge</span></span>
             </DialogTitle>
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
@@ -52,7 +52,7 @@ export function AlcorBridgeDialog({ open, onOpenChange }: { open: boolean; onOpe
         <div className="relative isolate min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3 sm:p-4">
           {tab === "bridge" && (
             <img
-              src={alcorIcon.url}
+              src={alcorIconUrl}
               alt=""
               aria-hidden="true"
               draggable={false}
