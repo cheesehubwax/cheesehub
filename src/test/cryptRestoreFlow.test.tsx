@@ -38,6 +38,24 @@ beforeEach(async () => {
 });
 
 describe('recovery through the messenger', () => {
+  it('restores an owner from carried join keys and its own authenticated admission after reset', async () => {
+    await saveKey(owner);
+    calls.lookup.mockResolvedValue(null);
+    calls.fetch.mockResolvedValue(history.filter(m => m.from !== 'carol' && m.to !== 'carol'));
+    mount('alice');
+    fireEvent.click(await screen.findByRole('button', { name: /Recovery club/ }));
+    expect(await screen.findByText('Room restored')).toBeInTheDocument();
+    expect(loadInvites('alice')[id]?.creator).toBe('alice');
+    expect(loadInvites('alice')[id]?.members.map(m => m.account)).toEqual(['alice', 'bob']);
+    expect(loadContacts('alice')).toEqual({});
+    expect(calls.transact).not.toHaveBeenCalled();
+  });
+  it('does not invent an owner roster from its listing alone', async () => {
+    await saveKey(owner); calls.fetch.mockResolvedValue([]);
+    mount('alice');
+    await waitFor(() => expect(calls.rooms).toHaveBeenCalled());
+    expect(loadInvites('alice')).toEqual({});
+  });
   it('recovers rooms and prior friends from an empty cache and retains them through account switching', async () => {
     const first = mount();
     const room = await screen.findByRole('button', { name: /Recovery club.*2 of 2 joined/ });
