@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  type PrivacyMode, loadCustomEndpoint, loadCustomOnly, saveCustomEndpoint, checkHistoryEndpoint, validateCustomEndpoint,
+  type PrivacyMode, loadCustomEndpoint, loadCustomOnlyPreference, saveCustomOnlyPreference, saveCustomEndpoint, checkHistoryEndpoint, validateCustomEndpoint,
 } from '@/lib/cryptNetworkPrivacy';
 import { COLD_LOCK_WARNING, IDLE_OPTIONS, type IdleMinutes, type LockHardening } from '@/lib/cryptPanicLock';
 import { CryptConfirmDialog } from './CryptConfirmDialog';
@@ -30,7 +30,7 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
   useEffect(() => {
     if (!open) return;
     const c = loadCustomEndpoint();
-    setSaved(c); setUrl(c ?? ''); setOnly(loadCustomOnly()); setNote(null); setCopyNote(null);
+    setSaved(c); setUrl(c ?? ''); setOnly(loadCustomOnlyPreference()); setNote(null); setCopyNote(null);
   }, [open]);
 
   const save = async () => {
@@ -40,7 +40,9 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
     const result = await checkHistoryEndpoint(v);
     setBusy(false);
     if (!result.ok) { setNote(result.error ?? 'Connection failed. Nothing was saved.'); return; }
-    saveCustomEndpoint(v, only); setSaved(v); setNote('Saved. CHEESECrypt now asks this server first.');
+    saveCustomEndpoint(v, only); setSaved(v); setNote(only
+      ? 'Saved. Only your server is used; if it is off, nothing is read until it is back.'
+      : 'Saved. Your server is asked first, with public servers as backup.');
   };
   const clear = () => { saveCustomEndpoint(null, false); setSaved(null); setUrl(''); setOnly(false); setNote('Removed. Public servers are used again.'); };
 
@@ -93,23 +95,23 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
           {rotationSlot}
           <section className="space-y-2 rounded-md border border-border p-3">
             <h3 className="font-semibold text-foreground">Your own history server (optional)</h3>
-            <p className="text-xs">The settings above save as soon as you tap them. The button below is only for this server box.</p>
+            <p className="text-xs">The checkbox saves immediately. A new server is used only after Test &amp; connect succeeds.</p>
             <p>If you run your own WAX Hyperion server, or reach one through your own VPN or Tor setup, enter it here. It is stored only in this browser; nothing goes through CHEESEHub.</p>
             <Input value={url} onChange={e => setUrl(e.target.value)} disabled={busy} placeholder="https://my-node.example.com" aria-label="Custom history server" />
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={only} disabled={busy} onChange={e => {
                 const on = e.target.checked;
                 setOnly(on);
-                // A saved server is already tested, so the toggle saves instantly with no re-test.
-                if (saved) {
-                  saveCustomEndpoint(saved, on);
-                  setNote(on
+                saveCustomOnlyPreference(on);
+                setNote(saved
+                  ? on
                     ? 'Saved. Only your server is used; if it is off, nothing is read until it is back.'
-                    : 'Saved. Your server is asked first, with public servers as backup.');
-                }
+                    : 'Saved. Your server is asked first, with public servers as backup.'
+                  : 'Preference saved. No custom server is connected yet; public servers remain active until Test & connect succeeds.');
               }} />
               Use only this server (no public servers if it fails)
             </label>
+            {only && !saved && <p className="text-xs">Only-server protection is not active yet. Test &amp; connect a server to activate it.</p>}
             <div className="flex gap-2">
               <Button size="sm" onClick={() => void save()} disabled={busy || !url.trim()}>{busy ? 'Testing…' : 'Test & connect server'}</Button>
               {saved && <Button size="sm" variant="outline" onClick={clear} disabled={busy}>Remove</Button>}

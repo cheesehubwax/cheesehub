@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { fetchContractStream, mergeMemos, streamRows, STREAM_PAGE, type ChainMemo } from '@/lib/cheeseCrypt';
-import { checkHistoryEndpoint, fetchCryptHistoryJson, historyTimeoutMs, loadCustomEndpoint, loadCustomOnly, orderWithCustom, saveCustomEndpoint, validateCustomEndpoint } from '@/lib/cryptNetworkPrivacy';
+import { checkHistoryEndpoint, fetchCryptHistoryJson, historyTimeoutMs, loadCustomEndpoint, loadCustomOnly, loadCustomOnlyPreference, saveCustomOnlyPreference, orderWithCustom, saveCustomEndpoint, validateCustomEndpoint } from '@/lib/cryptNetworkPrivacy';
 
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); localStorage.clear(); });
 
@@ -47,6 +47,20 @@ describe('fetchContractStream', () => {
 });
 
 describe('custom history server', () => {
+  it('remembers the checkbox before connection without activating an untested server', () => {
+    saveCustomOnlyPreference(true);
+    expect(loadCustomOnlyPreference()).toBe(true);
+    expect(loadCustomEndpoint()).toBeNull();
+    expect(loadCustomOnly()).toBe(false);
+    saveCustomOnlyPreference(false);
+    expect(loadCustomOnlyPreference()).toBe(false);
+  });
+  it('removes the preference when the connected server is removed', () => {
+    saveCustomEndpoint('http://localhost:8088', true);
+    saveCustomEndpoint(null, false);
+    expect(loadCustomOnlyPreference()).toBe(false);
+    expect(loadCustomOnly()).toBe(false);
+  });
   it('accepts a complete history response and never names the user in its probe', async () => {
     const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ actions: [] }) });
     vi.stubGlobal('fetch', fetcher);
