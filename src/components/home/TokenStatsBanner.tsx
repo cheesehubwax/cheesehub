@@ -1,3 +1,4 @@
+import { explorerAccount } from '@/lib/explorer';
 import { useCheeseStats } from '@/hooks/useCheeseStats';
 import { useNullBreakdown } from '@/hooks/useNullBreakdown';
 import { Card } from '@/components/ui/card';
@@ -344,12 +345,12 @@ export function TokenStatsBanner() {
           {/* Contract link */}
           <div className="mt-4 pt-4 border-t border-border/50 flex justify-center">
             <a
-              href={`https://waxblock.io/account/${CHEESE_CONFIG.tokenContract}`}
+              href={explorerAccount(CHEESE_CONFIG.tokenContract)}
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm text-muted-foreground hover:text-cheese transition-colors flex items-center gap-1"
             >
-              View {CHEESE_CONFIG.tokenContract} contract on WaxBlock
+              View {CHEESE_CONFIG.tokenContract} contract on Alcor Explorer
               <ExternalLink className="h-3 w-3" />
             </a>
           </div>

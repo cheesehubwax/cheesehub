@@ -1,3 +1,4 @@
+import { explorerAccount } from '@/lib/explorer';
 import { useState } from "react";
 import { Layout } from "@/components/Layout";
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
@@ -123,11 +124,11 @@ const Farm = () => {
         <div className="text-center text-sm text-muted-foreground mt-8">
           <p>
             Powered by{" "}
-            <a href="https://waxblock.io/account/farms.waxdao" target="_blank" rel="noopener noreferrer" className="text-cheese hover:underline">
+            <a href={explorerAccount('farms.waxdao')} target="_blank" rel="noopener noreferrer" className="text-cheese hover:underline">
               FARMS.WAXDAO
             </a>{" "}
             &{" "}
-            <a href="https://waxblock.io/account/cheesefeefee" target="_blank" rel="noopener noreferrer" className="text-cheese hover:underline">
+            <a href={explorerAccount('cheesefeefee')} target="_blank" rel="noopener noreferrer" className="text-cheese hover:underline">
               CHEESEFEEFEE
             </a>{" "}
             smart contracts

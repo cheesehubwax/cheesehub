@@ -1,3 +1,4 @@
+import { explorerAccount } from '@/lib/explorer';
 // CHEESERam page — buy and sell WAX RAM with $CHEESE
 import { useCallback, useEffect, useRef } from 'react';
 import { Layout } from '@/components/Layout';
@@ -165,7 +166,7 @@ const Ram = () => {
           <p>
             Powered by the{' '}
             <a
-              href={`https://waxblock.io/account/${CHEESE_RAM_CONTRACT}`}
+              href={explorerAccount(CHEESE_RAM_CONTRACT)}
               target="_blank"
               rel="noopener noreferrer"
               className="text-cheese hover:underline"

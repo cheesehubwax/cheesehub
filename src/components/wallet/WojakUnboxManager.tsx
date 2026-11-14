@@ -1,3 +1,4 @@
+import { explorerAccount } from '@/lib/explorer';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2, ExternalLink, Package, RefreshCw } from 'lucide-react';
@@ -82,7 +83,7 @@ export function WojakUnboxManager({ onTransactionComplete, onTransactionSuccess 
             Each pack burns and mints a random Wojak NFT back to your wallet.
           </p>
           <a
-            href={`https://waxblock.io/account/${WAXDAO_UNBOX_CONTRACT}`}
+            href={explorerAccount(WAXDAO_UNBOX_CONTRACT)}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs text-cheese hover:underline inline-flex items-center gap-1 mt-1"

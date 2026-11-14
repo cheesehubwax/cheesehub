@@ -1,3 +1,4 @@
+import { explorerTx } from '@/lib/explorer';
 import { STATIC_ENDPOINTS } from './endpointHealth';
 
 // WAX Mainnet Configuration
@@ -53,4 +54,4 @@ export const ATOMIC_API = {
 };
 
 // WAX Block Explorer
-export const WAX_EXPLORER = 'https://waxblock.io/transaction/';
+export const WAX_EXPLORER = explorerTx('');

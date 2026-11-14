@@ -1,3 +1,4 @@
+import { explorerAccount } from '@/lib/explorer';
 import { Layout } from "@/components/Layout";
 import { DropStatsBar } from "@/components/drops/DropStatsBar";
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
@@ -316,7 +317,7 @@ const Drops = () => {
         />
         <p className="text-sm text-muted-foreground">
           Powered by the{" "}
-          <a href="https://waxblock.io/account/nfthivedrops" target="_blank" rel="noopener noreferrer" className="text-cheese hover:underline">
+          <a href={explorerAccount('nfthivedrops')} target="_blank" rel="noopener noreferrer" className="text-cheese hover:underline">
             NFTHIVEDROPS
           </a>{" "}
           smart contract.

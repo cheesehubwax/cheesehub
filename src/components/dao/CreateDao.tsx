@@ -1,3 +1,4 @@
+import { explorerAccount } from '@/lib/explorer';
 import { useState, useCallback, useRef, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -760,7 +761,7 @@ export function CreateDao() {
         {/* Footer */}
         <p className="text-center text-xs text-muted-foreground">
           Powered by the{" "}
-          <a href="https://waxblock.io/account/dao.waxdao" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+          <a href={explorerAccount('dao.waxdao')} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
             DAO.WAXDAO
           </a>
           {" "}smart contract

@@ -1,9 +1,9 @@
+import { explorerTx } from '@/lib/explorer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ShoppingCart } from '@phosphor-icons/react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { WAX_EXPLORER } from '@/lib/waxConfig';
 import type { DropPurchase } from '@/hooks/useDropPurchases';
 
 interface DropPurchaseLogProps {
@@ -84,7 +84,7 @@ export function DropPurchaseLog({ purchases, isLoading, isError = false }: DropP
                     <TableCell>
                       {p.txId ? (
                         <a
-                          href={`${WAX_EXPLORER}${p.txId}`}
+                          href={explorerTx(p.txId)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-xs text-primary hover:underline font-mono"

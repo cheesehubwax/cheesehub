@@ -1,3 +1,4 @@
+import { explorerTx } from '@/lib/explorer';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Pause, Play, Loader2 } from 'lucide-react';
@@ -63,7 +64,7 @@ function markAutoplayed(key: string) {
 }
 
 function TxLink({ txId }: { txId: string }) {
-  return <a href={`https://waxblock.io/transaction/${encodeURIComponent(txId)}`} target="_blank" rel="noreferrer"
+  return <a href={explorerTx(txId)} target="_blank" rel="noreferrer"
     className="font-semibold text-cheese underline underline-offset-2 hover:text-cheese/80">Transaction {txId.slice(0, 8)}…</a>;
 }
 

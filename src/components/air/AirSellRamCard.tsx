@@ -1,3 +1,4 @@
+import { explorerAccount } from '@/lib/explorer';
 // Optional mini CHEESERam sell box for CHEESEAir — sell leftover RAM back for $CHEESE.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -209,7 +210,7 @@ export function AirSellRamCard() {
       <p className="text-xs text-muted-foreground">
         Left over with unused RAM after your airdrop? Sell it straight back to the{' '}
         <a
-          href={`https://waxblock.io/account/${CHEESE_RAM_CONTRACT}`}
+          href={explorerAccount(CHEESE_RAM_CONTRACT)}
           target="_blank"
           rel="noopener noreferrer"
           className="text-cheese hover:underline"

@@ -1,3 +1,4 @@
+import { explorerAccount } from '@/lib/explorer';
 import { Layout } from "@/components/Layout";
 import { SlotCalendar } from "@/components/bannerads/SlotCalendar";
 import { BannerAdStatsBar } from "@/components/bannerads/BannerAdStatsBar";
@@ -28,7 +29,7 @@ const BannerAds = () => {
           <BannerAdStatsBar />
           <p className="text-muted-foreground text-sm text-center max-w-lg mx-auto mt-8">
             Powered by the{" "}
-            <a href="https://waxblock.io/account/cheesebannad" target="_blank" rel="noopener noreferrer" className="text-cheese hover:text-cheese-dark underline underline-offset-2 font-semibold">CHEESEBANNAD</a>{" "}
+            <a href={explorerAccount('cheesebannad')} target="_blank" rel="noopener noreferrer" className="text-cheese hover:text-cheese-dark underline underline-offset-2 font-semibold">CHEESEBANNAD</a>{" "}
             Smart Contract
           </p>
         </div>

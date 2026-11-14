@@ -1,3 +1,4 @@
+import { explorerTx } from '@/lib/explorer';
 // Lists every free receipt behind a token's gifted amount.
 import { useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -42,7 +43,7 @@ export function GiftListDialog({ row, events, onClose }: { row: HoldingRow | nul
                       <td className="px-3 py-2 text-right whitespace-nowrap">{fmt(amount, row.precision)} {row.symbol}</td>
                       <td className="px-3 py-2 break-words text-muted-foreground">{e.memo || '—'}</td>
                       <td className="px-3 py-2 text-right">
-                        <a className="text-cheese hover:underline" href={`https://waxblock.io/transaction/${e.trx}`} target="_blank" rel="noopener noreferrer">
+                        <a className="text-cheese hover:underline" href={explorerTx(e.trx)} target="_blank" rel="noopener noreferrer">
                           {e.trx.slice(0, 8)}
                         </a>
                       </td>

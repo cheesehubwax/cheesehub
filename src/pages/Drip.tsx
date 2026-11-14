@@ -1,3 +1,4 @@
+import { explorerAccount } from '@/lib/explorer';
 import { Layout } from "@/components/Layout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreateDrip } from "@/components/drip/CreateDrip";
@@ -73,7 +74,7 @@ export default function Drip() {
           <p>
             Powered by the{" "}
             <a
-              href="https://waxblock.io/account/waxdaoescrow"
+              href={explorerAccount('waxdaoescrow')}
               target="_blank"
               rel="noopener noreferrer"
               className="text-cheese hover:underline"

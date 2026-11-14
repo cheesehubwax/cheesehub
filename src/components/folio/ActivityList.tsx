@@ -1,3 +1,4 @@
+import { explorerTx } from '@/lib/explorer';
 // Paged activity feed with per-event value and realised P/L.
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -49,7 +50,7 @@ export function ActivityList({
                   <div><div className="text-xs text-muted-foreground">Value</div>{value.has(e.id) ? money(value.get(e.id), cur) : '—'}</div>
                   <div className={plClass(r)}><div className="text-xs text-muted-foreground">Realised P/L</div>{r == null ? '—' : signedMoney(r, cur)}</div>
                 </div>
-                <a className="text-xs text-cheese hover:underline" href={`https://waxblock.io/transaction/${e.trx}`} target="_blank" rel="noopener noreferrer">tx {e.trx.slice(0, 8)}</a>
+                <a className="text-xs text-cheese hover:underline" href={explorerTx(e.trx)} target="_blank" rel="noopener noreferrer">tx {e.trx.slice(0, 8)}</a>
               </div>
             );
           })}
@@ -84,7 +85,7 @@ export function ActivityList({
                   <td className="px-3 py-2 text-right whitespace-nowrap">{value.has(e.id) ? money(value.get(e.id), cur) : '—'}</td>
                   <td className={`px-3 py-2 text-right whitespace-nowrap ${plClass(r)}`}>{r == null ? '—' : signedMoney(r, cur)}</td>
                   <td className="px-3 py-2 text-right">
-                    <a className="text-cheese hover:underline" href={`https://waxblock.io/transaction/${e.trx}`} target="_blank" rel="noopener noreferrer">
+                    <a className="text-cheese hover:underline" href={explorerTx(e.trx)} target="_blank" rel="noopener noreferrer">
                       {e.trx.slice(0, 8)}
                     </a>
                   </td>

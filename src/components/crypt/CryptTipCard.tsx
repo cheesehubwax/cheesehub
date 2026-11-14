@@ -1,3 +1,4 @@
+import { explorerTx } from '@/lib/explorer';
 import { useQuery } from '@tanstack/react-query';
 import { fetchTipVerified, type Tip } from '@/lib/cryptTips';
 
@@ -15,7 +16,7 @@ export function CryptTipCard({ tip, sender, txId, nameFor }: { tip: Tip; sender:
       {tip.note && <span className="block mt-0.5">{tip.note}</span>}
       <span className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
         {isLoading ? 'Checking transfer…' : data === true ? '✅ Verified on chain' : data === false ? '⚠️ Unverified tip — no matching transfer' : '⏳ Transfer not confirmed yet'}
-        {txId && <a href={`https://waxblock.io/transaction/${txId}`} target="_blank" rel="noopener noreferrer" className="underline">transaction</a>}
+        {txId && <a href={explorerTx(txId)} target="_blank" rel="noopener noreferrer" className="underline">transaction</a>}
       </span>
     </span>
   );

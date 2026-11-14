@@ -1,3 +1,4 @@
+import { explorerTx } from '@/lib/explorer';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, ExternalLink, Copy } from 'lucide-react';
@@ -32,7 +33,7 @@ export function TransactionSuccessDialog({ open, onOpenChange, title, descriptio
               <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(txId); toast.success('Transaction ID copied!'); }} className="flex-1">
                 <Copy className="h-4 w-4 mr-2" />Copy TX ID
               </Button>
-              <Button variant="outline" size="sm" onClick={() => window.open(`https://wax.bloks.io/transaction/${txId}`, '_blank')} className="flex-1">
+              <Button variant="outline" size="sm" onClick={() => window.open(explorerTx(txId), '_blank', 'noopener,noreferrer')} className="flex-1">
                 <ExternalLink className="h-4 w-4 mr-2" />View on Explorer
               </Button>
             </div>
