@@ -59,7 +59,7 @@ export function AlcorBridgeDialog({ open, onOpenChange }: { open: boolean; onOpe
 
             <TabsContent value="bridge" className="mt-0">
               <div className="mb-3 flex justify-center">
-                <Button variant="outline" size="sm" className="h-7 animate-glow-pulse bg-accent text-xs text-accent-foreground hover:bg-accent/80" onClick={() => setRoutesOpen((v) => !v)} aria-expanded={routesOpen}>
+                <Button variant="outline" size="sm" className={cn("h-7 bg-accent text-xs text-accent-foreground hover:bg-accent/80", !routesOpen && "animate-glow-pulse")} onClick={() => setRoutesOpen((v) => !v)} aria-expanded={routesOpen}>
                   📡 Route status {routesOpen ? "◀" : "▶"}
                 </Button>
               </div>

@@ -118,7 +118,7 @@ export function BridgeRoutesCard() {
   const [token, setToken] = useState<string | null>(null);
   const tokens = useMemo(() => {
     if (!split) return [];
-    return Array.from(new Set([...split.into, ...split.outOf].map((r) => r.symbol)));
+    return Array.from(new Set(split.into.map((r) => r.symbol)));
   }, [split]);
   const pick = (k: string) => setPinned((p) => (p === k ? null : k));
 
@@ -143,7 +143,7 @@ export function BridgeRoutesCard() {
   return (
     <div className="rounded-lg border border-[#24262d] bg-[#0b0c0f] p-4 font-sans text-[#f1f2f4]">
       <h3 className="mb-1 text-base font-semibold">📡 Route status</h3>
-      <p className="mb-3 text-[11px] text-[#8b8f99]">Pick a token or click your route to pin it to the top.</p>
+      <p className="mb-3 text-[11px] text-[#8b8f99]">Routes into WAX. Pick a token or click your route to pin it to the top.</p>
       {tokens.length > 0 && (
         <div className="mb-4 flex flex-wrap gap-1.5">
           {pill("All", null)}
@@ -154,10 +154,7 @@ export function BridgeRoutesCard() {
         {q.isLoading && <p className="text-sm text-[#8b8f99]">Checking routes…</p>}
         {q.isError && <p className="text-sm text-[#f87171]">Route status unavailable right now.</p>}
         {split && (
-          <>
-            <RouteTable title="Into WAX" side="from" rows={split.into} pinned={pinned} token={token} onPick={pick} />
-            <RouteTable title="Out of WAX" side="to" rows={split.outOf} pinned={pinned} token={token} onPick={pick} />
-          </>
+          <RouteTable title="Into WAX" side="from" rows={split.into} pinned={pinned} token={token} onPick={pick} />
         )}
       </div>
     </div>
