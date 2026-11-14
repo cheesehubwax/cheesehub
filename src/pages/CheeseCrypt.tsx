@@ -80,7 +80,8 @@ import { CryptKeySetup } from '@/components/crypt/CryptKeySetup';
 import { CryptLockGate } from '@/components/crypt/CryptLockGate';
 import { CryptSidebar } from '@/components/crypt/CryptSidebar';
 import { CryptAvatarRail } from '@/components/crypt/CryptAvatarRail';
-import { isAccountStorageKey, recoveryCandidates, recoverFriends, recoverRoomRequests, recoveredRoomEvents } from '@/lib/cryptRestore';
+import { isAccountStorageKey, recoveryCandidates, recoverFriends, recoverRoomRequests, recoveredRoomEvents, recoverOwnedRoomEvents } from '@/lib/cryptRestore';
+import { readGroupBackup, writeGroupBackup } from '@/lib/cryptGroupBackup';
 import { CryptChatHeader } from '@/components/crypt/CryptChatHeader';
 import { canRequestRejoin } from '@/lib/cryptRejoin';
 import { encodeReadmit } from '@/lib/cryptInviteGroups';
@@ -423,7 +424,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     (async () => {
       const v = await recallVault(account).catch(() => null);
       const ok = !!v && await vaultWritable(v, false).catch(() => false);
-      const marks = ok ? await readVaultMarks(v!, account) : null;
+      const marks = ok && v ? await readVaultMarks(v, account) : null;
       if (!cancelled) setFolderMarks(marks);
     })();
     return () => { cancelled = true; };
@@ -492,6 +493,51 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     })();
     return () => { cancelled = true; };
   }, [vault, account]);
+
+  const [backupReady, setBackupReady] = useState<DirHandle | null>(null);
+  const backupWrites = useRef(Promise.resolve());
+  useEffect(() => {
+    let cancelled = false;
+    setBackupReady(null);
+    if (!vault || !key) return;
+    const root = vault;
+    (async () => {
+      if (!(await vaultWritable(root, false))) return;
+      await backupWrites.current;
+      const backup = await readGroupBackup(root, key);
+      if (cancelled) return;
+      if (backup) {
+        const current = loadInvites(account);
+        for (const [id, g] of Object.entries(backup.invites)) {
+          const held = current[id];
+          if (!held || (held.creator === g.creator && held.created === g.created && held.members.every(m => g.members.some(n => n.account === m.account && n.publicKey === m.publicKey)))) current[id] = g;
+        }
+        saveInvites(account, current); setInviteStore(current);
+        const local = loadDecisions(account);
+        for (const [id, d] of Object.entries(backup.decisions)) if (!local[id] || local[id].at < d.at) saveDecision(account, id, d.status, d.at);
+        setDecisions(loadDecisions(account));
+        for (const [id, r] of Object.entries(backup.requests)) if (!loadRoomRequests(account)[id]) saveRoomRequest(account, r, r.time);
+        setRoomRequests(loadRoomRequests(account));
+        const controls = mergeModerationMemos(loadModerationMemos(account), backup.controls);
+        saveModerationMemos(account, controls); setSavedControls(controls);
+      }
+      setBackupReady(root);
+    })().catch(() => { if (!cancelled) toast({ title: 'Could not read group backup', description: 'Your existing backup was not replaced.', variant: 'destructive' }); });
+    return () => { cancelled = true; };
+  }, [vault, key, account, toast]);
+  useEffect(() => {
+    if (!key || !vault || backupReady !== vault) return;
+    let cancelled = false;
+    const root = vault;
+    const data = { invites: inviteStore, decisions, requests: roomRequests, controls: savedControls };
+    const timer = window.setTimeout(() => {
+      backupWrites.current = backupWrites.current.then(async () => {
+        if (cancelled || !(await vaultWritable(root, false))) return;
+        await writeGroupBackup(root, key, data);
+      }).catch(() => { if (!cancelled) toast({ title: 'Group backup not saved', description: 'Check folder access and available disk space.', variant: 'destructive' }); });
+    }, 500);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [vault, key, backupReady, account, inviteStore, decisions, roomRequests, savedControls, toast]);
 
   const inFlight = useRef(false);
   const historyScope = `${account}:${privacyMode}:${key?.publicKey ?? ''}`;
@@ -645,7 +691,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     ? [{ key: c.key, txId: c.txId, time: c.time, from: c.from, to: c.to, control: c.control, usedKey: c.usedKey }] : []), [decoded]);
   // Creators of public rooms I asked to join: their listing key reads only their invite to that room.
   const { data: roomMemos, isFetching: roomsLoading, refetch: refetchRooms } = useQuery({
-    queryKey: ['crypt-rooms'], enabled: !!key && loaded && (roomsOpen || Object.keys(roomRequests).length > 0 || Object.keys(inviteStore).length > 0), queryFn: () => fetchRoomMemos(ROOM_PREFIX),
+    queryKey: ['crypt-rooms'], enabled: !!key && loaded, queryFn: () => fetchRoomMemos(ROOM_PREFIX),
     staleTime: 30 * 60_000, refetchInterval: () => (roomsOpen && document.visibilityState === 'visible' ? 60_000 : false), retry: false,
   });
   const listings = useMemo(() => collectListings(roomMemos ?? []).filter(l => !blocked.includes(l.creator)), [roomMemos, blocked]);
@@ -682,9 +728,15 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   }, [restoredRequests, roomRequests, account]);
   const roomInviteEvents = useMemo(() => key ? recoveredRoomEvents(visibleMemos, key, restoredRequests) : [],
     [visibleMemos, key, restoredRequests]);
-  const allGroupEvents = useMemo(() => [...new Map([...cg2Events, ...roomInviteEvents].map(e => [e.key, e])).values()], [cg2Events, roomInviteEvents]);
+  const ownedRoomEvents = useMemo(() => key ? recoverOwnedRoomEvents(visibleMemos, key, listings, inviteStore, contacts) : [], [visibleMemos, key, listings, inviteStore, contacts]);
+  const allGroupEvents = useMemo(() => [...new Map([...cg2Events, ...roomInviteEvents, ...ownedRoomEvents].map(e => [e.key, e])).values()], [cg2Events, roomInviteEvents, ownedRoomEvents]);
   const invites = useMemo(() => key ? collectInvites(allGroupEvents, account, [key.publicKey, ...(key.retired ?? []).map(r => r.publicKey)], contacts, inviteStore, restoredRequests) : inviteStore,
     [allGroupEvents, account, key, contacts, inviteStore, restoredRequests]);
+  useEffect(() => {
+    // A reset can leave the original invite outside the first fast history page.
+    const missing = key && listings.some(l => l.creator === account && [key.publicKey, ...(key.retired ?? []).map(k => k.publicKey)].includes(l.publicKey) && !invites[l.id]);
+    if (loaded && missing && depth < MAX_HISTORY_PAGES) setDepth(d => d + 1);
+  }, [key, account, listings, invites, loaded, depth]);
   useEffect(() => {
     // Compares member keys too, so a creator adding members to a known group is saved.
     if (invitesSignature(invites) === invitesSignature(inviteStore)) return;
