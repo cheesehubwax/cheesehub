@@ -32,7 +32,7 @@ function RoleChip({ icon, label, title }: { icon: string; label: string; title: 
 }
 
 /** Pure sound-effect-NFT posts render without the bubble box — sender header, playback and timestamp stay. */
-export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, reactionHighlighted, reactions, onReact, searchHit, editable, onEdit, onCollapse, canReveal, revealed, onReveal, badges, onMute, ban, adminToggle, report, reportHighlighted, friend, delivery, trust, onOpenProfile }: {
+export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, active, activeGroup, nameFor, openedAt, onReply, onOpenQuote, highlighted, reactionHighlighted, reactions, onReact, searchHit, editable, onEdit, onCollapse, canReveal, revealed, onReveal, badges, onMute, ban, founderGrant, adminToggle, report, reportHighlighted, friend, delivery, trust, onOpenProfile }: {
   m: EditedMessage; account: string; keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>;
   contacts: Record<string, string>; active: string; activeGroup: CryptGroup | null;
   nameFor: (id: string) => string; openedAt: { current: number };
@@ -52,6 +52,7 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
   onMute?: (minutes: MuteMinutes) => void;
   ban?: { disabled: boolean; onBan: () => void };
   adminToggle?: { isAdmin: boolean; onToggle: () => void };
+  founderGrant?: { onGrant: () => void };
   /** Members report to admins; admins report to the owner for a possible ban. */
   report?: { toOwner: boolean; onReport: () => void };
   reportHighlighted?: boolean;
@@ -154,6 +155,7 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
         {ban.disabled && <span className="text-[10px] text-muted-foreground">Founding member — can't be banned</span>}
       </ContextMenuItem>}
       {adminToggle && <ContextMenuItem onSelect={adminToggle.onToggle}>🛡️ {adminToggle.isAdmin ? 'Remove admin' : 'Make admin'}</ContextMenuItem>}
+      {founderGrant && <ContextMenuItem onSelect={founderGrant.onGrant}>⭐ Make founder</ContextMenuItem>}
     </ContextMenuContent>
     </ContextMenu>
   );
