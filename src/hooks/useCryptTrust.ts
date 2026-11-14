@@ -7,18 +7,25 @@ import type { TrustSignals } from '@/lib/cryptTrust';
 
 const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
-const cache = new Map<string, { at: number; value: unknown }>();
+const FAILURE_COOLDOWN_MS = 120_000;
+const cache = new Map<string, { expiresAt: number; value: unknown }>();
 const inflight = new Map<string, Promise<unknown>>();
 
-/** Cached read; failures resolve to null (unknown) and are not cached. */
+/** Failures remain unknown, with a short cooldown rather than repeated reads. */
 async function cached<T>(key: string, ttl: number, read: () => Promise<T>): Promise<T | null> {
   const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < ttl) return hit.value as T;
-  let p = inflight.get(key) as Promise<T> | undefined;
-  if (!p) { p = read(); inflight.set(key, p); }
-  try { const v = await p; cache.set(key, { at: Date.now(), value: v }); return v; }
-  catch { return null; }
-  finally { inflight.delete(key); }
+  if (hit && Date.now() < hit.expiresAt) return hit.value as T | null;
+  const pending = inflight.get(key) as Promise<T | null> | undefined;
+  if (pending) return pending;
+  const request = Promise.resolve().then(read).then(value => {
+    cache.set(key, { expiresAt: Date.now() + (value == null ? FAILURE_COOLDOWN_MS : ttl), value });
+    return value;
+  }).catch(() => {
+    cache.set(key, { expiresAt: Date.now() + FAILURE_COOLDOWN_MS, value: null });
+    return null;
+  }).finally(() => { inflight.delete(key); });
+  inflight.set(key, request);
+  return request;
 }
 
 const qty = (asset: unknown) => { const n = Number(String(asset ?? '').trim().split(' ')[0]); if (!Number.isFinite(n)) throw new Error('bad asset'); return n; };
@@ -77,15 +84,33 @@ export async function loadTrustSignals(account: string): Promise<TrustSignals> {
   return { account, createdAt, cheese, staked, pooled, nfts, key };
 }
 
-/** Loads signals once `enabled` (the badge is on screen). */
+/** Only hydrate a full, unexpired snapshot; cached failures stay null/partial. */
+export function getCachedTrustSignals(account: string): TrustSignals | null {
+  if (!account) return null;
+  const keys = ['age', 'cheese', 'stake', 'pool', 'nft', 'key'];
+  const entries = keys.map(key => cache.get(`${key}:${account}`));
+  if (entries.some(entry => !entry || Date.now() >= entry.expiresAt)) return null;
+  return {
+    account,
+    createdAt: entries[0]?.value as TrustSignals['createdAt'],
+    cheese: entries[1]?.value as TrustSignals['cheese'],
+    staked: entries[2]?.value as TrustSignals['staked'],
+    pooled: entries[3]?.value as TrustSignals['pooled'],
+    nfts: entries[4]?.value as TrustSignals['nfts'],
+    key: entries[5]?.value as TrustSignals['key'],
+  };
+}
+
+/** Reuse cached signals synchronously; read only when the badge is on screen. */
 export function useCryptTrust(account: string, enabled: boolean) {
-  const [signals, setSignals] = useState<TrustSignals | null>(null);
+  const [signals, setSignals] = useState<TrustSignals | null>(() => getCachedTrustSignals(account));
   useEffect(() => {
     if (!enabled || !account) return;
     let live = true;
-    setSignals(null);
+    const hit = getCachedTrustSignals(account);
+    if (hit) { setSignals(hit); return; }
     void loadTrustSignals(account).then(s => { if (live) setSignals(s); });
     return () => { live = false; };
   }, [account, enabled]);
-  return signals;
+  return signals?.account === account ? signals : getCachedTrustSignals(account);
 }
