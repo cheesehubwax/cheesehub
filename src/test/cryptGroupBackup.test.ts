@@ -48,7 +48,7 @@ describe('encrypted group folder backup', () => {
   it('opens a pre-rotation backup only with the retained matching key', async () => {
     const f = folder(); await writeGroupBackup(f.root, owner, backup);
     const next = generateKey('alice');
-    const ring = { ...next, retired: [{ publicKey: owner.publicKey, secretKey: owner.secretKey, retiredAt: Date.now() }] };
+    const ring = { ...next, retired: [{ publicKey: owner.publicKey, secretKey: owner.secretKey, retiredAt: new Date().toISOString(), expiresAt: null }] };
     expect(await readGroupBackup(f.root, ring)).toEqual(backup);
   });
 });

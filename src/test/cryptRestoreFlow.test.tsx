@@ -7,12 +7,14 @@ import { encryptMemo, generateKey, loadContacts, saveContact } from '@/lib/chees
 import { buildCg2Actions, encodeAdmission, encodeGroupText, encodeNotice, encodePolicySnapshot, loadInvites, type InviteGroup } from '@/lib/cryptInviteGroups';
 import { encodeJoinMemo, encodeListing } from '@/lib/cryptRooms';
 import { Messenger } from '@/pages/CheeseCrypt';
+import { writeGroupBackup, readGroupBackup } from '@/lib/cryptGroupBackup';
+import type { DirHandle } from '@/lib/cryptVault';
 
-const calls = vi.hoisted(() => ({ fetch: vi.fn(), lookup: vi.fn(), rooms: vi.fn(), transact: vi.fn() }));
+const calls = vi.hoisted(() => ({ fetch: vi.fn(), lookup: vi.fn(), rooms: vi.fn(), transact: vi.fn(), vault: vi.fn() }));
 vi.mock('@/context/WaxContext', () => ({ useWax: vi.fn() }));
 vi.mock('@/hooks/useWaxTransaction', () => ({ useWaxTransaction: () => ({ executeTransaction: calls.transact }) }));
 vi.mock('@/lib/cheeseCrypt', async original => ({ ...await original<typeof import('@/lib/cheeseCrypt')>(), fetchMessages: calls.fetch, fetchContractStream: async (a: string, c: number) => ({ rows: await calls.fetch(a), cursor: c, complete: true }), lookupPublishedKey: calls.lookup, fetchRoomMemos: calls.rooms }));
-vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import('@/lib/cryptVault')>(), recallVault: async () => null }));
+vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import('@/lib/cryptVault')>(), recallVault: calls.vault }));
 const owner = generateKey('alice'), me = generateKey('bob'), friend = generateKey('carol');
 const id = '00112233445566ff';
 const group: InviteGroup = { id, creator: 'alice', created: 1, name: 'Recovery club', publicRoom: true, members: [owner, me].map(k => ({ account: k.account, publicKey: k.publicKey })) };
@@ -31,13 +33,31 @@ const mount = (account = 'bob') => render(<QueryClientProvider client={new Query
 </QueryClientProvider>);
 
 beforeEach(async () => {
-  localStorage.clear(); vi.clearAllMocks(); await saveKey(me);
+  localStorage.clear(); vi.clearAllMocks(); calls.vault.mockResolvedValue(null); await saveKey(me);
   calls.fetch.mockResolvedValue(history);
   calls.lookup.mockImplementation(async (a: string) => a === 'carol' ? friend.publicKey : null);
   calls.rooms.mockResolvedValue([{ from: 'alice', to: 'eosio.null', time: 1, txId: 'list', quantity: '80.0000 CHEESE', memo: encodeListing({ id, name: group.name, topic: '', tags: [], publicKey: owner.publicKey, members: 2 }) }]);
 });
 
 describe('recovery through the messenger', () => {
+  it('restores an encrypted folder roster after reset and preserves leave consent through automatic saving', async () => {
+    let text = '';
+    const root: DirHandle = { name: 'cheesecrypt', getDirectoryHandle: async () => { throw new DOMException('Missing', 'NotFoundError'); }, getFileHandle: async (name, options) => {
+      if (!name.endsWith('-groups.json') || (!text && !options?.create)) throw new DOMException('Missing', 'NotFoundError');
+      return { getFile: async () => ({ text: async () => text }), createWritable: async () => {
+        let staged = ''; return { write: async v => { staged = v; }, close: async () => { text = staged; } };
+      } };
+    } };
+    await writeGroupBackup(root, me, { invites: { [id]: group }, decisions: { [id]: { status: 'left', at: 100 } }, requests: {}, controls: admission });
+    calls.vault.mockResolvedValue(root); calls.fetch.mockResolvedValue([]); calls.rooms.mockResolvedValue([]);
+    const first = mount();
+    await waitFor(() => expect(loadInvites('bob')[id]?.members).toHaveLength(2));
+    expect(await screen.findByRole('button', { name: /Recovery club.*left/ })).toBeInTheDocument();
+    await waitFor(async () => expect((await readGroupBackup(root, me))?.decisions[id]).toEqual({ status: 'left', at: 100 }));
+    first.unmount(); localStorage.clear(); await saveKey(me); mount();
+    expect(await screen.findByRole('button', { name: /Recovery club.*left/ })).toBeInTheDocument();
+    expect(calls.transact).not.toHaveBeenCalled();
+  });
   it('restores an owner from carried join keys and its own authenticated admission after reset', async () => {
     await saveKey(owner);
     calls.lookup.mockResolvedValue(null);
