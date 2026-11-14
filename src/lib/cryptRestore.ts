@@ -1,6 +1,23 @@
 import { type ChainMemo, type MessagingKey } from '@/lib/cheeseCrypt';
 import { decodeConversations, isDirectMessage } from '@/lib/cryptGroups';
 import { decodeRoomEvents, joinMemoKey, type RoomListing, type RoomRequest } from '@/lib/cryptRooms';
+import { scopedKeys, type InviteGroup } from '@/lib/cryptInviteGroups';
+
+/** Carried request keys are discovery hints only; collectInvites still authenticates every roster. */
+export function recoverOwnedRoomEvents(memos: ChainMemo[], key: MessagingKey, listings: RoomListing[], invites: Record<string, InviteGroup>, contacts: Record<string, string>) {
+  const owned = new Set(listings.filter(l => l.creator === key.account && [key.publicKey, ...(key.retired ?? []).map(k => k.publicKey)].includes(l.publicKey)).map(l => l.id));
+  if (!owned.size) return [];
+  const peers = new Map<string, Set<string>>();
+  const add = (account: string, pub: string) => { const keys = peers.get(account) ?? new Set<string>(); keys.add(pub); peers.set(account, keys); };
+  Object.entries(contacts).forEach(([a, p]) => add(a, p));
+  scopedKeys(invites, key.account).forEach(k => add(k.account, k.publicKey));
+  for (const m of memos) {
+    const pub = m.to === key.account ? joinMemoKey(m.memo) : null;
+    if (pub) add(m.from, pub);
+  }
+  const events = [...peers].flatMap(([account, keys]) => [...keys].flatMap(pub => decodeRoomEvents(memos.filter(m => m.from === account || m.to === account), key, { [account]: pub })));
+  return [...new Map(events.filter(e => owned.has(e.control.kind === 'invite' || e.control.kind === 'admission' ? e.control.invite.id : e.control.id)).map(e => [e.key, e])).values()];
+}
 
 /** Discovery is bounded and only our own sent history can establish prior consent. */
 export function recoveryCandidates(memos: ChainMemo[], account: string, excluded: Set<string>): string[] {
