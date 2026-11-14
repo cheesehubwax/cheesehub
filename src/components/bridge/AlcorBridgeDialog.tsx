@@ -43,7 +43,7 @@ export function AlcorBridgeDialog({ open, onOpenChange }: { open: boolean; onOpe
             </span>
           </div>
           <DialogDescription className="text-sm text-muted-foreground">
-            Move USDC, USDT, ETH, BNB and POL between Ethereum, BNB Smart Chain, Polygon and WAX.
+            Bridge USDC, USDT, ETH, BNB and POL from Ethereum, BNB Smart Chain or Polygon onto the WAX blockchain.
           </DialogDescription>
         </DialogHeader>
 
