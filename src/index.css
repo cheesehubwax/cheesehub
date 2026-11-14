@@ -248,6 +248,28 @@
   }
 }
 
+/* Alcor companion panels share the embedded bridge's dark visual roles. */
+@layer components {
+  .alcor-panel {
+    --background: 225 15.4% 5.1%;
+    --foreground: 220 12% 95.1%;
+    --card: 225 15.4% 5.1%;
+    --card-foreground: 220 12% 95.1%;
+    --muted: 228 12.2% 8%;
+    --muted-foreground: 223 6.3% 57.3%;
+    --border: 227 11.1% 15.9%;
+    --input: 227 11.1% 15.9%;
+    --primary: 142 70.6% 45.3%;
+    --primary-foreground: 225 15.4% 5.1%;
+    --accent: 223 13.7% 10%;
+    --accent-foreground: 220 12% 95.1%;
+    --ring: 142 70.6% 45.3%;
+    --destructive: 0 90.6% 70.8%;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+}
+
 /* Ensure WharfKit/Anchor wallet modals appear above all other UI */
 #wharfkit-web-ui,
 [id^="wharfkit"],

@@ -94,7 +94,7 @@ export function AlcorBridgeDialog({ open, onOpenChange }: { open: boolean; onOpe
             </TabsContent>
 
             <TabsContent value="deposit" className="mt-0">
-              <div className="mx-auto max-w-[480px] rounded-lg border border-border/50 bg-card/80 p-4">
+              <div className="alcor-panel mx-auto max-w-[480px] rounded-lg border border-border p-4 font-sans">
                 <DepositAddressPanel account={accountName} idSuffix="modal" />
               </div>
             </TabsContent>

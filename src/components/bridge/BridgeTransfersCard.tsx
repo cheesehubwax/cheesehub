@@ -16,9 +16,9 @@ export function BridgeTransfersCard({ account }: { account: string | null }) {
   });
 
   return (
-    <Card className="bg-card/80 border-border/50">
-      <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><img src={alcorIcon.url} alt="" aria-hidden="true" className="h-5 w-5 shrink-0 object-contain" />Your transfers</CardTitle></CardHeader>
-      <CardContent className="space-y-3">
+    <Card className="alcor-panel rounded-lg border-border font-sans">
+      <CardHeader className="p-4 pb-2"><CardTitle className="flex items-center gap-2 text-base font-semibold"><img src={alcorIcon.url} alt="" aria-hidden="true" className="h-5 w-5 shrink-0 object-contain" />Your transfers</CardTitle></CardHeader>
+      <CardContent className="space-y-3 p-4 pt-0">
         {!account && <p className="text-sm text-muted-foreground">Connect your wallet to see your bridge transfers.</p>}
         {account && q.isLoading && <p className="text-sm text-muted-foreground">Loading transfers…</p>}
         {account && q.isError && <p className="text-sm text-destructive">Transfers unavailable right now.</p>}
@@ -27,9 +27,9 @@ export function BridgeTransfersCard({ account }: { account: string | null }) {
           const pct = hopPercent(h);
           const amt = h.deposit?.amount && h.deposit.precision != null ? formatRawUnits(h.deposit.amount, h.deposit.precision) : null;
           return (
-            <div key={h.key} className="rounded-md border border-border/50 p-2 space-y-1 text-xs">
+            <div key={h.key} className="border-t border-border py-3 space-y-2 text-xs">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="flex items-center gap-2 font-medium">{h.deposit?.symbol && <TokenLogo contract={h.deposit.symbol.toUpperCase() === "WAX" ? "eosio.token" : "wrap.alcor"} symbol={h.deposit.symbol} size="sm" />}{amt ?? "?"} {h.deposit?.symbol ?? ""}</span>
+                <span className="flex items-center gap-2 font-medium tabular-nums">{h.deposit?.symbol && <TokenLogo contract={h.deposit.symbol.toUpperCase() === "WAX" ? "eosio.token" : "wrap.alcor"} symbol={h.deposit.symbol} size="sm" />}{amt ?? "?"} {h.deposit?.symbol ?? ""}</span>
                 <span className="text-muted-foreground">{chainName(h.from?.chain ?? "?")} → {chainName(h.to?.chain ?? "?")}</span>
               </div>
               <div className="text-muted-foreground">{h.progress?.stage ?? STATUS_LABEL[h.status] ?? h.status}</div>
