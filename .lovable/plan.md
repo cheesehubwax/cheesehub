@@ -1,30 +1,26 @@
-# Switch block explorer links to the Alcor Explorer
+# Owner can make any member a permanent Founder
 
-Every link that opens waxblock.io will open https://explorer.alcor.exchange/wax instead.
+## What changes
+- In a public room, the owner's right-click / long-press menu on a member's message gets a new item: **Make founder** (shown below Make/Remove admin).
+- A confirmation explains it is permanent: the member gets the Founder badge and can never be banned, and admins can never collapse their messages. It cannot be undone, even by the owner.
+- After it is sent, the member shows the Founder badge everywhere badges appear, and the owner's Ban user option is dimmed for them.
+- Hidden for: the owner, people who are already founders, banned members, and private (unlisted) rooms.
+- Cost: the same per-part message fee as other moderation controls (one copy per member, like admin appointment). No new fees.
+- The About guide is updated: founders are the members present when the room was first listed, plus anyone the owner later names founder.
 
-## What I found (about 45 places across 25 files)
-
-- **Transaction links:** CHEESECrypt messages, NFT and tip cards, quote dialog, CHEESEFolio activity and gifts, the Claim All farms dialog, the admin drop purchase log and airdrop results.
-- **Account and contract links:** "contract" links at the bottom of the Ram, PowerUp, Air, Locker, Farm, Dao, Drip, Drops, CHEESENull and Banner Ads pages. Also the Create DAO form, the Wojak unbox manager, wallet token rows, farm staker tables, the RAM "unconfirmed" notice and the home page CHEESE stats banner.
-- **Asset link:** the NFT links in the farm stakers table.
-- **Messages that mention waxblock.io:** several "we could not confirm it, check waxblock.io" warnings. These will now name the Alcor Explorer.
-- **Another explorer:** the transaction success window ("View on Explorer") opens wax.bloks.io. I'll switch it to Alcor too, so every explorer link matches.
-
-## Limits of the Alcor Explorer
-
-I checked the Alcor Explorer's own page addresses. It has pages for accounts, transactions, blocks, keys and tokens.
-- **No NFT asset page.** NFT links will open the AtomicHub explorer asset page instead. That's the standard page for WAX NFTs.
-- **No direct links to contract tables.** The home stats banner links to specific table views, such as the CHEESE supply table, locker rows, nulled balance and keys. These will open the contract's account page instead, where you can click the Tables tab.
-
-## What stays the same
-
-- Developer notes in the contract and automation guides still mention waxblock.io as a place to sign admin actions. Explorer pages that only display information can't sign actions, so I'll leave those notes alone.
+## Rules
+- Only the owner can grant it; admins cannot.
+- A banned member cannot be made founder (unban isn't possible, so this keeps things consistent). Granting must happen before any ban.
+- Granted founder status survives unlisting/relisting and readmission, exactly like original founders.
+- New members joining later receive the full founder list in their welcome package, so everyone sees the same badges.
 
 ## Technical details
+- New authenticated encrypted CG2 control `founder { id, member }`, owner-only, accepted in `deriveModeration` only when the room is listed, the target is a current member, not the creator, not already protected and not banned at that chain time; it appends to `state.protected` (never removes). Chain ordering decides ban-vs-founder races.
+- Readmission/policy snapshots already carry `protected`; `roomPolicyValid` must accept a roster that is a superset of the held one (still never a subset), so grants propagate to newcomers and relists without weakening immunity.
+- Wire the menu item and confirm dialog in `CheeseCrypt.tsx` / message menu alongside the admin toggle; reuse the existing moderation send path and pending-moderation dialog.
+- Contract stays a blind router: no founder data on-chain in plaintext.
+- Tests: grant by owner accepted; grant by admin/member ignored; grant to banned or non-member ignored; ban after grant ignored; grant persists across relist and readmission snapshot; badge list includes granted founder.
+- Update `mem://features/crypt-room-moderation` and the AGENTS.md moderation rule.
 
-- I'll add `src/lib/explorer.ts` with `explorerTx(id)`, `explorerAccount(name)`, `explorerAsset(id)` and an `EXPLORER_NAME` label. Base: `https://explorer.alcor.exchange/wax`. Paths: `/transaction/{id}` and `/account/{name}`. Asset base: `https://wax.atomichub.io/explorer/asset/wax-mainnet/{id}`.
-- I'll keep `WAX_EXPLORER` in `waxConfig.ts`, built from the helper so existing imports keep working.
-- I'll replace every hardcoded URL with these helpers. Transaction IDs will be URI-encoded everywhere, as Crypt already does.
-- I'll update the two test files that check the old addresses (`folioGiftDialog`, `cryptNftTile`). I'll also add a small `explorer.test.ts` that checks the account, transaction and asset addresses.
-- At the end I'll search for `waxblock` and `bloks.io`. The only matches left should be the contract and automation guides.
-- I'll add an AGENTS.md rule: all explorer links come from the explorer helper and are never hardcoded.
+## Note
+Like every Crypt moderation control, this is enforced by honest clients; it cannot be revoked once sent because blockchain copies are permanent.
