@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { STATUS_LABEL, chainName, fetchHops, formatRawUnits, hopPercent, isInFlight } from "@/lib/alcorBridge";
+import { TokenLogo } from "@/components/TokenLogo";
+import alcorIcon from "@/assets/alcor-icon.svg.asset.json";
 
 export function BridgeTransfersCard({ account }: { account: string | null }) {
   const q = useQuery({
@@ -15,7 +17,7 @@ export function BridgeTransfersCard({ account }: { account: string | null }) {
 
   return (
     <Card className="bg-card/80 border-border/50">
-      <CardHeader className="pb-2"><CardTitle className="text-base">🚚 Your transfers</CardTitle></CardHeader>
+      <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><img src={alcorIcon.url} alt="" aria-hidden="true" className="h-5 w-5 shrink-0 object-contain" />Your transfers</CardTitle></CardHeader>
       <CardContent className="space-y-3">
         {!account && <p className="text-sm text-muted-foreground">Connect your wallet to see your bridge transfers.</p>}
         {account && q.isLoading && <p className="text-sm text-muted-foreground">Loading transfers…</p>}
@@ -26,8 +28,8 @@ export function BridgeTransfersCard({ account }: { account: string | null }) {
           const amt = h.deposit?.amount && h.deposit.precision != null ? formatRawUnits(h.deposit.amount, h.deposit.precision) : null;
           return (
             <div key={h.key} className="rounded-md border border-border/50 p-2 space-y-1 text-xs">
-              <div className="flex justify-between gap-2">
-                <span className="font-medium">{amt ?? "?"} {h.deposit?.symbol ?? ""}</span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="flex items-center gap-2 font-medium">{h.deposit?.symbol && <TokenLogo contract={h.deposit.symbol.toUpperCase() === "WAX" ? "eosio.token" : "wrap.alcor"} symbol={h.deposit.symbol} size="sm" />}{amt ?? "?"} {h.deposit?.symbol ?? ""}</span>
                 <span className="text-muted-foreground">{chainName(h.from?.chain ?? "?")} → {chainName(h.to?.chain ?? "?")}</span>
               </div>
               <div className="text-muted-foreground">{h.progress?.stage ?? STATUS_LABEL[h.status] ?? h.status}</div>

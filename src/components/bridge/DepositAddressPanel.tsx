@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { RiskAcknowledgement } from "@/components/shared/RiskAcknowledgement";
 import { fetchDepositAddress, formatRawUnits } from "@/lib/alcorBridge";
+import { TokenLogo } from "@/components/TokenLogo";
+import { BridgeChainLogo } from "./BridgeChainLogo";
 
 /** Permanent personal deposit address (Ethereum, BSC, Polygon) paying out to the WAX account. */
 export function DepositAddressPanel({ account, idSuffix = "page" }: { account: string | null; idSuffix?: string }) {
@@ -51,12 +53,12 @@ export function DepositAddressPanel({ account, idSuffix = "page" }: { account: s
       </div>
       {d.chains.map((c) => (
         <div key={c.id} className="text-xs">
-          <h4 className="font-semibold text-sm mb-1">{c.name}</h4>
+          <h4 className="flex items-center gap-2 font-semibold text-sm mb-1"><BridgeChainLogo chain={c.id} />{c.name}</h4>
           <ul className="space-y-0.5">
             {c.tokens.map((t) => (
-              <li key={t.symbol} className="flex justify-between">
-                <span>{t.symbol}</span>
-                <span className="text-muted-foreground">min {formatRawUnits(t.min, t.decimals) ?? "unavailable"}</span>
+              <li key={t.symbol} className="flex items-center justify-between gap-2 py-0.5">
+                <span className="flex items-center gap-2"><TokenLogo contract={t.symbol.toUpperCase() === "WAX" ? "eosio.token" : "wrap.alcor"} symbol={t.symbol} size="sm" />{t.symbol}</span>
+                <span className="text-muted-foreground text-right">min {formatRawUnits(t.min, t.decimals) ?? "unavailable"}</span>
               </li>
             ))}
           </ul>
