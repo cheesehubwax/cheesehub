@@ -1,4 +1,3 @@
-import { explorerAccount } from '@/lib/explorer';
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -370,7 +369,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                           {sortedBalances.map((b) => (
                             <a
                               key={`${b.contract}:${b.symbol}`}
-                              href={explorerAccount(b.contract}?action=tables&table=accounts&scope=${accountName)}
+                              href={`https://waxblock.io/account/${b.contract}?action=tables&table=accounts&scope=${accountName}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 text-sm hover:bg-muted/50 transition-colors group"
