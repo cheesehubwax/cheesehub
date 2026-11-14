@@ -71,7 +71,7 @@ import { ChainMemo, MessagingKey, MAX_MESSAGE_BYTES, MAX_HISTORY_PAGES, MAX_PART
 import { download } from '@/components/crypt/cryptDownload';
 import { ChatMessageItem } from '@/components/crypt/ChatMessageItem';
 import { EditedMessagesDialog } from '@/components/crypt/EditedMessagesDialog';
-import { encodeAdmin, encodeCollapse, encodeReport, encodeModeration, encodePolicySnapshot, encodeRoomPolicy, type MuteMinutes } from '@/lib/cryptInviteGroups';
+import { encodeAdmin, encodeFounder, encodeCollapse, encodeReport, encodeModeration, encodePolicySnapshot, encodeRoomPolicy, type MuteMinutes } from '@/lib/cryptInviteGroups';
 import { applyCollapses, canCollapseAuthor, canMuteMember, collapsedKeys, collectReports, loadSeenReports, reportKey, saveSeenReports, deriveModeration, founderBadges, MAX_FOUNDERS, loadModerationMemos, mergeModerationMemos, moderateMessages, mutedUntil, restrictedAt, roomRole, saveModerationMemos } from '@/lib/cryptModeration';
 import { applyEdits, canEdit, editTarget, encodeEdit, publicEditLog } from '@/lib/cryptEdits';
 import type { ConversationEntry } from '@/lib/cryptGroups';
