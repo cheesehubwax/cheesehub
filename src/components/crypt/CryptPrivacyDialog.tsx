@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -8,6 +9,8 @@ import {
 import { COLD_LOCK_WARNING, IDLE_OPTIONS, type IdleMinutes, type LockHardening } from '@/lib/cryptPanicLock';
 import { CryptConfirmDialog } from './CryptConfirmDialog';
 import type { CryptConfirm } from './CryptConfirmDialog';
+
+const TOR_CHECK_COMMAND = 'curl.exe --socks5-hostname 127.0.0.1:9150 https://check.torproject.org/api/ip';
 
 /** Network privacy settings. Presentational: the mode lives in the Messenger, the server setting on this device. */
 export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFullHistory, idleMinutes, setIdleMinutes, shieldOn, setShieldOn, hardening, setHardening, rotationSlot }: {
@@ -22,11 +25,12 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<CryptConfirm | null>(null);
+  const [copyNote, setCopyNote] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     const c = loadCustomEndpoint();
-    setSaved(c); setUrl(c ?? ''); setOnly(loadCustomOnly()); setNote(null);
+    setSaved(c); setUrl(c ?? ''); setOnly(loadCustomOnly()); setNote(null); setCopyNote(null);
   }, [open]);
 
   const save = async () => {
@@ -122,6 +126,25 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
                   <li>Open a terminal in the folder you saved it to (Windows: right-click the folder → Open in Terminal) and run: <code className="rounded bg-muted px-1 text-foreground">node cheesecrypt-tor-proxy.mjs</code></li>
                   <li>Enter <code className="rounded bg-muted px-1 text-foreground">http://localhost:8088</code> in the box above and press Test &amp; connect. Tick "Use only this server" if you never want public servers used directly.</li>
                 </ol>
+                <div className="space-y-2 border-t border-border pt-2">
+                  <h4 className="font-semibold text-foreground">Verify Tor is working</h4>
+                  <p>With Tor Browser connected, paste this into Windows Terminal or PowerShell and press Enter:</p>
+                  <div className="flex items-start gap-2">
+                    <code className="min-w-0 flex-1 break-all rounded bg-muted p-2 text-foreground">{TOR_CHECK_COMMAND}</code>
+                    <Button size="icon" variant="outline" className="shrink-0" aria-label="Copy Tor check command" title="Copy Tor check command" onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(TOR_CHECK_COMMAND);
+                        setCopyNote('Command copied.');
+                      } catch {
+                        setCopyNote('Could not copy. Select the command and copy it manually.');
+                      }
+                    }}><Copy className="h-4 w-4" /></Button>
+                  </div>
+                  {copyNote && <p role="status" className="text-foreground">{copyNote}</p>}
+                  <p>On macOS or Linux, use <code className="text-foreground">curl</code> instead of <code className="text-foreground">curl.exe</code>. For a background Tor service, change <code className="text-foreground">9150</code> to <code className="text-foreground">9050</code>.</p>
+                  <p>The Tor Project should return <code className="text-foreground">"IsTor": true</code> and an <code className="text-foreground">"IP"</code> showing the Tor exit address. If it returns false or an error, this check has not confirmed Tor is working.</p>
+                  <p>This checks the command's connection through Tor, not CHEESECrypt's helper or every app request. Keep the helper running, connect it above, and tick "Use only this server" to prevent direct public-history fallback. Wallet broadcasts and other traffic may still expose your normal IP; this check does not prove anonymity.</p>
+                </div>
                 <p>If you downloaded an older helper, stop it with Ctrl+C and replace the file with this download (v1.1). Keep the terminal window open while you chat; press Ctrl+C to stop. Testing can take up to 40 seconds while slow servers are skipped. If localhost fails, try http://127.0.0.1:8088 and allow local-network access if your browser asks. Tor protects these history requests only, not all CHEESEHub traffic. Using Tor as a client is legal in many countries, but rules and restrictions vary; this is not legal advice. Sending messages still goes through your wallet, not this helper.</p>
               </div>
             </details>
