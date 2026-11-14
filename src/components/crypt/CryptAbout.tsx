@@ -104,7 +104,7 @@ function ChatTypesAndRoles() {
             ['Earlier messages', 'Whole conversation', 'Newcomers do not see earlier messages', 'Newcomers do not see earlier messages'],
           ]}
         />
-        <p className="pl-3.5 text-sm leading-relaxed text-muted-foreground">A private group must be listed publicly to grow past 8. Everyone who was a member when the room was first listed becomes a permanent Founder.</p>
+        <p className="pl-3.5 text-sm leading-relaxed text-muted-foreground">A private group must be listed publicly to grow past 8. Everyone who was a member when the room was first listed becomes a permanent Founder, and the owner can make up to 8 founders in total (owner included) by right-clicking a member’s message. Founder status can never be removed.</p>
       </section>
 
       <section className="space-y-2">

@@ -71,8 +71,8 @@ import { ChainMemo, MessagingKey, MAX_MESSAGE_BYTES, MAX_HISTORY_PAGES, MAX_PART
 import { download } from '@/components/crypt/cryptDownload';
 import { ChatMessageItem } from '@/components/crypt/ChatMessageItem';
 import { EditedMessagesDialog } from '@/components/crypt/EditedMessagesDialog';
-import { encodeAdmin, encodeCollapse, encodeReport, encodeModeration, encodePolicySnapshot, encodeRoomPolicy, type MuteMinutes } from '@/lib/cryptInviteGroups';
-import { applyCollapses, canCollapseAuthor, canMuteMember, collapsedKeys, collectReports, loadSeenReports, reportKey, saveSeenReports, deriveModeration, founderBadges, loadModerationMemos, mergeModerationMemos, moderateMessages, mutedUntil, restrictedAt, roomRole, saveModerationMemos } from '@/lib/cryptModeration';
+import { encodeAdmin, encodeFounder, encodeCollapse, encodeReport, encodeModeration, encodePolicySnapshot, encodeRoomPolicy, type MuteMinutes } from '@/lib/cryptInviteGroups';
+import { applyCollapses, canCollapseAuthor, canMuteMember, collapsedKeys, collectReports, loadSeenReports, reportKey, saveSeenReports, deriveModeration, founderBadges, MAX_FOUNDERS, loadModerationMemos, mergeModerationMemos, moderateMessages, mutedUntil, restrictedAt, roomRole, saveModerationMemos } from '@/lib/cryptModeration';
 import { applyEdits, canEdit, editTarget, encodeEdit, publicEditLog } from '@/lib/cryptEdits';
 import type { ConversationEntry } from '@/lib/cryptGroups';
 import { CryptHero } from '@/components/crypt/CryptHero';
@@ -346,7 +346,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const [text, setText] = useState('');
   const [editingMessage, setEditingMessage] = useState<ConversationEntry | null>(null);
   const [editLogRoom, setEditLogRoom] = useState<string | null>(null);
-  const [pendingModeration, setPendingModeration] = useState<{ id: string; member: string; action: 'mute' | 'ban' | 'admin' | 'unadmin' | 'collapse' | 'report'; minutes?: MuteMinutes; target?: string } | null>(null);
+  const [pendingModeration, setPendingModeration] = useState<{ id: string; member: string; action: 'mute' | 'ban' | 'admin' | 'unadmin' | 'founder' | 'collapse' | 'report'; minutes?: MuteMinutes; target?: string } | null>(null);
   const [seenReports, setSeenReports] = useState<string[]>(() => loadSeenReports(account));
   const [reportFocus, setReportFocus] = useState<string | null>(null);
   const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
@@ -751,7 +751,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     saveRoomProfiles(account, next); setRoomProfiles(next);
   }, [allGroupEvents, invites, account, roomProfiles, moderation]);
   useEffect(() => {
-    const controlTxs = new Set(allGroupEvents.filter(e => (e.control.kind === 'invite' || e.control.kind === 'admission') || e.control.kind === 'add' || e.control.kind === 'readmit' || e.control.kind === 'leave' || e.control.kind === 'joined' || e.control.kind === 'room' || e.control.kind === 'mute' || e.control.kind === 'ban' || e.control.kind === 'policy' || e.control.kind === 'admin' || e.control.kind === 'collapse' || e.control.kind === 'report').filter(e => {
+    const controlTxs = new Set(allGroupEvents.filter(e => (e.control.kind === 'invite' || e.control.kind === 'admission') || e.control.kind === 'add' || e.control.kind === 'readmit' || e.control.kind === 'leave' || e.control.kind === 'joined' || e.control.kind === 'room' || e.control.kind === 'mute' || e.control.kind === 'ban' || e.control.kind === 'policy' || e.control.kind === 'admin' || e.control.kind === 'founder' || e.control.kind === 'collapse' || e.control.kind === 'report').filter(e => {
       if ((e.control.kind === 'invite' || e.control.kind === 'admission')) return invites[e.control.invite.id]?.creator === e.from;
       return !!eventFromMember(e, invites, account);
     }).map(e => e.txId));
@@ -1029,6 +1029,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     return {
       onMute: canMuteMember(muteState, g, account, m.from, clock) ? (minutes: MuteMinutes) => setPendingModeration({ id, member: m.from, action: 'mute', minutes }) : undefined,
       ban: owner ? { disabled: founderBadges(state, g, true).includes(m.from), onBan: () => setPendingModeration({ id, member: m.from, action: 'ban' }) } : undefined,
+      founderGrant: owner && listedIds.has(id) && !founderBadges(state, g, true).includes(m.from) && founderBadges(state, g, true).length < MAX_FOUNDERS ? { onGrant: () => setPendingModeration({ id, member: m.from, action: 'founder' }) } : undefined,
       adminToggle: owner ? { isAdmin: !!state?.admins.includes(m.from), onToggle: () => setPendingModeration({ id, member: m.from, action: state?.admins.includes(m.from) ? 'unadmin' : 'admin' }) } : undefined,
     };
   };
@@ -1734,13 +1735,14 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     if (n.action === 'mute') { if (!n.minutes || !canMuteMember(state ?? { listed: true, protected: [], bans: {}, mutes: {}, admins: [], collapses: {} }, v.invite, account, n.member, now)) return null; payload = encodeModeration(n.id, n.member, n.minutes); }
     else if (n.action === 'ban') { if (!owner || !state || state.protected.includes(n.member) || n.member === account) return null; payload = encodeModeration(n.id, n.member); }
     else if (n.action === 'admin' || n.action === 'unadmin') { if (!owner || n.member === account || (n.action === 'admin') === !!state?.admins.includes(n.member)) return null; payload = encodeAdmin(n.id, n.member, n.action === 'admin'); }
+    else if (n.action === 'founder') { if (!owner || n.member === account || founderBadges(state, v.invite, true).includes(n.member) || founderBadges(state, v.invite, true).length >= MAX_FOUNDERS) return null; payload = encodeFounder(n.id, n.member); }
     else { if (!n.target || (!owner && !canCollapseAuthor(state, v.invite, account, n.member, now)) || state?.collapses[`${n.member}:${n.target}`]) return null; payload = encodeCollapse(n.id, n.member, n.target); }
     const policy = !state && owner ? encodeRoomPolicy(n.id, true, v.invite.members.map(m => m.account)) : null;
     const to = v.invite.members.map(m => m.account).filter(a => a !== account && state?.bans[a] === undefined);
     if (!to.length) return null;
     return { v, to, payload, policy, cost: `${(parseFloat(cg2Cost(payload, to.length)) + (policy ? parseFloat(cg2Cost(policy, to.length)) : 0)).toFixed(4)} CHEESE` };
   };
-  const moderationTitles = { mute: 'Member muted', ban: 'Member removed', admin: 'Admin appointed', unadmin: 'Admin removed', collapse: 'Message collapsed', report: 'Report sent' } as const;
+  const moderationTitles = { mute: 'Member muted', ban: 'Member removed', admin: 'Admin appointed', unadmin: 'Admin removed', founder: 'Founder added', collapse: 'Message collapsed', report: 'Report sent' } as const;
   const confirmModeration = async () => {
     if (!key || !pendingModeration || busy) return false;
     const plan = moderationPlan(pendingModeration);
@@ -1967,6 +1969,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
           ban: { title: `🚫 Remove ${who}`, description: 'Exclude this member from future room messages. Existing blockchain copies and keys cannot be revoked.', confirm: 'Pay & remove' },
           admin: { title: `🛡️ Make ${who} an admin`, description: 'Admins can mute anyone except you and collapse messages from members who joined after the room went public. They cannot remove members or appoint admins.', confirm: 'Pay & appoint' },
           unadmin: { title: `🛡️ Remove ${who} as admin`, description: `${who} goes back to being a regular member. Their earlier mutes and collapses stay in place.`, confirm: 'Pay & remove admin' },
+          founder: { title: `⭐ Make ${who} a Founder`, description: `${who} gets the Founder badge permanently: they can never be banned, and admins can never collapse their messages. This cannot be undone, even by you.`, confirm: 'Pay & make founder' },
           report: myRoomRole === 'admin'
             ? { title: `🚩 Report ${who} to the owner`, description: `Only the room owner is notified, so they can review ${who} for a ban.`, confirm: 'Pay & report' }
             : { title: `🚩 Report ${who}'s message`, description: 'The room owner and admins are notified privately and can jump to this message.', confirm: 'Pay & report' },
