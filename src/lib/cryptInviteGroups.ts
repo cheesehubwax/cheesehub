@@ -348,8 +348,9 @@ export function collectInvites(events: Cg2Event[], me: string, myPublicKey: MyKe
         // Readmission can refresh a retained roster, but never replace any existing key or founder protection.
         if (c.kind === 'admission') {
           const room = rooms[id];
-          const snapshot = events.find(p => p.txId === e.txId && p.from === e.from && p.to === me && p.usedKey === e.usedKey && p.control.kind === 'policy' && p.control.id === id && policySnapshotValid(p.control, c.invite, e.time));
-          if (!snapshot || !room || room.creator !== e.from || room.publicKey !== e.usedKey || !inviteAcceptable(e, me, myPublicKey, contacts, rooms)) continue;
+          const sentByOwner = e.from === me && c.invite.creator === me;
+          const snapshot = events.find(p => p.txId === e.txId && p.from === e.from && p.to === e.to && p.usedKey === e.usedKey && p.control.kind === 'policy' && p.control.id === id && policySnapshotValid(p.control, c.invite, e.time));
+          if (!snapshot || (!sentByOwner && (!room || room.creator !== e.from || room.publicKey !== e.usedKey)) || !inviteAcceptable(e, me, myPublicKey, contacts, rooms)) continue;
           if (current) {
             if (c.invite.creator !== current.creator || c.invite.created !== current.created || current.members.some(m => memberKey(c.invite, m.account) !== m.publicKey)) continue;
             if (snapshot.control.kind !== 'policy' || (protectedRosters[id] && !roomPolicyValid({ kind: 'room', id, listed: true, protected: snapshot.control.protected }, c.invite, protectedRosters[id]))) continue;
@@ -358,7 +359,7 @@ export function collectInvites(events: Cg2Event[], me: string, myPublicKey: MyKe
           }
         }
         if (c.kind === 'admission') {
-          const bootstrap = events.find(p => p.txId === e.txId && p.from === e.from && p.to === me && p.control.kind === 'policy' && p.control.id === id);
+          const bootstrap = events.find(p => p.txId === e.txId && p.from === e.from && p.to === e.to && p.control.kind === 'policy' && p.control.id === id);
           if (bootstrap?.control.kind === 'policy') protectedRosters[id] = bootstrap.control.protected;
         }
         if (!current) { if (inviteAcceptable(e, me, myPublicKey, contacts, rooms)) { out[id] = c.invite; changed = true; } continue; }

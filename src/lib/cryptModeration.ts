@@ -48,7 +48,7 @@ export function deriveModeration(events: Cg2Event[], invites: Record<string, Inv
     let state = out[g.id];
     if (c.kind === 'policy') {
       // Readmission refreshes current policy while preserving immutable founders and historical restrictions.
-      const myInvites = events.filter(x => (x.control.kind === 'invite' || x.control.kind === 'admission') && x.control.invite.id === g.id && x.from === g.creator && x.to === me);
+      const myInvites = events.filter(x => (x.control.kind === 'invite' || x.control.kind === 'admission') && x.control.invite.id === g.id && x.from === g.creator && x.to === e.to && (x.to === me || x.from === me));
       const readmission = events.some(x => x.txId === e.txId && x.to === me && x.from === g.creator && x.control.kind === 'readmit' && x.control.id === g.id && x.control.member === me && eventFromMember(x, invites, me));
       if (!myInvites.some(x => x.txId === e.txId) || !policySnapshotValid(c, g, e.time)) continue;
       if (state || myInvites.some(x => x.time < e.time)) {
