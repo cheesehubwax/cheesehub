@@ -142,7 +142,7 @@ export function BridgeRoutesCard() {
 
   return (
     <div className="rounded-lg border border-[#24262d] bg-[#0b0c0f] p-4 font-sans text-[#f1f2f4]">
-      <h3 className="mb-1 text-base font-semibold">📡 Route status</h3>
+      <h3 className="mb-1 text-base font-semibold">Route status</h3>
       <p className="mb-3 text-[11px] text-[#8b8f99]">Routes into WAX. Pick a token or click your route to pin it to the top.</p>
       {tokens.length > 0 && (
         <div className="mb-4 flex flex-wrap gap-1.5">

@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { OpenMojiIcon } from "@/components/OpenMojiIcon";
+import alcorIcon from "@/assets/alcor-icon.svg.asset.json";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { RiskAcknowledgement } from "@/components/shared/RiskAcknowledgement";
 import { useWax } from "@/context/WaxContext";
 import { cn } from "@/lib/utils";
@@ -34,8 +35,9 @@ export function AlcorBridgeDialog({ open, onOpenChange }: { open: boolean; onOpe
       >
         <DialogHeader className="shrink-0 border-b border-border/50 bg-background p-3 pr-10 sm:p-4 sm:pb-3 sm:pr-10">
           <div className="flex items-center gap-3">
-            <DialogTitle className="text-lg font-bold">
-              <span className="text-cheese">ALCOR</span><span className="text-foreground">Bridge</span>
+            <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+              <img src={alcorIcon.url} alt="" aria-hidden="true" className="h-6 w-6 shrink-0 object-contain" />
+              <span><span className="text-cheese">ALCOR</span><span className="text-foreground">Bridge</span></span>
             </DialogTitle>
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cheese/20 text-cheese border border-cheese/30 leading-none">BETA</span>
             <span className="text-xs text-muted-foreground">
@@ -51,16 +53,16 @@ export function AlcorBridgeDialog({ open, onOpenChange }: { open: boolean; onOpe
           <Tabs value={tab} onValueChange={setTab}>
             <div className="mb-4 flex justify-center">
               <TabsList className="bg-card/80 border border-border/50 h-10">
-                <TabsTrigger value="bridge" className="gap-1.5 text-sm px-3"><OpenMojiIcon emoji="🔁" size={14} /> Bridge</TabsTrigger>
-                <TabsTrigger value="deposit" className="gap-1.5 text-sm px-3"><OpenMojiIcon emoji="📥" size={14} /> Deposit Address</TabsTrigger>
-                <TabsTrigger value="history" className="gap-1.5 text-sm px-3"><OpenMojiIcon emoji="📜" size={14} /> History</TabsTrigger>
+                <TabsTrigger value="bridge" className="text-sm px-3">Bridge</TabsTrigger>
+                <TabsTrigger value="deposit" className="text-sm px-3">Deposit Address</TabsTrigger>
+                <TabsTrigger value="history" className="text-sm px-3">History</TabsTrigger>
               </TabsList>
             </div>
 
             <TabsContent value="bridge" className="mt-0">
               <div className="mb-3 flex justify-center">
                 <Button variant="outline" size="sm" className={cn("h-7 bg-accent text-xs text-accent-foreground hover:bg-accent/80", !routesOpen && "animate-glow-pulse")} onClick={() => setRoutesOpen((v) => !v)} aria-expanded={routesOpen}>
-                  📡 Route status {routesOpen ? "◀" : "▶"}
+                  Route status {routesOpen ? <ChevronLeft className="ml-1 h-3 w-3" aria-hidden="true" /> : <ChevronRight className="ml-1 h-3 w-3" aria-hidden="true" />}
                 </Button>
               </div>
               <div className="flex flex-col items-center justify-center gap-3 lg:flex-row lg:items-start lg:gap-0">

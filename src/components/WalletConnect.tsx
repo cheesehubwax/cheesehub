@@ -22,6 +22,7 @@ import {
   DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 import cheeseLogo from "@/assets/cheese-logo.png";
+import alcorIcon from "@/assets/alcor-icon.svg.asset.json";
 import walletIcon from "@/assets/wallet-icon.png";
 import { WalletTransferDialog } from "./wallet/WalletTransferDialog";
 import { CheeseAmpDialog } from "./music/CheeseAmpDialog";
@@ -202,7 +203,7 @@ export function WalletConnect() {
             <span><span className="text-cheese">CHEESE</span>Swap</span>
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setBridgeOpen(true)} className="cursor-pointer">
-            <OpenMojiIcon emoji="🌉" size={16} className="mr-2 text-base leading-none" />
+            <img src={alcorIcon.url} alt="" aria-hidden="true" className="mr-2 h-4 w-4 shrink-0 object-contain" />
             <span><span className="text-cheese">ALCOR</span>Bridge</span>
           </DropdownMenuItem>
           
