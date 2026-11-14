@@ -53,12 +53,12 @@ export function DepositAddressPanel({ account, idSuffix = "page" }: { account: s
       </div>
       {d.chains.map((c) => (
         <div key={c.id} className="text-xs">
-          <h4 className="flex items-center gap-2 font-semibold text-sm mb-1"><BridgeChainLogo chain={c.id} />{c.name}</h4>
-          <ul className="space-y-0.5">
+          <h4 className="flex items-center gap-2 font-semibold text-sm mb-2"><BridgeChainLogo chain={c.id} />{c.name}</h4>
+          <ul>
             {c.tokens.map((t) => (
-              <li key={t.symbol} className="flex items-center justify-between gap-2 py-0.5">
-                <span className="flex items-center gap-2"><TokenLogo contract={t.symbol.toUpperCase() === "WAX" ? "eosio.token" : "wrap.alcor"} symbol={t.symbol} size="sm" />{t.symbol}</span>
-                <span className="text-muted-foreground text-right">min {formatRawUnits(t.min, t.decimals) ?? "unavailable"}</span>
+              <li key={t.symbol} className="flex items-center justify-between gap-2 border-t border-border py-2">
+                <span className="flex items-center gap-2 font-medium"><TokenLogo contract={t.symbol.toUpperCase() === "WAX" ? "eosio.token" : "wrap.alcor"} symbol={t.symbol} size="sm" />{t.symbol}</span>
+                <span className="text-muted-foreground text-right tabular-nums">min {formatRawUnits(t.min, t.decimals) ?? "unavailable"}</span>
               </li>
             ))}
           </ul>
