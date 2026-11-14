@@ -40,27 +40,33 @@ function validate(raw: unknown, key: MessagingKey): GroupBackup | null {
 }
 
 export async function readGroupBackup(root: DirHandle, key: MessagingKey): Promise<GroupBackup | null> {
+  let existing = false;
   try {
     const file = await root.getFileHandle(groupBackupName(key.account));
-    if (!file.getFile) return null;
+    existing = true;
+    if (!file.getFile) throw new Error('Cannot read group backup');
     const text = await (await file.getFile()).text();
-    if (text.length > 16_000_000) return null;
+    if (text.length > 16_000_000) throw new Error('Group backup is too large');
     const envelope = JSON.parse(text);
-    if (envelope.type !== 'cheesecrypt-groups' || envelope.version !== 1 || envelope.account !== key.account) return null;
+    if (envelope.type !== 'cheesecrypt-groups' || envelope.version !== 1 || envelope.account !== key.account) throw new Error('Invalid group backup');
     const ring = [key, ...(key.retired ?? []).map(k => ({ ...key, ...k }))];
     const matched = ring.find(k => k.publicKey === envelope.publicKey);
-    if (!matched) return null;
+    if (!matched) throw new Error('Group backup belongs to a different messaging key');
     const plain = nacl.secretbox.open(decodeBase64(envelope.box), decodeBase64(envelope.nonce), backupKey(matched));
-    return plain ? validate(JSON.parse(encodeUTF8(plain)), key) : null;
+    const parsed = plain ? validate(JSON.parse(encodeUTF8(plain)), key) : null;
+    if (!parsed) throw new Error('Group backup could not be verified');
+    return parsed;
   } catch (error) {
-    if (['NotAllowedError', 'NotReadableError'].includes((error as DOMException)?.name)) throw error;
-    return null;
+    if (!existing && (error as DOMException)?.name === 'NotFoundError') return null;
+    throw error;
   }
 }
 
 export async function writeGroupBackup(root: DirHandle, key: MessagingKey, data: GroupBackup): Promise<void> {
   const checked = validate(data, key);
   if (!checked) throw new Error('Invalid group backup');
+  // Never replace an unreadable or different-key backup even if another tab changed it.
+  await readGroupBackup(root, key);
   const nonce = nacl.randomBytes(nacl.secretbox.nonceLength);
   const envelope = { type: 'cheesecrypt-groups', version: 1, account: key.account, publicKey: key.publicKey,
     nonce: encodeBase64(nonce), box: encodeBase64(nacl.secretbox(decodeUTF8(JSON.stringify(checked)), nonce, backupKey(key))) };

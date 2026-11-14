@@ -11,12 +11,14 @@ const backup: GroupBackup = {
 };
 function folder() {
   let text = '';
-  const root: DirHandle = { name: 'cheesecrypt', getDirectoryHandle: async () => root, getFileHandle: async () => ({
+  const root: DirHandle = { name: 'cheesecrypt', getDirectoryHandle: async () => root, getFileHandle: async (_name, options) => {
+    if (!text && !options?.create) throw new DOMException('Missing', 'NotFoundError');
+    return ({
     getFile: async () => ({ text: async () => text }), createWritable: async () => {
       let staged = '';
       return { write: async v => { staged = v; }, close: async () => { text = staged; }, abort: async () => {} };
     },
-  }) };
+  }); } };
   return { root, read: () => text, replace: (value: string) => { text = value; } };
 }
 describe('encrypted group folder backup', () => {
@@ -31,8 +33,9 @@ describe('encrypted group folder backup', () => {
   });
   it('rejects another account or a replaced key', async () => {
     const f = folder(); await writeGroupBackup(f.root, owner, backup);
-    expect(await readGroupBackup(f.root, member)).toBeNull();
-    expect(await readGroupBackup(f.root, generateKey('alice'))).toBeNull();
+    await expect(readGroupBackup(f.root, member)).rejects.toThrow();
+    await expect(readGroupBackup(f.root, generateKey('alice'))).rejects.toThrow();
+    await expect(writeGroupBackup(f.root, generateKey('alice'), { invites: {}, decisions: {}, requests: {}, controls: [] })).rejects.toThrow();
   });
   it('rejects tampering and invalid rosters without replacing the file', async () => {
     const f = folder(); await writeGroupBackup(f.root, owner, backup);
@@ -40,7 +43,7 @@ describe('encrypted group folder backup', () => {
     await expect(writeGroupBackup(f.root, owner, { ...backup, invites: { [id]: { ...backup.invites[id], creator: 'carol' } } })).rejects.toThrow();
     expect(f.read()).toBe(before);
     const e = JSON.parse(before); e.box = `${e.box[0] === 'A' ? 'B' : 'A'}${e.box.slice(1)}`;
-    f.replace(JSON.stringify(e)); expect(await readGroupBackup(f.root, owner)).toBeNull();
+    f.replace(JSON.stringify(e)); await expect(readGroupBackup(f.root, owner)).rejects.toThrow();
   });
   it('opens a pre-rotation backup only with the retained matching key', async () => {
     const f = folder(); await writeGroupBackup(f.root, owner, backup);
