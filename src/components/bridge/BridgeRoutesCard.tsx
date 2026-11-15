@@ -33,7 +33,12 @@ function RouteRow({ r, side, pinned, dimmed, onPick, rowRef }: {
       <td className="py-2 pl-2 pr-2">
         <span className={`flex items-center gap-2 font-medium ${pinned ? "text-cheese" : "text-[#f1f2f4]"}`}>
           <TokenLogo contract={logoContract(r.symbol)} symbol={r.symbol} size="md" className="h-5 w-5" />
-          {r.symbol}{pinned && <span aria-hidden>📌</span>}
+          <span className="flex min-w-0 flex-col">
+            <span>{r.symbol}{pinned && <span aria-hidden>📌</span>}</span>
+            <span className="text-[10px] font-normal leading-tight text-muted-foreground" title="WAX token contract">
+              {logoContract(r.symbol)}
+            </span>
+          </span>
         </span>
       </td>
       <td className="py-2 text-[#c5c8d0]">{chainName(side === "from" ? r.from : r.to)}</td>
