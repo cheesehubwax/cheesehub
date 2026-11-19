@@ -20,20 +20,21 @@ interface ActiveBanner {
   alt?: string;
 }
 
-// First placeholder = WaxEDGE promo; GPK Collection Manager is the second
-// placeholder so two open shared slots side by side never show the same image.
-function placeholderBanner(placeholderNumber: number): ActiveBanner {
-  const isFirst = placeholderNumber === 1;
+// Each slot position has its own standby banner: Position 1 open shared halves
+// always show WaxEDGE, Position 2 open shared halves always show the GPK
+// Collection Manager — regardless of the other slot's state.
+export function placeholderBanner(position: number): ActiveBanner {
+  const isPos1 = position === 1;
   return {
-    localSrc: isFirst ? waxedgeBanner : gpkCollectionManagerBanner,
-    websiteUrl: isFirst ? "https://waxedge.app" : "https://gpkonwax.github.io/collection-manager/",
-    user: isFirst ? "placeholder-waxedge" : "placeholder-gpk-collection-manager",
+    localSrc: isPos1 ? waxedgeBanner : gpkCollectionManagerBanner,
+    websiteUrl: isPos1 ? "https://waxedge.app" : "https://gpkonwax.github.io/collection-manager/",
+    user: isPos1 ? "placeholder-waxedge" : "placeholder-gpk-collection-manager",
     isPlaceholder: true,
-    alt: isFirst ? "WaxEDGE Banner" : "Unofficial GPK Collection Manager Banner",
+    alt: isPos1 ? "WaxEDGE Banner" : "Unofficial GPK Collection Manager Banner",
   };
 }
 
-function extractBannersForSlot(slot: BannerSlot, placeholderNumber: number): ActiveBanner[] {
+export function extractBannersForSlot(slot: BannerSlot): ActiveBanner[] {
   const banners: ActiveBanner[] = [];
   if (slot.suspended) return banners;
 
@@ -61,9 +62,9 @@ function extractBannersForSlot(slot: BannerSlot, placeholderNumber: number): Act
     }
   }
 
-  // Placeholder for unrented shared half
+  // Placeholder for unrented shared half — bound to this slot's position
   if (slot.rentalType === "shared" && slot.user !== "cheesebannad" && !slot.sharedUser) {
-    banners.push(placeholderBanner(placeholderNumber));
+    banners.push(placeholderBanner(slot.position));
   }
 
   return banners;
@@ -228,11 +229,8 @@ export function BannerDisplay() {
 
     if (!currentGroup) return result;
 
-    // Position order so the first empty slot always gets the WaxEDGE placeholder
-    let placeholderCount = 0;
     for (const slot of [...currentGroup.slots].sort((a, b) => a.position - b.position)) {
-      const banners = extractBannersForSlot(slot, placeholderCount + 1);
-      if (banners.some((b) => b.isPlaceholder)) placeholderCount++;
+      const banners = extractBannersForSlot(slot);
       if (slot.position === 1) {
         result.pos1Banners.push(...banners);
       } else if (slot.position === 2) {
