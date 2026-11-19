@@ -381,7 +381,7 @@ export function CreateDao() {
               <div>
                 <Label className="text-sm font-medium">
                   Minimum Vote Weight
-                  <InfoTooltip text="Minimum total vote weight required for a proposal to be valid" />
+                  <InfoTooltip text="Voting power is measured in tokens (or NFTs), not people. One member with lots of tokens can outweigh many members with a few." />
                 </Label>
                 <Input
                   type="number"
@@ -390,6 +390,10 @@ export function CreateDao() {
                   min={0}
                   className="mt-1"
                 />
+                <div className="mt-2 rounded-md border border-primary/30 bg-primary/5 p-2 text-xs text-muted-foreground space-y-1">
+                  <p><span className="font-semibold text-foreground">Counted in {needsToken ? "tokens" : "NFTs"}, not members.</span> A vote's weight is how many {needsToken ? "governance tokens the voter has staked" : "qualifying NFTs the voter holds"}.</p>
+                  <p>Every proposal also needs at least <span className="font-semibold text-foreground">1 whole {needsToken ? "token" : "NFT"}</span> of total votes cast to count. If the votes add up to less, it ends as <span className="font-semibold text-foreground">Quorum Not Met</span> and nothing is sent from the treasury, even when everyone voted Yes.{needsToken ? " Example: two members voting with 0.1 WAX staked each is only 0.2 WAX, which is not enough." : ""}</p>
+                </div>
               </div>
 
               {/* Voting duration */}

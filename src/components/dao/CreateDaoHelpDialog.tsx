@@ -68,7 +68,7 @@ export function CreateDaoHelpDialog({ open, onOpenChange, accordionValue, onAcco
                 </div>
                 <div>
                   <p className="font-semibold text-primary">Minimum Votes</p>
-                  <p>The minimum total vote weight needed for a proposal to be valid. This prevents proposals from passing with very few participants. Vote weight equals token balance in wallets. For example, if set to 1000, at least 1000 tokens worth of votes must be cast before the result counts.</p>
+                  <p>The minimum total vote weight needed for a proposal to be valid. Vote weight is counted in tokens staked (or NFTs held), <strong>not in number of members</strong>, so one large holder can outweigh many small ones. Every proposal needs at least 1 whole token (or NFT) of total votes cast. If the total is lower, the proposal ends as "Quorum Not Met" and nothing is sent from the treasury, even if every vote was Yes. For example, two members voting with 0.1 WAX staked each adds up to only 0.2 WAX, which is not enough.</p>
                 </div>
                 <div>
                   <p className="font-semibold text-primary">Voting Duration</p>
