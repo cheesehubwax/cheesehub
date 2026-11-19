@@ -47,14 +47,14 @@ describe("fetchProposals parsing", () => {
     expect(p[9].token_receivers).toEqual([{ wax_account: "r", quantity: "1 X", contract: "x" }]);
   });
 
-  it("shows minimum-votes failures (outcome 5) as rejected even when yes leads", async () => {
+  it("shows minimum-votes failures (outcome 5) as quorum not met even when yes leads", async () => {
     hyperion.mockResolvedValue({ actions: [] });
     rpc.mockResolvedValue(json({ rows: [
       { proposal_id: 74, title: "gggff", proposal_type: 4, outcome: 5, end_time: NOW - 10, choices: yna(1, 0, 0) },
       { proposal_id: 75, title: "multi quorum", proposal_type: 0, outcome: 5, end_time: NOW - 10, choices: [{ choice: 0, description: "A", total_votes: 1 }] },
     ] }));
     const p = await fetchProposals("d");
-    expect(p.map(x => x.status)).toEqual(["rejected", "rejected"]);
+    expect(p.map(x => x.status)).toEqual(["quorum_not_met", "quorum_not_met"]);
   });
 
   it("recovers token receivers from transfer actions, then Hyperion by title", async () => {

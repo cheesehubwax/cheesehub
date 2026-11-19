@@ -37,7 +37,10 @@ const statusColors: Record<string, string> = {
   expired: "bg-muted text-muted-foreground border-border",
   pending: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   inconclusive: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  quorum_not_met: "bg-destructive/20 text-destructive border-destructive/30",
 };
+
+const statusLabels: Record<string, string> = { quorum_not_met: "Quorum Not Met" };
 
 export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: parentVote, onVote }: ProposalCardProps) {
   const { accountName, session } = useWax();
@@ -154,8 +157,11 @@ export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: paren
               </Button>
             )}
           </div>
-          <Badge className={statusColors[proposal.status] || statusColors.pending}>
-            {proposal.status}
+          <Badge
+            className={statusColors[proposal.status] || statusColors.pending}
+            title={proposal.status === "quorum_not_met" ? "Not enough total votes were cast to reach this DAO's minimum votes, so the proposal could not pass." : undefined}
+          >
+            {statusLabels[proposal.status] ?? proposal.status}
           </Badge>
         </div>
 

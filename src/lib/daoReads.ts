@@ -286,7 +286,9 @@ export async function fetchProposals(daoName: string): Promise<Proposal[]> {
         } else {
           status = outcome === 4 ? "executed" : "passed";
         }
-      } else if (outcome === 3 || outcome === 5) {
+      } else if (outcome === 5) {
+        status = "quorum_not_met";
+      } else if (outcome === 3) {
         status = "rejected";
       } else if (outcome >= 6) {
         status = (OUTCOME_STATUS[outcome] as typeof status) || "rejected";

@@ -44,7 +44,7 @@ export const VOTING_TYPE_LABELS: Record<number, string> = {
 
 export const OUTCOME_STATUS: Record<number, string> = {
   0: "active", 1: "active", 2: "passed", 3: "rejected",
-  4: "executed", 5: "rejected", 6: "expired",
+  4: "executed", 5: "quorum_not_met", 6: "expired",
 };
 
 export const EXPIRY_THRESHOLD = 30 * 24 * 60 * 60;
@@ -94,7 +94,7 @@ export interface Proposal {
   description: string;
   proposal_type: string;
   voting_type: number;
-  status: "pending" | "active" | "passed" | "rejected" | "executed" | "expired" | "inconclusive";
+  status: "pending" | "active" | "passed" | "rejected" | "executed" | "expired" | "inconclusive" | "quorum_not_met";
   yes_votes: number;
   no_votes: number;
   abstain_votes: number;

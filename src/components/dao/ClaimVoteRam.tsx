@@ -74,7 +74,7 @@ export function ClaimVoteRam({ daoName }: ClaimVoteRamProps) {
               <p className="text-sm font-medium truncate">{p.title}</p>
               <div className="flex items-center gap-2 mt-1">
                 <Badge variant="outline" className="text-xs">#{p.proposal_id}</Badge>
-                <Badge variant="secondary" className="text-xs capitalize">{p.status}</Badge>
+                <Badge variant="secondary" className="text-xs capitalize">{p.status === "quorum_not_met" ? "Quorum Not Met" : p.status}</Badge>
               </div>
             </div>
             {claimed.has(p.proposal_id) ? (
