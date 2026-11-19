@@ -11,18 +11,9 @@ import {
   type StakedToken, type StakedNFT, type UserVote,
 } from "./daoModel";
 
-// Chain reads used to go to a single node, so CHEESEDao went blank whenever
-// that node was down or rate-limited. Every read now fails over across nodes.
-const DAO_RPC_ENDPOINTS = [
-  "https://wax.eosusa.io",
-  "https://api.waxsweden.org",
-  "https://wax.greymass.com",
-  "https://wax.eosphere.io",
-  "https://api.wax.alohaeos.com",
-];
-
-function daoRpcFetch(path: string, init?: RequestInit): Promise<Response> {
-  return fetchWithFallback(DAO_RPC_ENDPOINTS, path, init, 10000);
+// Chain reads fail over across the shared HerdCheck health-ordered node list.
+async function daoRpcFetch(path: string, init?: RequestInit): Promise<Response> {
+  return fetchWithFallback(await resolveEndpoints('chain-api'), path, init, 10000);
 }
 
 // --- Fetch functions ---
@@ -469,9 +460,9 @@ export async function fetchUserStakedTokens(daoName: string, userAccount: string
       const row = data.rows[0];
       const balanceStr = row.balance || "0";
       const balanceParts = balanceStr.split(" ");
-      const amount = parseFloat(balanceParts[0]) || 0;
-      const precision = balanceParts[0].includes(".") ? balanceParts[0].split(".")[1].length : 0;
-      const weight = Math.floor(amount * Math.pow(10, precision));
+      // Integer parse of the asset string: float multiply lost a unit (12.3456 → 123455).
+      const [whole = "0", frac = ""] = (balanceParts[0] || "0").split(".");
+      const weight = Number(`${whole.replace(/^-/, "")}${frac}`.replace(/^0+(?=\d)/, "")) || 0;
       return { balance: balanceStr, weight };
     }
     return null;
@@ -530,7 +521,7 @@ export async function fetchUserStakedNFTs(daoName: string, userAccount: string):
         const assetId = row.asset_id?.toString() || row.asset_ids?.[0]?.toString();
         if (assetId) {
           try {
-            const assetResponse = await fetch(`https://wax.api.atomicassets.io/atomicassets/v1/assets/${assetId}`);
+            const assetResponse = await fetchFromAtomicAPI(`/atomicassets/v1/assets/${assetId}`);
             const assetData = await assetResponse.json();
             if (assetData.success && assetData.data) {
               const asset = assetData.data;
@@ -648,12 +639,8 @@ export async function fetchDaoTreasuryNFTs(daoName: string): Promise<TreasuryNFT
       const schema = asset.schema as { schema_name: string } || { schema_name: "" };
       const template = asset.template as { template_id: string } || { template_id: "" };
 
-      let image = data.img || data.image || "";
-      if (image && !image.startsWith("http")) {
-        if (image.startsWith("Qm") || image.startsWith("bafy")) {
-          image = `https://ipfs.io/ipfs/${image}`;
-        }
-      }
+      // Raw value: DaoTreasurySection resolves it through the shared gateway list.
+      const image = data.img || data.image || "";
 
       return {
         asset_id: asset.asset_id as string,

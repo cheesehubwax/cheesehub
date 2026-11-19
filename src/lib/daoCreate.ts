@@ -98,7 +98,8 @@ export function buildCreateDaoTransaction(i: CreateDaoTxInput) {
     actions.push(buildCheesePaymentAction(i.accountName, i.cheese.formattedForTx, "dao", i.daoName));
     actions.push(buildAssertPointAction(i.accountName));
     actions.push(buildWaxdaoFeeAction(i.accountName, "dao.waxdao", i.waxdao.formattedForTx, "|dao_payment|"));
-  } else if (i.paymentMethod === "wax" && i.waxdao.isAvailable) {
+  } else if (i.waxdao.isAvailable) {
+    // CHEESE chosen but unpriced falls back to the WAX fee, same as CHEESEFarm.
     actions.push(buildWaxPaymentAction(i.accountName, "dao", i.daoName));
     actions.push(buildAssertPointAction(i.accountName));
     actions.push(buildWaxdaoFeeAction(i.accountName, "dao.waxdao", i.waxdao.formattedForTx, "|dao_payment|"));

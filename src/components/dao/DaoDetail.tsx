@@ -23,7 +23,7 @@ import { DaoTreasurySection } from "./DaoTreasurySection";
 import { daoSocialEntries } from "@/lib/daoSocials";
 import type { UserVote } from "@/lib/voteStorage";
 
-type Section = "info" | "stake" | "new-proposal" | "active" | "past" | "treasury";
+type Section = "info" | "stake" | "new-proposal" | "active" | "past" | "treasury" | "ram";
 
 interface DaoDetailProps {
   daoName: string;
@@ -142,6 +142,7 @@ export function DaoDetail({ daoName, onBack }: DaoDetailProps) {
     { key: "active", label: "Active Proposals", icon: <OpenMojiIcon emoji="📢" size={14} className="text-sm" />, badge: activeProposals.length, pulse: unvotedCount > 0 },
     { key: "past", label: "Past Proposals", icon: <OpenMojiIcon emoji="🕰️" size={14} className="text-sm" />, badge: pastProposals.length },
     { key: "treasury", label: "Treasury", icon: <OpenMojiIcon emoji="💎" size={14} className="text-sm" /> },
+    { key: "ram", label: "Claim Vote RAM", icon: <OpenMojiIcon emoji="💾" size={14} className="text-sm" />, hidden: !isConnected },
   ];
 
   const socialEntries = useMemo(() => daoSocialEntries(dao?.socials), [dao?.socials]);
@@ -214,6 +215,9 @@ export function DaoDetail({ daoName, onBack }: DaoDetailProps) {
             onRefresh={refreshTreasury}
           />
         );
+
+      case "ram":
+        return <ClaimVoteRam daoName={daoName} />;
 
       default:
         return null;

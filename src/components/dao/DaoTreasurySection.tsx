@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Coins, Image as ImageIcon, RefreshCw, Wallet } from "lucide-react";
 import type { TreasuryBalance, TreasuryNFT } from "@/lib/dao";
 import { TokenLogo } from "@/components/TokenLogo";
+import { TreasuryNftImage } from "./TreasuryNftImage";
 import { TreasuryDeposit } from "./TreasuryDeposit";
 import { TreasuryNFTDeposit } from "./TreasuryNFTDeposit";
 
@@ -85,13 +86,7 @@ export function DaoTreasurySection({ daoName, treasury, treasuryNFTs, treasuryLo
                 key={nft.asset_id}
                 className="relative aspect-square rounded-lg overflow-hidden border border-border/50"
               >
-                {nft.image ? (
-                  <img src={nft.image} alt={nft.name} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full bg-muted flex items-center justify-center">
-                    <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                )}
+                <TreasuryNftImage image={nft.image} name={nft.name} />
                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-1">
                   <p className="text-[8px] text-white truncate">{nft.name}</p>
                 </div>

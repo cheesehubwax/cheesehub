@@ -27,8 +27,9 @@ describe("Create DAO transaction", () => {
     const a = buildCreateDaoTransaction({ ...base, daoType: 5, needsToken: false, needsSchemas: true, govSchemas: [{ collection_name: "c", schema_name: "s" }, { collection_name: "", schema_name: "" }] });
     expect((a[3] as { data: Record<string, unknown> }).data).toMatchObject({ gov_schemas: [{ collection_name: "c", schema_name: "s" }], gov_token_symbol: "0,NULL" });
   });
-  it("unchanged today: unavailable pricing leaves only createdao", () => {
-    expect(names(buildCreateDaoTransaction({ ...base, paymentMethod: "cheese", cheese: { isAvailable: false, formattedForTx: "" } }))).toEqual(["dao.waxdao::createdao"]);
+  it("CHEESE without a price falls back to the WAX fee legs", () => {
+    expect(names(buildCreateDaoTransaction({ ...base, paymentMethod: "cheese", cheese: { isAvailable: false, formattedForTx: "" } }))).toEqual(
+      names(buildCreateDaoTransaction({ ...base, paymentMethod: "wax" })));
   });
 });
 

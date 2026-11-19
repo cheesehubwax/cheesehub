@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { TreasuryNftImage } from "./TreasuryNftImage";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,6 @@ import {
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useToast } from "@/hooks/use-toast";
-import { getIpfsUrl } from "@/lib/ipfsGateways";
 
 interface DaoStakingProps {
   daoName: string;
@@ -230,15 +230,7 @@ export function DaoStaking({ daoName, dao }: DaoStakingProps) {
               {stakedNFTs.map(nft => (
                 <Card key={nft.asset_id} className="bg-card/60 border-border/40 overflow-hidden">
                   <div className="aspect-square bg-muted/30 flex items-center justify-center">
-                    {nft.image ? (
-                      <img
-                        src={nft.image.startsWith("Qm") || nft.image.startsWith("bafy") ? getIpfsUrl(nft.image) : nft.image}
-                        alt={nft.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                    )}
+                    <TreasuryNftImage image={nft.image} name={nft.name} />
                   </div>
                   <CardContent className="p-2">
                     <p className="text-xs font-medium truncate">{nft.name}</p>

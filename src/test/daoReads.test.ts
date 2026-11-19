@@ -5,6 +5,8 @@ vi.mock("@/lib/fetchWithFallback", () => ({ fetchWithFallback: (...a: unknown[])
 const hyperion = vi.fn();
 vi.mock("@/lib/hyperionHistory", () => ({ fetchActionsUnion: (...a: unknown[]) => hyperion(...a) }));
 
+vi.mock("@/lib/endpointHealth", () => ({ resolveEndpoints: async () => ["https://health-first.example"] }));
+
 import { fetchProposals, fetchDaoTreasury, fetchUserStakedTokens, fetchAllDaos, checkDaoMembership } from "@/lib/dao";
 
 const NOW = 1_800_000_000;
@@ -83,6 +85,17 @@ describe("other reads", () => {
   it("staked token weight uses integer units", async () => {
     rpc.mockResolvedValue(json({ rows: [{ balance: "12.5000 CHEESE" }] }));
     expect(await fetchUserStakedTokens("d", "u")).toEqual({ balance: "12.5000 CHEESE", weight: 125000 });
+  });
+
+  it("counts 12.3456 CHEESE as 123456 units, not 123455", async () => {
+    rpc.mockResolvedValue(json({ rows: [{ balance: "12.3456 CHEESE" }] }));
+    expect((await fetchUserStakedTokens("d", "u"))?.weight).toBe(123456);
+  });
+
+  it("reads through the health-ordered node list", async () => {
+    rpc.mockResolvedValue(json({ rows: [] }));
+    await fetchUserStakedTokens("d", "u");
+    expect(rpc.mock.calls[0][0]).toEqual(["https://health-first.example"]);
   });
   it("fetchAllDaos merges profiles from daoprofiles", async () => {
     rpc.mockImplementation(async (_e: unknown, _p: string, init: RequestInit) => tableOf(init) === "daos"
