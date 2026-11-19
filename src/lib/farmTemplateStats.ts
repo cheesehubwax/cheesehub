@@ -1,3 +1,4 @@
+import { preferredIpfsImageUrl } from "./ipfsGateways";
 // Owner-only template-distribution helpers for a farm.
 //
 // For each template a farm accepts, we resolve:
@@ -16,14 +17,13 @@ import { fetchFarmStakers, fetchAssetsMetadata } from "./farmStakers";
 export const TEMPLATE_DISTRIBUTION_MAX = 50;
 export const TEMPLATE_FETCH_CONCURRENCY = 5;
 
-const IPFS_GATEWAY = "https://gateway.pinata.cloud/ipfs/";
 
+// Thumbnails resolve through the shared image order (bundled → AtomicHub cache
+// → IPFS); empty means "no artwork" so callers render their own fallback.
 function toImageUrl(img: string | undefined): string {
-  if (!img) return "/placeholder.svg";
-  if (img.startsWith("http")) return img;
-  if (img.startsWith("ipfs://")) return `${IPFS_GATEWAY}${img.replace("ipfs://", "")}`;
-  if (img.startsWith("Qm") || img.startsWith("bafy") || img.startsWith("bafk")) {
-    return `${IPFS_GATEWAY}${img}`;
+  if (!img) return "";
+  if (img.startsWith("ipfs://") || /^(Qm|baf)/.test(img)) {
+    return preferredIpfsImageUrl(img.startsWith("ipfs://") ? img : `ipfs://${img}`);
   }
   return img;
 }

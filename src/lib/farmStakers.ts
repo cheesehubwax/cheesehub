@@ -1,3 +1,4 @@
+import { preferredIpfsImageUrl } from "./ipfsGateways";
 // Fetch the list of stakers for a single farm + per-asset thumbnails.
 // Uses the farms.waxdao `stakednfts` / `stakers` tables and the
 // AtomicAssets API for asset metadata. Asset metadata is memoised at the
@@ -6,8 +7,7 @@
 import { fetchTableRows } from "./waxRpcFallback";
 import { fetchWithFallback } from "./fetchWithFallback";
 import { ATOMIC_API } from "./waxConfig";
-import { FARM_CONTRACT } from "./farm";
-import { IPFS_GATEWAYS } from "./ipfsGateways";
+import { FARM_CONTRACT } from "./farmModel";
 
 export interface FarmStakerRow {
   user: string;
@@ -23,22 +23,19 @@ export interface StakerAssetMeta {
   mint: string;
 }
 
-// Use the shared, reliability-ordered gateway list. The old hardcoded
-// ipfs.io gateway stopped responding, which broke every staker thumbnail.
-const IPFS_GATEWAY = IPFS_GATEWAYS[0];
 
+// Thumbnails resolve through the shared image order (bundled → AtomicHub cache
+// → IPFS); empty means "no artwork" so callers render their own fallback.
 function toImageUrl(img: string | undefined): string {
-  if (!img) return "/placeholder.svg";
-  if (img.startsWith("http")) return img;
-  if (img.startsWith("ipfs://")) return `${IPFS_GATEWAY}${img.replace("ipfs://", "")}`;
-  if (img.startsWith("Qm") || img.startsWith("baf")) {
-    return `${IPFS_GATEWAY}${img}`;
+  if (!img) return "";
+  if (img.startsWith("ipfs://") || /^(Qm|baf)/.test(img)) {
+    return preferredIpfsImageUrl(img.startsWith("ipfs://") ? img : `ipfs://${img}`);
   }
   return img;
 }
 
 function pickImage(data: Record<string, string | undefined> | undefined): string {
-  if (!data) return "/placeholder.svg";
+  if (!data) return "";
   const img = data.img || data.image || data.video;
   return toImageUrl(img);
 }

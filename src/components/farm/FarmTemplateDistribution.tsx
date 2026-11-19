@@ -146,7 +146,7 @@ export function FarmTemplateDistribution({ farmName }: FarmTemplateDistributionP
                           className="block w-10 h-10 rounded bg-muted overflow-hidden shrink-0"
                           aria-label={`Template ${r.templateId}`}
                         >
-                          <img
+                          {r.image && <img
                             src={r.image}
                             alt={r.name}
                             loading="lazy"
@@ -154,7 +154,7 @@ export function FarmTemplateDistribution({ farmName }: FarmTemplateDistributionP
                             onError={(e) => {
                               (e.currentTarget as HTMLImageElement).style.visibility = "hidden";
                             }}
-                          />
+                          />}
                         </a>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">

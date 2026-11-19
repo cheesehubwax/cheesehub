@@ -9,27 +9,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { OpenMojiIcon } from '@/components/OpenMojiIcon';
-import {
-  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Loader2, Search, Layers, CheckSquare, Square, AlertTriangle,
-  RefreshCw, Coins, Image as ImageIcon, Info,
+  Loader2, Search, Layers, CheckSquare, Square,
+  RefreshCw, Info,
 } from "lucide-react";
 import {
   FarmInfo, fetchUserStakes, fetchFarmStakableConfig,
   buildStakeNftsAction, buildUnstakeNftsAction, buildClaimRewardsAction,
-  getCollectionNames, getIpfsUrl, UserStake, PendingReward, FarmStakableConfig,
+  getCollectionNames, UserStake, PendingReward, FarmStakableConfig,
   fetchUserGlobalStakes, GlobalStakeInfo,
 } from "@/lib/farm";
 import { ATOMIC_API } from "@/lib/waxConfig";
@@ -38,13 +24,8 @@ import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useToast } from "@/hooks/use-toast";
 import { batchGetOrFetch } from "@/lib/templateCache";
-import { useVirtualizer } from "@tanstack/react-virtual";
-import { getTokenLogoUrl } from "@/lib/tokenLogos";
 import { waxRpcCall } from "@/lib/waxRpcFallback";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { cn } from "@/lib/utils";
-import { useSquareGridRowHeight } from "@/hooks/useSquareGridRowHeight";
-import { NFTGridCard } from "@/components/shared/NFTGridCard";
 import {
   claimableBalancesToClaimed,
   pendingRewardsToClaimed,
@@ -52,171 +33,16 @@ import {
 } from "@/lib/farmClaimHistory";
 import { useFarmClaimTotals } from "@/hooks/useFarmClaimTotals";
 
-const TOKEN_LOGO_PLACEHOLDER = "/placeholder.svg";
-const IPFS_GATEWAY = "https://gateway.pinata.cloud/ipfs/";
 
 interface NFTStakingProps {
   farm: FarmInfo;
   onRefresh: () => void;
 }
 
-interface NFTAsset {
-  asset_id: string;
-  name: string;
-  image: string;
-  collection: string;
-  schema: string;
-  template_id: string;
-}
-
-function getImageUrl(img: string | undefined): string {
-  if (!img) return "/placeholder.svg";
-  if (img.startsWith("http")) return img;
-  if (img.startsWith("ipfs://")) return `${IPFS_GATEWAY}${img.replace("ipfs://", "")}`;
-  if (img.startsWith("Qm") || img.startsWith("bafy") || img.startsWith("bafk"))
-    return `${IPFS_GATEWAY}${img}`;
-  return img || "/placeholder.svg";
-}
-
-function getMediaUrl(data: Record<string, string | undefined> | undefined): { url: string; isVideo: boolean } {
-  if (!data) return { url: "/placeholder.svg", isVideo: false };
-  const imageField = data.img || data.image;
-  if (imageField) return { url: getImageUrl(imageField), isVideo: false };
-  const videoField = data.video;
-  if (videoField) return { url: getImageUrl(videoField), isVideo: true };
-  return { url: "/placeholder.svg", isVideo: false };
-}
-
-// ── Virtualized Grid (defined outside main component to avoid re-creation) ──
-
-// Farm-specific NFT card wrapper that adds "staked elsewhere" tooltip
-interface FarmNFTCardProps {
-  nft: NFTAsset;
-  isSelected: boolean;
-  onToggle: () => void;
-  stakedInFarm?: string;
-  onNavigateToFarm?: () => void;
-}
-
-const FarmNFTCard = React.memo(function FarmNFTCard({ nft, isSelected, onToggle, stakedInFarm, onNavigateToFarm }: FarmNFTCardProps) {
-  const isStakedElsewhere = Boolean(stakedInFarm);
-
-  if (isStakedElsewhere) {
-    return (
-      <div className="opacity-60">
-        <NFTGridCard
-          nft={nft}
-          isSelected={false}
-          onToggle={onNavigateToFarm || (() => {})}
-          borderClass="border-amber-500/50"
-          extraBadge={
-            <>
-              <div className="absolute top-1 left-1">
-                <AlertTriangle className="h-3 w-3 text-amber-500" />
-              </div>
-              <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-1 py-0.5 text-center">
-                <span className="text-[8px] font-medium text-amber-400 leading-tight">
-                  Staked in {stakedInFarm}
-                </span>
-              </div>
-            </>
-          }
-          extraHoverContent={
-            <div className="flex justify-between text-amber-500"><OpenMojiIcon emoji="⚠️" size={18} /> Staked in<span className="font-semibold">{stakedInFarm}</span></div>
-          }
-        />
-      </div>
-    );
-  }
-
-  return (
-    <NFTGridCard
-      nft={nft}
-      isSelected={isSelected}
-      onToggle={onToggle}
-    />
-  );
-});
-
-interface VirtualGridProps {
-  items: NFTAsset[];
-  selected: Set<string>;
-  onToggle: (id: string) => void;
-  parentRef: React.RefObject<HTMLDivElement>;
-  type: "stake" | "unstake";
-  globallyStakedMap?: Map<string, string>;
-  onNavigateToFarm?: (farmName: string) => void;
-}
-
-function getGridCols(): number {
-  return 6;
-}
-
-const VirtualGrid = React.memo(function VirtualGrid({
-  items,
-  selected,
-  onToggle,
-  parentRef,
-  type,
-  globallyStakedMap,
-  onNavigateToFarm,
-}: VirtualGridProps) {
-  const [cols, setCols] = useState(getGridCols);
-  const gridRowHeight = useSquareGridRowHeight(parentRef, { columns: cols });
-
-  useEffect(() => {
-    const handleResize = () => setCols(getGridCols());
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  const rowCount = Math.ceil(items.length / cols);
-  const virtualizer = useVirtualizer({
-    count: rowCount,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => gridRowHeight,
-    overscan: 3,
-  });
-
-  useEffect(() => {
-    virtualizer.measure();
-  }, [gridRowHeight, virtualizer]);
-
-  return (
-    <div ref={parentRef} className="h-[560px] overflow-auto rounded-md border border-border">
-      <div style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}>
-        {virtualizer.getVirtualItems().map((vRow) => {
-          const start = vRow.index * cols;
-          const rowItems = items.slice(start, start + cols);
-          return (
-            <div
-              key={vRow.key}
-              className="absolute top-0 left-0 w-full grid grid-cols-6 gap-2 p-1"
-              style={{
-                height: `${vRow.size}px`,
-                transform: `translateY(${vRow.start}px)`,
-              }}
-            >
-              {rowItems.map((nft) => {
-                const stakedInFarm = type === "stake" ? globallyStakedMap?.get(nft.asset_id) : undefined;
-                return (
-                  <FarmNFTCard
-                    key={nft.asset_id}
-                    nft={nft}
-                    isSelected={selected.has(nft.asset_id)}
-                    onToggle={() => onToggle(nft.asset_id)}
-                    stakedInFarm={stakedInFarm}
-                    onNavigateToFarm={stakedInFarm && onNavigateToFarm ? () => onNavigateToFarm(stakedInFarm) : undefined}
-                  />
-                );
-              })}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-});
+import { StakingRewardsCard } from "./staking/StakingRewardsCard";
+import { ConfirmStakeClaimDialog } from "./staking/ConfirmStakeClaimDialog";
+import { VirtualGrid } from "./staking/StakingVirtualGrid";
+import { getMediaUrl, type NFTAsset } from "./staking/stakingMedia";
 
 // ── Main Component ──
 
@@ -512,7 +338,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
             assets.push({
               asset_id: id,
               name: tpl?.name || `NFT #${id}`,
-              image: tpl?.image || "/placeholder.svg",
+              image: tpl?.image || "",
               collection: meta?.collection || "Unknown",
               schema: meta?.schema || "",
               template_id: String(tid),
@@ -639,7 +465,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
             assets.push({
               asset_id: id,
               name: tpl?.name || `NFT #${id}`,
-              image: tpl?.image || "/placeholder.svg",
+              image: tpl?.image || "",
               collection: meta?.collection || "Unknown",
               schema: meta?.schema || "",
               template_id: String(tid),
@@ -1098,167 +924,26 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
         </CardContent>
       </Card>
 
-      {/* Rewards Card */}
       {stakedNfts.length > 0 && (
-        <Card className="bg-card/80 border-border/50">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2 text-foreground">
-              <Coins className="h-5 w-5 text-primary" />
-              Rewards
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isExpired && (
-              <Alert className="mb-4 border-destructive/50 bg-destructive/10">
-                <AlertTriangle className="h-4 w-4 text-destructive" />
-                <AlertDescription className="text-sm text-destructive">
-                  This farm has expired. Rewards are no longer accruing. Claim any remaining rewards.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-              <div className="rounded-lg border border-border/50 bg-background/50 p-3">
-                <p className="text-xs text-foreground mb-2 font-medium">
-                  Pending
-                  {nextPayoutIn > 0 && (
-                    <span className="text-muted-foreground/70 ml-1">
-                      (in {Math.floor(nextPayoutIn / 60)}:{(nextPayoutIn % 60).toString().padStart(2, "0")})
-                    </span>
-                  )}
-                </p>
-                {pendingNextPayout.length > 0 && pendingNextPayout.some((r) => r.amount > 0) ? (
-                  <div className="space-y-1.5">
-                    {pendingNextPayout.map((reward, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <img
-                          src={reward.contract ? getTokenLogoUrl(reward.contract, reward.symbol) : TOKEN_LOGO_PLACEHOLDER}
-                          alt={reward.symbol}
-                          className="w-4 h-4 rounded-full opacity-70"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = TOKEN_LOGO_PLACEHOLDER;
-                          }}
-                        />
-                        <Badge variant="outline" className="text-foreground border-border/50 text-xs">
-                          +{reward.amount.toFixed(reward.precision)} {reward.symbol}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-foreground text-sm">—</p>
-                )}
-              </div>
-
-              <div className="rounded-lg border border-border/50 bg-background/50 p-3">
-                <p className="text-xs text-foreground mb-2 font-medium">Claimable Now</p>
-                {pendingRewards.length > 0 && hasRewards ? (
-                  <div className="space-y-1.5">
-                    {pendingRewards.map((reward, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <img
-                          src={reward.contract ? getTokenLogoUrl(reward.contract, reward.symbol) : TOKEN_LOGO_PLACEHOLDER}
-                          alt={reward.symbol}
-                          className="w-5 h-5 rounded-full"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = TOKEN_LOGO_PLACEHOLDER;
-                          }}
-                        />
-                        <Badge variant="secondary" className="bg-primary/10 text-foreground border-primary/20">
-                          {reward.amount.toFixed(reward.precision)} {reward.symbol}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-sm">No claimable rewards</p>
-                )}
-              </div>
-            </div>
-
-            <div className="flex justify-center">
-              <Button
-                onClick={handleClaim}
-                disabled={isClaiming || !hasRewards}
-                className="w-full sm:w-1/2 bg-primary hover:bg-primary/90 text-primary-foreground"
-              >
-                {isClaiming ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Coins className="h-4 w-4 mr-2" />}
-                Claim Rewards
-              </Button>
-            </div>
-
-            {(() => {
-              const userClaimed = claimTotals[farm.farm_name];
-              if (!userClaimed || userClaimed.length === 0) return null;
-              return (
-                <div className="mt-4 pt-4 border-t border-cheese/20">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
-                    You've claimed (lifetime)
-                  </p>
-                  <div className="flex flex-wrap gap-3">
-                    {userClaimed.map((c, i) => (
-                      <div key={`${c.contract}:${c.symbol}:${i}`} className="flex items-center gap-1.5 text-sm">
-                        <img
-                          src={c.contract ? getTokenLogoUrl(c.contract, c.symbol) : TOKEN_LOGO_PLACEHOLDER}
-                          alt={c.symbol}
-                          className="w-4 h-4 rounded-full"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = TOKEN_LOGO_PLACEHOLDER;
-                          }}
-                        />
-                        <span className="font-mono text-cheese">
-                          {c.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })} {c.symbol}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
-          </CardContent>
-        </Card>
+        <StakingRewardsCard
+          isExpired={isExpired}
+          nextPayoutIn={nextPayoutIn}
+          pendingNextPayout={pendingNextPayout}
+          pendingRewards={pendingRewards}
+          hasRewards={hasRewards}
+          isClaiming={isClaiming}
+          onClaim={handleClaim}
+          claimed={claimTotals[farm.farm_name]}
+        />
       )}
 
-      <AlertDialog open={confirmStakeOpen} onOpenChange={setConfirmStakeOpen}>
-        <AlertDialogContent className="sm:max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <Coins className="h-5 w-5 text-cheese" />
-              Pending rewards will be claimed
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3 text-sm">
-                <p>
-                  Staking additional NFTs into{" "}
-                  <span className="font-semibold text-cheese">{farm.farm_name}</span>{" "}
-                  will auto-claim your current pending rewards in the same transaction:
-                </p>
-                <div className="rounded-md border border-cheese/30 bg-cheese/5 p-3 space-y-1">
-                  {pendingRewards
-                    .filter((r) => r.amount > 0)
-                    .map((r) => (
-                      <div key={r.symbol} className="flex justify-between font-mono">
-                        <span className="text-muted-foreground">{r.symbol}</span>
-                        <span className="text-cheese">
-                          {r.amount.toFixed(r.precision)}
-                        </span>
-                      </div>
-                    ))}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  This is enforced by the farm smart contract and cannot be skipped.
-                </p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmAndStake}>
-              Claim & Stake
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmStakeClaimDialog
+        open={confirmStakeOpen}
+        onOpenChange={setConfirmStakeOpen}
+        farmName={farm.farm_name}
+        pendingRewards={pendingRewards}
+        onConfirm={confirmAndStake}
+      />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { explorerAccount, explorerAsset } from '@/lib/explorer';
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -67,7 +67,7 @@ function Thumb({ assetId, meta }: { assetId: string; meta?: StakerAssetMeta }) {
   );
 }
 
-const StakerRow = ({
+const StakerRow = memo(function StakerRow({
   user,
   assetIds,
   index,
@@ -80,10 +80,10 @@ const StakerRow = ({
   assetIds: string[];
   index: number;
   expanded: boolean;
-  onToggleExpanded: () => void;
+  onToggleExpanded: (user: string) => void;
   measureRef: (node: HTMLDivElement | null) => void;
   largeFarm: boolean;
-}) => {
+}) {
   // On large farms, rows start fully collapsed (no thumbs rendered) until
   // the user opts in. `revealed` controls that opt-in. On small farms the
   // row always renders its preview thumbs.
@@ -168,7 +168,7 @@ const StakerRow = ({
               <button
                 type="button"
                 onClick={() => {
-                  if (expanded) onToggleExpanded();
+                  if (expanded) onToggleExpanded(user);
                   setRevealed(false);
                 }}
                 className="h-8 px-2 rounded bg-muted text-xs text-muted-foreground hover:text-foreground hover:bg-muted/80 inline-flex items-center gap-1"
@@ -179,7 +179,7 @@ const StakerRow = ({
             {!expanded && overflow > 0 && (
           <button
             type="button"
-            onClick={onToggleExpanded}
+            onClick={() => onToggleExpanded(user)}
             className="h-8 px-2 rounded bg-muted text-xs text-muted-foreground hover:text-foreground hover:bg-muted/80 inline-flex items-center gap-1"
           >
             +{overflow} <ChevronDown className="h-3 w-3" />
@@ -188,7 +188,7 @@ const StakerRow = ({
         {expanded && overflow > 0 && (
           <button
             type="button"
-            onClick={onToggleExpanded}
+            onClick={() => onToggleExpanded(user)}
             className="h-8 px-2 rounded bg-muted text-xs text-muted-foreground hover:text-foreground hover:bg-muted/80 inline-flex items-center gap-1"
           >
             Collapse <ChevronUp className="h-3 w-3" />
@@ -208,7 +208,7 @@ const StakerRow = ({
       </a>
     </div>
   );
-};
+});
 
 export function FarmStakersTable({ farmName }: FarmStakersTableProps) {
   const { stakers, isLoading, isFetching, error, refetch } = useFarmStakers(farmName, true);
@@ -314,7 +314,7 @@ export function FarmStakersTable({ farmName }: FarmStakersTableProps) {
                         assetIds={s.assetIds}
                         index={vRow.index}
                         expanded={expandedUsers.has(s.user)}
-                        onToggleExpanded={() => toggleExpanded(s.user)}
+                        onToggleExpanded={toggleExpanded}
                         measureRef={virtualizer.measureElement}
                         largeFarm={isLargeFarm}
                       />

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -56,7 +57,7 @@ function getDaysRemaining(expiration: number): string {
   return `${hours}h remaining`;
 }
 
-export function FarmCard({ farm, userClaimed }: { farm: FarmInfo; userClaimed?: ClaimedToken[] }) {
+export const FarmCard = memo(function FarmCard({ farm, userClaimed }: { farm: FarmInfo; userClaimed?: ClaimedToken[] }) {
   const navigate = useNavigate();
   const logo = useIpfsImageSrc(farm.logo);
   const status = getStatusInfo(farm);
@@ -149,4 +150,4 @@ export function FarmCard({ farm, userClaimed }: { farm: FarmInfo; userClaimed?: 
       </CardContent>
     </Card>
   );
-}
+});

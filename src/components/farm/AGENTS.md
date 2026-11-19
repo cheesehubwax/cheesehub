@@ -1,3 +1,5 @@
 - Claim All: exact integer reward units (stored + rate × completed periods), skip empty farms, sequential 5-farm batches so one failure never blocks the rest.
 - Claim All hover summary shares the dialog's cached stake read and ready/empty split so button counts and dialog never disagree.
 - farms.waxdao stakers secondary indexes: 3 = user, 4 = farmname (2 returns nothing); verified on chain.
+- Farm code layout: `@/lib/farm` is a re-export entry over farmModel (constants/types/pure maths), farmActions (action builders), farmReads (chain reads) and farmGlobalStakes; farmCreate builds the exact creation transaction. Staking screen pieces live in `staking/` as display-only parts; NFTStaking keeps the state. Keeps signed shapes testable without rendering.
+- Farm images go through shared ipfsGateways helpers and TokenLogo; empty image means "no art", never a hardcoded placeholder path (breaks under GitHub Pages base path).
