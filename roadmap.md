@@ -36,3 +36,5 @@ Open tasks only. Completed work lives in git history.
 - [ ] CHEESEFolio tidy: Stages 1-6 done; remaining: live check with a connected wallet (sync, holdings, pool rows, file save/load) — needs the user's wallet sign-in in the preview.
 
 - [ ] ALCORBridge (/bridge, no menu link yet by request): verify one real bridge-in with the user's EVM wallet or exchange withdrawal; page, deposit address, routes and transfers read live here.
+
+- [ ] CHEESEWallet tidy: done (tests, live server order, image fallback, Alcor split, farm cards). Remaining: one signed farm claim/stake and stake/RAM read in a connected wallet — needs the user's Anchor sign-in.

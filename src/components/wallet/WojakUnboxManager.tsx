@@ -9,6 +9,10 @@ import { buildUnboxAction, WAXDAO_UNBOX_CONTRACT, WOJAK_UNBOX_POOL_ID, WOJAK_PAC
 import { getImageUrl } from '@/services/atomicApi';
 import { toast } from 'sonner';
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+import { IpfsImage } from '@/components/shared/IpfsImage';
+
+/** Base-path aware so it resolves on GitHub Pages too. */
+const PACK_FALLBACK_SRC = `${import.meta.env.BASE_URL}placeholder.svg`;
 
 
 interface WojakUnboxManagerProps {
@@ -65,12 +69,11 @@ export function WojakUnboxManager({ onTransactionComplete, onTransactionSuccess 
       {/* Header */}
       <div className="flex items-start gap-4 p-4 rounded-lg border border-border bg-muted/20">
         <div className="shrink-0 h-16 w-16 rounded-md overflow-hidden bg-muted/50 flex items-center justify-center">
-          <img
+          <IpfsImage
             src={getImageUrl('QmcMHEk3SLzQEoYDykiCy1bJ6DuYy7fwQWsByVhfQuY7pL')}
             alt="Waxy Wojak Pack"
             className="h-full w-full object-cover"
-            loading="lazy"
-            onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/placeholder.svg'; }}
+            fallbackSrc={PACK_FALLBACK_SRC}
           />
         </div>
         <div className="flex-1 min-w-0">
@@ -143,12 +146,11 @@ export function WojakUnboxManager({ onTransactionComplete, onTransactionSuccess 
                 className="rounded-lg border border-border bg-muted/20 overflow-hidden flex flex-col"
               >
                 <div className="aspect-square bg-muted/40 relative">
-                  <img
+                  <IpfsImage
                     src={getImageUrl(pack.image)}
                     alt={pack.name}
                     className="h-full w-full object-cover"
-                    loading="lazy"
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/placeholder.svg'; }}
+                    fallbackSrc={PACK_FALLBACK_SRC}
                   />
                   {pack.mintNumber !== null && (
                     <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-cheese text-primary-foreground text-[10px] font-bold font-mono shadow-md leading-none">

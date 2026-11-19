@@ -10,6 +10,7 @@ import { Loader2, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { AccountResources, formatBytes } from './WalletResources';
 import { fetchWithFallback } from '@/lib/fetchWithFallback';
+import { resolveEndpoints } from '@/lib/endpointHealth';
 import { AreaChart, Area, ResponsiveContainer, Tooltip, YAxis } from 'recharts';
 import { BuyRamCard } from '@/components/ram/BuyRamCard';
 import { SellRamCard } from '@/components/ram/SellRamCard';
@@ -17,7 +18,6 @@ import { useAccountRam, useCheeseRamConfig, useCheeseRamReserves, useRamPrice } 
 import { useCheesePriceData } from '@/hooks/useCheesePriceData';
 import cheeseLogo from '@/assets/cheese-logo.png';
 
-const WAX_ENDPOINTS = ['https://wax.greymass.com', 'https://api.wax.alohaeos.com', 'https://wax.eosphere.io'];
 
 interface RamManagerProps {
   resources: AccountResources | null;
@@ -88,7 +88,7 @@ function WaxRamManager({ resources, onTransactionComplete, onTransactionSuccess 
 
   const fetchRamPrice = useCallback(async () => {
     try {
-      const response = await fetchWithFallback(WAX_ENDPOINTS, '/v1/chain/get_table_rows', {
+      const response = await fetchWithFallback(await resolveEndpoints('chain-api'), '/v1/chain/get_table_rows', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: 'eosio', scope: 'eosio', table: 'rammarket', json: true, limit: 1 }),
       });

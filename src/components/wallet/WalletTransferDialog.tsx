@@ -1,3 +1,5 @@
+import { isValidWaxAccount } from '@/lib/walletResources';
+import { explorerAccount } from '@/lib/explorer';
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -78,10 +80,6 @@ const SIDEBAR_ITEMS: { id: WalletSection; label: string; icon: React.ElementType
   { id: "unbox-wojak", label: "Open Wojak Pack", icon: Package, bottom: true },
 ];
 
-function isValidWaxAccount(account: string): boolean {
-  if (!account || account.length < 1 || account.length > 12) return false;
-  return /^[a-z1-5.]+$/.test(account);
-}
 
 export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialogProps) {
   const { accountName, transferToken } = useWax();
@@ -370,7 +368,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                           {sortedBalances.map((b) => (
                             <a
                               key={`${b.contract}:${b.symbol}`}
-                              href={`https://waxblock.io/account/${b.contract}?action=tables&table=accounts&scope=${accountName}`}
+                              href={explorerAccount(b.contract)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 text-sm hover:bg-muted/50 transition-colors group"

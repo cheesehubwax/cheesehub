@@ -9,8 +9,8 @@ import { Loader2, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { AccountResources, parseWaxBalance, getRefundStatus, type RefundRequest } from './WalletResources';
 import { fetchWithFallback } from '@/lib/fetchWithFallback';
+import { resolveEndpoints } from '@/lib/endpointHealth';
 
-const WAX_ENDPOINTS = ['https://wax.greymass.com', 'https://api.wax.alohaeos.com', 'https://wax.eosphere.io'];
 
 interface StakeManagerProps {
   resources: AccountResources | null;
@@ -45,7 +45,7 @@ export function StakeManager({ resources, onTransactionComplete, onTransactionSu
   const fetchStakedResources = async () => {
     if (!accountName) return;
     try {
-      const response = await fetchWithFallback(WAX_ENDPOINTS, '/v1/chain/get_account', {
+      const response = await fetchWithFallback(await resolveEndpoints('chain-api'), '/v1/chain/get_account', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ account_name: accountName }),
       });
@@ -61,7 +61,7 @@ export function StakeManager({ resources, onTransactionComplete, onTransactionSu
     if (!accountName) return;
     setIsLoadingRefund(true);
     try {
-      const response = await fetchWithFallback(WAX_ENDPOINTS, '/v1/chain/get_table_rows', {
+      const response = await fetchWithFallback(await resolveEndpoints('chain-api'), '/v1/chain/get_table_rows', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: 'eosio', scope: accountName, table: 'refunds', json: true, limit: 1 }),
       });

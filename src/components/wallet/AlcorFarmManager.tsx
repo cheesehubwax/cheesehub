@@ -1,15 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ExternalLink, TrendingUp, Percent, Coins, ChevronDown, ChevronUp, Plus, RefreshCw, Zap, Wifi, Database, Clock, LogOut, Recycle } from 'lucide-react';
+import { Loader2, ExternalLink, TrendingUp, Coins, Plus, RefreshCw, Zap, Wifi, Database, LogOut, Recycle } from 'lucide-react';
 import { useWax } from '@/context/WaxContext';
 import { useAlcorFarms, UnstakedIncentivesMap, UnstakedLPPosition } from '@/hooks/useAlcorFarms';
 import { useAlcorTokenPrices } from '@/hooks/useAlcorTokenPrices';
 import { useWaxPrice } from '@/hooks/useWaxPrice';
 import { useAllTokenBalances } from '@/hooks/useAllTokenBalances';
 import { buildClaimRewardsAction, buildUnstakeAction, buildStakeAction, AlcorFarmPosition, UnstakedIncentive } from '@/lib/alcorFarms';
-import { TokenLogo } from '@/components/TokenLogo';
 import { toast } from 'sonner';
 import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
 import { IncreaseLiquidityDialog } from './IncreaseLiquidityDialog';
@@ -25,56 +23,11 @@ interface AlcorFarmManagerProps {
   onTransactionSuccess?: (title: string, description: string, txId: string | null) => void;
 }
 
-interface GroupedFarmPosition {
-  positionId: number;
-  poolId: number;
-  tokenA: { contract: string; symbol: string; amount: number };
-  tokenB: { contract: string; symbol: string; amount: number };
-  tickLower: number;
-  tickUpper: number;
-  isInRange: boolean;
-  incentives: AlcorFarmPosition[];
-  unstakedIncentives: UnstakedIncentive[];
-  usdValue: number;
-}
+import { getIncentiveKey, isIncentiveExpired } from '@/lib/alcor/time';
+import type { GroupedFarmPosition } from './alcor/types';
+import { StakedFarmCard } from './alcor/StakedFarmCard';
+import { UnstakedLPCard } from './alcor/UnstakedLPCard';
 
-function isIncentiveExpired(endTimestamp: number): boolean {
-  if (endTimestamp <= 0) return false;
-  return endTimestamp <= Math.floor(Date.now() / 1000);
-}
-
-function formatRemainingDays(endTimestamp: number): { label: string; isUrgent: boolean; isExpired: boolean } {
-  const now = Math.floor(Date.now() / 1000);
-  if (endTimestamp <= 0) return { label: '—', isUrgent: false, isExpired: false };
-  if (endTimestamp <= now) return { label: 'Ended', isUrgent: false, isExpired: true };
-
-  const secondsLeft = endTimestamp - now;
-  const daysLeft = Math.floor(secondsLeft / 86400);
-  const hoursLeft = Math.floor((secondsLeft % 86400) / 3600);
-
-  if (daysLeft > 7) return { label: `${daysLeft}d`, isUrgent: false, isExpired: false };
-  if (daysLeft > 0) return { label: `${daysLeft}d ${hoursLeft}h`, isUrgent: true, isExpired: false };
-  return { label: `${hoursLeft}h`, isUrgent: true, isExpired: false };
-}
-
-function formatDetailedCountdown(endTimestamp: number): string {
-  const now = Math.floor(Date.now() / 1000);
-  if (endTimestamp <= 0) return 'Unknown end time';
-  if (endTimestamp <= now) return 'Farm has ended';
-
-  const secondsLeft = endTimestamp - now;
-  const days = Math.floor(secondsLeft / 86400);
-  const hours = Math.floor((secondsLeft % 86400) / 3600);
-  const minutes = Math.floor((secondsLeft % 3600) / 60);
-
-  const endDate = new Date(endTimestamp * 1000);
-  const dateStr = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  const timeStr = endDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-
-  if (days > 0) return `${days}d ${hours}h ${minutes}m (${dateStr} ${timeStr})`;
-  if (hours > 0) return `${hours}h ${minutes}m (${dateStr} ${timeStr})`;
-  return `${minutes}m (${dateStr} ${timeStr})`;
-}
 
 export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }: AlcorFarmManagerProps) {
   const { session, accountName } = useWax();
@@ -182,7 +135,9 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
     return count;
   }, [unstakedList, groupedPositions]);
 
-  const getIncentiveKey = (farm: AlcorFarmPosition) => `${farm.positionId}-${farm.incentiveId}`;
+  const toggleExpanded = useCallback((positionId: number) => {
+    setExpandedPosition((current) => (current === positionId ? null : positionId));
+  }, []);
 
   const totalRewardsByToken = useMemo(() => {
     const totals = new Map<string, { symbol: string; precision: number; total: number }>();
@@ -552,301 +507,36 @@ export function AlcorFarmManager({ onTransactionComplete, onTransactionSuccess }
 
       {/* Farm position cards */}
       <div className="space-y-3 max-h-[500px] overflow-y-auto pr-4">
-        {allPositionsSorted.map((item) => {
-          if (item.type === 'staked') {
-            const position = item.data;
-            const isExpanded = expandedPosition === position.positionId;
-            const positionClaims = position.incentives.map(i => ({ incentiveId: i.incentiveId, posId: i.positionId }));
-            const allIncentivesExpired = position.incentives.every(i => isIncentiveExpired(i.incentiveEndsAt));
-
-            return (
-              <Card key={position.positionId} className={cn("border-border/50", allIncentivesExpired ? "bg-amber-500/5 border-l-4 border-l-amber-500/70" : "bg-muted/30")}>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="flex -space-x-2">
-                        <TokenLogo contract={position.tokenA.contract} symbol={position.tokenA.symbol} size="sm" />
-                        <TokenLogo contract={position.tokenB.contract} symbol={position.tokenB.symbol} size="sm" />
-                      </div>
-                      <div>
-                        <div className="font-medium text-sm">{position.tokenA.symbol}/{position.tokenB.symbol}</div>
-                        <div className="text-[10px] text-muted-foreground">
-                          Pool #{position.positionId}
-                          {position.usdValue > 0 && <span className="text-cheese ml-1">${position.usdValue.toFixed(2)}</span>}
-                        </div>
-                      </div>
-                    </div>
-                    {position.unstakedIncentives.length > 0 && (
-                      <Button size="sm" onClick={(e) => { e.stopPropagation(); position.unstakedIncentives.length === 1 ? handleStakeToIncentive(position.positionId, position.unstakedIncentives[0]) : handleStakeAllIncentives(position.positionId, position.unstakedIncentives); }} disabled={isTransacting} className="h-7 px-3 text-xs bg-green-600 hover:bg-green-700 text-white animate-pulse">
-                        <Zap className="h-3 w-3 mr-1" />{position.unstakedIncentives.length === 1 ? 'Stake' : `Stake (${position.unstakedIncentives.length})`}
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="w-[140px] shrink-0">
-                      <div className="text-xs text-muted-foreground mb-1">Stake</div>
-                      <div className="font-mono text-xs space-y-0.5 text-foreground">
-                        <div>{position.tokenA.amount.toFixed(4)} {position.tokenA.symbol}</div>
-                        <div>{position.tokenB.amount.toFixed(4)} {position.tokenB.symbol}</div>
-                      </div>
-                    </div>
-
-                    <div className="w-[70px] shrink-0 text-center" title="Live estimate derived from current pool reward rate and TVL. Not a promised return.">
-                      <div className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-1"><Percent className="h-3 w-3" />Est.</div>
-                      <div className="space-y-0.5">
-                        {position.incentives.map((incentive) => {
-                          const key = getIncentiveKey(incentive);
-                          const dailyValueUsd = getTokenUsdValue(incentive.rewardToken.contract, incentive.rewardToken.symbol, incentive.dailyEarnRate);
-                          const apr = position.usdValue > 0 ? (dailyValueUsd * 365 / position.usdValue) * 100 : 0;
-                          return <div key={key} className="font-mono text-xs text-green-400">{apr > 0 ? `${apr.toFixed(1)}%` : '—'}</div>;
-                        })}
-                      </div>
-                      <div className="text-[9px] text-muted-foreground/70 mt-1 leading-tight">estimate only</div>
-                    </div>
-
-                    <div className="w-[120px] shrink-0 text-center">
-                      <div className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-1"><TrendingUp className="h-3 w-3" />Daily</div>
-                      <div className="space-y-0.5">
-                        {position.incentives.map((incentive) => {
-                          const key = getIncentiveKey(incentive);
-                          return <div key={key} className="font-mono text-xs">{incentive.dailyEarnRate.toFixed(Math.min(4, incentive.rewardToken.precision))} {incentive.rewardToken.symbol}</div>;
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="w-[70px] shrink-0 text-center">
-                      <div className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-1"><Clock className="h-3 w-3" />Remaining</div>
-                      <div className="space-y-0.5">
-                        {position.incentives.map((incentive) => {
-                          const key = getIncentiveKey(incentive);
-                          const { label, isUrgent, isExpired } = formatRemainingDays(incentive.incentiveEndsAt);
-                          return <div key={key} className={cn("font-mono text-xs", isExpired ? "text-amber-500" : isUrgent ? "text-red-400" : "text-muted-foreground")}>{label}</div>;
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="min-w-[100px]">
-                      <div className="text-xs text-muted-foreground flex items-center gap-1 mb-1"><Coins className="h-3 w-3" />Earned</div>
-                      <div className="space-y-0.5">
-                        {position.incentives.map((incentive) => {
-                          const key = getIncentiveKey(incentive);
-                          const liveReward = liveRewards.get(key) || incentive.pendingReward;
-                          return <div key={key} className="font-mono text-xs text-cheese">{liveReward.toFixed(Math.min(4, incentive.rewardToken.precision))} {incentive.rewardToken.symbol}</div>;
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {allIncentivesExpired ? (
-                        <Button size="sm" onClick={() => handleUnstake(position.incentives)} disabled={isTransacting} className="h-8 px-3 text-xs bg-amber-600 hover:bg-amber-700 text-white">
-                          <LogOut className="h-3 w-3 mr-1" />Claim & Unstake
-                        </Button>
-                      ) : (
-                        <Button size="sm" onClick={() => handleClaimRewards(positionClaims)} disabled={isTransacting} className="h-8 px-3 text-xs bg-green-600 hover:bg-green-700 text-white">
-                          Claim
-                        </Button>
-                      )}
-                      <Button size="sm" variant="ghost" onClick={() => setExpandedPosition(isExpanded ? null : position.positionId)} className="h-8 w-8 p-0">
-                        {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                  </div>
-
-                  {isExpanded && (
-                    <div className="mt-4 pt-4 border-t border-border/50 space-y-4">
-                      <div className="flex items-center justify-between gap-4 text-sm">
-                        <Badge variant={position.isInRange ? "default" : "secondary"} className={cn("text-xs", position.isInRange ? "bg-green-500/20 text-green-400 border-green-500/50" : "")}>
-                          {position.isInRange ? 'In Range' : 'Out of Range'}
-                        </Badge>
-                      </div>
-
-                      <div className="space-y-2">
-                        <span className="text-xs text-muted-foreground font-medium">Reward Breakdown:</span>
-                        <div className="grid gap-2">
-                          {position.incentives.map((incentive) => {
-                            const key = getIncentiveKey(incentive);
-                            const liveReward = liveRewards.get(key) || incentive.pendingReward;
-                            const detailedTime = formatDetailedCountdown(incentive.incentiveEndsAt);
-                            const isExpiredInc = isIncentiveExpired(incentive.incentiveEndsAt);
-                            return (
-                              <div key={key} className={cn("flex items-center justify-between p-2 rounded text-sm", isExpiredInc ? "bg-amber-500/10 border border-amber-500/30" : "bg-background/50")}>
-                                <div className="flex items-center gap-2">
-                                  <TokenLogo contract={incentive.rewardToken.contract} symbol={incentive.rewardToken.symbol} size="sm" />
-                                  <div>
-                                    <div className="flex items-center gap-1">
-                                      <span className="font-medium">{incentive.rewardToken.symbol}</span>
-                                      <span className="text-xs text-muted-foreground">#{incentive.incentiveId}</span>
-                                      {isExpiredInc && <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 bg-amber-500/20 text-amber-400 border-amber-500/50">ENDED</Badge>}
-                                    </div>
-                                    <div className={cn("text-xs mt-0.5 flex items-center gap-1", isExpiredInc ? "text-amber-500" : "text-muted-foreground")}>
-                                      <Clock className="h-3 w-3" />{detailedTime}
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <div className="text-right">
-                                    <div className="font-mono text-cheese">{liveReward.toFixed(incentive.rewardToken.precision)}</div>
-                                    {!isExpiredInc && (
-                                      <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                        <TrendingUp className="h-3 w-3" />{incentive.dailyEarnRate.toFixed(Math.min(4, incentive.rewardToken.precision))}/day
-                                        <span className="ml-1"><Percent className="h-3 w-3 inline" />{incentive.rewardShare.toFixed(2)}%</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                  {isExpiredInc && (
-                                    <Button size="sm" onClick={() => handleUnstakeSingle(incentive)} disabled={isTransacting} variant="outline" className="h-7 px-2 text-xs border-amber-500/50 text-amber-400 hover:bg-amber-500/10">
-                                      <LogOut className="h-3 w-3 mr-1" />Claim & Unstake
-                                    </Button>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {position.unstakedIncentives.length > 0 && (
-                        <div className="space-y-2">
-                          <span className="text-xs text-muted-foreground font-medium">New Rewards Available:</span>
-                          <div className="grid gap-2">
-                            {position.unstakedIncentives.map((incentive) => (
-                              <div key={incentive.incentiveId} className="flex items-center justify-between p-2 rounded bg-green-500/10 border border-green-500/30 text-sm">
-                                <div className="flex items-center gap-2">
-                                  <TokenLogo contract={incentive.rewardToken.contract} symbol={incentive.rewardToken.symbol} size="sm" />
-                                  <span className="font-medium">{incentive.rewardToken.symbol}</span>
-                                  <span className="text-xs text-muted-foreground">#{incentive.incentiveId}</span>
-                                </div>
-                                <Button size="sm" onClick={() => handleStakeToIncentive(position.positionId, incentive)} disabled={isTransacting} className="h-7 px-3 text-xs bg-green-600 hover:bg-green-700">
-                                  <Zap className="h-3 w-3 mr-1" />Stake Position
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="flex gap-2 pt-2">
-                        <Button size="sm" onClick={() => { const baseIncentive = position.incentives[0]; if (baseIncentive) setIncreaseLiquidityPosition({ ...baseIncentive, tickLower: position.tickLower, tickUpper: position.tickUpper }); }} disabled={isTransacting || (position.tickLower === 0 && position.tickUpper === 0)} className="flex-1 gap-1 bg-green-600 hover:bg-green-700 text-white">
-                          <Plus className="h-3 w-3" />Increase Position
-                        </Button>
-                        <Button size="sm" onClick={() => handleUnstake(position.incentives)} disabled={isTransacting} className="flex-1 bg-red-600 hover:bg-red-700 text-white">
-                          Unstake from Farm
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => window.open(`https://wax.alcor.exchange/positions/${position.positionId}`, '_blank')} className="px-2">
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      {position.tickLower === 0 && position.tickUpper === 0 && (
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Tick data unavailable. <a href={`https://wax.alcor.exchange/positions/${position.positionId}`} target="_blank" rel="noopener noreferrer" className="text-cheese hover:underline">Manage on Alcor</a>
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          } else {
-            const position = item.data;
-            const usdValue = item.usdValue;
-            const isExpanded = expandedPosition === position.positionId;
-
-            return (
-              <Card key={`unstaked-${position.positionId}`} className="bg-muted/30 border-border/50 border-l-4 border-l-green-500/70">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-2 w-[130px] shrink-0">
-                      <div className="flex -space-x-2">
-                        <TokenLogo contract={position.tokenA.contract} symbol={position.tokenA.symbol} size="sm" />
-                        <TokenLogo contract={position.tokenB.contract} symbol={position.tokenB.symbol} size="sm" />
-                      </div>
-                      <div>
-                        <div className="font-medium text-sm">{position.tokenA.symbol}/{position.tokenB.symbol}</div>
-                        <div className="text-[10px] text-muted-foreground">
-                          Pool #{position.positionId}
-                          {usdValue > 0 && <span className="text-cheese ml-1">${usdValue.toFixed(2)}</span>}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="w-[120px] shrink-0">
-                      <div className="text-xs text-muted-foreground mb-1">Stake</div>
-                      <div className="font-mono text-xs space-y-0.5">
-                        <div>{position.tokenA.amount.toFixed(4)} {position.tokenA.symbol}</div>
-                        <div>{position.tokenB.amount.toFixed(4)} {position.tokenB.symbol}</div>
-                      </div>
-                    </div>
-
-                    <div className="flex-1 text-center">
-                      <Badge variant="secondary" className="text-xs bg-amber-500/20 text-amber-400 border-amber-500/50">Not Earning Rewards</Badge>
-                    </div>
-
-                    <div className="text-sm text-muted-foreground">
-                      {position.availableIncentives.length} farm{position.availableIncentives.length !== 1 ? 's' : ''} available
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {position.availableIncentives.length === 1 ? (
-                        <Button size="sm" onClick={() => handleStakeToIncentive(position.positionId, position.availableIncentives[0])} disabled={isTransacting} className="h-8 px-4 text-xs bg-green-600 hover:bg-green-700 text-white animate-pulse">
-                          <Zap className="h-4 w-4 mr-1" />Stake Position
-                        </Button>
-                      ) : (
-                        <Button size="sm" onClick={() => handleStakeAllIncentives(position.positionId, position.availableIncentives)} disabled={isTransacting} className="h-8 px-4 text-xs bg-green-600 hover:bg-green-700 text-white animate-pulse">
-                          <Zap className="h-4 w-4 mr-1" />Stake All ({position.availableIncentives.length})
-                        </Button>
-                      )}
-                      <Button size="sm" variant="ghost" onClick={() => setExpandedPosition(isExpanded ? null : position.positionId)} className="h-8 w-8 p-0">
-                        {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                  </div>
-
-                  {isExpanded && (
-                    <div className="mt-4 pt-4 border-t border-border/50 space-y-4">
-                      <div className="flex items-start justify-between gap-4 text-sm">
-                        <div>
-                          <span className="text-muted-foreground">Your LP Tokens:</span>
-                          <div className="font-mono mt-1">
-                            <div>{position.tokenA.amount.toFixed(4)} {position.tokenA.symbol}</div>
-                            <div>{position.tokenB.amount.toFixed(4)} {position.tokenB.symbol}</div>
-                          </div>
-                        </div>
-                        <Badge variant={position.isInRange ? "default" : "secondary"} className={cn("text-xs", position.isInRange ? "bg-green-500/20 text-green-400 border-green-500/50" : "")}>
-                          {position.isInRange ? 'In Range' : 'Out of Range'}
-                        </Badge>
-                      </div>
-
-                      <div className="space-y-2">
-                        <span className="text-xs text-muted-foreground font-medium">Available Farms:</span>
-                        <div className="grid gap-2">
-                          {position.availableIncentives.map((incentive) => (
-                            <div key={incentive.incentiveId} className="flex items-center justify-between p-2 rounded bg-background/50 text-sm">
-                              <div className="flex items-center gap-2">
-                                <TokenLogo contract={incentive.rewardToken.contract} symbol={incentive.rewardToken.symbol} size="sm" />
-                                <span className="font-medium">{incentive.rewardToken.symbol}</span>
-                                <span className="text-xs text-muted-foreground">#{incentive.incentiveId}</span>
-                              </div>
-                              <Button size="sm" variant="outline" onClick={() => handleStakeToIncentive(position.positionId, incentive)} disabled={isTransacting} className="h-6 px-2 text-xs">
-                                <Zap className="h-3 w-3 mr-1" />Stake
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2 pt-2">
-                        <Button size="sm" variant="ghost" onClick={() => window.open(`https://wax.alcor.exchange/positions/${position.positionId}`, '_blank')} className="flex-1 gap-1">
-                          <ExternalLink className="h-3 w-3" />Manage on Alcor
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          }
-        })}
+        {allPositionsSorted.map((item) =>
+          item.type === 'staked' ? (
+            <StakedFarmCard
+              key={item.data.positionId}
+              position={item.data}
+              isExpanded={expandedPosition === item.data.positionId}
+              isTransacting={isTransacting}
+              liveRewards={liveRewards}
+              getTokenUsdValue={getTokenUsdValue}
+              onToggleExpand={toggleExpanded}
+              onIncreaseLiquidity={setIncreaseLiquidityPosition}
+              handleClaimRewards={handleClaimRewards}
+              handleUnstake={handleUnstake}
+              handleUnstakeSingle={handleUnstakeSingle}
+              handleStakeToIncentive={handleStakeToIncentive}
+              handleStakeAllIncentives={handleStakeAllIncentives}
+            />
+          ) : (
+            <UnstakedLPCard
+              key={`unstaked-${item.data.positionId}`}
+              position={item.data}
+              usdValue={item.usdValue}
+              isExpanded={expandedPosition === item.data.positionId}
+              isTransacting={isTransacting}
+              onToggleExpand={toggleExpanded}
+              handleStakeToIncentive={handleStakeToIncentive}
+              handleStakeAllIncentives={handleStakeAllIncentives}
+            />
+          )
+        )}
       </div>
 
       <IncreaseLiquidityDialog
