@@ -29,7 +29,7 @@ describe("fetchProposals parsing", () => {
       { proposal_id: 1, author: "a", title: "active", proposal_type: 4, outcome: 0, end_time: NOW + 10, choices: yna(0, 0, 0) },
       { proposal_id: 2, title: "passed", proposal_type: 4, outcome: 2, end_time: NOW - 10, choices: yna(5, 2, 0) },
       { proposal_id: 3, title: "rejected", proposal_type: 4, outcome: 2, end_time: NOW - 10, choices: yna(1, 2, 0) },
-      { proposal_id: 4, title: "inconclusive", proposal_type: 4, outcome: 5, end_time: NOW - 10, choices: yna(0, 0, 3) },
+      { proposal_id: 4, title: "inconclusive", proposal_type: 4, outcome: 2, end_time: NOW - 10, choices: yna(0, 0, 3) },
       { proposal_id: 5, title: "executed", proposal_type: 4, outcome: 4, end_time: NOW - 10, choices: yna(5, 1, 0) },
       { proposal_id: 6, title: "pending", proposal_type: 4, outcome: 0, end_time: NOW - 10, choices: yna(0, 0, 0) },
       { proposal_id: 7, title: "expired", proposal_type: 4, outcome: 0, end_time: NOW - 2_592_001, choices: yna(0, 0, 0) },
@@ -45,6 +45,16 @@ describe("fetchProposals parsing", () => {
     expect(p[0].proposer).toBe("a");
     expect(p[10].description).toBe("hi");
     expect(p[9].token_receivers).toEqual([{ wax_account: "r", quantity: "1 X", contract: "x" }]);
+  });
+
+  it("shows minimum-votes failures (outcome 5) as rejected even when yes leads", async () => {
+    hyperion.mockResolvedValue({ actions: [] });
+    rpc.mockResolvedValue(json({ rows: [
+      { proposal_id: 74, title: "gggff", proposal_type: 4, outcome: 5, end_time: NOW - 10, choices: yna(1, 0, 0) },
+      { proposal_id: 75, title: "multi quorum", proposal_type: 0, outcome: 5, end_time: NOW - 10, choices: [{ choice: 0, description: "A", total_votes: 1 }] },
+    ] }));
+    const p = await fetchProposals("d");
+    expect(p.map(x => x.status)).toEqual(["rejected", "rejected"]);
   });
 
   it("recovers token receivers from transfer actions, then Hyperion by title", async () => {

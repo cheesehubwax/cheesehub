@@ -271,7 +271,7 @@ export async function fetchProposals(daoName: string): Promise<Proposal[]> {
 
       let status: Proposal["status"] = "pending";
 
-      if (outcome === 2 || outcome === 4 || outcome === 5) {
+      if (outcome === 2 || outcome === 4) {
         if (contractProposalType === 4) {
           if (yesVotes === 0 && noVotes === 0) {
             status = abstainVotes > 0 ? "inconclusive" : "rejected";
@@ -286,7 +286,7 @@ export async function fetchProposals(daoName: string): Promise<Proposal[]> {
         } else {
           status = outcome === 4 ? "executed" : "passed";
         }
-      } else if (outcome === 3) {
+      } else if (outcome === 3 || outcome === 5) {
         status = "rejected";
       } else if (outcome >= 6) {
         status = (OUTCOME_STATUS[outcome] as typeof status) || "rejected";
