@@ -1,50 +1,25 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Plus, Trash2, AlertTriangle, Info, Search, ChevronDown, Check } from 'lucide-react';
+import { Loader2, Plus, AlertTriangle, Info } from 'lucide-react';
 import { useWax } from '@/context/WaxContext';
 import { toast } from 'sonner';
 import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
-import { TokenLogo } from '@/components/TokenLogo';
 import { cn } from '@/lib/utils';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { fetchAllPools, buildCreateIncentiveActions, getNextIncentiveId, AlcorPool } from '@/lib/alcorFarms';
-import { useAllTokenBalances, TokenWithBalance } from '@/hooks/useAllTokenBalances';
+import { useAllTokenBalances } from '@/hooks/useAllTokenBalances';
+import { DEFAULT_DURATION, DURATION_OPTIONS, RewardToken, formatFee, isCreateFarmValid, maxRewardAmount } from './alcor/createFarm';
+import { PoolPicker } from './alcor/PoolPicker';
+import { RewardTokenPicker } from './alcor/RewardTokenPicker';
+import { RewardTokenRow } from './alcor/RewardTokenRow';
 
 interface CreateAlcorFarmDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onTransactionSuccess?: (title: string, description: string, txId: string | null) => void;
   onTransactionComplete?: () => void;
-}
-
-interface RewardToken {
-  id: string;
-  contract: string;
-  symbol: string;
-  precision: number;
-  amount: string;
-  balance: number;
-}
-
-const DURATION_OPTIONS = [
-  { label: '1 Day', days: 1, seconds: 86400 },
-  { label: '7 Days', days: 7, seconds: 604800 },
-  { label: '30 Days', days: 30, seconds: 2592000 },
-  { label: '60 Days', days: 60, seconds: 5184000 },
-  { label: '90 Days', days: 90, seconds: 7776000 },
-  { label: '180 Days', days: 180, seconds: 15552000 },
-  { label: '240 Days', days: 240, seconds: 20736000 },
-  { label: '360 Days', days: 360, seconds: 31104000 },
-];
-
-function formatFee(fee: number): string {
-  return `${(fee / 10000).toFixed(2)}%`;
 }
 
 export function CreateAlcorFarmDialog({
@@ -63,7 +38,7 @@ export function CreateAlcorFarmDialog({
   const [poolSearchOpen, setPoolSearchOpen] = useState(false);
   const [poolSearch, setPoolSearch] = useState('');
   const [rewardTokens, setRewardTokens] = useState<RewardToken[]>([]);
-  const [selectedDuration, setSelectedDuration] = useState(DURATION_OPTIONS[2]);
+  const [selectedDuration, setSelectedDuration] = useState(DEFAULT_DURATION);
   const [rewardTokenOpen, setRewardTokenOpen] = useState(false);
   const [rewardTokenSearch, setRewardTokenSearch] = useState('');
 
@@ -139,22 +114,16 @@ export function CreateAlcorFarmDialog({
   }, []);
 
   const setMaxAmount = useCallback((id: string, balance: number, precision: number) => {
-    const maxAmount = (balance * 0.9999).toFixed(precision);
-    updateRewardAmount(id, maxAmount);
+    updateRewardAmount(id, maxRewardAmount(balance, precision));
   }, [updateRewardAmount]);
 
-  const isValid = useMemo(() => {
-    if (!selectedPool) return false;
-    if (rewardTokens.length === 0) return false;
+  const isValid = useMemo(() => isCreateFarmValid(selectedPool, rewardTokens), [selectedPool, rewardTokens]);
 
-    for (const rt of rewardTokens) {
-      const amount = parseFloat(rt.amount);
-      if (isNaN(amount) || amount <= 0) return false;
-      if (amount > rt.balance) return false;
-    }
-
-    return true;
-  }, [selectedPool, rewardTokens]);
+  const selectPool = useCallback((pool: AlcorPool) => {
+    setSelectedPool(pool);
+    setPoolSearchOpen(false);
+    setPoolSearch('');
+  }, []);
 
   const handleSubmit = async () => {
     if (!session || !accountName || !selectedPool || !isValid) return;
@@ -189,7 +158,7 @@ export function CreateAlcorFarmDialog({
 
       setSelectedPool(null);
       setRewardTokens([]);
-      setSelectedDuration(DURATION_OPTIONS[2]);
+      setSelectedDuration(DEFAULT_DURATION);
       onOpenChange(false);
       onTransactionComplete?.();
     } catch (error: any) {
@@ -206,7 +175,7 @@ export function CreateAlcorFarmDialog({
     if (!open) {
       setSelectedPool(null);
       setRewardTokens([]);
-      setSelectedDuration(DURATION_OPTIONS[2]);
+      setSelectedDuration(DEFAULT_DURATION);
       setPoolSearch('');
     }
   }, [open]);
@@ -238,134 +207,30 @@ export function CreateAlcorFarmDialog({
 
             <div className="space-y-2">
               <Label>Select Pool</Label>
-              <Popover open={poolSearchOpen} onOpenChange={setPoolSearchOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={poolSearchOpen}
-                    className="w-full justify-between h-12"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Loading pools...
-                      </div>
-                    ) : selectedPool ? (
-                      <div className="flex items-center gap-2">
-                        <div className="flex -space-x-1">
-                          <TokenLogo contract={selectedPool.tokenA.contract} symbol={selectedPool.tokenA.symbol} size="sm" />
-                          <TokenLogo contract={selectedPool.tokenB.contract} symbol={selectedPool.tokenB.symbol} size="sm" />
-                        </div>
-                        <span>{selectedPool.tokenA.symbol}/{selectedPool.tokenB.symbol}</span>
-                        <Badge variant="outline" className="ml-2 text-xs">
-                          {formatFee(selectedPool.fee)}
-                        </Badge>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">Select a pool...</span>
-                    )}
-                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0" align="start">
-                  <Command>
-                    <CommandInput
-                      placeholder="Search pools by token..."
-                      value={poolSearch}
-                      onValueChange={setPoolSearch}
-                    />
-                    <CommandList>
-                      <CommandEmpty>No pools found.</CommandEmpty>
-                      <CommandGroup>
-                        {filteredPools.map(pool => (
-                          <CommandItem
-                            key={pool.id}
-                            value={`${pool.tokenA.symbol}-${pool.tokenB.symbol}-${pool.id}`}
-                            onSelect={() => {
-                              setSelectedPool(pool);
-                              setPoolSearchOpen(false);
-                              setPoolSearch('');
-                            }}
-                            className="flex items-center justify-between"
-                          >
-                            <div className="flex items-center gap-2">
-                              <div className="flex -space-x-1">
-                                <TokenLogo contract={pool.tokenA.contract} symbol={pool.tokenA.symbol} size="sm" />
-                                <TokenLogo contract={pool.tokenB.contract} symbol={pool.tokenB.symbol} size="sm" />
-                              </div>
-                              <div>
-                                <div className="font-medium">{pool.tokenA.symbol}/{pool.tokenB.symbol}</div>
-                                <div className="text-xs text-muted-foreground">Pool #{pool.id}</div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-xs">
-                                {formatFee(pool.fee)}
-                              </Badge>
-                              {selectedPool?.id === pool.id && (
-                                <Check className="h-4 w-4 text-cheese" />
-                              )}
-                            </div>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <PoolPicker
+                open={poolSearchOpen}
+                onOpenChange={setPoolSearchOpen}
+                isLoading={isLoading}
+                selectedPool={selectedPool}
+                pools={filteredPools}
+                search={poolSearch}
+                onSearchChange={setPoolSearch}
+                onSelect={selectPool}
+              />
             </div>
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label>Reward Tokens</Label>
-                <Popover open={rewardTokenOpen} onOpenChange={setRewardTokenOpen}>
-                  <PopoverTrigger asChild>
-                    <Button size="sm" variant="outline" className="h-8 gap-1">
-                      <Plus className="h-3 w-3" />
-                      Add Token
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[300px] p-0" align="end">
-                    <Command>
-                      <CommandInput
-                        placeholder="Search tokens..."
-                        value={rewardTokenSearch}
-                        onValueChange={setRewardTokenSearch}
-                      />
-                      <CommandList>
-                        {balancesLoading ? (
-                          <div className="flex items-center justify-center py-6">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          </div>
-                        ) : (
-                          <>
-                            <CommandEmpty>No tokens found.</CommandEmpty>
-                            <CommandGroup>
-                              {filteredRewardTokens.map(token => (
-                                <CommandItem
-                                  key={`${token.contract}-${token.symbol}`}
-                                  value={`${token.contract}-${token.symbol}`}
-                                  onSelect={() => addRewardToken(token)}
-                                  className="flex items-center justify-between"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <TokenLogo contract={token.contract} symbol={token.symbol} size="sm" />
-                                    <span>{token.symbol}</span>
-                                  </div>
-                                  <span className="text-xs text-muted-foreground">
-                                    {token.balance.toFixed(Math.min(4, token.precision))}
-                                  </span>
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </>
-                        )}
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                <RewardTokenPicker
+                  open={rewardTokenOpen}
+                  onOpenChange={setRewardTokenOpen}
+                  isLoading={balancesLoading}
+                  tokens={filteredRewardTokens}
+                  search={rewardTokenSearch}
+                  onSearchChange={setRewardTokenSearch}
+                  onSelect={addRewardToken}
+                />
               </div>
 
               {rewardTokens.length === 0 ? (
@@ -375,48 +240,13 @@ export function CreateAlcorFarmDialog({
               ) : (
                 <div className="space-y-3">
                   {rewardTokens.map(rt => (
-                    <div
+                    <RewardTokenRow
                       key={rt.id}
-                      className="p-3 rounded-lg bg-muted/30 border border-border/50 space-y-2"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <TokenLogo contract={rt.contract} symbol={rt.symbol} size="sm" />
-                          <span className="font-medium">{rt.symbol}</span>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => removeRewardToken(rt.id)}
-                          className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          placeholder="0.0000"
-                          value={rt.amount}
-                          onChange={(e) => updateRewardAmount(rt.id, e.target.value)}
-                          className="flex-1"
-                        />
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setMaxAmount(rt.id, rt.balance, rt.precision)}
-                          className="h-9"
-                        >
-                          Max
-                        </Button>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Balance: {rt.balance.toFixed(Math.min(4, rt.precision))} {rt.symbol}</span>
-                        {parseFloat(rt.amount) > rt.balance && (
-                          <span className="text-red-500">Insufficient balance</span>
-                        )}
-                      </div>
-                    </div>
+                      token={rt}
+                      onRemove={removeRewardToken}
+                      onAmountChange={updateRewardAmount}
+                      onMax={setMaxAmount}
+                    />
                   ))}
                 </div>
               )}

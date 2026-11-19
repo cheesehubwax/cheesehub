@@ -1,12 +1,8 @@
 import { isValidWaxAccount } from '@/lib/walletResources';
-import { explorerAccount } from '@/lib/explorer';
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useWax } from "@/context/WaxContext";
 import { useWaxPrice } from "@/hooks/useWaxPrice";
 import { useAllTokenBalances, TokenWithBalance } from "@/hooks/useAllTokenBalances";
@@ -22,64 +18,20 @@ import { CreateAccountManager } from "./CreateAccountManager";
 import { AlcorFarmManager } from "./AlcorFarmManager";
 import { WojakUnboxManager } from "./WojakUnboxManager";
 import { TransactionSuccessDialog } from "./TransactionSuccessDialog";
+import { WalletSidebarNav, type WalletSection } from "./transfer/WalletSidebarNav";
+import { TokenBalancesGrid } from "./transfer/TokenBalancesGrid";
+import { SendTokensForm } from "./transfer/SendTokensForm";
 import { openAlcorBridge } from "@/components/bridge/AlcorBridgeDialog";
-import { TokenLogo } from "@/components/TokenLogo";
 import { closeWharfkitModals } from "@/lib/wharfKit";
 import cheeseLogo from "@/assets/cheese-logo.png";
 import alcorIconUrl from "@/assets/alcor-icon.svg";
-import {
-  Wallet,
-  Send,
-  Image,
-  Landmark,
-  Zap,
-  HardDrive,
-  Vote,
-  Gift,
-  UserPlus,
-  Sprout,
-  Package,
-  X,
-  Search,
-  ExternalLink,
-  Loader2,
-  Check,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import { X } from "lucide-react";
 import { toast } from "sonner";
 
 interface WalletTransferDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
-type WalletSection =
-  | "account"
-  | "send-tokens"
-  | "send-nfts"
-  | "stake"
-  | "rent"
-  | "ram"
-  | "governance"
-  | "vote-rewards"
-  | "create-account"
-  | "alcor-farms"
-  | "unbox-wojak";
-
-const SIDEBAR_ITEMS: { id: WalletSection; label: string; icon: React.ElementType; bottom?: boolean }[] = [
-  { id: "account", label: "Account", icon: Wallet },
-  { id: "send-tokens", label: "Send Tokens", icon: Send },
-  { id: "send-nfts", label: "Send NFTs", icon: Image },
-  { id: "stake", label: "Stake CPU/NET", icon: Landmark },
-  { id: "rent", label: "Rent CPU/NET", icon: Zap },
-  { id: "ram", label: "Trade RAM", icon: HardDrive },
-  { id: "governance", label: "Governance", icon: Vote },
-  { id: "vote-rewards", label: "Vote Rewards", icon: Gift },
-  { id: "create-account", label: "Create Account", icon: UserPlus },
-  { id: "alcor-farms", label: "Manage Alcor Farms", icon: Sprout, bottom: true },
-  { id: "unbox-wojak", label: "Open Wojak Pack", icon: Package, bottom: true },
-];
-
 
 export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialogProps) {
   const { accountName, transferToken } = useWax();
@@ -98,7 +50,6 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
   const [resourcesKey, setResourcesKey] = useState(0);
 
   // Inline send tokens state
-  const [tokenSearch, setTokenSearch] = useState("");
   const [selectedToken, setSelectedToken] = useState<TokenWithBalance | null>(null);
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
@@ -178,16 +129,6 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
       .sort((a, b) => getUsdValue(b) - getUsdValue(a));
   }, [balances, tokenPrices, waxPrice]);
 
-  // Send tokens: filtered token list
-  const filteredTokens = useMemo(() => {
-    if (!tokenSearch) return balances;
-    const q = tokenSearch.toLowerCase();
-    return balances.filter(
-      (b) =>
-        b.symbol.toLowerCase().includes(q) ||
-        b.contract.toLowerCase().includes(q)
-    );
-  }, [balances, tokenSearch]);
 
   const isValidRecipient = recipient.length > 0 && isValidWaxAccount(recipient);
   const canSend =
@@ -232,9 +173,6 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
     }
   };
 
-  const topItems = SIDEBAR_ITEMS.filter((i) => !i.bottom);
-  const bottomItems = SIDEBAR_ITEMS.filter((i) => i.bottom);
-
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
@@ -273,53 +211,7 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
           </div>
 
           <div className="flex flex-1 min-h-0">
-            {/* Sidebar */}
-            <div className="w-[180px] shrink-0 border-r border-border flex flex-col">
-              <nav className="flex-1 py-2 space-y-1.5">
-                {topItems.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = activeSection === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => setActiveSection(item.id)}
-                      className={cn(
-                        "w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors text-left",
-                        isActive
-                          ? "bg-primary/20 text-primary border-r-2 border-primary font-medium"
-                          : "text-foreground hover:bg-muted/50"
-                      )}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      <span className="truncate">{item.label}</span>
-                    </button>
-                  );
-                })}
-              </nav>
-              {bottomItems.length > 0 && (
-                <div className="border-t border-border py-2">
-                  {bottomItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = activeSection === item.id;
-                    return (
-                      <button
-                        key={item.id}
-                        onClick={() => setActiveSection(item.id)}
-                        className={cn(
-                          "w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors text-left",
-                          isActive
-                            ? "bg-primary/20 text-primary border-r-2 border-primary font-medium"
-                            : "text-foreground hover:bg-muted/50"
-                        )}
-                      >
-                        <Icon className="h-4 w-4 shrink-0" />
-                        <span className="truncate">{item.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            <WalletSidebarNav activeSection={activeSection} onSelect={setActiveSection} />
 
             {/* Main Content */}
             <ScrollArea className="flex-1">
@@ -341,172 +233,32 @@ export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialo
                   <div className="space-y-6">
                     <StakedResourcesSection resources={resources} />
 
-                    {/* Token Balances */}
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-medium">Token Balances</h3>
-                        {portfolioValue.totalWax > 0 && (
-                          <span className="text-sm">
-                            <span className="font-medium text-primary">
-                              {portfolioValue.totalWax.toLocaleString(undefined, { maximumFractionDigits: 4 })} WAX
-                            </span>
-                            {waxPrice > 0 && (
-                              <span className="text-muted-foreground ml-1.5">
-                                (${portfolioValue.totalUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })})
-                              </span>
-                            )}
-                          </span>
-                        )}
-                      </div>
-                      {isUsingFallback && (
-                        <div className="p-2 bg-primary/5 border border-primary/20 rounded-lg text-xs text-primary/70">
-                          Balance data may be slightly delayed.
-                        </div>
-                      )}
-                      {balances.length > 0 ? (
-                        <div className="grid grid-cols-4 gap-2">
-                          {sortedBalances.map((b) => (
-                            <a
-                              key={`${b.contract}:${b.symbol}`}
-                              href={explorerAccount(b.contract)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 text-sm hover:bg-muted/50 transition-colors group"
-                            >
-                              <TokenLogo contract={b.contract} symbol={b.symbol} size="sm" />
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium truncate flex items-center gap-1">
-                                  {b.symbol}
-                                  <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                                </div>
-                                <div className="text-xs text-cheese truncate">
-                                  {b.balance.toLocaleString(undefined, {
-                                    minimumFractionDigits: Math.min(20, Math.max(0, b.precision || 0)),
-                                    maximumFractionDigits: Math.min(20, Math.max(0, b.precision || 0)),
-                                  })}
-                                </div>
-                              </div>
-                            </a>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">No token balances found.</p>
-                      )}
-                    </div>
+                    <TokenBalancesGrid
+                      hasBalances={balances.length > 0}
+                      sortedBalances={sortedBalances}
+                      portfolioWax={portfolioValue.totalWax}
+                      portfolioUsd={portfolioValue.totalUsd}
+                      waxPrice={waxPrice}
+                      isUsingFallback={isUsingFallback}
+                    />
                   </div>
                 )}
 
                 {activeSection === "send-tokens" && (
-                  <div className="space-y-5">
-                    {/* Recipient */}
-                    <div className="space-y-2">
-                      <Label className="text-sm font-semibold">Recipient</Label>
-                      <Input
-                        placeholder="Enter WAX account"
-                        value={recipient}
-                        onChange={(e) => setRecipient(e.target.value.toLowerCase())}
-                      />
-                    </div>
-
-                    {/* Token Select */}
-                    <div className="space-y-2">
-                      <Label className="text-sm font-semibold">Token</Label>
-                      <Select
-                        value={selectedToken ? `${selectedToken.contract}:${selectedToken.symbol}` : ""}
-                        onValueChange={(val) => {
-                          const token = balances.find(b => `${b.contract}:${b.symbol}` === val);
-                          if (token) setSelectedToken(token);
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choose a token">
-                            {selectedToken && (
-                              <span className="flex items-center gap-2">
-                                <TokenLogo contract={selectedToken.contract} symbol={selectedToken.symbol} size="sm" />
-                                <span className="font-medium">{selectedToken.symbol}</span>
-                                <span className="text-muted-foreground">({selectedToken.balance.toLocaleString(undefined, { minimumFractionDigits: Math.min(2, Math.min(20, Math.max(0, selectedToken.precision || 0))), maximumFractionDigits: Math.min(20, Math.max(0, selectedToken.precision || 0)) })})</span>
-                              </span>
-                            )}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {balances.map((b) => (
-                            <SelectItem key={`${b.contract}:${b.symbol}`} value={`${b.contract}:${b.symbol}`}>
-                              <span className="flex items-center gap-2">
-                                <TokenLogo contract={b.contract} symbol={b.symbol} size="sm" />
-                                <span className="font-medium">{b.symbol}</span>
-                                <span className="text-muted-foreground ml-1">({b.balance.toLocaleString(undefined, { minimumFractionDigits: Math.min(2, Math.min(20, Math.max(0, b.precision || 0))), maximumFractionDigits: Math.min(20, Math.max(0, b.precision || 0)) })})</span>
-                              </span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Amount */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-semibold">Amount</Label>
-                        {selectedToken && (
-                          <span className="text-xs text-muted-foreground flex items-center gap-1">
-                            Balance: <TokenLogo contract={selectedToken.contract} symbol={selectedToken.symbol} size="sm" />
-                            <span>{selectedToken.balance.toLocaleString(undefined, { minimumFractionDigits: Math.min(2, Math.min(20, Math.max(0, selectedToken.precision || 0))), maximumFractionDigits: Math.min(20, Math.max(0, selectedToken.precision || 0)) })} {selectedToken.symbol}</span>
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        <Input
-                          type="number"
-                          placeholder="0.00"
-                          value={amount}
-                          onChange={(e) => setAmount(e.target.value)}
-                          min={0}
-                          className="flex-1"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            if (selectedToken) {
-                              setAmount(selectedToken.balance.toFixed(selectedToken.precision));
-                            }
-                          }}
-                          disabled={!selectedToken}
-                          className="shrink-0 font-semibold"
-                        >
-                          Max
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Memo */}
-                    <div className="space-y-2">
-                      <Label className="text-sm font-semibold">Memo (optional)</Label>
-                      <Input
-                        placeholder="Enter memo"
-                        value={memo}
-                        onChange={(e) => setMemo(e.target.value)}
-                      />
-                    </div>
-
-                    <Button
-                      onClick={handleSend}
-                      disabled={!canSend}
-                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-                    >
-                      {isSending ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Sending...
-                        </>
-                      ) : (
-                        <>
-                          <Send className="mr-2 h-4 w-4" />
-                          Send {selectedToken?.symbol || "Tokens"}
-                        </>
-                      )}
-                    </Button>
-                  </div>
+                  <SendTokensForm
+                    balances={balances}
+                    recipient={recipient}
+                    setRecipient={setRecipient}
+                    selectedToken={selectedToken}
+                    setSelectedToken={setSelectedToken}
+                    amount={amount}
+                    setAmount={setAmount}
+                    memo={memo}
+                    setMemo={setMemo}
+                    canSend={!!canSend}
+                    isSending={isSending}
+                    handleSend={handleSend}
+                  />
                 )}
 
                 {activeSection === "send-nfts" && (

@@ -6,11 +6,18 @@ import { AlertTriangle, Info, Loader2, Recycle } from 'lucide-react';
 import { useWax } from '@/context/WaxContext';
 import { toast } from 'sonner';
 import { closeWharfkitModals, getTransactPlugins } from '@/lib/wharfKit';
-import { TokenLogo } from '@/components/TokenLogo';
 import { Checkbox } from '@/components/ui/checkbox';
-import { buildClaimRewardsAction, buildIncreaseLiquidityAction, fetchPoolSlot, AlcorFarmPosition } from '@/lib/alcorFarms';
-import type { PoolSlot } from '@/lib/alcorV3Amounts';
-import { waxRpcCall } from '@/lib/waxRpcFallback';
+import { buildClaimRewardsAction, buildIncreaseLiquidityAction, AlcorFarmPosition } from '@/lib/alcorFarms';
+import { CompoundEntryRow } from './alcor/CompoundEntryRow';
+import {
+  POLL_ATTEMPTS,
+  POLL_DELAY_MS,
+  clearRecentClaim,
+  readBalances,
+  readPoolSlots,
+  recentClaimFor,
+  recordClaim,
+} from './alcor/compoundBalances';
 import {
   AvailableBalance,
   COMPOUND_FEE_ACCOUNT,
@@ -47,106 +54,6 @@ interface CompoundAllDialogProps {
 }
 
 type Stage = 'confirm' | 'claiming' | 'waiting' | 'preview' | 'compounding' | 'done';
-
-const POLL_ATTEMPTS = 12;
-const POLL_DELAY_MS = 2000;
-/**
- * How long a successful claim stays usable. Reopening the dialog inside this
- * window reuses that claim instead of claiming again — a repeat claim only pays
- * a few seconds' worth of dust and costs another signature.
- */
-const CLAIM_REUSE_WINDOW_MS = 15 * 60 * 1000;
-
-interface RecentClaim {
-  account: string;
-  txId: string | null;
-  at: number;
-  before: Map<string, AvailableBalance>;
-}
-
-let recentClaim: RecentClaim | null = null;
-
-function recordClaim(account: string, txId: string | null, before: Map<string, AvailableBalance>) {
-  recentClaim = { account, txId, at: Date.now(), before };
-}
-
-function recentClaimFor(account: string): RecentClaim | null {
-  if (!recentClaim || recentClaim.account !== account) return null;
-  if (Date.now() - recentClaim.at > CLAIM_REUSE_WINDOW_MS) return null;
-  return recentClaim;
-}
-
-/** Forget the stored claim once its rewards have been compounded. */
-function clearRecentClaim() {
-  recentClaim = null;
-}
-
-
-function parseBalance(raw: string | undefined): AvailableBalance {
-  if (!raw) return { balance: 0, precision: 8, known: true };
-  const [amountStr] = raw.split(' ');
-  const decimals = amountStr.split('.')[1]?.length ?? 0;
-  return { balance: parseFloat(amountStr) || 0, precision: decimals, known: true };
-}
-
-async function readBalance(
-  account: string,
-  contract: string | undefined,
-  symbol: string,
-): Promise<AvailableBalance> {
-  // Without an issuing contract the chain cannot answer — report it as unknown
-  // rather than pretending the wallet holds nothing.
-  if (!contract) return { balance: 0, precision: 8, known: false };
-  try {
-    const rows = await waxRpcCall<string[] | undefined>(
-      '/v1/chain/get_currency_balance',
-      { code: contract, account, symbol },
-      6000,
-    );
-    if (!Array.isArray(rows)) return { balance: 0, precision: 8, known: false };
-    return parseBalance(rows[0]);
-  } catch {
-    return { balance: 0, precision: 8, known: false };
-  }
-}
-
-async function readBalances(
-  account: string,
-  tokens: Array<{ contract?: string; symbol: string }>,
-): Promise<Map<string, AvailableBalance>> {
-  const map = new Map<string, AvailableBalance>();
-  const results = await Promise.all(tokens.map(t => readBalance(account, t.contract, t.symbol)));
-  tokens.forEach((t, i) => {
-    const key = balanceKey(t.contract ?? '', t.symbol);
-    const existing = map.get(key);
-    const value = results[i];
-    // Keep the largest reported precision if the same token appears twice.
-    if (!existing || value.precision > existing.precision) {
-      map.set(key, value);
-    }
-  });
-  return map;
-}
-
-/**
- * Read the live price slot of each pool. The deposit must be sized at the exact
- * ratio the pool accepts, otherwise Alcor rejects it with "Price slippage check".
- */
-async function readPoolSlots(poolIds: number[]): Promise<Map<number, PoolSlot | null>> {
-  const unique = Array.from(new Set(poolIds));
-  const slots = await Promise.all(
-    unique.map(async id => {
-      try {
-        return await fetchPoolSlot(id);
-      } catch {
-        return null;
-      }
-    }),
-  );
-  const map = new Map<number, PoolSlot | null>();
-  unique.forEach((id, i) => map.set(id, slots[i]));
-  return map;
-}
 
 
 export function CompoundAllDialog({
@@ -373,6 +280,15 @@ export function CompoundAllDialog({
     [plan, deselectedIds],
   );
 
+  const toggleEntry = useCallback((positionId: number, checked: boolean) => {
+    setDeselectedIds(prev => {
+      const next = new Set(prev);
+      if (checked) next.delete(positionId);
+      else next.add(positionId);
+      return next;
+    });
+  }, []);
+
   const runCompound = useCallback(async () => {
     if (!session || !accountName || selectedEntries.length === 0) return;
     setError(null);
@@ -571,55 +487,15 @@ export function CompoundAllDialog({
                     {selectedEntries.length} of {plan.compoundable.length} selected
                   </label>
                 </div>
-                {plan.compoundable.map(entry => {
-                  const isSelected = !deselectedIds.has(entry.positionId);
-                  return (
-                    <div
-                      key={entry.positionId}
-                      className={`flex items-center justify-between gap-2 rounded-md border p-2 ${
-                        isSelected ? 'border-border/50 bg-muted/30' : 'border-border/30 opacity-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id={`compound-entry-${entry.positionId}`}
-                          checked={isSelected}
-                          onCheckedChange={(checked) => {
-                            setDeselectedIds(prev => {
-                              const next = new Set(prev);
-                              if (checked === true) next.delete(entry.positionId);
-                              else next.add(entry.positionId);
-                              return next;
-                            });
-                          }}
-                          disabled={stage === 'compounding'}
-                        />
-                        <label htmlFor={`compound-entry-${entry.positionId}`} className="flex items-center gap-2 cursor-pointer">
-                          <div className="flex -space-x-2">
-                            <TokenLogo contract={entry.tokenA.contract} symbol={entry.tokenA.symbol} size="sm" />
-                            <TokenLogo contract={entry.tokenB.contract} symbol={entry.tokenB.symbol} size="sm" />
-                          </div>
-                          <div className="text-xs">
-                            <div className="font-medium">{entry.tokenA.symbol}/{entry.tokenB.symbol}</div>
-                            <div className="text-muted-foreground">#{entry.positionId}</div>
-                          </div>
-                        </label>
-                      </div>
-                      <div className="font-mono text-xs text-right text-cheese">
-                        <div>{entry.tokenA.amount.toFixed(Math.min(6, entry.tokenA.precision))} {entry.tokenA.symbol}</div>
-                        <div>{entry.tokenB.amount.toFixed(Math.min(6, entry.tokenB.precision))} {entry.tokenB.symbol}</div>
-                        {(entry.tokenA.fee > 0 || entry.tokenB.fee > 0) && (
-                          <div className="text-[10px] text-muted-foreground">
-                            fee {entry.tokenA.fee.toFixed(Math.min(6, entry.tokenA.precision))} {entry.tokenA.symbol}
-                            {entry.tokenB.fee > 0 && (
-                              <> · {entry.tokenB.fee.toFixed(Math.min(6, entry.tokenB.precision))} {entry.tokenB.symbol}</>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                {plan.compoundable.map(entry => (
+                  <CompoundEntryRow
+                    key={entry.positionId}
+                    entry={entry}
+                    isSelected={!deselectedIds.has(entry.positionId)}
+                    disabled={stage === 'compounding'}
+                    onToggle={toggleEntry}
+                  />
+                ))}
                 <p className="text-[11px] text-muted-foreground">
                   Only the rewards from this claim are used — tokens you already held are never touched. 0.75% of each
                   deposit supports HOLE. Pool prices move constantly, so the pool may use a little less than shown;
