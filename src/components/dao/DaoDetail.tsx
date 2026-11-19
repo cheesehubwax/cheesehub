@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Loader2, Users, Settings, Coins, ChevronRight } from "lucide-react";
@@ -103,9 +103,28 @@ export function DaoDetail({ daoName, onBack }: DaoDetailProps) {
     }
   }, [activeSection, treasuryLoaded, daoName]);
 
-  const refreshProposals = useCallback(() => {
-    fetchProposals(daoName).then(setProposals);
-  }, [daoName]);
+  // After a new proposal is signed, chain nodes can take a few seconds to list it.
+  // Re-read on a short schedule until a proposal ID we haven't seen appears.
+  const proposalPollRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => proposalPollRef.current.forEach(clearTimeout), [daoName]);
+  const pollForNewProposal = useCallback(() => {
+    proposalPollRef.current.forEach(clearTimeout);
+    proposalPollRef.current = [];
+    const known = new Set(proposals.map(p => p.proposal_id));
+    let found = false;
+    const check = async () => {
+      if (found) return;
+      const next = await fetchProposals(daoName);
+      if (found) return;
+      if (next.some(p => !known.has(p.proposal_id))) {
+        found = true;
+        proposalPollRef.current.forEach(clearTimeout);
+      }
+      setProposals(next);
+    };
+    check();
+    proposalPollRef.current = [1500, 3000, 5000, 8000, 12000].map(ms => setTimeout(check, ms));
+  }, [daoName, proposals]);
 
   const refreshTreasury = useCallback(() => {
     fetchDaoTreasury(daoName).then(setTreasury);
@@ -190,7 +209,7 @@ export function DaoDetail({ daoName, onBack }: DaoDetailProps) {
             onClose={() => setActiveSection("active")}
             onCreated={() => {
               setActiveSection("active");
-              refreshProposals();
+              pollForNewProposal();
             }}
           />
         );
