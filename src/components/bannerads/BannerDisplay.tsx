@@ -20,6 +20,10 @@ interface ActiveBanner {
   alt?: string;
 }
 
+// CHEESEHub-curated standby banners open directly without the external-link
+// warning — they are trusted, first-party picks, not paid third-party ads.
+export const TRUSTED_STANDBY_HOSTS = ["waxedge.app", "gpkonwax.github.io"];
+
 // Each slot position has its own standby banner: Position 1 open shared halves
 // always show WaxEDGE, Position 2 open shared halves always show the GPK
 // Collection Manager — regardless of the other slot's state.
@@ -268,6 +272,12 @@ export function BannerDisplay() {
     try {
       const parsed = new URL(sanitized);
       const host = parsed.hostname.toLowerCase();
+      // Curated standby banners are trusted — open directly, no warning
+      if (TRUSTED_STANDBY_HOSTS.includes(host)) {
+        window.open(sanitized, "_blank", "noopener,noreferrer");
+        return;
+      }
+
       const isInternal =
         host === window.location.hostname ||
         INTERNAL_HOSTS.includes(host) ||

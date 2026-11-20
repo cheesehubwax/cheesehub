@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractBannersForSlot, placeholderBanner } from "@/components/bannerads/BannerDisplay";
+import { extractBannersForSlot, placeholderBanner, TRUSTED_STANDBY_HOSTS } from "@/components/bannerads/BannerDisplay";
 import type { BannerSlot } from "@/hooks/useBannerSlots";
 
 function sharedSlotWithOpenHalf(position: number): BannerSlot {
@@ -53,5 +53,12 @@ describe("banner standby placeholders", () => {
     expect(extractBannersForSlot(exclusive).some((b) => b.isPlaceholder)).toBe(false);
     const suspended: BannerSlot = { ...sharedSlotWithOpenHalf(1), suspended: true };
     expect(extractBannersForSlot(suspended)).toHaveLength(0);
+  });
+
+  it("marks both standby banner hosts as trusted so they skip the external-link warning", () => {
+    for (const position of [1, 2]) {
+      const host = new URL(placeholderBanner(position).websiteUrl).hostname;
+      expect(TRUSTED_STANDBY_HOSTS).toContain(host);
+    }
   });
 });
