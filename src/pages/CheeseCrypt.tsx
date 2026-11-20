@@ -80,7 +80,7 @@ import { CryptKeySetup } from '@/components/crypt/CryptKeySetup';
 import { CryptLockGate } from '@/components/crypt/CryptLockGate';
 import { CryptSidebar } from '@/components/crypt/CryptSidebar';
 import { CryptAvatarRail } from '@/components/crypt/CryptAvatarRail';
-import { isAccountStorageKey, recoveryCandidates, recoverFriends, recoverRoomRequests, recoveredRoomEvents, recoverOwnedRoomEvents } from '@/lib/cryptRestore';
+import { isAccountStorageKey, recoveryCandidates, recoverFriends, recoverRoomRequests, recoveredRoomEvents, recoverOwnedRoomEvents, needsRoomRecovery } from '@/lib/cryptRestore';
 import { readGroupBackup, writeGroupBackup } from '@/lib/cryptGroupBackup';
 import { CryptChatHeader } from '@/components/crypt/CryptChatHeader';
 import { canRequestRejoin } from '@/lib/cryptRejoin';
@@ -733,10 +733,11 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const invites = useMemo(() => key ? collectInvites(allGroupEvents, account, [key.publicKey, ...(key.retired ?? []).map(r => r.publicKey)], contacts, inviteStore, restoredRequests) : inviteStore,
     [allGroupEvents, account, key, contacts, inviteStore, restoredRequests]);
   useEffect(() => {
-    // A reset can leave the original invite outside the first fast history page.
-    const missing = key && listings.some(l => l.creator === account && [key.publicKey, ...(key.retired ?? []).map(k => k.publicKey)].includes(l.publicKey) && !invites[l.id]);
-    if (loaded && missing && depth < MAX_HISTORY_PAGES) setDepth(d => d + 1);
-  }, [key, account, listings, invites, loaded, depth]);
+    // Owners and members can both have admissions outside the fast first page.
+    // Finish each read before increasing depth; failures must not skip recovery pages.
+    if (!key || !loaded || loading || inFlight.current || loadedDepth.current < depth || depth >= MAX_HISTORY_PAGES) return;
+    if (needsRoomRecovery(key, listings, invites, restoredRequests)) setDepth(d => Math.min(MAX_HISTORY_PAGES, d + 1));
+  }, [key, listings, invites, restoredRequests, loaded, loading, depth, checkpoint]);
   useEffect(() => {
     // Compares member keys too, so a creator adding members to a known group is saved.
     if (invitesSignature(invites) === invitesSignature(inviteStore)) return;

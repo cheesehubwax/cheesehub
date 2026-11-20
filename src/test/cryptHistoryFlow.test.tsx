@@ -24,11 +24,12 @@ it('opens saved ciphertext before a stalled network, merges a new message and re
   await saveHistory(alice.account, 'standard', [memo('saved conversation', 'saved')], at, 4);
   let complete: ((r: { rows: ReturnType<typeof memo>[]; cursor: number; complete: boolean }) => void) | undefined;
   calls.delta.mockImplementation(() => new Promise(resolve => { complete = resolve; }));
+  // Listings may start after cache hydration, but must never delay saved chat readback.
+  calls.rooms.mockImplementation(() => new Promise(() => {}));
   const first = mount();
   fireEvent.click(await screen.findByRole('button', { name: /^cachebob/ }));
   expect(await screen.findByText('saved conversation')).toBeInTheDocument();
   expect(calls.full).not.toHaveBeenCalled();
-  expect(calls.rooms).not.toHaveBeenCalled();
   await waitFor(() => expect(complete).toBeDefined());
   complete?.({ rows: [memo('new conversation', 'new', at + 1000)], cursor: Date.now(), complete: true });
   expect(await screen.findByText('new conversation')).toBeInTheDocument();

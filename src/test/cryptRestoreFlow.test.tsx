@@ -9,11 +9,12 @@ import { encodeJoinMemo, encodeListing } from '@/lib/cryptRooms';
 import { Messenger } from '@/pages/CheeseCrypt';
 import { writeGroupBackup, readGroupBackup } from '@/lib/cryptGroupBackup';
 import type { DirHandle } from '@/lib/cryptVault';
+import { savePrivacyMode } from '@/lib/cryptNetworkPrivacy';
 
-const calls = vi.hoisted(() => ({ fetch: vi.fn(), lookup: vi.fn(), rooms: vi.fn(), transact: vi.fn(), vault: vi.fn() }));
+const calls = vi.hoisted(() => ({ fetch: vi.fn(), stream: vi.fn(), lookup: vi.fn(), rooms: vi.fn(), transact: vi.fn(), vault: vi.fn() }));
 vi.mock('@/context/WaxContext', () => ({ useWax: vi.fn() }));
 vi.mock('@/hooks/useWaxTransaction', () => ({ useWaxTransaction: () => ({ executeTransaction: calls.transact }) }));
-vi.mock('@/lib/cheeseCrypt', async original => ({ ...await original<typeof import('@/lib/cheeseCrypt')>(), fetchMessages: calls.fetch, fetchContractStream: async (a: string, c: number) => ({ rows: await calls.fetch(a), cursor: c, complete: true }), lookupPublishedKey: calls.lookup, fetchRoomMemos: calls.rooms }));
+vi.mock('@/lib/cheeseCrypt', async original => ({ ...await original<typeof import('@/lib/cheeseCrypt')>(), fetchMessages: calls.fetch, fetchStreamHistory: calls.stream, fetchContractStream: async (a: string, c: number) => ({ rows: await calls.fetch(a), cursor: c, complete: true }), lookupPublishedKey: calls.lookup, fetchRoomMemos: calls.rooms }));
 vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import('@/lib/cryptVault')>(), recallVault: calls.vault }));
 const owner = generateKey('alice'), me = generateKey('bob'), friend = generateKey('carol');
 const id = '00112233445566ff';
@@ -40,6 +41,51 @@ beforeEach(async () => {
 });
 
 describe('recovery through the messenger', () => {
+  it('recovers older member admissions in Maximum without an account-history read', async () => {
+    savePrivacyMode('maximum');
+    calls.stream.mockImplementation(async (_account: string, pages = 1) => pages > 1 ? history : []);
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: /Recovery club.*2 of 2 joined/ }));
+    expect(await screen.findByText('Room restored')).toBeInTheDocument();
+    expect(calls.stream).toHaveBeenCalledWith('bob', 2);
+    expect(calls.fetch).not.toHaveBeenCalled();
+    expect(calls.transact).not.toHaveBeenCalled();
+  });
+  it('waits for each recovery read and does not skip ahead when that read fails', async () => {
+    let fail: ((reason: Error) => void) | undefined;
+    calls.fetch.mockImplementation((_account: string, pages = 1) => pages === 1 ? Promise.resolve([]) : new Promise((_resolve, reject) => { fail = reject; }));
+    mount();
+    await waitFor(() => expect(calls.fetch).toHaveBeenCalledWith('bob', 2, true, 500));
+    expect(calls.fetch.mock.calls.map(([, pages]) => pages)).toEqual([1, 2]);
+    fail?.(new Error('History unavailable'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Refresh messages' })).toBeEnabled());
+    await waitFor(() => expect(calls.fetch.mock.calls.map(([, pages]) => pages)).toEqual([1, 2]));
+    expect(loadInvites('bob')).toEqual({});
+  });
+  it('automatically restores a member whose admission is older than the first page after an account switch', async () => {
+    await saveKey(friend);
+    calls.fetch.mockResolvedValue([]); calls.rooms.mockResolvedValue([]);
+    const other = mount('carol');
+    await waitFor(() => expect(calls.fetch).toHaveBeenCalledWith('carol', 1, true, 100));
+    other.unmount();
+    calls.fetch.mockImplementation(async (account: string, pages = 1) => account === 'bob' && pages > 1 ? history : []);
+    calls.rooms.mockResolvedValue([{ from: 'alice', to: 'eosio.null', time: 1, txId: 'list', quantity: '80.0000 CHEESE', memo: encodeListing({ id, name: group.name, topic: '', tags: [], publicKey: owner.publicKey, members: 2 }) }]);
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: /Recovery club.*2 of 2 joined/ }));
+    expect(await screen.findByText('Room restored')).toBeInTheDocument();
+    expect(calls.fetch).toHaveBeenCalledWith('bob', 2, true, 500);
+    expect(loadInvites('bob')[id]?.members.map(m => m.account)).toEqual(['alice', 'bob']);
+    expect(loadInvites('carol')).toEqual({});
+    expect(calls.transact).not.toHaveBeenCalled();
+  });
+  it('bounds member discovery and never restores membership from a listing alone', async () => {
+    calls.fetch.mockResolvedValue([]);
+    mount();
+    await waitFor(() => expect(calls.fetch).toHaveBeenCalledWith('bob', 4, true, 500));
+    expect(calls.fetch.mock.calls.filter(([, pages]) => pages > 4)).toEqual([]);
+    expect(loadInvites('bob')).toEqual({});
+    expect(calls.transact).not.toHaveBeenCalled();
+  });
   it('restores an encrypted folder roster after reset and preserves leave consent through automatic saving', async () => {
     let text = '', writes = 0;
     const root: DirHandle = { name: 'cheesecrypt', getDirectoryHandle: async () => { throw new DOMException('Missing', 'NotFoundError'); }, getFileHandle: async (name, options) => {

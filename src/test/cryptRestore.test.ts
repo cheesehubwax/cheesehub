@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { encryptMemo, generateKey, splitMessage, type ChainMemo } from '@/lib/cheeseCrypt';
 import { encodeGroupText, encodeNotice } from '@/lib/cryptInviteGroups';
 import { encodeJoinMemo, type RoomListing } from '@/lib/cryptRooms';
-import { isAccountStorageKey, recoveryCandidates, recoverFriends, recoverRoomRequests, recoveredRoomEvents } from '@/lib/cryptRestore';
+import { isAccountStorageKey, recoveryCandidates, recoverFriends, recoverRoomRequests, recoveredRoomEvents, needsRoomRecovery } from '@/lib/cryptRestore';
 
 const me = generateKey('bob'), owner = generateKey('alice');
 const id = '00112233445566ff';
@@ -10,6 +10,19 @@ const listing: RoomListing = { id, creator: owner.account, publicKey: owner.publ
 const sent = (text: string, time = 10): ChainMemo => ({ from: me.account, to: owner.account, time, txId: `tx${time}`, quantity: '0.0001 CHEESE', memo: encryptMemo(text, owner.publicKey, me.secretKey) });
 
 describe('authenticated recovery', () => {
+  it('searches older history for a member with no local groups without granting membership', () => {
+    const invites = {};
+    expect(needsRoomRecovery(me, [listing], invites, {})).toBe(true);
+    expect(invites).toEqual({});
+    expect(recoverRoomRequests([], me, [listing], {})).toEqual({});
+  });
+  it('does not scan an empty directory or unrelated rooms when a roster already exists', () => {
+    const group = { id, creator: 'alice', created: 1, name: 'Club', members: [me, owner].map(k => ({ account: k.account, publicKey: k.publicKey })) };
+    expect(needsRoomRecovery(me, [], {}, {})).toBe(false);
+    expect(needsRoomRecovery(me, [listing], { [id]: group }, {})).toBe(false);
+    expect(needsRoomRecovery(me, [{ ...listing, id: 'ffeeddccbbaa0099' }], { [id]: group }, {})).toBe(false);
+    expect(needsRoomRecovery(me, [listing], { other: group }, { [id]: { id, creator: 'alice', publicKey: owner.publicKey, time: 1 } })).toBe(true);
+  });
   it('restores a prior outgoing direct chat with a verified published key', () => {
     expect(recoverFriends([sent('Hello')], me, { alice: owner.publicKey })).toEqual({ alice: owner.publicKey });
   });

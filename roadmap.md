@@ -24,7 +24,7 @@ Open tasks only. Completed work lives in git history.
 
 - [ ] CHEESECrypt: verify mandatory creation/legacy locking with the user's Anchor wallet and local folder; automated signing-retry, sealed-backup, restart-unlock and preservation tests cover the client flow.
 
-- [ ] CHEESECrypt: confirm recovery for bum.gpk with its original key in the user's wallet session; automated recovery/reload/account-switch/tab tests pass, but that private key is unavailable here.
+- [ ] CHEESECrypt: confirm recovery for bum.gpk with its original key in the user's wallet session; automatic bounded member recovery beyond the first page, account-switch readback, failed-read sequencing and Maximum privacy pass 68 targeted tests, but that private key is unavailable here.
 
 - [ ] CHEESECrypt: verify 50-member admissions/delivery and CPU/NET feasibility, room mutes/removals, admins and message collapsing, message edits, owner edit logs, group send/reply, invite groups, public rooms, public inbox, profile notes, replies and Anchor key lock/unlock on WAX — requires connected wallets and signing approval.
 - [ ] CHEESECrypt key rotation: verify one real rotation (two Anchor lock signatures, backup save, paid friend notices) and a friend switching keys — needs the user's Anchor wallet. Room owner rekey (swapping a member's pinned key) is a later step; until then rooms keep the old key.

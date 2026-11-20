@@ -3,6 +3,16 @@ import { decodeConversations, isDirectMessage } from '@/lib/cryptGroups';
 import { decodeRoomEvents, joinMemoKey, type RoomListing, type RoomRequest } from '@/lib/cryptRooms';
 import { scopedKeys, type InviteGroup } from '@/lib/cryptInviteGroups';
 
+/** Decide whether to search older ciphertext, never whether a listing grants membership. */
+export function needsRoomRecovery(key: MessagingKey, listings: RoomListing[], invites: Record<string, InviteGroup>, requests: Record<string, RoomRequest>): boolean {
+  const keys = [key.publicKey, ...(key.retired ?? []).map(k => k.publicKey)];
+  return listings.some(l => !invites[l.id] && (
+    (l.creator === key.account && keys.includes(l.publicKey)) ||
+    (l.creator !== key.account && (Object.keys(invites).length === 0 ||
+      (requests[l.id]?.creator === l.creator && requests[l.id]?.publicKey === l.publicKey)))
+  ));
+}
+
 /** Carried request keys are discovery hints only; collectInvites still authenticates every roster. */
 export function recoverOwnedRoomEvents(memos: ChainMemo[], key: MessagingKey, listings: RoomListing[], invites: Record<string, InviteGroup>, contacts: Record<string, string>) {
   const owned = new Set(listings.filter(l => l.creator === key.account && [key.publicKey, ...(key.retired ?? []).map(k => k.publicKey)].includes(l.publicKey)).map(l => l.id));
