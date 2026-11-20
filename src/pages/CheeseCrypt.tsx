@@ -1123,7 +1123,10 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   readMarksRef.current = readMarks;
   const resumeRef = useRef<{ id: string | null; at: number | null }>({ id: null, at: null });
   if (resumeRef.current.id !== active) {
-    resumeRef.current = { id: active, at: active ? (readMarksRef.current?.[active] ?? null) : null };
+    // A chat with unread messages but no stored marker yet (fresh login, recovered room) resumes from the start,
+    // matching unreadCounts, which treats a missing marker as 0.
+    const mark = active ? readMarksRef.current?.[active] : undefined;
+    resumeRef.current = { id: active, at: !active ? null : mark != null ? mark : (unread[active] ?? 0) > 0 ? 0 : null };
   }
   const resumeAt = resumeRef.current.id === active ? resumeRef.current.at : null;
   const firstNew = firstUnreadIndex(thread, resumeAt);
@@ -1174,6 +1177,8 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
           const top = el.scrollTop + marker.getBoundingClientRect().top - el.getBoundingClientRect().top - 12;
           if (typeof el.scrollTo === 'function') el.scrollTo({ top, behavior: 'auto' });
           else el.scrollTop = top;
+          // Stay anchored at the divider while older/newer history keeps loading in the background.
+          nearBottom.current = false;
         } else {
           const top = el.scrollHeight;
           if (typeof el.scrollTo === 'function') el.scrollTo({ top, behavior: switched ? 'auto' : 'smooth' });
