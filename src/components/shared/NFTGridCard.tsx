@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { Check, Loader2, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { extractIpfsHash, ipfsImageCandidates } from "@/lib/ipfsGateways";
+import { queueNftImage } from "@/lib/nftImageQueue";
 
 export interface NFTGridCardData {
   asset_id: string;
@@ -37,6 +38,24 @@ export const NFTGridCard = React.memo(function NFTGridCard({
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const card = cardRef.current;
+    if (!card) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setVisible(true);
+      return;
+    }
+    // Zero margin respects the dialog's clipping scroll viewport, including
+    // virtualizer overscan rows that are mounted but not actually visible.
+    const observer = new IntersectionObserver(entries => {
+      setVisible(entries.some(entry => entry.isIntersecting));
+    }, { rootMargin: '0px' });
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, []);
 
   const hasValidImage = Boolean(nft.image && nft.image !== "/placeholder.svg");
   const imageCandidates = useMemo(() => {
@@ -67,14 +86,12 @@ export const NFTGridCard = React.memo(function NFTGridCard({
     }
   }, [imageCandidates.length, gatewayIndex]);
 
-  // Timeout fallback – try next gateway after 10s
+  // The deadline starts only once a pool slot is granted, not while waiting
+  // behind other tiles. Off-screen/unmounted requests release their slot.
   useEffect(() => {
-    if (!hasValidImage || imgError || imgLoaded) return;
-    const t = setTimeout(() => {
-      if (!imgLoaded && !imgError) handleImageError();
-    }, 10000);
-    return () => clearTimeout(t);
-  }, [hasValidImage, imgError, imgLoaded, currentImageUrl, handleImageError]);
+    if (!visible || !hasValidImage || imgError || imgLoaded) return;
+    return queueNftImage(currentImageUrl, () => setImgLoaded(true), handleImageError);
+  }, [visible, hasValidImage, imgError, imgLoaded, currentImageUrl, handleImageError]);
 
   const handleRetry = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -88,6 +105,7 @@ export const NFTGridCard = React.memo(function NFTGridCard({
 
   const card = (
     <div
+      ref={cardRef}
       role="button"
       tabIndex={disabled ? -1 : 0}
       onClick={disabled ? undefined : onToggle}
@@ -127,21 +145,20 @@ export const NFTGridCard = React.memo(function NFTGridCard({
                 <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
               </div>
             )}
-            <img
+            {imgLoaded && <img
               src={currentImageUrl}
               alt={nft.name}
               className={cn(
                 "w-full h-full object-cover transition-opacity",
                 imgLoaded ? "opacity-100" : "opacity-0"
               )}
-              loading="lazy"
               onError={handleImageError}
               onLoad={(e) => {
                 const t = e.target as HTMLImageElement;
                 if (t.naturalWidth === 0) handleImageError();
                 else setImgLoaded(true);
               }}
-            />
+            />}
           </>
         )}
       </div>

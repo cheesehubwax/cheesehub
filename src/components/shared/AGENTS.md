@@ -1,1 +1,2 @@
 - Terms acceptance lives in the wallet provider (one versioned gate before login/restore); forms never re-ask, except RiskAcknowledgement for specific irreversible or liability-bearing actions.
+- NFT grid artwork uses a shared cancellable four-request pool and zero-margin visibility gating; deadlines start after admission so large collections and virtualizer overscan cannot expire in the queue.

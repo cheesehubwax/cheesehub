@@ -1,0 +1,55 @@
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { NFTGridCard } from '@/components/shared/NFTGridCard';
+
+const h = vi.hoisted(() => ({ queue: vi.fn() }));
+vi.mock('@/lib/nftImageQueue', () => ({ queueNftImage: h.queue }));
+const nft = { asset_id: '99', name: 'Artwork', collection: 'cheese', image: 'ipfs://QmcyKFxZWFMFJAmjuowJ4F1DUzGGUpEFDV6Co4mV9Dx5ND' };
+let notify: (visible: boolean) => void;
+let cancel: ReturnType<typeof vi.fn>;
+beforeEach(() => {
+  h.queue.mockReset();
+  cancel = vi.fn();
+  h.queue.mockReturnValue(cancel);
+  vi.stubGlobal('IntersectionObserver', class {
+    constructor(callback: (entries: { isIntersecting: boolean }[]) => void) {
+      notify = visible => callback([{ isIntersecting: visible }]);
+    }
+    observe() {}
+    disconnect() {}
+  });
+});
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+describe('viewport-only NFT tiles', () => {
+  it('never queues artwork until visible and cancels when scrolled away', () => {
+    const { unmount } = render(<NFTGridCard nft={nft} isSelected={false} onToggle={() => {}} />);
+    expect(h.queue).not.toHaveBeenCalled();
+    act(() => notify(true));
+    expect(h.queue).toHaveBeenCalledTimes(1);
+    act(() => notify(false));
+    expect(cancel).toHaveBeenCalledTimes(1);
+    act(() => notify(true));
+    expect(h.queue).toHaveBeenCalledTimes(2);
+    unmount();
+    expect(cancel).toHaveBeenCalledTimes(2);
+  });
+
+  it('walks all gateway fallbacks then restarts from AtomicHub on manual retry', () => {
+    render(<NFTGridCard nft={nft} isSelected={false} onToggle={() => {}} />);
+    act(() => notify(true));
+    for (let i = 0; i < 6; i++) act(() => h.queue.mock.calls[i][2]());
+    expect(screen.getByText('Retry')).toBeTruthy();
+    fireEvent.click(screen.getByText('Retry'));
+    expect(h.queue.mock.calls[6][0]).toContain('resizer.atomichub.io');
+    expect(h.queue.mock.calls[6][0]).toContain('retry=1');
+    act(() => h.queue.mock.calls[6][1]());
+    expect(screen.getByAltText('Artwork').getAttribute('src')).toContain('retry=1');
+  });
+
+  it('does not download missing placeholder artwork', () => {
+    render(<NFTGridCard nft={{ ...nft, image: '/placeholder.svg' }} isSelected={false} onToggle={() => {}} />);
+    act(() => notify(true));
+    expect(h.queue).not.toHaveBeenCalled();
+  });
+});
