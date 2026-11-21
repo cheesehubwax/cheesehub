@@ -1,4 +1,4 @@
-import type { ReactNode, RefObject } from 'react';
+import { startTransition, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Button } from '@/components/ui/button';
 import { YoutubeTitleHelper } from '@/components/crypt/YoutubeTitleHelper';
 import { Textarea } from '@/components/ui/textarea';
@@ -22,6 +22,16 @@ export function CryptComposer({
   totalCost: string; send: () => void; sendVoice: () => void;
   editing?: boolean; cancelEdit?: () => void; editExpired?: boolean; instantSlot?: ReactNode;
 }) {
+  // Instant local draft: keystrokes update only this box; the chat screen gets the text as a low-priority update.
+  const [draft, setDraft] = useState(text);
+  const pushed = useRef(text);
+  const [sendQueued, setSendQueued] = useState(false);
+  useEffect(() => { if (text !== pushed.current) { pushed.current = text; setDraft(text); } }, [text]);
+  const onType = (v: string) => { setDraft(v); pushed.current = v; startTransition(() => setText(v)); };
+  // Send must use the newest text: commit the draft urgently, then send once the screen has it.
+  const sendNow = () => { if (draft === text) send(); else { pushed.current = draft; setText(draft); setSendQueued(true); } };
+  useEffect(() => { if (sendQueued && text === draft) { setSendQueued(false); send(); } }, [sendQueued, text, draft, send]);
+  const pending = draft !== text;
   return (
     <div className="space-y-2 p-4 border-t border-border">
       {editing && <div className="flex items-center gap-2 border-l-2 border-cheese bg-muted px-2 py-1 text-xs"><span className="flex-1">✏️ {editExpired ? 'Editing window ended' : 'Editing message'}</span><Button variant="ghost" size="icon" className="h-5 w-5" aria-label="Cancel edit" onClick={cancelEdit}>✕</Button></div>}
@@ -29,14 +39,14 @@ export function CryptComposer({
         <span className="min-w-0 flex-1"><span className="block font-semibold text-reply">↩️ Replying to {replyingTo.author === account ? 'yourself' : nameFor(replyingTo.author)}</span><span className="block truncate opacity-80">{replyingTo.quote || '…'}</span></span>
         <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" aria-label="Cancel reply" onClick={() => setReplyingTo(null)}>✕</Button>
       </div>}
-      <Textarea ref={composerRef} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && editing) cancelEdit?.(); }} rows={3} disabled={!!voice || busy} placeholder={voice ? 'Sending a voice note — discard it to type a message' : activeGroup || activeInvite ? 'Message group' : `Message ${nameFor(active)}`} />
-      {!voice && <YoutubeTitleHelper text={text} setText={setText} disabled={busy} />}
+      <Textarea ref={composerRef} value={draft} onChange={(e) => onType(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && editing) cancelEdit?.(); }} rows={3} disabled={!!voice || busy} placeholder={voice ? 'Sending a voice note — discard it to type a message' : activeGroup || activeInvite ? 'Message group' : `Message ${nameFor(active)}`} />
+      {!voice && <YoutubeTitleHelper text={draft} setText={setText} disabled={busy} />}
       <div className="flex flex-wrap items-center gap-2 gap-y-1 text-xs">
         <span className={!voice && tooLong ? 'text-destructive' : 'text-muted-foreground'}>
           {voice ? `${voiceParts} parts · ${voiceTxs} transaction${voiceTxs > 1 ? 's' : ''}` : `${bytes}/${maxBytes} · ${parts || 1} part${parts > 1 ? 's' : ''}`}{(activeGroup || activeInvite) && ` × ${copies} recipients`}
         </span>
         {!voice && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setAttachingNft(true); }}>🖼️ Attach NFT</Button>}
-        {!text.trim() && <VoiceRecorder clip={voice} onChange={setVoice} disabled={busy} />}
+        {!draft.trim() && <VoiceRecorder clip={voice} onChange={setVoice} disabled={busy} />}
       </div>
       {/* Bottom line: price, Instant and Send on the right. */}
       <div className="flex flex-wrap items-center gap-2 gap-y-1 pr-6 text-xs">
@@ -44,7 +54,7 @@ export function CryptComposer({
         {instantSlot}
         {voice
           ? <Button size="sm" disabled={busy || !agreed || editExpired} onClick={sendVoice} className="bg-cheese text-primary-foreground hover:bg-cheese/90">{editing ? 'Save edit' : 'Send voice'}{voiceTxs > 1 ? ` (${voiceTxs} signatures)` : ''}</Button>
-          : <Button size="sm" disabled={busy || !agreed || !text.trim() || tooLong || editExpired} onClick={() => send()}
+          : <Button size="sm" disabled={busy || sendQueued || !agreed || !draft.trim() || (!pending && tooLong) || editExpired} onClick={sendNow}
             className="bg-cheese text-primary-foreground hover:bg-cheese/90">{editing ? 'Save edit' : 'Send'}</Button>}
       </div>
     </div>
