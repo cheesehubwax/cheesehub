@@ -28,15 +28,15 @@ describe('NFT grid image pool', () => {
     expect(TestImage.requests[4].url).toBe('image-4');
   });
 
-  it('does not spend the ten-second deadline while queued', () => {
+  it('does not spend the six-second deadline while queued', () => {
     const queue = createNftImageQueue(1);
     const failure = vi.fn();
     queue('first', vi.fn(), vi.fn());
     queue('waiting', vi.fn(), failure);
-    vi.advanceTimersByTime(10000);
+    vi.advanceTimersByTime(6000);
     expect(TestImage.requests[1].url).toBe('waiting');
     expect(failure).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(9999);
+    vi.advanceTimersByTime(5999);
     expect(failure).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1);
     expect(failure).toHaveBeenCalledTimes(1);

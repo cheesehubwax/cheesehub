@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Eraser, ImagePlus, Pencil, RotateCcw, Save, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { NFTGridCard } from '@/components/shared/NFTGridCard';
 import { useUserNFTs, UserNFT } from '@/hooks/useUserNFTs';
 import { useSquareGridRowHeight } from '@/hooks/useSquareGridRowHeight';
+import { useDebounce } from '@/hooks/useDebounce';
 import { accountAvatar, CryptAvatar, quantizeAvatar } from '@/lib/cryptAvatar';
 import { extractIpfsHash, ipfsImageCandidates } from '@/lib/ipfsGateways';
 import { PixelAvatar } from './PixelAvatar';
@@ -57,21 +58,37 @@ async function nftPixels(image: string): Promise<CryptAvatar> {
   finally { timers.forEach(clearTimeout); controllers.forEach(ctl => ctl.abort()); }
 }
 
-export function WalletAvatarPicker({ account, busy, onPick }: { account: string; busy: boolean; onPick: (nft: UserNFT) => void }) {
+export function WalletAvatarPicker({ account, busy, onPick, fillHeight = false }: { account: string; busy: boolean; onPick: (nft: UserNFT) => void; fillHeight?: boolean }) {
   const { nfts, isLoading, error, refetch, collections } = useUserNFTs(account);
   const [search, setSearch] = useState('');
   const [collection, setCollection] = useState('');
   const [schema, setSchema] = useState('');
+  const debouncedSearch = useDebounce(search, 300);
   const scrollRef = useRef<HTMLDivElement>(null);
   const schemas = useMemo(() => [...new Set(nfts.filter(n => !collection || n.collection === collection).map(n => n.schema))].sort(), [nfts, collection]);
   const filtered = useMemo(() => nfts.filter(n => (!collection || n.collection === collection) && (!schema || n.schema === schema)
-    && `${n.name} ${n.asset_id} ${n.schema}`.toLowerCase().includes(search.toLowerCase())), [nfts, collection, schema, search]);
+    && `${n.name} ${n.asset_id} ${n.schema}`.toLowerCase().includes(debouncedSearch.toLowerCase())), [nfts, collection, schema, debouncedSearch]);
   const [columns, setColumns] = useState(() => window.matchMedia('(min-width: 640px)').matches ? 6 : 3);
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+    const updateColumns = () => setColumns(element.clientWidth >= 500 ? 6 : 3);
+    updateColumns();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateColumns);
+      return () => window.removeEventListener('resize', updateColumns);
+    }
+    const observer = new ResizeObserver(updateColumns);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
   // Grid width follows the dialog, not the page; the height hook observes that width.
   const rowHeight = useSquareGridRowHeight(scrollRef, { columns });
   const virtualizer = useVirtualizer({ count: Math.ceil(filtered.length / columns), getScrollElement: () => scrollRef.current, estimateSize: () => rowHeight, overscan: 2 });
-  return <div className="space-y-3">
-    <div className="flex flex-wrap gap-2">
+  useEffect(() => { virtualizer.measure(); }, [rowHeight, columns, virtualizer]);
+  useEffect(() => { virtualizer.scrollToOffset(0); }, [account, collection, schema, debouncedSearch, virtualizer]);
+  return <div className={cn('flex min-h-0 flex-col gap-3', fillHeight && 'flex-1')}>
+    <div className="flex shrink-0 flex-wrap gap-2">
       <Input aria-label="Search NFTs" placeholder="Name, asset ID or schema" value={search} onChange={e => setSearch(e.target.value)} className="flex-1 min-w-32" />
       <select aria-label="NFT collection" className="h-10 max-w-full rounded-md border border-input bg-background px-2 text-sm" value={collection}
         onChange={e => { setCollection(e.target.value); setSchema(''); }}>
@@ -83,7 +100,7 @@ export function WalletAvatarPicker({ account, busy, onPick }: { account: string;
     </div>
     {isLoading && <p className="text-xs text-muted-foreground">Loading wallet NFTs…</p>}
     {error && <div className="text-sm text-destructive">NFTs could not be loaded. <Button size="sm" variant="outline" onClick={() => refetch()}>Retry</Button></div>}
-    <div ref={element => { scrollRef.current = element; if (element) { const next = element.clientWidth >= 500 ? 6 : 3; if (next !== columns) setColumns(next); } }} className="h-[560px] max-h-[40dvh] overflow-y-auto">
+    <div ref={scrollRef} aria-label="Wallet NFTs" className={cn('overflow-y-auto overscroll-contain [scrollbar-gutter:stable]', fillHeight ? 'min-h-0 flex-1' : 'h-[560px] max-h-[40dvh]')}>
       <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
         {virtualizer.getVirtualItems().map(row => <div key={row.key} className={cn('absolute top-0 left-0 w-full grid gap-2 pb-2', columns === 6 ? 'grid-cols-6' : 'grid-cols-3')} style={{ transform: `translateY(${row.start}px)` }}>
           {filtered.slice(row.index * columns, (row.index + 1) * columns).map(nft => <NFTGridCard key={nft.asset_id} nft={nft} isSelected={false} disabled={busy || nft.image === '/placeholder.svg'} onToggle={() => onPick(nft)} />)}

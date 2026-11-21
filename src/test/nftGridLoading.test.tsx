@@ -12,10 +12,10 @@ beforeEach(() => {
   cancel = vi.fn();
   h.queue.mockReturnValue(cancel);
   vi.stubGlobal('IntersectionObserver', class {
-    constructor(callback: (entries: { isIntersecting: boolean }[]) => void) {
-      notify = visible => callback([{ isIntersecting: visible }]);
+    constructor(private callback: (entries: { target: Element; isIntersecting: boolean }[]) => void) {
     }
-    observe() {}
+    observe(target: Element) { notify = visible => this.callback([{ target, isIntersecting: visible }]); }
+    unobserve() {}
     disconnect() {}
   });
 });

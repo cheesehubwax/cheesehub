@@ -2,7 +2,7 @@
 
 Open tasks only. Completed work lives in git history.
 
-- [ ] CHEESECrypt NFT picker: confirm artwork loading with the user's full collection after Anchor unlock; queue/visibility/retry tests and a browser check loading/selecting NFT 92 pass, but the user's unlocked wallet is unavailable here.
+- [ ] CHEESECrypt NFT picker: verify scrolling/loading beyond 100 NFTs with the user's full collection after Anchor unlock; stable single-scroll layout, shared visibility and bounded queue are implemented, but the user's unlocked wallet is unavailable here.
 
 - [ ] CHEESECrypt: confirm restored owned room with the user's original Anchor key/folder; authenticated owner recovery and encrypted per-account backups pass reset/reopen/leave-consent tests, but the user's wallet signature and local folder are unavailable here.
 

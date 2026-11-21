@@ -4,6 +4,7 @@ import { Check, Loader2, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { extractIpfsHash, ipfsImageCandidates } from "@/lib/ipfsGateways";
 import { queueNftImage } from "@/lib/nftImageQueue";
+import { observeNftVisibility } from "@/lib/nftVisibility";
 
 export interface NFTGridCardData {
   asset_id: string;
@@ -44,17 +45,7 @@ export const NFTGridCard = React.memo(function NFTGridCard({
   useEffect(() => {
     const card = cardRef.current;
     if (!card) return;
-    if (typeof IntersectionObserver === 'undefined') {
-      setVisible(true);
-      return;
-    }
-    // Zero margin respects the dialog's clipping scroll viewport, including
-    // virtualizer overscan rows that are mounted but not actually visible.
-    const observer = new IntersectionObserver(entries => {
-      setVisible(entries.some(entry => entry.isIntersecting));
-    }, { rootMargin: '0px' });
-    observer.observe(card);
-    return () => observer.disconnect();
+    return observeNftVisibility(card, setVisible);
   }, []);
 
   const hasValidImage = Boolean(nft.image && nft.image !== "/placeholder.svg");

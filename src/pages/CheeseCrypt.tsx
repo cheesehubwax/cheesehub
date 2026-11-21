@@ -1994,10 +1994,10 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
         saveCryptName(account, editingFriend, name, 'nicknames'); setNicknames(loadCryptNames(account, 'nicknames')); setEditingFriend(null);
       }} />}
       {attachingNft && <Dialog open onOpenChange={o => { if (!o) setAttachingNft(false); }}>
-        <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto" aria-describedby={undefined}>
+        <DialogContent className="max-w-2xl h-[min(760px,90dvh)] flex flex-col overflow-hidden" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>🖼️ Attach an NFT</DialogTitle></DialogHeader>
           <p className="text-xs text-muted-foreground">Pick any NFT. If it has sound, a play button appears in the chat. Only the NFT's asset ID is added to your encrypted message; the artwork and sound are public on WAX.</p>
-          <WalletAvatarPicker account={account} busy={false} onPick={nft => {
+          <WalletAvatarPicker account={account} busy={false} fillHeight onPick={nft => {
             setText(t => `${t.trimEnd()}${t.trim() ? ' ' : ''}${nftToken(nft.asset_id)} `); setAttachingNft(false);
           }} />
         </DialogContent>
