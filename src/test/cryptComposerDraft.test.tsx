@@ -33,4 +33,13 @@ describe('CryptComposer draft', () => {
     act(() => set(''));
     expect((screen.getByRole('textbox') as HTMLTextAreaElement).value).toBe('');
   });
+  it('a late echo of earlier typing never resets the box mid-edit', () => {
+    let set!: (t: string) => void;
+    render(<Harness onSend={() => {}} external={s => { set = s; }} />);
+    const box = screen.getByRole('textbox') as HTMLTextAreaElement;
+    fireEvent.change(box, { target: { value: 'hello Xworld' } });
+    fireEvent.change(box, { target: { value: 'hello XYworld' } });
+    act(() => set('hello Xworld'));
+    expect(box.value).toBe('hello XYworld');
+  });
 });

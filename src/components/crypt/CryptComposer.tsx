@@ -24,12 +24,20 @@ export function CryptComposer({
 }) {
   // Instant local draft: keystrokes update only this box; the chat screen gets the text as a low-priority update.
   const [draft, setDraft] = useState(text);
-  const pushed = useRef(text);
+  // Values this box sent up that may still echo back late; an echo of our own typing must never overwrite the draft
+  // (that would reset the textarea and snap the caret to the end mid-edit).
+  const inFlight = useRef<string[]>([]);
   const [sendQueued, setSendQueued] = useState(false);
-  useEffect(() => { if (text !== pushed.current) { pushed.current = text; setDraft(text); } }, [text]);
-  const onType = (v: string) => { setDraft(v); pushed.current = v; startTransition(() => setText(v)); };
+  useEffect(() => {
+    const i = inFlight.current.lastIndexOf(text);
+    if (i >= 0) { inFlight.current = inFlight.current.slice(i + 1); return; }
+    inFlight.current = [];
+    setDraft(text);
+  }, [text]);
+  const push = (v: string) => { inFlight.current.push(v); if (inFlight.current.length > 200) inFlight.current.shift(); };
+  const onType = (v: string) => { setDraft(v); push(v); startTransition(() => setText(v)); };
   // Send must use the newest text: commit the draft urgently, then send once the screen has it.
-  const sendNow = () => { if (draft === text) send(); else { pushed.current = draft; setText(draft); setSendQueued(true); } };
+  const sendNow = () => { if (draft === text) send(); else { push(draft); setText(draft); setSendQueued(true); } };
   useEffect(() => { if (sendQueued && text === draft) { setSendQueued(false); send(); } }, [sendQueued, text, draft, send]);
   const pending = draft !== text;
   return (
