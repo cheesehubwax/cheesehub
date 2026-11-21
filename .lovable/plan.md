@@ -1,36 +1,23 @@
-# CHEESEWallet cleanup — staged plan
+# Smooth backspace and typing in the CHEESECrypt message box
 
-Goal: tidy the code without changing what users see, what they sign, or any fees. Each stage is checked (tests + build + signed-out page load) before the next starts. No wallet transactions are signed during testing.
+## Why it stutters
+Every keypress in the message box updates state that lives in the main chat screen. That redraws the whole screen (message list, sidebar, cost line) and re-measures the encrypted message size on each key. When you hold Backspace the key repeats about 30 times a second, the redraws fall behind, and the box catches up in jumps, so it looks like it skips and erases more than you meant.
 
-## Findings
-- Biggest files: Alcor farm logic (~1,190 lines), Alcor Farm Manager screen (~890), Compound All dialog (~700), Transfer dialog (~590), Create Alcor Farm dialog (~490).
-- Only one wallet test exists (wallet server fetching). Farm/position math, compound batching and transfer building are untested.
-- Stake, RAM and Resources screens use their own fixed server lists instead of the shared live health check (breaks the endpoint rule).
-- Transfer dialog still links one token table to waxblock.io (contract-table links were deliberately kept — will stay unless you say otherwise).
-- Wojak unbox falls back to a missing placeholder image (same 404 spam we fixed in CHEESEDrip).
-- Wording says "burn" in Wojak unbox and the NFT send screen.
+## What changes for you
+- Holding Backspace (or typing fast) deletes smoothly, one character at a time, with the cursor staying where it should.
+- The size counter, part count and price under the box still update, just a fraction of a second behind while keys are held.
+- Sending, editing, replying, attaching NFTs, YouTube titles and the /tip command work exactly as now. Nothing about fees, encryption or what gets sent changes.
 
-## Stage 1 — Safety net (tests only)
-Lock current behaviour: Alcor position sizing from pool price, farm reward/claim action building, Compound All batching, transfer/NFT send action shapes, RAM/stake amount formatting.
+## Steps
+1. The message box keeps its own instant copy of what you type, so keystrokes no longer redraw the whole chat screen.
+2. The main screen receives the text as a low-priority update, so the counter and price calculations never block typing.
+3. When the app itself changes the text (clearing after send, starting an edit, adding an NFT, cancelling), the box picks that up immediately.
+4. Send always uses the exact latest text in the box, never a delayed copy, so nothing typed just before clicking Send is lost.
+5. Keep the message list from redrawing when only the typed text changes.
+6. Add tests: fast repeated deletes end with the right text; Send right after typing uses the newest text; clearing/edit/NFT attach update the box. Then check by holding Backspace in the browser.
 
-## Stage 2 — Small safe fixes
-- Stake, RAM and Resources read through the shared health-checked server order.
-- Wojak images use the shared NFT image fallback instead of the missing placeholder.
-
-## Stage 3 — Split Alcor farm logic
-Break `alcorFarms` into focused parts (API reads, on-chain position reads, math, action builders) behind the same entry point, so nothing that imports it changes.
-
-## Stage 4 — Break up big screens
-Extract position cards, farm rows and dialog sections from Alcor Farm Manager, Compound All, Transfer and Create Alcor Farm into one-component-per-file pieces; screens keep owning their state.
-
-## Stage 5 — Rendering and dead code
-Memoize repeated rows/cards, remove only code proven unused, add a wallet AGENTS.md with the conventions.
-
-## Decisions needed (left unchanged unless you say)
-1. "Burn" wording in Wojak unbox ("burns and mints") and NFT "burn" — switch to "nulled"? Note: NFT burning genuinely destroys the NFT on chain, so "nulled" could be misleading there.
-2. The waxblock.io token-table link in Transfer — keep as a contract-table link?
-
-## Technical notes
-- Barrel re-export keeps `src/lib/alcorFarms.ts` import paths stable.
-- Endpoints via `resolveEndpoints()` / `applyHealthOrder()`.
-- Image fallback via shared `ipfsGateways`/`nftMedia` helpers.
+## Technical details
+- `CryptComposer`: local `draft` state bound to the Textarea; propagate to Messenger via `startTransition(() => setText(v))`; sync local draft from the `text` prop when it changes externally (track last value pushed to detect external writes). Expose latest draft via a ref used by `send`/size checks at send time.
+- Messenger: derive size/cost from `useDeferredValue(text)` for display; `send()` re-computes size from the ref'd live text before signing so the over-length guard stays exact.
+- Wrap the thread rendering in a memoized component (or `useMemo` on the rendered list) keyed on thread/message props, not composer text.
+- Record rule in `src/components/crypt/AGENTS.md`: composer owns instant draft; Messenger state is a deferred mirror; send reads the live draft.
