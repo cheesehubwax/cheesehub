@@ -1,5 +1,5 @@
 import { act, cleanup, render, screen, fireEvent } from '@testing-library/react';
-import { useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useCryptReplyNavigation } from '@/hooks/useCryptReplyNavigation';
 import { encodeReply } from '@/lib/cryptReply';
@@ -140,5 +140,31 @@ describe('in-room reply navigation', () => {
     view.unmount();
     render(<Room thread={rows} resumeAt={100} />);
     expect(screen.getByRole('button').textContent).toBe('@1');
+  });
+  it('reattaches visibility tracking after the same conversation viewport is replaced', () => {
+    const roots: Element[] = [];
+    const disconnect = vi.fn();
+    vi.stubGlobal('IntersectionObserver', vi.fn(function (_: unknown, options: IntersectionObserverInit) {
+      if (options.root instanceof Element) roots.push(options.root);
+      return { observe: vi.fn(), unobserve: vi.fn(), disconnect };
+    }));
+    function RecoverableRoom({ version }: { version: number }) {
+      const list = useRef<HTMLOListElement | null>(null);
+      const [element, setElement] = useState<HTMLOListElement | null>(null);
+      const bind = useCallback((node: HTMLOListElement | null) => { list.current = node; setElement(node); }, []);
+      const nav = useCryptReplyNavigation('alice', 'bob', messages, 5, list, undefined, element);
+      return <><button onClick={nav.jump}>@{nav.pending.length}</button><ol ref={bind} key={version} onScroll={nav.inspectVisible}>
+        {messages.map(m => <li key={m.key} data-reply-key={m.key}>{m.key}</li>)}
+      </ol></>;
+    }
+    const view = render(<RecoverableRoom version={1} />);
+    const original = screen.getByRole('list');
+    view.rerender(<RecoverableRoom version={2} />);
+    const replacement = screen.getByRole('list');
+    expect(replacement).not.toBe(original);
+    expect(roots.at(-1)).toBe(replacement);
+    expect(disconnect).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button'));
+    expect(screen.getByRole('button')).toHaveTextContent('@5');
   });
 });

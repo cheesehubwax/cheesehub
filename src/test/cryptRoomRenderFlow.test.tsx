@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Session } from '@wharfkit/session';
 import { encryptMemo, generateKey, saveContact } from '@/lib/cheeseCrypt';
-import { encodeGroupText, saveDecision, saveInvites } from '@/lib/cryptInviteGroups';
+import { encodeGroupText, loadInvites, saveDecision, saveInvites } from '@/lib/cryptInviteGroups';
 import { encodeReply } from '@/lib/cryptReply';
 import { saveReadMarks } from '@/lib/cryptUnread';
 import { Messenger } from '@/pages/CheeseCrypt';
@@ -17,6 +17,7 @@ vi.mock('@/lib/cheeseCrypt', async original => ({ ...await original<typeof impor
   fetchRoomMemos: async () => [], lookupPublishedKey: async () => null }));
 vi.mock('@/lib/cryptVault', async original => ({ ...await original<typeof import('@/lib/cryptVault')>(), recallVault: async () => null }));
 vi.mock('@/components/crypt/CryptTrustBadge', async original => ({ ...await original<typeof import('@/components/crypt/CryptTrustBadge')>(), CryptTrustBadge: () => null }));
+vi.mock('@/components/crypt/CryptNftCard', () => ({ CryptNftCard: () => { throw new Error('Synthetic NFT failure'); } }));
 vi.mock('@/components/crypt/ChatMessageItem', async original => {
   const actual = await original<typeof import('@/components/crypt/ChatMessageItem')>();
   return { ChatMessageItem: (props: Parameters<typeof actual.ChatMessageItem>[0]) => {
@@ -74,6 +75,31 @@ describe('authenticated public-room rendering', () => {
     expect(screen.getByText('Before')).toBeInTheDocument();
     expect(screen.getByText('After')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Message group')).toBeInTheDocument();
+    expect(calls.transact).not.toHaveBeenCalled();
+  });
+  it('uses the same protected feed for a private invite group', async () => {
+    const held = loadInvites('alice');
+    saveInvites('alice', { [id]: { ...held[id], publicRoom: false, name: 'Private invite room' } });
+    calls.fetch.mockResolvedValue([memo(encodeReply({ author: 'alice', time: 1, quote: 'original' }, 'Private group reply'), 0)]);
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: /Private invite room/ }));
+    expect(await screen.findByText('Private group reply')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Jump to earliest unseen reply (1 remaining)' }));
+    expect(screen.queryByRole('button', { name: /Jump to earliest unseen reply/ })).not.toBeInTheDocument();
+    expect(calls.transact).not.toHaveBeenCalled();
+  });
+  it('contains a quoted NFT failure inside the quote dialog while keeping the chat and composer usable', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    calls.fetch.mockResolvedValue([memo('[nft:123]', 0), memo(encodeReply({ author: 'bob', time: 100, quote: 'NFT' }, 'Reply to NFT'), 1)]);
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: /Public cheese room/ }));
+    await screen.findByText('Reply to NFT');
+    fireEvent.click(screen.getByRole('button', { name: 'Show the message from bob this replies to' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Unable to display this message.');
+    expect(screen.getByPlaceholderText('Message group')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+    expect(screen.getByText('Reply to NFT')).toBeInTheDocument();
     expect(calls.transact).not.toHaveBeenCalled();
   });
 });

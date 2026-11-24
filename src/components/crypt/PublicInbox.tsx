@@ -1,4 +1,5 @@
-import { parseReply } from '@/lib/cryptReply';
+import { CryptInboxPreview } from '@/components/crypt/CryptInboxPreview';
+import { CryptMessageBoundary } from '@/components/crypt/CryptMessageBoundary';
 import { Inbox } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { CardAction } from '@/components/crypt/CardAction';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { CryptTrustBadge } from '@/components/crypt/CryptTrustBadge';
-import { parseNftMessage } from '@/lib/cryptNft';
 import type { InboxRequest } from '@/lib/cryptPublicInbox';
 import { cn } from '@/lib/utils';
 
@@ -43,7 +43,7 @@ export function MessageRequests({ requests, onAccept, onDecline, onBlock }: { re
     <h2 className="px-2 text-xs font-bold text-cheese">📥 Message requests ({requests.length})</h2>
     {requests.map(r => <div key={r.from} className="space-y-2 px-2">
       <div className="flex items-center gap-2"><PixelAvatar account={r.from} /><div className="min-w-0"><p className="flex flex-wrap items-center gap-1 break-words text-xs font-semibold">{r.from}<CryptTrustBadge account={r.from} variant="inline" /></p><p className="text-[10px] text-muted-foreground">{r.messages.length} message{r.messages.length === 1 ? '' : 's'}</p></div></div>
-      {r.messages.slice(-3).map(m => <p key={m.key} className="line-clamp-2 whitespace-pre-wrap break-words text-xs text-muted-foreground">{parseNftMessage(parseReply(m.text)?.body ?? m.text ?? '').map(s => s.type === 'nft' ? '🖼️ Sent an NFT' : s.text).join(' ')}</p>)}
+      {r.messages.slice(-3).map(m => <CryptMessageBoundary key={m.key} inline><CryptInboxPreview text={m.text} /></CryptMessageBoundary>)}
       <div className="flex flex-wrap gap-1">
         <Button size="sm" className="h-7 px-2 text-xs" aria-label={`Accept request from ${r.from}`} onClick={() => onAccept(r.from)}>Accept</Button>
         <Button size="sm" variant="outline" className="h-7 px-2 text-xs" aria-label={`Decline request from ${r.from}`} onClick={() => onDecline(r.from)}>Decline</Button>

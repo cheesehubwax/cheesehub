@@ -1120,7 +1120,9 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const hiddenReplies = Object.entries(replyUnread).reduce((n, [id, c]) => id === active ? n : n + c, 0);
 
 
-  const listRef = useRef<HTMLOListElement>(null);
+  const listRef = useRef<HTMLOListElement | null>(null);
+  const [listElement, setListElement] = useState<HTMLOListElement | null>(null);
+  const bindList = useCallback((node: HTMLOListElement | null) => { listRef.current = node; setListElement(node); }, []);
   const nearBottom = useRef(true);
   const lastActive = useRef<string | null>(null);
   const newMarkerRef = useRef<HTMLLIElement | null>(null);
@@ -1140,7 +1142,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     if (!active || !readMarks || time <= (readMarks[active] ?? 0)) return;
     const next = { ...readMarks, [active]: time };
     saveReadMarks(account, next); setReadMarks(next);
-  });
+  }, listElement);
   const reactionNavigation = useCryptReactionNavigation(account, active, threadReactions, rowForTarget, resumeAt, listRef);
   // Reports addressed to me in the open room, matched to their message row by author + pre-edit digest.
   const reportedRows = useMemo(() => {
@@ -1155,10 +1157,12 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const jumpToReport = () => {
     const next = pendingReports[0];
     if (!next) return;
+    const node = findCryptMessageNode(listRef.current, next.key);
+    if (!node) return;
     const viewed = pendingReports.filter(r => r.key === next.key).map(r => r.report);
     const keys = [...new Set([...seenReports, ...viewed])];
     saveSeenReports(account, keys); setSeenReports(keys); setReportFocus(next.key);
-    findCryptMessageNode(listRef.current, next.key)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    node.scrollIntoView({ block: 'center', behavior: 'smooth' });
   };
   // Remember where the page itself was so switching chats never moves the outer page.
   const pageY = useRef(typeof window === 'undefined' ? 0 : window.scrollY);
@@ -2138,11 +2142,13 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
                       <DialogTitle>↩️ {openQuote.author === account ? 'Your message' : nameFor(openQuote.author)}</DialogTitle>
                       <DialogDescription>{new Date(openQuote.time).toLocaleString()}{original?.txId && <> · <a href={explorerTx(original.txId)} target="_blank" rel="noreferrer" className="font-semibold text-cheese underline underline-offset-2">Tx</a></>}</DialogDescription>
                     </DialogHeader>
+                    <CryptMessageBoundary key={`${active}:${openQuote.author}:${openQuote.time}`} inline>
                     <div className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words text-sm">
                       {quoteHidden ? null : original?.voice ? <VoiceNoteBubble note={original.voice} />
-                        : full != null ? parseNftMessage(full).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} txId={original!.txId} /> : <span key={i} className="block">{seg.text}</span>)
+                        : full != null ? parseNftMessage(full).map((seg, i) => seg.type === 'nft' ? <CryptNftCard key={i} assetId={seg.assetId} txId={original?.txId} /> : <span key={i} className="block">{seg.text}</span>)
                         : <><span className="block">{openQuote.quote || '…'}</span><span className="mt-2 block text-xs text-muted-foreground">The original message isn't loaded here, so this is the quoted snippet.</span></>}
                     </div>
+                    </CryptMessageBoundary>
                   </>;
                 })()}
               </DialogContent>
@@ -2163,7 +2169,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
             </div>
             <div className="relative flex min-h-0 flex-1">
             <CryptMessageBoundary key={active}>
-            <ol ref={listRef} aria-label="Chat messages" className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden space-y-2 p-4"
+            <ol ref={bindList} aria-label="Chat messages" className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden space-y-2 p-4"
               onScroll={(e) => { const el = e.currentTarget; nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; replyNavigation.inspectVisible(); if (el.scrollTop < 40 && loaded && !inFlight.current && depth < MAX_HISTORY_PAGES) setDepth(d => Math.min(MAX_HISTORY_PAGES, d + 1)); }}>
               {thread.map((m, i) => (
                 <Fragment key={m.key}>

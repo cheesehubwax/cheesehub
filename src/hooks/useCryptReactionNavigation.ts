@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { reactionsToMe, type ActiveReaction } from '@/lib/cryptReactions';
+import { findCryptMessageNode } from '@/lib/cryptMessageDom';
 
 interface State { pending: string[]; seen: string[] }
 type Store = Record<string, State>;
@@ -48,7 +49,11 @@ export function useCryptReactionNavigation(account: string, active: string | nul
   const current = useRef({ active, pending, store });
   current.current = { active, pending, store };
 
-  const save = (next: Store) => { current.current.store = next; localStorage.setItem(storageKey(account), JSON.stringify(next)); setStore(next); };
+  const save = useCallback((next: Store) => {
+    current.current.store = next;
+    try { localStorage.setItem(storageKey(account), JSON.stringify(next)); } catch { /* keep session receipts when storage is unavailable */ }
+    setStore(next);
+  }, [account]);
   // Persist the queue so unseen reactions survive switching chats, reloads and the read marker moving on.
   useEffect(() => {
     if (!active) return;
@@ -56,19 +61,18 @@ export function useCryptReactionNavigation(account: string, active: string | nul
     const keys = [...new Set([...old.pending, ...pending.flatMap(p => p.reactions)])];
     if (keys.length === old.pending.length) return;
     save({ ...store, [active]: { ...old, pending: keys } });
-  }); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [active, store, pending, save]);
 
   const jump = () => {
     const { active: id, pending: queue, store: latest } = current.current;
     const next = queue[0];
     const el = list.current;
     if (!id || !next || !el) return;
-    const node = Array.from(el.querySelectorAll<HTMLElement>('[data-reply-key]')).find(n => n.dataset.replyKey === next.key);
-    if (node) {
-      const top = el.scrollTop + node.getBoundingClientRect().top - el.getBoundingClientRect().top - 12;
-      if (typeof el.scrollTo === 'function') el.scrollTo({ top, behavior: 'auto' });
-      else el.scrollTop = top;
-    }
+    const node = findCryptMessageNode(el, next.key);
+    if (!node) return;
+    const top = el.scrollTop + node.getBoundingClientRect().top - el.getBoundingClientRect().top - 12;
+    if (typeof el.scrollTo === 'function') el.scrollTo({ top, behavior: 'auto' });
+    else el.scrollTop = top;
     const old = latest[id] ?? { pending: [], seen: [] };
     save({ ...latest, [id]: {
       pending: [...new Set([...old.pending, ...queue.flatMap(p => p.reactions)])].filter(k => !next.reactions.includes(k)),

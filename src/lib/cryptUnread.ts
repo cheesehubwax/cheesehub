@@ -16,7 +16,9 @@ export function loadReadMarks(account: string): ReadMarks | null {
     return out;
   } catch { return null; }
 }
-export const saveReadMarks = (account: string, marks: ReadMarks) => localStorage.setItem(storeKey(account), JSON.stringify(marks));
+export function saveReadMarks(account: string, marks: ReadMarks) {
+  try { localStorage.setItem(storeKey(account), JSON.stringify(marks)); } catch { /* callers retain read markers in memory */ }
+}
 
 /** Marks every existing conversation read at its newest message (first visit: no phantom badges on old history). */
 export function baselineMarks(messages: Msg[], account: string): ReadMarks {

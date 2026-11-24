@@ -140,7 +140,9 @@ export const reportKey = (r: Pick<RoomReport, 'id' | 'reporter' | 'author' | 'ta
 export function loadSeenReports(account: string): string[] {
   try { const raw: unknown = JSON.parse(localStorage.getItem(reportStore(account)) || '[]'); return Array.isArray(raw) ? raw.filter((k): k is string => typeof k === 'string') : []; } catch { return []; }
 }
-export function saveSeenReports(account: string, keys: string[]) { localStorage.setItem(reportStore(account), JSON.stringify(keys)); }
+export function saveSeenReports(account: string, keys: string[]) {
+  try { localStorage.setItem(reportStore(account), JSON.stringify(keys)); } catch { /* viewed-report receipts remain session-local */ }
+}
 export function restrictedAt(state: RoomModeration | undefined, member: string, at: number) {
   return !!state && ((state.bans[member] !== undefined && at >= state.bans[member]) || !!state.mutes[member]?.some(m => at >= m.from && at < m.until));
 }

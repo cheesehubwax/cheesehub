@@ -28,7 +28,7 @@ function save(account: string, store: ReplyStore) {
 }
 
 /** Separate per-message receipts: jumping past a reply never marks that skipped reply viewed. */
-export function useCryptReplyNavigation(account: string, active: string | null, thread: ReplyMessage[], resumeAt: number | null, list: RefObject<HTMLOListElement>, onRead?: (time: number) => void) {
+export function useCryptReplyNavigation(account: string, active: string | null, thread: ReplyMessage[], resumeAt: number | null, list: RefObject<HTMLOListElement>, onRead?: (time: number) => void, listElement?: HTMLOListElement | null) {
   const [store, setStore] = useState<ReplyStore>(() => load(account));
   const [highlighted, setHighlighted] = useState<{ id: string | null; keys: Set<string> }>({ id: active, keys: new Set() });
   const state = active ? store[active] : undefined;
@@ -123,7 +123,7 @@ export function useCryptReplyNavigation(account: string, active: string | null, 
       window.removeEventListener('scroll', inspectVisible); window.removeEventListener('resize', inspectVisible);
       document.removeEventListener('visibilitychange', inspectVisible);
     };
-  }, [active, account, list, inspectVisible]);
+  }, [active, account, list, listElement, inspectVisible]);
   // Updated content/read callbacks use the existing observers, never rebuild them after receipt writes.
   useEffect(() => { inspectVisible(); }, [active, thread, inspectVisible]);
   const jump = () => {
