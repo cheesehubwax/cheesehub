@@ -70,6 +70,8 @@ import type { PublicKeyFile } from '@/lib/cheeseCrypt';
 import { ChainMemo, MessagingKey, MAX_MESSAGE_BYTES, MAX_HISTORY_PAGES, MAX_PARTS, messageCost, partCount, splitMessage, buildCreateKeyActions, KEY_CREATION_QUANTITY, buildPublishKeyActions, buildSendMessageActions, CRYPT_ROUTER_ENABLED, routeCryptActions, encryptMemo, fetchMessages, fetchContractStream, fetchStreamHistory, mergeMemos, generateKey, loadContacts, loadContactAvatars, loadKey, loadRemovedContacts, removeContact, lookupPublishedKey, parseKeyFile, plaintextBytes, saveContact, saveKey, toPublicFile } from '@/lib/cheeseCrypt';
 import { download } from '@/components/crypt/cryptDownload';
 import { ChatMessageItem } from '@/components/crypt/ChatMessageItem';
+import { CryptMessageBoundary } from '@/components/crypt/CryptMessageBoundary';
+import { findCryptMessageNode } from '@/lib/cryptMessageDom';
 import { EditedMessagesDialog } from '@/components/crypt/EditedMessagesDialog';
 import { encodeAdmin, encodeFounder, encodeCollapse, encodeReport, encodeModeration, encodePolicySnapshot, encodeRoomPolicy, type MuteMinutes } from '@/lib/cryptInviteGroups';
 import { applyCollapses, canCollapseAuthor, canMuteMember, collapsedKeys, collectReports, loadSeenReports, reportKey, saveSeenReports, deriveModeration, founderBadges, MAX_FOUNDERS, loadModerationMemos, mergeModerationMemos, moderateMessages, mutedUntil, restrictedAt, roomRole, saveModerationMemos } from '@/lib/cryptModeration';
@@ -134,7 +136,9 @@ const CheeseCrypt = () => {
             <Button onClick={login} className="bg-cheese text-primary-foreground hover:bg-cheese/90">Connect wallet</Button>
           </div>
         ) : (
-          <Messenger key={`${accountName}:${lockNonce}`} account={accountName} session={session} onLocked={onLocked} />
+          <CryptMessageBoundary key={`${accountName}:${lockNonce}`}>
+            <Messenger account={accountName} session={session} onLocked={onLocked} />
+          </CryptMessageBoundary>
         )}
       </div>
     </Layout>
@@ -1053,7 +1057,9 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const inThread = (m: ConversationEntry) => activeInvite ? m.igroup === activeInvite.invite.id : activeGroup
     ? m.group?.id === activeGroup.id && m.group.members.join(',') === activeGroup.members.join(',')
     : isDirectMessage(m, account, active);
-  const thread = conversations.filter(inThread);
+  const thread = useMemo(() => conversations.filter(m => activeInvite ? m.igroup === activeInvite.invite.id : activeGroup
+    ? m.group?.id === activeGroup.id && m.group.members.join(',') === activeGroup.members.join(',')
+    : isDirectMessage(m, account, active)), [conversations, activeInvite, activeGroup, account, active]);
   // Delivery ticks: poll the irreversible block time only while one of my recent messages is still reversible.
   const [libSeen, setLibSeen] = useState<number | null>(null);
   const deliveryPending = thread.some(m => m.from === account && !!m.txId && m.time >= clock - DELIVERY_SETTLED_MS && deliveryState(m.time, libSeen) === 'sent');
@@ -1069,7 +1075,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   useEffect(() => { setSearchIndex(Math.max(0, searchMatches.length - 1)); }, [searchQuery, active]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { setSearchOpen(false); setSearchQuery(''); }, [active]);
   useEffect(() => {
-    if (currentMatch) listRef.current?.querySelector<HTMLElement>(`[data-reply-key="${CSS.escape(currentMatch)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (currentMatch) findCryptMessageNode(listRef.current, currentMatch)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, [currentMatch]);
   const stepSearch = (dir: 1 | -1) => { if (searchMatches.length) setSearchIndex(i => (Math.min(i, searchMatches.length - 1) + dir + searchMatches.length) % searchMatches.length); };
 
@@ -1152,7 +1158,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     const viewed = pendingReports.filter(r => r.key === next.key).map(r => r.report);
     const keys = [...new Set([...seenReports, ...viewed])];
     saveSeenReports(account, keys); setSeenReports(keys); setReportFocus(next.key);
-    listRef.current?.querySelector<HTMLElement>(`[data-reply-key="${CSS.escape(next.key)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    findCryptMessageNode(listRef.current, next.key)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   };
   // Remember where the page itself was so switching chats never moves the outer page.
   const pageY = useRef(typeof window === 'undefined' ? 0 : window.scrollY);
@@ -2156,6 +2162,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
               </> : <Button size="sm" variant="ghost" className="ml-auto h-7 gap-1 text-xs font-normal" onClick={() => setSearchOpen(true)}><Search className="h-3.5 w-3.5" /> Search chat</Button>}
             </div>
             <div className="relative flex min-h-0 flex-1">
+            <CryptMessageBoundary key={active}>
             <ol ref={listRef} aria-label="Chat messages" className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden space-y-2 p-4"
               onScroll={(e) => { const el = e.currentTarget; nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; replyNavigation.inspectVisible(); if (el.scrollTop < 40 && loaded && !inFlight.current && depth < MAX_HISTORY_PAGES) setDepth(d => Math.min(MAX_HISTORY_PAGES, d + 1)); }}>
               {thread.map((m, i) => (
@@ -2169,6 +2176,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
                       <span className="h-px flex-1 bg-border" />
                     </li>
                   )}
+                  <CryptMessageBoundary row>
                   <ChatMessageItem m={m} account={account} delivery={m.from === account && m.txId ? (m.time < clock - DELIVERY_SETTLED_MS ? 'permanent' : deliveryState(m.time, libTime)) : undefined} keyAvatar={key?.avatar} avatars={shownAvatars}
                     contacts={contacts} active={active} activeGroup={activeGroup} nameFor={nameFor} trust={!!(activeGroup || activeInvite)}
                     highlighted={replyNavigation.highlighted.has(m.key)} reactionHighlighted={reactionNavigation.highlighted === m.key}
@@ -2181,6 +2189,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
                     onCollapse={collapseTarget(m) && activeInvite ? () => setPendingModeration({ id: activeInvite.invite.id, member: m.from, action: 'collapse', target: collapseTarget(m)! }) : undefined}
                     badges={activeInvite ? { owner: m.from === activeInvite.invite.creator, admin: m.from !== activeInvite.invite.creator && !!moderation[activeInvite.invite.id]?.admins.includes(m.from), founder: founderBadges(moderation[activeInvite.invite.id], activeInvite.invite, listedIds.has(activeInvite.invite.id)).includes(m.from) } : undefined}
                     friend={friendAction(m)} onOpenProfile={setProfileOf} {...authorModeration(m)} onOpenQuote={setOpenQuote} openedAt={acceptedRequestMessages.current.has(m.key) ? { current: Infinity } : openedAt} />
+                  </CryptMessageBoundary>
                 </Fragment>
               ))}
               {leaveNotices.filter(n => !thread.length || n.time > thread[thread.length - 1].time).map(n => <LeavePill key={n.key} name={nameFor(n.from)} account={n.from} />)}
@@ -2188,6 +2197,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
               {!thread.length && <li className="text-sm text-muted-foreground">{activeGroup || activeInvite ? 'No group messages yet.' : `No messages with ${nameFor(active)} yet.`}</li>}
               <li ref={endRef} aria-hidden />
             </ol>
+            </CryptMessageBoundary>
             {pendingReports.length > 0 && <Button size="icon" title="Jump to the earliest reported message"
               aria-label={`Jump to reported message (${pendingReports.length} remaining)`}
               onClick={jumpToReport}

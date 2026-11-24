@@ -14,8 +14,17 @@ function Room({ active = 'bob', thread = messages, resumeAt = 5, onRead }: { act
   </ol></>;
 }
 const bounds = (top: number, bottom: number) => ({ top, bottom, height: bottom - top, left: 0, right: 100, width: 100, x: 0, y: top, toJSON: () => ({}) });
-beforeEach(() => { localStorage.clear(); });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+let frames: Map<number, FrameRequestCallback>;
+let frameId: number;
+function flushFrame() {
+  act(() => { const queued = [...frames.values()]; frames.clear(); queued.forEach(cb => cb(0)); });
+}
+beforeEach(() => {
+  localStorage.clear(); frames = new Map(); frameId = 0;
+  vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { frames.set(++frameId, cb); return frameId; });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => { frames.delete(id); });
+});
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('in-room reply navigation', () => {
   it('six replies decrease to five when jumping to the earliest and highlight that exact post', () => {
@@ -39,11 +48,13 @@ describe('in-room reply navigation', () => {
     vi.spyOn(list, 'getBoundingClientRect').mockReturnValue(bounds(100, 500));
     messages.forEach((m, i) => vi.spyOn(screen.getByText(m.key), 'getBoundingClientRect').mockReturnValue(bounds(i === 2 ? 200 : 800, i === 2 ? 260 : 860)));
     fireEvent.scroll(list);
+    flushFrame();
     expect(screen.getByRole('button').textContent).toBe('@5');
     expect(screen.getByText('reply-2').dataset.highlighted).toBe('true');
     expect(onRead).toHaveBeenCalledWith(12);
     expect(onRead).not.toHaveBeenCalledWith(15);
     fireEvent.scroll(list);
+    flushFrame();
     expect(screen.getByRole('button').textContent).toBe('@5');
   });
   it('jumping past unread replies never loses them when switching chats or reloading with a newer read timestamp', () => {
@@ -77,6 +88,57 @@ describe('in-room reply navigation', () => {
     vi.spyOn(screen.getByRole('list'), 'getBoundingClientRect').mockReturnValue(bounds(-600, -100));
     vi.spyOn(screen.getByText('reply-0'), 'getBoundingClientRect').mockReturnValue(bounds(-500, -450));
     act(() => { fireEvent.scroll(screen.getByRole('list')); });
+    flushFrame();
     expect(screen.getByRole('button').textContent).toBe('@6');
+  });
+  it('coalesces scroll bursts and does not report the same visible timestamp again after receipt renders', () => {
+    const onRead = vi.fn();
+    render(<Room onRead={onRead} />);
+    const list = screen.getByRole('list');
+    vi.spyOn(list, 'getBoundingClientRect').mockReturnValue(bounds(100, 500));
+    const measure = vi.spyOn(screen.getByText('reply-0'), 'getBoundingClientRect').mockReturnValue(bounds(200, 260));
+    for (let i = 0; i < 100; i++) fireEvent.scroll(list);
+    expect(frames.size).toBe(1);
+    flushFrame();
+    expect(measure).toHaveBeenCalledTimes(1);
+    expect(onRead).toHaveBeenCalledTimes(1);
+    expect(onRead).toHaveBeenCalledWith(10);
+    fireEvent.scroll(list); flushFrame();
+    expect(onRead).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button').textContent).toBe('@5');
+  });
+  it('retains one observer across receipt and parent renders, and reconnects only when the chat changes', () => {
+    const disconnect = vi.fn();
+    const create = vi.fn(function () { return { observe: vi.fn(), unobserve: vi.fn(), disconnect }; });
+    vi.stubGlobal('IntersectionObserver', create);
+    const view = render(<Room />);
+    expect(create).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button'));
+    view.rerender(<Room onRead={() => {}} />);
+    expect(create).toHaveBeenCalledTimes(1);
+    view.rerender(<Room active="carol" thread={[]} />);
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(disconnect).toHaveBeenCalledTimes(1);
+    view.unmount();
+    expect(disconnect).toHaveBeenCalledTimes(2);
+    expect(frames.size).toBe(0);
+  });
+  it('keeps reply navigation working when device storage is full', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('Quota exceeded', 'QuotaExceededError'); });
+    render(<Room />);
+    fireEvent.click(screen.getByRole('button'));
+    expect(screen.getByRole('button').textContent).toBe('@5');
+    expect(screen.getByText('reply-0').dataset.highlighted).toBe('true');
+  });
+  it('keeps wire/control-character message identities intact when jumping and restoring receipts', () => {
+    const key = 'cg2:tx:bob:room:\u0004R1:quote\n"[end]\\';
+    const rows = [{ ...messages[0], key }, messages[1]];
+    const view = render(<Room thread={rows} />);
+    fireEvent.click(screen.getByRole('button'));
+    expect(screen.getByRole('button').textContent).toBe('@1');
+    expect(document.querySelector('[data-highlighted="true"]')?.getAttribute('data-reply-key')).toBe(key);
+    view.unmount();
+    render(<Room thread={rows} resumeAt={100} />);
+    expect(screen.getByRole('button').textContent).toBe('@1');
   });
 });
