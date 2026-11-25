@@ -73,3 +73,15 @@ describe('AtomicHub-first image sources', () => {
     expect(getMediaUrl({ video: 'QmTestHash' }).url).not.toContain('resizer.atomichub.io');
   });
 });
+describe('IPFS folder subpaths', () => {
+  it('keeps the file path for ipfs:// URIs so AtomicHub gets a real image', async () => {
+    const { extractIpfsHash, preferredIpfsImageUrl } = await import('@/lib/ipfsGateways');
+    const uri = 'ipfs://QmbcnAE5c4PpA8rnEyx4Zh7Qn83VLo7cGzpnzXNwZ1835Z/base/GPK_FG_02a.jpg';
+    expect(extractIpfsHash(uri)).toBe('QmbcnAE5c4PpA8rnEyx4Zh7Qn83VLo7cGzpnzXNwZ1835Z/base/GPK_FG_02a.jpg');
+    expect(preferredIpfsImageUrl(uri)).toContain('ipfs=QmbcnAE5c4PpA8rnEyx4Zh7Qn83VLo7cGzpnzXNwZ1835Z%2Fbase%2FGPK_FG_02a.jpg');
+  });
+  it('no longer falls back to the dead Pinata gateway for images', async () => {
+    const { ipfsImageCandidates } = await import('@/lib/ipfsGateways');
+    expect(ipfsImageCandidates('QmTestHash').some((u) => u.includes('pinata'))).toBe(false);
+  });
+});

@@ -38,12 +38,12 @@ describe('viewport-only NFT tiles', () => {
   it('walks all gateway fallbacks then restarts from AtomicHub on manual retry', () => {
     render(<NFTGridCard nft={nft} isSelected={false} onToggle={() => {}} />);
     act(() => notify(true));
-    for (let i = 0; i < 6; i++) act(() => h.queue.mock.calls[i][2]());
+    for (let i = 0; i < 7; i++) act(() => h.queue.mock.calls[i][2]());
     expect(screen.getByText('Retry')).toBeTruthy();
     fireEvent.click(screen.getByText('Retry'));
-    expect(h.queue.mock.calls[6][0]).toContain('resizer.atomichub.io');
-    expect(h.queue.mock.calls[6][0]).toContain('retry=1');
-    act(() => h.queue.mock.calls[6][1]());
+    expect(h.queue.mock.calls[7][0]).toContain('resizer.atomichub.io');
+    expect(h.queue.mock.calls[7][0]).toContain('retry=1');
+    act(() => h.queue.mock.calls[7][1]());
     expect(screen.getByAltText('Artwork').getAttribute('src')).toContain('retry=1');
   });
 

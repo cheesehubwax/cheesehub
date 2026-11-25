@@ -4,7 +4,7 @@ import cheeseKeyringImage from '@/assets/cheese-keyring.webp';
 // Unified IPFS gateway configuration
 // Ordered by reliability and speed (based on real-world testing)
 export const IPFS_GATEWAYS = [
-  'https://gateway.pinata.cloud/ipfs/',
+  'https://ipfs.filebase.io/ipfs/',
   'https://dweb.link/ipfs/',
   'https://nftstorage.link/ipfs/',
   'https://ipfs.io/ipfs/',
@@ -37,7 +37,7 @@ const BUNDLED_IPFS_IMAGES: Record<string, string> = {
 
 export function preferredIpfsImageUrl(url: string): string {
   const hash = extractIpfsHash(url);
-  return hash ? BUNDLED_IPFS_IMAGES[hash] ?? atomicHubImageUrl(hash) : url;
+  return hash ? BUNDLED_IPFS_IMAGES[hash.split('/')[0]] ?? atomicHubImageUrl(hash) : url;
 }
 
 // Image-only sources: cached artwork first, original IPFS gateways as fallbacks.
@@ -56,7 +56,7 @@ export function buildIpfsImageUrl(index: number, hash: string): string {
 // Every candidate URL for a hash, in preference order. The AtomicHub cache is
 // included so unpinned content still resolves.
 export function ipfsImageCandidates(hash: string): string[] {
-  const bundledImage = BUNDLED_IPFS_IMAGES[hash];
+  const bundledImage = BUNDLED_IPFS_IMAGES[hash.split('/')[0]];
   return bundledImage
     ? [bundledImage]
     : IPFS_IMAGE_SOURCES.map((builder) => builder(hash));
@@ -137,8 +137,9 @@ export function extractIpfsHash(url: string): string | null {
     }
   }
 
+  // Keep folder subpaths (e.g. Qm.../base/01a.jpg): the bare folder CID is not an image.
   if (url.startsWith('ipfs://')) {
-    return url.replace('ipfs://', '').split('/')[0];
+    return url.slice('ipfs://'.length).split(/[?#]/)[0] || null;
   }
 
   const ipfsMatch = url.match(/\/ipfs\/([a-zA-Z0-9]+(?:\/[^?#]*)?)/);

@@ -19,13 +19,13 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('NFT grid image pool', () => {
-  it('starts only four downloads even with 92 queued tiles', () => {
+  it('starts only eight downloads even with 92 queued tiles', () => {
     const queue = createNftImageQueue();
     for (let i = 0; i < 92; i++) queue(`image-${i}`, vi.fn(), vi.fn());
-    expect(TestImage.requests).toHaveLength(4);
+    expect(TestImage.requests).toHaveLength(8);
     TestImage.requests[0].onload?.();
-    expect(TestImage.requests).toHaveLength(5);
-    expect(TestImage.requests[4].url).toBe('image-4');
+    expect(TestImage.requests).toHaveLength(9);
+    expect(TestImage.requests[8].url).toBe('image-8');
   });
 
   it('does not spend the six-second deadline while queued', () => {

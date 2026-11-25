@@ -289,7 +289,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
 
           if (json.success && json.data) {
             for (const asset of json.data) {
-              const media = getMediaUrl(asset.data);
+              const media = getMediaUrl({ ...asset.template?.immutable_data, ...asset.immutable_data, ...asset.data });
               assets.push({
                 asset_id: asset.asset_id,
                 name: asset.data?.name || asset.name || `NFT #${asset.asset_id}`,
@@ -387,7 +387,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
 
         if (json.success && json.data) {
           for (const asset of json.data) {
-            const media = getMediaUrl(asset.data);
+            const media = getMediaUrl({ ...asset.template?.immutable_data, ...asset.immutable_data, ...asset.data });
             assets.push({
               asset_id: asset.asset_id,
               name: asset.data?.name || asset.name || `NFT #${asset.asset_id}`,
