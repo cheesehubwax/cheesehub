@@ -16,7 +16,7 @@ import {
   FarmInfo, fetchUserStakes, fetchFarmStakableConfig,
   buildStakeNftsAction, buildUnstakeNftsAction, buildClaimRewardsAction,
   getCollectionNames, UserStake, PendingReward, FarmStakableConfig,
-  fetchUserGlobalStakes, GlobalStakeInfo,
+  fetchUserGlobalStakes, GlobalStakeInfo, isFarmFull,
 } from "@/lib/farm";
 import { ATOMIC_API } from "@/lib/waxConfig";
 import { fetchWithFallback } from "@/lib/fetchWithFallback";
@@ -747,6 +747,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
 
   const now = Math.floor(Date.now() / 1000);
   const isExpired = farm.expiration > 1 && now > farm.expiration;
+  const isFull = isFarmFull(farm, now);
   const isLoadingAny = isLoadingStaked || isLoadingEligible || isLoadingStakedDetails;
 
   if (isLoadingAny && !eligibleNfts.length && !stakedNftDetails.length) {
@@ -826,6 +827,16 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
             </TabsList>
 
             <TabsContent value="unstaked" className="mt-4 space-y-3">
+              {isFull && (
+                <Alert className="border-amber-500/40 bg-amber-500/5">
+                  <Info className="h-4 w-4 text-amber-400" />
+                  <AlertDescription className="text-xs">
+                    <span className="font-semibold text-amber-400">This farm is full.</span>{" "}
+                    All remaining rewards are already committed to existing stakers until the farm ends, so the contract
+                    will reject new stakes. Staking reopens if the creator deposits more rewards or stakers leave.
+                  </AlertDescription>
+                </Alert>
+              )}
               {willAutoClaimOnStake && (
                 <Alert className="border-cheese/40 bg-cheese/5">
                   <Info className="h-4 w-4 text-cheese" />
@@ -850,12 +861,12 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
                 </Button>
                 <Button
                   onClick={requestStake}
-                  disabled={isStaking || selectedToStake.size === 0 || isExpired}
+                  disabled={isStaking || selectedToStake.size === 0 || isExpired || isFull}
                   size="sm"
                   className="bg-primary text-primary-foreground"
                 >
                   {isStaking && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
-                  Stake Selected ({selectedToStake.size})
+                  {isFull ? "Farm Full" : `Stake Selected (${selectedToStake.size})`}
                 </Button>
               </div>
 

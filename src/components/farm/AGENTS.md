@@ -3,3 +3,4 @@
 - farms.waxdao stakers secondary indexes: 3 = user, 4 = farmname (2 returns nothing); verified on chain.
 - Farm code layout: `@/lib/farm` is a re-export entry over farmModel (constants/types/pure maths), farmActions (action builders), farmReads (chain reads) and farmGlobalStakes; farmCreate builds the exact creation transaction. Staking screen pieces live in `staking/` as display-only parts; NFTStaking keeps the state. Keeps signed shapes testable without rendering.
 - Farm images go through shared ipfsGateways helpers and TokenLogo; empty image means "no art", never a hardcoded placeholder path (breaks under GitHub Pages base path).
+- Farm "Full" = any paying pool's hourly × hours left ≥ its total_funds (mirrors farms.waxdao stakenfts assertion); computed client-side via isFarmFull, never a separate read.

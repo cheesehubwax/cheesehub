@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, Sprout } from "lucide-react";
-import { fetchAllFarms, FarmInfo, fetchUserGlobalStakes } from "@/lib/farm";
+import { fetchAllFarms, FarmInfo, fetchUserGlobalStakes, isFarmFull } from "@/lib/farm";
 import { useWax } from "@/context/WaxContext";
 import { useQuery } from "@tanstack/react-query";
 import { FarmCard } from "./FarmCard";
@@ -23,6 +23,7 @@ export function BrowseFarms() {
   const [search, setSearch] = useState("");
   const [activeOnly, setActiveOnly] = useState(true);
   const [stakedOnly, setStakedOnly] = useState(false);
+  const [hideFull, setHideFull] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>("staked");
   const [claimAllOpen, setClaimAllOpen] = useState(false);
 
@@ -45,6 +46,10 @@ export function BrowseFarms() {
 
     if (activeOnly) {
       result = result.filter(f => f.is_active && (f.expiration === 0 || f.expiration > now));
+    }
+
+    if (hideFull) {
+      result = result.filter(f => !isFarmFull(f, now));
     }
 
     if (stakedOnly && accountName) {
@@ -74,7 +79,7 @@ export function BrowseFarms() {
     }
 
     return result;
-  }, [farms, search, activeOnly, stakedOnly, sortBy, accountName, userStakes]);
+  }, [farms, search, activeOnly, hideFull, stakedOnly, sortBy, accountName, userStakes]);
 
   return (
     <div className="space-y-4">
@@ -94,6 +99,11 @@ export function BrowseFarms() {
           <div className="flex items-center gap-2">
             <Switch id="active-only" checked={activeOnly} onCheckedChange={setActiveOnly} />
             <Label htmlFor="active-only" className="text-sm cursor-pointer">Active only</Label>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Checkbox id="hide-full" checked={hideFull} onCheckedChange={(v) => setHideFull(!!v)} />
+            <Label htmlFor="hide-full" className="text-sm cursor-pointer">Hide full</Label>
           </div>
 
           {accountName && (

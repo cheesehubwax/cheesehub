@@ -206,3 +206,19 @@ export function getCollectionNames(config: FarmStakableConfig): string[] {
 
   return Array.from(collections);
 }
+
+/**
+ * farms.waxdao rejects `stakenfts` when (hourly rate incl. new NFT) × hours left
+ * exceeds a pool's remaining funds. A farm is "full" when any paying pool's
+ * existing commitment already uses up its funds, so no further NFT can be staked.
+ */
+export function isFarmFull(farm: Pick<FarmInfo, "status" | "expiration" | "reward_pools">, nowSeconds: number): boolean {
+  if (farm.status !== 1 || farm.expiration <= nowSeconds) return false;
+  const hoursLeft = (farm.expiration - nowSeconds) / 3600;
+  return farm.reward_pools.some((pool) => {
+    const hourly = parseFloat((pool.total_hourly_reward || "0").split(" ")[0]) || 0;
+    if (hourly <= 0) return false;
+    const funds = parseFloat((pool.total_funds || pool.balance || "0").split(" ")[0]) || 0;
+    return hourly * hoursLeft >= funds;
+  });
+}
