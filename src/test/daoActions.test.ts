@@ -156,8 +156,8 @@ describe("pure helpers", () => {
   it("IPFS URLs", () => {
     expect(dao.getIpfsUrl("")).toBe("");
     expect(dao.getIpfsUrl("https://x/y.png")).toBe("https://x/y.png");
-    expect(dao.getIpfsUrl("QmAbc")).toBe("https://ipfs.io/ipfs/QmAbc");
-    expect(dao.getIpfsUrl("bafyAbc")).toBe("https://ipfs.io/ipfs/bafyAbc");
+    expect(dao.getIpfsUrl("QmAbc")).toBe("https://resizer.atomichub.io/images/v1/preview?ipfs=QmAbc&size=370");
+    expect(dao.getIpfsUrl("bafyAbc")).toBe("https://resizer.atomichub.io/images/v1/preview?ipfs=bafyAbc&size=370");
     expect(dao.getIpfsUrl("other")).toBe("other");
   });
   it("labels and expiry", () => {

@@ -8,16 +8,23 @@ export const IPFS_GATEWAYS = [
   'https://dweb.link/ipfs/',
   'https://nftstorage.link/ipfs/',
   'https://ipfs.io/ipfs/',
-  'https://cloudflare-ipfs.com/ipfs/',
 ];
 
 // AtomicHub's image cache is the preferred artwork source, including for new
 // NFTs whose public IPFS gateways hang. This is image-only: audio and video
 // continue to use the original content gateways above.
-// Only the 370px preview is reliably cached; larger sizes 500 when the source
-// content is no longer retrievable from IPFS.
+// Three AtomicHub mirrors are tried in order: the 370px preview (fast WebP),
+// the larger JPEG thumbnail, then the original cached file.
 export function atomicHubImageUrl(hash: string, size = 370): string {
   return `https://resizer.atomichub.io/images/v1/preview?ipfs=${encodeURIComponent(hash)}&size=${size}`;
+}
+
+export function atomicHubThumbnailUrl(hash: string): string {
+  return `https://resizer.atomichub.io/images/v1/thumbnail?ipfs=${encodeURIComponent(hash)}`;
+}
+
+export function atomicHubOriginalUrl(hash: string): string {
+  return `https://resizer.atomichub.io/media/v1/original?ipfs=${encodeURIComponent(hash)}`;
 }
 
 // The original IPFS content for these products no longer resolves publicly.
@@ -36,6 +43,8 @@ export function preferredIpfsImageUrl(url: string): string {
 // Image-only sources: cached artwork first, original IPFS gateways as fallbacks.
 export const IPFS_IMAGE_SOURCES: Array<(hash: string) => string> = [
   (hash: string) => atomicHubImageUrl(hash),
+  (hash: string) => atomicHubThumbnailUrl(hash),
+  (hash: string) => atomicHubOriginalUrl(hash),
   ...IPFS_GATEWAYS.map((gateway) => (hash: string) => `${gateway}${hash}`),
 ];
 
@@ -102,9 +111,17 @@ export const IMAGE_LOAD_TIMEOUT = {
   max: 25000,
 };
 
-// Helper to get primary IPFS gateway URL
+// Raw content URL on the primary public gateway. Use for audio/video only;
+// images should use getIpfsImageUrl so they come from the AtomicHub mirror.
 export function getIpfsUrl(hash: string): string {
   return `${IPFS_GATEWAYS[0]}${hash}`;
+}
+
+// Image URL for an IPFS hash: bundled copy, else AtomicHub's cached preview.
+// Grid cards recover the hash from this URL to walk the remaining candidates.
+export function getIpfsImageUrl(hash: string): string {
+  if (!hash) return '';
+  return BUNDLED_IPFS_IMAGES[hash.split('/')[0]] ?? atomicHubImageUrl(hash);
 }
 
 // Helper to extract IPFS hash from various URL formats

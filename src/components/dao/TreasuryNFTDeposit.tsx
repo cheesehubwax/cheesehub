@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { buildDepositNFTToTreasuryAction, buildNFTDepositAction, buildAnnounceDepoAction } from "@/lib/dao";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
-import { getIpfsUrl } from "@/lib/ipfsGateways";
+import { getIpfsImageUrl } from "@/lib/ipfsGateways";
 import { Loader2, ArrowDownToLine, Wallet, Search, RefreshCw, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -64,7 +64,7 @@ export function TreasuryNFTDeposit({ daoName, onDeposited }: TreasuryNFTDepositP
           const data = asset.data || {};
           let image = data.img || data.image || "";
           if (image && !image.startsWith("http") && (image.startsWith("Qm") || image.startsWith("bafy"))) {
-            image = getIpfsUrl(image);
+            image = getIpfsImageUrl(image);
           }
           return {
             asset_id: asset.asset_id,

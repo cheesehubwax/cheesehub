@@ -59,3 +59,17 @@ describe('NFT artwork resolution', () => {
     expect(await result).toEqual({ url: atomicHubImageUrl(hash), index: 0 });
   });
 });
+describe('AtomicHub-first image sources', () => {
+  it('tries all three AtomicHub mirrors before any public gateway', async () => {
+    const { ipfsImageCandidates: c, getIpfsImageUrl } = await import('@/lib/ipfsGateways');
+    const list = c('QmTestHash');
+    expect(list.slice(0, 3).every((u) => u.startsWith('https://resizer.atomichub.io/'))).toBe(true);
+    expect(list.some((u) => u.includes('cloudflare-ipfs.com'))).toBe(false);
+    expect(getIpfsImageUrl('QmTestHash')).toBe('https://resizer.atomichub.io/images/v1/preview?ipfs=QmTestHash&size=370');
+  });
+  it('farm staking images use AtomicHub but videos keep raw IPFS', async () => {
+    const { getMediaUrl } = await import('@/components/farm/staking/stakingMedia');
+    expect(getMediaUrl({ img: 'QmTestHash' }).url).toContain('resizer.atomichub.io');
+    expect(getMediaUrl({ video: 'QmTestHash' }).url).not.toContain('resizer.atomichub.io');
+  });
+});

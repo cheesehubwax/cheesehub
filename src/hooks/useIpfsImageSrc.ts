@@ -1,22 +1,23 @@
 import { useCallback, useMemo, useState } from "react";
-import { IPFS_GATEWAYS } from "@/lib/ipfsGateways";
+import { ipfsImageCandidates } from "@/lib/ipfsGateways";
 
-// Shared hook: returns an image src that cycles through IPFS gateways on error.
+// Shared hook for farm/DAO logos and banners: AtomicHub mirrors first, then
+// public IPFS gateways, advancing one candidate on each load error.
 export function useIpfsImageSrc(hash: string | undefined) {
-  const [gatewayIdx, setGatewayIdx] = useState(0);
+  const [idx, setIdx] = useState(0);
 
-  const src = useMemo(() => {
-    if (!hash) return "";
-    if (hash.startsWith("http")) return hash;
-    if (hash.startsWith("Qm") || hash.startsWith("baf")) {
-      return `${IPFS_GATEWAYS[gatewayIdx % IPFS_GATEWAYS.length]}${hash}`;
-    }
-    return hash;
-  }, [hash, gatewayIdx]);
+  const candidates = useMemo(() => {
+    if (!hash) return [] as string[];
+    if (hash.startsWith("http")) return [hash];
+    if (hash.startsWith("Qm") || hash.startsWith("baf")) return ipfsImageCandidates(hash);
+    return [hash];
+  }, [hash]);
+
+  const src = candidates.length ? candidates[Math.min(idx, candidates.length - 1)] : "";
 
   const onError = useCallback(() => {
-    setGatewayIdx(prev => (prev + 1 < IPFS_GATEWAYS.length ? prev + 1 : prev));
-  }, []);
+    setIdx(prev => (prev + 1 < candidates.length ? prev + 1 : prev));
+  }, [candidates.length]);
 
   return { src, onError };
 }

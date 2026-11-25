@@ -1,3 +1,4 @@
+import { getIpfsImageUrl } from "@/lib/ipfsGateways";
 // CHEESEDao model: contract name, fees, labels, shared types and pure helpers.
 // Import from "@/lib/dao" (stable entry point), not this file directly.
 
@@ -75,7 +76,7 @@ export function getIpfsUrl(hash: string): string {
   if (!hash) return "";
   if (hash.startsWith("http")) return hash;
   if (hash.startsWith("Qm") || hash.startsWith("bafy")) {
-    return `https://ipfs.io/ipfs/${hash}`;
+    return getIpfsImageUrl(hash);
   }
   return hash;
 }

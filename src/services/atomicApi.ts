@@ -56,7 +56,7 @@ export function waitForPreload(url: string): Promise<boolean> {
   return Promise.resolve(false);
 }
 
-import { IPFS_GATEWAYS, getIpfsUrl, extractIpfsHash, atomicHubImageUrl } from '@/lib/ipfsGateways';
+import { IPFS_GATEWAYS, getIpfsUrl, getIpfsImageUrl, extractIpfsHash, atomicHubImageUrl } from '@/lib/ipfsGateways';
 
 // Warm the AtomicHub image cache alongside the primary gateway URL: for content
 // that is no longer retrievable from public IPFS gateways, the cache is the only
@@ -72,11 +72,11 @@ export function getImageUrl(img: string | undefined): string {
   if (img.startsWith('http://') || img.startsWith('https://')) return img;
   if (img.startsWith('ipfs://')) {
     const hash = img.replace('ipfs://', '');
-    return getIpfsUrl(hash);
+    return getIpfsImageUrl(hash);
   }
-  if (img.startsWith('Qm') || img.startsWith('bafy') || img.startsWith('bafk')) return getIpfsUrl(img);
-  if (img.startsWith('/ipfs/')) return `https://ipfs.io${img}`;
-  if (/^[a-zA-Z0-9]{46,}$/.test(img)) return getIpfsUrl(img);
+  if (img.startsWith('Qm') || img.startsWith('bafy') || img.startsWith('bafk')) return getIpfsImageUrl(img);
+  if (img.startsWith('/ipfs/')) return getIpfsImageUrl(img.slice(6));
+  if (/^[a-zA-Z0-9]{46,}$/.test(img)) return getIpfsImageUrl(img);
   return img || '/placeholder.svg';
 }
 

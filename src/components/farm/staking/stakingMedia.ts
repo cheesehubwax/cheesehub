@@ -1,4 +1,4 @@
-import { getIpfsUrl as getSharedIpfsUrl } from "@/lib/ipfsGateways";
+import { getIpfsImageUrl, getIpfsUrl } from "@/lib/ipfsGateways";
 
 export interface NFTAsset {
   asset_id: string;
@@ -11,18 +11,23 @@ export interface NFTAsset {
 
 // Raw IPFS hashes/URIs become a gateway URL; NFTGridCard extracts the hash and
 // walks the shared bundled → AtomicHub → IPFS candidates. Empty means no art.
-export function getImageUrl(img: string | undefined): string {
+function toIpfsUrl(img: string | undefined, build: (hash: string) => string): string {
   if (!img) return "";
-  if (img.startsWith("ipfs://")) return getSharedIpfsUrl(img.replace("ipfs://", ""));
-  if (img.startsWith("Qm") || img.startsWith("bafy") || img.startsWith("bafk")) return getSharedIpfsUrl(img);
+  if (img.startsWith("ipfs://")) return build(img.replace("ipfs://", ""));
+  if (img.startsWith("Qm") || img.startsWith("bafy") || img.startsWith("bafk")) return build(img);
   return img;
+}
+
+// Images come from the AtomicHub mirror; videos keep raw IPFS gateways.
+export function getImageUrl(img: string | undefined): string {
+  return toIpfsUrl(img, getIpfsImageUrl);
 }
 
 export function getMediaUrl(data: Record<string, string | undefined> | undefined): { url: string; isVideo: boolean } {
   const imageField = data?.img || data?.image;
   if (imageField) return { url: getImageUrl(imageField), isVideo: false };
   const videoField = data?.video;
-  if (videoField) return { url: getImageUrl(videoField), isVideo: true };
+  if (videoField) return { url: toIpfsUrl(videoField, getIpfsUrl), isVideo: true };
   return { url: "", isVideo: false };
 }
 

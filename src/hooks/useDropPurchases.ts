@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchTableRows } from '@/lib/waxRpcFallback';
 import { NFTHIVE_CONFIG, CHEESE_CONFIG, ATOMIC_API } from '@/lib/waxConfig';
-import { getIpfsUrl, extractIpfsHash } from '@/lib/ipfsGateways';
+import { getIpfsImageUrl, extractIpfsHash } from '@/lib/ipfsGateways';
 import { fetchActionsUnion } from '@/lib/hyperionHistory';
 import { resolveEndpoints } from '@/lib/endpointHealth';
 
@@ -83,7 +83,7 @@ async function fetchTemplateImages(templateIds: number[]): Promise<Map<number, s
       const img = t.immutable_data?.img || t.immutable_data?.image || t.immutable_data?.video || '';
       if (img) {
         const hash = extractIpfsHash(img);
-        imageMap.set(Number(t.template_id), hash ? getIpfsUrl(hash) : img);
+        imageMap.set(Number(t.template_id), hash ? getIpfsImageUrl(hash) : img);
       }
     }
   } catch {

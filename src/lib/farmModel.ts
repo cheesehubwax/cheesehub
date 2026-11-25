@@ -1,3 +1,4 @@
+import { getIpfsImageUrl } from "@/lib/ipfsGateways";
 // WaxDAO V2 Farm Contract (farms.waxdao) — constants, types and pure helpers.
 
 export const FARM_CONTRACT = "farms.waxdao";
@@ -133,7 +134,7 @@ export function getIpfsUrl(hash: string): string {
   if (!hash) return "";
   if (hash.startsWith("http")) return hash;
   if (hash.startsWith("Qm") || hash.startsWith("bafy")) {
-    return `https://gateway.pinata.cloud/ipfs/${hash}`;
+    return getIpfsImageUrl(hash);
   }
   return hash;
 }

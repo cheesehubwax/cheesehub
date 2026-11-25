@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, Image as ImageIcon, Search, RefreshCw } from "lucide-react";
 import { DaoInfo, UserNFT, fetchVotedNFTs } from "@/lib/dao";
 import { useWax } from "@/context/WaxContext";
-import { getIpfsUrl } from "@/lib/ipfsGateways";
+import { getIpfsImageUrl } from "@/lib/ipfsGateways";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useSquareGridRowHeight } from "@/hooks/useSquareGridRowHeight";
 import { NFTGridCard } from "@/components/shared/NFTGridCard";
@@ -57,7 +57,7 @@ export function NFTVotePicker({ dao, proposalId, onSelect, selectedIds }: NFTVot
               let image = data.img || data.image || "";
               if (image && !image.startsWith("http")) {
                 if (image.startsWith("Qm") || image.startsWith("bafy")) {
-                  image = getIpfsUrl(image);
+                  image = getIpfsImageUrl(image);
                 }
               }
               allNFTs.push({
