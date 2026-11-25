@@ -39,12 +39,36 @@ describe('viewport-only NFT tiles', () => {
     render(<NFTGridCard nft={nft} isSelected={false} onToggle={() => {}} />);
     act(() => notify(true));
     for (let i = 0; i < 7; i++) act(() => h.queue.mock.calls[i][2]());
+    const video = document.querySelector('video');
+    expect(video?.getAttribute('src')).toContain('QmcyKFxZ');
+    fireEvent.error(video!);
     expect(screen.getByText('Retry')).toBeTruthy();
     fireEvent.click(screen.getByText('Retry'));
     expect(h.queue.mock.calls[7][0]).toContain('resizer.atomichub.io');
     expect(h.queue.mock.calls[7][0]).toContain('retry=1');
     act(() => h.queue.mock.calls[7][1]());
     expect(screen.getByAltText('Artwork').getAttribute('src')).toContain('retry=1');
+  });
+
+  it('shows remounted artwork from the session cache without re-queuing', () => {
+    const cachedNft = { ...nft, asset_id: '100', image: 'ipfs://QmCacheTestHash11111111111111111111111111111111' };
+    const first = render(<NFTGridCard nft={cachedNft} isSelected={false} onToggle={() => {}} />);
+    act(() => notify(true));
+    act(() => h.queue.mock.calls[0][1]());
+    first.unmount();
+    h.queue.mockClear();
+    render(<NFTGridCard nft={cachedNft} isSelected={false} onToggle={() => {}} />);
+    act(() => notify(true));
+    expect(h.queue).not.toHaveBeenCalled();
+    expect(screen.getByAltText('Artwork').getAttribute('src')).toContain('resizer.atomichub.io');
+  });
+
+  it('renders video-only NFTs as a muted video preview', () => {
+    render(<NFTGridCard nft={{ ...nft, image: 'ipfs://QmVideoHash/clip.mp4' }} isSelected={false} onToggle={() => {}} />);
+    act(() => notify(true));
+    expect(h.queue).not.toHaveBeenCalled();
+    const video = document.querySelector('video');
+    expect(video?.muted).toBe(true);
   });
 
   it('does not download missing placeholder artwork', () => {

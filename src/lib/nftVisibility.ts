@@ -1,4 +1,4 @@
-// Share one viewport observer across tiles; ancestor scroll clipping is respected.
+// Share one viewport observer across tiles; a 300px margin prefetches rows just before they scroll in.
 const listeners = new Map<Element, (visible: boolean) => void>();
 let observer: IntersectionObserver | undefined;
 
@@ -10,7 +10,7 @@ export function observeNftVisibility(element: Element, onChange: (visible: boole
   if (!observer) {
     observer = new IntersectionObserver(entries => {
       for (const entry of entries) listeners.get(entry.target)?.(entry.isIntersecting);
-    }, { rootMargin: '0px' });
+    }, { rootMargin: '300px 0px' });
   }
   listeners.set(element, onChange);
   observer.observe(element);

@@ -1,7 +1,7 @@
 // Grid artwork uses one shared pool. Waiting time never consumes a request's
 // deadline, and removing a tile cancels its queued or active request.
 export const NFT_IMAGE_CONCURRENCY = 8;
-export const NFT_IMAGE_TIMEOUT_MS = 6000;
+export const NFT_IMAGE_TIMEOUT_MS = 8000;
 
 export function createNftImageQueue(limit = NFT_IMAGE_CONCURRENCY) {
   type Job = { start: () => void; cancelled: boolean };

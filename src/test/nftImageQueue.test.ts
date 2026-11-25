@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createNftImageQueue } from '@/lib/nftImageQueue';
+import { createNftImageQueue, NFT_IMAGE_TIMEOUT_MS } from '@/lib/nftImageQueue';
 
 class TestImage {
   static requests: TestImage[] = [];
@@ -28,15 +28,15 @@ describe('NFT grid image pool', () => {
     expect(TestImage.requests[8].url).toBe('image-8');
   });
 
-  it('does not spend the six-second deadline while queued', () => {
+  it('does not spend the full deadline while queued', () => {
     const queue = createNftImageQueue(1);
     const failure = vi.fn();
     queue('first', vi.fn(), vi.fn());
     queue('waiting', vi.fn(), failure);
-    vi.advanceTimersByTime(6000);
+    vi.advanceTimersByTime(NFT_IMAGE_TIMEOUT_MS);
     expect(TestImage.requests[1].url).toBe('waiting');
     expect(failure).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(5999);
+    vi.advanceTimersByTime(NFT_IMAGE_TIMEOUT_MS - 1);
     expect(failure).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1);
     expect(failure).toHaveBeenCalledTimes(1);

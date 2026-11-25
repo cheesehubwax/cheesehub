@@ -2,9 +2,21 @@ import React, { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { Check, Loader2, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { extractIpfsHash, ipfsImageCandidates } from "@/lib/ipfsGateways";
+import { extractIpfsHash, getIpfsUrl, ipfsImageCandidates, isVideoUrl } from "@/lib/ipfsGateways";
 import { queueNftImage } from "@/lib/nftImageQueue";
 import { observeNftVisibility } from "@/lib/nftVisibility";
+
+// Session memory of artwork that already loaded, keyed by the NFT's image field.
+// Remounted tiles (virtualized scrolling) show it instantly without re-queuing.
+const loadedNftImages = new Map<string, string>();
+const MAX_LOADED_NFT_IMAGES = 5000;
+function rememberLoaded(key: string, url: string) {
+  if (loadedNftImages.size >= MAX_LOADED_NFT_IMAGES) {
+    const oldest = loadedNftImages.keys().next().value;
+    if (oldest !== undefined) loadedNftImages.delete(oldest);
+  }
+  loadedNftImages.set(key, url);
+}
 
 export interface NFTGridCardData {
   asset_id: string;
@@ -37,7 +49,10 @@ export const NFTGridCard = React.memo(function NFTGridCard({
 }: NFTGridCardProps) {
   const [gatewayIndex, setGatewayIndex] = useState(0);
   const [imgError, setImgError] = useState(false);
-  const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(() => loadedNftImages.has(nft.image));
+  const [cachedUrl, setCachedUrl] = useState<string | undefined>(() => loadedNftImages.get(nft.image));
+  // Video-only NFTs (or images that never load) fall back to a muted raw-gateway preview.
+  const [videoMode, setVideoMode] = useState(() => isVideoUrl(nft.image));
   const [retryCount, setRetryCount] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
@@ -49,45 +64,73 @@ export const NFTGridCard = React.memo(function NFTGridCard({
   }, []);
 
   const hasValidImage = Boolean(nft.image && nft.image !== "/placeholder.svg");
+  const ipfsHash = useMemo(() => extractIpfsHash(nft.image), [nft.image]);
   const imageCandidates = useMemo(() => {
-    const hash = extractIpfsHash(nft.image);
+    const hash = ipfsHash;
     return hash ? ipfsImageCandidates(hash) : [nft.image || "/placeholder.svg"];
-  }, [nft.image]);
+  }, [ipfsHash, nft.image]);
 
+  const firstRun = useRef(true);
   useEffect(() => {
+    if (firstRun.current) { firstRun.current = false; return; }
+    const cached = loadedNftImages.get(nft.image);
     setGatewayIndex(0);
     setImgError(false);
-    setImgLoaded(false);
+    setImgLoaded(Boolean(cached));
+    setCachedUrl(cached);
+    setVideoMode(isVideoUrl(nft.image));
     setRetryCount(0);
   }, [nft.asset_id, nft.image]);
 
   const currentImageUrl = useMemo(() => {
     if (!nft.image || nft.image === "/placeholder.svg") return "/placeholder.svg";
+    if (cachedUrl) return cachedUrl;
     const baseUrl = imageCandidates[gatewayIndex] ?? imageCandidates[0];
     const sep = baseUrl.includes("?") ? "&" : "?";
     return retryCount > 0 ? `${baseUrl}${sep}retry=${retryCount}` : baseUrl;
-  }, [nft.image, imageCandidates, gatewayIndex, retryCount]);
+  }, [nft.image, cachedUrl, imageCandidates, gatewayIndex, retryCount]);
 
   const handleImageError = useCallback(() => {
+    if (cachedUrl) {
+      loadedNftImages.delete(nft.image);
+      setCachedUrl(undefined);
+      setImgLoaded(false);
+      return;
+    }
     if (gatewayIndex < imageCandidates.length - 1) {
       setGatewayIndex((p) => p + 1);
       setImgLoaded(false);
+    } else if (ipfsHash && !videoMode) {
+      setVideoMode(true);
     } else {
       setImgError(true);
     }
-  }, [imageCandidates.length, gatewayIndex]);
+  }, [cachedUrl, nft.image, imageCandidates.length, gatewayIndex, ipfsHash, videoMode]);
+
+  const markLoaded = useCallback(() => {
+    rememberLoaded(nft.image, currentImageUrl);
+    setImgLoaded(true);
+  }, [nft.image, currentImageUrl]);
 
   // The deadline starts only once a pool slot is granted, not while waiting
   // behind other tiles. Off-screen/unmounted requests release their slot.
   useEffect(() => {
-    if (!visible || !hasValidImage || imgError || imgLoaded) return;
-    return queueNftImage(currentImageUrl, () => setImgLoaded(true), handleImageError);
-  }, [visible, hasValidImage, imgError, imgLoaded, currentImageUrl, handleImageError]);
+    if (!visible || !hasValidImage || imgError || imgLoaded || videoMode) return;
+    return queueNftImage(currentImageUrl, markLoaded, handleImageError);
+  }, [visible, hasValidImage, imgError, imgLoaded, videoMode, currentImageUrl, markLoaded, handleImageError]);
+
+  const videoUrl = useMemo(() => {
+    if (!videoMode) return "";
+    if (ipfsHash) return getIpfsUrl(ipfsHash);
+    return nft.image;
+  }, [videoMode, ipfsHash, nft.image]);
 
   const handleRetry = (e: React.MouseEvent) => {
     e.stopPropagation();
     setImgError(false);
     setImgLoaded(false);
+    setCachedUrl(undefined);
+    setVideoMode(isVideoUrl(nft.image));
     setGatewayIndex(0);
     setRetryCount((p) => p + 1);
   };
@@ -129,6 +172,23 @@ export const NFTGridCard = React.memo(function NFTGridCard({
             <ImageIcon className="h-5 w-5 text-primary mb-1" />
             <span className="text-[9px] text-primary font-medium">Retry</span>
           </div>
+        ) : videoMode ? (
+          visible ? (
+            <video
+              src={videoUrl}
+              className="w-full h-full object-cover pointer-events-none"
+              muted
+              loop
+              autoPlay
+              playsInline
+              preload="metadata"
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center bg-muted">
+              <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
+            </div>
+          )
         ) : (
           <>
             {!imgLoaded && (
@@ -147,7 +207,7 @@ export const NFTGridCard = React.memo(function NFTGridCard({
               onLoad={(e) => {
                 const t = e.target as HTMLImageElement;
                 if (t.naturalWidth === 0) handleImageError();
-                else setImgLoaded(true);
+                else markLoaded();
               }}
             />}
           </>
