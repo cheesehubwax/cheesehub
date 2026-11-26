@@ -2026,7 +2026,12 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
       {sharingProfile && key && (() => {
         const to = profileRecipients(account, contacts, groups.map(g => g.members), [...blocked, ...removedContacts]);
         const parts = profileNoteParts(key);
+        const rooms = inviteViews.filter(v => v.status === 'joined').flatMap(v => {
+          const plan = noticePlan({ kind: 'profile', id: v.invite.id });
+          return plan && plan.to.length ? [{ id: v.invite.id, name: v.name, count: plan.to.length, cost: plan.cost }] : [];
+        });
         return <ProfileShareDialog recipients={to.map(nameFor)} cost={to.length ? profileNoteCost(parts, to.length) : ''} busy={busy}
+          rooms={rooms} onShareRoom={id => { setSharingProfile(false); requestNotice({ kind: 'profile', id }); }}
           onClose={() => setSharingProfile(false)} onSend={async () => { if (await sendProfileNote(to)) setSharingProfile(false); }} />;
       })()}
       {showBlocked && <BlockedDialog blocked={blocked} onBlock={blockAccount} onUnblock={unblockAccount} onClose={() => setShowBlocked(false)} />}

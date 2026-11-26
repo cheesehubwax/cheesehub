@@ -88,7 +88,7 @@ export function CryptChatHeader({
                       return undefined;
                     })}
                   {activeInvite.isCreator && activeInvite.status === 'joined' && <Button size="sm" variant="ghost" className="h-7 text-xs font-normal" onClick={() => setEditingInvite({ id: activeInvite.invite.id, name: activeInvite.name, avatar: activeInvite.avatar })}><Pencil className="h-3 w-3" /> Edit group</Button>}
-                  {activeInvite.status === 'joined' && <Button size="sm" variant="ghost" className="h-7 text-xs font-normal" title="Send your current name and picture to everyone in this group, including people who aren't your friends" onClick={() => setPendingNotice({ kind: 'profile', id: activeInvite.invite.id })}>📣 Share my profile</Button>}
+                  
                   {onReportRoom && <Button size="sm" variant="ghost" className="h-7 text-xs font-normal" title="Report this room, including its owner or admins, to the CHEESEHub moderation team" onClick={onReportRoom}>🚩 Report room</Button>}
                   {activeInvite.status === 'joined' && <Button size="sm" variant="ghost" className="h-7 text-xs font-normal text-destructive hover:text-destructive" onClick={() => setPendingNotice({ kind: 'leave', id: activeInvite.invite.id })}>🚪 Leave group</Button>}
                 </span>
