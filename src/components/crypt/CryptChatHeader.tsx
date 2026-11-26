@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { ChevronDown, MoreHorizontal, Pencil, UserPlus } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { useEffect, useState } from 'react';
+import { JITTER_EVENT, isJitterOnForChat, jitterChatKey, loadSendJitter, saveSendJitter, setChatJitter } from '@/lib/cryptNetworkPrivacy';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
@@ -17,7 +19,7 @@ type Notice = { kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'profile'; i
 /** Chat title bar: friend or group title, Members dropdown and per-chat actions. State lives in Messenger. */
 export function CryptChatHeader({
   account, active, activeGroup, activeInvite, keyAvatar, avatars, contacts, blocked, friendDeclines, setFriendDeclines,
-  nameFor, membersOpen, setMembersOpen, setPendingNotice, setEditingInvite, setEditingFriend, saveFriend, blockAccount, admins = [], onReportRoom, verify, onVerify, onOpenProfile, lockSlot,
+  nameFor, membersOpen, setMembersOpen, setPendingNotice, setEditingInvite, setEditingFriend, saveFriend, blockAccount, admins = [], onReportRoom, verify, onVerify, onOpenProfile, lockSlot, instantReady = false,
 }: {
   account: string; active: string | null; activeGroup: CryptGroup | undefined; activeInvite: InviteGroupView | undefined;
   keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>; contacts: Record<string, string>; blocked: string[];
@@ -35,7 +37,26 @@ export function CryptChatHeader({
   onOpenProfile?: (account: string) => void;
   /** Panic lock button, shown at the right of every open chat's header. */
   lockSlot?: ReactNode;
+  /** Instant Messaging ready (only used for a recommendation in the Privacy submenu). */
+  instantReady?: boolean;
 }) {
+  // Per-chat random send delay; the master mode and delay range live in Privacy settings.
+  const [jitter, setJitter] = useState(loadSendJitter);
+  useEffect(() => { const f = () => setJitter(loadSendJitter()); window.addEventListener(JITTER_EVENT, f); window.addEventListener('storage', f); return () => { window.removeEventListener(JITTER_EVENT, f); window.removeEventListener('storage', f); }; }, []);
+  const privacySub = (chat: string) => {
+    const mine = jitter.chats.includes(jitterChatKey(account, chat));
+    return <DropdownMenuSub>
+      <DropdownMenuSubTrigger>🛡️ Privacy</DropdownMenuSubTrigger>
+      <DropdownMenuSubContent className="w-64">
+        <DropdownMenuCheckboxItem checked={jitter.mode === 'all' || (jitter.mode === 'chat' && mine)} disabled={jitter.mode === 'all'}
+          onSelect={e => e.preventDefault()} onCheckedChange={on => setJitter(saveSendJitter(setChatJitter(loadSendJitter(), account, chat, on === true)))}>
+          <span>⏱️ Random send delay (jitter){jitter.mode === 'all' && <span className="block text-[10px] text-muted-foreground">On for all chats in Privacy settings</span>}
+            {jitter.mode !== 'all' && isJitterOnForChat(jitter, account, chat) && <span className="block text-[10px] text-muted-foreground">{jitter.minSeconds}–{jitter.maxSeconds}s, set in Privacy settings</span>}</span>
+        </DropdownMenuCheckboxItem>
+        {!instantReady && <p className="px-2 py-1.5 text-[10px] text-muted-foreground">Recommended: turn on ⚡ Instant Messaging so delayed messages sign by themselves when the wait ends. Without it your wallet asks to approve each one.</p>}
+      </DropdownMenuSubContent>
+    </DropdownMenuSub>;
+  };
   const memberLine = (member: string, status?: string, action?: ReactNode) => (
     <li key={member} className="flex items-center gap-2 min-w-0">
       {onOpenProfile ? <button type="button" className="shrink-0 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Open ${nameFor(member)}'s profile`} onClick={() => { setMembersOpen(false); onOpenProfile(member); }}>
@@ -95,6 +116,7 @@ export function CryptChatHeader({
                     <DropdownMenuContent align="end" className="w-52">
                       {activeInvite.status === 'joined' && <DropdownMenuItem title="Send your current name and picture to everyone in this group, including people who aren't your friends" onSelect={() => setPendingNotice({ kind: 'profile', id: activeInvite.invite.id })}>📣 Share my profile</DropdownMenuItem>}
                       {activeInvite.isCreator && activeInvite.status === 'joined' && <DropdownMenuItem onSelect={() => setEditingInvite({ id: activeInvite.invite.id, name: activeInvite.name, avatar: activeInvite.avatar })}>✏️ Edit group</DropdownMenuItem>}
+                      {active && activeInvite.status === 'joined' && privacySub(active)}
                       {onReportRoom && <DropdownMenuItem title="Report this group, including its owner or admins, to the CHEESEHub moderation team" onSelect={onReportRoom}>🚩 Report group</DropdownMenuItem>}
                       {activeInvite.status === 'joined' && <><DropdownMenuSeparator />
                       <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setPendingNotice({ kind: 'leave', id: activeInvite.invite.id })}>🚪 Leave group</DropdownMenuItem></>}
@@ -120,6 +142,7 @@ export function CryptChatHeader({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52">
                   <DropdownMenuItem onSelect={() => setEditingFriend(active)}>✏️ Edit nickname</DropdownMenuItem>
+                  {privacySub(active)}
                   {contacts[active] && onVerify && <DropdownMenuItem className={cn(verify === 'changed' && 'text-destructive focus:text-destructive')} onSelect={onVerify}
                     title="Compare safety numbers to confirm nobody swapped your keys">{verify === 'verified' ? '✅ Verified' : verify === 'changed' ? '⚠️ Key changed' : '🔐 Verify'}</DropdownMenuItem>}
                   {contacts[active] && <DropdownMenuItem onSelect={() => saveFriend(active, true)}>💾 Save to {FRIENDS_DIR}</DropdownMenuItem>}

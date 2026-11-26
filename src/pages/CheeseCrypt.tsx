@@ -2113,7 +2113,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
         </>} />
 
       <CryptChatHeader lockSlot={<Button size="sm" variant="outline" className="h-7 text-xs font-normal" onClick={panicLock} title="Lock now: clear the screen (Esc Esc or Ctrl/Cmd+Shift+L)">🔒 Lock now</Button>}
-        account={account} active={active} activeGroup={activeGroup} activeInvite={activeInvite} keyAvatar={key.avatar}
+        account={account} active={active} activeGroup={activeGroup} activeInvite={activeInvite} keyAvatar={key.avatar} instantReady={instant.ready}
         avatars={shownAvatars} contacts={contacts} blocked={blocked} friendDeclines={friendDeclines} setFriendDeclines={setFriendDeclines}
         nameFor={nameFor} membersOpen={membersOpen} setMembersOpen={setMembersOpen} setPendingNotice={requestNotice}
         setEditingInvite={setEditingInvite} setEditingFriend={setEditingFriend} saveFriend={saveFriend} blockAccount={blockAccount}

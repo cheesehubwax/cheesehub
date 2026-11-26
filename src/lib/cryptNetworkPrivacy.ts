@@ -117,17 +117,21 @@ export const privacyGateSatisfied = (): boolean => {
 
 // Optional send jitter: a random local delay before signing, so block times don't line up with incoming messages.
 // Device-local only; the timer runs in this tab and nothing is sent anywhere while waiting.
-export type SendJitter = { enabled: boolean; minSeconds: number; maxSeconds: number };
+/** mode: 'off' everywhere, 'chat' only in chats switched on from their ⋯ Privacy menu, 'all' in every chat (master switch).
+ * chats holds `account|chatId` keys and is kept even while the master switch is off or 'all'. */
+export type JitterMode = 'off' | 'chat' | 'all';
+export type SendJitter = { mode: JitterMode; chats: string[]; minSeconds: number; maxSeconds: number };
+export const JITTER_EVENT = 'cheesecrypt-send-jitter-changed';
 const JITTER_KEY = 'cheesecrypt-send-jitter';
 export const JITTER_LIMITS = { min: 1, max: 120 } as const;
-export const DEFAULT_JITTER: SendJitter = { enabled: false, minSeconds: 5, maxSeconds: 25 };
+export const DEFAULT_JITTER: SendJitter = { mode: 'off', chats: [], minSeconds: 5, maxSeconds: 25 };
 export const JITTER_PRESETS = [
   { label: 'Short', minSeconds: 3, maxSeconds: 10 },
   { label: 'Medium', minSeconds: 5, maxSeconds: 25 },
   { label: 'Long', minSeconds: 15, maxSeconds: 60 },
 ] as const;
 /** Clamp to whole seconds within 1–120 and keep min ≤ max. */
-export function normalizeJitter(j: Partial<SendJitter> | null | undefined): SendJitter {
+export function normalizeJitter(j: (Partial<SendJitter> & { enabled?: unknown }) | null | undefined): SendJitter {
   const clamp = (v: unknown, d: number) => {
     const n = typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : d;
     return Math.min(JITTER_LIMITS.max, Math.max(JITTER_LIMITS.min, n));
@@ -135,14 +139,31 @@ export function normalizeJitter(j: Partial<SendJitter> | null | undefined): Send
   let minSeconds = clamp(j?.minSeconds, DEFAULT_JITTER.minSeconds);
   let maxSeconds = clamp(j?.maxSeconds, DEFAULT_JITTER.maxSeconds);
   if (minSeconds > maxSeconds) [minSeconds, maxSeconds] = [maxSeconds, minSeconds];
-  return { enabled: j?.enabled === true, minSeconds, maxSeconds };
+  // Older saves had one on/off switch that applied everywhere.
+  const mode: JitterMode = j?.mode === 'chat' || j?.mode === 'all' || j?.mode === 'off' ? j.mode : j?.enabled === true ? 'all' : 'off';
+  const chats = Array.isArray(j?.chats) ? [...new Set(j!.chats.filter((c): c is string => typeof c === 'string' && c.length > 0 && c.length <= 300))].slice(0, 2000) : [];
+  return { mode, chats, minSeconds, maxSeconds };
 }
 export const loadSendJitter = (): SendJitter => {
   const raw = read(JITTER_KEY);
   if (!raw) return { ...DEFAULT_JITTER };
   try { return normalizeJitter(JSON.parse(raw)); } catch { return { ...DEFAULT_JITTER }; }
 };
-export const saveSendJitter = (j: SendJitter): SendJitter => { const n = normalizeJitter(j); write(JITTER_KEY, JSON.stringify(n)); return n; };
+export const saveSendJitter = (j: SendJitter): SendJitter => {
+  const n = normalizeJitter(j); write(JITTER_KEY, JSON.stringify(n));
+  try { window.dispatchEvent(new Event(JITTER_EVENT)); } catch { /* no window */ }
+  return n;
+};
+export const jitterChatKey = (account: string, chat: string) => `${account}|${chat}`;
+/** Whether a send from this account in this chat waits a random delay. */
+export const isJitterOnForChat = (j: SendJitter, account: string, chat: string) =>
+  j.mode === 'all' || (j.mode === 'chat' && j.chats.includes(jitterChatKey(account, chat)));
+/** Per-chat switch from the chat's ⋯ Privacy menu; switching one on while the master switch is off turns on per-chat mode. */
+export function setChatJitter(j: SendJitter, account: string, chat: string, on: boolean): SendJitter {
+  const k = jitterChatKey(account, chat);
+  const chats = on ? [...j.chats.filter(c => c !== k), k] : j.chats.filter(c => c !== k);
+  return { ...j, chats, mode: on && j.mode === 'off' ? 'chat' : j.mode };
+}
 /** Whole-second delay in [min, max] inclusive; `rand` is injectable for tests. */
 export function pickJitterSeconds(j: SendJitter, rand: () => number = () => {
   const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] / 2 ** 32;

@@ -7,7 +7,7 @@ import type { ReplyRef } from '@/lib/cryptReply';
 import type { VoiceClip } from '@/lib/cryptVoice';
 import type { CryptGroup } from '@/lib/cryptGroups';
 import type { InviteGroupView } from '@/lib/cryptInviteGroups';
-import { loadSendJitter, pickJitterSeconds } from '@/lib/cryptNetworkPrivacy';
+import { isJitterOnForChat, loadSendJitter, pickJitterSeconds } from '@/lib/cryptNetworkPrivacy';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { SCHEDULE_PRESETS, formatLeft, nextLocalTime, secondsLeft } from '@/lib/cryptSchedule';
 
@@ -48,8 +48,9 @@ export function CryptComposer({
   const sendRef = useRef({ send, sendVoice }); sendRef.current = { send, sendVoice };
   const fire = (run: 'text' | 'voice') => { if (run === 'voice') sendRef.current.sendVoice(); else sendRef.current.send(); };
   const startDelay = (ms: number, run: 'text' | 'voice', scheduled: boolean) => { const until = Date.now() + ms; setDelay({ until, left: secondsLeft(until), run, scheduled }); };
-  const doSend = () => { const j = loadSendJitter(); if (j.enabled) startDelay(pickJitterSeconds(j) * 1000, 'text', false); else send(); };
-  const doSendVoice = () => { const j = loadSendJitter(); if (j.enabled) startDelay(pickJitterSeconds(j) * 1000, 'voice', false); else sendVoice(); };
+  const jitterHere = () => { const j = loadSendJitter(); return isJitterOnForChat(j, account, active) ? j : null; };
+  const doSend = () => { const j = jitterHere(); if (j) startDelay(pickJitterSeconds(j) * 1000, 'text', false); else send(); };
+  const doSendVoice = () => { const j = jitterHere(); if (j) startDelay(pickJitterSeconds(j) * 1000, 'voice', false); else sendVoice(); };
   // Scheduling commits the newest draft first (same as Send), then starts the countdown.
   const [schedOpen, setSchedOpen] = useState(false);
   const [customTime, setCustomTime] = useState('');
@@ -92,7 +93,7 @@ export function CryptComposer({
       {delay && <div role="status" className="flex flex-wrap items-center gap-2 rounded border border-cheese/50 bg-muted px-2 py-1 text-xs">
         <span className="flex-1">{delay.scheduled
           ? <>⏰ Queued — sending automatically in {formatLeft(delay.left)} (at {new Date(delay.until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}). Keep this tab open on this chat.</>
-          : <>⏳ Sending in {delay.left}s… (random delay)</>}</span>
+          : <>⏳ Sending in {delay.left}s… (random delay){!instantReady && <span className="block text-muted-foreground">Tip: turn on ⚡ Instant Messaging so delayed messages sign by themselves when the wait ends, without a wallet popup.</span>}</>}</span>
         <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => setDelay(d => d && { ...d, left: 0 })}>{delay.scheduled ? 'Skip wait & send now' : 'Send now'}</Button>
         <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setDelay(null)}>Cancel</Button>
       </div>}
