@@ -15,7 +15,7 @@ import { SCHEDULE_PRESETS, formatLeft, nextLocalTime, secondsLeft } from '@/lib/
 export function CryptComposer({
   account, active, activeGroup, activeInvite, nameFor, replyingTo, setReplyingTo, composerRef, text, setText, voice, setVoice,
   tooLong, bytes, maxBytes, parts, copies, voiceParts, voiceTxs, setAttachingNft, busy, listHidden, agreed, setAgreed,
-  totalCost, send, sendVoice, editing, cancelEdit, editExpired, instantSlot,
+  totalCost, send, sendVoice, editing, cancelEdit, editExpired, instantSlot, instantReady = false, openInstant,
 }: {
   account: string; active: string; activeGroup: CryptGroup | undefined; activeInvite: InviteGroupView | undefined; nameFor: (id: string) => string;
   replyingTo: ReplyRef | null; setReplyingTo: (r: ReplyRef | null) => void; composerRef: RefObject<HTMLTextAreaElement>;
@@ -24,6 +24,7 @@ export function CryptComposer({
   setAttachingNft: (v: boolean) => void; busy: boolean; listHidden: boolean; agreed: boolean; setAgreed: (v: boolean) => void;
   totalCost: string; send: () => void; sendVoice: () => void;
   editing?: boolean; cancelEdit?: () => void; editExpired?: boolean; instantSlot?: ReactNode;
+  instantReady?: boolean; openInstant?: () => void;
 }) {
   // Instant local draft: keystrokes update only this box; the chat screen gets the text as a low-priority update.
   const [draft, setDraft] = useState(text);
@@ -55,6 +56,7 @@ export function CryptComposer({
   const [queuedSchedule, setQueuedSchedule] = useState<number | null>(null);
   const schedule = (until: number) => {
     setSchedOpen(false);
+    if (!instantReady) return;
     const run = voice ? 'voice' : 'text';
     if (run === 'text' && draft !== text) { push(draft); setText(draft); setQueuedSchedule(until); return; }
     setDelay({ until, left: secondsLeft(until), run, scheduled: true });
@@ -87,9 +89,9 @@ export function CryptComposer({
       </div>
       {delay && <div role="status" className="flex flex-wrap items-center gap-2 rounded border border-cheese/50 bg-muted px-2 py-1 text-xs">
         <span className="flex-1">{delay.scheduled
-          ? <>⏰ Scheduled for {new Date(delay.until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · sending in {formatLeft(delay.left)}. Keep this chat open; your wallet may ask you to approve when it sends.</>
+          ? <>⏰ Queued — sending automatically in {formatLeft(delay.left)} (at {new Date(delay.until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}). Keep this tab open on this chat.</>
           : <>⏳ Sending in {delay.left}s… (random delay)</>}</span>
-        <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => setDelay(d => d && { ...d, left: 0 })}>Send now</Button>
+        <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => setDelay(d => d && { ...d, left: 0 })}>{delay.scheduled ? 'Skip wait & send now' : 'Send now'}</Button>
         <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setDelay(null)}>Cancel</Button>
       </div>}
       {/* Bottom line: price, Instant and Send on the right. */}
@@ -102,6 +104,10 @@ export function CryptComposer({
           </PopoverTrigger>
           <PopoverContent align="end" className="w-64 space-y-2 text-xs">
             <p className="font-semibold">⏰ Schedule this message</p>
+            {!instantReady ? <>
+              <p className="text-muted-foreground">⚡ Instant Messaging is required for scheduled sends, so messages can sign automatically in the background without wallet popups.</p>
+              {openInstant && <Button size="sm" className="h-7 w-full bg-cheese text-xs text-primary-foreground hover:bg-cheese/90" onClick={() => { setSchedOpen(false); openInstant(); }}>⚡ Set up Instant Messaging</Button>}
+            </> : <>
             <p className="text-muted-foreground">It waits in this tab and sends at the chosen time. Keep CHEESECrypt open on this chat and your computer awake; leaving the chat or closing the tab cancels it.</p>
             <div className="grid grid-cols-2 gap-1">
               {SCHEDULE_PRESETS.map(p => <Button key={p.minutes} size="sm" variant="outline" className="h-7 text-xs" onClick={() => schedule(Date.now() + p.minutes * 60000)}>{p.label}</Button>)}
@@ -112,6 +118,7 @@ export function CryptComposer({
               <Button size="sm" className="h-7 bg-cheese text-xs text-primary-foreground hover:bg-cheese/90" disabled={nextLocalTime(customTime) === null} onClick={() => { const t = nextLocalTime(customTime); if (t !== null) schedule(t); }}>Schedule</Button>
             </div>
             <p className="text-muted-foreground">A time that has already passed today means tomorrow (up to 24 hours ahead).</p>
+            </>}
           </PopoverContent>
         </Popover>
         {voice

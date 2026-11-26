@@ -2264,6 +2264,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
                 setAttachingNft={setAttachingNft} busy={busy} listHidden={listHidden} agreed={agreed} setAgreed={setAgreed}
                 totalCost={totalCost} send={() => void send()} sendVoice={sendVoice}
                 editing={!!editingMessage} cancelEdit={cancelEdit} editExpired={!!editingMessage && !canEdit(editingMessage, account, clock)}
+                instantReady={instant.ready} openInstant={sponsorUnits > 0 || instant.ready || !!instant.status?.exists ? () => setInstantOpen(true) : undefined}
                 instantSlot={<>
                   {(sponsorUnits > 0 || instant.ready || !!instant.status?.exists) && <>
                   <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setInstantOpen(true)}
