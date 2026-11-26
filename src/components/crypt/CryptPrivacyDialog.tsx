@@ -30,7 +30,7 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
   useEffect(() => {
     if (!open) return;
     const c = loadCustomEndpoint();
-    setSaved(c); setUrl(c ?? ''); setOnly(loadCustomOnlyPreference()); setNote(null); setCopyNote(null);
+    setSaved(c); setUrl(c ?? 'http://localhost:8088'); setOnly(loadCustomOnlyPreference()); setNote(null); setCopyNote(null);
   }, [open]);
 
   const save = async () => {
@@ -97,7 +97,8 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
             <h3 className="font-semibold text-foreground">Your own history &amp; broadcast server (optional)</h3>
             <p className="text-xs">The checkbox saves immediately. A new server is used only after Test &amp; connect succeeds.</p>
             <p>If you run your own WAX Hyperion server, or reach one through your own VPN or Tor setup, enter it here. It is stored only in this browser; nothing goes through CHEESEHub.</p>
-            <Input value={url} onChange={e => setUrl(e.target.value)} disabled={busy} placeholder="https://my-node.example.com" aria-label="Custom history server" />
+            <Input value={url} onChange={e => setUrl(e.target.value)} disabled={busy} placeholder="http://localhost:8088" aria-label="Custom history server" />
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => { setUrl('http://localhost:8088'); setNote(null); }}>Autofill Tor helper</Button>
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={only} disabled={busy} onChange={e => {
                 const on = e.target.checked;
@@ -126,7 +127,7 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
                   <li>Open Tor Browser and press Connect. Leave it open.</li>
                   <li><a className="text-cheese underline" href={`${import.meta.env.BASE_URL}downloads/cheesecrypt-tor-proxy.mjs`} download="cheesecrypt-tor-proxy.mjs">Download the helper</a> (one file, no installs needed). You can open it in any text editor to read it first.</li>
                   <li>Open a terminal in the folder you saved it to (Windows: right-click the folder → Open in Terminal) and run: <code className="rounded bg-muted px-1 text-foreground">node cheesecrypt-tor-proxy.mjs</code></li>
-                  <li>Enter <code className="rounded bg-muted px-1 text-foreground">http://localhost:8088</code> in the box above and press Test &amp; connect. Tick "Use only this server" to prevent direct public-history fallback and route CHEESECrypt's signed broadcasts through v1.2+ of this helper.</li>
+                  <li>The default address is <code className="rounded bg-muted px-1 text-foreground">http://localhost:8088</code> — it points to this computer, so everyone can use the same address. Use Autofill Tor helper if needed, then press Test &amp; connect. Tick "Use only this server" to prevent direct public-history fallback and route CHEESECrypt's signed broadcasts through v1.2+ of this helper.</li>
                 </ol>
                 <div className="space-y-2 border-t border-border pt-2">
                   <h4 className="font-semibold text-foreground">Verify Tor is working</h4>

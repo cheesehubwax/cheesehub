@@ -13,6 +13,14 @@ const props = {
 const checkbox = () => screen.getByRole('checkbox', { name: 'Use only this server (no public servers if it fails)' });
 
 describe('privacy checkbox persistence', () => {
+  it('autofills the local helper without replacing the connected server before testing', () => {
+    saveCustomEndpoint('https://history.example.com', true);
+    render(<CryptPrivacyDialog {...props} open />);
+    fireEvent.click(screen.getByRole('button', { name: 'Autofill Tor helper' }));
+    expect(loadCustomEndpoint()).toBe('https://history.example.com');
+    expect(loadCustomOnly()).toBe(true);
+  });
+
   it('stays checked after closing and reopening before a server is connected', () => {
     const view = render(<CryptPrivacyDialog {...props} open />);
     fireEvent.change(screen.getByRole('textbox', { name: 'Custom history server' }), { target: { value: 'http://localhost:8088' } });

@@ -6,14 +6,14 @@ import { checkHistoryEndpoint, saveCustomEndpoint, savePrivacyGateChoice, valida
 /** Shown before CHEESECrypt starts reading history on this browser. Presentational; the page decides when to show it. */
 export function CryptPrivacyGate({ onDone }: { onDone: () => void }) {
   const [setup, setSetup] = useState(false);
-  const [url, setUrl] = useState('http://127.0.0.1:8088');
+  const [url, setUrl] = useState('http://localhost:8088');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
   const usePublic = () => { savePrivacyGateChoice('public'); onDone(); };
   const usePrivate = async () => {
     const v = validateCustomEndpoint(url);
-    if (!v) { setNote('Use an https:// address (or http://127.0.0.1 for the helper on this computer).'); return; }
+    if (!v) { setNote('Use an https:// address (or http://localhost:8088 for the helper on this computer).'); return; }
     setBusy(true); setNote(null);
     const result = await checkHistoryEndpoint(v);
     setBusy(false);
@@ -34,8 +34,9 @@ export function CryptPrivacyGate({ onDone }: { onDone: () => void }) {
         </div>
       ) : (
         <div className="space-y-3">
-          <p>Start the helper (<code>node cheesecrypt-tor-proxy.mjs</code>) with Tor running, then enter its address. Only this server will be used — if it is off, nothing is read until it is back.</p>
+          <p>Start the helper (<code>node cheesecrypt-tor-proxy.mjs</code>) with Tor running. Its default address is already filled in below — it points to this computer, so everyone can use the same address. Only this server will be used — if it is off, nothing is read until it is back.</p>
           <Input value={url} onChange={e => setUrl(e.target.value)} aria-label="Your history server address" disabled={busy} />
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => { setUrl('http://localhost:8088'); setNote(null); }}>Autofill Tor helper</Button>
           {note && <p role="alert" className="text-destructive">{note}</p>}
           <div className="flex flex-col sm:flex-row gap-2">
             <Button onClick={() => void usePrivate()} disabled={busy} className="bg-cheese text-primary-foreground hover:bg-cheese/90">{busy ? 'Testing…' : 'Test and use only this server'}</Button>
