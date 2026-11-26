@@ -53,10 +53,12 @@ export function CryptComposer({
   // Scheduling commits the newest draft first (same as Send), then starts the countdown.
   const [schedOpen, setSchedOpen] = useState(false);
   const [customTime, setCustomTime] = useState('');
+  // Picking a time only proposes it; nothing is queued until the user confirms.
+  const [pick, setPick] = useState<number | null>(null);
   const [queuedSchedule, setQueuedSchedule] = useState<number | null>(null);
   const schedule = (until: number) => {
-    setSchedOpen(false);
-    if (!instantReady) return;
+    setSchedOpen(false); setPick(null);
+    if (!instantReady || until <= Date.now()) return;
     const run = voice ? 'voice' : 'text';
     if (run === 'text' && draft !== text) { push(draft); setText(draft); setQueuedSchedule(until); return; }
     setDelay({ until, left: secondsLeft(until), run, scheduled: true });
@@ -98,7 +100,7 @@ export function CryptComposer({
       <div className="flex flex-wrap items-center gap-2 gap-y-1 pr-6 text-xs">
         <span className="ml-auto text-muted-foreground">{totalCost}</span>
         {instantSlot}
-        <Popover open={schedOpen} onOpenChange={setSchedOpen}>
+        <Popover open={schedOpen} onOpenChange={o => { setSchedOpen(o); if (!o) setPick(null); }}>
           <PopoverTrigger asChild>
             <Button size="sm" variant="outline" className="h-8 px-2" aria-label="Schedule send" title={editing ? 'Edits send straight away' : 'Schedule send'} disabled={!(!busy && !sendQueued && queuedSchedule === null && !delay && agreed && !editing && (voice ? true : !!draft.trim() && !(!pending && tooLong)))}>⏰</Button>
           </PopoverTrigger>
@@ -107,15 +109,22 @@ export function CryptComposer({
             {!instantReady ? <>
               <p className="text-muted-foreground">⚡ Instant Messaging is required for scheduled sends, so messages can sign automatically in the background without wallet popups.</p>
               {openInstant && <Button size="sm" className="h-7 w-full bg-cheese text-xs text-primary-foreground hover:bg-cheese/90" onClick={() => { setSchedOpen(false); openInstant(); }}>⚡ Set up Instant Messaging</Button>}
+            </> : pick !== null ? <>
+              <p>Send this message at <span className="font-semibold">{new Date(pick).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })}</span> (in {formatLeft(secondsLeft(pick))})?</p>
+              <p className="text-muted-foreground">The countdown starts only after you confirm. Keep this tab open on this chat.</p>
+              <div className="flex gap-1">
+                <Button size="sm" variant="outline" className="h-7 flex-1 text-xs" onClick={() => setPick(null)}>Back</Button>
+                <Button size="sm" className="h-7 flex-1 bg-cheese text-xs text-primary-foreground hover:bg-cheese/90" onClick={() => schedule(pick)}>✅ Confirm schedule</Button>
+              </div>
             </> : <>
             <p className="text-muted-foreground">It waits in this tab and sends at the chosen time. Keep CHEESECrypt open on this chat and your computer awake; leaving the chat or closing the tab cancels it.</p>
             <div className="grid grid-cols-2 gap-1">
-              {SCHEDULE_PRESETS.map(p => <Button key={p.minutes} size="sm" variant="outline" className="h-7 text-xs" onClick={() => schedule(Date.now() + p.minutes * 60000)}>{p.label}</Button>)}
+              {SCHEDULE_PRESETS.map(p => <Button key={p.minutes} size="sm" variant="outline" className="h-7 text-xs" onClick={() => setPick(Date.now() + p.minutes * 60000)}>{p.label}</Button>)}
             </div>
             <div className="flex items-center gap-1">
               <label htmlFor="crypt-sched-time" className="shrink-0">At</label>
               <input id="crypt-sched-time" type="time" value={customTime} onChange={e => setCustomTime(e.target.value)} className="h-7 min-w-0 flex-1 rounded border border-input bg-background px-1 text-foreground" />
-              <Button size="sm" className="h-7 bg-cheese text-xs text-primary-foreground hover:bg-cheese/90" disabled={nextLocalTime(customTime) === null} onClick={() => { const t = nextLocalTime(customTime); if (t !== null) schedule(t); }}>Schedule</Button>
+              <Button size="sm" className="h-7 bg-cheese text-xs text-primary-foreground hover:bg-cheese/90" disabled={nextLocalTime(customTime) === null} onClick={() => { const t = nextLocalTime(customTime); if (t !== null) setPick(t); }}>Choose</Button>
             </div>
             <p className="text-muted-foreground">A time that has already passed today means tomorrow (up to 24 hours ahead).</p>
             </>}
