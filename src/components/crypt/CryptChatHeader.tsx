@@ -79,18 +79,18 @@ export function CryptChatHeader({
                   <span className="block break-words">{activeInvite.name}</span>
                   <span className="block text-[10px] font-normal text-muted-foreground">created by {nameFor(activeInvite.invite.creator)}</span>
                 </span>
+                {membersDropdown(activeInvite.invite.members.map(({ account: member }) => member).filter(member => !activeInvite.left.includes(member)),
+                  member => `${member === activeInvite.invite.creator ? '👑 ' : admins.includes(member) ? '🛡️ ' : ''}${activeInvite.joined.includes(member) ? 'joined' : 'invited'}`,
+                  member => {
+                    if (member !== account && activeInvite.status === 'joined' && !contacts[member] && !blocked.includes(member) && !activeInvite.requested.includes(member) && !activeInvite.friendRequests.includes(member))
+                      return <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px]" aria-label={`Send friend request to ${member}`} onClick={() => setPendingNotice({ kind: 'friend', id: activeInvite.invite.id, to: member })}><UserPlus className="h-3 w-3" /> Friend request</Button>;
+                    if (member !== account && activeInvite.requested.includes(member) && !contacts[member]) return <span className="shrink-0 text-[10px] text-muted-foreground">request sent</span>;
+                    return undefined;
+                  })}
                 <span className="ml-auto flex items-center gap-1">
-                  {membersDropdown(activeInvite.invite.members.map(({ account: member }) => member).filter(member => !activeInvite.left.includes(member)),
-                    member => `${member === activeInvite.invite.creator ? '👑 ' : admins.includes(member) ? '🛡️ ' : ''}${activeInvite.joined.includes(member) ? 'joined' : 'invited'}`,
-                    member => {
-                      if (member !== account && activeInvite.status === 'joined' && !contacts[member] && !blocked.includes(member) && !activeInvite.requested.includes(member) && !activeInvite.friendRequests.includes(member))
-                        return <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px]" aria-label={`Send friend request to ${member}`} onClick={() => setPendingNotice({ kind: 'friend', id: activeInvite.invite.id, to: member })}><UserPlus className="h-3 w-3" /> Friend request</Button>;
-                      if (member !== account && activeInvite.requested.includes(member) && !contacts[member]) return <span className="shrink-0 text-[10px] text-muted-foreground">request sent</span>;
-                      return undefined;
-                    })}
                   {(activeInvite.status === 'joined' || onReportRoom) && <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" aria-label="Group options" title="Group options"><MoreHorizontal className="h-4 w-4" /></Button>
+                      <Button size="sm" className="h-7 w-7 p-0 bg-cheese text-primary-foreground hover:bg-cheese/90 hover:text-primary-foreground" aria-label="Group options" title="Group options"><MoreHorizontal className="h-4 w-4" /></Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-52">
                       {activeInvite.status === 'joined' && <DropdownMenuItem title="Send your current name and picture to everyone in this group, including people who aren't your friends" onSelect={() => setPendingNotice({ kind: 'profile', id: activeInvite.invite.id })}>📣 Share my profile</DropdownMenuItem>}
