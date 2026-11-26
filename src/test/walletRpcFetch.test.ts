@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChainDefinition, Session, SessionKit } from '@wharfkit/session';
 import { createWalletRpcFetch } from '@/lib/walletRpcFetch';
 import { isBenched, resetEndpointHealthCache } from '@/lib/endpointHealth';
+import { saveCustomEndpoint } from '@/lib/cryptNetworkPrivacy';
 
 const first = 'https://wax.greymass.com';
 const second = 'https://api.waxsweden.org';
@@ -12,7 +13,10 @@ beforeEach(() => {
   resetEndpointHealthCache();
   vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('health offline'); }));
 });
-afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); resetEndpointHealthCache(); });
+afterEach(() => {
+  vi.useRealTimers(); vi.unstubAllGlobals(); resetEndpointHealthCache();
+  localStorage.clear(); window.history.pushState({}, '', '/');
+});
 
 describe('wallet RPC resilience', () => {
   it('moves a restored dead-node read to the health-ordered nodes and benches network failures', async () => {
@@ -57,6 +61,27 @@ describe('wallet RPC resilience', () => {
     expect(native).toHaveBeenCalledTimes(1);
     expect(native.mock.calls[0][1].body).toBe(body);
     expect(native.mock.calls[0][1].headers.get('Content-Type')).toBe('text/plain;charset=UTF-8');
+  });
+
+  it('uses the exclusive loopback helper once for exact CHEESECrypt broadcast bytes', async () => {
+    window.history.pushState({}, '', '/crypt');
+    saveCustomEndpoint('http://localhost:8088', true);
+    const native = vi.fn().mockResolvedValue(new Response('{"transaction_id":"abc"}', { status: 202 }));
+    const body = '{"signatures":["sig"],"packed_trx":"deadbeef"}';
+    const response = await createWalletRpcFetch(native)(`${oldUrl}/v1/chain/send_transaction`, { method: 'POST', body });
+    expect(response.status).toBe(202);
+    expect(native).toHaveBeenCalledTimes(1);
+    expect(native.mock.calls[0][0]).toBe('http://localhost:8088/v1/chain/send_transaction');
+    expect(native.mock.calls[0][1].body).toBe(body);
+  });
+
+  it('never falls back directly when the exclusive Tor broadcast fails', async () => {
+    window.history.pushState({}, '', '/crypt');
+    saveCustomEndpoint('http://127.0.0.1:8088', true);
+    const native = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    await expect(createWalletRpcFetch(native)(`${oldUrl}/v1/chain/send_transaction`, { method: 'POST', body: 'signed bytes' })).rejects.toThrow('Failed to fetch');
+    expect(native).toHaveBeenCalledTimes(1);
+    expect(native.mock.calls[0][0]).toBe('http://127.0.0.1:8088/v1/chain/send_transaction');
   });
 
   it('leaves Fuel and wallet callback requests untouched', async () => {

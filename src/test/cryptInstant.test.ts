@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { ChainDefinition, Session } from '@wharfkit/session';
+import { walletRpcFetch } from '@/lib/walletRpcFetch';
+import { WAX_CHAIN_ID } from '@/lib/wharfKit';
 import {
   buildEnableActions, buildRevokeActions, generateInstantKey, instantReady, isInstantEligible, needsRam,
   parseInstantStatus, ramTopUpQuantity, sendInstant, INSTANT_PERMISSION,
@@ -47,6 +50,20 @@ describe('Instant Messaging permission', () => {
     expect(isInstantEligible([{ account: 'cheeseburger', name: 'transfer', data: { from: 'alice' } }], 'alice')).toBe(false);
     expect(isInstantEligible([sendfree, sendfree], 'alice')).toBe(false);
     await expect(sendInstant({} as never, generateInstantKey('alice'), [{ account: 'cheeseburger', name: 'transfer', data: {} }])).rejects.toThrow();
+  });
+
+  it('uses the shared Tor-capable transport for instant signed broadcasts', async () => {
+    const transact = vi.spyOn(Session.prototype, 'transact').mockImplementation(async function (this: Session) {
+      expect(this.fetch).toBe(walletRpcFetch);
+      return { resolved: null } as never;
+    });
+    try {
+      const chain = ChainDefinition.from({ id: WAX_CHAIN_ID, url: 'https://wax.eosusa.io' });
+      expect(await sendInstant(chain, generateInstantKey('alice'), [sendfree])).toBeNull();
+      expect(transact).toHaveBeenCalledOnce();
+    } finally {
+      transact.mockRestore();
+    }
   });
 });
 

@@ -1,15 +1,19 @@
 #!/usr/bin/env node
 // CHEESECrypt Tor helper — open source, no dependencies, runs only on your own computer.
 //
-// What it does: listens on http://127.0.0.1:8088 and forwards READ-ONLY WAX history
-// requests (GET /v2/history/... and /v2/health) through your local Tor client to public
-// Hyperion servers, so those servers see a Tor exit address instead of your home IP.
+// What it does: listens on http://127.0.0.1:8088 and forwards WAX history reads
+// (GET /v2/history/... and /v2/health) plus already-signed transaction broadcasts
+// (POST /v1/chain/send_transaction or push_transaction) through your local Tor client.
+// Those public servers see a Tor exit address instead of your home IP.
 //
 // What it does NOT do: it is not a Tor relay or exit node, it never accepts connections
-// from other computers, it never sends transactions, and it keeps no logs or files.
+// from other computers, it never signs or changes transactions, and it writes no traffic
+// logs or files. A broadcast is attempted on ONE upstream only, never retried: a lost
+// reply does not prove the chain rejected it. Check the account before manually retrying.
 //
 // Run:  node cheesecrypt-tor-proxy.mjs
 // Then in CHEESECrypt → Menu → Privacy → "Your own history server" enter http://localhost:8088
+// Tick "Use only this server" to route CHEESECrypt's signed broadcasts here too.
 //
 // Needs Node.js 18+ and Tor running (Tor Browser open = port 9150, Tor service = port 9050).
 
@@ -28,8 +32,11 @@ const UPSTREAMS = [
   'https://wax.eosusa.io',
 ];
 export const TIMEOUT_MS = 8000;
+export const BROADCAST_TIMEOUT_MS = 12000;
 const MAX_BODY = 20 * 1024 * 1024;
+const MAX_REQUEST_BODY = 1024 * 1024;
 const ALLOWED_PATH = /^\/v2\/(history\/[a-z_]+|health)(\?|$)/;
+const BROADCAST_PATH = /^\/v1\/chain\/(send_transaction|push_transaction)$/;
 
 /** Open a TCP tunnel to host:port through Tor's SOCKS5 port (host resolved by Tor, never locally). */
 function socksConnect(torPort, host, port) {
@@ -63,8 +70,11 @@ function socksConnect(torPort, host, port) {
 }
 
 let torPortInUse = null;
-async function findTor() {
-  for (const p of torPortInUse ? [torPortInUse, ...TOR_PORTS] : TOR_PORTS) {
+async function findTor(ports = TOR_PORTS) {
+  const candidates = torPortInUse && ports.includes(torPortInUse)
+    ? [torPortInUse, ...ports.filter(p => p !== torPortInUse)]
+    : ports;
+  for (const p of candidates) {
     const ok = await new Promise((r) => {
       const s = net.connect(p, '127.0.0.1');
       s.setTimeout(1000, () => { s.destroy(); r(false); });
@@ -76,11 +86,16 @@ async function findTor() {
   return null;
 }
 
-/** One HTTPS GET through Tor; resolves only with a complete 2xx body. */
-export function fetchViaTor(torPort, upstream, path, { timeoutMs = TIMEOUT_MS, ca } = {}) {
-  const u = new URL(path, upstream);
-  // agent:false discards request-level createConnection in Node. Use a real HTTPS
-  // Agent with its connector overridden: it cannot open a direct/DNS connection.
+/**
+ * One HTTPS request through Tor. Complete JSON responses, including nodeos errors,
+ * are returned to the caller; network failures and malformed JSON are rejected.
+ * The dedicated Agent cannot open a direct/DNS connection.
+ */
+export function requestViaTor(torPort, upstream, path, { method = 'GET', body, contentType = 'text/plain;charset=UTF-8', timeoutMs = TIMEOUT_MS, ca } = {}) {
+  const base = new URL(upstream);
+  const u = new URL(path, base);
+  if (u.protocol !== 'https:' || u.origin !== base.origin) return Promise.reject(new Error('upstream must stay on the original HTTPS server'));
+  const payload = body == null ? null : Buffer.isBuffer(body) ? body : Buffer.from(String(body));
   return new Promise((resolve, reject) => {
     let raw, sock, req, agent, settled = false;
     const finish = (error, result) => {
@@ -101,8 +116,11 @@ export function fetchViaTor(torPort, upstream, path, { timeoutMs = TIMEOUT_MS, c
         return sock;
       };
       req = https.request({
-        hostname: u.hostname, port: 443, path: u.pathname + u.search, method: 'GET', agent,
-        headers: { Host: u.hostname, Accept: 'application/json', 'User-Agent': 'CHEESECrypt-Tor-Helper/1.1' },
+        hostname: u.hostname, port: 443, path: u.pathname + u.search, method, agent,
+        headers: {
+          Host: u.hostname, Accept: 'application/json', 'User-Agent': 'CHEESECrypt-Tor-Helper/1.2',
+          ...(payload ? { 'Content-Type': contentType, 'Content-Length': payload.length } : {}),
+        },
       }, (res) => {
         const parts = []; let size = 0;
         res.on('data', (c) => {
@@ -110,22 +128,27 @@ export function fetchViaTor(torPort, upstream, path, { timeoutMs = TIMEOUT_MS, c
           if (size > MAX_BODY) finish(new Error('response too large')); else parts.push(c);
         });
         res.on('end', () => {
-          if (res.statusCode < 200 || res.statusCode >= 300) return finish(new Error(`HTTP ${res.statusCode}`));
-          const body = Buffer.concat(parts);
-          try { JSON.parse(body.toString('utf8')); } catch { return finish(new Error('server returned invalid JSON')); }
-          finish(null, { type: 'application/json', body });
+          const responseBody = Buffer.concat(parts);
+          try { JSON.parse(responseBody.toString('utf8')); } catch { return finish(new Error('server returned invalid JSON')); }
+          finish(null, { status: res.statusCode || 502, type: 'application/json', body: responseBody });
         });
         res.on('aborted', () => finish(new Error('incomplete response')));
         res.on('error', (error) => finish(error));
       });
       req.on('error', (error) => finish(error));
-      req.end();
+      req.end(payload || undefined);
     }).catch((error) => finish(error));
   });
 }
 
+/** One HTTPS GET through Tor; resolves only with a complete 2xx JSON body. */
+export async function fetchViaTor(torPort, upstream, path, options = {}) {
+  const r = await requestViaTor(torPort, upstream, path, { ...options, method: 'GET' });
+  if (r.status < 200 || r.status >= 300) throw new Error(`HTTP ${r.status}`);
+  return r;
+}
+
 let upstreamOrder = [...UPSTREAMS];
-let lastGood = null;
 // The standalone download cannot import the app's resolver. Fetch the same
 // HerdCheck source through Tor only; an outage leaves the vetted fallback intact.
 async function updateHealthOrder(torPort) {
@@ -141,43 +164,107 @@ async function updateHealthOrder(torPort) {
   } catch { /* health outage never prevents Tor reads */ }
 }
 
-export const server = http.createServer(async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Access-Control-Allow-Private-Network', 'true');
-  res.setHeader('Cache-Control', 'no-store');
-  const send = (code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
+function readRequestBody(req) {
+  return new Promise((resolve, reject) => {
+    const parts = [];
+    let size = 0, settled = false;
+    const cleanup = () => {
+      req.removeListener('data', onData); req.removeListener('end', onEnd);
+      req.removeListener('aborted', onAborted); req.removeListener('error', onError);
+    };
+    const fail = (message) => {
+      if (settled) return;
+      settled = true; cleanup(); req.resume(); reject(new Error(message));
+    };
+    const onData = (chunk) => {
+      size += chunk.length;
+      if (size > MAX_REQUEST_BODY) return fail('signed transaction is too large');
+      parts.push(chunk);
+    };
+    const onEnd = () => {
+      if (settled) return;
+      settled = true; cleanup(); resolve(Buffer.concat(parts));
+    };
+    const onAborted = () => fail('incomplete request');
+    const onError = () => fail('request failed');
+    req.on('data', onData); req.on('end', onEnd);
+    req.on('aborted', onAborted); req.on('error', onError);
+  });
+}
 
-  if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
-  if (req.method !== 'GET' || !ALLOWED_PATH.test(req.url || '')) return send(403, { error: 'Only read-only WAX history requests are forwarded.' });
+export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS, ca } = {}) {
+  let lastGood = null;
+  return http.createServer(async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Private-Network', 'true');
+    res.setHeader('Cache-Control', 'no-store');
+    const send = (code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
 
-  const torPort = await findTor();
-  if (!torPort) return send(503, { error: 'Tor is not running. Open Tor Browser (or start the Tor service) and try again.' });
+    if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
+    const historyRequest = req.method === 'GET' && ALLOWED_PATH.test(req.url || '');
+    const broadcastRequest = req.method === 'POST' && BROADCAST_PATH.test(req.url || '');
+    if (!historyRequest && !broadcastRequest) return send(403, { error: 'Only WAX history reads and signed transaction broadcasts are forwarded.' });
 
-  const order = lastGood ? [lastGood, ...upstreamOrder.filter(u => u !== lastGood)] : upstreamOrder;
-  for (const upstream of order) {
-    if (res.destroyed) return;
-    try {
-      const r = await fetchViaTor(torPort, upstream, req.url);
-      const j = JSON.parse(r.body.toString('utf8'));
-      const pathname = new URL(req.url, 'http://localhost').pathname;
-      if ((pathname.endsWith('/get_actions') || pathname.endsWith('/get_transaction')) && !Array.isArray(j.actions)) throw new Error('server returned no actions array');
-      lastGood = upstream;
-      res.writeHead(200, { 'Content-Type': r.type });
-      return res.end(r.body);
-    } catch (e) {
-      console.warn(`  ${new URL(upstream).hostname} via Tor failed: ${e.message} — trying next`);
+    const torPort = await findTor(torPorts);
+    if (!torPort) return send(503, { error: 'Tor is not running. Open Tor Browser (or start the Tor service) and try again.' });
+
+    const available = upstreams === UPSTREAMS ? upstreamOrder : upstreams;
+    const order = lastGood ? [lastGood, ...available.filter(u => u !== lastGood)] : available;
+
+    if (broadcastRequest) {
+      let body;
+      try {
+        body = await readRequestBody(req);
+        JSON.parse(body.toString('utf8'));
+      } catch (e) {
+        return send(400, { error: `Signed transaction was not forwarded: ${e.message}` });
+      }
+
+      // Never rotate or retry a signed transaction. Even a timeout or HTTP failure
+      // can follow acceptance by nodeos, so a second attempt could duplicate it.
+      const upstream = order[0];
+      try {
+        const r = await requestViaTor(torPort, upstream, req.url, {
+          method: 'POST', body, timeoutMs: BROADCAST_TIMEOUT_MS,
+          contentType: req.headers['content-type'] || 'text/plain;charset=UTF-8', ca,
+        });
+        lastGood = upstream;
+        res.writeHead(r.status, { 'Content-Type': r.type });
+        return res.end(r.body);
+      } catch (e) {
+        console.warn(`  ${new URL(upstream).hostname} broadcast via Tor failed: ${e.message} — not retried`);
+        return send(502, { error: 'No valid reply arrived for the signed transaction. It may already be on-chain; check the account before retrying. No other server was tried.' });
+      }
     }
-  }
-  send(502, { error: 'Every public history server failed through Tor. Try again in a minute (Tor may pick a new route).' });
-});
+
+    for (const upstream of order) {
+      if (res.destroyed) return;
+      try {
+        const r = await fetchViaTor(torPort, upstream, req.url, { ca });
+        const j = JSON.parse(r.body.toString('utf8'));
+        const pathname = new URL(req.url, 'http://localhost').pathname;
+        if ((pathname.endsWith('/get_actions') || pathname.endsWith('/get_transaction')) && !Array.isArray(j.actions)) throw new Error('server returned no actions array');
+        lastGood = upstream;
+        res.writeHead(200, { 'Content-Type': r.type });
+        return res.end(r.body);
+      } catch (e) {
+        console.warn(`  ${new URL(upstream).hostname} via Tor failed: ${e.message} — trying next`);
+      }
+    }
+    send(502, { error: 'Every public history server failed through Tor. Try again in a minute (Tor may pick a new route).' });
+  });
+}
+
+export const server = createProxyServer();
 
 // 127.0.0.1 only: nobody else on your network or the internet can use this helper.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) server.listen(LISTEN_PORT, '127.0.0.1', async () => {
   const tor = await findTor();
-  console.log('\n🧅 CHEESECrypt Tor helper v1.1 is running');
+  console.log('\n🧅 CHEESECrypt Tor helper v1.2 is running');
   console.log(`   Address for CHEESECrypt: http://localhost:${LISTEN_PORT}`);
+  console.log('   History reads + single-attempt signed broadcasts use Tor');
   console.log(tor ? `   Tor port ${tor} is open (connection verified on first request)` : '   ⚠️  Tor not found yet — open Tor Browser or start the Tor service');
   console.log('   Leave this window open. Press Ctrl+C to stop.\n');
   if (tor) void updateHealthOrder(tor);

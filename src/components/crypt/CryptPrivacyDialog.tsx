@@ -94,7 +94,7 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
           </section>
           {rotationSlot}
           <section className="space-y-2 rounded-md border border-border p-3">
-            <h3 className="font-semibold text-foreground">Your own history server (optional)</h3>
+            <h3 className="font-semibold text-foreground">Your own history &amp; broadcast server (optional)</h3>
             <p className="text-xs">The checkbox saves immediately. A new server is used only after Test &amp; connect succeeds.</p>
             <p>If you run your own WAX Hyperion server, or reach one through your own VPN or Tor setup, enter it here. It is stored only in this browser; nothing goes through CHEESEHub.</p>
             <Input value={url} onChange={e => setUrl(e.target.value)} disabled={busy} placeholder="https://my-node.example.com" aria-label="Custom history server" />
@@ -120,13 +120,13 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
             <details className="rounded-md border border-border p-2">
               <summary className="cursor-pointer font-semibold text-foreground">🧅 How to use Tor with CHEESECrypt (free helper)</summary>
               <div className="mt-2 space-y-2 text-xs">
-                <p>A small open-source helper that runs only on your computer. It sends CHEESECrypt's history checks through Tor, so public WAX servers see a Tor address instead of your home IP. It is not a Tor relay, only accepts connections from your own computer, only forwards history reads, and keeps no logs. CHEESEHub never sees your traffic.</p>
+                <p>A small open-source helper that runs only on your computer. It sends CHEESECrypt's history checks—and, when "Use only this server" is ticked, your already-signed CHEESECrypt transaction broadcasts—through Tor. Those WAX servers see a Tor exit address instead of your home IP. It is not a Tor relay, only accepts connections from your own computer, and writes no traffic logs or files. Your wallet still signs; the helper never sees your private keys or changes the transaction.</p>
                 <ol className="list-decimal space-y-1 pl-4">
                   <li>Install <a className="text-cheese underline" href="https://nodejs.org" target="_blank" rel="noopener noreferrer">Node.js</a> (version 18 or newer) and <a className="text-cheese underline" href="https://www.torproject.org/download/" target="_blank" rel="noopener noreferrer">Tor Browser</a>.</li>
                   <li>Open Tor Browser and press Connect. Leave it open.</li>
                   <li><a className="text-cheese underline" href={`${import.meta.env.BASE_URL}downloads/cheesecrypt-tor-proxy.mjs`} download="cheesecrypt-tor-proxy.mjs">Download the helper</a> (one file, no installs needed). You can open it in any text editor to read it first.</li>
                   <li>Open a terminal in the folder you saved it to (Windows: right-click the folder → Open in Terminal) and run: <code className="rounded bg-muted px-1 text-foreground">node cheesecrypt-tor-proxy.mjs</code></li>
-                  <li>Enter <code className="rounded bg-muted px-1 text-foreground">http://localhost:8088</code> in the box above and press Test &amp; connect. Tick "Use only this server" if you never want public servers used directly.</li>
+                  <li>Enter <code className="rounded bg-muted px-1 text-foreground">http://localhost:8088</code> in the box above and press Test &amp; connect. Tick "Use only this server" to prevent direct public-history fallback and route CHEESECrypt's signed broadcasts through v1.2+ of this helper.</li>
                 </ol>
                 <div className="space-y-2 border-t border-border pt-2">
                   <h4 className="font-semibold text-foreground">Verify Tor is working</h4>
@@ -145,13 +145,13 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
                   {copyNote && <p role="status" className="text-foreground">{copyNote}</p>}
                   <p>On macOS or Linux, use <code className="text-foreground">curl</code> instead of <code className="text-foreground">curl.exe</code>. For a background Tor service, change <code className="text-foreground">9150</code> to <code className="text-foreground">9050</code>.</p>
                   <p>The Tor Project should return <code className="text-foreground">"IsTor": true</code> and an <code className="text-foreground">"IP"</code> showing the Tor exit address. If it returns false or an error, this check has not confirmed Tor is working.</p>
-                  <p>This checks the command's connection through Tor, not CHEESECrypt's helper or every app request. Keep the helper running, connect it above, and tick "Use only this server" to prevent direct public-history fallback. Wallet broadcasts and other traffic may still expose your normal IP; this check does not prove anonymity.</p>
+                  <p>This checks the command's connection through Tor, not CHEESECrypt's helper or every app request. Keep v1.2+ running, connect it above, and tick "Use only this server" to protect both history and signed-broadcast connections on CHEESECrypt. Resource-provider, wallet-service and other app traffic may still expose your normal IP; this check does not prove anonymity.</p>
                 </div>
-                <p>If you downloaded an older helper, stop it with Ctrl+C and replace the file with this download (v1.1). Keep the terminal window open while you chat; press Ctrl+C to stop. Testing can take up to 40 seconds while slow servers are skipped. If localhost fails, try http://127.0.0.1:8088 and allow local-network access if your browser asks. Tor protects these history requests only, not all CHEESEHub traffic. Using Tor as a client is legal in many countries, but rules and restrictions vary; this is not legal advice. Sending messages still goes through your wallet, not this helper.</p>
+                <p>If you downloaded an older helper, stop it with Ctrl+C and replace the file with this download (v1.2). Keep the terminal window open while you chat; press Ctrl+C to stop. Testing can take up to 40 seconds while slow history servers are skipped. If localhost fails, try http://127.0.0.1:8088 and allow local-network access if your browser asks. Sending still uses your wallet to sign; the helper only forwards the exact signed bytes. It tries one broadcast server once and never falls back directly or retries another server. If the reply is lost, the transaction may already be on-chain—check Alcor Explorer before retrying. Other CHEESEHub dApps keep their normal wallet route. Using Tor as a client is legal in many countries, but rules and restrictions vary; this is not legal advice.</p>
               </div>
             </details>
           </section>
-          <p className="text-xs">Servers still see your internet address. A VPN or Tor hides it. Sending, looking up a friend's key, and the public record of who messaged whom still show your account.</p>
+          <p className="text-xs">Without Tor or a VPN, servers see your normal internet address. The helper protects only the connections described above; resource providers and wallet services may still see it. Sending, looking up a friend's key, timing, and the public record of who messaged whom still show your account.</p>
           <div className="flex justify-end">
             <Button onClick={() => onOpenChange(false)} disabled={busy}>Done</Button>
           </div>

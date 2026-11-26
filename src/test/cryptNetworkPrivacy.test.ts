@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { fetchContractStream, mergeMemos, streamRows, STREAM_PAGE, type ChainMemo } from '@/lib/cheeseCrypt';
-import { checkHistoryEndpoint, fetchCryptHistoryJson, historyTimeoutMs, loadCustomEndpoint, loadCustomOnly, loadCustomOnlyPreference, saveCustomOnlyPreference, orderWithCustom, saveCustomEndpoint, validateCustomEndpoint } from '@/lib/cryptNetworkPrivacy';
+import { checkHistoryEndpoint, cryptTorBroadcastEndpoint, fetchCryptHistoryJson, historyTimeoutMs, loadCustomEndpoint, loadCustomOnly, loadCustomOnlyPreference, saveCustomOnlyPreference, orderWithCustom, saveCustomEndpoint, validateCustomEndpoint } from '@/lib/cryptNetworkPrivacy';
 
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); localStorage.clear(); });
 
@@ -47,6 +47,18 @@ describe('fetchContractStream', () => {
 });
 
 describe('custom history server', () => {
+  it('routes signed broadcasts only to an exclusive loopback helper on CHEESECrypt', () => {
+    saveCustomEndpoint('http://localhost:8088', true);
+    expect(cryptTorBroadcastEndpoint('/crypt')).toBe('http://localhost:8088');
+    expect(cryptTorBroadcastEndpoint('/cheesehub/crypt/')).toBe('http://localhost:8088');
+    expect(cryptTorBroadcastEndpoint('/wallet')).toBeNull();
+    saveCustomEndpoint('http://localhost:8088', false);
+    expect(cryptTorBroadcastEndpoint('/crypt')).toBeNull();
+  });
+  it('does not send wallet broadcasts to a remote history-only server', () => {
+    saveCustomEndpoint('https://node.example.com', true);
+    expect(cryptTorBroadcastEndpoint('/crypt')).toBeNull();
+  });
   it('remembers the checkbox before connection without activating an untested server', () => {
     saveCustomOnlyPreference(true);
     expect(loadCustomOnlyPreference()).toBe(true);

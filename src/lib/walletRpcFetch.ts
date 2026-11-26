@@ -1,4 +1,5 @@
 import { BENCH_MS, STATIC_ENDPOINTS, benchEndpoint, clearBench, resolveEndpoints } from './endpointHealth';
+import { cryptTorBroadcastEndpoint } from './cryptNetworkPrivacy';
 
 export const WALLET_RPC_READ_TIMEOUT_MS = 3_500;
 export const WALLET_RPC_WRITE_TIMEOUT_MS = 15_000;
@@ -21,7 +22,10 @@ export function createWalletRpcFetch(nativeFetch: typeof fetch = (input, init) =
     if (!origins.has(url.origin) || !url.pathname.startsWith('/v1/chain/')) return nativeFetch(input, init);
 
     const readOnly = READ_PATHS.has(url.pathname);
-    const hosts = await resolveEndpoints('chain-api');
+    const torBroadcast = !readOnly ? cryptTorBroadcastEndpoint() : null;
+    // Do not even perform direct endpoint-health discovery for an exclusive Tor
+    // broadcast. Unknown write paths also go here, where the helper rejects them.
+    const hosts = torBroadcast ? [torBroadcast] : await resolveEndpoints('chain-api');
     const attempts = hosts.slice(0, readOnly ? MAX_READ_ATTEMPTS : 1);
     let lastError: unknown = new Error('No WAX RPC endpoints available');
     for (const host of attempts) {

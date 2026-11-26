@@ -14,6 +14,7 @@ import { chainPost } from './chainRequest';
 import { CRYPT_ROUTER_ACCOUNT } from './cheeseCrypt';
 import { CHEESE_RAM_CONTRACT, CHEESE_TOKEN_CONTRACT, estimateCheeseForTargetBytes, resolveQuoteRate, type CheeseRamConfig } from './cheeseRam';
 import { WAX_CHAIN_ID } from './wharfKit';
+import { walletRpcFetch } from './walletRpcFetch';
 
 export const INSTANT_PERMISSION = 'cheesecrypt';
 export const INSTANT_ACTION = 'sendfree';
@@ -174,7 +175,10 @@ export function isInstantEligible(actions: unknown[], account: string): boolean 
 /** Signs and broadcasts one sendfree with the browser key (Greymass Fuel free tier covers CPU when available). */
 export async function sendInstant(chain: ChainDefinition, key: InstantKey, actions: unknown[]): Promise<string | null> {
   if (!isInstantEligible(actions, key.account)) throw new Error('Only free messages can be sent instantly.');
-  const session = new Session({ chain, actor: key.account, permission: INSTANT_PERMISSION, walletPlugin: new WalletPluginPrivateKey(key.privateKey) });
+  const session = new Session(
+    { chain, actor: key.account, permission: INSTANT_PERMISSION, walletPlugin: new WalletPluginPrivateKey(key.privateKey) },
+    { fetch: walletRpcFetch },
+  );
   const auth = [{ actor: key.account, permission: INSTANT_PERMISSION }];
   const signed = (actions as Act[]).map(a => ({ account: String(a.account), name: String(a.name), data: a.data ?? {}, authorization: auth }));
   const result = await session.transact({ actions: signed }, {

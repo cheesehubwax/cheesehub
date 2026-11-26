@@ -30,6 +30,19 @@ export const loadCustomEndpoint = (): string | null => { const v = read(NODE_KEY
 export const loadCustomOnlyPreference = (): boolean => read(ONLY_KEY) === '1';
 export const saveCustomOnlyPreference = (only: boolean) => write(ONLY_KEY, only ? '1' : null);
 export const loadCustomOnly = (): boolean => loadCustomOnlyPreference() && !!loadCustomEndpoint();
+
+const isLoopback = (url: string): boolean => /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(?=[:/]|$)/.test(url);
+
+/**
+ * CHEESECrypt's sole signed-broadcast transport when its loopback helper is
+ * explicitly exclusive. Remote Hyperion servers and other dApps are untouched.
+ */
+export function cryptTorBroadcastEndpoint(pathname = typeof window !== 'undefined' ? window.location.pathname : ''): string | null {
+  const custom = loadCustomEndpoint();
+  if (!custom || !loadCustomOnly() || !isLoopback(custom) || !/\/crypt\/?$/.test(pathname)) return null;
+  return custom;
+}
+
 export function saveCustomEndpoint(url: string | null, only: boolean) {
   write(NODE_KEY, url);
   saveCustomOnlyPreference(!!url && only);
