@@ -13,3 +13,4 @@
 
 - CryptComposer owns the instant draft; Messenger's text is a transition-deferred mirror, and Send commits the draft urgently before sending so keystroke redraws never block typing or lose text.
 - Message rows, quote/edit/inbox previews and the viewport isolate render errors with local retry, without logging plaintext; opaque message identities stay unchanged for receipts and use dataset equality, never dynamic CSS selectors. Reply observers stay attached per mounted active list (reattach after viewport retry) and coalesce visibility work per frame. View-receipt storage failures retain session state; missing/failed rows never consume jump receipts.
+- First-run privacy gate: /crypt mounts neither the connect prompt nor Messenger until this device chose public servers or has an exclusive custom server saved, so no account-naming history read happens before the choice; losing the exclusive server re-shows the gate rather than silently using public servers.

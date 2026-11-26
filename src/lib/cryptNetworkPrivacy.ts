@@ -96,3 +96,21 @@ export async function checkHistoryEndpoint(url: string): Promise<{ ok: boolean; 
 export async function testHistoryEndpoint(url: string): Promise<boolean> {
   return (await checkHistoryEndpoint(url)).ok;
 }
+
+/**
+ * First-run privacy gate (device-local). Until the user picks, CHEESECrypt mounts no
+ * messenger, so no history reads naming their account are made from this browser.
+ * 'private' stays satisfied only while an exclusive custom server is saved; if it is
+ * removed the gate returns instead of silently falling back to public servers.
+ */
+export type PrivacyGateChoice = 'public' | 'private';
+const GATE_KEY = 'cheesecrypt-privacy-gate';
+export const loadPrivacyGateChoice = (): PrivacyGateChoice | null => {
+  const v = read(GATE_KEY);
+  return v === 'public' || v === 'private' ? v : null;
+};
+export const savePrivacyGateChoice = (c: PrivacyGateChoice | null) => write(GATE_KEY, c);
+export const privacyGateSatisfied = (): boolean => {
+  if (loadCustomOnly()) return true;
+  return loadPrivacyGateChoice() === 'public';
+};

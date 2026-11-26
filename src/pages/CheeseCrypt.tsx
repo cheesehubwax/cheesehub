@@ -53,6 +53,8 @@ import { isInstantAuthFailure, isResourceShortage } from '@/lib/cryptInstant';
 import { ToastAction } from '@/components/ui/toast';
 import { CryptInstantDialog } from '@/components/crypt/CryptInstantDialog';
 import { CryptPrivacyDialog } from '@/components/crypt/CryptPrivacyDialog';
+import { CryptPrivacyGate } from '@/components/crypt/CryptPrivacyGate';
+import { privacyGateSatisfied } from '@/lib/cryptNetworkPrivacy';
 import { DeviceTransferSendDialog } from '@/components/crypt/DeviceTransferSendDialog';
 import { DeviceTransferReceiveDialog } from '@/components/crypt/DeviceTransferReceiveDialog';
 import { loadPrivacyMode, savePrivacyMode, type PrivacyMode } from '@/lib/cryptNetworkPrivacy';
@@ -117,6 +119,7 @@ const LIVE_POLL_MS = 6000;
 const CheeseCrypt = () => {
   const { accountName, isConnected, login, logout, session } = useWax();
   const [lockNonce, setLockNonce] = useState(0);
+  const [gateOk, setGateOk] = useState(privacyGateSatisfied);
   const navigate = useNavigate();
   /** Remounts the messenger, then always disconnects the wallet and stealth-redirects home. */
   const onLocked = useCallback(() => {
@@ -130,7 +133,9 @@ const CheeseCrypt = () => {
       <CryptHero />
 
       <div className="container pb-12 flex flex-col items-center max-w-5xl">
-        {!isConnected || !accountName || !session ? (
+        {!gateOk ? (
+          <CryptPrivacyGate onDone={() => setGateOk(privacyGateSatisfied())} />
+        ) : !isConnected || !accountName || !session ? (
           <div className="rounded-lg border border-cheese/20 bg-card/80 p-8 text-center space-y-4 max-w-md">
             <p className="text-muted-foreground">Connect your WAX wallet to read and send encrypted messages.</p>
             <Button onClick={login} className="bg-cheese text-primary-foreground hover:bg-cheese/90">Connect wallet</Button>
