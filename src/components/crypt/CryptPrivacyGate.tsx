@@ -26,7 +26,6 @@ export function CryptPrivacyGate({ onDone }: { onDone: () => void }) {
   return (
     <div className="rounded-lg border border-cheese/20 bg-card/80 p-6 space-y-4 max-w-lg text-sm text-muted-foreground">
       <h2 className="text-lg font-semibold text-cheese">🛡️ Before CHEESECrypt starts</h2>
-      <p>When CHEESECrypt opens, it downloads your messages from public WAX history servers. Those servers can see your internet (IP) address and the account being looked up. Once that happens it can't be undone.</p>
       <p>If you want your messages read through your own Tor helper, set it up <span className="text-foreground font-medium">now</span>, before anything is downloaded.</p>
       {!setup ? (
         <div className="flex flex-col sm:flex-row gap-2">
@@ -45,7 +44,6 @@ export function CryptPrivacyGate({ onDone }: { onDone: () => void }) {
           <p className="text-xs">The helper download and full guide are in Privacy settings once you are in.</p>
         </div>
       )}
-      <p className="text-xs">This protects CHEESECrypt's message downloads. Your wallet sign-in, fee/resource services and the rest of CHEESEHub can still use your normal connection, and what you send on-chain is public. You can change this later in Privacy settings.</p>
     </div>
   );
 }
