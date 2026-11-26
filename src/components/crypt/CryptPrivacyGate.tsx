@@ -7,6 +7,7 @@ import { checkHistoryEndpoint, saveCustomEndpoint, savePrivacyGateChoice, valida
 export function CryptPrivacyGate({ onDone }: { onDone: () => void }) {
   const [setup, setSetup] = useState(false);
   const [url, setUrl] = useState('http://localhost:8088');
+  const [only, setOnly] = useState(true);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
@@ -18,8 +19,9 @@ export function CryptPrivacyGate({ onDone }: { onDone: () => void }) {
     const result = await checkHistoryEndpoint(v);
     setBusy(false);
     if (!result.ok) { setNote(result.error ?? 'Connection failed. Nothing was saved.'); return; }
-    saveCustomEndpoint(v, true);
-    savePrivacyGateChoice('private');
+    saveCustomEndpoint(v, only);
+    // With the box unticked public servers stay reachable, so this device's choice is the public one.
+    savePrivacyGateChoice(only ? 'private' : 'public');
     onDone();
   };
 
@@ -34,12 +36,19 @@ export function CryptPrivacyGate({ onDone }: { onDone: () => void }) {
         </div>
       ) : (
         <div className="space-y-3">
-          <p>Start the helper (<code>node cheesecrypt-tor-proxy.mjs</code>) with Tor running. <strong>Its default address is already filled in below</strong> — it points to this computer, so everyone can use the same address. Only this server will be used — if it is off, nothing is read until it is back.</p>
+          <p>Start the helper (<code>node cheesecrypt-tor-proxy.mjs</code>) with Tor running. <strong>Its default address is already filled in below</strong> — it points to this computer, so everyone can use the same address.</p>
           <Input className="text-[hsl(var(--input-value-foreground))]" value={url} onChange={e => setUrl(e.target.value)} aria-label="Your history server address" disabled={busy} />
           <Button size="sm" variant="outline" disabled={busy} onClick={() => { setUrl('http://localhost:8088'); setNote(null); }}>Autofill Tor helper</Button>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={only} disabled={busy} onChange={e => setOnly(e.target.checked)} />
+            Use only this server (no public servers if it fails)
+          </label>
+          {only
+            ? <p className="text-xs">Only this server will be used — if it is off, nothing is read until it is back.</p>
+            : <p className="text-xs">Unticked: your server is asked first, with public servers as backup, so messages could still be read from them.</p>}
           {note && <p role="alert" className="text-destructive">{note}</p>}
           <div className="flex flex-col sm:flex-row gap-2">
-            <Button onClick={() => void usePrivate()} disabled={busy} className="bg-cheese text-primary-foreground hover:bg-cheese/90">{busy ? 'Testing…' : 'Test and use only this server'}</Button>
+            <Button onClick={() => void usePrivate()} disabled={busy} className="bg-cheese text-primary-foreground hover:bg-cheese/90">{busy ? 'Testing…' : 'Test this server'}</Button>
             <Button variant="outline" onClick={() => { setSetup(false); setNote(null); }} disabled={busy}>Back</Button>
           </div>
           <p className="text-xs">The helper download and full guide are in Privacy settings once you are in.</p>
