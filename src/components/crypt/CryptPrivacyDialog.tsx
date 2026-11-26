@@ -97,7 +97,7 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
             <h3 className="font-semibold text-foreground">Your own history &amp; broadcast server (optional)</h3>
             <p className="text-xs">The checkbox saves immediately. A new server is used only after Test &amp; connect succeeds.</p>
             <p>If you run your own WAX Hyperion server, or reach one through your own VPN or Tor setup, enter it here. It is stored only in this browser; nothing goes through CHEESEHub.</p>
-            <Input value={url} onChange={e => setUrl(e.target.value)} disabled={busy} placeholder="http://localhost:8088" aria-label="Custom history server" />
+            <Input className="text-[hsl(var(--input-value-foreground))]" value={url} onChange={e => setUrl(e.target.value)} disabled={busy} placeholder="http://localhost:8088" aria-label="Custom history server" />
             <Button size="sm" variant="outline" disabled={busy} onClick={() => { setUrl('http://localhost:8088'); setNote(null); }}>Autofill Tor helper</Button>
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={only} disabled={busy} onChange={e => {

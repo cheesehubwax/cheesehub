@@ -35,7 +35,7 @@ export function CryptPrivacyGate({ onDone }: { onDone: () => void }) {
       ) : (
         <div className="space-y-3">
           <p>Start the helper (<code>node cheesecrypt-tor-proxy.mjs</code>) with Tor running. Its default address is already filled in below — it points to this computer, so everyone can use the same address. Only this server will be used — if it is off, nothing is read until it is back.</p>
-          <Input value={url} onChange={e => setUrl(e.target.value)} aria-label="Your history server address" disabled={busy} />
+          <Input className="text-[hsl(var(--input-value-foreground))]" value={url} onChange={e => setUrl(e.target.value)} aria-label="Your history server address" disabled={busy} />
           <Button size="sm" variant="outline" disabled={busy} onClick={() => { setUrl('http://localhost:8088'); setNote(null); }}>Autofill Tor helper</Button>
           {note && <p role="alert" className="text-destructive">{note}</p>}
           <div className="flex flex-col sm:flex-row gap-2">
