@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   type PrivacyMode, loadCustomEndpoint, loadCustomOnlyPreference, saveCustomOnlyPreference, saveCustomEndpoint, checkHistoryEndpoint, validateCustomEndpoint,
+  type SendJitter, JITTER_LIMITS, JITTER_PRESETS, loadSendJitter, saveSendJitter,
 } from '@/lib/cryptNetworkPrivacy';
 import { COLD_LOCK_WARNING, IDLE_OPTIONS, type IdleMinutes, type LockHardening } from '@/lib/cryptPanicLock';
 import { CryptConfirmDialog } from './CryptConfirmDialog';
@@ -26,11 +27,16 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
   const [note, setNote] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<CryptConfirm | null>(null);
   const [copyNote, setCopyNote] = useState<string | null>(null);
+  const [jitter, setJitterState] = useState<SendJitter>(() => loadSendJitter());
+  const [minDraft, setMinDraft] = useState('');
+  const [maxDraft, setMaxDraft] = useState('');
+  const setJitter = (j: SendJitter) => { const n = saveSendJitter(j); setJitterState(n); setMinDraft(String(n.minSeconds)); setMaxDraft(String(n.maxSeconds)); };
 
   useEffect(() => {
     if (!open) return;
     const c = loadCustomEndpoint();
     setSaved(c); setUrl(c ?? 'http://localhost:8088'); setOnly(loadCustomOnlyPreference()); setNote(null); setCopyNote(null);
+    const j = loadSendJitter(); setJitterState(j); setMinDraft(String(j.minSeconds)); setMaxDraft(String(j.maxSeconds));
   }, [open]);
 
   const save = async () => {
@@ -91,6 +97,30 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
               }} />
               <span>Cold lock: forget the saved key on this device <span className="block text-xs">Friends, nicknames, avatars and settings stay. {COLD_LOCK_WARNING}</span></span>
             </label>
+          </section>
+          <section className="space-y-2">
+            <h3 className="font-semibold text-foreground">⏱️ Random send delay (optional)</h3>
+            <p>Waits a random number of seconds before your wallet asks to sign, so the time your message lands on-chain doesn't line up neatly with the message you're replying to. The wait happens only in this tab: closing or locking it cancels unsent messages.</p>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={jitter.enabled} onChange={e => setJitter({ ...jitter, enabled: e.target.checked })} />
+              Randomize message send times
+            </label>
+            {jitter.enabled && <div className="space-y-2">
+              <div className="flex flex-wrap gap-2">
+                {JITTER_PRESETS.map(p => {
+                  const on = jitter.minSeconds === p.minSeconds && jitter.maxSeconds === p.maxSeconds;
+                  return <Button key={p.label} size="sm" variant={on ? 'default' : 'outline'} aria-pressed={on} onClick={() => setJitter({ ...jitter, minSeconds: p.minSeconds, maxSeconds: p.maxSeconds })}>{p.label} {p.minSeconds}–{p.maxSeconds}s</Button>;
+                })}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-foreground">Custom</span>
+                <Input type="number" min={JITTER_LIMITS.min} max={JITTER_LIMITS.max} className="h-8 w-20 text-[hsl(var(--input-value-foreground))]" aria-label="Minimum delay seconds" value={minDraft} onChange={e => setMinDraft(e.target.value)} onBlur={() => setJitter({ ...jitter, minSeconds: Number(minDraft) })} />
+                <span>to</span>
+                <Input type="number" min={JITTER_LIMITS.min} max={JITTER_LIMITS.max} className="h-8 w-20 text-[hsl(var(--input-value-foreground))]" aria-label="Maximum delay seconds" value={maxDraft} onChange={e => setMaxDraft(e.target.value)} onBlur={() => setJitter({ ...jitter, maxSeconds: Number(maxDraft) })} />
+                <span>seconds ({JITTER_LIMITS.min}–{JITTER_LIMITS.max})</span>
+              </div>
+              <p className="text-xs">Applies to messages, voice notes and edits. While waiting you can press Send now or Cancel.</p>
+            </div>}
           </section>
           {rotationSlot}
           <section className="space-y-2 rounded-md border border-border p-3">

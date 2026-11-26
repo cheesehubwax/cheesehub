@@ -7,6 +7,7 @@ import type { ReplyRef } from '@/lib/cryptReply';
 import type { VoiceClip } from '@/lib/cryptVoice';
 import type { CryptGroup } from '@/lib/cryptGroups';
 import type { InviteGroupView } from '@/lib/cryptInviteGroups';
+import { loadSendJitter, pickJitterSeconds } from '@/lib/cryptNetworkPrivacy';
 
 /** Message composer: reply bar, text box and footer (counter, NFT, voice, price, Instant, Send). State lives in Messenger. */
 export function CryptComposer({
@@ -37,8 +38,21 @@ export function CryptComposer({
   const push = (v: string) => { inFlight.current.push(v); if (inFlight.current.length > 200) inFlight.current.shift(); };
   const onType = (v: string) => { setDraft(v); push(v); startTransition(() => setText(v)); };
   // Send must use the newest text: commit the draft urgently, then send once the screen has it.
-  const sendNow = () => { if (draft === text) send(); else { push(draft); setText(draft); setSendQueued(true); } };
-  useEffect(() => { if (sendQueued && text === draft) { setSendQueued(false); send(); } }, [sendQueued, text, draft, send]);
+  const sendNow = () => { if (draft === text) doSend(); else { push(draft); setText(draft); setSendQueued(true); } };
+  // Optional random send delay (Privacy settings): count down locally, then run the same send. Leaving the chat cancels it.
+  const [delay, setDelay] = useState<{ left: number; run: 'text' | 'voice' } | null>(null);
+  const sendRef = useRef({ send, sendVoice }); sendRef.current = { send, sendVoice };
+  const fire = (run: 'text' | 'voice') => { if (run === 'voice') sendRef.current.sendVoice(); else sendRef.current.send(); };
+  const doSend = () => { const j = loadSendJitter(); if (j.enabled) setDelay({ left: pickJitterSeconds(j), run: 'text' }); else send(); };
+  const doSendVoice = () => { const j = loadSendJitter(); if (j.enabled) setDelay({ left: pickJitterSeconds(j), run: 'voice' }); else sendVoice(); };
+  useEffect(() => {
+    if (!delay) return;
+    if (delay.left <= 0) { setDelay(null); fire(delay.run); return; }
+    const t = setTimeout(() => setDelay(d => d && { ...d, left: d.left - 1 }), 1000);
+    return () => clearTimeout(t);
+  }, [delay]);
+  useEffect(() => { setDelay(null); }, [active]);
+  useEffect(() => { if (sendQueued && text === draft) { setSendQueued(false); doSend(); } }, [sendQueued, text, draft, send]);
   const pending = draft !== text;
   return (
     <div className="space-y-2 p-4 border-t border-border">
@@ -47,22 +61,27 @@ export function CryptComposer({
         <span className="min-w-0 flex-1"><span className="block font-semibold text-reply">↩️ Replying to {replyingTo.author === account ? 'yourself' : nameFor(replyingTo.author)}</span><span className="block truncate opacity-80">{replyingTo.quote || '…'}</span></span>
         <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" aria-label="Cancel reply" onClick={() => setReplyingTo(null)}>✕</Button>
       </div>}
-      <Textarea ref={composerRef} value={draft} onChange={(e) => onType(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && editing) cancelEdit?.(); }} rows={3} disabled={!!voice || busy} placeholder={voice ? 'Sending a voice note — discard it to type a message' : activeGroup || activeInvite ? 'Message group' : `Message ${nameFor(active)}`} />
+      <Textarea ref={composerRef} value={draft} onChange={(e) => onType(e.target.value)} onKeyDown={e => { if (e.key === 'Escape' && editing) cancelEdit?.(); }} rows={3} disabled={!!voice || busy || !!delay} placeholder={voice ? 'Sending a voice note — discard it to type a message' : activeGroup || activeInvite ? 'Message group' : `Message ${nameFor(active)}`} />
       {!voice && <YoutubeTitleHelper text={draft} setText={setText} disabled={busy} />}
       <div className="flex flex-wrap items-center gap-2 gap-y-1 text-xs">
         <span className={!voice && tooLong ? 'text-destructive' : 'text-muted-foreground'}>
           {voice ? `${voiceParts} parts · ${voiceTxs} transaction${voiceTxs > 1 ? 's' : ''}` : `${bytes}/${maxBytes} · ${parts || 1} part${parts > 1 ? 's' : ''}`}{(activeGroup || activeInvite) && ` × ${copies} recipients`}
         </span>
         {!voice && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setAttachingNft(true); }}>🖼️ Attach NFT</Button>}
-        {!draft.trim() && <VoiceRecorder clip={voice} onChange={setVoice} disabled={busy} />}
+        {!draft.trim() && <VoiceRecorder clip={voice} onChange={setVoice} disabled={busy || !!delay} />}
       </div>
+      {delay && <div role="status" className="flex flex-wrap items-center gap-2 rounded border border-cheese/50 bg-muted px-2 py-1 text-xs">
+        <span className="flex-1">⏳ Sending in {delay.left}s… (random delay)</span>
+        <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => setDelay(d => d && { ...d, left: 0 })}>Send now</Button>
+        <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setDelay(null)}>Cancel</Button>
+      </div>}
       {/* Bottom line: price, Instant and Send on the right. */}
       <div className="flex flex-wrap items-center gap-2 gap-y-1 pr-6 text-xs">
         <span className="ml-auto text-muted-foreground">{totalCost}</span>
         {instantSlot}
         {voice
-          ? <Button size="sm" disabled={busy || !agreed || editExpired} onClick={sendVoice} className="bg-cheese text-primary-foreground hover:bg-cheese/90">{editing ? 'Save edit' : 'Send voice'}{voiceTxs > 1 ? ` (${voiceTxs} signatures)` : ''}</Button>
-          : <Button size="sm" disabled={busy || sendQueued || !agreed || !draft.trim() || (!pending && tooLong) || editExpired} onClick={sendNow}
+          ? <Button size="sm" disabled={busy || !!delay || !agreed || editExpired} onClick={doSendVoice} className="bg-cheese text-primary-foreground hover:bg-cheese/90">{editing ? 'Save edit' : 'Send voice'}{voiceTxs > 1 ? ` (${voiceTxs} signatures)` : ''}</Button>
+          : <Button size="sm" disabled={busy || sendQueued || !!delay || !agreed || !draft.trim() || (!pending && tooLong) || editExpired} onClick={sendNow}
             className="bg-cheese text-primary-foreground hover:bg-cheese/90">{editing ? 'Save edit' : 'Send'}</Button>}
       </div>
     </div>

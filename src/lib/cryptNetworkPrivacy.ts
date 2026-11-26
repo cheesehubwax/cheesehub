@@ -114,3 +114,39 @@ export const privacyGateSatisfied = (): boolean => {
   if (loadCustomOnly()) return true;
   return loadPrivacyGateChoice() === 'public';
 };
+
+// Optional send jitter: a random local delay before signing, so block times don't line up with incoming messages.
+// Device-local only; the timer runs in this tab and nothing is sent anywhere while waiting.
+export type SendJitter = { enabled: boolean; minSeconds: number; maxSeconds: number };
+const JITTER_KEY = 'cheesecrypt-send-jitter';
+export const JITTER_LIMITS = { min: 1, max: 120 } as const;
+export const DEFAULT_JITTER: SendJitter = { enabled: false, minSeconds: 5, maxSeconds: 25 };
+export const JITTER_PRESETS = [
+  { label: 'Short', minSeconds: 3, maxSeconds: 10 },
+  { label: 'Medium', minSeconds: 5, maxSeconds: 25 },
+  { label: 'Long', minSeconds: 15, maxSeconds: 60 },
+] as const;
+/** Clamp to whole seconds within 1–120 and keep min ≤ max. */
+export function normalizeJitter(j: Partial<SendJitter> | null | undefined): SendJitter {
+  const clamp = (v: unknown, d: number) => {
+    const n = typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : d;
+    return Math.min(JITTER_LIMITS.max, Math.max(JITTER_LIMITS.min, n));
+  };
+  let minSeconds = clamp(j?.minSeconds, DEFAULT_JITTER.minSeconds);
+  let maxSeconds = clamp(j?.maxSeconds, DEFAULT_JITTER.maxSeconds);
+  if (minSeconds > maxSeconds) [minSeconds, maxSeconds] = [maxSeconds, minSeconds];
+  return { enabled: j?.enabled === true, minSeconds, maxSeconds };
+}
+export const loadSendJitter = (): SendJitter => {
+  const raw = read(JITTER_KEY);
+  if (!raw) return { ...DEFAULT_JITTER };
+  try { return normalizeJitter(JSON.parse(raw)); } catch { return { ...DEFAULT_JITTER }; }
+};
+export const saveSendJitter = (j: SendJitter): SendJitter => { const n = normalizeJitter(j); write(JITTER_KEY, JSON.stringify(n)); return n; };
+/** Whole-second delay in [min, max] inclusive; `rand` is injectable for tests. */
+export function pickJitterSeconds(j: SendJitter, rand: () => number = () => {
+  const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] / 2 ** 32;
+}): number {
+  const n = normalizeJitter(j);
+  return n.minSeconds + Math.floor(rand() * (n.maxSeconds - n.minSeconds + 1));
+}
