@@ -25,11 +25,12 @@ export interface ClaimSnapshot {
   totals: ClaimTotals;
   baselineFetchedAt: number; // unix ms
   lastClaimSeenAt: number;   // unix ms of newest claim included
-  version: 1;
+  version: 2;
 }
 
 const STORAGE_PREFIX = "cheesehub:farmClaims:v1:";
-const SCHEMA_VERSION = 1 as const;
+// Rebuild v1 snapshots: they attributed every transfer in a batch to one farm.
+const SCHEMA_VERSION = 2 as const;
 
 const HYPERION_FALLBACK = [
   "https://wax.hivebp.io",
@@ -116,6 +117,9 @@ export function addClaimToTotals(
 interface HyperionAction {
   "@timestamp"?: string;
   trx_id?: string;
+  action_ordinal?: number;
+  creator_action_ordinal?: number;
+  global_sequence?: number | string;
   act?: {
     account?: string;
     name?: string;
@@ -127,6 +131,47 @@ interface HyperionAction {
 interface HyperionTransactionResponse {
   actions?: HyperionAction[];
   trx_id?: string;
+}
+
+/** Attribute only farm-origin reward transfers to their own claim, not the batch. */
+export function claimedTotalsFromTransaction(account: string, traces: HyperionAction[]): ClaimTotals {
+  const claims = traces.filter(t => t.act?.account === FARM_CONTRACT && t.act.name === "claim" && t.act.data?.user === account);
+  const farms = new Set(claims.map(t => String(t.act?.data?.farmname || t.act?.data?.farm_name || "")).filter(Boolean));
+  const byOrdinal = new Map(traces.filter(t => t.action_ordinal !== undefined).map(t => [t.action_ordinal, t]));
+  const seen = new Set<string>();
+  let totals: ClaimTotals = {};
+  for (const trace of traces) {
+    const data = trace.act?.data;
+    if (trace.act?.name !== "transfer" || data?.from !== FARM_CONTRACT || data.to !== account) continue;
+    const memoFarm = /^claimed rewards from ([a-z1-5.]{1,12}) farm on WaxDAO$/.exec(String(data.memo || ""))?.[1];
+    let parent = trace;
+    let parentFarm: string | undefined;
+    const visited = new Set<number>();
+    while (parent.creator_action_ordinal && !visited.has(parent.creator_action_ordinal)) {
+      visited.add(parent.creator_action_ordinal);
+      const next = byOrdinal.get(parent.creator_action_ordinal);
+      if (!next) break;
+      if (claims.includes(next)) {
+        parentFarm = String(next.act?.data?.farmname || next.act?.data?.farm_name || "");
+        break;
+      }
+      parent = next;
+    }
+    if (parentFarm && memoFarm && parentFarm !== memoFarm) continue;
+    const farmName = parentFarm || memoFarm;
+    if (!farmName || !farms.has(farmName)) continue;
+    const parsed = parseAsset(String(data.quantity || ""));
+    if (!parsed || parsed.amount <= 0 || !trace.act.account) continue;
+    // Hyperion can return creator and receiver notification copies.
+    const key = trace.global_sequence !== undefined ? `seq:${trace.global_sequence}`
+      : trace.action_ordinal !== undefined ? `ordinal:${trace.action_ordinal}`
+      : `${farmName}:${trace.act.account}:${data.quantity}:${data.memo}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    parsed.contract = trace.act.account;
+    totals = addClaimToTotals(totals, farmName, [parsed]);
+  }
+  return totals;
 }
 
 async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
@@ -193,17 +238,10 @@ export async function fetchBaselineFromHyperion(
   }
 
   const uniqueTrxIds = Array.from(new Set(claimRefs.map((c) => c.trxId)));
-  const farmByTrx = new Map<string, string>();
-  for (const c of claimRefs) {
-    if (!farmByTrx.has(c.trxId)) farmByTrx.set(c.trxId, c.farmName);
-  }
-
   const totals: ClaimTotals = {};
   const CONCURRENCY = 5;
 
   async function processOne(trxId: string): Promise<void> {
-    const farmName = farmByTrx.get(trxId);
-    if (!farmName) return;
     let resp: HyperionTransactionResponse;
     try {
       resp = await withHyperionFallback<HyperionTransactionResponse>(
@@ -214,23 +252,7 @@ export async function fetchBaselineFromHyperion(
     } catch {
       return;
     }
-    const traces = resp.actions || [];
-    const claimed: ClaimedToken[] = [];
-    for (const t of traces) {
-      if (t.act?.name !== "transfer") continue;
-      const tokenContract = String(t.act?.account || "");
-      const d = (t.act?.data || {}) as Record<string, unknown>;
-      const to = String(d.to || "");
-      const from = String(d.from || "");
-      if (to !== account) continue;
-      if (from !== FARM_CONTRACT) continue;
-      const qty = String(d.quantity || "");
-      const parsed = parseAsset(qty);
-      if (!parsed) continue;
-      parsed.contract = tokenContract;
-      claimed.push(parsed);
-    }
-    if (claimed.length > 0) {
+    for (const [farmName, claimed] of Object.entries(claimedTotalsFromTransaction(account, resp.actions || []))) {
       const next = addClaimToTotals(totals, farmName, claimed);
       totals[farmName] = next[farmName];
     }
