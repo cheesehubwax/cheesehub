@@ -88,16 +88,16 @@ export function CryptChatHeader({
                       if (member !== account && activeInvite.requested.includes(member) && !contacts[member]) return <span className="shrink-0 text-[10px] text-muted-foreground">request sent</span>;
                       return undefined;
                     })}
-                  {onReportRoom && <Button size="sm" variant="ghost" className="h-7 text-xs font-normal" title="Report this room, including its owner or admins, to the CHEESEHub moderation team" onClick={onReportRoom}>🚩 Report room</Button>}
-                  {activeInvite.status === 'joined' && <DropdownMenu>
+                  {(activeInvite.status === 'joined' || onReportRoom) && <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button size="sm" variant="ghost" className="h-7 w-7 p-0" aria-label="Group options" title="Group options"><MoreHorizontal className="h-4 w-4" /></Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-52">
-                      <DropdownMenuItem title="Send your current name and picture to everyone in this group, including people who aren't your friends" onSelect={() => setPendingNotice({ kind: 'profile', id: activeInvite.invite.id })}>📣 Share my profile</DropdownMenuItem>
-                      {activeInvite.isCreator && <DropdownMenuItem onSelect={() => setEditingInvite({ id: activeInvite.invite.id, name: activeInvite.name, avatar: activeInvite.avatar })}><Pencil className="h-3 w-3" /> Edit group</DropdownMenuItem>}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setPendingNotice({ kind: 'leave', id: activeInvite.invite.id })}>🚪 Leave group</DropdownMenuItem>
+                      {activeInvite.status === 'joined' && <DropdownMenuItem title="Send your current name and picture to everyone in this group, including people who aren't your friends" onSelect={() => setPendingNotice({ kind: 'profile', id: activeInvite.invite.id })}>📣 Share my profile</DropdownMenuItem>}
+                      {activeInvite.isCreator && activeInvite.status === 'joined' && <DropdownMenuItem onSelect={() => setEditingInvite({ id: activeInvite.invite.id, name: activeInvite.name, avatar: activeInvite.avatar })}><Pencil className="h-3 w-3" /> Edit group</DropdownMenuItem>}
+                      {onReportRoom && <DropdownMenuItem title="Report this group, including its owner or admins, to the CHEESEHub moderation team" onSelect={onReportRoom}>🚩 Report group</DropdownMenuItem>}
+                      {activeInvite.status === 'joined' && <><DropdownMenuSeparator />
+                      <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setPendingNotice({ kind: 'leave', id: activeInvite.invite.id })}>🚪 Leave group</DropdownMenuItem></>}
                     </DropdownMenuContent>
                   </DropdownMenu>}
                 </span>
