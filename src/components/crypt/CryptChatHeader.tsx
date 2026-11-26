@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Ban, ChevronDown, MoreHorizontal, Pencil, UserPlus } from 'lucide-react';
+import { ChevronDown, MoreHorizontal, Pencil, UserPlus } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -112,13 +112,22 @@ export function CryptChatHeader({
               <span aria-hidden>👥</span>
               <span className="break-words">Group</span>
               {membersDropdown(activeGroup.members, undefined, member => member !== account && <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" aria-label={`Edit nickname for ${member}`} title={`Edit nickname for ${member}`} onClick={() => setEditingFriend(member)}><Pencil className="h-3 w-3" /></Button>)}
-            </span> : <><PixelAvatar account={active} avatar={avatars[active]} /><span className="min-w-0 break-words">{nameFor(active)}{nameFor(active) !== active && <span className="block text-xs text-muted-foreground">{active}</span>}</span>{!contacts[active] && <CryptTrustBadge account={active} />}<Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" aria-label={`Edit nickname for ${active}`} title={`Edit nickname for ${active}`} onClick={() => setEditingFriend(active)}><Pencil className="h-3 w-3" /></Button></>}
+            </span> : <><PixelAvatar account={active} avatar={avatars[active]} /><span className="min-w-0 break-words">{nameFor(active)}{nameFor(active) !== active && <span className="block text-xs text-muted-foreground">{active}</span>}</span>{!contacts[active] && <CryptTrustBadge account={active} />}</>}
             {!activeGroup && !activeInvite && <span className="ml-auto flex items-center gap-1">
-              {contacts[active] && onVerify && <Button size="sm" variant="ghost" className={cn('h-7 text-xs font-normal', verify === 'changed' && 'text-destructive hover:text-destructive')} onClick={onVerify}
-                title="Compare safety numbers to confirm nobody swapped your keys">{verify === 'verified' ? '✅ Verified' : verify === 'changed' ? '⚠️ Key changed' : '🔐 Verify'}</Button>}
-              {contacts[active] && <Button size="sm" variant="ghost" className="h-7 text-xs font-normal" onClick={() => saveFriend(active, true)}>💾 Save to {FRIENDS_DIR}</Button>}
-              <Button size="sm" variant="ghost" className="h-7 text-xs font-normal text-destructive hover:text-destructive" aria-label={`Block ${active}`}
-                onClick={() => { if (window.confirm(`Block ${active}? Their messages will be hidden on this device.`)) blockAccount(active); }}><Ban className="h-3.5 w-3.5" /> Block</Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" className="h-7 w-7 p-0 bg-cheese text-primary-foreground hover:bg-cheese/90 hover:text-primary-foreground" aria-label="Private chat options" title="Private chat options"><MoreHorizontal className="h-4 w-4" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuItem onSelect={() => setEditingFriend(active)}>✏️ Edit nickname</DropdownMenuItem>
+                  {contacts[active] && onVerify && <DropdownMenuItem className={cn(verify === 'changed' && 'text-destructive focus:text-destructive')} onSelect={onVerify}
+                    title="Compare safety numbers to confirm nobody swapped your keys">{verify === 'verified' ? '✅ Verified' : verify === 'changed' ? '⚠️ Key changed' : '🔐 Verify'}</DropdownMenuItem>}
+                  {contacts[active] && <DropdownMenuItem onSelect={() => saveFriend(active, true)}>💾 Save to {FRIENDS_DIR}</DropdownMenuItem>}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="text-destructive focus:text-destructive" aria-label={`Block ${active}`}
+                    onSelect={() => { if (window.confirm(`Block ${active}? Their messages will be hidden on this device.`)) blockAccount(active); }}>🚫 Block</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </span>}</>}
       {active && lockSlot && <span className="absolute right-2 top-1.5">{lockSlot}</span>}
     </div>
