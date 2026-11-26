@@ -13,14 +13,11 @@ export const IPFS_GATEWAYS = [
 // AtomicHub's image cache is the preferred artwork source, including for new
 // NFTs whose public IPFS gateways hang. This is image-only: audio and video
 // continue to use the original content gateways above.
-// Three AtomicHub mirrors are tried in order: the 370px preview (fast WebP),
-// the larger JPEG thumbnail, then the original cached file.
+// Two AtomicHub mirrors are tried: the 370px preview (fast WebP), then the
+// original cached file. Never use AtomicHub's /thumbnail: it is a fixed
+// 1200x630 social card padded with navy, which borders every picture.
 export function atomicHubImageUrl(hash: string, size = 370): string {
   return `https://resizer.atomichub.io/images/v1/preview?ipfs=${encodeURIComponent(hash)}&size=${size}`;
-}
-
-export function atomicHubThumbnailUrl(hash: string): string {
-  return `https://resizer.atomichub.io/images/v1/thumbnail?ipfs=${encodeURIComponent(hash)}`;
 }
 
 export function atomicHubOriginalUrl(hash: string): string {
@@ -43,7 +40,6 @@ export function preferredIpfsImageUrl(url: string): string {
 // Image-only sources: cached artwork first, original IPFS gateways as fallbacks.
 export const IPFS_IMAGE_SOURCES: Array<(hash: string) => string> = [
   (hash: string) => atomicHubImageUrl(hash),
-  (hash: string) => atomicHubThumbnailUrl(hash),
   (hash: string) => atomicHubOriginalUrl(hash),
   ...IPFS_GATEWAYS.map((gateway) => (hash: string) => `${gateway}${hash}`),
 ];

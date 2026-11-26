@@ -63,7 +63,8 @@ describe('AtomicHub-first image sources', () => {
   it('tries all three AtomicHub mirrors before any public gateway', async () => {
     const { ipfsImageCandidates: c, getIpfsImageUrl } = await import('@/lib/ipfsGateways');
     const list = c('QmTestHash');
-    expect(list.slice(0, 3).every((u) => u.startsWith('https://resizer.atomichub.io/'))).toBe(true);
+    expect(list.slice(0, 2).every((u) => u.startsWith('https://resizer.atomichub.io/'))).toBe(true);
+    expect(list.some((u) => u.includes('/thumbnail'))).toBe(false);
     expect(list.some((u) => u.includes('cloudflare-ipfs.com'))).toBe(false);
     expect(getIpfsImageUrl('QmTestHash')).toBe('https://resizer.atomichub.io/images/v1/preview?ipfs=QmTestHash&size=370');
   });
