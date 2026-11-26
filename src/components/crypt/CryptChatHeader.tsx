@@ -94,7 +94,7 @@ export function CryptChatHeader({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-52">
                       {activeInvite.status === 'joined' && <DropdownMenuItem title="Send your current name and picture to everyone in this group, including people who aren't your friends" onSelect={() => setPendingNotice({ kind: 'profile', id: activeInvite.invite.id })}>📣 Share my profile</DropdownMenuItem>}
-                      {activeInvite.isCreator && activeInvite.status === 'joined' && <DropdownMenuItem onSelect={() => setEditingInvite({ id: activeInvite.invite.id, name: activeInvite.name, avatar: activeInvite.avatar })}><Pencil className="h-3 w-3" /> Edit group</DropdownMenuItem>}
+                      {activeInvite.isCreator && activeInvite.status === 'joined' && <DropdownMenuItem onSelect={() => setEditingInvite({ id: activeInvite.invite.id, name: activeInvite.name, avatar: activeInvite.avatar })}>✏️ Edit group</DropdownMenuItem>}
                       {onReportRoom && <DropdownMenuItem title="Report this group, including its owner or admins, to the CHEESEHub moderation team" onSelect={onReportRoom}>🚩 Report group</DropdownMenuItem>}
                       {activeInvite.status === 'joined' && <><DropdownMenuSeparator />
                       <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setPendingNotice({ kind: 'leave', id: activeInvite.invite.id })}>🚪 Leave group</DropdownMenuItem></>}
