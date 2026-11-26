@@ -1,0 +1,7 @@
+{
+  "name": "cheesecrypt-swarm",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "bun run run.ts", "test": "bun test" },
+  "dependencies": { "@wharfkit/antelope": "1.1.1" }
+}
