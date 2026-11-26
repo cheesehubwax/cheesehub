@@ -11,7 +11,7 @@
 // logs or files. A broadcast is attempted on ONE upstream only, never retried: a lost
 // reply does not prove the chain rejected it. Check the account before manually retrying.
 //
-// Run:  node cheesecrypt-tor-proxy.mjs
+// Run:  node cheesecrypt-tor-proxy-v1.2.mjs
 // Then in CHEESECrypt → Menu → Privacy → "Your own history server" enter http://localhost:8088
 // Tick "Use only this server" to route CHEESECrypt's signed broadcasts here too.
 //

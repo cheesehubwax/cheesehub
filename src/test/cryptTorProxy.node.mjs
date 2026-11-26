@@ -6,7 +6,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { createProxyServer, fetchViaTor, TIMEOUT_MS } from '../../public/downloads/cheesecrypt-tor-proxy.mjs';
+import { createProxyServer, fetchViaTor, TIMEOUT_MS } from '../../public/downloads/cheesecrypt-tor-proxy-v1.2.mjs';
 
 const folder = mkdtempSync(join(tmpdir(), 'crypt-tor-test-'));
 const sockets = new Set();

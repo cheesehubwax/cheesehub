@@ -125,8 +125,8 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
                 <ol className="list-decimal space-y-1 pl-4">
                   <li>Install <a className="text-cheese underline" href="https://nodejs.org" target="_blank" rel="noopener noreferrer">Node.js</a> (version 18 or newer) and <a className="text-cheese underline" href="https://www.torproject.org/download/" target="_blank" rel="noopener noreferrer">Tor Browser</a>.</li>
                   <li>Open Tor Browser and press Connect. Leave it open.</li>
-                  <li><a className="text-cheese underline" href={`${import.meta.env.BASE_URL}downloads/cheesecrypt-tor-proxy.mjs`} download="cheesecrypt-tor-proxy.mjs">Download the helper</a> (one file, no installs needed). You can open it in any text editor to read it first.</li>
-                  <li>Open a terminal in the folder you saved it to (Windows: right-click the folder → Open in Terminal) and run: <code className="rounded bg-muted px-1 text-foreground">node cheesecrypt-tor-proxy.mjs</code></li>
+                  <li><a className="text-cheese underline" href={`${import.meta.env.BASE_URL}downloads/cheesecrypt-tor-proxy-v1.2.mjs`} download="cheesecrypt-tor-proxy-v1.2.mjs">Download the helper</a> (one file, no installs needed). You can open it in any text editor to read it first.</li>
+                  <li>Open a terminal in the folder you saved it to (Windows: right-click the folder → Open in Terminal) and run: <code className="rounded bg-muted px-1 text-foreground">node cheesecrypt-tor-proxy-v1.2.mjs</code></li>
                   <li>The default address is <code className="rounded bg-muted px-1 text-foreground">http://localhost:8088</code> — it points to this computer, so everyone can use the same address. Use Autofill Tor helper if needed, then press Test &amp; connect. Tick "Use only this server" to prevent direct public-history fallback and route CHEESECrypt's signed broadcasts through v1.2+ of this helper.</li>
                 </ol>
                 <div className="space-y-2 border-t border-border pt-2">
