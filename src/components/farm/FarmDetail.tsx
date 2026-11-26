@@ -18,6 +18,7 @@ import { TokenLogo } from "@/components/TokenLogo";
 import { useToast } from "@/hooks/use-toast";
 import { useIpfsImageSrc } from "@/hooks/useIpfsImageSrc";
 import { useFarmClaimTotals } from "@/hooks/useFarmClaimTotals";
+import { useFarmCapacity } from "@/hooks/useFarmCapacity";
 import { NFTStaking } from "./NFTStaking";
 import { EditFarmProfile } from "./EditFarmProfile";
 import { OpenFarmDialog } from "./OpenFarmDialog";
@@ -160,6 +161,7 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
 
   const logo = useIpfsImageSrc(farm?.logo);
   const cover = useIpfsImageSrc(farm?.profile?.cover_image);
+  const { summary: capacitySummary } = useFarmCapacity(farm ?? undefined);
 
   if (isLoading) {
     return (
@@ -183,7 +185,9 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
     );
   }
 
-  const status = getStatusInfo(farm);
+  const status = capacitySummary === 'full' || capacitySummary === 'limited'
+    ? { label: capacitySummary === 'full' ? 'Full' : 'Limited capacity', className: 'bg-primary/10 text-primary border-primary/30' }
+    : getStatusInfo(farm);
   const isCreator = accountName === farm.creator;
   const now = Math.floor(Date.now() / 1000);
 
@@ -523,7 +527,7 @@ export function FarmDetail({ farmName, onBack }: FarmDetailProps) {
       </div>
 
       {/* Stakeable Assets */}
-      <StakeableAssets farmName={farm.farm_name} farmType={farm.farm_type} />
+      <StakeableAssets farmName={farm.farm_name} farmType={farm.farm_type} farm={farm} />
 
       {/* Owner-only: who is currently staking in this farm */}
       {isCreator && <FarmTemplateDistribution farmName={farm.farm_name} />}

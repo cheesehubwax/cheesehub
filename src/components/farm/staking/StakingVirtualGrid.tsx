@@ -14,10 +14,11 @@ interface FarmNFTCardProps {
   isSelected: boolean;
   onToggle: () => void;
   stakedInFarm?: string;
+  capacityBlocked?: boolean;
   onNavigateToFarm?: () => void;
 }
 
-const FarmNFTCard = React.memo(function FarmNFTCard({ nft, isSelected, onToggle, stakedInFarm, onNavigateToFarm }: FarmNFTCardProps) {
+const FarmNFTCard = React.memo(function FarmNFTCard({ nft, isSelected, onToggle, stakedInFarm, capacityBlocked, onNavigateToFarm }: FarmNFTCardProps) {
   const isStakedElsewhere = Boolean(stakedInFarm);
 
   if (isStakedElsewhere) {
@@ -51,8 +52,13 @@ const FarmNFTCard = React.memo(function FarmNFTCard({ nft, isSelected, onToggle,
   return (
     <NFTGridCard
       nft={nft}
-      isSelected={isSelected}
+      isSelected={capacityBlocked ? false : isSelected}
       onToggle={onToggle}
+      disabled={capacityBlocked}
+      extraBadge={capacityBlocked ? (
+        <div className="absolute bottom-0 inset-x-0 bg-background/95 text-primary px-1 py-1 text-center text-[9px] leading-tight">At capacity</div>
+      ) : undefined}
+      extraHoverContent={capacityBlocked ? <p className="text-primary">This NFT's rewards exceed the remaining pool funds until the farm ends.</p> : undefined}
     />
   );
 });
@@ -64,6 +70,7 @@ interface VirtualGridProps {
   parentRef: React.RefObject<HTMLDivElement>;
   type: "stake" | "unstake";
   globallyStakedMap?: Map<string, string>;
+  capacityBlockedIds?: Set<string>;
   onNavigateToFarm?: (farmName: string) => void;
 }
 
@@ -78,6 +85,7 @@ export const VirtualGrid = React.memo(function VirtualGrid({
   parentRef,
   type,
   globallyStakedMap,
+  capacityBlockedIds,
   onNavigateToFarm,
 }: VirtualGridProps) {
   const [cols, setCols] = useState(getGridCols);
@@ -125,6 +133,7 @@ export const VirtualGrid = React.memo(function VirtualGrid({
                     isSelected={selected.has(nft.asset_id)}
                     onToggle={() => onToggle(nft.asset_id)}
                     stakedInFarm={stakedInFarm}
+                    capacityBlocked={type === "stake" && capacityBlockedIds?.has(nft.asset_id)}
                     onNavigateToFarm={stakedInFarm && onNavigateToFarm ? () => onNavigateToFarm(stakedInFarm) : undefined}
                   />
                 );

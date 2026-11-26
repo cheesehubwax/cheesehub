@@ -16,7 +16,7 @@ import {
   FarmInfo, fetchUserStakes, fetchFarmStakableConfig,
   buildStakeNftsAction, buildUnstakeNftsAction, buildClaimRewardsAction,
   getCollectionNames, UserStake, PendingReward, FarmStakableConfig,
-  fetchUserGlobalStakes, GlobalStakeInfo, isFarmFull,
+  fetchUserGlobalStakes, GlobalStakeInfo, fetchFarmDetails, fetchFarmCapacityConfig,
 } from "@/lib/farm";
 import { ATOMIC_API } from "@/lib/waxConfig";
 import { fetchWithFallback } from "@/lib/fetchWithFallback";
@@ -32,6 +32,8 @@ import {
   applyClaimToAccount,
 } from "@/lib/farmClaimHistory";
 import { useFarmClaimTotals } from "@/hooks/useFarmClaimTotals";
+import { useFarmCapacity } from "@/hooks/useFarmCapacity";
+import { assetCapacityRule, checkFarmCapacity } from "@/lib/farmCapacity";
 
 
 interface NFTStakingProps {
@@ -57,6 +59,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
   }, [navigate]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: capacityConfig, summary: capacitySummary, now, refetch: refetchCapacity } = useFarmCapacity(farm);
 
   const [selectedToStake, setSelectedToStake] = useState<Set<string>>(new Set());
   const [selectedToUnstake, setSelectedToUnstake] = useState<Set<string>>(new Set());
@@ -297,6 +300,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
                 collection: asset.collection?.collection_name || "",
                 schema: asset.schema?.schema_name || "",
                 template_id: asset.template?.template_id || "",
+                attributes: { ...asset.template?.immutable_data, ...asset.immutable_data, ...asset.data },
               });
             }
           }
@@ -556,8 +560,26 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
   }, [stakedNftDetails, searchQuery, collectionFilter, schemaFilter]);
 
   // ── Bulk select ──
+  const capacityBlockedIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (!capacityConfig) return ids;
+    for (const nft of eligibleNfts) {
+      const rule = assetCapacityRule(capacityConfig, farm.farm_type, nft);
+      if (rule && checkFarmCapacity(farm, [rule], now) === 'blocked') ids.add(nft.asset_id);
+    }
+    return ids;
+  }, [capacityConfig, eligibleNfts, farm, now]);
+  const selectionCapacity = useMemo(() => {
+    if (!capacityConfig || !selectedToStake.size) return 'unknown';
+    const assets = eligibleNfts.filter(nft => selectedToStake.has(nft.asset_id));
+    const rules = assets.map(nft => assetCapacityRule(capacityConfig, farm.farm_type, nft));
+    if (rules.some(rule => !rule) || assets.length !== selectedToStake.size) return 'unknown';
+    return checkFarmCapacity(farm, rules.filter(rule => rule !== undefined), now);
+  }, [capacityConfig, eligibleNfts, selectedToStake, farm, now]);
+  const selectableEligible = filteredEligible.filter(nft => !globallyStakedMap.has(nft.asset_id) && !capacityBlockedIds.has(nft.asset_id));
+
   const selectAllEligible = () => {
-    const stakeable = filteredEligible.filter((n) => !globallyStakedMap.has(n.asset_id));
+    const stakeable = selectableEligible;
     if (selectedToStake.size === stakeable.length && stakeable.length > 0) {
       setSelectedToStake(new Set());
     } else {
@@ -574,7 +596,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
   };
 
   const toggleStake = (id: string) => {
-    if (globallyStakedMap.has(id)) return; // NFT staked elsewhere, not selectable
+    if (globallyStakedMap.has(id) || capacityBlockedIds.has(id)) return;
     setSelectedToStake((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -592,7 +614,8 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
   // ── Actions ──
   const refetchAll = async () => {
     await new Promise((r) => setTimeout(r, 1000));
-    await Promise.all([refetchStaked(), refetchEligible(), refetchStakedDetails(), refetchGlobalStakes()]);
+    await Promise.all([refetchStaked(), refetchEligible(), refetchStakedDetails(), refetchGlobalStakes(), refetchCapacity()]);
+    onRefresh();
   };
 
   const handleStake = async () => {
@@ -601,6 +624,23 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
     try {
       const ids = Array.from(selectedToStake).filter((id) => !globallyStakedMap.has(id) && !currentStakedIds.has(id));
       if (ids.length === 0) return;
+      // Recheck the whole selection against fresh chain state before opening the wallet.
+      const [latestFarm, latestConfig] = await Promise.all([
+        fetchFarmDetails(farm.farm_name), fetchFarmCapacityConfig(farm.farm_name, farm.farm_type),
+      ]);
+      if (!latestFarm) throw new Error('Unable to check current farm capacity. Refresh and try again.');
+      const rules = ids.map(id => {
+        const nft = eligibleNfts.find(asset => asset.asset_id === id);
+        return nft ? assetCapacityRule(latestConfig, latestFarm.farm_type, nft) : undefined;
+      });
+      if (rules.some(rule => !rule)) throw new Error('Unable to verify the reward rate for every selected NFT. Refresh and try again.');
+      const capacity = checkFarmCapacity(latestFarm, rules.filter(rule => rule !== undefined), Math.floor(Date.now() / 1000));
+      if (capacity !== 'available') {
+        onRefresh();
+        throw new Error(capacity === 'blocked'
+          ? 'The selected NFTs exceed the remaining rewards. Select fewer NFTs or a lower reward rate.'
+          : capacity === 'inactive' ? 'This farm is not accepting new stakes.' : 'Unable to verify current reward capacity. Refresh and try again.');
+      }
       const hasPendingClaim =
         stakedNfts.length > 0 &&
         ((liveRewards.some((r) => r.amount > 0)) ||
@@ -745,9 +785,8 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
 
 
 
-  const now = Math.floor(Date.now() / 1000);
   const isExpired = farm.expiration > 1 && now > farm.expiration;
-  const isFull = isFarmFull(farm, now);
+  const isFull = capacitySummary === 'full';
   const isLoadingAny = isLoadingStaked || isLoadingEligible || isLoadingStakedDetails;
 
   if (isLoadingAny && !eligibleNfts.length && !stakedNftDetails.length) {
@@ -852,16 +891,30 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
                   </AlertDescription>
                 </Alert>
               )}
+              {!isFull && capacitySummary === 'limited' && (
+                <Alert className="border-primary/40 bg-primary/5">
+                  <Info className="h-4 w-4 text-primary" />
+                  <AlertDescription className="text-xs">
+                    <strong>Limited capacity.</strong> Some NFT reward rates exceed the remaining rewards. NFTs marked At capacity cannot be selected; lower-rate NFTs may still fit.
+                  </AlertDescription>
+                </Alert>
+              )}
+              {selectionCapacity === 'blocked' && selectedToStake.size > 0 && (
+                <Alert className="border-primary/40 bg-primary/5">
+                  <Info className="h-4 w-4 text-primary" />
+                  <AlertDescription className="text-xs">These NFTs fit individually but not together, or capacity has changed. Select fewer NFTs or lower reward rates.</AlertDescription>
+                </Alert>
+              )}
               <div className="flex items-center justify-between">
                 <Button variant="ghost" size="sm" onClick={selectAllEligible}>
-                  {selectedToStake.size === filteredEligible.filter((n) => !globallyStakedMap.has(n.asset_id)).length &&
-                  filteredEligible.length > 0
+                  {selectedToStake.size === selectableEligible.length &&
+                  selectableEligible.length > 0
                     ? "Deselect All"
                     : "Select All"}
                 </Button>
                 <Button
                   onClick={requestStake}
-                  disabled={isStaking || selectedToStake.size === 0 || isExpired || isFull}
+                  disabled={isStaking || selectedToStake.size === 0 || isExpired || isFull || selectionCapacity === 'blocked' || farm.status !== 1}
                   size="sm"
                   className="bg-primary text-primary-foreground"
                 >
@@ -888,6 +941,7 @@ export function NFTStaking({ farm, onRefresh }: NFTStakingProps) {
                   parentRef={stakeParentRef as React.RefObject<HTMLDivElement>}
                   type="stake"
                   globallyStakedMap={globallyStakedMap}
+                  capacityBlockedIds={capacityBlockedIds}
                   onNavigateToFarm={handleNavigateToFarm}
                 />
               )}

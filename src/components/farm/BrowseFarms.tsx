@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, Sprout } from "lucide-react";
-import { fetchAllFarms, FarmInfo, fetchUserGlobalStakes, isFarmFull } from "@/lib/farm";
+import { fetchAllFarms, FarmInfo, fetchUserGlobalStakes } from "@/lib/farm";
 import { useWax } from "@/context/WaxContext";
 import { useQuery } from "@tanstack/react-query";
 import { FarmCard } from "./FarmCard";
@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useFarmClaimTotals } from "@/hooks/useFarmClaimTotals";
 
 type SortOption = "newest" | "staked" | "name";
+const EMPTY_FARMS: FarmInfo[] = [];
 
 export function BrowseFarms() {
   const { accountName } = useWax();
@@ -26,12 +27,24 @@ export function BrowseFarms() {
   const [hideFull, setHideFull] = useState(false);
   const [sortBy, setSortBy] = useState<SortOption>("staked");
   const [claimAllOpen, setClaimAllOpen] = useState(false);
+  const [fullFarmNames, setFullFarmNames] = useState<Set<string>>(new Set());
+  const onCapacity = useCallback((name: string, full: boolean) => {
+    setFullFarmNames(previous => {
+      if (previous.has(name) === full) return previous;
+      const next = new Set(previous);
+      if (full) next.add(name); else next.delete(name);
+      return next;
+    });
+  }, []);
 
-  const { data: farms = [], isLoading } = useQuery({
+  const { data: farms = EMPTY_FARMS, isLoading } = useQuery({
     queryKey: ["farms"],
     queryFn: fetchAllFarms,
     staleTime: 60_000,
+    refetchInterval: 60_000,
   });
+  // Re-evaluate hidden cards after the farm snapshot changes; unknown stays visible.
+  useEffect(() => { setFullFarmNames(new Set()); }, [farms]);
 
   const { data: userStakes = [] } = useQuery({
     queryKey: ["userGlobalStakes", accountName],
@@ -49,7 +62,7 @@ export function BrowseFarms() {
     }
 
     if (hideFull) {
-      result = result.filter(f => !isFarmFull(f, now));
+      result = result.filter(f => !fullFarmNames.has(f.farm_name));
     }
 
     if (stakedOnly && accountName) {
@@ -79,7 +92,7 @@ export function BrowseFarms() {
     }
 
     return result;
-  }, [farms, search, activeOnly, hideFull, stakedOnly, sortBy, accountName, userStakes]);
+  }, [farms, search, activeOnly, hideFull, stakedOnly, sortBy, accountName, userStakes, fullFarmNames]);
 
   return (
     <div className="space-y-4">
@@ -153,6 +166,7 @@ export function BrowseFarms() {
               key={farm.farm_name}
               farm={farm}
               userClaimed={claimTotals[farm.farm_name]}
+              onCapacity={onCapacity}
             />
           ))}
         </div>

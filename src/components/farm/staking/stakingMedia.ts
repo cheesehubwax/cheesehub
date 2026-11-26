@@ -7,6 +7,7 @@ export interface NFTAsset {
   collection: string;
   schema: string;
   template_id: string;
+  attributes?: Record<string, unknown>;
 }
 
 // Raw IPFS hashes/URIs become a gateway URL; NFTGridCard extracts the hash and

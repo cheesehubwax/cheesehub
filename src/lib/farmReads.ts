@@ -408,6 +408,31 @@ function parseRewardValues(row: Record<string, unknown>): { hourlyRate: string; 
   return { hourlyRate, hourlyRates };
 }
 
+// Capacity needs only the farm's active rule table, not metadata or unrelated tables.
+// Never publish a partial read as a complete capacity summary.
+export async function fetchFarmCapacityConfig(farmName: string, farmType: number): Promise<FarmStakableConfig> {
+  const table = ['valuesbycol', 'valuesbysch', 'valuesbytemp', 'valuesbyatt'][farmType];
+  if (!table) throw new Error('Unknown farm type');
+  const config: FarmStakableConfig = { collections: [], schemas: [], templates: [], attributes: [] };
+  let cursor: string | undefined;
+  for (let page = 0; page < 10; page++) {
+    const data = await fetchTableRows({ code: FARM_CONTRACT, scope: farmName, table, limit: 500, lower_bound: cursor });
+    for (const row of data.rows) {
+      const { hourlyRate, hourlyRates } = parseRewardValues(row);
+      const rate = { hourly_rate: hourlyRate, hourly_rates: hourlyRates.length ? hourlyRates : undefined };
+      const collection = String(row.collection_name || row.collection || row.name || '');
+      if (farmType === 0) config.collections.push({ ...rate, collection });
+      if (farmType === 1) config.schemas.push({ ...rate, collection, schema: String(row.schema_name || row.schema || '') });
+      if (farmType === 2) config.templates.push({ ...rate, collection, template_id: Number(row.template_id || row.templateid || row.id || 0) });
+      if (farmType === 3) config.attributes.push({ ...rate, attribute_name: String(row.attribute_name || row.attr_name || row.key || ''), attribute_value: String(row.attribute_value || row.attr_value || row.value || '') });
+    }
+    if (!data.more) return config;
+    if (!data.next_key || data.next_key === cursor) throw new Error('Incomplete farm capacity rules');
+    cursor = data.next_key;
+  }
+  throw new Error('Farm capacity rule limit reached');
+}
+
 export async function fetchFarmStakableConfig(farmName: string): Promise<FarmStakableConfig> {
   const config: FarmStakableConfig = {
     collections: [],

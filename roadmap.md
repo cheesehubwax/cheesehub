@@ -2,6 +2,8 @@
 
 Open tasks only. Completed work lives in git history.
 
+- [ ] CHEESEFarm: verify one real capacity-aware stake with the user's Anchor wallet; per-rule warnings, browse-to-detail live checks and 41 capacity/action tests pass, including mixed rates, combined selections and fresh pre-sign checks. Requires the user's wallet signature.
+
 - [ ] CHEESECrypt public-room opening: confirm eventhorizon's original room with their unlocked wallet — cross-chat render recovery, mounted-list reply tracking, safe navigation and storage-failure handling pass 80 targeted tests plus two private/legacy navigation checks; live signed-out page has no runtime errors. Original history/key unavailable here; two existing admission-test failures also reproduce against the unchanged page. Sweep coverage is recorded in `.lovable/reviews/crypt-chat-safety-sweep.md`.
 
 - [ ] CHEESECrypt NFT picker: verify scrolling/loading beyond 100 NFTs with the user's full collection after Anchor unlock; stable single-scroll layout, shared visibility and bounded queue are implemented, but the user's unlocked wallet is unavailable here.

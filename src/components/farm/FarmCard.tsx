@@ -1,13 +1,14 @@
-import { memo } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sprout } from "lucide-react";
 import { TokenLogo } from "@/components/TokenLogo";
-import { FarmInfo, FARM_TYPE_LABELS, FarmType, isFarmFull } from "@/lib/farm";
+import { FarmInfo, FARM_TYPE_LABELS, FarmType } from "@/lib/farm";
 import { useNavigate } from "react-router-dom";
 import { useIpfsImageSrc } from "@/hooks/useIpfsImageSrc";
 import type { ClaimedToken } from "@/lib/farmClaimHistory";
+import { useFarmCapacity } from "@/hooks/useFarmCapacity";
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 
 function formatAmount(val: string | number): string {
@@ -41,7 +42,6 @@ function getStatusInfo(farm: FarmInfo): { label: string; className: string } {
   if (farm.status === 2) return { label: "Closed", className: "bg-orange-500/20 text-orange-400 border-orange-500/30" };
   if (farm.status === 0) return { label: "Under Construction", className: "bg-blue-500/20 text-blue-400 border-blue-500/30" };
   if (farm.expiration > 0 && farm.expiration < now) return { label: "Expired", className: "bg-orange-500/20 text-orange-400 border-orange-500/30" };
-  if (farm.is_active && isFarmFull(farm, now)) return { label: "Full", className: "bg-amber-500/20 text-amber-400 border-amber-500/30" };
   if (farm.is_active) return { label: "Active", className: "bg-green-500/20 text-green-400 border-green-500/30" };
   return { label: "Inactive", className: "bg-muted text-muted-foreground border-border" };
 }
@@ -58,14 +58,27 @@ function getDaysRemaining(expiration: number): string {
   return `${hours}h remaining`;
 }
 
-export const FarmCard = memo(function FarmCard({ farm, userClaimed }: { farm: FarmInfo; userClaimed?: ClaimedToken[] }) {
+export const FarmCard = memo(function FarmCard({ farm, userClaimed, onCapacity }: { farm: FarmInfo; userClaimed?: ClaimedToken[]; onCapacity?: (name: string, full: boolean) => void }) {
   const navigate = useNavigate();
   const logo = useIpfsImageSrc(farm.logo);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const node = cardRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), { rootMargin: '200px' });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  const { summary } = useFarmCapacity(farm, visible);
   const status = getStatusInfo(farm);
-  const isFull = status.label === "Full";
+  const isFull = summary === 'full';
+  const limited = summary === 'limited';
+  useEffect(() => { onCapacity?.(farm.farm_name, isFull); }, [onCapacity, farm, isFull]);
 
   return (
     <Card
+      ref={cardRef}
       className="bg-card/80 border-primary/30 shadow-lg transition-all cursor-pointer group flex flex-col"
       onClick={() => navigate(`/farm/${farm.farm_name}`)}
     >
@@ -89,13 +102,19 @@ export const FarmCard = memo(function FarmCard({ farm, userClaimed }: { farm: Fa
 
         {/* Badges */}
         <div className="flex flex-wrap gap-1.5 mt-3">
-          <Badge className={`text-[10px] ${status.className}`}>{status.label}</Badge>
+          <Badge className={`text-[10px] ${isFull || limited ? 'bg-primary/10 text-primary border-primary/30' : status.className}`}>{isFull ? 'Full' : limited ? 'Limited capacity' : status.label}</Badge>
           <Badge variant="outline" className="text-[10px] border-border/50 text-foreground">{getFarmTypeLabel(farm.farm_type)}</Badge>
         </div>
 
         {isFull && (
           <p className="mt-2 text-[11px] text-amber-400">
             Rewards fully committed — no room to stake more NFTs until the creator adds rewards.
+          </p>
+        )}
+
+        {limited && (
+          <p className="mt-2 text-[11px] text-primary">
+            Some NFT reward rates no longer fit. Check Stakeable Assets before buying an NFT.
           </p>
         )}
 
