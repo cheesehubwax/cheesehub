@@ -86,6 +86,7 @@ describe('CPU shortage detection', () => {
   it('recognises CPU/NET exhaustion but not auth or budget errors', () => {
     expect(isResourceShortage('transaction was executing for too long: billed CPU time (1200 us) is greater than the maximum billable CPU time')).toBe(true);
     expect(isResourceShortage('tx_net_usage_exceeded')).toBe(true);
+    expect(isResourceShortage('transaction 687b exceeded failure limit for account dr.cheese until 2026-11-27T14:21:17.000')).toBe(true);
     expect(isResourceShortage('missing authority of alice')).toBe(false);
     expect(isResourceShortage('free messaging budget reached for today')).toBe(false);
   });

@@ -186,7 +186,10 @@ export async function sendInstant(chain: ChainDefinition, key: InstantKey, actio
 
 /** Chain rejections meaning the account ran out of CPU or NET (Fuel did not cover the message). */
 export const isResourceShortage = (message: string | undefined) =>
-  !!message && /(billed cpu|cpu usage|tx_cpu_usage_exceeded|deadline exceeded|insufficient cpu|net usage|tx_net_usage_exceeded|ram_usage_exceeded|leeway_deadline)/i.test(message);
+  !!message && /(billed cpu|cpu usage|tx_cpu_usage_exceeded|deadline exceeded|insufficient cpu|net usage|tx_net_usage_exceeded|ram_usage_exceeded|leeway_deadline|exceeded failure limit|failure limit for account)/i.test(message);
+
+/** Shown when a Crypt send runs out of CPU/NET; Fuel is off on /crypt so the account pays its own resources. */
+export const RESOURCE_SHORTAGE_MESSAGE = 'Your account ran out of CPU or NET for this message. Greymass Fuel is turned off on CHEESECrypt for privacy, so your account pays for its own resources. Rent CPU with CHEESE on CHEESEUp or stake more WAX to CPU/NET, wait a minute, then press Send again.';
 
 /** Chain rejections meaning the browser key no longer matches the account's permission (revoked elsewhere). */
 export const isInstantAuthFailure = (message: string | undefined) =>

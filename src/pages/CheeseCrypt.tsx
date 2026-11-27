@@ -49,8 +49,7 @@ import { buildCg2Actions, JOIN_NOTE_MAX, encodeAdmission, encodeMemberAdd, encod
 import { ShareKeyDialog } from '@/components/crypt/ShareKeyDialog';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { useCryptInstant } from '@/hooks/useCryptInstant';
-import { isInstantAuthFailure, isResourceShortage } from '@/lib/cryptInstant';
-import { ToastAction } from '@/components/ui/toast';
+import { isInstantAuthFailure, isResourceShortage, RESOURCE_SHORTAGE_MESSAGE } from '@/lib/cryptInstant';
 import { CryptInstantDialog } from '@/components/crypt/CryptInstantDialog';
 import { CryptPrivacyDialog } from '@/components/crypt/CryptPrivacyDialog';
 import { CryptPrivacyGate } from '@/components/crypt/CryptPrivacyGate';
@@ -204,9 +203,8 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
         // Only a rejected browser key (removed or replaced elsewhere) falls back to Anchor, so a send that
         // may already be on chain is never broadcast twice.
         if (isResourceShortage(message)) {
-          const error = new Error('Your account is out of CPU for this message. Rent CPU with CHEESE on CHEESEUp, then press Send again.');
-          toast({ title: 'Not enough CPU', description: error.message, variant: 'destructive',
-            action: <ToastAction altText="Open CHEESEUp" onClick={() => { window.location.assign(`${import.meta.env.BASE_URL.replace(/\/$/, '')}/powerup`); }}>⚡ CHEESEUp</ToastAction> });
+          const error = new Error(RESOURCE_SHORTAGE_MESSAGE);
+          if (options?.showErrorToast !== false) toast({ title: 'Not enough CPU', description: error.message, variant: 'destructive' });
           return { success: false, txId: null, error };
         }
         if (!isInstantAuthFailure(message)) {
@@ -217,6 +215,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
       }
     }
     const r = await executeDirect(out, options);
+    if (!r.success && isResourceShortage(r.error?.message)) return { ...r, error: new Error(RESOURCE_SHORTAGE_MESSAGE) };
     if (sponsored) {
       invalidateSponsorBudget();
       void fetchSponsorBudget(true).then(b => setSponsorUnits(sponsorRemaining(b)));
@@ -1938,7 +1937,12 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
             <DialogTitle className="text-center">Transaction declined</DialogTitle>
             <DialogDescription className="text-center">Your message was not sent. {sendDeclined}</DialogDescription>
           </DialogHeader>
-          <Button onClick={() => setSendDeclined(null)} className="w-full">OK</Button>
+          {sendDeclined === RESOURCE_SHORTAGE_MESSAGE ? (
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setSendDeclined(null)}>OK</Button>
+              <Button className="flex-1" onClick={() => { window.location.assign(`${import.meta.env.BASE_URL.replace(/\/$/, '')}/powerup`); }}>⚡ Open CHEESEUp</Button>
+            </div>
+          ) : <Button onClick={() => setSendDeclined(null)} className="w-full">OK</Button>}
         </DialogContent>
       </Dialog>
       {rotateStep && <CryptRotateDialog step={rotateStep} friends={rotateStep === 'announce' ? rot.pendingFriends.length : Object.keys(contacts).filter(c => !blocked.includes(c)).length}
