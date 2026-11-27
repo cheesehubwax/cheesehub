@@ -9,7 +9,7 @@ import { parseReply, type ReplyRef } from '@/lib/cryptReply';
 import { CryptNftCard } from '@/components/crypt/CryptNftCard';
 import { CryptYoutubeEmbed } from '@/components/crypt/CryptYoutubeEmbed';
 import { splitYoutube } from '@/lib/cryptYoutube';
-import { fetchAssetById } from '@/services/atomicApi';
+import { fetchCryptAsset } from '@/lib/cryptMediaProxy';
 import { parseNftMessage } from '@/lib/cryptNft';
 import type { CryptAvatar } from '@/lib/cryptAvatar';
 import { PixelAvatar } from '@/components/crypt/PixelAvatar';
@@ -72,7 +72,7 @@ export function ChatMessageItem({ m, account, keyAvatar, avatars, contacts, acti
   const segments = body != null && !tip ? parseNftMessage(body) : null;
   const soloAssetId = segments && segments.length === 1 && segments[0].type === 'nft' ? segments[0].assetId : null;
   const { data } = useQuery({
-    queryKey: ['crypt-nft', soloAssetId], queryFn: () => { if (!soloAssetId) throw new Error('Missing asset'); return fetchAssetById(soloAssetId); },
+    queryKey: ['crypt-nft', soloAssetId], queryFn: () => { if (!soloAssetId) throw new Error('Missing asset'); return fetchCryptAsset(soloAssetId); },
     enabled: !!soloAssetId, staleTime: 3600_000,
   });
   const bare = !!soloAssetId && !!data?.isSfx;

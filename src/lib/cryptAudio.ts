@@ -2,6 +2,7 @@
 // Only one sound plays at a time across chat NFTs, voice notes and CHEESEAmp.
 import { getAudioPlayer } from '@/lib/musicPlayer';
 import { IPFS_GATEWAYS, extractIpfsHash } from '@/lib/ipfsGateways';
+import { currentMediaRoute, routedMediaCandidates } from '@/lib/cryptMediaProxy';
 
 export const CRYPT_NOW_PLAYING = 'cheesecrypt-now-playing';
 
@@ -19,7 +20,7 @@ export function mediaCandidates(url: string): string[] {
   const out = [url];
   const hash = extractIpfsHash(url);
   if (hash) for (const g of IPFS_GATEWAYS) out.push(`${g}${hash}`);
-  return [...new Set(out)];
+  return routedMediaCandidates(currentMediaRoute(), url, [...new Set(out)]);
 }
 
 let audio: HTMLAudioElement | null = null;
@@ -74,6 +75,7 @@ export const cryptAudio = {
     candidates = mediaCandidates(url); attempt = 0;
     const failed = new Set(state.failedKeys); failed.delete(key);
     set({ key, playing: false, loading: true, time: 0, duration: 0, failedKeys: failed });
+    if (!candidates.length) { failed.add(key); set({ loading: false, failedKeys: failed }); return; }
     el.src = candidates[0];
     void el.play().catch(() => {});
   },

@@ -6,8 +6,9 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { createProxyServer, fetchViaTor, TIMEOUT_MS } from '../../public/downloads/cheesecrypt-tor-proxy-v1.2.mjs';
+import { createProxyServer, fetchViaTor, TIMEOUT_MS } from '../../public/downloads/cheesecrypt-tor-proxy-v1.3.mjs';
 
+const CID = 'QmYTvGVY8eVxrzYf7VTgqJJqZiNJF7gAfji6ewxo4qUyeM';
 const folder = mkdtempSync(join(tmpdir(), 'crypt-tor-test-'));
 const sockets = new Set();
 const destinations = [];
@@ -24,7 +25,10 @@ before(async () => {
     for await (const chunk of req) chunks.push(chunk);
     upstreamRequests.push({ method: req.method, url: req.url, body: Buffer.concat(chunks).toString('utf8') });
     if (req.url === '/stall') { res.writeHead(200); res.write('{'); return; }
+    if (req.url === `/ipfs/${CID}/art.png`) { res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(Buffer.from([137, 80, 78, 71])); return; }
+    if (req.url === `/ipfs/${CID}/page.html`) { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<script>alert(1)</script>'); return; }
     res.setHeader('Content-Type', 'application/json');
+    if (req.url === '/atomicassets/v1/assets/42') { res.end(JSON.stringify({ success: true, data: { asset_id: '42' } })); return; }
     if (req.url === '/bad-json') { res.end('<html>not history</html>'); return; }
     if (req.url === '/v1/chain/send_transaction') {
       res.writeHead(202);
@@ -70,7 +74,7 @@ before(async () => {
     socket.on('data', handshake);
   });
   socksPort = await listen(socks);
-  proxy = createProxyServer({ torPorts: [socksPort], upstreams: ['https://history.invalid'], ca });
+  proxy = createProxyServer({ torPorts: [socksPort], upstreams: ['https://history.invalid'], atomicUpstreams: ['https://history.invalid'], ipfsGateways: ['https://history.invalid'], ca });
   proxyPort = await listen(proxy);
 });
 
@@ -146,4 +150,31 @@ test('loopback helper blocks other writes and non-history paths, and supports br
   assert.equal(preflight.status, 204);
   assert.equal(preflight.headers.get('access-control-allow-private-network'), 'true');
   assert.match(preflight.headers.get('access-control-allow-methods'), /POST/);
+});
+
+test('v1.3 reports its media capabilities', async () => {
+  const j = await (await fetch(`http://127.0.0.1:${proxyPort}/v2/helper`)).json();
+  assert.equal(j.version, '1.3');
+  assert.ok(j.features.includes('atomic') && j.features.includes('ipfs'));
+});
+
+test('chat NFT lookups and IPFS pictures travel through SOCKS', async () => {
+  const before = destinations.length;
+  const a = await fetch(`http://127.0.0.1:${proxyPort}/atomic/v1/assets/42`);
+  assert.equal((await a.json()).data.asset_id, '42');
+  const img = await fetch(`http://127.0.0.1:${proxyPort}/ipfs/${CID}/art.png`);
+  assert.equal(img.status, 200);
+  assert.equal(img.headers.get('content-type'), 'image/png');
+  assert.equal(img.headers.get('x-content-type-options'), 'nosniff');
+  assert.deepEqual([...new Uint8Array(await img.arrayBuffer())], [137, 80, 78, 71]);
+  assert.ok(destinations.slice(before).every(d => d.host === 'history.invalid'));
+  assert.equal(destinations.length - before, 2);
+});
+
+test('non-media gateway replies and unsafe media paths are refused', async () => {
+  const base = `http://127.0.0.1:${proxyPort}`;
+  assert.equal((await fetch(`${base}/ipfs/${CID}/page.html`)).status, 502);
+  for (const path of [`/ipfs/${CID}/..`, `/ipfs/${CID}/%2e%2e`, '/ipfs/notacid', `/ipfs/${CID}?x=1`, '/atomic/v1/assets/abc', '/atomic/v1/collections/x']) {
+    assert.equal((await fetch(base + path)).status, 403, path);
+  }
 });

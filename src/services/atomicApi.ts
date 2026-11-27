@@ -1062,9 +1062,13 @@ export async function fetchCollectionSales(collectionName: string, limit = 50): 
 export { getIpfsUrl };
 
 // Single asset lookup (CHEESECrypt shared NFT cards). Returns null when the asset is unknown.
-export async function fetchAssetById(assetId: string): Promise<{ asset_id: string; name: string; image: string; collection: string; mint: string; title?: string; artist?: string; tracks: NftMediaTrack[]; isSfx: boolean; video?: string } | null> {
+export async function fetchAssetById(assetId: string, viaTorHelper?: string): Promise<{ asset_id: string; name: string; image: string; collection: string; mint: string; title?: string; artist?: string; tracks: NftMediaTrack[]; isSfx: boolean; video?: string } | null> {
   if (!/^\d{1,20}$/.test(assetId)) return null;
-  const response = await fetchWithFallback(ATOMIC_API.baseUrls, `${ATOMIC_API.paths.assets}/${assetId}`);
+  // A loopback Tor helper (CHEESECrypt) is the only route when given: no public fallback.
+  const response = viaTorHelper
+    ? await fetch(`${viaTorHelper}/atomic/v1/assets/${assetId}`, { cache: 'no-store' })
+    : await fetchWithFallback(ATOMIC_API.baseUrls, `${ATOMIC_API.paths.assets}/${assetId}`);
+  if (viaTorHelper && !response.ok) throw new Error(`Tor helper HTTP ${response.status}`);
   const json = await response.json();
   const a = json?.data;
   if (!json?.success || !a) return null;

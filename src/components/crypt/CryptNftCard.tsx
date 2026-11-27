@@ -5,7 +5,7 @@ import { Pause, Play, Loader2 } from 'lucide-react';
 import { IpfsImage } from '@/components/shared/IpfsImage';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { fetchAssetById } from '@/services/atomicApi';
+import { currentMediaRoute, fetchCryptAsset, MediaBlockedError, routedImageUrl } from '@/lib/cryptMediaProxy';
 import { announcePlaying, cryptAudio, mediaCandidates } from '@/lib/cryptAudio';
 import { formatTime, getAudioPlayer } from '@/lib/musicPlayer';
 
@@ -39,7 +39,7 @@ function CryptVideo({ url, poster, label }: { url: string; poster?: string; labe
   const candidates = useMemo(() => mediaCandidates(url), [url]);
   const [idx, setIdx] = useState(0);
   const [failed, setFailed] = useState(false);
-  if (failed) return <p className="text-xs italic opacity-80">📹 Video unavailable</p>;
+  if (failed || !candidates.length) return <p className="text-xs italic opacity-80">📹 Video unavailable</p>;
   return (
     <video key={candidates[idx]} src={candidates[idx]} poster={poster || undefined} controls playsInline preload="metadata"
       className="w-full max-h-[60vh] rounded-md bg-muted" aria-label={label}
@@ -63,6 +63,19 @@ function markAutoplayed(key: string) {
   try { localStorage.setItem(PLAYED_KEY, JSON.stringify([...autoplayed].slice(-PLAYED_MAX))); } catch { /* storage full/blocked: session-only */ }
 }
 
+/**
+ * Artwork that honours the media route: public routes keep IpfsImage's gateway race;
+ * the Tor helper route loads one helper URL (or a bundled copy) and never races public gateways.
+ */
+function NftPicture({ src, alt, className }: { src: string; alt: string; className: string }) {
+  const route = currentMediaRoute();
+  const [broken, setBroken] = useState(false);
+  if (route.kind === 'public' || route.kind === 'legacy') return <IpfsImage src={src} alt={alt} className={className} />;
+  const url = routedImageUrl(route, src);
+  if (!url || broken) return <div className="aspect-square w-full flex items-center justify-center text-2xl" role="img" aria-label={alt}>🖼️</div>;
+  return <img src={url} alt={alt} className={className} onError={() => setBroken(true)} />;
+}
+
 function TxLink({ txId }: { txId: string }) {
   return <a href={explorerTx(txId)} target="_blank" rel="noreferrer"
     className="font-semibold text-cheese underline underline-offset-2 hover:text-cheese/80">Transaction {txId.slice(0, 8)}…</a>;
@@ -80,7 +93,7 @@ function TxLink({ txId }: { txId: string }) {
 export function CryptNftCard({ assetId, autoplayKey, txId }: { assetId: string; autoplayKey?: string; txId?: string }) {
   const [open, setOpen] = useState(false);
   const [watchVideo, setWatchVideo] = useState(false);
-  const { data, isLoading } = useQuery({ queryKey: ['crypt-nft', assetId], queryFn: () => fetchAssetById(assetId), staleTime: 3600_000 });
+  const { data, isLoading, error } = useQuery({ queryKey: ['crypt-nft', assetId], queryFn: () => fetchCryptAsset(assetId), staleTime: 3600_000 });
   const audioState = useSyncExternalStore(cryptAudio.subscribe, cryptAudio.getState);
   const tracks = data?.tracks ?? [];
   const video = data?.video;
@@ -95,10 +108,11 @@ export function CryptNftCard({ assetId, autoplayKey, txId }: { assetId: string; 
   }, [autoplayKey, data, tracks, sfxKey]);
   const heading = data ? (data.title || data.name) : '';
   const hasImage = !!data?.image && data.image !== '/placeholder.svg';
-  const picture = (cls: string) => hasImage ? <IpfsImage src={data!.image} alt={data!.name} className={cls} />
+  const picture = (cls: string) => hasImage ? <NftPicture src={data!.image} alt={data!.name} className={cls} />
     : <div className="aspect-square w-full flex items-center justify-center text-2xl">{isLoading ? '⏳' : tracks.length ? '🎵' : video ? '🎬' : '🖼️'}</div>;
 
-  if (!data) return <span className="block w-44 my-1 text-xs italic opacity-80">{isLoading ? '⏳ Loading NFT…' : '🖼️ NFT unavailable'}</span>;
+  if (!data) return <span className="block w-44 my-1 text-xs italic opacity-80">{isLoading ? '⏳ Loading NFT…'
+    : error instanceof MediaBlockedError ? '🧅 NFT hidden: your Tor helper isn\'t reachable' : '🖼️ NFT unavailable'}</span>;
 
   if (data.isSfx) {
     const playing = audioState.key === sfxKey && audioState.playing;
@@ -134,8 +148,8 @@ export function CryptNftCard({ assetId, autoplayKey, txId }: { assetId: string; 
           {data.artist || `Larger view of ${heading}`}
         </DialogDescription>
         {showVideo
-          ? <CryptVideo url={video!} poster={hasImage ? data.image : undefined} label={`Video for ${heading}`} />
-          : hasImage && <IpfsImage src={data.image} alt={data.name} className="w-full max-h-[60vh] object-contain rounded-md" />}
+          ? <CryptVideo url={video!} poster={hasImage ? routedImageUrl(currentMediaRoute(), data.image) ?? undefined : undefined} label={`Video for ${heading}`} />
+          : hasImage && <NftPicture src={data.image} alt={data.name} className="w-full max-h-[60vh] object-contain rounded-md" />}
         {video && !videoOnly && (
           <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 px-2 text-cheese" onClick={() => setWatchVideo(v => !v)}>
             {watchVideo ? '🎵 Back to audio' : '🎬 Watch video'}
