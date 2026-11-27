@@ -32,10 +32,10 @@ export const isPremiumName = (account: string) => /\.(cheese|chz)$/.test(account
 export const PREMIUM_POINTS = 40;
 
 /** Maximum points each signal can earn, so the checklist can show progress as points/max. */
-export const MAX_AGE_POINTS = 32;
+export const MAX_AGE_POINTS = 20;
 export const MAX_BALANCE_POINTS = 30;
-export const MAX_STAKE_POINTS = 32;
-export const MAX_POOL_POINTS = 45; // 40 base + 5 multi-pool bonus
+export const MAX_STAKE_POINTS = 20;
+export const MAX_POOL_POINTS = 105; // 100 base + 5 multi-pool bonus
 export const MAX_NFT_POINTS = 25;
 export const MAX_KEY_POINTS = 10;
 export const MAX_KEY_AGE_POINTS = 10;
@@ -44,11 +44,11 @@ export const MAX_TOTAL_POINTS = PREMIUM_POINTS + MAX_AGE_POINTS + MAX_BALANCE_PO
 
 export function agePoints(ageMs: number): number {
   if (ageMs < 7 * DAY) return -15;
-  if (ageMs < 30 * DAY) return 3;
-  if (ageMs < YEAR) return 8;
-  if (ageMs < 3 * YEAR) return 16;
-  if (ageMs < 5 * YEAR) return 24;
-  return 32;
+  if (ageMs < 30 * DAY) return 2;
+  if (ageMs < YEAR) return 5;
+  if (ageMs < 3 * YEAR) return 10;
+  if (ageMs < 5 * YEAR) return 15;
+  return 20;
 }
 
 export function balancePoints(c: number): number {
@@ -61,16 +61,16 @@ export function balancePoints(c: number): number {
 }
 
 export function stakePoints(c: number): number {
-  if (c >= 50_000) return 32;
-  if (c >= 20_000) return 24;
-  if (c >= 5_000) return 16;
-  if (c >= 100) return 8;
+  if (c >= 50_000) return 20;
+  if (c >= 20_000) return 15;
+  if (c >= 5_000) return 10;
+  if (c >= 100) return 5;
   return 0;
 }
 
 export function poolPoints(c: number, pools: number): number {
-  if (!(c > 0)) return 0;
-  const base = c >= 50_000 ? 40 : c >= 20_000 ? 32 : c >= 5_000 ? 24 : c >= 1_000 ? 16 : c >= 100 ? 8 : 2;
+  if (!(c >= 100)) return 0;
+  const base = c >= 100_000 ? 100 : c >= 50_000 ? 70 : c >= 20_000 ? 35 : c >= 5_000 ? 15 : c >= 1_000 ? 5 : 1;
   return base + (pools >= 2 ? 5 : 0);
 }
 
@@ -99,7 +99,7 @@ export function markFor(total: number, newAccount: boolean): TrustMark {
 }
 
 export const MARK_LABEL: Record<TrustMark, string> = {
-  warning: '🪤 Warning', low: '🥛 No Respect', moderate: '🧀 Little Respect', good: '🫕 Much Respect', strong: 'Big Respect', huge: '🏆 Huge Respect',
+  warning: '🪤 Warning', low: '🥛 No Respect', moderate: '🧀 Some Respect', good: '🫕 Much Respect', strong: 'Big Respect', huge: '🏆 Huge Respect',
 };
 
 /** Emoji per mark; null means the CHEESE token logo image is shown instead. */
@@ -107,7 +107,7 @@ export const MARK_ICON: Record<TrustMark, string | null> = {
   warning: '🪤', low: '🥛', moderate: '🧀', good: '🫕', strong: null, huge: '🏆',
 };
 export const MARK_NAME: Record<TrustMark, string> = {
-  warning: 'Warning', low: 'No Respect', moderate: 'Little Respect', good: 'Much Respect', strong: 'Big Respect', huge: 'Huge Respect',
+  warning: 'Warning', low: 'No Respect', moderate: 'Some Respect', good: 'Much Respect', strong: 'Big Respect', huge: 'Huge Respect',
 };
 
 const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 4 });
