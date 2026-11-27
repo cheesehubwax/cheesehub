@@ -36,7 +36,7 @@ interface WalletTransferDialogProps {
 export function WalletTransferDialog({ open, onOpenChange }: WalletTransferDialogProps) {
   const { accountName, transferToken } = useWax();
   const { data: waxPrice = 0 } = useWaxPrice();
-  const { tokens: balances, isUsingFallback, refetch: refetchBalances } = useAllTokenBalances(accountName || undefined);
+  const { tokens: balances, isUsingFallback, refetch: refetchBalances } = useAllTokenBalances(open && accountName ? accountName : undefined); // closed wallet makes no account-naming balance scan
   const { data: tokenPrices } = useAlcorTokenPrices();
 
   // Refetch balances whenever the wallet dialog opens
