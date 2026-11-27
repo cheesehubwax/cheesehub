@@ -36,7 +36,7 @@ import { OpenMojiIcon } from '@/components/OpenMojiIcon';
 import { useLocation } from "react-router-dom";
 import { isCryptPath } from "@/context/waxContextState";
 
-const CRYPT_BLOCK_NOTE = "Disabled on Crypt to prevent account metadata leaks";
+const CRYPT_BLOCK_NOTE = "Disabled while using CHEESECrypt";
 
 
 export function WalletConnect() {
@@ -63,7 +63,11 @@ export function WalletConnect() {
   // Wallet, Swap and Bridge send account-named queries to public servers, so they stay closed on Crypt.
   const onCrypt = isCryptPath(useLocation().pathname);
   useEffect(() => {
-    if (onCrypt) { setWalletOpen(false); setSwapOpen(false); setBridgeOpen(false); }
+    if (onCrypt) {
+      setWalletOpen(false); setSwapOpen(false); setBridgeOpen(false); setCheeseAmpOpen(false);
+      // CHEESEAmp streams from public IPFS gateways, so playback pauses on Crypt.
+      try { getAudioPlayer().pause(); } catch { /* no player yet */ }
+    }
   }, [onCrypt]);
 
   // Persistent auto-advance hook - works even when CHEESEAmp dialog is minimized
@@ -86,6 +90,7 @@ export function WalletConnect() {
   // Listen for custom event to open CHEESEAmp
   useEffect(() => {
     const handleOpenCheeseAmp = () => {
+      if (isCryptPath(window.location.pathname)) return;
       if (isConnected) {
         if (cheeseAmpMinimized) {
           setCheeseAmpMinimized(false);
@@ -194,33 +199,34 @@ export function WalletConnect() {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuItem 
+            disabled={onCrypt}
+            title={onCrypt ? CRYPT_BLOCK_NOTE : undefined}
             onClick={() => {
+              if (onCrypt) return;
               if (cheeseAmpMinimized) {
                 handleCheeseAmpExpand();
               } else {
                 setCheeseAmpOpen(true);
               }
             }} 
-            className="cursor-pointer"
+            className={onCrypt ? undefined : "cursor-pointer"}
           >
             <OpenMojiIcon emoji="🎧" size={16} className="mr-2 text-base leading-none" />
             <span><span className="text-cheese">CHEESE</span>Amp</span>
           </DropdownMenuItem>
-          <DropdownMenuItem disabled={onCrypt} title={onCrypt ? CRYPT_BLOCK_NOTE : undefined} onClick={() => { if (!onCrypt) setWalletOpen(true); }} className={onCrypt ? "flex-wrap" : "cursor-pointer"}>
+          <DropdownMenuItem disabled={onCrypt} title={onCrypt ? CRYPT_BLOCK_NOTE : undefined} onClick={() => { if (!onCrypt) setWalletOpen(true); }} className={onCrypt ? undefined : "cursor-pointer"}>
             <img src={walletIcon} alt="Wallet" className="mr-2 h-4 w-4 object-contain" />
             <span><span className="text-cheese">CHEESE</span>Wallet</span>
-            {onCrypt && <span className="basis-full pl-6 text-[10px] text-muted-foreground">{CRYPT_BLOCK_NOTE}</span>}
           </DropdownMenuItem>
-          <DropdownMenuItem disabled={onCrypt} title={onCrypt ? CRYPT_BLOCK_NOTE : undefined} onClick={() => { if (!onCrypt) setSwapOpen(true); }} className={onCrypt ? "flex-wrap" : "cursor-pointer"}>
+          <DropdownMenuItem disabled={onCrypt} title={onCrypt ? CRYPT_BLOCK_NOTE : undefined} onClick={() => { if (!onCrypt) setSwapOpen(true); }} className={onCrypt ? undefined : "cursor-pointer"}>
             <OpenMojiIcon emoji="🔄" size={16} className="mr-2 text-base leading-none" />
             <span><span className="text-cheese">CHEESE</span>Swap</span>
-            {onCrypt && <span className="basis-full pl-6 text-[10px] text-muted-foreground">{CRYPT_BLOCK_NOTE}</span>}
           </DropdownMenuItem>
-          <DropdownMenuItem disabled={onCrypt} title={onCrypt ? CRYPT_BLOCK_NOTE : undefined} onClick={() => { if (!onCrypt) setBridgeOpen(true); }} className={onCrypt ? "flex-wrap" : "cursor-pointer"}>
+          <DropdownMenuItem disabled={onCrypt} title={onCrypt ? CRYPT_BLOCK_NOTE : undefined} onClick={() => { if (!onCrypt) setBridgeOpen(true); }} className={onCrypt ? undefined : "cursor-pointer"}>
             <img src={alcorIconUrl} alt="" aria-hidden="true" className="mr-2 h-4 w-4 shrink-0 object-contain" />
             <span><span className="text-cheese">ALCOR</span>Bridge</span>
-            {onCrypt && <span className="basis-full pl-6 text-[10px] text-muted-foreground">{CRYPT_BLOCK_NOTE}</span>}
           </DropdownMenuItem>
+          {onCrypt && <p className="px-2 pb-1 text-[10px] text-muted-foreground">{CRYPT_BLOCK_NOTE}</p>}
           
           {/* Account Switching Submenu */}
           {allSessions.length > 0 && (
@@ -287,7 +293,7 @@ export function WalletConnect() {
         onOpenChange={setCheeseAmpOpen} 
         onMinimize={handleCheeseAmpMinimize} 
       />
-      {cheeseAmpMinimized && (
+      {cheeseAmpMinimized && !onCrypt && (
         <CheeseAmpMiniPlayer
           onExpand={handleCheeseAmpExpand}
           onClose={handleMiniPlayerClose}
