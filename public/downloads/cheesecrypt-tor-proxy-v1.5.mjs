@@ -9,6 +9,12 @@
 // v1.4 also forwards the read-only lookups behind Respect badges (account age, CHEESE
 // balance, staked CHEESE, Alcor pool positions and CHEESE NFT count) so the public WAX,
 // AtomicAssets and Alcor servers never learn which accounts you are looking at.
+// v1.5 gives each kind of traffic its own Tor circuit (Tor's IsolateSOCKSAuth, on by
+// default): every Respect lookup and every broadcast gets a brand-new circuit, history
+// reads keep one steady circuit, and NFT media spreads over four circuits. Read-only
+// Respect and NFT lookups also rotate between servers, so no single server or exit sees
+// a decoy and the real lookup beside each other. History stays on one server (servers
+// index history differently) and a broadcast still goes to ONE server, never retried.
 // Those public servers see a Tor exit address instead of your home IP.
 //
 // What it does NOT do: it is not a Tor relay or exit node, it never accepts connections
@@ -16,7 +22,7 @@
 // logs or files. Media is passed through in memory only (never saved to disk). A broadcast is attempted on ONE upstream only, never retried: a lost
 // reply does not prove the chain rejected it. Check the account before manually retrying.
 //
-// Run:  node cheesecrypt-tor-proxy-v1.4.mjs
+// Run:  node cheesecrypt-tor-proxy-v1.5.mjs
 // Then in CHEESECrypt → Menu → Privacy → "Your own history server" enter http://localhost:8088
 // Tick "Use only this server" to route CHEESECrypt's signed broadcasts here too.
 //
@@ -27,6 +33,7 @@ import https from 'node:https';
 import net from 'node:net';
 import tls from 'node:tls';
 import { pathToFileURL } from 'node:url';
+import { randomBytes } from 'node:crypto';
 
 const LISTEN_PORT = Number(process.env.PORT || 8088);
 const TOR_PORTS = [9150, 9050];
@@ -49,7 +56,24 @@ const IPFS_GATEWAYS = [
   'https://ipfs.io',
 ];
 const ALCOR_UPSTREAMS = ['https://wax.alcor.exchange'];
-export const HELPER_VERSION = '1.4';
+export const HELPER_VERSION = '1.5';
+export const MEDIA_LANES = 4;
+// Circuit labels are random per helper run and never leave this computer except as the
+// SOCKS username/password Tor uses to keep circuits apart.
+const SESSION = randomBytes(6).toString('hex');
+let mediaLane = 0;
+/** Tor circuit label: 'history' is steady, 'media' cycles four lanes, anything else is fresh each time. */
+export function isolationFor(kind) {
+  if (kind === 'history') return `cc-${SESSION}-history`;
+  if (kind === 'media') return `cc-${SESSION}-media-${mediaLane++ % MEDIA_LANES}`;
+  return `cc-${SESSION}-${kind}-${randomBytes(8).toString('hex')}`;
+}
+/** Start each read-only lookup on the next server in turn; failures still fall through the rest. */
+export function rotate(list, counter) {
+  if (list.length < 2) return [...list];
+  const i = counter % list.length;
+  return [...list.slice(i), ...list.slice(0, i)];
+}
 export const TIMEOUT_MS = 8000;
 export const MEDIA_TIMEOUT_MS = 45000;
 export const MAX_MEDIA = 50 * 1024 * 1024;
@@ -73,22 +97,36 @@ const ALLOWED_PATH = /^\/v2\/(history\/[a-z_]+|health)(\?|$)/;
 const BROADCAST_PATH = /^\/v1\/chain\/(send_transaction|push_transaction)$/;
 
 /** Open a TCP tunnel to host:port through Tor's SOCKS5 port (host resolved by Tor, never locally). */
-function socksConnect(torPort, host, port) {
+function socksConnect(torPort, host, port, isolation) {
   return new Promise((resolve, reject) => {
     const s = net.connect(torPort, '127.0.0.1');
     let stage = 0, buf = Buffer.alloc(0);
     const fail = (e) => { s.destroy(); reject(e instanceof Error ? e : new Error(String(e))); };
     s.setTimeout(TIMEOUT_MS, () => fail('Tor connection timed out'));
     s.on('error', fail);
-    s.on('connect', () => s.write(Buffer.from([5, 1, 0])));
+    // With a label, offer username/password so Tor puts this stream on that label's circuit.
+    const label = isolation ? Buffer.from(String(isolation).slice(0, 255)) : null;
+    const sendConnect = () => {
+      stage = 1;
+      const h = Buffer.from(host);
+      s.write(Buffer.concat([Buffer.from([5, 1, 0, 3, h.length]), h, Buffer.from([port >> 8, port & 255])]));
+    };
+    s.on('connect', () => s.write(Buffer.from(label ? [5, 2, 0, 2] : [5, 1, 0])));
     s.on('data', (chunk) => {
       buf = Buffer.concat([buf, chunk]);
       if (stage === 0) {
         if (buf.length < 2) return;
-        if (buf[0] !== 5 || buf[1] !== 0) return fail('Tor refused the handshake');
-        buf = buf.subarray(2); stage = 1;
-        const h = Buffer.from(host);
-        s.write(Buffer.concat([Buffer.from([5, 1, 0, 3, h.length]), h, Buffer.from([port >> 8, port & 255])]));
+        if (buf[0] !== 5) return fail('Tor refused the handshake');
+        if (buf[1] === 2 && label) {
+          buf = buf.subarray(2); stage = 3;
+          s.write(Buffer.concat([Buffer.from([1, label.length]), label, Buffer.from([label.length]), label]));
+        } else if (buf[1] === 0) { buf = buf.subarray(2); sendConnect(); }
+        else return fail('Tor refused the handshake');
+      }
+      if (stage === 3) {
+        if (buf.length < 2) return;
+        if (buf[0] !== 1 || buf[1] !== 0) return fail('Tor refused the circuit label');
+        buf = buf.subarray(2); sendConnect();
       }
       if (stage === 1) {
         if (buf.length < 5) return;
@@ -125,7 +163,7 @@ async function findTor(ports = TOR_PORTS) {
  * are returned to the caller; network failures and malformed JSON are rejected.
  * The dedicated Agent cannot open a direct/DNS connection.
  */
-export function requestViaTor(torPort, upstream, path, { method = 'GET', body, contentType = 'text/plain;charset=UTF-8', timeoutMs = TIMEOUT_MS, ca, media = false } = {}) {
+export function requestViaTor(torPort, upstream, path, { method = 'GET', body, contentType = 'text/plain;charset=UTF-8', timeoutMs = TIMEOUT_MS, ca, media = false, isolation } = {}) {
   const base = new URL(upstream);
   const u = new URL(path, base);
   if (u.protocol !== 'https:' || u.origin !== base.origin) return Promise.reject(new Error('upstream must stay on the original HTTPS server'));
@@ -139,7 +177,7 @@ export function requestViaTor(torPort, upstream, path, { method = 'GET', body, c
       if (error) reject(error); else resolve(result);
     };
     const timer = setTimeout(() => finish(new Error('timed out')), timeoutMs);
-    socksConnect(torPort, u.hostname, 443).then((socket) => {
+    socksConnect(torPort, u.hostname, 443, isolation).then((socket) => {
       raw = socket;
       if (settled) { raw.destroy(); return; }
       raw.on('error', (error) => finish(error));
@@ -192,7 +230,7 @@ let upstreamOrder = [...UPSTREAMS];
 // HerdCheck source through Tor only; an outage leaves the vetted fallback intact.
 async function updateHealthOrder(torPort) {
   try {
-    const r = await fetchViaTor(torPort, 'https://herdcheck.blocdraig.com', '/api/v1/wax/endpoints?feature=hyperion-v2', { timeoutMs: 4000 });
+    const r = await fetchViaTor(torPort, 'https://herdcheck.blocdraig.com', '/api/v1/wax/endpoints?feature=hyperion-v2', { timeoutMs: 4000, isolation: isolationFor('health') });
     const j = JSON.parse(r.body.toString('utf8'));
     if (!Array.isArray(j.endpoints)) return;
     const healthy = j.endpoints.filter(e => e.status === 'healthy' || e.status === 'degraded');
@@ -232,7 +270,7 @@ function readRequestBody(req, limit = MAX_REQUEST_BODY) {
 }
 
 export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS, atomicUpstreams = ATOMIC_UPSTREAMS, ipfsGateways = IPFS_GATEWAYS, alcorUpstreams = ALCOR_UPSTREAMS, ca } = {}) {
-  let lastGood = null;
+  let lastGood = null, turn = 0;
   return http.createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -242,7 +280,7 @@ export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS,
     const send = (code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
 
     if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
-    if (req.method === 'GET' && req.url === '/v2/helper') return send(200, { helper: 'cheesecrypt-tor', version: HELPER_VERSION, features: ['history', 'broadcast', 'atomic', 'ipfs', 'chain', 'respect'] });
+    if (req.method === 'GET' && req.url === '/v2/helper') return send(200, { helper: 'cheesecrypt-tor', version: HELPER_VERSION, features: ['history', 'broadcast', 'atomic', 'ipfs', 'chain', 'respect', 'isolation', 'rotation'] });
 
     // Respect lookups (v1.4): read-only, so trying the next server on failure is safe.
     const accountMatch = req.method === 'GET' ? ATOMIC_ACCOUNT_PATH.exec(req.url || '') : null;
@@ -259,11 +297,14 @@ export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS,
       }
       const torPort = await findTor(torPorts);
       if (!torPort) return send(503, { error: 'Tor is not running. Open Tor Browser (or start the Tor service) and try again.' });
+      // Each Respect lookup gets its own new circuit and starts on the next server in turn.
+      const isolation = isolationFor('respect');
+      const n = turn++;
       if (accountMatch) {
-        for (const upstream of atomicUpstreams) {
+        for (const upstream of rotate(atomicUpstreams, n)) {
           if (res.destroyed) return;
           try {
-            const r = await fetchViaTor(torPort, upstream, `/atomicassets/v1/accounts/${accountMatch[1]}${accountMatch[2] || ''}`, { ca });
+            const r = await fetchViaTor(torPort, upstream, `/atomicassets/v1/accounts/${accountMatch[1]}${accountMatch[2] || ''}`, { ca, isolation });
             const j = JSON.parse(r.body.toString('utf8'));
             if (!j?.success || !j.data) throw new Error('no account in reply');
             res.writeHead(200, { 'Content-Type': r.type });
@@ -276,7 +317,7 @@ export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS,
         for (const upstream of alcorUpstreams) {
           if (res.destroyed) return;
           try {
-            const r = await fetchViaTor(torPort, upstream, `/api/v2/account/${alcorMatch[1]}/positions`, { ca });
+            const r = await fetchViaTor(torPort, upstream, `/api/v2/account/${alcorMatch[1]}/positions`, { ca, isolation });
             if (!Array.isArray(JSON.parse(r.body.toString('utf8')))) throw new Error('no positions list in reply');
             res.writeHead(200, { 'Content-Type': r.type });
             return res.end(r.body);
@@ -286,10 +327,10 @@ export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS,
       }
       // Complete nodeos replies (including 4xx errors) are returned; 5xx and network failures try the next server.
       let lastReply = null;
-      for (const upstream of (upstreams === UPSTREAMS ? upstreamOrder : upstreams)) {
+      for (const upstream of rotate(upstreams === UPSTREAMS ? upstreamOrder : upstreams, n)) {
         if (res.destroyed) return;
         try {
-          const r = await requestViaTor(torPort, upstream, req.url, { method: 'POST', body, contentType: 'application/json', ca });
+          const r = await requestViaTor(torPort, upstream, req.url, { method: 'POST', body, contentType: 'application/json', ca, isolation });
           if (r.status >= 500) { lastReply = r; throw new Error(`HTTP ${r.status}`); }
           res.writeHead(r.status, { 'Content-Type': r.type });
           return res.end(r.body);
@@ -304,11 +345,13 @@ export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS,
     if (atomicMatch || ipfsRequest) {
       const torPort = await findTor(torPorts);
       if (!torPort) return send(503, { error: 'Tor is not running. Open Tor Browser (or start the Tor service) and try again.' });
+      const isolation = isolationFor('media');
+      const n = turn++;
       if (atomicMatch) {
-        for (const upstream of atomicUpstreams) {
+        for (const upstream of rotate(atomicUpstreams, n)) {
           if (res.destroyed) return;
           try {
-            const r = await fetchViaTor(torPort, upstream, `/atomicassets/v1/assets/${atomicMatch[1]}`, { ca });
+            const r = await fetchViaTor(torPort, upstream, `/atomicassets/v1/assets/${atomicMatch[1]}`, { ca, isolation });
             const j = JSON.parse(r.body.toString('utf8'));
             if (!j?.success || !j.data) throw new Error('no asset in reply');
             res.writeHead(200, { 'Content-Type': r.type });
@@ -317,10 +360,10 @@ export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS,
         }
         return send(502, { error: 'Every NFT server failed through Tor. Try again in a minute.' });
       }
-      for (const gateway of ipfsGateways) {
+      for (const gateway of rotate(ipfsGateways, n)) {
         if (res.destroyed) return;
         try {
-          const r = await requestViaTor(torPort, gateway, req.url, { ca, media: true, timeoutMs: MEDIA_TIMEOUT_MS });
+          const r = await requestViaTor(torPort, gateway, req.url, { ca, media: true, timeoutMs: MEDIA_TIMEOUT_MS, isolation });
           if (r.status < 200 || r.status >= 300) throw new Error(`HTTP ${r.status}`);
           // Served to <img>/<audio>/<video> only: no sniffing, no scripts, no framing.
           res.writeHead(200, { 'Content-Type': r.type, 'Content-Length': r.body.length, 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; sandbox", 'Cross-Origin-Resource-Policy': 'cross-origin' });
@@ -355,6 +398,7 @@ export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS,
         const r = await requestViaTor(torPort, upstream, req.url, {
           method: 'POST', body, timeoutMs: BROADCAST_TIMEOUT_MS,
           contentType: req.headers['content-type'] || 'text/plain;charset=UTF-8', ca,
+          isolation: isolationFor('broadcast'),
         });
         lastGood = upstream;
         res.writeHead(r.status, { 'Content-Type': r.type });
@@ -368,7 +412,7 @@ export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS,
     for (const upstream of order) {
       if (res.destroyed) return;
       try {
-        const r = await fetchViaTor(torPort, upstream, req.url, { ca });
+        const r = await fetchViaTor(torPort, upstream, req.url, { ca, isolation: isolationFor('history') });
         const j = JSON.parse(r.body.toString('utf8'));
         const pathname = new URL(req.url, 'http://localhost').pathname;
         if ((pathname.endsWith('/get_actions') || pathname.endsWith('/get_transaction')) && !Array.isArray(j.actions)) throw new Error('server returned no actions array');
@@ -391,6 +435,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   console.log(`\n🧅 CHEESECrypt Tor helper v${HELPER_VERSION} is running`);
   console.log(`   Address for CHEESECrypt: http://localhost:${LISTEN_PORT}`);
   console.log('   History reads, Respect lookups, single-attempt signed broadcasts and chat NFT media use Tor');
+  console.log('   Each kind of traffic uses its own Tor circuit; Respect and NFT lookups rotate servers');
   console.log(tor ? `   Tor port ${tor} is open (connection verified on first request)` : '   ⚠️  Tor not found yet — open Tor Browser or start the Tor service');
   console.log('   Leave this window open. Press Ctrl+C to stop.\n');
   if (tor) void updateHealthOrder(tor);

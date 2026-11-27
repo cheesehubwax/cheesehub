@@ -6,13 +6,14 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { createProxyServer, fetchViaTor, TIMEOUT_MS } from '../../public/downloads/cheesecrypt-tor-proxy-v1.4.mjs';
+import { createProxyServer, fetchViaTor, isolationFor, rotate, TIMEOUT_MS } from '../../public/downloads/cheesecrypt-tor-proxy-v1.5.mjs';
 
 const CID = 'QmYTvGVY8eVxrzYf7VTgqJJqZiNJF7gAfji6ewxo4qUyeM';
 const folder = mkdtempSync(join(tmpdir(), 'crypt-tor-test-'));
 const sockets = new Set();
 const destinations = [];
 const upstreamRequests = [];
+const labels = [];
 let ca, upstream, socks, proxy, socksPort, proxyPort;
 const track = s => { sockets.add(s); s.on('close', () => sockets.delete(s)); return s; };
 const listen = s => new Promise(r => s.listen(0, '127.0.0.1', () => r(s.address().port)));
@@ -53,11 +54,22 @@ before(async () => {
     let stage = 0, buffer = Buffer.alloc(0);
     const handshake = chunk => {
       buffer = Buffer.concat([buffer, chunk]);
-      if (stage === 0 && buffer.length >= 3) {
-        assert.deepEqual([...buffer.subarray(0, 3)], [5, 1, 0]);
-        buffer = buffer.subarray(3); stage = 1;
+      if (stage === 0 && buffer.length >= 2 && buffer.length >= 2 + buffer[1]) {
+        assert.equal(buffer[0], 5);
+        const methods = [...buffer.subarray(2, 2 + buffer[1])];
+        buffer = buffer.subarray(2 + buffer[1]);
+        // Like Tor: prefer username/password when offered, so the label picks the circuit.
+        stage = methods.includes(2) ? 2 : 1;
+        if (stage === 1) labels.push(null);
         socket.write(Buffer.from([5]));
-        setImmediate(() => socket.write(Buffer.from([0])));
+        setImmediate(() => socket.write(Buffer.from([stage === 2 ? 2 : 0])));
+      }
+      if (stage === 2 && buffer.length >= 2 && buffer.length >= 3 + buffer[1] && buffer.length >= 3 + buffer[1] + buffer[2 + buffer[1]]) {
+        assert.equal(buffer[0], 1);
+        const ulen = buffer[1], plen = buffer[2 + ulen];
+        labels.push(buffer.subarray(2, 2 + ulen).toString());
+        buffer = buffer.subarray(3 + ulen + plen); stage = 1;
+        socket.write(Buffer.from([1, 0]));
       }
       if (stage === 1 && buffer.length >= 5 && buffer.length >= 7 + buffer[4]) {
         assert.equal(buffer[3], 3, 'domain is sent to SOCKS, not resolved locally');
@@ -158,10 +170,42 @@ test('loopback helper blocks other writes and non-history paths, and supports br
   assert.match(preflight.headers.get('access-control-allow-methods'), /POST/);
 });
 
-test('v1.4 reports its media and Respect capabilities', async () => {
+test('v1.5 reports its media, Respect, isolation and rotation capabilities', async () => {
   const j = await (await fetch(`http://127.0.0.1:${proxyPort}/v2/helper`)).json();
-  assert.equal(j.version, '1.4');
-  for (const f of ['atomic', 'ipfs', 'chain', 'respect']) assert.ok(j.features.includes(f), f);
+  assert.equal(j.version, '1.5');
+  for (const f of ['atomic', 'ipfs', 'chain', 'respect', 'isolation', 'rotation']) assert.ok(j.features.includes(f), f);
+});
+
+test('circuit labels: steady history, four media lanes, fresh Respect and broadcast circuits', () => {
+  assert.equal(isolationFor('history'), isolationFor('history'));
+  assert.notEqual(isolationFor('respect'), isolationFor('respect'));
+  assert.notEqual(isolationFor('broadcast'), isolationFor('broadcast'));
+  const lanes = new Set(Array.from({ length: 12 }, () => isolationFor('media')));
+  assert.equal(lanes.size, 4);
+});
+
+test('rotation starts on the next server each time and keeps every server as a fallback', () => {
+  const list = ['a', 'b', 'c'];
+  assert.deepEqual(rotate(list, 0), ['a', 'b', 'c']);
+  assert.deepEqual(rotate(list, 1), ['b', 'c', 'a']);
+  assert.deepEqual(rotate(list, 5), ['c', 'a', 'b']);
+  assert.deepEqual(rotate(['x'], 3), ['x']);
+});
+
+test('each Respect lookup and each broadcast reaches Tor on its own circuit label', async () => {
+  const base = `http://127.0.0.1:${proxyPort}`;
+  const before = labels.length;
+  await fetch(`${base}/v1/chain/get_account`, { method: 'POST', body: '{"account_name":"bob"}' });
+  await fetch(`${base}/v1/chain/get_account`, { method: 'POST', body: '{"account_name":"bob"}' });
+  await fetch(`${base}/v1/chain/send_transaction`, { method: 'POST', body: '{"signatures":[],"packed_trx":"00"}' });
+  await fetch(`${base}/v2/history/get_actions`);
+  await fetch(`${base}/v2/history/get_actions`);
+  const got = labels.slice(before);
+  assert.equal(got.length, 5);
+  assert.ok(got.every(l => typeof l === 'string' && l.length > 0), 'every helper stream carries a label');
+  assert.equal(new Set(got.slice(0, 3)).size, 3, 'two Respect lookups and a broadcast never share a circuit');
+  assert.equal(got[3], got[4], 'history keeps one steady circuit');
+  assert.ok(!got.slice(0, 3).includes(got[3]));
 });
 
 test('Respect lookups travel through SOCKS with their exact bodies', async () => {

@@ -19,7 +19,7 @@ Nothing is hosted or relayed by CHEESEHub, and no one but you holds the keys.
 3. On each bot add a dedicated permission (for example `cheesecrypt`) with a **new key that is not on owner or active**,
    and linkauth it to `cheeseburger::transfer`, `crypt.cheese::sendmsg` and `crypt.cheese::sendfree` only.
 4. `cp swarm-config.example.json swarm-config.json` and fill in accounts and keys (the file is git-ignored; keep it private).
-5. Run the Tor helper (`public/downloads/cheesecrypt-tor-proxy-v1.2.mjs`), then:
+5. Run the Tor helper (`public/downloads/cheesecrypt-tor-proxy-v1.5.mjs`), then:
    ```
    bun install
    bun run run.ts swarm-config.json --dry-run   # builds and signs locally, broadcasts nothing
