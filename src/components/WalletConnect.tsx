@@ -33,6 +33,10 @@ import { useCheeseAmpAutoAdvance } from "@/hooks/useCheeseAmpAutoAdvance";
 import { getAudioPlayer } from "@/lib/musicPlayer";
 import { useCheeseAmpStore } from "@/stores/cheeseAmpStore";
 import { OpenMojiIcon } from '@/components/OpenMojiIcon';
+import { useLocation } from "react-router-dom";
+import { isCryptPath } from "@/context/waxContextState";
+
+const CRYPT_BLOCK_NOTE = "Disabled on Crypt to prevent account metadata leaks";
 
 
 export function WalletConnect() {
@@ -56,6 +60,11 @@ export function WalletConnect() {
   const [bridgeOpen, setBridgeOpen] = useState(false);
   const cheeseAmpMinimized = useCheeseAmpStore((state) => state.isMinimized);
   const setCheeseAmpMinimized = useCheeseAmpStore((state) => state.setMinimized);
+  // Wallet, Swap and Bridge send account-named queries to public servers, so they stay closed on Crypt.
+  const onCrypt = isCryptPath(useLocation().pathname);
+  useEffect(() => {
+    if (onCrypt) { setWalletOpen(false); setSwapOpen(false); setBridgeOpen(false); }
+  }, [onCrypt]);
 
   // Persistent auto-advance hook - works even when CHEESEAmp dialog is minimized
   useCheeseAmpAutoAdvance(accountName);
@@ -63,6 +72,7 @@ export function WalletConnect() {
   // Listen for custom event to open wallet
   useEffect(() => {
     const handleOpenWallet = () => {
+      if (isCryptPath(window.location.pathname)) return;
       if (isConnected) {
         setWalletOpen(true);
       } else {
@@ -94,6 +104,7 @@ export function WalletConnect() {
   // Listen for custom event to open CHEESESwap
   useEffect(() => {
     const handleOpenCheeseSwap = () => {
+      if (isCryptPath(window.location.pathname)) return;
       if (isConnected) {
         setSwapOpen(true);
       } else {
@@ -107,6 +118,7 @@ export function WalletConnect() {
   // Listen for custom event to open ALCORBridge
   useEffect(() => {
     const handleOpenBridge = () => {
+      if (isCryptPath(window.location.pathname)) return;
       if (isConnected) setBridgeOpen(true);
       else setOpen(true);
     };
@@ -194,17 +206,20 @@ export function WalletConnect() {
             <OpenMojiIcon emoji="🎧" size={16} className="mr-2 text-base leading-none" />
             <span><span className="text-cheese">CHEESE</span>Amp</span>
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setWalletOpen(true)} className="cursor-pointer">
+          <DropdownMenuItem disabled={onCrypt} title={onCrypt ? CRYPT_BLOCK_NOTE : undefined} onClick={() => { if (!onCrypt) setWalletOpen(true); }} className={onCrypt ? "flex-wrap" : "cursor-pointer"}>
             <img src={walletIcon} alt="Wallet" className="mr-2 h-4 w-4 object-contain" />
             <span><span className="text-cheese">CHEESE</span>Wallet</span>
+            {onCrypt && <span className="basis-full pl-6 text-[10px] text-muted-foreground">{CRYPT_BLOCK_NOTE}</span>}
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setSwapOpen(true)} className="cursor-pointer">
+          <DropdownMenuItem disabled={onCrypt} title={onCrypt ? CRYPT_BLOCK_NOTE : undefined} onClick={() => { if (!onCrypt) setSwapOpen(true); }} className={onCrypt ? "flex-wrap" : "cursor-pointer"}>
             <OpenMojiIcon emoji="🔄" size={16} className="mr-2 text-base leading-none" />
             <span><span className="text-cheese">CHEESE</span>Swap</span>
+            {onCrypt && <span className="basis-full pl-6 text-[10px] text-muted-foreground">{CRYPT_BLOCK_NOTE}</span>}
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setBridgeOpen(true)} className="cursor-pointer">
+          <DropdownMenuItem disabled={onCrypt} title={onCrypt ? CRYPT_BLOCK_NOTE : undefined} onClick={() => { if (!onCrypt) setBridgeOpen(true); }} className={onCrypt ? "flex-wrap" : "cursor-pointer"}>
             <img src={alcorIconUrl} alt="" aria-hidden="true" className="mr-2 h-4 w-4 shrink-0 object-contain" />
             <span><span className="text-cheese">ALCOR</span>Bridge</span>
+            {onCrypt && <span className="basis-full pl-6 text-[10px] text-muted-foreground">{CRYPT_BLOCK_NOTE}</span>}
           </DropdownMenuItem>
           
           {/* Account Switching Submenu */}

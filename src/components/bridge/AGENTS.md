@@ -2,3 +2,4 @@
 - ALCORBridge embeds Alcor's iframe (not their remote script) with the read-only bridge API; iframe postMessages are accepted only from alcor.exchange and that iframe's window.
 - BridgeChainLogo resolves supported deposit-network icons from bundled official assets; token rows use the shared TokenLogo resolver so missing-token fallbacks remain consistent.
 - Deposit and history panels use scoped global .alcor-panel semantic tokens to match the embed without changing CHEESEHub's theme.
+- WalletConnect keeps CHEESEWallet, CHEESESwap and ALCORBridge disabled (with a note) and ignores their open events on /crypt, because opening them sends account-named queries to public servers.
