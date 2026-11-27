@@ -5,6 +5,8 @@ import { Session, SerializedSession } from '@wharfkit/session';
 import { sessionKit, closeWharfkitModals, setLoginInProgress, getTransactPlugins } from '@/lib/wharfKit';
 import { CHEESE_CONFIG, NFTHIVE_CONFIG } from '@/lib/waxConfig';
 import { chainPost } from '@/lib/chainRequest';
+import { resolveChainReadRoute } from '@/lib/cryptMediaProxy';
+import { helperChainPost } from '@/lib/cryptChainRead';
 import { useToast } from '@/hooks/use-toast';
 import { WaxContext, isCryptPath } from './waxContextState';
 
@@ -75,18 +77,30 @@ export function WaxProvider({ children }: { children: ReactNode }) {
   const accountName = session?.actor?.toString() || null;
   const isConnected = !!session;
 
-  const refreshBalance = useCallback(async () => {
+  const refreshBalance = useCallback(async (opts?: { startup?: boolean }) => {
     if (!session) {
       setCheeseBalance(0);
       return;
     }
 
       try {
-        const balances = await chainPost<string[]>('/v1/chain/get_currency_balance', {
+        const body = {
           code: CHEESE_CONFIG.tokenContract,
           account: session.actor.toString(),
           symbol: CHEESE_CONFIG.tokenSymbol,
-        }, { timeoutMs: 3_500 });
+        };
+        let balances: string[];
+        if (typeof window !== 'undefined' && isCryptPath(window.location.pathname)) {
+          // CHEESECrypt: this account-named read goes only through a saved Tor helper. A helper that is
+          // down skips it (fail closed); with no helper, the startup read is skipped entirely.
+          const route = await resolveChainReadRoute();
+          if (route.kind === 'blocked') return;
+          if (route.kind === 'tor') balances = await helperChainPost<string[]>(route.base, '/v1/chain/get_currency_balance', body);
+          else if (opts?.startup === true) return;
+          else balances = await chainPost<string[]>('/v1/chain/get_currency_balance', body, { timeoutMs: 3_500 });
+        } else {
+          balances = await chainPost<string[]>('/v1/chain/get_currency_balance', body, { timeoutMs: 3_500 });
+        }
         if (balances && balances.length > 0) {
           const balance = parseFloat(balances[0].split(' ')[0]);
           setCheeseBalance(balance);
@@ -131,7 +145,7 @@ export function WaxProvider({ children }: { children: ReactNode }) {
 
   // Initial balance refresh on session change
   useEffect(() => {
-    refreshBalance();
+    refreshBalance({ startup: true });
   }, [session, refreshBalance]);
 
   // Periodic balance refresh every 30 seconds when connected

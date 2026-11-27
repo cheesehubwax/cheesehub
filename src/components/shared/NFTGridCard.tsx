@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { extractIpfsHash, getIpfsUrl, ipfsImageCandidates, isVideoUrl } from "@/lib/ipfsGateways";
 import { queueNftImage } from "@/lib/nftImageQueue";
 import { observeNftVisibility } from "@/lib/nftVisibility";
+import { torMediaUrl } from "@/lib/cryptMediaProxy";
 
 // Session memory of artwork that already loaded, keyed by the NFT's image field.
 // Remounted tiles (virtualized scrolling) show it instantly without re-queuing.
@@ -36,6 +37,8 @@ interface NFTGridCardProps {
   extraBadge?: React.ReactNode;
   extraHoverContent?: React.ReactNode;
   borderClass?: string;
+  /** Loopback Tor helper: artwork loads only from it, never from public gateways. */
+  torBase?: string;
 }
 
 export const NFTGridCard = React.memo(function NFTGridCard({
@@ -46,11 +49,14 @@ export const NFTGridCard = React.memo(function NFTGridCard({
   extraBadge,
   extraHoverContent,
   borderClass,
+  torBase,
 }: NFTGridCardProps) {
+  // Tor-routed artwork never reuses a URL remembered from a public gateway.
+  const cacheKey = torBase ? `tor|${nft.image}` : nft.image;
   const [gatewayIndex, setGatewayIndex] = useState(0);
   const [imgError, setImgError] = useState(false);
-  const [imgLoaded, setImgLoaded] = useState(() => loadedNftImages.has(nft.image));
-  const [cachedUrl, setCachedUrl] = useState<string | undefined>(() => loadedNftImages.get(nft.image));
+  const [imgLoaded, setImgLoaded] = useState(() => loadedNftImages.has(cacheKey));
+  const [cachedUrl, setCachedUrl] = useState<string | undefined>(() => loadedNftImages.get(cacheKey));
   // Video-only NFTs (or images that never load) fall back to a muted raw-gateway preview.
   const [videoMode, setVideoMode] = useState(() => isVideoUrl(nft.image));
   const [retryCount, setRetryCount] = useState(0);
@@ -63,24 +69,26 @@ export const NFTGridCard = React.memo(function NFTGridCard({
     return observeNftVisibility(card, setVisible);
   }, []);
 
-  const hasValidImage = Boolean(nft.image && nft.image !== "/placeholder.svg");
+  const torUrl = useMemo(() => (torBase ? torMediaUrl(torBase, nft.image) : null), [torBase, nft.image]);
+  const hasValidImage = Boolean(nft.image && nft.image !== "/placeholder.svg") && (!torBase || !!torUrl);
   const ipfsHash = useMemo(() => extractIpfsHash(nft.image), [nft.image]);
   const imageCandidates = useMemo(() => {
+    if (torBase) return [torUrl ?? "/placeholder.svg"];
     const hash = ipfsHash;
     return hash ? ipfsImageCandidates(hash) : [nft.image || "/placeholder.svg"];
-  }, [ipfsHash, nft.image]);
+  }, [torBase, torUrl, ipfsHash, nft.image]);
 
   const firstRun = useRef(true);
   useEffect(() => {
     if (firstRun.current) { firstRun.current = false; return; }
-    const cached = loadedNftImages.get(nft.image);
+    const cached = loadedNftImages.get(cacheKey);
     setGatewayIndex(0);
     setImgError(false);
     setImgLoaded(Boolean(cached));
     setCachedUrl(cached);
     setVideoMode(isVideoUrl(nft.image));
     setRetryCount(0);
-  }, [nft.asset_id, nft.image]);
+  }, [nft.asset_id, nft.image, cacheKey]);
 
   const currentImageUrl = useMemo(() => {
     if (!nft.image || nft.image === "/placeholder.svg") return "/placeholder.svg";
@@ -92,7 +100,7 @@ export const NFTGridCard = React.memo(function NFTGridCard({
 
   const handleImageError = useCallback(() => {
     if (cachedUrl) {
-      loadedNftImages.delete(nft.image);
+      loadedNftImages.delete(cacheKey);
       setCachedUrl(undefined);
       setImgLoaded(false);
       return;
@@ -105,12 +113,12 @@ export const NFTGridCard = React.memo(function NFTGridCard({
     } else {
       setImgError(true);
     }
-  }, [cachedUrl, nft.image, imageCandidates.length, gatewayIndex, ipfsHash, videoMode]);
+  }, [cachedUrl, cacheKey, imageCandidates.length, gatewayIndex, ipfsHash, videoMode]);
 
   const markLoaded = useCallback(() => {
-    rememberLoaded(nft.image, currentImageUrl);
+    rememberLoaded(cacheKey, currentImageUrl);
     setImgLoaded(true);
-  }, [nft.image, currentImageUrl]);
+  }, [cacheKey, currentImageUrl]);
 
   // The deadline starts only once a pool slot is granted, not while waiting
   // behind other tiles. Off-screen/unmounted requests release their slot.
@@ -121,9 +129,10 @@ export const NFTGridCard = React.memo(function NFTGridCard({
 
   const videoUrl = useMemo(() => {
     if (!videoMode) return "";
+    if (torBase) return torUrl ?? "";
     if (ipfsHash) return getIpfsUrl(ipfsHash);
     return nft.image;
-  }, [videoMode, ipfsHash, nft.image]);
+  }, [videoMode, torBase, torUrl, ipfsHash, nft.image]);
 
   const handleRetry = (e: React.MouseEvent) => {
     e.stopPropagation();

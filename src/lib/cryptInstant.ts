@@ -9,7 +9,7 @@
  */
 import { PrivateKey, PublicKey, Session, type ChainDefinition } from '@wharfkit/session';
 import { WalletPluginPrivateKey } from '@wharfkit/wallet-plugin-privatekey';
-import { chainPost } from './chainRequest';
+import { cryptChainPost } from './cryptChainRead';
 import { CRYPT_ROUTER_ACCOUNT } from './cheeseCrypt';
 import { CHEESE_RAM_CONTRACT, CHEESE_TOKEN_CONTRACT, estimateCheeseForTargetBytes, resolveQuoteRate, type CheeseRamConfig } from './cheeseRam';
 import { WAX_CHAIN_ID } from './wharfKit';
@@ -106,7 +106,7 @@ export function parseInstantStatus(acct: unknown): InstantStatus {
 }
 
 export async function fetchInstantStatus(account: string): Promise<InstantStatus> {
-  return parseInstantStatus(await chainPost('/v1/chain/get_account', { account_name: account }));
+  return parseInstantStatus(await cryptChainPost('/v1/chain/get_account', { account_name: account }));
 }
 
 /**

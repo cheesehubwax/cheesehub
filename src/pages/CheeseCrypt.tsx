@@ -27,7 +27,7 @@ import { encodeReply, parseReply, quoteOf, type ReplyRef } from '@/lib/cryptRepl
 import { useCryptReplyNavigation } from '@/hooks/useCryptReplyNavigation';
 import { useCryptReactionNavigation } from '@/hooks/useCryptReactionNavigation';
 import { buildTipTransfer, encodeTip, isTipCommand, parseTipCommand, type Tip } from '@/lib/cryptTips';
-import { fetchSingleTokenBalance } from '@/lib/waxRpcFallback';
+import { cryptTokenBalance } from '@/lib/cryptChainRead';
 import { activeReactions, encodeReaction, isReaction, reactionPills, targetRef, type ReactionEmoji } from '@/lib/cryptReactions';
 import { useCryptJoinAlerts } from '@/hooks/useCryptJoinAlerts';
 import { AvatarEditor, WalletAvatarPicker } from '@/components/crypt/AvatarEditor';
@@ -1502,7 +1502,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
       if (!confirmedTip) {
         const tip = { recipient: replyingTo.author, amount: tipCommand.amount, note: tipCommand.note };
         setPendingTip({ tip, balance: null });
-        void fetchSingleTokenBalance(account, 'cheeseburger', 'CHEESE').then(b => setPendingTip(p => p && p.tip === tip ? { ...p, balance: b } : p));
+        void cryptTokenBalance(account, 'cheeseburger', 'CHEESE').then(b => setPendingTip(p => p && p.tip === tip ? { ...p, balance: b } : p));
         return;
       }
     }

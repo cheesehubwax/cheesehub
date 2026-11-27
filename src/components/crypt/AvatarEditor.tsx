@@ -11,6 +11,9 @@ import { useSquareGridRowHeight } from '@/hooks/useSquareGridRowHeight';
 import { useDebounce } from '@/hooks/useDebounce';
 import { accountAvatar, CryptAvatar, quantizeAvatar } from '@/lib/cryptAvatar';
 import { extractIpfsHash, ipfsImageCandidates } from '@/lib/ipfsGateways';
+import { useQuery } from '@tanstack/react-query';
+import { MediaRoute, resolveMediaRoute, resolvePrepRoute, torMediaUrl } from '@/lib/cryptMediaProxy';
+import { fetchTorWalletNfts } from '@/lib/cryptWalletNfts';
 import { PixelAvatar } from './PixelAvatar';
 import { cn } from '@/lib/utils';
 import { MAX_CRYPT_BIO_LENGTH, MAX_CRYPT_NAME_LENGTH, parseCryptBio, parseCryptName } from '@/lib/cryptNames';
@@ -37,13 +40,18 @@ async function pixelsFromBlob(blob: Blob): Promise<CryptAvatar> {
 }
 
 async function nftPixels(image: string): Promise<CryptAvatar> {
+  // With a saved Tor helper the picture comes only from it (or not at all while it is down).
+  const media = await resolveMediaRoute();
+  if (media.kind === 'blocked') throw new Error('🧅 Your Tor helper isn\'t reachable, so this NFT picture was not loaded.');
   const hash = extractIpfsHash(image);
-  const urls = hash ? ipfsImageCandidates(hash) : [image];
+  const tor = media.kind === 'tor' ? torMediaUrl(media.base, image) : null;
+  if (media.kind === 'tor' && !tor) throw new Error('Could not import this NFT image. Try another NFT or upload its image.');
+  const urls = tor ? [tor] : hash ? ipfsImageCandidates(hash) : [image];
   const controllers = urls.map(() => new AbortController());
   const timers = controllers.map(ctl => setTimeout(() => ctl.abort(), 10000));
   try {
     const attempts = urls.map(async (url, i) => {
-      if (!url.startsWith('/') && !url.startsWith('https://')) throw new Error('Unsupported image URL');
+      if (!url.startsWith('/') && !url.startsWith('https://') && url !== tor) throw new Error('Unsupported image URL');
       const response = await fetch(url, { signal: controllers[i].signal });
       if (!response.ok) throw new Error('Image unavailable');
       const blob = await response.blob();
@@ -59,7 +67,27 @@ async function nftPixels(image: string): Promise<CryptAvatar> {
 }
 
 export function WalletAvatarPicker({ account, busy, onPick, fillHeight = false }: { account: string; busy: boolean; onPick: (nft: UserNFT) => void; fillHeight?: boolean }) {
-  const { nfts, isLoading, error, refetch, collections } = useUserNFTs(account);
+  // Which path the wallet NFT list may take: a v1.6+ Tor helper, public (no or older helper) or blocked.
+  const [listRoute, setListRoute] = useState<MediaRoute | null>(null);
+  const [mediaRoute, setMediaRoute] = useState<MediaRoute | null>(null);
+  useEffect(() => {
+    let live = true;
+    void Promise.all([resolvePrepRoute(), resolveMediaRoute()]).then(([l, m]) => { if (live) { setListRoute(l); setMediaRoute(m); } });
+    return () => { live = false; };
+  }, []);
+  const publicList = listRoute?.kind === 'public' || listRoute?.kind === 'legacy';
+  const pub = useUserNFTs(publicList ? account : null);
+  const torBase = listRoute?.kind === 'tor' ? listRoute.base : undefined;
+  const tor = useQuery({ queryKey: ['crypt-tor-wallet-nfts', torBase, account], enabled: !!torBase, queryFn: () => fetchTorWalletNfts(torBase!, account), staleTime: 5 * 60_000, retry: false });
+  const blocked = listRoute?.kind === 'blocked';
+  const nfts = torBase ? tor.data ?? [] : pub.nfts;
+  const isLoading = !listRoute || (torBase ? tor.isLoading : pub.isLoading);
+  const error = torBase ? (tor.error ? 'failed' : '') : pub.error;
+  const refetch = torBase ? () => void tor.refetch() : pub.refetch;
+  const collections = useMemo(() => torBase ? [...new Set(nfts.map(n => n.collection))].sort().map(name => ({ name })) : pub.collections, [torBase, nfts, pub.collections]);
+  // Artwork: helper only when the media route is Tor; hidden while the helper is down.
+  const imageBase = mediaRoute?.kind === 'tor' ? mediaRoute.base : undefined;
+  const mediaBlocked = mediaRoute?.kind === 'blocked';
   const [search, setSearch] = useState('');
   const [collection, setCollection] = useState('');
   const [schema, setSchema] = useState('');
@@ -98,15 +126,17 @@ export function WalletAvatarPicker({ account, busy, onPick, fillHeight = false }
         <option value="">All schemas</option>{schemas.map(s => <option key={s} value={s}>{s}</option>)}
       </select>
     </div>
-    {isLoading && <p className="text-xs text-muted-foreground">Loading wallet NFTs…</p>}
+    {blocked && <p className="text-sm text-muted-foreground">🧅 Wallet NFTs hidden: your Tor helper isn't reachable. Start it (and Tor), then reopen this window.</p>}
+    {!blocked && listRoute?.kind === 'legacy' && <p className="text-xs text-muted-foreground">Your Tor helper is older than v1.6, so this NFT list comes from public servers. Update it in Menu → Privacy.</p>}
+    {!blocked && isLoading && <p className="text-xs text-muted-foreground">Loading wallet NFTs…</p>}
     {error && <div className="text-sm text-destructive">NFTs could not be loaded. <Button size="sm" variant="outline" onClick={() => refetch()}>Retry</Button></div>}
     <div ref={scrollRef} aria-label="Wallet NFTs" className={cn('overflow-y-auto overscroll-contain [scrollbar-gutter:stable]', fillHeight ? 'min-h-0 flex-1' : 'h-[560px] max-h-[40dvh]')}>
       <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
         {virtualizer.getVirtualItems().map(row => <div key={row.key} className={cn('absolute top-0 left-0 w-full grid gap-2 pb-2', columns === 6 ? 'grid-cols-6' : 'grid-cols-3')} style={{ transform: `translateY(${row.start}px)` }}>
-          {filtered.slice(row.index * columns, (row.index + 1) * columns).map(nft => <NFTGridCard key={nft.asset_id} nft={nft} isSelected={false} disabled={busy || nft.image === '/placeholder.svg'} onToggle={() => onPick(nft)} />)}
+          {filtered.slice(row.index * columns, (row.index + 1) * columns).map(nft => <NFTGridCard key={nft.asset_id} nft={mediaBlocked ? { ...nft, image: '/placeholder.svg' } : nft} torBase={imageBase} isSelected={false} disabled={busy || nft.image === '/placeholder.svg'} onToggle={() => onPick(nft)} />)}
         </div>)}
       </div>
-      {!isLoading && !filtered.length && <p className="text-sm text-muted-foreground py-6 text-center">No NFTs found.</p>}
+      {!blocked && !isLoading && !filtered.length && <p className="text-sm text-muted-foreground py-6 text-center">No NFTs found.</p>}
     </div>
   </div>;
 }

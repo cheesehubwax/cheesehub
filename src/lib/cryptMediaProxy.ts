@@ -13,8 +13,11 @@ export type MediaRoute =
   | { kind: 'legacy'; base: string }   // helper answers but predates media routing: public, as before v1.3
   | { kind: 'blocked'; base: string }; // helper configured but unreachable: fail closed
 
-/** 'full' = v1.4+ (media plus Respect lookups), 'media' = v1.3, 'legacy' = older helper. */
-export type ProbeResult = 'full' | 'media' | 'legacy' | 'down';
+/**
+ * 'prep' = v1.6+ (adds wallet transaction-prep reads and the wallet NFT list),
+ * 'full' = v1.4+ (media plus Respect/account chain reads), 'media' = v1.3, 'legacy' = older helper.
+ */
+export type ProbeResult = 'prep' | 'full' | 'media' | 'legacy' | 'down';
 
 const LOOPBACK = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(?=[:/]|$)/;
 export const isLoopbackHelper = (url: string | null): url is string => !!url && LOOPBACK.test(url);
@@ -22,7 +25,7 @@ export const isLoopbackHelper = (url: string | null): url is string => !!url && 
 /** Pure routing rule: which path chat NFT media may take for a saved server and probe outcome. */
 export function decideMediaRoute(custom: string | null, probe: ProbeResult | null): MediaRoute {
   if (!isLoopbackHelper(custom)) return { kind: 'public' };
-  if (probe === 'full' || probe === 'media') return { kind: 'tor', base: custom };
+  if (probe === 'prep' || probe === 'full' || probe === 'media') return { kind: 'tor', base: custom };
   if (probe === 'legacy') return { kind: 'legacy', base: custom };
   return { kind: 'blocked', base: custom }; // unknown or down never leaks
 }
@@ -66,7 +69,8 @@ export async function probeHelper(base: string, fetcher: typeof fetch = fetch): 
       const j = await r.json().catch(() => null);
       const f: unknown[] = Array.isArray(j?.features) ? j.features : [];
       if (!f.includes('ipfs') || !f.includes('atomic')) return 'legacy';
-      return f.includes('chain') && f.includes('respect') ? 'full' : 'media';
+      if (!f.includes('chain') || !f.includes('respect')) return 'media';
+      return f.includes('prep') && f.includes('atomic-list') ? 'prep' : 'full';
     }
     return r.status === 403 || r.status === 404 ? 'legacy' : 'down';
   } catch { return 'down'; } finally { clearTimeout(t); }
@@ -85,8 +89,22 @@ export function currentMediaRoute(): MediaRoute {
  */
 export function decideRespectRoute(custom: string | null, probe: ProbeResult | null): MediaRoute {
   if (!isLoopbackHelper(custom)) return { kind: 'public' };
-  if (probe === 'full') return { kind: 'tor', base: custom };
+  if (probe === 'prep' || probe === 'full') return { kind: 'tor', base: custom };
   if (probe === 'media' || probe === 'legacy') return { kind: 'legacy', base: custom };
+  return { kind: 'blocked', base: custom };
+}
+
+/** Account-named chain reads (balance, Instant status, tables) need v1.4+, like Respect. */
+export const decideChainReadRoute = decideRespectRoute;
+
+/**
+ * Wallet transaction-prep reads and the wallet NFT list need v1.6+. An older helper keeps the
+ * public path (as before v1.6); a saved helper that is unreachable fails closed.
+ */
+export function decidePrepRoute(custom: string | null, probe: ProbeResult | null): MediaRoute {
+  if (!isLoopbackHelper(custom)) return { kind: 'public' };
+  if (probe === 'prep') return { kind: 'tor', base: custom };
+  if (probe === 'full' || probe === 'media' || probe === 'legacy') return { kind: 'legacy', base: custom };
   return { kind: 'blocked', base: custom };
 }
 
@@ -113,6 +131,18 @@ export async function resolveRespectRoute(fetcher: typeof fetch = fetch): Promis
   const custom = loadCustomEndpoint();
   if (!isLoopbackHelper(custom)) return { kind: 'public' };
   return decideRespectRoute(custom, await ensureProbe(custom, fetcher));
+}
+
+export async function resolveChainReadRoute(fetcher: typeof fetch = fetch): Promise<MediaRoute> {
+  const custom = loadCustomEndpoint();
+  if (!isLoopbackHelper(custom)) return { kind: 'public' };
+  return decideChainReadRoute(custom, await ensureProbe(custom, fetcher));
+}
+
+export async function resolvePrepRoute(fetcher: typeof fetch = fetch): Promise<MediaRoute> {
+  const custom = loadCustomEndpoint();
+  if (!isLoopbackHelper(custom)) return { kind: 'public' };
+  return decidePrepRoute(custom, await ensureProbe(custom, fetcher));
 }
 
 export class MediaBlockedError extends Error {

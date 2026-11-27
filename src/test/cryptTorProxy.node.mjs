@@ -6,7 +6,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { createProxyServer, fetchViaTor, isolationFor, rotate, TIMEOUT_MS } from '../../public/downloads/cheesecrypt-tor-proxy-v1.5.mjs';
+import { createProxyServer, fetchViaTor, isolationFor, rotate, TIMEOUT_MS } from '../../public/downloads/cheesecrypt-tor-proxy-v1.6.mjs';
 
 const CID = 'QmYTvGVY8eVxrzYf7VTgqJJqZiNJF7gAfji6ewxo4qUyeM';
 const folder = mkdtempSync(join(tmpdir(), 'crypt-tor-test-'));
@@ -158,7 +158,8 @@ test('loopback helper blocks other writes and non-history paths, and supports br
     ['/v1/chain/push_transaction', 'GET'],
     ['/v1/chain/get_info', 'GET'],
     ['/v1/chain/get_table_rows', 'GET'],
-    ['/v1/chain/get_info', 'POST'],
+    ['/v1/chain/get_producer_schedule', 'POST'],
+    ['/atomic/v1/assets?owner=bob&page=1&limit=100', 'GET'],
     ['/v1/chain/push_action', 'POST'],
     ['//other.example/v2/history/get_actions', 'GET'],
   ]) {
@@ -170,10 +171,10 @@ test('loopback helper blocks other writes and non-history paths, and supports br
   assert.match(preflight.headers.get('access-control-allow-methods'), /POST/);
 });
 
-test('v1.5 reports its media, Respect, isolation and rotation capabilities', async () => {
+test('v1.6 reports its media, Respect, isolation, rotation, prep and NFT list capabilities', async () => {
   const j = await (await fetch(`http://127.0.0.1:${proxyPort}/v2/helper`)).json();
-  assert.equal(j.version, '1.5');
-  for (const f of ['atomic', 'ipfs', 'chain', 'respect', 'isolation', 'rotation']) assert.ok(j.features.includes(f), f);
+  assert.equal(j.version, '1.6');
+  for (const f of ['atomic', 'ipfs', 'chain', 'respect', 'isolation', 'rotation', 'prep', 'atomic-list']) assert.ok(j.features.includes(f), f);
 });
 
 test('circuit labels: steady history, four media lanes, fresh Respect and broadcast circuits', () => {

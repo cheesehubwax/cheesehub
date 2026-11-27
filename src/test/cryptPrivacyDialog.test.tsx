@@ -70,8 +70,8 @@ describe('privacy checkbox persistence', () => {
   it('links the helper download to the versioned file', () => {
     render(<CryptPrivacyDialog {...props} open />);
     const link = screen.getByRole('link', { name: 'Download the helper' });
-    expect(link.getAttribute('download')).toBe('cheesecrypt-tor-proxy-v1.5.mjs');
-    expect(link.getAttribute('href')).toContain('downloads/cheesecrypt-tor-proxy-v1.5.mjs');
-    expect(screen.getByText('node cheesecrypt-tor-proxy-v1.5.mjs', { exact: false })).toBeInTheDocument();
+    expect(link.getAttribute('download')).toBe('cheesecrypt-tor-proxy-v1.6.mjs');
+    expect(link.getAttribute('href')).toContain('downloads/cheesecrypt-tor-proxy-v1.6.mjs');
+    expect(screen.getByText('node cheesecrypt-tor-proxy-v1.6.mjs', { exact: false })).toBeInTheDocument();
   });
 });

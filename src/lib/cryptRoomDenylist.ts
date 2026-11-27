@@ -1,6 +1,6 @@
 import type { RoomListing } from '@/lib/cryptRooms';
 import { HISTORY_PAGE, hyperionTransfers, KEY_PUBLISH_TO, type ChainMemo } from '@/lib/cheeseCrypt';
-import { fetchBannadAdmins } from '@/lib/adminData';
+import { cryptChainPost } from '@/lib/cryptChainRead';
 
 /**
  * Platform suppression of the public room directory, published on chain by CHEESEHub admins from /admin:
@@ -58,9 +58,15 @@ export function filterVisibleListings<T extends Pick<RoomListing, 'creator' | 'i
   return hides.length ? listings.filter(l => !isSuppressed(l, hides)) : listings;
 }
 
+/** cheesebannad admins via the routed read: the Tor helper when one is saved, failing closed while it is down. */
+async function readAdmins(): Promise<string[]> {
+  const r = await cryptChainPost<{ rows?: { account?: string }[] }>('/v1/chain/get_table_rows', { code: PLATFORM_ACCOUNT, scope: PLATFORM_ACCOUNT, table: 'admins', json: true, limit: 100 });
+  return (r.rows ?? []).map(a => String(a?.account ?? '')).filter(a => ACCOUNT.test(a));
+}
+
 /** Full read of every admin's eosio.null CHEESE history (admin accounts are small, so hides never age out). */
 export async function fetchRoomHides(): Promise<HideRecord[]> {
-  const admins = (await fetchBannadAdmins()).map(a => a.account).filter(a => ACCOUNT.test(a));
+  const admins = await readAdmins();
   const senders = [...new Set([...admins, PLATFORM_ACCOUNT])];
   const per = await Promise.all(senders.map(async account => {
     let rows: ChainMemo[] = [];
@@ -103,7 +109,7 @@ export function filterCuratedListings<T extends Pick<RoomListing, 'creator'>>(li
   return listings.filter(l => curators.has(l.creator));
 }
 export async function fetchRoomCurators(): Promise<string[]> {
-  const admins = (await fetchBannadAdmins()).map(a => a.account).filter(a => ACCOUNT.test(a));
+  const admins = await readAdmins();
   try { localStorage.setItem(CURATORS_CACHE_KEY, JSON.stringify(admins)); } catch { /* storage blocked */ }
   return admins;
 }

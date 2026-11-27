@@ -1,8 +1,12 @@
 import { BENCH_MS, STATIC_ENDPOINTS, benchEndpoint, clearBench, resolveEndpoints } from './endpointHealth';
 import { cryptTorBroadcastEndpoint } from './cryptNetworkPrivacy';
+import { resolvePrepRoute, type MediaRoute } from './cryptMediaProxy';
+import { isCryptPath } from '@/context/waxContextState';
 
 export const WALLET_RPC_READ_TIMEOUT_MS = 3_500;
 export const WALLET_RPC_WRITE_TIMEOUT_MS = 15_000;
+/** Tor adds latency, and the helper already tries several servers per read. */
+export const WALLET_RPC_HELPER_READ_TIMEOUT_MS = 30_000;
 const MAX_READ_ATTEMPTS = 4;
 const READ_PATHS = new Set([
   'get_info', 'get_block', 'get_block_info', 'get_block_header_state',
@@ -12,7 +16,18 @@ const READ_PATHS = new Set([
 ].map((name) => `/v1/chain/${name}`));
 
 /** Transport-only fallback: never restart transact, re-sign, or retry a broadcast. */
-export function createWalletRpcFetch(nativeFetch: typeof fetch = (input, init) => globalThis.fetch(input, init)): typeof fetch {
+export interface WalletRpcPrivacy {
+  /** True while CHEESECrypt is open. */
+  onCrypt: () => boolean;
+  /** Where wallet transaction-prep reads may go (v1.6+ Tor helper, public, or blocked). */
+  prepRoute: () => Promise<MediaRoute>;
+}
+const DEFAULT_PRIVACY: WalletRpcPrivacy = {
+  onCrypt: () => typeof window !== 'undefined' && isCryptPath(window.location.pathname),
+  prepRoute: () => resolvePrepRoute(),
+};
+
+export function createWalletRpcFetch(nativeFetch: typeof fetch = (input, init) => globalThis.fetch(input, init), privacy: WalletRpcPrivacy = DEFAULT_PRIVACY): typeof fetch {
   const origins = new Set(STATIC_ENDPOINTS['chain-api'].map((host) => new URL(host).origin));
   return async (input, init) => {
     // WharfKit FetchProvider uses URL strings. Other services (including Fuel)
@@ -22,6 +37,28 @@ export function createWalletRpcFetch(nativeFetch: typeof fetch = (input, init) =
     if (!origins.has(url.origin) || !url.pathname.startsWith('/v1/chain/')) return nativeFetch(input, init);
 
     const readOnly = READ_PATHS.has(url.pathname);
+    // CHEESECrypt: transaction-prep reads go only through a saved v1.6+ Tor helper (which rotates its
+    // own servers) and fail closed while that helper is unreachable. Older helpers keep the public path.
+    if (readOnly && privacy.onCrypt()) {
+      const route = await privacy.prepRoute();
+      if (route.kind === 'blocked') throw new Error('Your Tor helper is not reachable, so CHEESECrypt did not prepare this transaction on a public server. Start the helper (and Tor), then try again.');
+      if (route.kind === 'tor') {
+        const controller = new AbortController();
+        const abort = () => controller.abort(init?.signal?.reason);
+        init?.signal?.addEventListener('abort', abort, { once: true });
+        const timer = setTimeout(() => controller.abort(), WALLET_RPC_HELPER_READ_TIMEOUT_MS);
+        try {
+          const headers = new Headers(init?.headers);
+          if (init?.body != null) headers.set('Content-Type', 'text/plain;charset=UTF-8');
+          const response = await nativeFetch(`${route.base}${url.pathname}`, { ...init, method: 'POST', body: init?.body ?? '{}', headers, signal: controller.signal });
+          const text = await response.text();
+          return new Response(response.status === 204 ? null : text, { status: response.status, statusText: response.statusText, headers: response.headers });
+        } finally {
+          clearTimeout(timer);
+          init?.signal?.removeEventListener('abort', abort);
+        }
+      }
+    }
     const torBroadcast = !readOnly ? cryptTorBroadcastEndpoint() : null;
     // Do not even perform direct endpoint-health discovery for an exclusive Tor
     // broadcast. Unknown write paths also go here, where the helper rejects them.
