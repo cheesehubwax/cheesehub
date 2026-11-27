@@ -27,6 +27,13 @@ Nothing is hosted or relayed by CHEESEHub, and no one but you holds the keys.
    ```
    The computer must be on; the screen may be off.
 
+## Auto-powerup (backup for staked CPU)
+- Before each send the runner reads every bot's available CPU. Below 2,000 µs a bot sends **0.0100 CHEESE** to
+  `cheesepowerz` (CHEESEUp) with its own name as the memo. Below 500 µs it may be unable to sign, so the bot with the
+  most CPU pays for it instead (memo = the stuck bot).
+- At most one powerup per bot every 6 hours (kept across restarts); unknown CPU never buys; the reserve still applies.
+- Uses the existing `cheeseburger::transfer` link, so no new permission is needed. Staked CPU stays the main source.
+
 ## Built-in safety
 - Refuses to start if the key is also on `owner`/`active`, the permission is missing, or its links exceed the two above.
 - Never sends if it would drop a bot below `reserve`, or past `maxSendsPerBotPerDay` (UTC day, kept across restarts).

@@ -169,18 +169,57 @@ export function burstAllowed(starts: number[], now: number, maxPerHour: number):
 
 /** Linked actions the dedicated permission must have, and nothing broader. */
 export const REQUIRED_LINKS = [`${TOKEN}::transfer`, `${ROUTER}::sendmsg`, `${ROUTER}::sendfree`];
-export function checkPermission(account: { permissions?: { perm_name: string; required_auth: { keys: { key: string }[] }; linked_actions?: { account: string; action?: string }[] }[] }, permission: string, publicKeys: string[]): string | null {
+type ChainAccount = { permissions?: { perm_name: unknown; required_auth?: { keys?: { key: unknown }[] }; linked_actions?: { account: unknown; action?: unknown }[] }[] };
+/**
+ * Chain libraries return names and keys as objects, so everything is compared as strings;
+ * keys match in either PUB_K1_ or legacy EOS form.
+ */
+export function checkPermission(account: ChainAccount, permission: string, publicKeys: string[]): string | null {
   const perms = account?.permissions ?? [];
-  const p = perms.find(x => x.perm_name === permission);
+  const p = perms.find(x => String(x.perm_name) === permission);
   if (!p) return `permission ${permission} not found`;
-  const keyMatch = (x: { required_auth: { keys: { key: string }[] } }) => x.required_auth.keys.some(k => publicKeys.includes(k.key));
+  const wanted = publicKeys.map(String);
+  const forms = (k: unknown) => { const o = k as { toLegacyString?: () => string }; return [String(k), typeof o?.toLegacyString === 'function' ? o.toLegacyString() : '']; };
+  const keyMatch = (x: { required_auth?: { keys?: { key: unknown }[] } }) => (x.required_auth?.keys ?? []).some(k => forms(k.key).some(f => f && wanted.includes(f)));
   if (!keyMatch(p)) return `configured key is not on ${permission}`;
-  for (const high of perms.filter(x => x.perm_name === 'owner' || x.perm_name === 'active')) if (keyMatch(high)) return `configured key is also on ${high.perm_name} — refuse (too much authority)`;
+  for (const high of perms.filter(x => ['owner', 'active'].includes(String(x.perm_name)))) if (keyMatch(high)) return `configured key is also on ${String(high.perm_name)} — refuse (too much authority)`;
   if (p.linked_actions) {
-    const links = p.linked_actions.map(l => `${l.account}::${l.action ?? '*'}`);
+    const links = p.linked_actions.map(l => `${String(l.account)}::${l.action == null ? '*' : String(l.action)}`);
     if (links.some(l => !REQUIRED_LINKS.includes(l))) return `${permission} is linked to more than ${REQUIRED_LINKS.join(', ')}`;
     const missing = REQUIRED_LINKS.filter(l => !links.includes(l));
     if (missing.length) return `${permission} is missing linkauth for ${missing.join(', ')}`;
   }
   return null;
+}
+
+// ---- Auto-powerup via CHEESEUp (cheesepowerz): a plain CHEESE transfer, already covered by the transfer link ----
+export const POWERZ = 'cheesepowerz';
+/** 0.0100 CHEESE per powerup lot, in integer units. */
+export const POWERUP_UNITS = 100;
+/** Below this many microseconds of available CPU a bot tops itself up. */
+export const CPU_LOW_US = 2000;
+/** Below this a bot may be unable to sign at all, so another bot pays for it. */
+export const CPU_STUCK_US = 500;
+/** At most one powerup per target in this window, so a slow read never causes repeat buys. */
+export const POWERUP_COOLDOWN_MS = 6 * 3_600_000;
+
+/** cheesepowerz reads the memo as the receiving account (default CPU split). */
+export function buildPowerup(payer: string, permission: string, target: string) {
+  return [{ account: TOKEN, name: 'transfer', authorization: [{ actor: payer, permission }],
+    data: { from: payer, to: POWERZ, quantity: cheese(POWERUP_UNITS), memo: target } }];
+}
+
+/**
+ * Who pays to power up `target`, or null. Unknown CPU never triggers a buy. A bot that is low pays for
+ * itself; one that is stuck is rescued by the bot with the most CPU that is itself not low.
+ */
+export function planPowerup(target: string, cpu: Record<string, number | null>, lastPowerupMs: number | undefined, nowMs: number): { payer: string; target: string } | null {
+  const mine = cpu[target];
+  if (mine == null || !Number.isFinite(mine) || mine >= CPU_LOW_US) return null;
+  if (lastPowerupMs !== undefined && nowMs - lastPowerupMs < POWERUP_COOLDOWN_MS) return null;
+  if (mine >= CPU_STUCK_US) return { payer: target, target };
+  const buddy = Object.entries(cpu)
+    .filter(([a, v]) => a !== target && v != null && Number.isFinite(v) && v >= CPU_LOW_US)
+    .sort((a, b) => (b[1] as number) - (a[1] as number))[0];
+  return buddy ? { payer: buddy[0], target } : null;
 }

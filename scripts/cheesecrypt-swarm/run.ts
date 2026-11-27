@@ -10,7 +10,7 @@ import { randomBytes, randomInt } from 'node:crypto';
 import { APIClient, FetchProvider, PrivateKey, Transaction, Action, ABI, Serializer } from '@wharfkit/antelope';
 import {
   ROUTER, TOKEN, validateConfig, buildSend, dummyMemo, poissonDelayMs, pickRecipient, planBurst, isOrganic,
-  refuseSend, burstAllowed, parseBudget, sponsorRemaining, SPONSOR_PART_UNITS, SEND_COST_UNITS, utcDay, cheeseUnits, checkPermission, type Config, type Bot,
+  refuseSend, burstAllowed, buildPowerup, planPowerup, POWERUP_UNITS, parseBudget, sponsorRemaining, SPONSOR_PART_UNITS, SEND_COST_UNITS, utcDay, cheeseUnits, checkPermission, type Config, type Bot,
 } from './policy';
 
 const WAX_CHAIN_ID = '1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4';
@@ -33,11 +33,11 @@ const botNames = [...bots.keys()];
 const botSet = new Set(botNames);
 
 // ---- Counts only (never keys) so a restart cannot reset daily caps ----
-interface State { day: string; sent: Record<string, number>; bursts: number[] }
-let state: State = { day: utcDay(Date.now()), sent: {}, bursts: [] };
-try { const s = JSON.parse(readFileSync(STATE_PATH, 'utf8')); if (s?.day) state = { day: s.day, sent: s.sent ?? {}, bursts: s.bursts ?? [] }; } catch { /* fresh */ }
+interface State { day: string; sent: Record<string, number>; bursts: number[]; powerups: Record<string, number> }
+let state: State = { day: utcDay(Date.now()), sent: {}, bursts: [], powerups: {} };
+try { const s = JSON.parse(readFileSync(STATE_PATH, 'utf8')); if (s?.day) state = { day: s.day, sent: s.sent ?? {}, bursts: s.bursts ?? [], powerups: s.powerups ?? {} }; } catch { /* fresh */ }
 const saveState = () => { try { writeFileSync(STATE_PATH, JSON.stringify(state)); } catch { /* non-fatal */ } };
-const rollDay = () => { const d = utcDay(Date.now()); if (d !== state.day) state = { day: d, sent: {}, bursts: state.bursts }; };
+const rollDay = () => { const d = utcDay(Date.now()); if (d !== state.day) state = { day: d, sent: {}, bursts: state.bursts, powerups: state.powerups }; };
 
 // ---- Chain access (reads direct: public chain metadata; signed broadcast follows the config) ----
 async function withEndpoint<T>(fn: (c: APIClient, url: string) => Promise<T>): Promise<T> {
@@ -70,7 +70,9 @@ async function freeAvailable(): Promise<boolean> {
 /** One attempt, never retried: an ambiguous result could mean the transaction still lands. */
 async function broadcast(bot: Bot & { key: PrivateKey }, to: string, free: boolean): Promise<string> {
   const memo = dummyMemo(n => new Uint8Array(randomBytes(n)));
-  const actionsJson = buildSend(bot.account, bot.permission, to, memo, free);
+  return broadcastActions(bot, buildSend(bot.account, bot.permission, to, memo, free), `${bot.account} → ${to}: ${free ? 'sendfree' : 'paid sendmsg'}`);
+}
+async function broadcastActions(bot: Bot & { key: PrivateKey }, actionsJson: { account: string }[], label: string): Promise<string> {
   return withEndpoint(async (client, url) => {
     const info = await client.v1.chain.get_info();
     if (String(info.chain_id) !== WAX_CHAIN_ID) throw new Error('endpoint is not WAX mainnet');
@@ -78,7 +80,7 @@ async function broadcast(bot: Bot & { key: PrivateKey }, to: string, free: boole
     const tx = Transaction.from({ ...info.getTransactionHeader(120), actions });
     const signature = bot.key.signDigest(tx.signingDigest(info.chain_id));
     const id = String(tx.id);
-    if (dryRun) { log(`DRY RUN ${bot.account} → ${to}: ${free ? 'sendfree' : 'paid sendmsg'} built and signed locally (${id.slice(0, 12)}…), not broadcast`); return id; }
+    if (dryRun) { log(`DRY RUN ${label}: built and signed locally (${id.slice(0, 12)}…), not broadcast`); return id; }
     const body = JSON.stringify({ signatures: [String(signature)], compression: 0, packed_context_free_data: '', packed_trx: Serializer.encode({ object: tx }).hexString });
     const target = config.broadcast === 'direct' ? `${url}/v1/chain/send_transaction` : `${config.broadcast}/v1/chain/send_transaction`;
     const res = await fetch(target, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body, signal: AbortSignal.timeout(30_000) });
@@ -99,6 +101,7 @@ async function send(senderName: string, why: string) {
     const bot = bots.get(senderName)!;
     const to = pickRecipient(botNames, senderName, rand());
     try {
+      if (!(await ensureCpu(senderName))) { log(`skip ${senderName} (${why}): CPU too low and no bot could power it up`); return; }
       const free = await freeAvailable();
       const refusal = refuseSend(state.sent[senderName] ?? 0, config.maxSendsPerBotPerDay, free ? 0 : await balanceUnits(senderName), cheeseUnits(config.reserve), free ? 0 : SEND_COST_UNITS);
       if (refusal) { log(`skip ${senderName} (${why}): ${refusal}`); return; }
@@ -111,6 +114,29 @@ async function send(senderName: string, why: string) {
       log(`FAILED ${senderName} (${why}): ${(e as Error).message} — not retried`);
     }
   });
+}
+
+// ---- Auto-powerup: 0.0100 CHEESE to cheesepowerz before a bot runs dry (staked CPU stays the main source) ----
+async function cpuAvailable(account: string): Promise<number | null> {
+  try { const a = await withEndpoint(c => c.v1.chain.get_account(account)); const v = Number(String(a.cpu_limit.available)); return Number.isFinite(v) ? v : null; }
+  catch { return null; }
+}
+/** False only when the bot is too low to send and nobody could top it up. */
+async function ensureCpu(target: string): Promise<boolean> {
+  const cpu: Record<string, number | null> = {};
+  for (const n of botNames) cpu[n] = await cpuAvailable(n);
+  const plan = planPowerup(target, cpu, state.powerups[target], Date.now());
+  if (!plan) return !(cpu[target] != null && (cpu[target] as number) < 500);
+  const payer = bots.get(plan.payer)!;
+  const refusal = refuseSend(0, 1, await balanceUnits(plan.payer).catch(() => NaN), cheeseUnits(config.reserve), POWERUP_UNITS);
+  if (refusal) { log(`powerup for ${target} skipped: ${plan.payer} ${refusal}`); return (cpu[target] as number) >= 500; }
+  // Recorded before broadcasting: an uncertain powerup is never repeated inside the cooldown.
+  if (!dryRun) { state.powerups[target] = Date.now(); saveState(); }
+  try {
+    const id = await broadcastActions(payer, buildPowerup(plan.payer, payer.permission, target), `powerup ${plan.payer} → cheesepowerz for ${target} (0.0100 CHEESE)`);
+    log(`powerup: ${plan.payer} paid 0.0100 CHEESE for ${target} (CPU ${cpu[target]} µs)  tx ${id}`);
+    return true;
+  } catch (e) { log(`powerup FAILED for ${target}: ${(e as Error).message} — not retried`); return false; }
 }
 
 // ---- Safety check at start: dedicated, narrowly linked permission only ----

@@ -5,3 +5,4 @@
 - The send shape must stay exactly the app's: lone `sendfree` when the live budget covers it, else payment then one-part `sendmsg` (so bots never split from free users by action shape) and decoy memos must match real padded memo length so they stay indistinguishable by size.
 - Never retry an ambiguous broadcast, and refuse keys that are on owner/active, because extra authority exceeds what an unattended script should hold.
 - Bots must never trigger bursts for each other, and nothing here may be hosted, relayed or auto-funded by CHEESEHub (custody and intermediary liability).
+- Auto-powerup is a 0.0100 CHEESE transfer to cheesepowerz (memo = target) planned in pure `planPowerup`: unknown CPU never buys, one per target per 6h recorded before broadcast, stuck bots are paid for by the best-CPU bot, because repeat or blind buys would waste CHEESE.

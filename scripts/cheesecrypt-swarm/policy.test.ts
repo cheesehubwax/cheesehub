@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { boxBytes, buildSend, burstAllowed, checkPermission, cheese, dummyMemo, isOrganic, planBurst, poissonDelayMs, pickRecipient, refuseSend, validateConfig, SEND_COST_UNITS, parseBudget, sponsorRemaining } from './policy';
+import { buildPowerup, planPowerup, POWERUP_COOLDOWN_MS, boxBytes, buildSend, burstAllowed, checkPermission, cheese, dummyMemo, isOrganic, planBurst, poissonDelayMs, pickRecipient, refuseSend, validateConfig, SEND_COST_UNITS, parseBudget, sponsorRemaining } from './policy';
 
 const base = {
   bots: [
@@ -86,5 +86,30 @@ describe('swarm policy', () => {
     expect(sponsorRemaining(parseBudget({ ...row, enabled: 0 }), 1100)).toBe(0);
     expect(sponsorRemaining(parseBudget({ ...row, sponsor_balance: '0.0040 CHEESE' }), 90_000)).toBe(40);
     expect(parseBudget({ ...row, spent: 'bad' })).toBeNull();
+  });
+  test('powerup is 0.0100 CHEESE to cheesepowerz with the target as memo', () => {
+    expect(buildPowerup('brie.chz', 'cheesecrypt', 'alpha.chz')[0].data).toEqual({ from: 'brie.chz', to: 'cheesepowerz', quantity: '0.0100 CHEESE', memo: 'alpha.chz' });
+  });
+  test('powerup plan: self when low, buddy when stuck, never on unknown CPU or inside cooldown', () => {
+    const now = 1e12;
+    expect(planPowerup('alpha.chz', { 'alpha.chz': 5000, 'brie.chz': 9000 }, undefined, now)).toBeNull();
+    expect(planPowerup('alpha.chz', { 'alpha.chz': 1500, 'brie.chz': 9000 }, undefined, now)).toEqual({ payer: 'alpha.chz', target: 'alpha.chz' });
+    expect(planPowerup('alpha.chz', { 'alpha.chz': 100, 'brie.chz': 9000, 'gouda.chz': 3000 }, undefined, now)).toEqual({ payer: 'brie.chz', target: 'alpha.chz' });
+    expect(planPowerup('alpha.chz', { 'alpha.chz': 100, 'brie.chz': 1000 }, undefined, now)).toBeNull();
+    expect(planPowerup('alpha.chz', { 'alpha.chz': null, 'brie.chz': 9000 }, undefined, now)).toBeNull();
+    expect(planPowerup('alpha.chz', { 'alpha.chz': 1500 }, now - POWERUP_COOLDOWN_MS + 1, now)).toBeNull();
+    expect(planPowerup('alpha.chz', { 'alpha.chz': 1500 }, now - POWERUP_COOLDOWN_MS, now)).not.toBeNull();
+  });
+  test('permission check accepts chain objects and legacy EOS keys', () => {
+    const name = (v: string) => ({ toString: () => v });
+    const key = { toString: () => 'PUB_K1_new', toLegacyString: () => 'EOS_legacy' };
+    const acc = { permissions: [
+      { perm_name: name('active'), required_auth: { keys: [{ key: { toString: () => 'PUB_K1_other' } }] }, linked_actions: [] },
+      { perm_name: name('cheesecrypt'), required_auth: { keys: [{ key }] }, linked_actions: [
+        { account: name('cheeseburger'), action: name('transfer') }, { account: name('crypt.cheese'), action: name('sendmsg') }, { account: name('crypt.cheese'), action: name('sendfree') }] },
+    ] };
+    expect(checkPermission(acc, 'cheesecrypt', ['EOS_legacy'])).toBeNull();
+    expect(checkPermission(acc, 'cheesecrypt', ['PUB_K1_new'])).toBeNull();
+    expect(checkPermission(acc, 'cheesecrypt', ['PUB_K1_wrong'])).toMatch(/not on/);
   });
 });
