@@ -1,3 +1,4 @@
+import { isCryptPath } from '@/context/waxContextState';
 import { SessionKit, ChainDefinition, Session } from '@wharfkit/session';
 import { WebRenderer } from '@wharfkit/web-renderer';
 import { WalletPluginAnchor } from '@wharfkit/wallet-plugin-anchor';
@@ -55,6 +56,9 @@ export function isAnchorSession(session: Session): boolean {
 // Get transact options with Fuel plugin for Anchor-only sessions
 // Cloud Wallet doesn't support Fuel's partial signature flow
 export function getTransactPlugins(session: Session) {
+  // CHEESECrypt privacy: never preflight Crypt transactions through Greymass Fuel
+  // (it would see account, actions and IP before broadcast). Users pay their own CPU.
+  if (typeof window !== 'undefined' && isCryptPath(window.location.pathname)) return [];
   const useAnchorPlugins = isAnchorSession(session);
   console.log('[WharfKit] getTransactPlugins - using Fuel:', useAnchorPlugins);
 

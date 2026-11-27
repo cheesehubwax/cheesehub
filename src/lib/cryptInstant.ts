@@ -9,7 +9,6 @@
  */
 import { PrivateKey, PublicKey, Session, type ChainDefinition } from '@wharfkit/session';
 import { WalletPluginPrivateKey } from '@wharfkit/wallet-plugin-privatekey';
-import { TransactPluginResourceProvider } from '@wharfkit/transact-plugin-resource-provider';
 import { chainPost } from './chainRequest';
 import { CRYPT_ROUTER_ACCOUNT } from './cheeseCrypt';
 import { CHEESE_RAM_CONTRACT, CHEESE_TOKEN_CONTRACT, estimateCheeseForTargetBytes, resolveQuoteRate, type CheeseRamConfig } from './cheeseRam';
@@ -172,7 +171,7 @@ export function isInstantEligible(actions: unknown[], account: string): boolean 
   return a?.account === CRYPT_ROUTER_ACCOUNT && a.name === INSTANT_ACTION && a.data?.sender === account;
 }
 
-/** Signs and broadcasts one sendfree with the browser key (Greymass Fuel free tier covers CPU when available). */
+/** Signs and broadcasts one sendfree with the browser key (no Greymass Fuel: Crypt never preflights through third-party co-signers; the account's own CPU pays). */
 export async function sendInstant(chain: ChainDefinition, key: InstantKey, actions: unknown[]): Promise<string | null> {
   if (!isInstantEligible(actions, key.account)) throw new Error('Only free messages can be sent instantly.');
   const session = new Session(
@@ -181,9 +180,7 @@ export async function sendInstant(chain: ChainDefinition, key: InstantKey, actio
   );
   const auth = [{ actor: key.account, permission: INSTANT_PERMISSION }];
   const signed = (actions as Act[]).map(a => ({ account: String(a.account), name: String(a.name), data: a.data ?? {}, authorization: auth }));
-  const result = await session.transact({ actions: signed }, {
-    transactPlugins: [new TransactPluginResourceProvider({ endpoints: { [WAX_CHAIN_ID]: 'https://wax.greymass.com' }, allowFees: false })],
-  });
+  const result = await session.transact({ actions: signed }, { transactPlugins: [] });
   return result.resolved?.transaction.id?.toString() || null;
 }
 

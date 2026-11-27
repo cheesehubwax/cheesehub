@@ -8,3 +8,4 @@
 - Crypt owner recovery requires authenticated outgoing invites/admissions, never a listing-only roster; carried request keys are hints scoped to room controls. Folder group backups are account/key-bound authenticated ciphertext, retain encrypted controls and local decisions, merge without replacing held keys, and read before serialized staged writes to prevent reset overwrite.
 - Crypt member recovery searches the existing bounded history when listings accompany an empty roster or a missing requested room; complete each depth before advancing and retain Maximum's account-blind transport, because listings are discovery hints, not membership authority.
 - Crypt founder rosters only grow: owner `founder` controls and superset relists add non-banned members (capped at MAX_FOUNDERS for fixed-size room controls); nothing removes a founder.
+- Crypt: getTransactPlugins returns no Greymass Fuel on /crypt and Instant sends use none; Fuel preflight leaks account/actions/IP.
