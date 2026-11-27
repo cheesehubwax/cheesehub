@@ -1,0 +1,1 @@
+- Crypt Respect: account creation time and earliest key time persist per device (lib/cryptTrustPermanent) because they never change; only confirmed values are stored, other signals stay time-limited.

@@ -4,6 +4,7 @@ import { normalizeEndpoint, resolveEndpoints, benchEndpoint } from '@/lib/endpoi
 import { fetchAlcorCheese } from '@/lib/folio/pooled';
 import { lookupFirstKeyTime, lookupPublishedKey } from '@/lib/cheeseCrypt';
 import type { TrustSignals } from '@/lib/cryptTrust';
+import { getPermanent, setPermanent } from '@/lib/cryptTrustPermanent';
 
 const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
@@ -31,9 +32,12 @@ async function cached<T>(key: string, ttl: number, read: () => Promise<T>): Prom
 const qty = (asset: unknown) => { const n = Number(String(asset ?? '').trim().split(' ')[0]); if (!Number.isFinite(n)) throw new Error('bad asset'); return n; };
 
 async function readCreated(account: string): Promise<number> {
+  const known = getPermanent('created', account);
+  if (known != null) return known;
   const r = await waxRpcCall<{ created?: string }>('/v1/chain/get_account', { account_name: account });
   const t = Date.parse(String(r?.created ?? '') + (String(r?.created ?? '').endsWith('Z') ? '' : 'Z'));
   if (!Number.isFinite(t)) throw new Error('no created');
+  setPermanent('created', account, t);
   return t;
 }
 
@@ -68,7 +72,12 @@ async function readNfts(account: string): Promise<number> {
 }
 
 async function readKey(account: string): Promise<{ published: boolean; firstAt: number | null }> {
-  const [current, firstAt] = await Promise.all([lookupPublishedKey(account), lookupFirstKeyTime(account)]);
+  const known = getPermanent('firstKey', account);
+  const [current, firstAt] = await Promise.all([
+    lookupPublishedKey(account),
+    known != null ? Promise.resolve(known) : lookupFirstKeyTime(account),
+  ]);
+  if (known == null) setPermanent('firstKey', account, firstAt);
   return { published: !!current, firstAt: current ? firstAt : null };
 }
 
