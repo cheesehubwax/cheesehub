@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -8,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { CheeseAmpPlayer } from './CheeseAmpPlayer';
 import { getAudioPlayer } from '@/lib/musicPlayer';
+import { useCheeseAmpStore } from '@/stores/cheeseAmpStore';
 import { Music2, Minus, X } from 'lucide-react';
 
 interface CheeseAmpDialogProps {
@@ -17,6 +19,13 @@ interface CheeseAmpDialogProps {
 }
 
 export function CheeseAmpDialog({ open, onOpenChange, onMinimize }: CheeseAmpDialogProps) {
+  const markOpened = useCheeseAmpStore((state) => state.markOpened);
+
+  // The background music-NFT scan stays silent until the player is actually opened.
+  useEffect(() => {
+    if (open) markOpened();
+  }, [open, markOpened]);
+
   const handleClose = () => {
     getAudioPlayer().stop();
     onOpenChange(false);
