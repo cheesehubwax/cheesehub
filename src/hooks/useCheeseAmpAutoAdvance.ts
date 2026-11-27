@@ -1,3 +1,5 @@
+import { useLocation } from 'react-router-dom';
+import { isCryptPath } from '@/context/waxContextState';
 import { useEffect, useRef, useCallback } from 'react';
 import { getAudioPlayer } from '@/lib/musicPlayer';
 import { useMusicNFTs, type StackedMusicNFT } from '@/hooks/useMusicNFTs';
@@ -41,7 +43,9 @@ function loadSettings(accountName: string): PlaybackSettings {
  * continues working even when the CHEESEAmp dialog is minimized/closed.
  */
 export function useCheeseAmpAutoAdvance(accountName: string | null) {
-  const { stackedNfts } = useMusicNFTs();
+  // No background NFT scan names the account while on CHEESECrypt.
+  const { pathname } = useLocation();
+  const { stackedNfts } = useMusicNFTs(undefined, isCryptPath(pathname));
   const shuffleOrderRef = useRef<number[]>([]);
   
   const getNextTrack = useCallback((): StackedMusicNFT | null => {

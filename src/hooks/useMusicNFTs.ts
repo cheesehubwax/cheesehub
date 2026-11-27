@@ -418,7 +418,8 @@ async function fetchApiPage(owner: string, page: number, limit: number): Promise
   }
 }
 
-export function useMusicNFTs(overrideAccount?: string) {
+/** `paused` skips all network reads (e.g. on CHEESECrypt); already-loaded tracks are kept. */
+export function useMusicNFTs(overrideAccount?: string, paused = false) {
   const { accountName: walletAccount } = useWax();
   const owner = overrideAccount || walletAccount;
   const [nfts, setNfts] = useState<MusicNFT[]>([]);
@@ -565,12 +566,9 @@ export function useMusicNFTs(overrideAccount?: string) {
   }, [owner]);
 
   useEffect(() => {
-    if (owner) {
-      fetchMusicNFTs();
-    } else {
-      setNfts([]);
-    }
-  }, [owner, fetchMusicNFTs]);
+    if (!owner) { setNfts([]); return; }
+    if (!paused) fetchMusicNFTs();
+  }, [owner, fetchMusicNFTs, paused]);
 
   useEffect(() => {
     return () => {
