@@ -1,6 +1,6 @@
 # Respect "Badge levels" guide
 
-When you open your own Respect badge, a small "Badge levels" link sits next to your current badge. Clicking it opens a small window that lists every Respect badge with its point range and a one-line description.
+When you open your own Respect badge, a small "Badge levels" link sits in the empty space on the right of the line showing your badge and points count. Clicking it opens a small window that lists every Respect badge with its point range and a one-line description.
 
 ## What the window shows (top to bottom, highest first)
 
@@ -20,5 +20,5 @@ When you open your own Respect badge, a small "Badge levels" link sits next to y
 ## Technical details
 
 - New `src/components/crypt/CryptRespectLevels.tsx`: small Dialog (`max-w-sm`), presentational; rows built from a `RESPECT_LEVELS` list exported from `src/lib/cryptTrust.ts` (mark, min, max, description), reusing the existing labels so names never drift from `markFor` cutoffs.
-- `CryptTrustBreakdown.tsx`: add a small underlined "Badge levels" button beside `<CryptRespectMark>` that opens the dialog with `current={score.mark}`.
+- `CryptTrustBreakdown.tsx`: turn the badge/points line into a `flex justify-between` row and put a small underlined "Badge levels" button at its right end, same line that opens the dialog with `current={score.mark}`.
 - Test in `src/test/cryptTrust.test.ts`: each level's min score maps to that level via the scoring cutoffs (and 199→strong, 200→huge), so the guide can't contradict the real ranking.
