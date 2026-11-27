@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { repliesTo } from '@/lib/cryptReply';
 import { findCryptMessageNode } from '@/lib/cryptMessageDom';
+import { useCryptNavigationGuard } from './useCryptNavigationGuard';
 
 interface ReplyMessage { key: string; from: string; time: number; text: string | null; missing: number }
 interface ReplyState { pending: string[]; seen: string[] }
@@ -30,12 +31,15 @@ function save(account: string, store: ReplyStore) {
 /** Separate per-message receipts: jumping past a reply never marks that skipped reply viewed. */
 export function useCryptReplyNavigation(account: string, active: string | null, thread: ReplyMessage[], resumeAt: number | null, list: RefObject<HTMLOListElement>, onRead?: (time: number) => void, listElement?: HTMLOListElement | null) {
   const [store, setStore] = useState<ReplyStore>(() => load(account));
+  const guard = useCryptNavigationGuard(active);
   const [highlighted, setHighlighted] = useState<{ id: string | null; keys: Set<string> }>({ id: active, keys: new Set() });
-  const state = active ? store[active] : undefined;
-  const seen = new Set(state?.seen ?? []);
-  const savedPending = new Set(state?.pending ?? []);
-  const pending = thread.filter(m => m.from !== account && m.missing === 0 && repliesTo(m.text, account)
-    && !seen.has(m.key) && (savedPending.has(m.key) || (resumeAt !== null && m.time > resumeAt)));
+  const pending = useMemo(() => {
+    const state = active ? store[active] : undefined;
+    const seen = new Set(state?.seen ?? []);
+    const savedPending = new Set(state?.pending ?? []);
+    return thread.filter(m => m.from !== account && m.missing === 0 && repliesTo(m.text, account)
+      && !seen.has(m.key) && (savedPending.has(m.key) || (resumeAt !== null && m.time > resumeAt)));
+  }, [active, store, thread, account, resumeAt]);
   const current = useRef({ active, pending, store, thread, onRead });
   current.current = { active, pending, store, thread, onRead };
   const reported = useRef({ active, time: 0 });
@@ -76,24 +80,30 @@ export function useCryptReplyNavigation(account: string, active: string | null, 
     const visible = new Set(keys);
     const { thread: rows, onRead: read } = current.current;
     const newestVisible = rows.reduce((time, m) => visible.has(m.key) ? Math.max(time, m.time) : time, 0);
+    // Persist per-message receipts before advancing the timestamp (including reentrant read callbacks).
+    consume(keys);
     if (read && newestVisible > reported.current.time) {
       reported.current.time = newestVisible;
       read(newestVisible);
     }
-    consume(keys);
   }, [list, consume]);
   const frame = useRef<number | null>(null);
   const inspectVisible = useCallback(() => {
     if (frame.current !== null) return;
-    frame.current = requestAnimationFrame(() => { frame.current = null; inspectNow(); });
-  }, [inspectNow]);
+    guard.run(() => {
+      frame.current = requestAnimationFrame(() => { frame.current = null; guard.run(inspectNow); });
+    });
+  }, [inspectNow, guard.run]);
   // Save the queue before a conversation's timestamp marker advances; unseen replies survive switching/reloading.
   useEffect(() => {
     if (!active) return;
-    const old = store[active] ?? { pending: [], seen: [] };
-    const keys = [...new Set([...old.pending, ...pending.map(m => m.key)])];
+    const latest = current.current;
+    if (latest.active !== active) return;
+    const old = latest.store[active] ?? { pending: [], seen: [] };
+    const seen = new Set(old.seen);
+    const keys = [...new Set([...old.pending, ...latest.pending.map(m => m.key)])].filter(k => !seen.has(k));
     if (keys.length === old.pending.length) return;
-    const next = { ...store, [active]: { ...old, pending: keys } };
+    const next = { ...latest.store, [active]: { ...old, pending: keys } };
     current.current.store = next;
     save(account, next);
     setStore(next);
@@ -126,7 +136,7 @@ export function useCryptReplyNavigation(account: string, active: string | null, 
   }, [active, account, list, listElement, inspectVisible]);
   // Updated content/read callbacks use the existing observers, never rebuild them after receipt writes.
   useEffect(() => { inspectVisible(); }, [active, thread, inspectVisible]);
-  const jump = () => {
+  const jump = () => guard.run(() => {
     const el = list.current;
     const next = current.current.pending[0];
     if (!el || !next) return;
@@ -136,6 +146,6 @@ export function useCryptReplyNavigation(account: string, active: string | null, 
     if (typeof el.scrollTo === 'function') el.scrollTo({ top, behavior: 'auto' });
     else el.scrollTop = top;
     consume([next.key]);
-  };
-  return { pending, jump, inspectVisible, highlighted: highlighted.id === active ? highlighted.keys : new Set<string>() };
+  });
+  return { pending, jump, inspectVisible, failed: guard.failed, retry: guard.retry, highlighted: highlighted.id === active ? highlighted.keys : new Set<string>() };
 }

@@ -1,5 +1,5 @@
 import { act, cleanup, render, screen, fireEvent } from '@testing-library/react';
-import { useCallback, useRef, useState } from 'react';
+import { StrictMode, useCallback, useRef, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useCryptReplyNavigation } from '@/hooks/useCryptReplyNavigation';
 import { encodeReply } from '@/lib/cryptReply';
@@ -9,7 +9,7 @@ const messages = Array.from({ length: 6 }, (_, i) => ({ key: `reply-${i}`, from:
 function Room({ active = 'bob', thread = messages, resumeAt = 5, onRead }: { active?: string; thread?: typeof messages; resumeAt?: number; onRead?: (time: number) => void }) {
   const list = useRef<HTMLOListElement>(null);
   const nav = useCryptReplyNavigation('alice', active, thread, resumeAt, list, onRead);
-  return <><button onClick={nav.jump}>@{nav.pending.length}</button><ol ref={list} onScroll={nav.inspectVisible}>
+  return <><button onClick={nav.jump}>@{nav.pending.length}</button>{nav.failed && <button onClick={() => { nav.retry(); nav.inspectVisible(); }}>Recover</button>}<ol ref={list} onScroll={nav.inspectVisible}>
     {thread.map(m => <li key={m.key} data-reply-key={m.key} data-highlighted={nav.highlighted.has(m.key)}>{m.key}</li>)}
   </ol></>;
 }
@@ -27,6 +27,50 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('in-room reply navigation', () => {
+  it('suspends failed asynchronous measurements without losing receipts, then retries in place', () => {
+    render(<Room />);
+    const list = screen.getByRole('list');
+    const measure = vi.spyOn(list, 'getBoundingClientRect').mockImplementation(() => { throw new Error('DOM failure'); });
+    expect(() => flushFrame()).not.toThrow();
+    expect(screen.getByRole('button', { name: '@6' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '@6' }));
+    expect(screen.getByRole('button', { name: '@6' })).toBeInTheDocument();
+    measure.mockReturnValue(bounds(100, 500));
+    vi.spyOn(screen.getByText('reply-2'), 'getBoundingClientRect').mockReturnValue(bounds(200, 260));
+    fireEvent.click(screen.getByRole('button', { name: 'Recover' }));
+    flushFrame();
+    expect(screen.queryByRole('button', { name: 'Recover' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '@5' })).toBeInTheDocument();
+  });
+  it('handles 500 replies from multiple senders with observer bursts and receipt-driven parent renders', () => {
+    const rows = Array.from({ length: 500 }, (_, i) => ({ ...messages[0], key: `busy-${i}`, time: 10 + i, from: ['bob', 'carol', 'dave'][i % 3] }));
+    const notify: (() => void)[] = [];
+    const create = vi.fn(function (callback: () => void) {
+      notify.push(callback);
+      return { observe: vi.fn(), unobserve: vi.fn(), disconnect: vi.fn() };
+    });
+    vi.stubGlobal('IntersectionObserver', create);
+    const read = vi.fn();
+    function BusyRoom() {
+      const [, setMark] = useState(0);
+      return <Room thread={rows} onRead={time => { read(time); setMark(time); }} />;
+    }
+    render(<StrictMode><BusyRoom /></StrictMode>);
+    vi.spyOn(screen.getByRole('list'), 'getBoundingClientRect').mockReturnValue(bounds(100, 500));
+    rows.forEach((m, i) => vi.spyOn(screen.getByText(m.key), 'getBoundingClientRect').mockReturnValue(bounds(i < 20 ? 200 : 800, i < 20 ? 260 : 860)));
+    const observerCount = create.mock.calls.length;
+    act(() => { for (let i = 0; i < 100; i++) notify.at(-1)?.(); });
+    flushFrame();
+    expect(screen.getByRole('button', { name: '@480' })).toBeInTheDocument();
+    expect(read).toHaveBeenCalledExactlyOnceWith(29);
+    for (let i = 0; i < 10; i++) { act(() => notify.at(-1)?.()); flushFrame(); }
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledTimes(observerCount);
+    expect(frames.size).toBe(0);
+    const receipts = JSON.parse(localStorage.getItem('cheesecrypt-reply-views-alice') || '{}').bob;
+    expect(receipts.pending).toHaveLength(480);
+    expect(receipts.seen).toHaveLength(20);
+  });
   it('six replies decrease to five when jumping to the earliest and highlight that exact post', () => {
     render(<Room />);
     expect(screen.getByRole('button').textContent).toBe('@6');

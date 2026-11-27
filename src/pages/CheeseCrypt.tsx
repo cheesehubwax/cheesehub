@@ -2181,6 +2181,10 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
                 <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Close search" onClick={() => { setSearchOpen(false); setSearchQuery(''); }}><X className="h-4 w-4" /></Button>
               </> : <Button size="sm" variant="ghost" className="ml-auto h-7 gap-1 text-xs font-normal" onClick={() => setSearchOpen(true)}><Search className="h-3.5 w-3.5" /> Search chat</Button>}
             </div>
+            {(replyNavigation.failed || reactionNavigation.failed) && <div role="alert" className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2 text-sm text-muted-foreground">
+              <span>Reply navigation paused. Your conversation is still open.</span>
+              <Button size="sm" variant="outline" onClick={() => { replyNavigation.retry(); reactionNavigation.retry(); replyNavigation.inspectVisible(); }}>Retry navigation</Button>
+            </div>}
             <div className="relative flex min-h-0 flex-1">
             <CryptMessageBoundary key={active}>
             <ol ref={bindList} aria-label="Chat messages" className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden space-y-2 p-4"

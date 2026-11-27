@@ -2,6 +2,8 @@
 
 Open tasks only. Completed work lives in git history.
 
+- [ ] CHEESECrypt busy-room safety: confirm eventhorizon's original unlocked room; 500-reply/multiple-sender observer stress and unlocked-fixture recovery preserve drafts and receipts, but their original wallet/key and browser error are unavailable here.
+
 - [ ] CHEESEFarm: verify one real capacity-aware stake with the user's Anchor wallet; per-rule warnings, browse-to-detail live checks and 41 capacity/action tests pass, including mixed rates, combined selections and fresh pre-sign checks. Requires the user's wallet signature.
 
 - [ ] CHEESECrypt public-room opening: confirm eventhorizon's original room with their unlocked wallet — cross-chat render recovery, mounted-list reply tracking, safe navigation and storage-failure handling pass 80 targeted tests plus two private/legacy navigation checks; live signed-out page has no runtime errors. Original history/key unavailable here; two existing admission-test failures also reproduce against the unchanged page. Sweep coverage is recorded in `.lovable/reviews/crypt-chat-safety-sweep.md`.

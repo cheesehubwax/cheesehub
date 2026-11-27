@@ -1,4 +1,5 @@
 - Crypt Respect: account creation time and earliest key time persist per device (lib/cryptTrustPermanent) because they never change; only confirmed values are stored, other signals stay time-limited.
 - CHEESECrypt route: background music-NFT scans (auto-advance) are paused via isCryptPath and Layout omits banner ads, so no third-party/account-naming requests run beside chats.
 - Music NFT scans only start once CHEESEAmp has actually been opened in the page session (cheeseAmpStore.hasBeenOpened); the persistent auto-advance hook stays silent until then.
+- Crypt navigation catches asynchronous visibility/jump failures locally, pauses until explicit retry, and merges receipt queues from the latest state before timestamp callbacks; async errors bypass React boundaries and stale effects can resurrect consumed receipts.
 - Crypt Respect lookups: confirmed balance/stake/pool/NFT/key signals persist per device for 24h (lib/cryptTrustSnapshot, never failures); each real network lookup is paired with one discarded decoy account lookup in random order with 150-400ms jitter (lib/cryptTrustChaff), so observers can't tell which account is on screen.

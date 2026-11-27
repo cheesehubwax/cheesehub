@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { reactionsToMe, type ActiveReaction } from '@/lib/cryptReactions';
 import { findCryptMessageNode } from '@/lib/cryptMessageDom';
+import { useCryptNavigationGuard } from './useCryptNavigationGuard';
 
 interface State { pending: string[]; seen: string[] }
 type Store = Record<string, State>;
@@ -43,9 +44,11 @@ export function pendingReactionTargets(reactions: ActiveReaction[], account: str
  */
 export function useCryptReactionNavigation(account: string, active: string | null, reactions: ActiveReaction[], rowFor: Map<string, { key: string; time: number }>, resumeAt: number | null, list: RefObject<HTMLOListElement>) {
   const [store, setStore] = useState<Store>(() => load(account));
+  const guard = useCryptNavigationGuard(active);
   const [highlighted, setHighlighted] = useState<{ id: string | null; key: string | null }>({ id: null, key: null });
   useEffect(() => { setStore(load(account)); }, [account]);
-  const pending = active ? pendingReactionTargets(reactions, account, rowFor, store[active], resumeAt) : [];
+  const pending = useMemo(() => active ? pendingReactionTargets(reactions, account, rowFor, store[active], resumeAt) : [],
+    [active, reactions, account, rowFor, store, resumeAt]);
   const current = useRef({ active, pending, store });
   current.current = { active, pending, store };
 
@@ -57,13 +60,16 @@ export function useCryptReactionNavigation(account: string, active: string | nul
   // Persist the queue so unseen reactions survive switching chats, reloads and the read marker moving on.
   useEffect(() => {
     if (!active) return;
-    const old = store[active] ?? { pending: [], seen: [] };
-    const keys = [...new Set([...old.pending, ...pending.flatMap(p => p.reactions)])];
+    const latest = current.current;
+    if (latest.active !== active) return;
+    const old = latest.store[active] ?? { pending: [], seen: [] };
+    const seen = new Set(old.seen);
+    const keys = [...new Set([...old.pending, ...latest.pending.flatMap(p => p.reactions)])].filter(k => !seen.has(k));
     if (keys.length === old.pending.length) return;
-    save({ ...store, [active]: { ...old, pending: keys } });
+    save({ ...latest.store, [active]: { ...old, pending: keys } });
   }, [active, store, pending, save]);
 
-  const jump = () => {
+  const jump = () => guard.run(() => {
     const { active: id, pending: queue, store: latest } = current.current;
     const next = queue[0];
     const el = list.current;
@@ -80,6 +86,6 @@ export function useCryptReactionNavigation(account: string, active: string | nul
     } });
     current.current.pending = queue.slice(1);
     setHighlighted({ id, key: next.key });
-  };
-  return { pending, jump, highlighted: highlighted.id === active ? highlighted.key : null };
+  });
+  return { pending, jump, failed: guard.failed, retry: guard.retry, highlighted: highlighted.id === active ? highlighted.key : null };
 }

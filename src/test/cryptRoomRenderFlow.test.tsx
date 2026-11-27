@@ -45,6 +45,27 @@ const mount = () => render(<QueryClientProvider client={new QueryClient({ defaul
 </QueryClientProvider>);
 
 describe('authenticated public-room rendering', () => {
+  it('keeps an unlocked room and its draft usable after an asynchronous visibility failure', async () => {
+    calls.fetch.mockResolvedValue([memo(encodeReply({ author: 'alice', time: 1, quote: 'original' }, 'Incoming reply'), 0)]);
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: /Public cheese room/ }));
+    const list = await screen.findByRole('list', { name: 'Chat messages' });
+    const draft = screen.getByPlaceholderText('Message group');
+    fireEvent.change(draft, { target: { value: 'Keep this unsent draft' } });
+    vi.spyOn(list, 'getBoundingClientRect').mockReturnValue({ top: 100, bottom: 500, height: 400 } as DOMRect);
+    const measure = vi.spyOn(within(list).getByText('Incoming reply').closest('li') as HTMLLIElement, 'getBoundingClientRect')
+      .mockImplementation(() => { throw new Error('Synthetic visibility failure'); });
+    fireEvent.scroll(list);
+    await screen.findByRole('button', { name: 'Retry navigation' });
+    expect(draft).toHaveValue('Keep this unsent draft');
+    expect(within(list).getByText('Incoming reply')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Jump to earliest unseen reply (1 remaining)' })).toBeInTheDocument();
+    measure.mockReturnValue({ top: 200, bottom: 260, height: 60 } as DOMRect);
+    fireEvent.click(screen.getByRole('button', { name: 'Retry navigation' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Jump to earliest unseen reply (1 remaining)' })).not.toBeInTheDocument());
+    expect(draft).toHaveValue('Keep this unsent draft');
+    expect(calls.transact).not.toHaveBeenCalled();
+  });
   it('opens 92 encrypted incoming replies, navigates/searches their wire keys, switches to DM and returns', async () => {
     calls.fetch.mockResolvedValue([...Array.from({ length: 92 }, (_, i) => memo(encodeReply({ author: 'alice', time: 1, quote: 'original' }, `answer ${i}`), i)), memo('Private conversation', 93, false)]);
     mount();
