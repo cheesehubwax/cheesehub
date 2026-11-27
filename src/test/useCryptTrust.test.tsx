@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getCachedTrustSignals, loadTrustSignals, useCryptTrust } from '@/hooks/useCryptTrust';
+import { __setTrustChaff, getCachedTrustSignals, loadTrustSignals, useCryptTrust } from '@/hooks/useCryptTrust';
 import { scoreTrust } from '@/lib/cryptTrust';
 import { saveCustomEndpoint } from '@/lib/cryptNetworkPrivacy';
 import { __resetMediaRouteCache } from '@/lib/cryptMediaProxy';
@@ -18,6 +18,8 @@ const account = () => `cachetest${++sequence}`;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  __setTrustChaff(false);
+  localStorage.removeItem('cheesecrypt-trust-snapshot-v1');
   vi.spyOn(Date, 'now').mockImplementation(() => now);
   reads.rpc.mockImplementation(async (path: string) => path.endsWith('get_account') ? { created: '2020-01-01T00:00:00' } : ['10000.0000 CHEESE']);
   reads.table.mockResolvedValue({ rows: [] });
@@ -71,22 +73,23 @@ describe('Respect signal caching', () => {
     expect(reads.currentKey).toHaveBeenCalledTimes(1);
   });
 
-  it('refreshes hourly signals without discarding the displayed score or rereading daily signals', async () => {
+  it('refreshes daily signals without discarding the displayed score or rereading daily signals', async () => {
     const name = account();
     const old = await loadTrustSignals(name);
-    now += 3600000;
+    now += 86400000;
     expect(getCachedTrustSignals(name)).toBeNull();
     const hook = renderHook(({ enabled }) => useCryptTrust(name, enabled), { initialProps: { enabled: false } });
     // Hydrate a fresh snapshot, then expire it while this badge is still mounted.
     await act(async () => { hook.rerender({ enabled: true }); });
     await waitFor(() => expect(hook.result.current).toEqual(old));
     hook.rerender({ enabled: false });
-    now += 3600000;
+    now += 86400000;
     reads.rpc.mockImplementation(async (path: string) => path.endsWith('get_account') ? { created: '2020-01-01T00:00:00' } : ['50000.0000 CHEESE']);
     hook.rerender({ enabled: true });
     expect(hook.result.current?.cheese).toBe(10000);
     await waitFor(() => expect(hook.result.current?.cheese).toBe(50000));
-    expect(reads.currentKey).toHaveBeenCalledTimes(1);
+    // The current key shares the 24-hour lifetime; account age is permanent and read once.
+    expect(reads.currentKey).toHaveBeenCalledTimes(3);
     expect(reads.rpc.mock.calls.filter(([path]) => path.endsWith('get_account'))).toHaveLength(1);
   });
 
@@ -149,5 +152,59 @@ describe('Respect lookups through the Tor helper', () => {
     await loadTrustSignals(account());
     expect(reads.rpc).toHaveBeenCalledTimes(2);
     expect(reads.pool).toHaveBeenCalledWith(expect.any(String), undefined);
+  });
+});
+
+describe('Respect 24-hour device snapshot and decoys', () => {
+  it('reloads a known account from the device after memory is gone, with no network read', async () => {
+    const name = account();
+    await loadTrustSignals(name);
+    vi.resetModules();
+    const fresh = await import('@/hooks/useCryptTrust');
+    fresh.__setTrustChaff(false);
+    vi.clearAllMocks();
+    now += 86400000 - 1;
+    const s = await fresh.loadTrustSignals(name);
+    expect(s).toMatchObject({ cheese: 10000, nfts: 0, pooled: { cheese: 1000, pools: 1 } });
+    expect(fresh.getCachedTrustSignals(name)).toEqual(s);
+    expect(reads.rpc).not.toHaveBeenCalled();
+    expect(reads.pool).not.toHaveBeenCalled();
+    expect(reads.currentKey).not.toHaveBeenCalled();
+  });
+
+  it('rereads after 24 hours', async () => {
+    const name = account();
+    await loadTrustSignals(name);
+    reads.pool.mockClear();
+    now += 86400000;
+    await loadTrustSignals(name);
+    expect(reads.pool).toHaveBeenCalledTimes(1);
+  });
+
+  it('never stores a failed lookup on the device', async () => {
+    const name = account();
+    reads.pool.mockRejectedValueOnce(new Error('offline'));
+    await loadTrustSignals(name);
+    expect(localStorage.getItem('cheesecrypt-trust-snapshot-v1')).not.toContain(`pool:${name}`);
+  });
+
+  it('looks up exactly one decoy beside a real lookup, and none for a cached account', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    try {
+      __setTrustChaff(true);
+      const name = account();
+      const p = loadTrustSignals(name);
+      await vi.advanceTimersByTimeAsync(500);
+      await p;
+      await vi.advanceTimersByTimeAsync(500);
+      const poolAccounts = reads.pool.mock.calls.map(([a]) => a);
+      expect(poolAccounts).toHaveLength(2);
+      expect(poolAccounts).toContain(name);
+      expect(poolAccounts.filter(a => a !== name)).toHaveLength(1);
+      reads.pool.mockClear();
+      await loadTrustSignals(name);
+      await vi.advanceTimersByTimeAsync(500);
+      expect(reads.pool).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
   });
 });

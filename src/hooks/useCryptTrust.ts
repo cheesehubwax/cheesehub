@@ -6,6 +6,8 @@ import { lookupFirstKeyTime, lookupPublishedKey } from '@/lib/cheeseCrypt';
 import type { TrustSignals } from '@/lib/cryptTrust';
 import { getPermanent, setPermanent } from '@/lib/cryptTrustPermanent';
 import { resolveRespectRoute } from '@/lib/cryptMediaProxy';
+import { getSnapshot, setSnapshot, snapshotAccounts } from '@/lib/cryptTrustSnapshot';
+import { jitterMs, pickDecoy, shuffle } from '@/lib/cryptTrustChaff';
 
 /**
  * Where Respect's public lookups go. Public by default; with a saved v1.4+ Tor helper
@@ -69,19 +71,34 @@ export function torTrustIO(base: string): TrustIO {
 }
 
 const DAY_MS = 86_400_000;
-const HOUR_MS = 3_600_000;
 const FAILURE_COOLDOWN_MS = 120_000;
 const cache = new Map<string, { expiresAt: number; value: unknown }>();
 const inflight = new Map<string, Promise<unknown>>();
 
+/** Signals kept on this device for 24 hours (age and first key time are permanent elsewhere). */
+const PERSISTED = new Set(['cheese', 'stake', 'pool', 'nft', 'key']);
+const persisted = (key: string) => PERSISTED.has(key.slice(0, key.indexOf(':')));
+
+/** Memory first, then the 24-hour device snapshot (hydrated into memory). */
+function peek(key: string): { expiresAt: number; value: unknown } | null {
+  const hit = cache.get(key);
+  if (hit && Date.now() < hit.expiresAt) return hit;
+  if (!persisted(key)) return null;
+  const stored = getSnapshot(key);
+  if (!stored) return null;
+  cache.set(key, stored);
+  return stored;
+}
+
 /** Failures remain unknown, with a short cooldown rather than repeated reads. */
 async function cached<T>(key: string, ttl: number, read: () => Promise<T>): Promise<T | null> {
-  const hit = cache.get(key);
-  if (hit && Date.now() < hit.expiresAt) return hit.value as T | null;
+  const hit = peek(key);
+  if (hit) return hit.value as T | null;
   const pending = inflight.get(key) as Promise<T | null> | undefined;
   if (pending) return pending;
   const request = Promise.resolve().then(read).then(value => {
     cache.set(key, { expiresAt: Date.now() + (value == null ? FAILURE_COOLDOWN_MS : ttl), value });
+    if (value != null && persisted(key)) setSnapshot(key, value);
     return value;
   }).catch(() => {
     cache.set(key, { expiresAt: Date.now() + FAILURE_COOLDOWN_MS, value: null });
@@ -89,6 +106,24 @@ async function cached<T>(key: string, ttl: number, read: () => Promise<T>): Prom
   }).finally(() => { inflight.delete(key); });
   inflight.set(key, request);
   return request;
+}
+
+let chaffEnabled = true;
+/** Tests only: turn decoy lookups off to count real reads exactly. */
+export function __setTrustChaff(on: boolean) { chaffEnabled = on; }
+const chaffing = new Set<string>();
+const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+
+/** Decoy reads mirror the real ones; results are discarded and never cached. */
+function decoyReads(decoy: string, io: TrustIO, alcorIO: Parameters<typeof fetchAlcorCheese>[1], withAge: boolean): Promise<void> {
+  const reads: (() => Promise<unknown>)[] = [
+    () => readCheese(decoy, io),
+    () => readStake(decoy, io),
+    () => fetchAlcorCheese(decoy, alcorIO),
+    () => readNfts(decoy, io),
+  ];
+  if (withAge) reads.push(() => io.rpc('/v1/chain/get_account', { account_name: decoy }));
+  return Promise.all(shuffle(reads).map(r => Promise.resolve().then(r).catch(() => null))).then(() => undefined);
 }
 
 const qty = (asset: unknown) => { const n = Number(String(asset ?? '').trim().split(' ')[0]); if (!Number.isFinite(n)) throw new Error('bad asset'); return n; };
@@ -139,12 +174,24 @@ export async function loadTrustSignals(account: string): Promise<TrustSignals> {
   const io = route.kind === 'tor' ? torTrustIO(route.base) : PUBLIC_IO;
   const alcorIO = route.kind === 'tor' ? { positions: io.alcorPositions, tableRows: io.table } : undefined;
   const routed = <T,>(key: string, ttl: number, read: () => Promise<T>) => blocked ? Promise.resolve(null) : cached(key, ttl, read);
+  const needsAge = getPermanent('created', account) == null && !peek(`age:${account}`);
+  const needsNetwork = needsAge || ['cheese', 'stake', 'pool', 'nft'].some(k => !peek(`${k}:${account}`));
+  if (!blocked && needsNetwork && chaffEnabled && !chaffing.has(account) && !inflight.has(`cheese:${account}`)) {
+    const decoy = pickDecoy(account, snapshotAccounts());
+    if (decoy) {
+      chaffing.add(account);
+      const gap = jitterMs();
+      const go = () => decoyReads(decoy, io, alcorIO, needsAge).finally(() => chaffing.delete(account));
+      // Random order: sometimes the decoy goes first and the real lookup follows after a jitter.
+      if (Math.random() < 0.5) { void go(); await sleep(gap); } else { setTimeout(() => { void go(); }, gap); }
+    }
+  }
   const [createdAt, cheese, staked, pooled, nfts, key] = await Promise.all([
     blocked && getPermanent('created', account) != null ? Promise.resolve(getPermanent('created', account)) : routed(`age:${account}`, DAY_MS, () => readCreated(account, io)),
-    routed(`cheese:${account}`, HOUR_MS, () => readCheese(account, io)),
-    routed(`stake:${account}`, HOUR_MS, () => readStake(account, io)),
-    routed(`pool:${account}`, HOUR_MS, () => fetchAlcorCheese(account, alcorIO)),
-    routed(`nft:${account}`, HOUR_MS, () => readNfts(account, io)),
+    routed(`cheese:${account}`, DAY_MS, () => readCheese(account, io)),
+    routed(`stake:${account}`, DAY_MS, () => readStake(account, io)),
+    routed(`pool:${account}`, DAY_MS, () => fetchAlcorCheese(account, alcorIO)),
+    routed(`nft:${account}`, DAY_MS, () => readNfts(account, io)),
     cached(`key:${account}`, DAY_MS, () => readKey(account)),
   ]);
   return { account, createdAt, cheese, staked, pooled, nfts, key };
@@ -154,7 +201,13 @@ export async function loadTrustSignals(account: string): Promise<TrustSignals> {
 export function getCachedTrustSignals(account: string): TrustSignals | null {
   if (!account) return null;
   const keys = ['age', 'cheese', 'stake', 'pool', 'nft', 'key'];
-  const entries = keys.map(key => cache.get(`${key}:${account}`));
+  const entries = keys.map(key => {
+    if (key === 'age') {
+      const known = getPermanent('created', account);
+      if (known != null) return { expiresAt: Infinity, value: known };
+    }
+    return peek(`${key}:${account}`);
+  });
   if (entries.some(entry => !entry || Date.now() >= entry.expiresAt)) return null;
   return {
     account,
