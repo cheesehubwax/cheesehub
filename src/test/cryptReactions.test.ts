@@ -11,7 +11,9 @@ describe('reactions', () => {
     const t = encodeReaction({ add: true, author: 'alice', time: 1234, emoji: '🧀' });
     expect(isReaction(t)).toBe(true);
     expect(parseReaction(t)).toEqual({ add: true, author: 'alice', time: 1234, emoji: '🧀' });
-    expect(parseReaction('\u0006R1:+:alice:ya:💩')).toBeNull();
+    expect(parseReaction('\u0006R1:+:alice:ya:🐸')).toBeNull();
+    const poop = encodeReaction({ add: true, author: 'alice', time: 1234, emoji: '💩' });
+    expect(parseReaction(poop)).toEqual({ add: true, author: 'alice', time: 1234, emoji: '💩' });
   });
   it('newest add/remove per reactor wins and counts aggregate', () => {
     const targets = new Set([targetRef('alice', 100)]);

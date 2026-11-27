@@ -4,7 +4,7 @@
 // (edits keep the original time), the same reference replies use.
 
 export const REACTION_MARK = '\u0006R1:';
-export const REACTION_EMOJIS = ['👍', '❤️', '🔥', '😂', '🧀', '🚀'] as const;
+export const REACTION_EMOJIS = ['👍', '❤️', '🔥', '😂', '🧀', '🚀', '💩'] as const;
 export type ReactionEmoji = typeof REACTION_EMOJIS[number];
 const LINE = /^\u0006R1:([+-]):([a-z1-5.]{1,12}):([0-9a-z]{1,12}):(.+)$/;
 
