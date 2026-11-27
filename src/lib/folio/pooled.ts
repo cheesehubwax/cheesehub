@@ -85,33 +85,45 @@ function add(out: Map<TokenKey, PooledToken>, contract: string, symbol: string, 
 
 const ALCOR_API = 'https://wax.alcor.exchange/api/v2';
 
-async function alcorPoolIds(account: string): Promise<number[]> {
+/** Where Alcor reads go; callers may route them (e.g. CHEESECrypt's Tor helper). */
+export interface AlcorReadIO {
+  positions: (account: string) => Promise<unknown>;
+  tableRows: typeof fetchTableRows;
+}
+
+async function publicPositions(account: string): Promise<unknown> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 12_000);
   try {
     const res = await fetch(`${ALCOR_API}/account/${encodeURIComponent(account)}/positions`, { signal: ctrl.signal });
     if (!res.ok) throw new Error(`Alcor positions ${res.status}`);
-    const data = (await res.json()) as { pool?: number; closed?: boolean }[];
-    if (!Array.isArray(data)) throw new Error('Unexpected Alcor positions');
-    return [...new Set(data.filter((p) => !p.closed && Number.isFinite(Number(p.pool))).map((p) => Number(p.pool)))];
+    return await res.json();
   } finally {
     clearTimeout(timer);
   }
+}
+
+const PUBLIC_IO: AlcorReadIO = { positions: publicPositions, tableRows: fetchTableRows };
+
+async function alcorPoolIds(account: string, io: AlcorReadIO): Promise<number[]> {
+  const data = (await io.positions(account)) as { pool?: number; closed?: boolean }[];
+  if (!Array.isArray(data)) throw new Error('Unexpected Alcor positions');
+  return [...new Set(data.filter((p) => !p.closed && Number.isFinite(Number(p.pool))).map((p) => Number(p.pool)))];
 }
 
 /**
  * Alcor's API says which pools the account is in; the amounts come from the
  * chain itself (positions are stored per pool, indexed by owner).
  */
-async function readAlcor(account: string, out: Map<TokenKey, PooledToken>): Promise<void> {
-  const poolIds = await alcorPoolIds(account);
+async function readAlcor(account: string, out: Map<TokenKey, PooledToken>, io: AlcorReadIO = PUBLIC_IO): Promise<void> {
+  const poolIds = await alcorPoolIds(account, io);
   await Promise.all(poolIds.map(async (id) => {
     const [posRes, poolRes] = await Promise.all([
-      fetchTableRows<ChainPosition>({
+      io.tableRows<ChainPosition>({
         code: 'swap.alcor', scope: String(id), table: 'positions',
         index_position: 3, key_type: 'name', lower_bound: account, upper_bound: account, limit: 100,
       }),
-      fetchTableRows<ChainPool>({
+      io.tableRows<ChainPool>({
         code: 'swap.alcor', scope: 'swap.alcor', table: 'pools', lower_bound: String(id), upper_bound: String(id), limit: 1,
       }),
     ]);
@@ -131,9 +143,9 @@ async function readAlcor(account: string, out: Map<TokenKey, PooledToken>): Prom
 }
 
 /** CHEESE the account holds across Alcor pools right now, and how many distinct pools hold it. Throws if any pool can't be read. */
-export async function fetchAlcorCheese(account: string): Promise<{ cheese: number; pools: number }> {
+export async function fetchAlcorCheese(account: string, io?: AlcorReadIO): Promise<{ cheese: number; pools: number }> {
   const out = new Map<TokenKey, PooledToken>();
-  await readAlcor(account, out);
+  await readAlcor(account, out, io);
   const t = out.get('cheeseburger:CHEESE');
   return { cheese: t?.qty ?? 0, pools: new Set((t?.parts ?? []).filter(p => p.qty > 0).map(p => p.pair)).size };
 }

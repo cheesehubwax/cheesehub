@@ -1,4 +1,4 @@
-// CHEESECrypt NFT media routing through the user's own loopback Tor helper (v1.3+).
+// CHEESECrypt NFT media (v1.3+) and Respect lookup (v1.4+) routing through the user's own loopback Tor helper.
 // When a loopback helper is saved as the custom history server, chat NFT metadata
 // (AtomicAssets) and IPFS artwork/audio/video go only through that helper, never
 // directly to public APIs or gateways. If the helper is configured but unreachable,
@@ -13,7 +13,8 @@ export type MediaRoute =
   | { kind: 'legacy'; base: string }   // helper answers but predates media routing: public, as before v1.3
   | { kind: 'blocked'; base: string }; // helper configured but unreachable: fail closed
 
-export type ProbeResult = 'media' | 'legacy' | 'down';
+/** 'full' = v1.4+ (media plus Respect lookups), 'media' = v1.3, 'legacy' = older helper. */
+export type ProbeResult = 'full' | 'media' | 'legacy' | 'down';
 
 const LOOPBACK = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(?=[:/]|$)/;
 export const isLoopbackHelper = (url: string | null): url is string => !!url && LOOPBACK.test(url);
@@ -21,7 +22,7 @@ export const isLoopbackHelper = (url: string | null): url is string => !!url && 
 /** Pure routing rule: which path chat NFT media may take for a saved server and probe outcome. */
 export function decideMediaRoute(custom: string | null, probe: ProbeResult | null): MediaRoute {
   if (!isLoopbackHelper(custom)) return { kind: 'public' };
-  if (probe === 'media') return { kind: 'tor', base: custom };
+  if (probe === 'full' || probe === 'media') return { kind: 'tor', base: custom };
   if (probe === 'legacy') return { kind: 'legacy', base: custom };
   return { kind: 'blocked', base: custom }; // unknown or down never leaks
 }
@@ -63,7 +64,9 @@ export async function probeHelper(base: string, fetcher: typeof fetch = fetch): 
     const r = await fetcher(`${base}/v2/helper`, { signal: ctl.signal, cache: 'no-store' });
     if (r.ok) {
       const j = await r.json().catch(() => null);
-      return Array.isArray(j?.features) && j.features.includes('ipfs') && j.features.includes('atomic') ? 'media' : 'legacy';
+      const f: unknown[] = Array.isArray(j?.features) ? j.features : [];
+      if (!f.includes('ipfs') || !f.includes('atomic')) return 'legacy';
+      return f.includes('chain') && f.includes('respect') ? 'full' : 'media';
     }
     return r.status === 403 || r.status === 404 ? 'legacy' : 'down';
   } catch { return 'down'; } finally { clearTimeout(t); }
@@ -76,9 +79,18 @@ export function currentMediaRoute(): MediaRoute {
   return decideMediaRoute(custom, cached?.base === custom ? cached.probe : null);
 }
 
-export async function resolveMediaRoute(fetcher: typeof fetch = fetch): Promise<MediaRoute> {
-  const custom = loadCustomEndpoint();
+/**
+ * Respect lookup route: only a v1.4+ helper carries them; an older helper keeps the public path
+ * (as before v1.4), and a saved helper that is unreachable fails closed.
+ */
+export function decideRespectRoute(custom: string | null, probe: ProbeResult | null): MediaRoute {
   if (!isLoopbackHelper(custom)) return { kind: 'public' };
+  if (probe === 'full') return { kind: 'tor', base: custom };
+  if (probe === 'media' || probe === 'legacy') return { kind: 'legacy', base: custom };
+  return { kind: 'blocked', base: custom };
+}
+
+async function ensureProbe(custom: string, fetcher: typeof fetch): Promise<ProbeResult | null> {
   const fresh = cached && cached.base === custom && (cached.probe !== 'down' || Date.now() - cached.at < DOWN_RETRY_MS);
   if (!fresh) {
     if (!inflight || inflight.base !== custom) {
@@ -88,7 +100,19 @@ export async function resolveMediaRoute(fetcher: typeof fetch = fetch): Promise<
     }
     await inflight.p;
   }
-  return currentMediaRoute();
+  return cached?.base === custom ? cached.probe : null;
+}
+
+export async function resolveMediaRoute(fetcher: typeof fetch = fetch): Promise<MediaRoute> {
+  const custom = loadCustomEndpoint();
+  if (!isLoopbackHelper(custom)) return { kind: 'public' };
+  return decideMediaRoute(custom, await ensureProbe(custom, fetcher));
+}
+
+export async function resolveRespectRoute(fetcher: typeof fetch = fetch): Promise<MediaRoute> {
+  const custom = loadCustomEndpoint();
+  if (!isLoopbackHelper(custom)) return { kind: 'public' };
+  return decideRespectRoute(custom, await ensureProbe(custom, fetcher));
 }
 
 export class MediaBlockedError extends Error {

@@ -2,10 +2,13 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getCachedTrustSignals, loadTrustSignals, useCryptTrust } from '@/hooks/useCryptTrust';
 import { scoreTrust } from '@/lib/cryptTrust';
+import { saveCustomEndpoint } from '@/lib/cryptNetworkPrivacy';
+import { __resetMediaRouteCache } from '@/lib/cryptMediaProxy';
 
 const reads = vi.hoisted(() => ({ rpc: vi.fn(), table: vi.fn(), pool: vi.fn(), currentKey: vi.fn(), firstKey: vi.fn() }));
 vi.mock('@/lib/waxRpcFallback', () => ({ waxRpcCall: reads.rpc, fetchTableRows: reads.table }));
 vi.mock('@/lib/endpointHealth', () => ({ resolveEndpoints: async () => ['https://nft.test'], normalizeEndpoint: (url: string) => url, benchEndpoint: vi.fn() }));
+vi.mock('@/services/atomicApi', () => ({ fetchAssetById: vi.fn() }));
 vi.mock('@/lib/folio/pooled', () => ({ fetchAlcorCheese: reads.pool }));
 vi.mock('@/lib/cheeseCrypt', () => ({ lookupPublishedKey: reads.currentKey, lookupFirstKeyTime: reads.firstKey }));
 
@@ -23,7 +26,7 @@ beforeEach(() => {
   reads.firstKey.mockResolvedValue(Date.UTC(2024, 0, 1));
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ success: true, data: { collections: [] } }) }));
 });
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); saveCustomEndpoint(null, false); __resetMediaRouteCache(); });
 
 describe('Respect signal caching', () => {
   it('renders a cached account immediately on remount without more network reads', async () => {
@@ -95,5 +98,56 @@ describe('Respect signal caching', () => {
     hook.rerender({ name: b });
     expect(hook.result.current).toBeNull();
     expect(reads.rpc).toHaveBeenCalledTimes(2);
+  });
+});
+describe('Respect lookups through the Tor helper', () => {
+  const H = 'http://localhost:8088';
+  const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+
+  it('sends every non-history lookup only to a v1.4 helper', async () => {
+    saveCustomEndpoint(H, true);
+    const urls: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      urls.push(url);
+      if (url.endsWith('/v2/helper')) return reply({ features: ['history', 'broadcast', 'atomic', 'ipfs', 'chain', 'respect'] });
+      if (url.endsWith('/v1/chain/get_account')) return reply({ created: '2020-01-01T00:00:00' });
+      if (url.endsWith('/v1/chain/get_currency_balance')) return reply({ error: 'no balance' }, 500);
+      if (url.endsWith('/v1/chain/get_table_rows')) return reply({ rows: [{ staker: JSON.parse(String(init?.body)).lower_bound, cheesestaked: '7.0000 CHEESE' }] });
+      if (url.includes('/atomic/v1/accounts/')) return reply({ success: true, data: { collections: [{ assets: '3', collection: { collection_name: 'cheesenftwax' } }] } });
+      if (url.includes('/alcor/v2/account/')) return reply([]);
+      return reply({}, 404);
+    }));
+    reads.pool.mockImplementation(async (name: string, io: { positions: (a: string) => Promise<unknown> }) => { await io.positions(name); return { cheese: 0, pools: 0 }; });
+    const name = account();
+    const s = await loadTrustSignals(name);
+    expect(s).toMatchObject({ createdAt: Date.UTC(2020, 0, 1), cheese: 0, staked: 7, nfts: 3, pooled: { cheese: 0, pools: 0 } });
+    expect(reads.rpc).not.toHaveBeenCalled();
+    expect(reads.table).not.toHaveBeenCalled();
+    expect(urls.length).toBe(6);
+    expect(urls.every(u => u.startsWith(H))).toBe(true);
+    expect(urls).toContain(`${H}/alcor/v2/account/${name}/positions`);
+  });
+
+  it('keeps lookups unknown, never public, while the saved helper is down', async () => {
+    saveCustomEndpoint(H, true);
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('connection refused'); }));
+    const name = account();
+    const s = await loadTrustSignals(name);
+    expect(s).toMatchObject({ createdAt: null, cheese: null, staked: null, pooled: null, nfts: null });
+    expect(reads.rpc).not.toHaveBeenCalled();
+    expect(reads.table).not.toHaveBeenCalled();
+    expect(reads.pool).not.toHaveBeenCalled();
+    expect(vi.mocked(fetch).mock.calls.every(([u]) => String(u).startsWith(H))).toBe(true);
+    expect(getCachedTrustSignals(name)).toBeNull();
+  });
+
+  it('keeps the public path for a v1.3 helper that cannot carry Respect lookups', async () => {
+    saveCustomEndpoint(H, true);
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => url.endsWith('/v2/helper')
+      ? reply({ features: ['history', 'broadcast', 'atomic', 'ipfs'] })
+      : reply({ success: true, data: { collections: [] } })));
+    await loadTrustSignals(account());
+    expect(reads.rpc).toHaveBeenCalledTimes(2);
+    expect(reads.pool).toHaveBeenCalledWith(expect.any(String), undefined);
   });
 });

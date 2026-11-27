@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { saveCustomEndpoint } from '@/lib/cryptNetworkPrivacy';
-import { __resetMediaRouteCache, currentMediaRoute, decideMediaRoute, resolveMediaRoute, routedImageUrl, routedMediaCandidates, torMediaUrl } from '@/lib/cryptMediaProxy';
+import { __resetMediaRouteCache, currentMediaRoute, decideMediaRoute, decideRespectRoute, resolveMediaRoute, routedImageUrl, routedMediaCandidates, torMediaUrl } from '@/lib/cryptMediaProxy';
 
 const CID = 'QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco';
 const H = 'http://localhost:8088';
@@ -45,5 +45,17 @@ describe('chat NFT media routing through the Tor helper', () => {
     __resetMediaRouteCache();
     const down = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
     expect((await resolveMediaRoute(down as unknown as typeof fetch)).kind).toBe('blocked');
+  });
+});
+
+describe('Respect route', () => {
+  it('uses Tor only for a v1.4 helper, public for older helpers, and fails closed when down', () => {
+    expect(decideMediaRoute(H, 'full')).toEqual({ kind: 'tor', base: H });
+    expect(decideRespectRoute(H, 'full')).toEqual({ kind: 'tor', base: H });
+    expect(decideRespectRoute(H, 'media').kind).toBe('legacy');
+    expect(decideRespectRoute(H, 'legacy').kind).toBe('legacy');
+    expect(decideRespectRoute(H, 'down').kind).toBe('blocked');
+    expect(decideRespectRoute(H, null).kind).toBe('blocked');
+    expect(decideRespectRoute('https://my.node', 'full')).toEqual({ kind: 'public' });
   });
 });

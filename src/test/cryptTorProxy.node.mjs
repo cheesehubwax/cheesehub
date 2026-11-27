@@ -6,7 +6,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { createProxyServer, fetchViaTor, TIMEOUT_MS } from '../../public/downloads/cheesecrypt-tor-proxy-v1.3.mjs';
+import { createProxyServer, fetchViaTor, TIMEOUT_MS } from '../../public/downloads/cheesecrypt-tor-proxy-v1.4.mjs';
 
 const CID = 'QmYTvGVY8eVxrzYf7VTgqJJqZiNJF7gAfji6ewxo4qUyeM';
 const folder = mkdtempSync(join(tmpdir(), 'crypt-tor-test-'));
@@ -29,6 +29,10 @@ before(async () => {
     if (req.url === `/ipfs/${CID}/page.html`) { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<script>alert(1)</script>'); return; }
     res.setHeader('Content-Type', 'application/json');
     if (req.url === '/atomicassets/v1/assets/42') { res.end(JSON.stringify({ success: true, data: { asset_id: '42' } })); return; }
+    if (req.url === '/v1/chain/get_account') { res.end(JSON.stringify({ account_name: JSON.parse(upstreamRequests.at(-1).body).account_name, created: '2020-01-01T00:00:00.000' })); return; }
+    if (req.url === '/v1/chain/get_currency_balance') { res.writeHead(500); res.end(JSON.stringify({ error: { what: 'no contract' } })); return; }
+    if (req.url === '/atomicassets/v1/accounts/bob?collection_whitelist=cheesenftwax') { res.end(JSON.stringify({ success: true, data: { collections: [] } })); return; }
+    if (req.url === '/api/v2/account/bob/positions') { res.end(JSON.stringify([{ pool: 7 }])); return; }
     if (req.url === '/bad-json') { res.end('<html>not history</html>'); return; }
     if (req.url === '/v1/chain/send_transaction') {
       res.writeHead(202);
@@ -74,7 +78,7 @@ before(async () => {
     socket.on('data', handshake);
   });
   socksPort = await listen(socks);
-  proxy = createProxyServer({ torPorts: [socksPort], upstreams: ['https://history.invalid'], atomicUpstreams: ['https://history.invalid'], ipfsGateways: ['https://history.invalid'], ca });
+  proxy = createProxyServer({ torPorts: [socksPort], upstreams: ['https://history.invalid'], atomicUpstreams: ['https://history.invalid'], ipfsGateways: ['https://history.invalid'], alcorUpstreams: ['https://history.invalid'], ca });
   proxyPort = await listen(proxy);
 });
 
@@ -141,7 +145,9 @@ test('loopback helper blocks other writes and non-history paths, and supports br
   for (const [path, method] of [
     ['/v1/chain/push_transaction', 'GET'],
     ['/v1/chain/get_info', 'GET'],
-    ['/v1/chain/get_table_rows', 'POST'],
+    ['/v1/chain/get_table_rows', 'GET'],
+    ['/v1/chain/get_info', 'POST'],
+    ['/v1/chain/push_action', 'POST'],
     ['//other.example/v2/history/get_actions', 'GET'],
   ]) {
     assert.equal((await fetch(base + path, { method })).status, 403);
@@ -152,10 +158,40 @@ test('loopback helper blocks other writes and non-history paths, and supports br
   assert.match(preflight.headers.get('access-control-allow-methods'), /POST/);
 });
 
-test('v1.3 reports its media capabilities', async () => {
+test('v1.4 reports its media and Respect capabilities', async () => {
   const j = await (await fetch(`http://127.0.0.1:${proxyPort}/v2/helper`)).json();
-  assert.equal(j.version, '1.3');
-  assert.ok(j.features.includes('atomic') && j.features.includes('ipfs'));
+  assert.equal(j.version, '1.4');
+  for (const f of ['atomic', 'ipfs', 'chain', 'respect']) assert.ok(j.features.includes(f), f);
+});
+
+test('Respect lookups travel through SOCKS with their exact bodies', async () => {
+  const base = `http://127.0.0.1:${proxyPort}`;
+  const before = destinations.length;
+  const body = JSON.stringify({ account_name: 'bob' });
+  const acct = await fetch(`${base}/v1/chain/get_account`, { method: 'POST', body });
+  assert.equal(acct.status, 200);
+  assert.equal((await acct.json()).account_name, 'bob');
+  assert.equal(upstreamRequests.at(-1).body, body);
+  const bal = await fetch(`${base}/v1/chain/get_currency_balance`, { method: 'POST', body: '{"code":"x","account":"bob","symbol":"CHEESE"}' });
+  assert.equal(bal.status, 500, 'a complete nodeos error is passed back for the app to interpret');
+  const nft = await fetch(`${base}/atomic/v1/accounts/bob?collection_whitelist=cheesenftwax`);
+  assert.deepEqual((await nft.json()).data.collections, []);
+  const pos = await fetch(`${base}/alcor/v2/account/bob/positions`);
+  assert.deepEqual(await pos.json(), [{ pool: 7 }]);
+  assert.ok(destinations.slice(before).every(d => d.host === 'history.invalid'));
+  assert.equal(destinations.length - before, 4);
+});
+
+test('malformed or unsafe Respect lookups are refused before using Tor', async () => {
+  const base = `http://127.0.0.1:${proxyPort}`;
+  const before = upstreamRequests.length;
+  assert.equal((await fetch(`${base}/v1/chain/get_account`, { method: 'POST', body: 'nope' })).status, 400);
+  assert.equal((await fetch(`${base}/v1/chain/get_account`, { method: 'POST', body: '[1]' })).status, 400);
+  assert.equal((await fetch(`${base}/v1/chain/get_table_rows`, { method: 'POST', body: JSON.stringify({ pad: 'x'.repeat(20000) }) })).status, 400);
+  for (const path of ['/atomic/v1/accounts/BOB', '/atomic/v1/accounts/bob?limit=5', '/alcor/v2/account/bob/orders', '/alcor/v2/account/../positions']) {
+    assert.equal((await fetch(base + path)).status, 403, path);
+  }
+  assert.equal(upstreamRequests.length, before);
 });
 
 test('chat NFT lookups and IPFS pictures travel through SOCKS', async () => {

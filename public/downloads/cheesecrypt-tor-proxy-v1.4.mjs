@@ -6,6 +6,9 @@
 // (POST /v1/chain/send_transaction or push_transaction) through your local Tor client.
 // v1.3 also forwards chat NFT lookups (GET /atomic/v1/assets/<id>) and NFT pictures,
 // sounds and videos (GET /ipfs/<cid>) so AtomicAssets and IPFS gateways never see you.
+// v1.4 also forwards the read-only lookups behind Respect badges (account age, CHEESE
+// balance, staked CHEESE, Alcor pool positions and CHEESE NFT count) so the public WAX,
+// AtomicAssets and Alcor servers never learn which accounts you are looking at.
 // Those public servers see a Tor exit address instead of your home IP.
 //
 // What it does NOT do: it is not a Tor relay or exit node, it never accepts connections
@@ -13,7 +16,7 @@
 // logs or files. Media is passed through in memory only (never saved to disk). A broadcast is attempted on ONE upstream only, never retried: a lost
 // reply does not prove the chain rejected it. Check the account before manually retrying.
 //
-// Run:  node cheesecrypt-tor-proxy-v1.3.mjs
+// Run:  node cheesecrypt-tor-proxy-v1.4.mjs
 // Then in CHEESECrypt → Menu → Privacy → "Your own history server" enter http://localhost:8088
 // Tick "Use only this server" to route CHEESECrypt's signed broadcasts here too.
 //
@@ -45,11 +48,17 @@ const IPFS_GATEWAYS = [
   'https://nftstorage.link',
   'https://ipfs.io',
 ];
-export const HELPER_VERSION = '1.3';
+const ALCOR_UPSTREAMS = ['https://wax.alcor.exchange'];
+export const HELPER_VERSION = '1.4';
 export const TIMEOUT_MS = 8000;
 export const MEDIA_TIMEOUT_MS = 45000;
 export const MAX_MEDIA = 50 * 1024 * 1024;
 const ATOMIC_PATH = /^\/atomic\/v1\/assets\/(\d{1,20})$/;
+// Respect lookups: exact read-only shapes, WAX account names only.
+const ATOMIC_ACCOUNT_PATH = /^\/atomic\/v1\/accounts\/([a-z1-5.]{1,13})(\?collection_whitelist=[a-z1-5.]{1,13})?$/;
+const ALCOR_POSITIONS_PATH = /^\/alcor\/v2\/account\/([a-z1-5.]{1,13})\/positions$/;
+const CHAIN_READ_PATH = /^\/v1\/chain\/(get_account|get_currency_balance|get_table_rows)$/;
+const MAX_READ_BODY = 16 * 1024;
 // CIDv0 (Qm…) or base32 CIDv1 (b…), optional folder sub-path; no dot segments, no query.
 const IPFS_PATH = /^\/ipfs\/((?:Qm[1-9A-HJ-NP-Za-km-z]{44}|b[a-z2-7]{20,})(?:\/[A-Za-z0-9._~%-]+)*)$/;
 const MEDIA_TYPE = /^(image|audio|video)\/[a-z0-9.+-]+$|^application\/octet-stream$/i;
@@ -194,7 +203,7 @@ async function updateHealthOrder(torPort) {
   } catch { /* health outage never prevents Tor reads */ }
 }
 
-function readRequestBody(req) {
+function readRequestBody(req, limit = MAX_REQUEST_BODY) {
   return new Promise((resolve, reject) => {
     const parts = [];
     let size = 0, settled = false;
@@ -208,7 +217,7 @@ function readRequestBody(req) {
     };
     const onData = (chunk) => {
       size += chunk.length;
-      if (size > MAX_REQUEST_BODY) return fail('signed transaction is too large');
+      if (size > limit) return fail(limit === MAX_REQUEST_BODY ? 'signed transaction is too large' : 'request is too large');
       parts.push(chunk);
     };
     const onEnd = () => {
@@ -222,7 +231,7 @@ function readRequestBody(req) {
   });
 }
 
-export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS, atomicUpstreams = ATOMIC_UPSTREAMS, ipfsGateways = IPFS_GATEWAYS, ca } = {}) {
+export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS, atomicUpstreams = ATOMIC_UPSTREAMS, ipfsGateways = IPFS_GATEWAYS, alcorUpstreams = ALCOR_UPSTREAMS, ca } = {}) {
   let lastGood = null;
   return http.createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -233,7 +242,62 @@ export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS,
     const send = (code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
 
     if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
-    if (req.method === 'GET' && req.url === '/v2/helper') return send(200, { helper: 'cheesecrypt-tor', version: HELPER_VERSION, features: ['history', 'broadcast', 'atomic', 'ipfs'] });
+    if (req.method === 'GET' && req.url === '/v2/helper') return send(200, { helper: 'cheesecrypt-tor', version: HELPER_VERSION, features: ['history', 'broadcast', 'atomic', 'ipfs', 'chain', 'respect'] });
+
+    // Respect lookups (v1.4): read-only, so trying the next server on failure is safe.
+    const accountMatch = req.method === 'GET' ? ATOMIC_ACCOUNT_PATH.exec(req.url || '') : null;
+    const alcorMatch = req.method === 'GET' ? ALCOR_POSITIONS_PATH.exec(req.url || '') : null;
+    const chainRead = req.method === 'POST' && CHAIN_READ_PATH.test(req.url || '');
+    if (accountMatch || alcorMatch || chainRead) {
+      let body = null;
+      if (chainRead) {
+        try {
+          body = await readRequestBody(req, MAX_READ_BODY);
+          const j = JSON.parse(body.toString('utf8'));
+          if (!j || typeof j !== 'object' || Array.isArray(j)) throw new Error('expected a JSON object');
+        } catch (e) { return send(400, { error: `Chain lookup was not forwarded: ${e.message}` }); }
+      }
+      const torPort = await findTor(torPorts);
+      if (!torPort) return send(503, { error: 'Tor is not running. Open Tor Browser (or start the Tor service) and try again.' });
+      if (accountMatch) {
+        for (const upstream of atomicUpstreams) {
+          if (res.destroyed) return;
+          try {
+            const r = await fetchViaTor(torPort, upstream, `/atomicassets/v1/accounts/${accountMatch[1]}${accountMatch[2] || ''}`, { ca });
+            const j = JSON.parse(r.body.toString('utf8'));
+            if (!j?.success || !j.data) throw new Error('no account in reply');
+            res.writeHead(200, { 'Content-Type': r.type });
+            return res.end(r.body);
+          } catch (e) { console.warn(`  ${new URL(upstream).hostname} NFT count via Tor failed: ${e.message} — trying next`); }
+        }
+        return send(502, { error: 'Every NFT server failed through Tor. Try again in a minute.' });
+      }
+      if (alcorMatch) {
+        for (const upstream of alcorUpstreams) {
+          if (res.destroyed) return;
+          try {
+            const r = await fetchViaTor(torPort, upstream, `/api/v2/account/${alcorMatch[1]}/positions`, { ca });
+            if (!Array.isArray(JSON.parse(r.body.toString('utf8')))) throw new Error('no positions list in reply');
+            res.writeHead(200, { 'Content-Type': r.type });
+            return res.end(r.body);
+          } catch (e) { console.warn(`  ${new URL(upstream).hostname} Alcor lookup via Tor failed: ${e.message} — trying next`); }
+        }
+        return send(502, { error: 'Alcor failed through Tor. Try again in a minute.' });
+      }
+      // Complete nodeos replies (including 4xx errors) are returned; 5xx and network failures try the next server.
+      let lastReply = null;
+      for (const upstream of (upstreams === UPSTREAMS ? upstreamOrder : upstreams)) {
+        if (res.destroyed) return;
+        try {
+          const r = await requestViaTor(torPort, upstream, req.url, { method: 'POST', body, contentType: 'application/json', ca });
+          if (r.status >= 500) { lastReply = r; throw new Error(`HTTP ${r.status}`); }
+          res.writeHead(r.status, { 'Content-Type': r.type });
+          return res.end(r.body);
+        } catch (e) { console.warn(`  ${new URL(upstream).hostname} chain lookup via Tor failed: ${e.message} — trying next`); }
+      }
+      if (lastReply) { res.writeHead(lastReply.status, { 'Content-Type': lastReply.type }); return res.end(lastReply.body); }
+      return send(502, { error: 'Every WAX server failed through Tor. Try again in a minute.' });
+    }
 
     const atomicMatch = req.method === 'GET' ? ATOMIC_PATH.exec(req.url || '') : null;
     const ipfsRequest = req.method === 'GET' && mediaPathAllowed(req.url);
@@ -267,7 +331,7 @@ export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS,
     }
     const historyRequest = req.method === 'GET' && ALLOWED_PATH.test(req.url || '');
     const broadcastRequest = req.method === 'POST' && BROADCAST_PATH.test(req.url || '');
-    if (!historyRequest && !broadcastRequest) return send(403, { error: 'Only WAX history reads, signed transaction broadcasts, NFT lookups and IPFS media are forwarded.' });
+    if (!historyRequest && !broadcastRequest) return send(403, { error: 'Only WAX history reads, Respect lookups, signed transaction broadcasts, NFT lookups and IPFS media are forwarded.' });
 
     const torPort = await findTor(torPorts);
     if (!torPort) return send(503, { error: 'Tor is not running. Open Tor Browser (or start the Tor service) and try again.' });
@@ -324,9 +388,9 @@ export const server = createProxyServer();
 // 127.0.0.1 only: nobody else on your network or the internet can use this helper.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) server.listen(LISTEN_PORT, '127.0.0.1', async () => {
   const tor = await findTor();
-  console.log('\n🧅 CHEESECrypt Tor helper v${HELPER_VERSION} is running');
+  console.log(`\n🧅 CHEESECrypt Tor helper v${HELPER_VERSION} is running`);
   console.log(`   Address for CHEESECrypt: http://localhost:${LISTEN_PORT}`);
-  console.log('   History reads, single-attempt signed broadcasts and chat NFT media use Tor');
+  console.log('   History reads, Respect lookups, single-attempt signed broadcasts and chat NFT media use Tor');
   console.log(tor ? `   Tor port ${tor} is open (connection verified on first request)` : '   ⚠️  Tor not found yet — open Tor Browser or start the Tor service');
   console.log('   Leave this window open. Press Ctrl+C to stop.\n');
   if (tor) void updateHealthOrder(tor);
