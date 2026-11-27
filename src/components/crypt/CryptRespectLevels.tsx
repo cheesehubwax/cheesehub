@@ -16,10 +16,9 @@ export function CryptRespectLevels({ current }: { current?: TrustMark }) {
       <ul className="space-y-2 text-xs">
         {RESPECT_LEVELS.map(l => <li key={l.mark} className={`rounded-md border p-2 ${l.mark === current ? 'border-primary bg-primary/10' : 'border-border'}`}>
           <div className="flex items-center justify-between gap-2">
-            <span className="font-semibold"><CryptRespectMark mark={l.mark} /></span>
+            <span className="font-semibold"><CryptRespectMark mark={l.mark} />{l.mark === current && <span className="text-primary"> · You</span>}</span>
             <span className="text-right font-mono text-[11px] text-muted-foreground">{l.range}</span>
           </div>
-          <p className="mt-1 text-muted-foreground">{l.description}{l.mark === current && <span className="font-semibold text-primary"> · You</span>}</p>
         </li>)}
       </ul>
       <p className="text-[10px] text-muted-foreground">{TRUST_DISCLAIMER}</p>
