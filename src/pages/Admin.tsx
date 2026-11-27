@@ -9,6 +9,7 @@ import { NodeHealthPanel } from '@/components/admin/NodeHealthPanel';
 import { CryptRoomModerationPanel } from '@/components/admin/CryptRoomModerationPanel';
 import { AddBannerSlotsCard } from '@/components/admin/AddBannerSlotsCard';
 import { CryptSponsorDepositBox } from '@/components/admin/CryptSponsorDepositBox';
+import { RamPoolDepositBox } from '@/components/admin/RamPoolDepositBox';
 import { parseAssetAmount, getDeviationSeverity } from '@/lib/adminData';
 import { DropPurchaseLog } from '@/components/admin/DropPurchaseLog';
 import { useDropPurchases } from '@/hooks/useDropPurchases';
@@ -328,7 +329,9 @@ export default function Admin() {
                   { label: 'CHEESE Nulled', value: data.ramStats ? `${data.ramStats.totalCheeseNulled.toFixed(4)} CHEESE` : '—' },
                   { label: 'WAX Claimed', value: data.ramStats ? `${data.ramStats.totalWaxClaimed.toFixed(4)} WAX` : '—' },
                 ]}
-              />
+             >
+                <RamPoolDepositBox />
+              </ContractStatusCard>
             </div>
 
             {/* Add Banner Slots Tool */}
