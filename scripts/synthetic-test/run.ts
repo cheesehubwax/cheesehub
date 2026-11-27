@@ -10,7 +10,7 @@ import { randomBytes, randomInt } from 'node:crypto';
 import { APIClient, FetchProvider, PrivateKey, Transaction, Action, ABI, Serializer } from '@wharfkit/antelope';
 import {
   ROUTER, TOKEN, validateConfig, buildSend, dummyMemo, poissonDelayMs, pickRecipient, planBurst, isOrganic,
-  refuseSend, burstAllowed, buildPowerup, planPowerup, POWERUP_UNITS, parseBudget, sponsorRemaining, SPONSOR_PART_UNITS, SEND_COST_UNITS, utcDay, cheeseUnits, checkPermission, type Config, type Bot,
+  refuseSend, burstAllowed, buildPowerup, planPowerup, POWERUP_UNITS, parseBudget, sponsorRemaining, SPONSOR_PART_UNITS, SEND_COST_UNITS, utcDay, cheeseUnits, checkPermission, nightKey, upcomingNightKey, planNight, dueNight, type NightEntry, type Config, type Bot,
 } from './policy';
 
 const WAX_CHAIN_ID = '1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4';
@@ -96,11 +96,11 @@ async function broadcastActions(bot: Bot & { key: PrivateKey }, actionsJson: { a
 let chain = Promise.resolve();
 const serial = (fn: () => Promise<void>) => { chain = chain.then(fn, fn); return chain; };
 
-async function send(senderName: string, why: string) {
+async function send(senderName: string, why: string, fixedTo?: string) {
   await serial(async () => {
     rollDay();
     const bot = bots.get(senderName)!;
-    const to = pickRecipient(botNames, senderName, rand());
+    const to = fixedTo ?? pickRecipient(botNames, senderName, rand());
     try {
       if (!(await ensureCpu(senderName))) { log(`skip ${senderName} (${why}): CPU too low and no worker could power it up`); return; }
       const free = await freeAvailable();
@@ -197,11 +197,42 @@ async function watch() {
   } catch (e) { log(`watch error: ${(e as Error).message}`); }
 }
 
+// ---- Night schedule: plan once per local night, persist, never re-send after a restart ----
+const NIGHT_PATH = configPath.replace(/\.json$/, '') + '.night.json';
+interface NightState { key: string; plan: NightEntry[]; done: string[] }
+let night: NightState | null = null;
+try { const s = JSON.parse(readFileSync(NIGHT_PATH, 'utf8')); if (s?.key && Array.isArray(s.plan)) night = { key: s.key, plan: s.plan, done: s.done ?? [] }; } catch { /* fresh */ }
+const saveNight = () => { if (dryRun) return; try { writeFileSync(NIGHT_PATH, JSON.stringify(night)); } catch { /* non-fatal */ } };
+const fmt = (ms: number) => new Date(ms).toLocaleString('en-GB', { timeZone: config.night!.timezone, hour12: false });
+function logNightPlan(s: NightState) {
+  if (!s.plan.length) { log(`night ${s.key}: no sends planned (quiet night)`); return; }
+  log(`night ${s.key}: ${s.plan.length} send(s) planned`);
+  for (const e of s.plan) log(`  ${fmt(e.atMs)}  ${e.sender} → ${e.recipient}${e.id.endsWith('r') ? '  (reply)' : ''}`);
+}
+function nightTick() {
+  const n = config.night!;
+  const key = nightKey(Date.now(), n);
+  if (!key) return;
+  if (night?.key !== key) { night = { key, plan: planNight(n, botNames, key, rand), done: [] }; saveNight(); logNightPlan(night); }
+  const { due, dropped } = dueNight(night.plan, new Set(night.done), Date.now());
+  for (const e of dropped) { night.done.push(e.id); log(`night: dropped overdue ${e.sender} → ${e.recipient}`); }
+  // Marked done before sending: an uncertain broadcast is never repeated.
+  for (const e of due) { night.done.push(e.id); void send(e.sender, 'night', e.recipient); }
+  if (due.length || dropped.length) saveNight();
+}
+
 async function main() {
   log(`CHEESECrypt synthetic test starting${dryRun ? ' (DRY RUN: nothing is broadcast)' : ''}: ${botNames.length} workers, broadcast ${config.broadcast === 'direct' ? 'DIRECT (not via Tor)' : config.broadcast}`);
   if (config.broadcast === 'direct') log('note: direct mode shows your IP to the nodes. Use the Tor helper for network privacy.');
   await preflight();
   for (const n of botNames) trickle(n);
+  if (config.night?.enabled) {
+    if (dryRun) {
+      const key = upcomingNightKey(Date.now(), config.night);
+      log(`DRY RUN night preview (${config.night.timezone} ${config.night.start}–${config.night.end}), a fresh roll each run:`);
+      logNightPlan({ key, plan: planNight(config.night, botNames, key, rand), done: [] });
+    } else { nightTick(); setInterval(nightTick, 20_000); }
+  }
   if (config.maxBurstsPerHour > 0 && config.burstMax > 0) { await watch(); setInterval(() => void watch(), 15_000); }
   process.on('SIGINT', () => { log('stopping'); saveState(); process.exit(0); });
   await new Promise(() => {});

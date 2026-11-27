@@ -7,3 +7,4 @@
 - Never retry an ambiguous broadcast, and refuse keys that are on owner/active, because extra authority exceeds what an unattended script should hold.
 - Workers must never trigger batches for each other, and nothing here may be hosted, relayed or auto-funded by CHEESEHub (custody and intermediary liability).
 - Auto-powerup is a 0.0100 CHEESE transfer to cheesepowerz (memo = target) planned in pure `planPowerup`: unknown CPU never buys, one per target per 6h recorded before broadcast, stuck workers are paid for by the best-CPU worker, because repeat or blind buys would waste CHEESE.
+- The night schedule is planned per local window in pure `planNight` and persisted with sent/dropped IDs marked before broadcast, so restarts never repeat or bunch sends; senders must be configured workers, because only the user's own accounts may take part.

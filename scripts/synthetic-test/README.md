@@ -16,3 +16,5 @@ response times under periodic and burst loads.
    bun run run.ts config.json --dry-run   # builds and signs locally, broadcasts nothing
    bun run run.ts config.json
    ```
+
+Optional `night` settings schedule a few random sends between your configured accounts inside a local time window; `--dry-run` prints a sample night plan. Progress is kept in a git-ignored `*.night.json` file.

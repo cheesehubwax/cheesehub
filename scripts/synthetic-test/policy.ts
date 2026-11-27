@@ -82,6 +82,24 @@ export interface Config {
   broadcast: string;
   /** Hyperion reads through the Tor helper too, when set. */
   historyViaHelper?: string;
+  /** Optional quiet-hours schedule (see NightConfig). */
+  night?: NightConfig;
+}
+
+export interface NightConfig {
+  enabled: boolean;
+  /** IANA timezone, e.g. "Australia/Brisbane". */
+  timezone: string;
+  /** Local "HH:MM"; the window may cross midnight. */
+  start: string; end: string;
+  sendsMin: number; sendsMax: number;
+  /** Chance (0–1) that a whole night has no sends. */
+  skipNightChance: number;
+  /** Chance (0–1) that the recipient answers. */
+  replyChance: number;
+  replyDelayMinSeconds: number; replyDelayMaxSeconds: number;
+  /** Which configured accounts may start night sends. */
+  senders: string[];
 }
 
 const NAME = /^[a-z1-5.]{1,12}$/;
@@ -115,6 +133,7 @@ export function validateConfig(raw: unknown): Config {
   if (!Array.isArray(c.hyperion) || !c.hyperion.length || !c.hyperion.every(u => /^https:\/\//.test(u))) bad('hyperion needs HTTPS endpoints');
   if (c.broadcast !== 'direct' && !loopback(c.broadcast)) bad('broadcast must be "direct" or a loopback Tor helper address');
   if (c.historyViaHelper !== undefined && !loopback(c.historyViaHelper)) bad('historyViaHelper must be a loopback address');
+  if (c.night !== undefined) validateNight(c.night, seen);
   return c;
 }
 
@@ -222,4 +241,100 @@ export function planPowerup(target: string, cpu: Record<string, number | null>, 
     .filter(([a, v]) => a !== target && v != null && Number.isFinite(v) && v >= CPU_LOW_US)
     .sort((a, b) => (b[1] as number) - (a[1] as number))[0];
   return buddy ? { payer: buddy[0], target } : null;
+}
+
+// ---- Night schedule: a few random sends inside the user's local quiet window ----
+const HM = /^([01]\d|2[0-3]):([0-5]\d)$/;
+export function parseHM(v: string): number { const m = HM.exec(v); if (!m) return NaN; return Number(m[1]) * 60 + Number(m[2]); }
+
+function validateNight(n: NightConfig, accounts: Set<string>) {
+  if (!n || typeof n !== 'object') bad('night must be an object');
+  if (typeof n.enabled !== 'boolean') bad('night.enabled must be true or false');
+  try { new Intl.DateTimeFormat('en-US', { timeZone: n.timezone }); } catch { bad(`night.timezone "${n.timezone}" is not a valid timezone`); }
+  if (typeof n.timezone !== 'string' || !n.timezone) bad('night.timezone is required');
+  if (Number.isNaN(parseHM(n.start))) bad('night.start must look like "23:00"');
+  if (Number.isNaN(parseHM(n.end))) bad('night.end must look like "06:30"');
+  if (n.start === n.end) bad('night.start and night.end must differ');
+  num(n.sendsMin, 0, 20, 'night.sendsMin');
+  num(n.sendsMax, n.sendsMin, 20, 'night.sendsMax');
+  num(n.skipNightChance, 0, 1, 'night.skipNightChance');
+  num(n.replyChance, 0, 1, 'night.replyChance');
+  num(n.replyDelayMinSeconds, 30, 3600, 'night.replyDelayMinSeconds');
+  num(n.replyDelayMaxSeconds, n.replyDelayMinSeconds, 3600, 'night.replyDelayMaxSeconds');
+  if (!Array.isArray(n.senders) || !n.senders.length) bad('night.senders needs at least one account');
+  for (const a of n.senders) if (!accounts.has(a)) bad(`night.senders: ${a} is not in bots (add it there with its own cheesecrypt key)`);
+}
+
+/** Local calendar date and minute-of-day for an instant in a timezone. */
+export function localParts(ms: number, tz: string) {
+  const f = new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const p: Record<string, number> = {};
+  for (const x of f.formatToParts(new Date(ms))) if (x.type !== 'literal') p[x.type] = Number(x.value);
+  return { y: p.year, m: p.month, d: p.day, minutes: p.hour * 60 + p.minute, s: p.second };
+}
+const iso = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d)).toISOString().slice(0, 10);
+export const addDays = (key: string, n: number) => new Date(Date.parse(key + 'T00:00:00Z') + n * 86_400_000).toISOString().slice(0, 10);
+
+/** UTC instant of a local date + minute in a timezone (DST-safe for times that exist). */
+export function zonedToUtc(key: string, minutes: number, tz: string): number {
+  const guess = Date.parse(key + 'T00:00:00Z') + minutes * 60_000;
+  const offsetAt = (ms: number) => { const l = localParts(ms, tz); return Date.UTC(l.y, l.m - 1, l.d, 0, l.minutes, l.s) - Math.floor(ms / 1000) * 1000; };
+  let t = guess - offsetAt(guess);
+  t = guess - offsetAt(t);
+  return t;
+}
+
+/** Key (local start date) of the window containing now, else null. */
+export function nightKey(nowMs: number, n: Pick<NightConfig, 'timezone' | 'start' | 'end'>): string | null {
+  const l = localParts(nowMs, n.timezone), s = parseHM(n.start), e = parseHM(n.end), today = iso(l.y, l.m, l.d);
+  if (s < e) return l.minutes >= s && l.minutes < e ? today : null;
+  if (l.minutes >= s) return today;
+  if (l.minutes < e) return addDays(today, -1);
+  return null;
+}
+/** The current window's key, or the next one to start. */
+export function upcomingNightKey(nowMs: number, n: Pick<NightConfig, 'timezone' | 'start' | 'end'>): string {
+  const cur = nightKey(nowMs, n); if (cur) return cur;
+  const l = localParts(nowMs, n.timezone), today = iso(l.y, l.m, l.d);
+  return l.minutes < parseHM(n.start) ? today : addDays(today, 1);
+}
+export function nightBounds(key: string, n: Pick<NightConfig, 'timezone' | 'start' | 'end'>) {
+  const s = parseHM(n.start), e = parseHM(n.end);
+  return { startMs: zonedToUtc(key, s, n.timezone), endMs: zonedToUtc(s < e ? key : addDays(key, 1), e, n.timezone) };
+}
+
+export interface NightEntry { id: string; atMs: number; sender: string; recipient: string }
+
+/** Tonight's sends: random count, random times (never on a round minute), random pairs, optional replies inside the window. */
+export function planNight(n: NightConfig, accounts: string[], key: string, rand: () => number): NightEntry[] {
+  if (!n.enabled || rand() < n.skipNightChance) return [];
+  const { startMs, endMs } = nightBounds(key, n);
+  const span = endMs - startMs;
+  const count = pickInt(n.sendsMin, n.sendsMax, rand());
+  const out: NightEntry[] = [];
+  for (let i = 0; i < count; i++) {
+    let at = startMs + Math.floor(rand() * span);
+    if (at % 60_000 < 1000) at += 1000 + Math.floor(rand() * 58_000);
+    if (at >= endMs) at = endMs - 1001;
+    const sender = n.senders[Math.min(n.senders.length - 1, Math.floor(rand() * n.senders.length))];
+    const recipient = pickRecipient(accounts, sender, rand());
+    out.push({ id: `${key}:${i}`, atMs: at, sender, recipient });
+    if (rand() < n.replyChance) {
+      let r = at + pickInt(n.replyDelayMinSeconds, n.replyDelayMaxSeconds, rand()) * 1000 + Math.floor(rand() * 1000);
+      if (r % 60_000 < 1000) r += 1000 + Math.floor(rand() * 58_000);
+      if (r < endMs) out.push({ id: `${key}:${i}r`, atMs: r, sender: recipient, recipient: sender });
+    }
+  }
+  return out.sort((a, b) => a.atMs - b.atMs);
+}
+
+/** Overdue beyond this (e.g. after a restart) is dropped, never bunched. */
+export const NIGHT_LATE_MS = 10 * 60_000;
+export function dueNight(plan: NightEntry[], done: Set<string>, nowMs: number): { due: NightEntry[]; dropped: NightEntry[] } {
+  const due: NightEntry[] = [], dropped: NightEntry[] = [];
+  for (const e of plan) {
+    if (done.has(e.id) || e.atMs > nowMs) continue;
+    (nowMs - e.atMs > NIGHT_LATE_MS ? dropped : due).push(e);
+  }
+  return { due, dropped };
 }
