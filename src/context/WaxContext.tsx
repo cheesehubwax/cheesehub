@@ -6,7 +6,7 @@ import { sessionKit, closeWharfkitModals, setLoginInProgress, getTransactPlugins
 import { CHEESE_CONFIG, NFTHIVE_CONFIG } from '@/lib/waxConfig';
 import { chainPost } from '@/lib/chainRequest';
 import { useToast } from '@/hooks/use-toast';
-import { WaxContext } from './waxContextState';
+import { WaxContext, isCryptPath } from './waxContextState';
 
 export interface WaxContextType {
   session: Session | null;
@@ -138,7 +138,10 @@ export function WaxProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!session) return;
 
+    // Silenced on CHEESECrypt: a periodic account-named balance query would
+    // let RPC operators tie this IP to the account while chatting.
     const intervalId = setInterval(() => {
+      if (isCryptPath(window.location.pathname)) return;
       refreshBalance();
     }, 30000); // 30 seconds
 
