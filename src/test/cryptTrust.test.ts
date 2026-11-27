@@ -39,6 +39,10 @@ describe('crypt trust strength', () => {
     expect(stakePoints(1_000_000)).toBe(20);
   });
   it('pooled CHEESE tiers with +5 for 2 or more pools', () => {
+    expect(poolPoints(9_999, 2)).toBe(15);
+    expect(poolPoints(10_000, 2)).toBe(20);
+    expect(poolPoints(10_000, 1)).toBe(15);
+    expect(poolPoints(1000, 3)).toBe(5);
     expect(poolPoints(0, 0)).toBe(0);
     expect(poolPoints(50, 1)).toBe(0);
     expect(poolPoints(99.9999, 2)).toBe(0);

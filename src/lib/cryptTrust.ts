@@ -71,7 +71,7 @@ export function stakePoints(c: number): number {
 export function poolPoints(c: number, pools: number): number {
   if (!(c >= 100)) return 0;
   const base = c >= 100_000 ? 100 : c >= 50_000 ? 70 : c >= 20_000 ? 35 : c >= 5_000 ? 15 : c >= 1_000 ? 5 : 1;
-  return base + (pools >= 2 ? 5 : 0);
+  return base + (pools >= 2 && c >= 10_000 ? 5 : 0);
 }
 
 export function nftPoints(n: number): number {
