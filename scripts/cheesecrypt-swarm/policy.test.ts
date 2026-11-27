@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { boxBytes, buildSend, burstAllowed, checkPermission, cheese, dummyMemo, isOrganic, planBurst, poissonDelayMs, pickRecipient, refuseSend, validateConfig, SEND_COST_UNITS } from './policy';
+import { boxBytes, buildSend, burstAllowed, checkPermission, cheese, dummyMemo, isOrganic, planBurst, poissonDelayMs, pickRecipient, refuseSend, validateConfig, SEND_COST_UNITS, parseBudget, sponsorRemaining } from './policy';
 
 const base = {
   bots: [
@@ -65,9 +65,26 @@ describe('swarm policy', () => {
       { perm_name: 'active', required_auth: { keys: [{ key: activeKey }] } },
       { perm_name: 'cheesecrypt', required_auth: { keys: [{ key: 'K1' }] }, linked_actions: links },
     ] });
-    const ok = [{ account: 'cheeseburger', action: 'transfer' }, { account: 'crypt.cheese', action: 'sendmsg' }];
+    const ok = [{ account: 'cheeseburger', action: 'transfer' }, { account: 'crypt.cheese', action: 'sendmsg' }, { account: 'crypt.cheese', action: 'sendfree' }];
+    expect(checkPermission(acc(ok.slice(0, 2)), 'cheesecrypt', ['K1'])).toContain('sendfree');
     expect(checkPermission(acc(ok), 'cheesecrypt', ['K1'])).toBeNull();
     expect(checkPermission(acc(ok, 'K1'), 'cheesecrypt', ['K1'])).toContain('active');
     expect(checkPermission(acc([...ok, { account: 'eosio.token' }]), 'cheesecrypt', ['K1'])).toContain('more than');
+  });
+  test('free sends use the lone sendfree shape the app signs', () => {
+    const acts = buildSend('alpha.chz', 'cheesecrypt', 'brie.chz', 'CRYPT2:a:b', true);
+    expect(acts).toEqual([{ account: 'crypt.cheese', name: 'sendfree', authorization: [{ actor: 'alpha.chz', permission: 'cheesecrypt' }], data: { sender: 'alpha.chz', parts: 1, copies: [{ to: 'brie.chz', memo: 'CRYPT2:a:b' }] } }]);
+    expect(() => buildSend('alpha.chz', 'cheesecrypt', 'alpha.chz', 'x', true)).toThrow();
+    expect(refuseSend(0, 40, NaN, 10_000, 0)).toBeNull();
+    expect(refuseSend(40, 40, NaN, 10_000, 0)).toBe('daily cap reached');
+  });
+  test('sponsor budget matches the contract window rule', () => {
+    const row = { daily_limit: '200.0000 CHEESE', window_start: 1000, spent: '199.9950 CHEESE', sponsor_balance: '497.1300 CHEESE', funder: 'cheesepromoz', enabled: 1 };
+    const b = parseBudget(row);
+    expect(sponsorRemaining(b, 1000 + 100)).toBe(50);
+    expect(sponsorRemaining(b, 1000 + 86400)).toBe(2_000_000);
+    expect(sponsorRemaining(parseBudget({ ...row, enabled: 0 }), 1100)).toBe(0);
+    expect(sponsorRemaining(parseBudget({ ...row, sponsor_balance: '0.0040 CHEESE' }), 90_000)).toBe(40);
+    expect(parseBudget({ ...row, spent: 'bad' })).toBeNull();
   });
 });

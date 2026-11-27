@@ -28,10 +28,35 @@ export function cheeseUnits(asset: string): number {
   return m ? Number(m[1]) * 10000 + Number(m[2]) : NaN;
 }
 
-/** Exact router shape the app uses for a one-part, one-recipient message (payment then sendmsg). */
-export function buildSend(sender: string, permission: string, to: string, memo: string) {
+/** Contract per-part platform fee the sponsor pays for a free message (0.0100 CHEESE). */
+export const SPONSOR_PART_UNITS = 100;
+export const SPONSOR_WINDOW_SEC = 86400;
+
+export interface Budget { dailyLimit: number; windowStart: number; spent: number; sponsorBalance: number; funder: string; enabled: boolean }
+const units = (a: unknown) => (typeof a === 'string' ? cheeseUnits(a) : NaN);
+/** Same validation as the app's parseBudget: anything malformed means "not sponsored". */
+export function parseBudget(row: unknown): Budget | null {
+  if (!row || typeof row !== 'object') return null;
+  const r = row as Record<string, unknown>;
+  const b: Budget = { dailyLimit: units(r.daily_limit), windowStart: Number(r.window_start), spent: units(r.spent),
+    sponsorBalance: units(r.sponsor_balance), funder: typeof r.funder === 'string' ? r.funder : '', enabled: r.enabled === true || r.enabled === 1 };
+  return [b.dailyLimit, b.windowStart, b.spent, b.sponsorBalance].every(n => Number.isSafeInteger(n) && n >= 0) ? b : null;
+}
+/** Same rule as the app and contract: units the sponsor can still cover right now (0 when off or used up). */
+export function sponsorRemaining(b: Budget | null, nowSec: number): number {
+  if (!b || !b.enabled || !b.funder) return 0;
+  const fresh = b.windowStart === 0 || (nowSec >= b.windowStart && nowSec - b.windowStart >= SPONSOR_WINDOW_SEC);
+  return Math.max(0, Math.min(b.dailyLimit - (fresh ? 0 : b.spent), b.sponsorBalance));
+}
+
+/**
+ * Exactly what the app signs for a one-part, one-recipient message: a lone `sendfree` when the live
+ * sponsor budget covers it (as Instant Messaging users send), otherwise payment then `sendmsg`.
+ */
+export function buildSend(sender: string, permission: string, to: string, memo: string, free = false) {
   if (sender === to) throw new Error('crypt.cheese rejects messages to self');
   const authorization = [{ actor: sender, permission }];
+  if (free) return [{ account: ROUTER, name: 'sendfree', authorization, data: { sender, parts: 1, copies: [{ to, memo }] } }];
   return [
     { account: TOKEN, name: 'transfer', authorization, data: { from: sender, to: ROUTER, quantity: cheese(SEND_COST_UNITS), memo: FEE_MEMO } },
     { account: ROUTER, name: 'sendmsg', authorization, data: { sender, parts: 1, copies: [{ to, memo }] } },
@@ -128,10 +153,11 @@ export function isOrganic(action: { act?: { name?: string; authorization?: { act
 }
 
 /** Per-UTC-day counter and balance gate; returns why a send is refused, or null when allowed. */
-export function refuseSend(sentToday: number, maxPerDay: number, balanceUnits: number, reserveUnits: number): string | null {
+export function refuseSend(sentToday: number, maxPerDay: number, balanceUnits: number, reserveUnits: number, costUnits = SEND_COST_UNITS): string | null {
   if (sentToday >= maxPerDay) return 'daily cap reached';
+  if (costUnits === 0) return null;
   if (!Number.isSafeInteger(balanceUnits)) return 'balance unknown';
-  if (balanceUnits - SEND_COST_UNITS < reserveUnits) return 'would go below reserve';
+  if (balanceUnits - costUnits < reserveUnits) return 'would go below reserve';
   return null;
 }
 export const utcDay = (ms: number) => new Date(ms).toISOString().slice(0, 10);
@@ -142,7 +168,7 @@ export function burstAllowed(starts: number[], now: number, maxPerHour: number):
 }
 
 /** Linked actions the dedicated permission must have, and nothing broader. */
-export const REQUIRED_LINKS = [`${TOKEN}::transfer`, `${ROUTER}::sendmsg`];
+export const REQUIRED_LINKS = [`${TOKEN}::transfer`, `${ROUTER}::sendmsg`, `${ROUTER}::sendfree`];
 export function checkPermission(account: { permissions?: { perm_name: string; required_auth: { keys: { key: string }[] }; linked_actions?: { account: string; action?: string }[] }[] }, permission: string, publicKeys: string[]): string | null {
   const perms = account?.permissions ?? [];
   const p = perms.find(x => x.perm_name === permission);
@@ -152,7 +178,7 @@ export function checkPermission(account: { permissions?: { perm_name: string; re
   for (const high of perms.filter(x => x.perm_name === 'owner' || x.perm_name === 'active')) if (keyMatch(high)) return `configured key is also on ${high.perm_name} — refuse (too much authority)`;
   if (p.linked_actions) {
     const links = p.linked_actions.map(l => `${l.account}::${l.action ?? '*'}`);
-    if (links.some(l => !REQUIRED_LINKS.includes(l))) return `${permission} is linked to more than ${REQUIRED_LINKS.join(' and ')}`;
+    if (links.some(l => !REQUIRED_LINKS.includes(l))) return `${permission} is linked to more than ${REQUIRED_LINKS.join(', ')}`;
     const missing = REQUIRED_LINKS.filter(l => !links.includes(l));
     if (missing.length) return `${permission} is missing linkauth for ${missing.join(', ')}`;
   }

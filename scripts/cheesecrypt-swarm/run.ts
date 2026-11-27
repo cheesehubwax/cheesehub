@@ -10,7 +10,7 @@ import { randomBytes, randomInt } from 'node:crypto';
 import { APIClient, FetchProvider, PrivateKey, Transaction, Action, ABI, Serializer } from '@wharfkit/antelope';
 import {
   ROUTER, TOKEN, validateConfig, buildSend, dummyMemo, poissonDelayMs, pickRecipient, planBurst, isOrganic,
-  refuseSend, burstAllowed, utcDay, cheeseUnits, checkPermission, type Config, type Bot,
+  refuseSend, burstAllowed, parseBudget, sponsorRemaining, SPONSOR_PART_UNITS, SEND_COST_UNITS, utcDay, cheeseUnits, checkPermission, type Config, type Bot,
 } from './policy';
 
 const WAX_CHAIN_ID = '1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4';
@@ -59,10 +59,18 @@ async function balanceUnits(account: string): Promise<number> {
   return rows.length ? cheeseUnits(String(rows[0])) : 0;
 }
 
+/** Live sponsor budget; any read failure means "not sponsored", so the send stays on the paid route. */
+async function freeAvailable(): Promise<boolean> {
+  try {
+    const r = await withEndpoint(c => c.v1.chain.get_table_rows({ code: ROUTER, scope: ROUTER, table: 'budget', limit: 1, json: true } as never));
+    return sponsorRemaining(parseBudget((r as { rows?: unknown[] }).rows?.[0]), Math.floor(Date.now() / 1000)) >= SPONSOR_PART_UNITS;
+  } catch { return false; }
+}
+
 /** One attempt, never retried: an ambiguous result could mean the transaction still lands. */
-async function broadcast(bot: Bot & { key: PrivateKey }, to: string): Promise<string> {
+async function broadcast(bot: Bot & { key: PrivateKey }, to: string, free: boolean): Promise<string> {
   const memo = dummyMemo(n => new Uint8Array(randomBytes(n)));
-  const actionsJson = buildSend(bot.account, bot.permission, to, memo);
+  const actionsJson = buildSend(bot.account, bot.permission, to, memo, free);
   return withEndpoint(async (client, url) => {
     const info = await client.v1.chain.get_info();
     if (String(info.chain_id) !== WAX_CHAIN_ID) throw new Error('endpoint is not WAX mainnet');
@@ -70,7 +78,7 @@ async function broadcast(bot: Bot & { key: PrivateKey }, to: string): Promise<st
     const tx = Transaction.from({ ...info.getTransactionHeader(120), actions });
     const signature = bot.key.signDigest(tx.signingDigest(info.chain_id));
     const id = String(tx.id);
-    if (dryRun) { log(`DRY RUN ${bot.account} → ${to}: built and signed locally (${id.slice(0, 12)}…), not broadcast`); return id; }
+    if (dryRun) { log(`DRY RUN ${bot.account} → ${to}: ${free ? 'sendfree' : 'paid sendmsg'} built and signed locally (${id.slice(0, 12)}…), not broadcast`); return id; }
     const body = JSON.stringify({ signatures: [String(signature)], compression: 0, packed_context_free_data: '', packed_trx: Serializer.encode({ object: tx }).hexString });
     const target = config.broadcast === 'direct' ? `${url}/v1/chain/send_transaction` : `${config.broadcast}/v1/chain/send_transaction`;
     const res = await fetch(target, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body, signal: AbortSignal.timeout(30_000) });
@@ -91,11 +99,12 @@ async function send(senderName: string, why: string) {
     const bot = bots.get(senderName)!;
     const to = pickRecipient(botNames, senderName, rand());
     try {
-      const refusal = refuseSend(state.sent[senderName] ?? 0, config.maxSendsPerBotPerDay, await balanceUnits(senderName), cheeseUnits(config.reserve));
+      const free = await freeAvailable();
+      const refusal = refuseSend(state.sent[senderName] ?? 0, config.maxSendsPerBotPerDay, free ? 0 : await balanceUnits(senderName), cheeseUnits(config.reserve), free ? 0 : SEND_COST_UNITS);
       if (refusal) { log(`skip ${senderName} (${why}): ${refusal}`); return; }
-      const id = await broadcast(bot, to);
+      const id = await broadcast(bot, to, free);
       state.sent[senderName] = (state.sent[senderName] ?? 0) + 1; saveState();
-      log(`${why}: ${senderName} → ${to}  tx ${id}`);
+      log(`${why}: ${senderName} → ${to}  ${free ? 'free' : 'paid'}  tx ${id}`);
     } catch (e) {
       // Counted as used: an uncertain broadcast must never be repeated automatically.
       state.sent[senderName] = (state.sent[senderName] ?? 0) + 1; saveState();
