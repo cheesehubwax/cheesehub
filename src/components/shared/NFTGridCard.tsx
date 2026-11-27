@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { extractIpfsHash, getIpfsUrl, ipfsImageCandidates, isVideoUrl } from "@/lib/ipfsGateways";
 import { queueNftImage } from "@/lib/nftImageQueue";
 import { observeNftVisibility } from "@/lib/nftVisibility";
-import { torMediaUrl } from "@/lib/cryptMediaProxy";
+import { routedImageUrl } from "@/lib/cryptMediaProxy";
 
 // Session memory of artwork that already loaded, keyed by the NFT's image field.
 // Remounted tiles (virtualized scrolling) show it instantly without re-queuing.
@@ -69,7 +69,8 @@ export const NFTGridCard = React.memo(function NFTGridCard({
     return observeNftVisibility(card, setVisible);
   }, []);
 
-  const torUrl = useMemo(() => (torBase ? torMediaUrl(torBase, nft.image) : null), [torBase, nft.image]);
+  // Bundled copies load from the app itself; other IPFS artwork goes via the helper.
+  const torUrl = useMemo(() => (torBase ? routedImageUrl({ kind: 'tor', base: torBase }, nft.image) : null), [torBase, nft.image]);
   const hasValidImage = Boolean(nft.image && nft.image !== "/placeholder.svg") && (!torBase || !!torUrl);
   const ipfsHash = useMemo(() => extractIpfsHash(nft.image), [nft.image]);
   const imageCandidates = useMemo(() => {

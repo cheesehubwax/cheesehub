@@ -1,5 +1,7 @@
 import cheeseBottleImage from '@/assets/cheese-bottle.webp';
 import cheeseKeyringImage from '@/assets/cheese-keyring.webp';
+import cryptSfxSound1Image from '@/assets/crypt-sfx-sound1.webp';
+import cryptSfxSound2Image from '@/assets/crypt-sfx-sound2.webp';
 
 // Unified IPFS gateway configuration
 // Ordered by reliability and speed (based on real-world testing)
@@ -30,6 +32,9 @@ export function atomicHubOriginalUrl(hash: string): string {
 const BUNDLED_IPFS_IMAGES: Record<string, string> = {
   QmYTvGVY8eVxrzYf7VTgqJJqZiNJF7gAfji6ewxo4qUyeM: cheeseBottleImage,
   QmYQRbxpnB3jQLpZDQnc2xKLuTrvEdvEwQsR8hbbwUSEg9: cheeseKeyringImage,
+  // cheesenftwax CHEESECrypt sound effects (Sound 1, Sound 2): artwork is unreliable on public IPFS.
+  Qmf8K1tZgdoHnRdG6dMHs2YShJcmtLvZP2K5G7uZaupj2D: cryptSfxSound1Image,
+  QmcyKFxZWFMFJAmjuowJ4F1DUzGGUpEFDV6Co4mV9Dx5ND: cryptSfxSound2Image,
 };
 
 export function preferredIpfsImageUrl(url: string): string {
