@@ -166,4 +166,13 @@ describe("pure helpers", () => {
     expect(dao.VOTING_TYPE_LABELS[3]).toBe("Ranked Choice");
     expect(dao.EXPIRY_THRESHOLD).toBe(2_592_000);
   });
+  it("vote RAM reclaim is only offered for non-custodial NFT DAOs", () => {
+    expect(dao.canClaimVoteRam(5)).toBe(true);
+    expect(dao.canClaimVoteRam(1)).toBe(false);
+    expect(dao.canClaimVoteRam(2)).toBe(false);
+    expect(dao.canClaimVoteRam(3)).toBe(false);
+    expect(dao.canClaimVoteRam(4)).toBe(false);
+    expect(dao.canClaimVoteRam(undefined)).toBe(false);
+    expect(dao.canClaimVoteRam(null)).toBe(false);
+  });
 });

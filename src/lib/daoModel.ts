@@ -15,6 +15,13 @@ export const DAO_TYPES: Record<number, string> = {
   5: "Hold NFTs (Non-Custodial)",
 };
 
+// dao.waxdao::claimvoteram only exists for Type 5 ("Hold NFTs (Non-Custodial)")
+// DAOs: those votes write per-voter rows that hold RAM. Custodial DAOs (types 1-4)
+// derive weight from staked balances, so the contract rejects the action.
+export function canClaimVoteRam(daoType: number | undefined | null): boolean {
+  return daoType === 5;
+}
+
 // Only these DAO types are available for creation on CHEESEHub
 export const CREATABLE_DAO_TYPES: Record<number, string> = {
   4: "Stake Tokens (Custodial)",

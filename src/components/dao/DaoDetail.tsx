@@ -7,7 +7,7 @@ import {
   fetchDaoDetails, fetchProposals, fetchDaoTreasury, fetchDaoTreasuryNFTs,
   checkDaoMembership, fetchUserStakedTokens,
   DaoInfo, Proposal, TreasuryBalance, TreasuryNFT,
-  DAO_TYPES, StakedToken, proposalsLocked,
+  DAO_TYPES, StakedToken, proposalsLocked, canClaimVoteRam,
 } from "@/lib/dao";
 import { getVotesForDao, saveVote } from "@/lib/voteStorage";
 import { useWax } from "@/context/WaxContext";
@@ -163,7 +163,7 @@ export function DaoDetail({ daoName, onBack }: DaoDetailProps) {
     { key: "active", label: "Active Proposals", icon: <OpenMojiIcon emoji="📢" size={14} className="text-sm" />, badge: activeProposals.length, pulse: unvotedCount > 0 },
     { key: "past", label: "Past Proposals", icon: <OpenMojiIcon emoji="🕰️" size={14} className="text-sm" />, badge: pastProposals.length },
     { key: "treasury", label: "Treasury", icon: <OpenMojiIcon emoji="💎" size={14} className="text-sm" /> },
-    { key: "ram", label: "Claim Vote RAM", icon: <OpenMojiIcon emoji="💾" size={14} className="text-sm" />, hidden: !isConnected },
+    { key: "ram", label: "Claim Vote RAM", icon: <OpenMojiIcon emoji="💾" size={14} className="text-sm" />, hidden: !isConnected || !canClaimVoteRam(dao?.dao_type) },
   ];
 
   const socialEntries = useMemo(() => daoSocialEntries(dao?.socials), [dao?.socials]);
@@ -238,7 +238,7 @@ export function DaoDetail({ daoName, onBack }: DaoDetailProps) {
         );
 
       case "ram":
-        return <ClaimVoteRam daoName={daoName} />;
+        return <ClaimVoteRam daoName={daoName} daoType={dao.dao_type} />;
 
       default:
         return null;

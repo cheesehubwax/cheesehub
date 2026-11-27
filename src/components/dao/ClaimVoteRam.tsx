@@ -3,16 +3,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, HardDrive, CheckCircle } from "lucide-react";
-import { fetchProposals, buildClaimVoteRamAction, Proposal } from "@/lib/dao";
+import { fetchProposals, buildClaimVoteRamAction, canClaimVoteRam, Proposal } from "@/lib/dao";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 import { useToast } from "@/hooks/use-toast";
 
 interface ClaimVoteRamProps {
   daoName: string;
+  /** DAO type; only type 5 ("Hold NFTs (Non-Custodial)") has vote RAM to reclaim. */
+  daoType?: number;
 }
 
-export function ClaimVoteRam({ daoName }: ClaimVoteRamProps) {
+export function ClaimVoteRam({ daoName, daoType }: ClaimVoteRamProps) {
   const { accountName, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const { toast } = useToast();
@@ -22,15 +24,19 @@ export function ClaimVoteRam({ daoName }: ClaimVoteRamProps) {
   const [claimed, setClaimed] = useState<Set<number>>(new Set());
 
   useEffect(() => {
+    if (!canClaimVoteRam(daoType)) {
+      setLoading(false);
+      return;
+    }
     fetchProposals(daoName).then(data => {
       const ended = data.filter(p => p.status !== "active");
       setProposals(ended);
       setLoading(false);
     });
-  }, [daoName]);
+  }, [daoName, daoType]);
 
   const handleClaim = async (proposalId: number) => {
-    if (!session || !accountName) return;
+    if (!canClaimVoteRam(daoType) || !session || !accountName) return;
     setClaiming(proposalId);
 
     const action = buildClaimVoteRamAction(accountName, daoName, proposalId);
@@ -44,6 +50,19 @@ export function ClaimVoteRam({ daoName }: ClaimVoteRamProps) {
     }
     setClaiming(null);
   };
+
+  if (!canClaimVoteRam(daoType)) {
+    return (
+      <div className="text-center py-8">
+        <HardDrive className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+        <p className="text-muted-foreground text-sm max-w-sm mx-auto">
+          This DAO type has no vote RAM to reclaim. Only non-custodial NFT DAOs
+          (&ldquo;Hold NFTs&rdquo;) store per-voter vote rows, so the contract
+          rejects reclaim requests from other DAO types.
+        </p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

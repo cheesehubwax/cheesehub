@@ -7,3 +7,4 @@
 - DAO chain reads use `resolveEndpoints('chain-api')` and AtomicAssets reads `fetchFromAtomicAPI`, never fixed host lists; NFT pictures go through `TreasuryNftImage` (shared AtomicHub→IPFS candidates) so dead gateways fall through.
 - Create DAO with CHEESE but no CHEESE price falls back to the WAX fee legs (same as CHEESEFarm); never send createdao without a fee leg. Staked token weight is parsed from the asset string as integers, never float-multiplied.
 - Members-only proposal teaser is a CHEESEHub display setting stored as a trailing `[cheese:members-teaser]` tag in the on-chain profile description (dao.waxdao has no config field); parse/apply via `@/lib/daoTeaser`, strip it before display, and always say chain data stays public.
+- `dao.waxdao::claimvoteram` is only valid for type 5 ("Hold NFTs (Non-Custodial)") DAOs; gate the Claim Vote RAM tab and its action behind `canClaimVoteRam` so custodial DAOs never offer a request the contract rejects.
