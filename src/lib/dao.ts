@@ -5,3 +5,4 @@ export * from "./daoModel";
 export * from "./daoFees";
 export * from "./daoActions";
 export * from "./daoReads";
+export * from "./daoTeaser";

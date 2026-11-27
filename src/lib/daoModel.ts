@@ -70,6 +70,8 @@ export interface DaoInfo {
   time_created: number;
   status: number;
   socials?: DaoSocials;
+  /** Members-only proposal teaser (CHEESEHub display setting). */
+  teaser_proposals?: boolean;
 }
 
 export function getIpfsUrl(hash: string): string {

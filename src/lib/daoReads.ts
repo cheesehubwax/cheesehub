@@ -10,6 +10,7 @@ import {
   type TokenReceiver, type NFTReceiver, type TreasuryBalance, type TreasuryNFT,
   type StakedToken, type StakedNFT, type UserVote,
 } from "./daoModel";
+import { parseTeaserTag } from "./daoTeaser";
 
 // Chain reads fail over across the shared HerdCheck health-ordered node list.
 async function daoRpcFetch(path: string, init?: RequestInit): Promise<Response> {
@@ -74,10 +75,12 @@ export async function fetchAllDaos(): Promise<DaoInfo[]> {
     return (data.rows || []).map((row: Record<string, unknown>) => {
       const daoName = row.daoname as string || "";
       const profile = profiles.get(daoName);
+      const desc = parseTeaserTag(profile?.description || "");
       return {
         dao_name: daoName,
         creator: row.creator as string || "",
-        description: profile?.description || "",
+        description: desc.description,
+        teaser_proposals: desc.teaser,
         logo: profile?.avatar || "",
         cover_image: profile?.cover_image || "",
         token_contract: row.gov_token_contract as string || "",

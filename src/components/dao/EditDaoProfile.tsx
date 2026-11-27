@@ -5,7 +5,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
-import { DaoInfo, buildSetProfileActionWithSocials, DaoSocials } from "@/lib/dao";
+import { DaoInfo, buildSetProfileActionWithSocials, DaoSocials, applyTeaserTag } from "@/lib/dao";
+import { Switch } from "@/components/ui/switch";
 import { useWax } from "@/context/WaxContext";
 import { useWaxTransaction } from "@/hooks/useWaxTransaction";
 
@@ -24,6 +25,7 @@ export function EditDaoProfile({ open, onOpenChange, dao, onUpdated }: EditDaoPr
   const [description, setDescription] = useState(dao.description || "");
   const [avatar, setAvatar] = useState(dao.logo || "");
   const [coverImage, setCoverImage] = useState(dao.cover_image || "");
+  const [teaser, setTeaser] = useState(!!dao.teaser_proposals);
   const [socials, setSocials] = useState<DaoSocials>(dao.socials || {});
 
   const updateSocial = (key: keyof DaoSocials, value: string) => {
@@ -35,7 +37,7 @@ export function EditDaoProfile({ open, onOpenChange, dao, onUpdated }: EditDaoPr
     setLoading(true);
 
     const action = buildSetProfileActionWithSocials(
-      accountName, dao.dao_name, description, avatar, coverImage, socials
+      accountName, dao.dao_name, applyTeaserTag(description, teaser), avatar, coverImage, socials
     );
     const result = await executeTransaction([action], {
       successTitle: "Profile Updated! ",
@@ -69,6 +71,16 @@ export function EditDaoProfile({ open, onOpenChange, dao, onUpdated }: EditDaoPr
           <div>
             <Label>Description</Label>
             <Textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} placeholder="DAO description..." />
+          </div>
+          <div className="rounded-lg border border-border/40 bg-muted/20 p-3 space-y-1">
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="dao-teaser">🔒 Members-only proposal details</Label>
+              <Switch id="dao-teaser" checked={teaser} onCheckedChange={setTeaser} />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Non-members on CHEESEHub see only proposal titles and status. Descriptions, results and voting need membership.
+              This only hides them here: everything stays public on the WAX blockchain, so never put secrets in a proposal.
+            </p>
           </div>
           <div>
             <Label>Avatar (IPFS hash or URL)</Label>

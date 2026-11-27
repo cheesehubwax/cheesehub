@@ -27,6 +27,9 @@ interface ProposalCardProps {
   hasVoted?: boolean;
   userVote?: UserVote | null;
   onVote?: (proposalId: number, vote: UserVote) => void;
+  /** Teaser mode: show title/status only. */
+  locked?: boolean;
+  onUnlock?: () => void;
 }
 
 const statusColors: Record<string, string> = {
@@ -42,7 +45,7 @@ const statusColors: Record<string, string> = {
 
 const statusLabels: Record<string, string> = { quorum_not_met: "Quorum Not Met" };
 
-export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: parentVote, onVote }: ProposalCardProps) {
+export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: parentVote, onVote, locked, onUnlock }: ProposalCardProps) {
   const { accountName, session } = useWax();
   const { executeTransaction } = useWaxTransaction(session);
   const [txLoading, setTxLoading] = useState(false);
@@ -148,6 +151,7 @@ export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: paren
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <h4 className="font-semibold text-foreground">{proposal.title}</h4>
+            {!locked && (<>
             <p className={`text-sm text-muted-foreground mt-1 ${expanded ? "" : "line-clamp-2"}`}>
               {proposal.description}
             </p>
@@ -156,6 +160,7 @@ export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: paren
                 {expanded ? <><ChevronUp className="h-3 w-3 mr-1" /> Less</> : <><ChevronDown className="h-3 w-3 mr-1" /> More</>}
               </Button>
             )}
+            </>)}
           </div>
           <Badge
             className={statusColors[proposal.status] || statusColors.pending}
@@ -185,6 +190,15 @@ export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: paren
           )}
         </div>
 
+        {locked ? (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
+            <p className="text-sm font-medium text-foreground">🔒 Members-only governance</p>
+            <p className="text-xs text-muted-foreground">Full details, results and voting are shown to members of this DAO.</p>
+            {onUnlock && (
+              <Button size="sm" variant="outline" onClick={onUnlock}>Stake to unlock</Button>
+            )}
+          </div>
+        ) : (<>
         {/* Token Transfer Details */}
         {isTokenTransfer && proposal.token_receivers && proposal.token_receivers.length > 0 && (
           <div className="bg-muted/30 rounded-lg p-3 space-y-1">
@@ -355,6 +369,7 @@ export function ProposalCard({ proposal, daoName, dao, hasVoted, userVote: paren
             </Button>
           </div>
         )}
+        </>)}
       </CardContent>
     </Card>
   );

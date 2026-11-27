@@ -7,7 +7,7 @@ import {
   fetchDaoDetails, fetchProposals, fetchDaoTreasury, fetchDaoTreasuryNFTs,
   checkDaoMembership, fetchUserStakedTokens,
   DaoInfo, Proposal, TreasuryBalance, TreasuryNFT,
-  DAO_TYPES, StakedToken,
+  DAO_TYPES, StakedToken, proposalsLocked,
 } from "@/lib/dao";
 import { getVotesForDao, saveVote } from "@/lib/voteStorage";
 import { useWax } from "@/context/WaxContext";
@@ -56,6 +56,8 @@ export function DaoDetail({ daoName, onBack }: DaoDetailProps) {
   const isCreator = dao?.creator === accountName;
   const isAuthor = dao?.authors?.includes(accountName || "") || false;
   const canEditProfile = isCreator || isAuthor;
+  const locked = proposalsLocked(!!dao?.teaser_proposals, isMember || canEditProfile);
+  const unlock = dao?.dao_type === 5 ? undefined : () => setActiveSection("stake");
 
   const logo = useIpfsImageSrc(dao?.logo);
   const cover = useIpfsImageSrc(dao?.cover_image);
@@ -216,12 +218,12 @@ export function DaoDetail({ daoName, onBack }: DaoDetailProps) {
 
       case "active":
         return (
-          <DaoProposalList proposals={activeProposals} emptyText="No active proposals" daoName={daoName} dao={dao} votedProposals={votedProposals} onVote={handleVote} />
+          <DaoProposalList proposals={activeProposals} emptyText="No active proposals" daoName={daoName} dao={dao} votedProposals={votedProposals} onVote={handleVote} locked={locked} onUnlock={unlock} />
         );
 
       case "past":
         return (
-          <DaoProposalList proposals={pastProposals} emptyText="No past proposals" daoName={daoName} dao={dao} votedProposals={votedProposals} onVote={handleVote} />
+          <DaoProposalList proposals={pastProposals} emptyText="No past proposals" daoName={daoName} dao={dao} votedProposals={votedProposals} onVote={handleVote} locked={locked} onUnlock={unlock} />
         );
 
       case "treasury":
