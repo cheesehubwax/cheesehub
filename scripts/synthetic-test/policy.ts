@@ -1,5 +1,5 @@
 /**
- * Pure rules for the CHEESECrypt cover-traffic swarm. No I/O here, so every amount,
+ * Pure rules for the CHEESECrypt synthetic test. No I/O here, so every amount,
  * timing and shape decision is unit-tested (policy.test.ts).
  */
 export const ROUTER = 'crypt.cheese';
@@ -16,7 +16,7 @@ export function boxBytes(budget = MEMO_MAX_BYTES): number {
   return 0;
 }
 
-/** A decoy memo is random bytes laid out exactly like a padded CRYPT2 ciphertext (nonce 24 + box). */
+/** A sample memo is random bytes laid out exactly like a padded CRYPT2 ciphertext (nonce 24 + box). */
 export function dummyMemo(random: (n: number) => Uint8Array): string {
   const b64 = (u: Uint8Array) => Buffer.from(u).toString('base64');
   return `${PREFIX}${b64(random(24))}:${b64(random(boxBytes()))}`;

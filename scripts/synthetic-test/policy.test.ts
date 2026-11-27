@@ -12,8 +12,8 @@ const base = {
   chainApi: ['https://wax.greymass.com'], hyperion: ['https://wax.eosusa.io'], broadcast: 'direct',
 };
 
-describe('swarm policy', () => {
-  test('decoy memos are exactly 256 bytes, the length of every real padded CRYPT2 memo', () => {
+describe('synthetic test policy', () => {
+  test('sample memos are exactly 256 bytes, the length of every real padded CRYPT2 memo', () => {
     expect(boxBytes()).toBe(162);
     const m = dummyMemo(n => new Uint8Array(n));
     expect(m.startsWith('CRYPT2:')).toBe(true);

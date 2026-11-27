@@ -1,3 +1,4 @@
 node_modules
+config.json
 swarm-config.json
 *.state.json

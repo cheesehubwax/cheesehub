@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 /**
- * CHEESECrypt cover-traffic swarm — runs on YOUR machine with YOUR bot keys.
+ * CHEESECrypt synthetic test — runs on YOUR machine with YOUR worker keys.
  * Nothing is hosted, relayed or uploaded. See README.md.
  *
- *   bun run run.ts swarm-config.json [--dry-run]
+ *   bun run run.ts config.json [--dry-run]
  */
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { randomBytes, randomInt } from 'node:crypto';
@@ -16,7 +16,8 @@ import {
 const WAX_CHAIN_ID = '1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4';
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
-const configPath = args.find(a => !a.startsWith('--')) ?? 'swarm-config.json';
+// config.json by default; an older local swarm-config.json still works.
+const configPath = args.find(a => !a.startsWith('--')) ?? (existsSync('config.json') || !existsSync('swarm-config.json') ? 'config.json' : 'swarm-config.json');
 const STATE_PATH = configPath.replace(/\.json$/, '') + '.state.json';
 const log = (m: string) => console.log(`${new Date().toISOString()}  ${m}`);
 const rand = () => randomInt(0, 2 ** 30) / 2 ** 30;
@@ -101,7 +102,7 @@ async function send(senderName: string, why: string) {
     const bot = bots.get(senderName)!;
     const to = pickRecipient(botNames, senderName, rand());
     try {
-      if (!(await ensureCpu(senderName))) { log(`skip ${senderName} (${why}): CPU too low and no bot could power it up`); return; }
+      if (!(await ensureCpu(senderName))) { log(`skip ${senderName} (${why}): CPU too low and no worker could power it up`); return; }
       const free = await freeAvailable();
       const refusal = refuseSend(state.sent[senderName] ?? 0, config.maxSendsPerBotPerDay, free ? 0 : await balanceUnits(senderName), cheeseUnits(config.reserve), free ? 0 : SEND_COST_UNITS);
       if (refusal) { log(`skip ${senderName} (${why}): ${refusal}`); return; }
@@ -189,15 +190,15 @@ async function watch() {
       if (burstAllowed(state.bursts, now, config.maxBurstsPerHour)) {
         state.bursts.push(now); saveState();
         const plan = planBurst(config, rand);
-        log(`burst: ${triggers} organic send(s) seen; ${plan.length} bot(s) will answer`);
-        for (const p of plan) setTimeout(() => void send(p.sender, 'burst'), p.delayMs);
-      } else log(`burst skipped: ${config.maxBurstsPerHour}/hour limit`);
+        log(`batch: ${triggers} external send(s) seen; ${plan.length} worker(s) scheduled`);
+        for (const p of plan) setTimeout(() => void send(p.sender, 'batch'), p.delayMs);
+      } else log(`batch skipped: ${config.maxBurstsPerHour}/hour limit`);
     }
   } catch (e) { log(`watch error: ${(e as Error).message}`); }
 }
 
 async function main() {
-  log(`CHEESECrypt swarm starting${dryRun ? ' (DRY RUN: nothing is broadcast)' : ''}: ${botNames.length} bots, broadcast ${config.broadcast === 'direct' ? 'DIRECT (not via Tor)' : config.broadcast}`);
+  log(`CHEESECrypt synthetic test starting${dryRun ? ' (DRY RUN: nothing is broadcast)' : ''}: ${botNames.length} workers, broadcast ${config.broadcast === 'direct' ? 'DIRECT (not via Tor)' : config.broadcast}`);
   if (config.broadcast === 'direct') log('note: direct mode shows your IP to the nodes. Use the Tor helper for network privacy.');
   await preflight();
   for (const n of botNames) trickle(n);

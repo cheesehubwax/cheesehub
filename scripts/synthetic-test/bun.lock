@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "cheesecrypt-swarm",
+      "name": "cheesecrypt-synthetic-test",
       "dependencies": {
         "@wharfkit/antelope": "1.1.1",
       },
