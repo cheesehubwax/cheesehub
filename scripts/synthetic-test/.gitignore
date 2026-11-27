@@ -3,3 +3,7 @@ config.json
 swarm-config.json
 *.state.json
 *.night.json
+night-config*.json
+!night-config.example.json
+*.night.json.lock
+*.tmp

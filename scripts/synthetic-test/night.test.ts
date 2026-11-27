@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { validateConfig, nightKey, nightBounds, planNight, dueNight, NIGHT_LATE_MS, type NightConfig } from './policy';
+import { readFileSync } from 'node:fs';
+import { validateConfig, validateNightRunnerConfig, nightKey, nightBounds, planNight, dueNight, NIGHT_LATE_MS, type NightConfig } from './policy';
 
 const bots = [
   { account: 'alpha.chz', permission: 'cheesecrypt', privateKey: 'PVT_K1_x' },
@@ -20,6 +21,13 @@ let seed = 1;
 const rng = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
 
 describe('night schedule', () => {
+  test('both shipped examples validate with night strictly disabled by default', () => {
+    const daytime = validateConfig(JSON.parse(readFileSync(new URL('./config.example.json', import.meta.url), 'utf8')));
+    const standalone = validateNightRunnerConfig(JSON.parse(readFileSync(new URL('./night-config.example.json', import.meta.url), 'utf8')));
+    expect(daytime.bots.length).toBe(2);
+    expect(daytime.night).toBeUndefined();
+    expect(standalone.night.enabled).toBe(false);
+  });
   test('window crossing midnight in Brisbane (UTC+10)', () => {
     expect(nightKey(Date.parse('2026-11-27T13:30:00Z'), night)).toBe('2026-11-27'); // 23:30 local
     expect(nightKey(Date.parse('2026-11-27T19:00:00Z'), night)).toBe('2026-11-27'); // 05:00 next day local
@@ -50,7 +58,8 @@ describe('night schedule', () => {
   test('replies swap the pair and land 180–900 s after their message', () => {
     const p = planNight(night, accounts, '2026-11-27', rng);
     for (const r of p.filter(e => e.id.endsWith('r'))) {
-      const o = p.find(e => e.id === r.id.slice(0, -1))!;
+      const o = p.find(e => e.id === r.id.slice(0, -1));
+      if (!o) throw new Error('missing reply origin');
       expect(r.sender).toBe(o.recipient); expect(r.recipient).toBe(o.sender);
       expect(r.atMs - o.atMs).toBeGreaterThanOrEqual(180_000); expect(r.atMs - o.atMs).toBeLessThan(960_000);
     }
@@ -66,10 +75,13 @@ describe('night schedule', () => {
     expect(r.dropped.map(e => e.id)).toEqual(['a']);
   });
   test('config checks', () => {
-    expect(validateConfig({ ...base, night }).night?.start).toBe('23:00');
-    expect(() => validateConfig({ ...base, night: { ...night, senders: ['stranger'] } })).toThrow();
-    expect(() => validateConfig({ ...base, night: { ...night, timezone: 'Mars/Base' } })).toThrow();
-    expect(() => validateConfig({ ...base, night: { ...night, start: '25:00' } })).toThrow();
-    expect(() => validateConfig({ ...base, night: { ...night, sendsMin: 4, sendsMax: 2 } })).toThrow();
+    const config = { accounts: bots, maxSendsPerAccountPerDay: 10, reserve: base.reserve, chainApi: base.chainApi, broadcast: base.broadcast, night };
+    expect(validateNightRunnerConfig(config).night.start).toBe('23:00');
+    expect(() => validateConfig({ ...base, night })).toThrow('now separate');
+    expect(validateConfig({ ...base, night: { ...night, enabled: false } }).bots).toEqual(bots);
+    expect(() => validateNightRunnerConfig({ accounts: bots, maxSendsPerAccountPerDay: 10, reserve: base.reserve, chainApi: base.chainApi, broadcast: base.broadcast, night: { ...night, senders: ['stranger'] } })).toThrow();
+    expect(() => validateNightRunnerConfig({ accounts: bots, maxSendsPerAccountPerDay: 10, reserve: base.reserve, chainApi: base.chainApi, broadcast: base.broadcast, night: { ...night, timezone: 'Mars/Base' } })).toThrow();
+    expect(() => validateNightRunnerConfig({ accounts: bots, maxSendsPerAccountPerDay: 10, reserve: base.reserve, chainApi: base.chainApi, broadcast: base.broadcast, night: { ...night, start: '25:00' } })).toThrow();
+    expect(() => validateNightRunnerConfig({ accounts: bots, maxSendsPerAccountPerDay: 10, reserve: base.reserve, chainApi: base.chainApi, broadcast: base.broadcast, night: { ...night, sendsMin: 4, sendsMax: 2 } })).toThrow();
   });
 });

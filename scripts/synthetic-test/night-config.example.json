@@ -1,0 +1,36 @@
+{
+  "accounts": [
+    {
+      "account": "alpha.chz",
+      "permission": "cheesecrypt",
+      "privateKey": "PVT_K1_REPLACE_ME"
+    },
+    {
+      "account": "brie.chz",
+      "permission": "cheesecrypt",
+      "privateKey": "PVT_K1_REPLACE_ME"
+    }
+  ],
+  "maxSendsPerAccountPerDay": 10,
+  "reserve": "1.0000 CHEESE",
+  "chainApi": [
+    "https://wax.greymass.com",
+    "https://api.waxsweden.org"
+  ],
+  "broadcast": "http://127.0.0.1:8088",
+  "night": {
+    "enabled": false,
+    "timezone": "Australia/Brisbane",
+    "start": "23:00",
+    "end": "06:30",
+    "sendsMin": 0,
+    "sendsMax": 3,
+    "skipNightChance": 0.15,
+    "replyChance": 0.5,
+    "replyDelayMinSeconds": 180,
+    "replyDelayMaxSeconds": 900,
+    "senders": [
+      "alpha.chz"
+    ]
+  }
+}

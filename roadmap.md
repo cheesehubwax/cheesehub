@@ -2,6 +2,8 @@
 
 Open tasks only. Completed work lives in git history.
 
+- [ ] Nightcrawler: verify live activation on the user's machine with their dedicated restricted keys and Tor helper; separation, disabled entrypoint, signing, disk readback and restart safety are tested offline. No real keys or local Tor connection are available here.
+
 - [ ] CHEESECrypt busy-room safety: confirm eventhorizon's original unlocked room; 500-reply/multiple-sender observer stress and unlocked-fixture recovery preserve drafts and receipts, but their original wallet/key and browser error are unavailable here.
 
 - [ ] CHEESEFarm: verify one real capacity-aware stake with the user's Anchor wallet; per-rule warnings, browse-to-detail live checks and 41 capacity/action tests pass, including mixed rates, combined selections and fresh pre-sign checks. Requires the user's wallet signature.

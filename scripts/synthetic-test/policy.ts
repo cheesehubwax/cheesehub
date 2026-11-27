@@ -133,7 +133,35 @@ export function validateConfig(raw: unknown): Config {
   if (!Array.isArray(c.hyperion) || !c.hyperion.length || !c.hyperion.every(u => /^https:\/\//.test(u))) bad('hyperion needs HTTPS endpoints');
   if (c.broadcast !== 'direct' && !loopback(c.broadcast)) bad('broadcast must be "direct" or a loopback Tor helper address');
   if (c.historyViaHelper !== undefined && !loopback(c.historyViaHelper)) bad('historyViaHelper must be a loopback address');
-  if (c.night !== undefined) validateNight(c.night, seen);
+  if (c.night !== undefined) {
+    validateNight(c.night, seen);
+    if (c.night.enabled) bad('night scheduling is now separate: use night.ts with night-config.json; remove or disable night in the daytime config');
+  }
+  return c;
+}
+
+/** Standalone configuration has no daytime traffic settings or shared account pool. */
+export interface NightRunnerConfig {
+  accounts: Bot[];
+  maxSendsPerAccountPerDay: number;
+  reserve: string;
+  chainApi: string[];
+  broadcast: string;
+  night: NightConfig;
+}
+export function validateNightRunnerConfig(raw: unknown): NightRunnerConfig {
+  const c = raw as NightRunnerConfig;
+  if (!c || typeof c !== 'object') bad('night configuration must be an object');
+  const day = validateConfig({
+    bots: c.accounts, maxSendsPerBotPerDay: c.maxSendsPerAccountPerDay,
+    reserve: c.reserve, chainApi: c.chainApi, broadcast: c.broadcast,
+    trickleRatePerHour: 0, burstMin: 0, burstMax: 0,
+    burstDelayMinSeconds: 5, burstDelayMaxSeconds: 5, maxBurstsPerHour: 0,
+    hyperion: c.chainApi,
+  });
+  validateNight(c.night, new Set(day.bots.map(b => b.account)));
+  if (!Number.isInteger(c.maxSendsPerAccountPerDay)) bad('maxSendsPerAccountPerDay must be a whole number');
+  if (!Number.isInteger(c.night.sendsMin) || !Number.isInteger(c.night.sendsMax)) bad('night send counts must be whole numbers');
   return c;
 }
 
