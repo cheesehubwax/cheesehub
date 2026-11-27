@@ -102,6 +102,16 @@ export const MARK_LABEL: Record<TrustMark, string> = {
   warning: '🪤 Warning', low: '🥛 No Respect', moderate: '🧀 Some Respect', good: '🫕 Much Respect', strong: 'Big Respect', huge: '🏆 Huge Respect',
 };
 
+/** Respect levels, highest first, for the "Badge levels" guide. Min/max must match markFor. */
+export const RESPECT_LEVELS: { mark: TrustMark; min: number; max: number | null; range: string; description: string }[] = [
+  { mark: 'huge', min: 200, max: null, range: '200+', description: 'A deeply invested, long-standing member of the CHEESE community.' },
+  { mark: 'strong', min: 150, max: 199, range: '150–199', description: 'Strong, well-rounded public track record.' },
+  { mark: 'good', min: 100, max: 149, range: '100–149', description: 'Clearly invested, with several solid signals.' },
+  { mark: 'moderate', min: 40, max: 99, range: '40–99', description: 'An established account with some community involvement.' },
+  { mark: 'low', min: 10, max: 39, range: '10–39', description: 'Few public signals so far.' },
+  { mark: 'warning', min: 0, max: 9, range: 'Under 10, or account under 7 days old', description: 'Very new or almost no public history — take care.' },
+];
+
 /** Emoji per mark; null means the CHEESE token logo image is shown instead. */
 export const MARK_ICON: Record<TrustMark, string | null> = {
   warning: '🪤', low: '🥛', moderate: '🧀', good: '🫕', strong: null, huge: '🏆',

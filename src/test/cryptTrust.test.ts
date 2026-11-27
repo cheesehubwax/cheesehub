@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { agePoints, balancePoints, keyAgePoints, markFor, MAX_TOTAL_POINTS, nftPoints, poolPoints, scoreTrust, stakePoints, type TrustSignals } from '@/lib/cryptTrust';
+import { agePoints, balancePoints, keyAgePoints, markFor, MAX_TOTAL_POINTS, RESPECT_LEVELS, nftPoints, poolPoints, scoreTrust, stakePoints, type TrustSignals } from '@/lib/cryptTrust';
 
 const DAY = 86_400_000, YEAR = 365 * DAY, NOW = Date.UTC(2026, 10, 7);
 const base: TrustSignals = { account: 'someone1', createdAt: NOW - 2 * YEAR, cheese: 0, staked: 0, pooled: { cheese: 0, pools: 0 }, nfts: 0, key: { published: false, firstAt: null } };
 
 describe('crypt trust strength', () => {
+  it('badge levels guide matches the ranking cutoffs', () => {
+    for (const l of RESPECT_LEVELS) {
+      expect(markFor(l.min, false)).toBe(l.mark);
+      if (l.max != null) expect(markFor(l.max, false)).toBe(l.mark);
+    }
+    expect(RESPECT_LEVELS.map(l => l.mark)).toEqual(['huge', 'strong', 'good', 'moderate', 'low', 'warning']);
+  });
   it('premium .cheese/.chz names score +40', () => {
     const plain = scoreTrust(base, NOW).total;
     expect(scoreTrust({ ...base, account: 'bob.cheese' }, NOW).total - plain).toBe(40);
