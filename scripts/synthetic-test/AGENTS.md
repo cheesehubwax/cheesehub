@@ -13,3 +13,4 @@
 - The night schedule is planned per local window in pure `planNight`; `nightState.ts` locks each live configuration and atomically persists sent/dropped IDs before serialized sends, failing closed on corrupt/unwritable progress so restarts never repeat sends.
 - Signed writes run outside read fallback loops and require an executed receipt with the matching transaction ID; ambiguous outcomes stop rather than rebroadcast.
 - Nightcrawler hardcodes free-only mode and requires exactly the sendfree link with an isolated key; unknown links fail closed, sponsorship/CPU shortages skip entries, and no transfers/powerups/balance scans occur because personal accounts must not expose CHEESE to runner keys. Daytime mode retains its existing three-link policy.
+- Daytime destination mixing uses pure pickDaytimeRecipient for existing sends only; free-only Nightcrawler never accepts eosio.null, keeping its personal-account schedule unchanged.

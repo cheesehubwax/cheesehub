@@ -4,6 +4,8 @@
  */
 export const ROUTER = 'crypt.cheese';
 export const TOKEN = 'cheeseburger';
+export const NULL_RECIPIENT = 'eosio.null';
+export const DEFAULT_NULL_RATIO = 0.3;
 export const FEE_MEMO = 'CHEESECrypt messaging fee';
 /** One single-part message via the router: 0.0100 fee + 0.0001 recipient copy, in integer CHEESE units. */
 export const SEND_COST_UNITS = 101;
@@ -66,6 +68,8 @@ export function buildSend(sender: string, permission: string, to: string, memo: 
 export interface Bot { account: string; permission: string; privateKey: string }
 export interface Config {
   bots: Bot[];
+  /** Fraction of daytime sends addressed to eosio.null instead of another worker. */
+  nullRatio?: number;
   /** Average background messages per bot per hour (Poisson trickle). */
   trickleRatePerHour: number;
   /** Reactive bursts: how many bots answer an organic CHEESECrypt send, and their stagger window. */
@@ -122,6 +126,7 @@ export function validateConfig(raw: unknown): Config {
     if (typeof b.privateKey !== 'string' || !/^PVT_K1_|^5[HJK]/.test(b.privateKey)) bad(`${b.account}: privateKey missing or malformed`);
   }
   num(c.trickleRatePerHour, 0, 6, 'trickleRatePerHour');
+  if (c.nullRatio !== undefined) num(c.nullRatio, 0, 1, 'nullRatio');
   num(c.burstMin, 0, c.bots.length - 1, 'burstMin');
   num(c.burstMax, c.burstMin, c.bots.length, 'burstMax');
   num(c.burstDelayMinSeconds, 5, 3600, 'burstDelayMinSeconds');
@@ -179,6 +184,13 @@ export function pickRecipient(accounts: string[], sender: string, u: number): st
   const others = accounts.filter(a => a !== sender);
   if (!others.length) throw new Error('no recipient available');
   return others[pickInt(0, others.length - 1, u)];
+}
+
+/** One destination per existing daytime send, never additional traffic. */
+export function pickDaytimeRecipient(accounts: string[], sender: string, u: number, nullRatio = DEFAULT_NULL_RATIO): string {
+  num(nullRatio, 0, 1, 'nullRatio');
+  if (u < nullRatio) return NULL_RECIPIENT;
+  return pickRecipient(accounts, sender, (u - nullRatio) / (1 - nullRatio));
 }
 
 /** A burst: distinct random senders, each with its own staggered delay (ms), sorted by time. */

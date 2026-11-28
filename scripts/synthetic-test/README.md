@@ -17,6 +17,20 @@ response times under periodic and burst loads.
    bun run run.ts config.json
    ```
 
+## Daytime recipient mix
+
+`nullRatio` defaults to `0.3`: each existing trickle or batch send independently has a
+30% chance of going to `eosio.null`, otherwise to another configured worker. Set `0`
+for peer-only or `1` for null-only. This is a probability, not an exact quota.
+Existing configs use 30% without an edit. No extra messages are scheduled: caps,
+fees, sponsor checks, CPU safeguards and permissions stay the same.
+
+These are random sample memos, not room messages. They blend destination and memo
+shape, but known worker accounts, timing and funding can still identify automation.
+They increase shared-stream scanning load; keep rates modest and use only accounts
+you own. This is not an anonymity or legal-compliance guarantee. Nightcrawler stays
+peer-only, and no real chats change.
+
 ## Nightcrawler (separate, optional)
 
 Nightcrawler schedules random **synthetic sample messages**, not readable conversations.

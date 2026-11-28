@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /** Daytime synthetic traffic only. Nightcrawler starts independently with night.ts. */
 import { readFileSync, existsSync } from 'node:fs';
-import { ROUTER, validateConfig, poissonDelayMs, planBurst, isOrganic, burstAllowed } from './policy';
+import { ROUTER, DEFAULT_NULL_RATIO, validateConfig, poissonDelayMs, planBurst, isOrganic, burstAllowed } from './policy';
 import { createRuntime, log, rand } from './runtime';
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
@@ -62,6 +62,7 @@ async function watch() {
 
 
   log(`CHEESECrypt synthetic test starting${dryRun ? ' (DRY RUN: nothing is broadcast)' : ''}: ${botNames.length} workers, broadcast ${config.broadcast}`);
+  log(`recipient mix: ${Math.round((config.nullRatio ?? DEFAULT_NULL_RATIO) * 100)}% eosio.null; remaining sends to configured peers (random per send)`);
   if (config.broadcast === 'direct') log('note: direct mode shows your IP to the nodes.');
   await preflight();
   for (const n of botNames) trickle(n);

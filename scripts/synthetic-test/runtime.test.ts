@@ -112,3 +112,51 @@ test('runtime with multiple read endpoints never retries an ambiguous signed sub
     expect(runtime.getState().sent['alpha.chz']).toBe(1);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('daytime null-only selection signs one padded copy through unchanged free and paid routes', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'day-null-flow-'));
+  try {
+    for (const sponsored of [true, false]) {
+      const fixture = runtimeFixture(sponsored);
+      let submissions = 0;
+      const path = join(dir, `${sponsored}.state.json`);
+      globalThis.fetch = (async (url, options) => {
+        const body = JSON.parse(String(options?.body ?? '{}'));
+        if (String(url).endsWith('/send_transaction')) {
+          submissions++;
+          const tx = Serializer.decode({ data: body.packed_trx, type: Transaction });
+          expect(tx.actions.length).toBe(sponsored ? 1 : 2);
+          const action = tx.actions[tx.actions.length - 1];
+          expect(String(action.name)).toBe(sponsored ? 'sendfree' : 'sendmsg');
+          const data = Serializer.objectify(Serializer.decode({ data: action.data, type: String(action.name), abi: fixture.abi }));
+          expect(data.sender).toBe('alpha.chz');
+          expect(data.parts).toBe(1);
+          expect(data.copies.length).toBe(1);
+          expect(data.copies[0].to).toBe('eosio.null');
+          expect(Buffer.byteLength(data.copies[0].memo)).toBe(256);
+          expect(Signature.from(body.signatures[0]).recoverDigest(tx.signingDigest(WAX_CHAIN_ID)).equals(fixture.keys[0].toPublic())).toBe(true);
+          return Response.json({ transaction_id: String(tx.id), processed: { receipt: { status: 'executed' } } });
+        }
+        return Response.json(fixture.respond(String(url), body));
+      }) as typeof fetch;
+      const runtime = createRuntime({ bots: fixture.bots, nullRatio: 1, chainApi: ['https://offline-chain.test'], broadcast: 'http://127.0.0.1:8088', reserve: '1.0000 CHEESE', maxSendsPerBotPerDay: 1 }, path, false);
+      await runtime.preflight();
+      await runtime.send('alpha.chz', 'trickle');
+      await runtime.send('alpha.chz', 'batch');
+      expect(submissions).toBe(1);
+      expect(JSON.parse(readFileSync(path, 'utf8')).sent['alpha.chz']).toBe(1);
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('Nightcrawler ignores daytime mixing and refuses an explicit eosio.null recipient', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'night-no-null-'));
+  const fixture = runtimeFixture(true, true);
+  try {
+    globalThis.fetch = (async (url, options) => Response.json(fixture.respond(String(url), JSON.parse(String(options?.body ?? '{}'))))) as typeof fetch;
+    const runtime = createRuntime({ bots: fixture.bots, nullRatio: 1, sendMode: 'free-only', chainApi: ['https://offline-chain.test'], broadcast: 'direct', reserve: '1.0000 CHEESE', maxSendsPerBotPerDay: 1 }, join(dir, 'state.json'), true);
+    await runtime.preflight();
+    await runtime.send('alpha.chz', 'night peer sample');
+    await expect(runtime.send('alpha.chz', 'night null sample', 'eosio.null')).rejects.toThrow('recipient not configured');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

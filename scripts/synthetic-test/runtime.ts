@@ -2,7 +2,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { randomBytes, randomInt } from 'node:crypto';
 import { APIClient, FetchProvider, PrivateKey, Transaction, Action, ABI, Serializer } from '@wharfkit/antelope';
-import { ROUTER, TOKEN, buildSend, dummyMemo, pickRecipient, refuseSend, buildPowerup, planPowerup, POWERUP_UNITS, parseBudget, sponsorRemaining, SPONSOR_PART_UNITS, SEND_COST_UNITS, utcDay, cheeseUnits, checkPermission, type Config, type Bot, type SendMode } from './policy';
+import { ROUTER, TOKEN, NULL_RECIPIENT, buildSend, dummyMemo, pickRecipient, pickDaytimeRecipient, refuseSend, buildPowerup, planPowerup, POWERUP_UNITS, parseBudget, sponsorRemaining, SPONSOR_PART_UNITS, SEND_COST_UNITS, utcDay, cheeseUnits, checkPermission, type Config, type Bot, type SendMode } from './policy';
 import { writeJsonAtomic } from './nightState';
 export const WAX_CHAIN_ID = '1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4';
 export const log = (m: string) => console.log(`${new Date().toISOString()}  ${m}`);
@@ -16,7 +16,7 @@ export async function submitOnce(target: string, body: string, id: string): Prom
   if (json.transaction_id !== id || json.processed?.receipt?.status !== 'executed') throw new Error('submission not confirmed executed with matching transaction ID; not retried');
   return id;
 }
-export type RuntimeConfig = Pick<Config, 'bots' | 'chainApi' | 'broadcast' | 'reserve' | 'maxSendsPerBotPerDay'> & { sendMode?: SendMode };
+export type RuntimeConfig = Pick<Config, 'bots' | 'chainApi' | 'broadcast' | 'reserve' | 'maxSendsPerBotPerDay' | 'nullRatio'> & { sendMode?: SendMode };
 export function createRuntime(config: RuntimeConfig, STATE_PATH: string, dryRun: boolean) {
   const mode = config.sendMode ?? 'standard';
   let preflightPassed = false;
@@ -93,8 +93,10 @@ async function send(senderName: string, why: string, fixedTo?: string) {
     if (!preflightPassed) throw new Error('permission preflight required before sending');
     rollDay();
     const bot = bots.get(senderName);
-    if (!bot || !botNames.includes(fixedTo ?? botNames.find(n => n !== senderName) ?? '')) throw new Error('sender or recipient not configured');
-    const to = fixedTo ?? pickRecipient(botNames, senderName, rand());
+    const to = fixedTo ?? (mode === 'free-only'
+      ? pickRecipient(botNames, senderName, rand())
+      : pickDaytimeRecipient(botNames, senderName, rand(), config.nullRatio));
+    if (!bot || to === senderName || (!botNames.includes(to) && !(mode === 'standard' && to === NULL_RECIPIENT))) throw new Error('sender or recipient not configured');
     try {
       if (!(await ensureCpu(senderName))) { if (mode !== 'free-only') log(`skip ${senderName} (${why}): CPU too low and no worker could power it up`); return; }
       const free = await freeAvailable();

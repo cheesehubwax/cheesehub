@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { buildPowerup, planPowerup, POWERUP_COOLDOWN_MS, boxBytes, buildSend, burstAllowed, checkPermission, cheese, dummyMemo, isOrganic, planBurst, poissonDelayMs, pickRecipient, refuseSend, validateConfig, SEND_COST_UNITS, parseBudget, sponsorRemaining } from './policy';
+import { buildPowerup, planPowerup, POWERUP_COOLDOWN_MS, boxBytes, buildSend, burstAllowed, checkPermission, cheese, dummyMemo, isOrganic, planBurst, poissonDelayMs, pickRecipient, pickDaytimeRecipient, refuseSend, validateConfig, SEND_COST_UNITS, parseBudget, sponsorRemaining } from './policy';
 
 const base = {
   bots: [
@@ -35,6 +35,22 @@ describe('synthetic test policy', () => {
   });
   test('recipient is never the sender', () => {
     for (const u of [0, 0.3, 0.6, 0.999]) expect(pickRecipient(['a', 'b', 'c'], 'b', u)).not.toBe('b');
+  });
+  test('default daytime mix selects 30% null and 70% configured peers without self-sends', () => {
+    const names = ['alpha.chz', 'brie.chz', 'gouda.chz'];
+    const selected = Array.from({ length: 1000 }, (_, i) => pickDaytimeRecipient(names, names[0], (i + 0.5) / 1000));
+    expect(selected.filter(n => n === 'eosio.null')).toHaveLength(300);
+    expect(selected.filter(n => n === 'brie.chz')).toHaveLength(350);
+    expect(selected.filter(n => n === 'gouda.chz')).toHaveLength(350);
+    expect(selected.includes('alpha.chz')).toBe(false);
+  });
+  test('nullRatio is configurable from zero to one and rejects invalid values', () => {
+    for (const u of [0, 0.3, 0.999]) {
+      expect(pickDaytimeRecipient(['a', 'b'], 'a', u, 0)).toBe('b');
+      expect(pickDaytimeRecipient(['a', 'b'], 'a', u, 1)).toBe('eosio.null');
+    }
+    for (const nullRatio of [-0.1, 1.1, NaN, Infinity, '0.3', null]) expect(() => validateConfig({ ...base, nullRatio })).toThrow('nullRatio');
+    expect(validateConfig({ ...base, nullRatio: 0.3 }).nullRatio).toBe(0.3);
   });
   test('poisson gap: rate 1/h at u=1-1/e is one hour; rate 0 never fires', () => {
     expect(poissonDelayMs(1, 1 - Math.exp(-1))).toBe(3_600_000);

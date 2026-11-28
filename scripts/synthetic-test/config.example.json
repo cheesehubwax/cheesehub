@@ -12,6 +12,7 @@
     }
   ],
   "trickleRatePerHour": 0.5,
+  "nullRatio": 0.3,
   "burstMin": 1,
   "burstMax": 2,
   "burstDelayMinSeconds": 45,
