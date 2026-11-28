@@ -55,19 +55,36 @@ function CryptographyDetails() {
   );
 }
 
-function Heading({ children }: { children: ReactNode }) {
+const P = 'pl-3.5 text-sm leading-relaxed text-muted-foreground';
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
-      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-cheese" />
+    <section className="space-y-2">
+      <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-cheese" />
+        {title}
+      </h3>
       {children}
-    </h3>
+    </section>
   );
+}
+
+function Bullets({ items }: { items: ReactNode[] }) {
+  return (
+    <ul className={`${P} ml-4 list-disc space-y-1 marker:text-cheese`}>
+      {items.map((item, i) => <li key={i}>{item}</li>)}
+    </ul>
+  );
+}
+
+function B({ children }: { children: ReactNode }) {
+  return <span className="font-medium text-foreground">{children}</span>;
 }
 
 function Grid({ label, head, rows }: { label: string; head: string[]; rows: ReactNode[][] }) {
   return (
     <div className="ml-3.5 overflow-x-auto rounded-md border border-cheese/20">
-      <table className="w-full min-w-[640px] border-collapse text-xs" aria-label={label}>
+      <table className="w-full min-w-[560px] border-collapse text-xs" aria-label={label}>
         <thead className="bg-cheese/10">
           <tr>{head.map((h) => <th key={h} scope="col" className="px-2 py-2 text-left font-semibold text-cheese">{h}</th>)}</tr>
         </thead>
@@ -87,83 +104,125 @@ function Grid({ label, head, rows }: { label: string; head: string[]; rows: Reac
 
 const Y = <span aria-label="Yes">✅</span>;
 const N = <span aria-label="No">❌</span>;
+const REPORT_URL = 'https://t.me/cheeseonwaxofficial';
 
-function ChatTypesAndRoles() {
+function AboutBody() {
   return (
     <>
-      <section className="space-y-2">
-        <Heading>Private chat, private group or public room?</Heading>
+      <Section title="🚀 Getting started">
+        <Bullets items={[
+          <>Connect with Anchor and create a messaging key (one-time 500 CHEESE), or load an existing key file for free.</>,
+          <>Every key is locked to your WAX account with Anchor before use — unlocking is a free signature.</>,
+          <>Add friends by swapping public key files. Share your public key only, never your private key.</>,
+          <>Keep your locked backup and your Anchor key safe: a lost key means old messages can't be read.</>,
+          <>📲 Move device copies your key, friends and groups to another device by QR code — nothing goes on chain or to a server.</>,
+        ]} />
+      </Section>
+
+      <Section title="💬 Chats & rooms">
         <Grid
           label="Chat types compared"
           head={['', '💬 Private chat', '🔒 Private group', '📣 Public room']}
           rows={[
-            ['Who', 'You and one friend', 'Up to 8 people, including the creator', 'Up to 50 people'],
-            ['How people join', 'Add each other as friends', 'Invitation from the creator; Join or Decline', 'Ask to join from the public listing; the owner admits you'],
-            ['Visible to outsiders', 'Only that two accounts traded transactions', 'Nothing is listed; transactions to members are still public', 'Room name and owner are listed on chain; members, admins, mutes and bans are never listed'],
-            ['Moderation', 'Block the person', 'Leave, or block a member', 'Owner and admins: mute, collapse, ban, reports'],
-            ['Earlier messages', 'Whole conversation', 'Newcomers do not see earlier messages', 'Newcomers do not see earlier messages'],
+            ['Who', 'You and one friend', 'Up to 8 people', 'Up to 50 people'],
+            ['Joining', 'Add each other as friends', 'Invite from the creator', 'Ask to join; the owner admits you'],
+            ['Listed publicly', 'No', 'No', 'Room name and owner only'],
+            ['Earlier messages', 'Whole conversation', 'Not for newcomers', 'Not for newcomers'],
           ]}
         />
-        <p className="pl-3.5 text-sm leading-relaxed text-muted-foreground">A private group must be listed publicly to grow past 8. Everyone who was a member when the room was first listed becomes a permanent Founder, and the owner can make up to 8 founders in total (owner included) by right-clicking a member’s message. Founder status can never be removed.</p>
-      </section>
+        <Bullets items={[
+          <>Public Inbox (off by default) lets strangers send requests you can Accept, Decline or Block for free.</>,
+          <>Publishing your key lets anyone find you — we recommend sharing it privately instead.</>,
+        ]} />
+      </Section>
 
-      <section className="space-y-2">
-        <Heading>Public room roles</Heading>
-        <p className="pl-3.5 text-sm leading-relaxed text-muted-foreground">👑 Owner (room creator) → 🛡️ Admin (appointed by the owner) → 👤 Member. <span className="font-semibold text-cheese">⭐ Founder</span> is an extra badge, not a rank: the owner, admins and members can all be founders, and a founder who also holds the owner or admin rank uses that rank's commands. Commands appear when you right-click (or long-press) a message, and badges show beside names in the chat.</p>
+      <Section title="✨ Messaging features">
+        <Bullets items={[
+          <><B>Replies & edits:</B> quote any message; edit your own for 24 hours. The blue @ jumps to unseen replies.</>,
+          <><B>Reactions:</B> 👍 ❤️ 🔥 😂 🧀 🚀 💩, encrypted so only the chat sees them.</>,
+          <><B>Voice notes:</B> up to 10 seconds, encrypted in your browser; plays only once fully received.</>,
+          <><B>NFTs:</B> share pictures, music and sound effects from your own WAX wallet.</>,
+          <><B>YouTube:</B> links stay encrypted; videos load only when you press ▶️ Play, through private mirrors first.</>,
+          <><B>Tips:</B> reply with /tip 100 cheese to send CHEESE straight to the author. Final, and never held by CHEESEHub.</>,
+          <><B>Search, names & avatars:</B> search runs on your screen only; set a name, pixel avatar and private nicknames.</>,
+        ]} />
+      </Section>
+
+      <Section title="🛡️ Privacy & security">
+        <p className={P}>Message content is protected with <CryptographyDetails />.</p>
+        <Bullets items={[
+          <><B>Private:</B> message text, voice, shared NFT IDs and group details.</>,
+          <><B>Public forever on WAX:</B> who sent to whom, when, fees paid and number of parts.</>,
+          <>Every part is padded to the same size, so a short "ok" looks like a long message.</>,
+          <>✔ means in a block, ✔✔ means permanent.</>,
+          <>🔐 Verify compares a safety number with a friend to prove no one swapped your keys.</>,
+          <>🔒 Lock now, Esc twice, or Ctrl/Cmd+Shift+L clears the screen; it also locks itself when idle.</>,
+          <>⚡ Instant Messaging sends free messages without Anchor popups, using a key that can only send messages.</>,
+          <>🛡️ Privacy menu: Tor helper, your own history server, random send delay, scheduled sends and Nightcrawler.</>,
+          <>Anyone you message can still copy or share it, and a compromised device can expose your messages.</>,
+        ]} />
+      </Section>
+
+      <Section title="🧀 Respect">
+        <Bullets items={[
+          <>A quick public-data signal shown next to strangers, join requests and group members.</>,
+          <>Rewards real involvement in CHEESE: liquidity (weighted highest), holdings, faucet staking, NFTs, account and key age, and .cheese/.chz names.</>,
+          <>Six marks, from 🪤 Warning to 🏆 Huge Respect. A * means some data couldn't be read.</>,
+          <>Others only see your total; tap your own badge to see your breakdown.</>,
+          <>It never confirms who someone is — use your own judgement.</>,
+        ]} />
+      </Section>
+
+      <Section title="👑 Public room moderation">
+        <p className={P}>👑 Owner → 🛡️ Admin → 👤 Member. <span className="font-semibold text-cheese">⭐ Founder</span> is a permanent badge for members present when a room is first listed (up to 8, owner included). Right-click or long-press a message for commands.</p>
         <Grid
           label="What each role can do"
           head={['Action', '👑 Owner', '🛡️ Admin', '⭐ Founder', '👤 Member']}
           rows={[
-            ['List, unlist and admit members', Y, N, N, N],
-            ['Make or remove admins', Y, N, N, N],
-            ['Mute (15m, 1h, 6h, 24h)', 'Anyone', 'Anyone except the owner', N, N],
-            ['Collapse a message', 'Anyone’s', 'Not the owner’s or a founder’s', N, N],
-            ['Ban', 'Anyone except founders', N, N, N],
-            ['🚩 Report a message', 'Not needed — can act directly', 'Reports go to the owner', 'Reports go to the owner and admins', 'Reports go to the owner and admins'],
-            ['See reports (orange 🚩 button)', Y, Y, N, N],
+            ['Admit members, list or unlist', Y, N, N, N],
+            ['Appoint admins', Y, N, N, N],
+            ['Mute (15m–24h)', 'Anyone', 'Not the owner', N, N],
+            ['Collapse a message', 'Anyone’s', 'Not owner’s or founders’', N, N],
+            ['Ban', 'Not founders', N, N, N],
+            ['🚩 Report a message', '—', 'To owner', 'To owner + admins', 'To owner + admins'],
             ['See the 72-hour edit log', Y, N, N, N],
-            ['Edit own messages (24 hours)', Y, Y, Y, Y],
           ]}
         />
+        <Bullets items={[
+          <>Messages sent during a mute stay hidden for good. Collapsed messages hide behind a notice.</>,
+          <>A ban stops future messages; it can't take back what was already received.</>,
+          <>Every app checks these rules itself, so no one can grant themselves powers.</>,
+        ]} />
+      </Section>
+
+      <Section title="💰 Costs">
         <Grid
-          label="Who is protected from what"
-          head={['Protection', '👑 Owner', '🛡️ Admin', '⭐ Founder', '👤 Member']}
+          label="Costs"
+          head={['Action', 'Cost']}
           rows={[
-            ['Can be muted', N, 'Yes, by the owner or another admin', 'Yes, by the owner or admins', 'Yes, by the owner or admins'],
-            ['Messages can be collapsed', N, 'By the owner only', 'Only by the owner', 'By the owner or admins'],
-            ['Can be banned', N, 'Yes, by the owner', N, 'Only by the owner'],
+            ['Text, replies, reactions, NFTs, links', 'Free while the shared daily budget lasts'],
+            ['Paid message part', '0.0100 CHEESE fee + 0.0001 per recipient'],
+            ['Voice note', 'Same as a paid part, per part'],
+            ['Join or rejoin request', '0.0101 CHEESE'],
+            ['Messaging key', '500 CHEESE once'],
+            ['Publish your key', '0.0100 CHEESE'],
+            ['List a public room (admins only)', '100 CHEESE non-refundable fee'],
           ]}
         />
-        <p className="pl-3.5 text-sm leading-relaxed text-muted-foreground">A muted person’s messages from that time stay hidden for everyone, even after the mute ends. Collapsed messages are hidden behind a notice that moderators can open. A ban stops future messages reaching that person; it cannot take back messages they already received. Muted or banned admins lose their powers while it applies. Every app checks these rules itself against the signed WAX sender, so no one can give themselves powers by changing their own app.</p>
-      </section>
-    </>
-  );
-}
+        <Bullets items={[
+          <>Fees are split 80% nulled, 20% to xcheeseliqst, and pass straight through crypt.cheese — it never holds your CHEESE.</>,
+          <>Anchor Fuel is off on CHEESECrypt for privacy, so you need your own CPU. Short? Rent some with <Link to="/powerup" className="text-cheese underline">CHEESEUp</Link>.</>,
+        ]} />
+      </Section>
 
-const REPORT_URL = 'https://t.me/cheeseonwaxofficial';
-
-function PrivacyAndResponsibility() {
-  const p = 'pl-3.5 text-sm leading-relaxed text-muted-foreground';
-  return (
-    <>
-      <section className="space-y-2 rounded-md border border-cheese/30 bg-cheese/5 p-3">
-        <Heading>What is private and what is public</Heading>
-        <ul className={`${p} list-disc list-inside space-y-1`}>
-          <li><span className="font-medium text-foreground">Private:</span> message text, voice notes, shared NFT IDs and group details inside messages. Only the people in the chat can read them.</li>
-          <li><span className="font-medium text-foreground">Public forever on WAX:</span> who sent to whom, when, transaction IDs, any CHEESE amounts and number of parts, plus anything you publish (your public key, a public room’s name, description and owner).</li>
-          <li>Nobody, including CHEESEHub, can delete anything from the blockchain, recover a lost key or read your private messages.</li>
-          <li>Anyone you message can copy, screenshot or share what you sent them.</li>
-        </ul>
-      </section>
-      <section className="space-y-2">
-        <Heading>Your responsibility</Heading>
-        <p className={p}>You alone are responsible for everything you send, publish or list, and for following the law where you live. CHEESEHub does not monitor, store, review or endorse private messages and cannot read them. CHEESEHub is software only; your messages go directly onto the WAX blockchain.</p>
-      </section>
-      <section className="space-y-2">
-        <Heading>Public rooms and takedowns</Heading>
-        <p className={p}>CHEESECrypt exists for private messaging; public room listings are an optional extra. The public room directory is curated: only CHEESEHub admins can list rooms in it, and everyone else creates private rooms and groups by invitation. To report a room, including its owner or admins, use the 🚩 Report button on the room (fastest), contact the moderation team in the official <a href={REPORT_URL} target="_blank" rel="noopener noreferrer" className="text-cheese underline">CHEESE Telegram group</a> (fast), or email <a href="mailto:cheesehub@protonmail.com" className="text-cheese underline">cheesehub@protonmail.com</a> (slower; best for formal notices). These reports go to CHEESEHub, not the room's owner.</p>
-        <p className={p}>Read the full <Link to="/terms" className="text-cheese underline">Terms of Use</Link>.</p>
-      </section>
+      <Section title="⚖️ Your responsibility">
+        <Bullets items={[
+          <>You are responsible for what you send, publish or list, and for following your local laws.</>,
+          <>CHEESEHub is software only: it can't read, store, delete or recover your messages or keys.</>,
+          <>Report a public room with 🚩 Report, in the <a href={REPORT_URL} target="_blank" rel="noopener noreferrer" className="text-cheese underline">CHEESE Telegram group</a>, or at <a href="mailto:cheesehub@protonmail.com" className="text-cheese underline">cheesehub@protonmail.com</a>.</>,
+          <>Read the full <Link to="/terms" className="text-cheese underline">Terms of Use</Link>.</>,
+        ]} />
+      </Section>
     </>
   );
 }
@@ -172,36 +231,9 @@ export function CryptAbout({ children }: { children: ReactNode }) {
   return (
     <DappAbout
       title="CHEESECrypt"
-      introduction={<>Send private messages to friends, private groups or public rooms on WAX. Text messages are usually free — CHEESECrypt pays the fee for you — while voice notes, keys and listings are paid in CHEESE. Message content is protected with <CryptographyDetails />, while who sent to whom and when stays public on the blockchain.</>}
-      sections={[
-        { title: 'Get started', body: 'Connect with Anchor, choose your profile and create a messaging key for a one-time 500 CHEESE (400 nulled via eosio.null, 100 to xcheeseliqst), or load your existing private key file for free. Every key must be locked to its WAX account before use, with no opt-out; legacy keys are upgraded for free without changing friends or rooms. Anchor requests two free, never-broadcast signatures for locking, or one to open a locked backup. Keep your locked backup and Anchor signing key safe. Add a friend by loading their public key file (or their published key, if they chose to publish). Share only your public key, never your private key.' },
-        { title: 'Screen shield & panic lock', body: 'Press 🔒 Lock now in the chat header, press Esc twice quickly, or Ctrl/Cmd+Shift+L to wipe every open chat off the screen at once and return to the Anchor unlock prompt. CHEESECrypt also locks itself after a period without any typing, clicking or scrolling (30 minutes unless you change it under 🛡️ Privacy), and can blur your messages while you are on another tab. Unlocking again is one free Anchor signature. This only protects your own screen: nothing is removed from the chain or from the other person\'s device, and anyone who can use your Anchor wallet can unlock again.' },
-        { title: 'Respect', body: 'Strangers, join requests, non-friend chats, group messages and group member lists show a Respect mark and total (🪤 Warning, 🥛 No Respect, 🧀 Some Respect, 🫕 Much Respect, the CHEESE logo for Big Respect, and 🏆 Huge Respect). Other people only ever see your total, never where it came from; tap your own badge to see your breakdown. Points: .cheese or .chz name +40; account age under 7 days -15, 7–30 days +2, 30 days–1 year +5, 1–3 years +10, 3–5 years +15, 5+ years +20; CHEESE held 1+ +2, 100+ +6, 1k+ +12, 10k+ +20, 50k+ +30; CHEESE staked in the faucet 100+ +5, 5k+ +10, 20k+ +15, 50k+ +20; CHEESE in Alcor pools under 100 +0, 100+ +1, 1k+ +5, 5k+ +15, 20k+ +35, 50k+ +70, 100k+ +100, plus +5 for 2 or more pools with at least 10,000 CHEESE total; CHEESE NFTs 1+ +4, 5+ +10, 20+ +18, 50+ +25; published key +10; CHEESECrypt key age 30 days+ +3, 6 months+ +6, 1 year+ +10. Marks: under 10 (or an account under 7 days old) Warning, 10+ No Respect, 40+ Some Respect, 100+ Much Respect, 150+ Big Respect, 200+ Huge Respect. Maximum total: 260 points. A * means some signals could not be read and were left out. This is based on public blockchain data only. It does not confirm who someone is. Use your own judgement.' },
-        { title: 'Moving to another device', body: 'On the device you already use, press 📲 Move device next to the message box. It shows a moving QR code and a 12-character one-time code. On the new device, connect the same account in Anchor, press 📷 Receive from another device, scan the code (or paste the copied text) and type the one-time code. Your locked key, friends, names, nicknames, blocked list and groups are added to that device; nothing already there is wiped. Anchor then asks for the usual free unlock. Everything happens between the two screens: nothing goes on chain or to any server, and Instant Messaging must be switched on again on the new device. Do not let anyone film the screen while both codes are showing.' },
-        { title: 'Publishing and the Public Inbox', body: 'Publishing (Menu → Publish) puts your account and public key permanently on chain so others can find you; it costs 0.0100 CHEESE. (CHEESECrypt recommends you do not publish your public key and instead share it privately and directly with friends) This feature benefits public figures who wish to be found and contactable. Public Inbox is off by default. Turn it on and strangers can send text or NFT message requests that you Accept, Decline or Block for free. Blocked accounts are ignored and you never see their messages.' },
-        { title: 'Messaging features', body: 'Longer messages are split and shown as one message. Reply to a message to quote it; the blue @ button jumps to replies you have not seen. You can edit your own messages for 24 hours; edited messages are marked (edited). React with 👍 ❤️ 🔥 😂 🧀 🚀 💩 — reactions are small encrypted messages, so only the chat sees them. 🔍 Search finds words in the messages already decrypted on your screen; searching never leaves your browser. Set a name and pixel avatar in your profile and give friends private nicknames. When the side panel is collapsed, a thin strip keeps every room and friend with their unread counts in view.' },
-        { title: 'Privacy & verification', body: 'Every message part is padded to the same size before it is encrypted, so the blockchain cannot tell a short "ok" from a full message (the number of parts, the time, sender and recipients are still public). Your own messages show ✔ once they are in a block and ✔✔ once that block is permanent, usually within a few minutes. In a direct chat, 🔐 Verify shows a 60-digit safety number and QR code made from both of your keys — compare it with your friend in person or on a call. If it matches, nobody has swapped your keys. Mark them verified and CHEESECrypt warns you if their key ever changes. Verifying is free, stays on this device and sends nothing on chain.' },
-        { title: 'Network privacy', body: 'WAX history servers can see your internet address. While a chat is open, CHEESECrypt checks for new messages by reading all crypt.cheese activity — the same request every user makes — and keeps only yours on your device, so the server cannot tell which account you are watching. 🛡️ Privacy (next to Send) lets you pick Standard (your history is loaded once by account name when you open CHEESECrypt) or Maximum (never names your account, but opens slower and may miss older messages), and add your own history server. Things that still show your account: sending (every message is public on chain with its sender and recipients), signing with Anchor, looking up a friend\'s key, and loading full history. A VPN or Tor hides your internet address itself; your own server removes the third party entirely. CHEESEHub never runs a relay and never sees your traffic.' },
-      ]}
-      extra={<>
-        <PrivacyAndResponsibility />
-        <ChatTypesAndRoles />
-        {[
-          { title: 'Free messages', body: 'Text messages, replies, reactions, NFT shares and YouTube links are free while CHEESECrypt’s daily budget lasts: crypt.cheese pays the 0.0100 CHEESE platform fee per part from CHEESEHub’s own deposit (still 80% nulled, 20% to xcheeseliqst) and no CHEESE leaves your wallet. The budget is shared by everyone, up to 200 CHEESE per day; when it runs out, messages are paid as normal (see Costs) until the next day. The composer shows “Free message” when your next message is covered. Free messages carry no 0.0001 CHEESE to recipients and contain no token transfer at all. CHEESEHub can pause or change free messaging at any time. Your account still uses its own WAX CPU/NET (usually covered by Greymass Fuel).' },
-          { title: '⚡ Instant Messaging', body: 'Optional: switch on Instant Messaging with the ⚡ button to send free messages without an Anchor popup. One Anchor approval adds a separate "cheesecrypt" permission to your account that can only call crypt.cheese’s free-message action — it cannot move tokens, NFTs or WAX, or do anything else. Its key is kept only in the open tab: it is deleted when the tab closes or after 4 hours without activity, and until then anyone using that tab could send messages as you (but never spend your funds); use it only on your own device. The permission stays on your account until you switch it off, so re-enabling later is one more Anchor approval. Adding the permission uses a little account RAM; if you are short, CHEESECrypt can buy it through ram.chz in the same approval, or link you to CHEESERam. If a message fails for lack of CPU, rent some with CHEESEUp. Paid actions (voice notes, tips, keys, listings and paid messages) still ask Anchor. Switch it off anytime from the same button (one Anchor approval), which removes the permission and deletes the browser key. Only one browser per account at a time.' },
-          { title: 'Costs and records', body: 'When a message is not free, each part costs 0.0001 CHEESE to each recipient plus a 0.0100 CHEESE platform fee once, shared across the whole group (80% nulled, 20% to xcheeseliqst). A three-person group costs 0.0102 CHEESE per part; direct messages cost 0.0101 CHEESE per part. Key creation is 500 CHEESE once; publishing your key is 0.0100 CHEESE. All fees pass straight through crypt.cheese in the same transaction — the contract never holds your CHEESE, and any change is refunded instantly. Asking to join or rejoin a public room costs 0.0101 CHEESE, the same as an ordinary one-part direct message: 0.0001 CHEESE with the request and a shared 0.0100 CHEESE platform fee, with no extra owner payment. Only CHEESEHub admins can make a room public; doing so costs a one-time, non-refundable 100.0000 CHEESE listing fee (unlisting never returns it) to deter throwaway spam listings; updating a listed room’s details or unlisting costs only the usual 0.0100 CHEESE.' },
-          { title: '🎬 Private YouTube links', body: 'Paste a YouTube link in a message and CHEESECrypt treats it like any other text: the link travels inside your encrypted message, so only the people in that chat know you shared it. Videos never load in the background — nothing is fetched until you press ▶️ Play. Playback runs through two private mirror services, Invidious and Piped, which serve the video themselves so Google is never asked for it and your IP is not visible to Google. Only if both mirrors fail does CHEESECrypt warn you and fall back to playing directly from YouTube as a last resort. Playback happens in a player inside the chat, and the ⛶ button expands it into a bigger window without interrupting the video. A video that starts loading is never proof it actually plays.' },
-          { title: 'Voice notes', body: 'Record up to 10 seconds, listen back, then send. The audio is encrypted in your browser and stored only as encrypted messages on WAX. Every encrypted voice part costs the ordinary 0.0100 CHEESE shared platform fee (0.0080 nulled, 0.0020 to xcheeseliqst), plus 0.0001 CHEESE to each recipient. A 30-part batch costs 0.3000 CHEESE in platform fees, or 0.3030 CHEESE total for one recipient; the whole note costs according to its actual part count. A note is sent in up to 30 parts per transaction, so you sign 2–4 times and need enough CPU/NET. If a later transaction fails, the note shows as incomplete and never plays. Safari and iPhone may not support recording or playback.' },
-          { title: 'Sharing WAX NFTs', body: 'Use 🖼️ Attach NFT to share pictures of NFTs you own on the WAX blockchain — art, collectibles and music NFTs alike. Pick any NFT from your own wallet and its picture shows in the chat for everyone in that chat to see. Music NFTs work the same way: songs, clips and sound effects can be attached and played, and only one sound plays at a time. Only the NFT ID travels inside your encrypted message; the media itself is public on WAX.' },
-          { title: 'Tips', body: 'Reply to a message and type /tip 100 cheese great work! to send CHEESE straight from your wallet to the author, signed together with your message. CHEESEHub never receives or holds tips and charges no fee on them. A tip moves CHEESE, so it always asks Anchor and the message carrying it is paid normally. Tips are final and cannot be reversed. The amount, sender and receiver are public on the blockchain; your note stays private inside the encrypted message. Tips are gifts; any tax obligations are your own.' },
-          { title: 'Keep your key safe', body: 'Your private key unlocks messages and stays in this browser unless you export it. Back it up in your cheesecrypt folder or keep the downloaded file somewhere safe. A new key cannot read messages encrypted for an older key. Participants can share what they read, so only send content you trust them with.' },
-        ].map((s) => (
-          <section key={s.title} className="space-y-2">
-            <Heading>{s.title}</Heading>
-            <p className="pl-3.5 text-sm leading-relaxed text-muted-foreground">{s.body}</p>
-          </section>
-        ))}
-      </>}
+      introduction="Encrypted messaging on WAX for friends, private groups and public rooms. Only your chat can read what you say; who messaged whom and when stays public on chain."
+      sections={[]}
+      extra={<AboutBody />}
     >
       {children}
     </DappAbout>
