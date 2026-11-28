@@ -12,8 +12,7 @@ export function CryptKeyRotationCard({ ageDays, retention, setRetention, retired
   pendingFriends: number; onRotate: () => void; onAnnounce: () => void; onDestroy: (publicKey: string) => void;
 }) {
   const [confirm, setConfirm] = useState<CryptConfirm | null>(null);
-  return <section className="space-y-2 rounded-md border border-border p-3">
-    <h3 className="font-semibold text-foreground">🔄 Key rotation</h3>
+  return <section className="space-y-2">
     <p>{ageDays === null ? 'Your key age is unknown.' : `Your key is ${ageDays} day${ageDays === 1 ? '' : 's'} old.`} Rotating swaps it for a fresh one, privately: only your friends get the new key, inside encrypted notices. Friends and groups stay.</p>
     <p className="text-xs">The real privacy gain comes when old keys are destroyed: messages only they could open become unreadable for everyone, including you. Backup files you downloaded earlier still hold old keys until you delete them.</p>
     <div className="flex flex-wrap gap-2">

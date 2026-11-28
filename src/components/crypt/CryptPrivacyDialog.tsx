@@ -3,6 +3,8 @@ import { Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Accordion, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Content as AccordionContent } from '@radix-ui/react-accordion';
 import {
   type PrivacyMode, loadCustomEndpoint, loadCustomOnlyPreference, saveCustomOnlyPreference, saveCustomEndpoint, checkHistoryEndpoint, validateCustomEndpoint,
   type SendJitter, JITTER_LIMITS, JITTER_PRESETS, loadSendJitter, saveSendJitter,
@@ -12,6 +14,18 @@ import { CryptConfirmDialog } from './CryptConfirmDialog';
 import type { CryptConfirm } from './CryptConfirmDialog';
 
 const TOR_CHECK_COMMAND = 'curl.exe --socks5-hostname 127.0.0.1:9150 https://check.torproject.org/api/ip';
+
+function PrivacySection({ value, title, description, children }: { value: string; title: string; description: string; children: ReactNode }) {
+  return <AccordionItem value={value} className="border-border">
+    <AccordionTrigger className="gap-3 text-left hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <span className="min-w-0 space-y-1">
+        <span className="block font-semibold text-foreground">{title}</span>
+        <span className="block text-xs font-normal text-muted-foreground break-words">{description}</span>
+      </span>
+    </AccordionTrigger>
+    <AccordionContent forceMount className="space-y-2 pb-4 data-[state=closed]:hidden">{children}</AccordionContent>
+  </AccordionItem>;
+}
 
 /** Network privacy settings. Presentational: the mode lives in the Messenger, the server setting on this device. */
 export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFullHistory, idleMinutes, setIdleMinutes, shieldOn, setShieldOn, hardening, setHardening, rotationSlot, nightcrawlerSlot }: {
@@ -30,10 +44,12 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
   const [jitter, setJitterState] = useState<SendJitter>(() => loadSendJitter());
   const [minDraft, setMinDraft] = useState('');
   const [maxDraft, setMaxDraft] = useState('');
+  const [expanded, setExpanded] = useState<string[]>([]);
   const setJitter = (j: SendJitter) => { const n = saveSendJitter(j); setJitterState(n); setMinDraft(String(n.minSeconds)); setMaxDraft(String(n.maxSeconds)); };
 
   useEffect(() => {
     if (!open) return;
+    setExpanded([]);
     const c = loadCustomEndpoint();
     setSaved(c); setUrl(c ?? 'http://localhost:8088'); setOnly(loadCustomOnlyPreference()); setNote(null); setCopyNote(null);
     const j = loadSendJitter(); setJitterState(j); setMinDraft(String(j.minSeconds)); setMaxDraft(String(j.maxSeconds));
@@ -61,9 +77,9 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>🛡️ Network privacy</DialogTitle></DialogHeader>
         <div className="space-y-4 text-sm text-muted-foreground">
-          <p>While a chat is open, CHEESECrypt checks for new messages by reading all crypt.cheese activity — the same request every user makes — and keeps only yours on this device. The history server can't tell which account you are watching.</p>
-          <section className="space-y-2">
-            <h3 className="font-semibold text-foreground">Mode</h3>
+          <Accordion type="multiple" value={expanded} onValueChange={setExpanded}>
+          <PrivacySection value="history" title="🛡️ History mode" description={mode === 'standard' ? 'Standard · Fast opening with one account-history lookup.' : 'Maximum · Account-blind opening from shared activity.'}>
+            <p>While a chat is open, CHEESECrypt checks for new messages by reading all crypt.cheese activity — the same request every user makes — and keeps only yours on this device. The history server can't tell which account you are watching.</p>
             <div className="flex gap-2">{modeBtn('standard', 'Standard')}{modeBtn('maximum', 'Maximum')}</div>
             {mode === 'standard'
               ? <p>Opening CHEESECrypt asks for your account's history once (fast, complete). After that, checks never name your account.</p>
@@ -73,9 +89,8 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
                 Load older history once (tells the server your account)
               </Button>
             )}
-          </section>
-          <section className="space-y-2">
-            <h3 className="font-semibold text-foreground">🔒 Screen shield &amp; panic lock</h3>
+          </PrivacySection>
+          <PrivacySection value="lock" title="🔒 Screen shield & panic lock" description={`Auto-lock: ${idleMinutes === 0 ? 'Off' : idleMinutes === 60 ? '1 hour' : idleMinutes === 240 ? '4 hours' : `${idleMinutes} min`} · Tab shield ${shieldOn ? 'on' : 'off'} · Cold lock ${hardening.cold ? 'on' : 'off'}`}>
             <p>Press 🔒 Lock now, Esc twice quickly, or Ctrl/Cmd+Shift+L to clear the screen instantly. Unlocking again is one free Anchor signature.</p>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-foreground">Auto-lock after</span>
@@ -97,9 +112,8 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
               }} />
               <span>Cold lock: forget the saved key on this device <span className="block text-xs">Friends, nicknames, avatars and settings stay. {COLD_LOCK_WARNING}</span></span>
             </label>
-          </section>
-          <section className="space-y-2">
-            <h3 className="font-semibold text-foreground">⏱️ Random send delay (optional)</h3>
+          </PrivacySection>
+          <PrivacySection value="delay" title="⏱️ Random send delay (optional)" description={jitter.mode === 'off' ? 'Off · No random delay.' : `${jitter.mode === 'all' ? 'All chats' : `Per chat · Active in ${jitter.chats.length} chats`} · ${jitter.minSeconds}–${jitter.maxSeconds}s`}>
             <p>Waits a random number of seconds before your wallet asks to sign, so the time your message lands on-chain doesn't line up neatly with the message you're replying to. The wait happens only in this tab: closing or locking it cancels unsent messages.</p>
             <div role="radiogroup" aria-label="Random send delay" className="space-y-1">
               {([['off', 'Off', 'No delay anywhere, even in chats you switched on.'],
@@ -127,11 +141,10 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
               </div>
               <p className="text-xs">Applies to messages, voice notes and edits. While waiting you can press Send now or Cancel.</p>
             </div>}
-          </section>
-          {rotationSlot}
-          {nightcrawlerSlot}
-          <section className="space-y-2 rounded-md border border-border p-3">
-            <h3 className="font-semibold text-foreground">Your own history &amp; broadcast server (optional)</h3>
+          </PrivacySection>
+          {rotationSlot && <PrivacySection value="rotation" title="🔄 Key rotation" description="Privately refresh your key and manage retained old keys.">{rotationSlot}</PrivacySection>}
+          {nightcrawlerSlot && <PrivacySection value="nightcrawler" title="🌙 Nightcrawler Companion (optional)" description="Set up a local off-hours schedule with an isolated signing key.">{nightcrawlerSlot}</PrivacySection>}
+          <PrivacySection value="server" title="🧅 Custom server & Tor helper" description={saved ? `${saved} · ${only ? 'Only this server' : 'Public backup allowed'}` : 'Public servers · Connect your own server or local Tor helper.'}>
             <p className="text-xs">The checkbox saves immediately. A new server is used only after Test &amp; connect succeeds.</p>
             <p>If you run your own WAX Hyperion server, or reach one through your own VPN or Tor setup, enter it here. It is stored only in this browser; nothing goes through CHEESEHub.</p>
             <Input className="text-[hsl(var(--input-value-foreground))]" value={url} onChange={e => setUrl(e.target.value)} disabled={busy} placeholder="http://localhost:8088" aria-label="Custom history server" />
@@ -188,8 +201,9 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
                 <p>If you downloaded an older helper, stop it with Ctrl+C and replace the file with this download (v1.6). Older helpers can't load chat NFTs (before v1.3), Respect badge checks and your own balance or Instant Messaging checks (before v1.4), or the wallet's transaction preparation and your wallet NFT list (before v1.6), so those still come from public servers until you update. v1.5+ keeps each kind of traffic on its own Tor circuit and spreads lookups across servers. Anchor desktop talks to its own WAX server when you sign; to hide that too, set a proxy in Anchor's settings or use a system-wide Tor or VPN. Keep the terminal window open while you chat; press Ctrl+C to stop. Testing can take up to 40 seconds while slow history servers are skipped. If localhost fails, try http://127.0.0.1:8088 and allow local-network access if your browser asks. Sending still uses your wallet to sign; the helper only forwards the exact signed bytes. It tries one broadcast server once and never falls back directly or retries another server. If the reply is lost, the transaction may already be on-chain—check Alcor Explorer before retrying. Other CHEESEHub dApps keep their normal wallet route. Using Tor as a client is legal in many countries, but rules and restrictions vary; this is not legal advice.</p>
               </div>
             </details>
-          </section>
           <p className="text-xs">Without Tor or a VPN, servers see your normal internet address. The helper protects only the connections described above; resource providers and wallet services may still see it. Sending, looking up a friend's key, timing, and the public record of who messaged whom still show your account.</p>
+          </PrivacySection>
+          </Accordion>
           <div className="flex justify-end">
             <Button onClick={() => onOpenChange(false)} disabled={busy}>Done</Button>
           </div>

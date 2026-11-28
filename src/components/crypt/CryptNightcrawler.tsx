@@ -55,8 +55,7 @@ export function CryptNightcrawler({ account, canSetup, execute, vault }: { accou
     if (alive.current) setNote('Saved to nightcrawler inside your chosen CHEESECrypt folder. Nothing has started.');
   });
 
-  return <section className="space-y-3 border-t border-border pt-4">
-    <h3 className="font-semibold text-foreground">🌙 Nightcrawler Companion</h3>
+  return <section className="space-y-3">
     <p className="text-xs">Optional, local-only synthetic messages between accounts you own—not readable conversations. The website never runs it. Random timing does not guarantee anonymity.</p>
     <fieldset disabled={busy} className="space-y-3">
       {rows.map((row, i) => <div key={i} className="space-y-2">

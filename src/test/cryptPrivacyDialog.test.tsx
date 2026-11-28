@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ReactNode } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { CryptPrivacyDialog } from '@/components/crypt/CryptPrivacyDialog';
 import { loadCustomEndpoint, loadCustomOnly, saveCustomEndpoint } from '@/lib/cryptNetworkPrivacy';
@@ -11,18 +12,27 @@ const props = {
   shieldOn: false, setShieldOn: vi.fn(), hardening: { cold: false }, setHardening: vi.fn(),
 };
 const checkbox = () => screen.getByRole('checkbox', { name: 'Use only this server (no public servers if it fails)' });
+const renderPrivacy = (ui: ReactNode) => {
+  const view = render(ui);
+  const expandServer = () => {
+    const trigger = screen.queryByRole('button', { name: /Custom server & Tor helper/ });
+    if (trigger?.getAttribute('aria-expanded') === 'false') fireEvent.click(trigger);
+  };
+  expandServer();
+  return { ...view, rerender: (next: ReactNode) => { view.rerender(next); expandServer(); } };
+};
 
 describe('privacy checkbox persistence', () => {
   it('autofills the local helper without replacing the connected server before testing', () => {
     saveCustomEndpoint('https://history.example.com', true);
-    render(<CryptPrivacyDialog {...props} open />);
+    renderPrivacy(<CryptPrivacyDialog {...props} open />);
     fireEvent.click(screen.getByRole('button', { name: 'Autofill Tor helper' }));
     expect(loadCustomEndpoint()).toBe('https://history.example.com');
     expect(loadCustomOnly()).toBe(true);
   });
 
   it('stays checked after closing and reopening before a server is connected', () => {
-    const view = render(<CryptPrivacyDialog {...props} open />);
+    const view = renderPrivacy(<CryptPrivacyDialog {...props} open />);
     fireEvent.change(screen.getByRole('textbox', { name: 'Custom history server' }), { target: { value: 'http://localhost:8088' } });
     fireEvent.click(checkbox());
     view.rerender(<CryptPrivacyDialog {...props} open={false} />);
@@ -36,7 +46,7 @@ describe('privacy checkbox persistence', () => {
     const fetcher = vi.fn().mockRejectedValueOnce(new TypeError('Failed to fetch'))
       .mockResolvedValueOnce({ ok: true, json: async () => ({ actions: [] }) });
     vi.stubGlobal('fetch', fetcher);
-    const view = render(<CryptPrivacyDialog {...props} open />);
+    const view = renderPrivacy(<CryptPrivacyDialog {...props} open />);
     fireEvent.change(screen.getByRole('textbox', { name: 'Custom history server' }), { target: { value: 'http://localhost:8088' } });
     fireEvent.click(checkbox());
     fireEvent.click(screen.getByRole('button', { name: 'Test & connect server' }));
@@ -54,7 +64,7 @@ describe('privacy checkbox persistence', () => {
 
   it('persists toggles in both directions for an already connected server', () => {
     saveCustomEndpoint('http://localhost:8088', false);
-    const view = render(<CryptPrivacyDialog {...props} open />);
+    const view = renderPrivacy(<CryptPrivacyDialog {...props} open />);
     fireEvent.click(checkbox());
     view.rerender(<CryptPrivacyDialog {...props} open={false} />);
     view.rerender(<CryptPrivacyDialog {...props} open />);
@@ -68,7 +78,7 @@ describe('privacy checkbox persistence', () => {
   });
 
   it('links the helper download to the versioned file', () => {
-    render(<CryptPrivacyDialog {...props} open />);
+    renderPrivacy(<CryptPrivacyDialog {...props} open />);
     const link = screen.getByRole('link', { name: 'Download the helper' });
     expect(link.getAttribute('download')).toBe('cheesecrypt-tor-proxy-v1.6.mjs');
     expect(link.getAttribute('href')).toContain('downloads/cheesecrypt-tor-proxy-v1.6.mjs');

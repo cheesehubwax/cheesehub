@@ -1,5 +1,7 @@
 # Crypt components
 
+- Privacy sections expand independently and start closed on each opening; keep their contents mounted while collapsed so pending setup keys, drafts and connection checks are not discarded.
+
 - Tips: `/tip` reply adds a direct sender→author CHEESE transfer (fixed memo) to the message transaction, never routed or held by crypt.cheese; tip cards show verified only when that tx has the matching sender-authorized transfer, so cards can't be faked.
 - Free sends: build `sendfree` only from an exact [payment, sendmsg] route when a live enabled `budget` row covers the fee; voice/join pass `paid`. History merges `crypt.cheese:sendfree` actions attributed only to the authorizing sender.
 - Instant Messaging: a browser key on the `cheesecrypt` permission, linkauth'd only to crypt.cheese::sendfree, signs lone sponsored sendfree actions; everything else stays on Anchor. The key lives only in tab sessionStorage (legacy localStorage copies are purged) and is dropped after 4h without activity, limiting exposure to the open tab. A new key replaces the stored one only after confirmed setup; only auth rejections fall back to Anchor (avoids double sends). Setup prepends a same-account ram.chz buy when free RAM < 1500 bytes. No contract change needed (sendfree only checks require_auth(sender)).
