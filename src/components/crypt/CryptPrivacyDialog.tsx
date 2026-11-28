@@ -91,7 +91,7 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
             )}
           </PrivacySection>
           <PrivacySection value="lock" title="🔒 Screen shield & panic lock" description={`Auto-lock: ${idleMinutes === 0 ? 'Off' : idleMinutes === 60 ? '1 hour' : idleMinutes === 240 ? '4 hours' : `${idleMinutes} min`} · Tab shield ${shieldOn ? 'on' : 'off'} · Cold lock ${hardening.cold ? 'on' : 'off'}`}>
-            <p>Press Lock now, Esc twice quickly, or Ctrl/Cmd+Shift+L to clear the screen instantly. Unlocking again is one free Anchor signature.</p>
+            <p>Press 🔒 Lock now, Esc twice quickly, or Ctrl/Cmd+Shift+L to clear the screen instantly. Unlocking again is one free Anchor signature.</p>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-foreground">Auto-lock after</span>
               {IDLE_OPTIONS.map(m => (
@@ -117,14 +117,14 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
             <p>Waits a random number of seconds before your wallet asks to sign, so the time your message lands on-chain doesn't line up neatly with the message you're replying to. The wait happens only in this tab: closing or locking it cancels unsent messages.</p>
             <div role="radiogroup" aria-label="Random send delay" className="space-y-1">
               {([['off', 'Off', 'No delay anywhere, even in chats you switched on.'],
-                 ['chat', 'Per chat', `Only in chats switched on from their ⋯ menu → Privacy. Active in ${jitter.chats.length} chat${jitter.chats.length === 1 ? '' : 's'} on this device.`],
+                 ['chat', 'Per chat', `Only in chats switched on from their ⋯ menu → 🛡️ Privacy. Active in ${jitter.chats.length} chat${jitter.chats.length === 1 ? '' : 's'} on this device.`],
                 ['all', 'All chats', 'Every room and private chat, whatever each chat is set to.']] as const).map(([m, label, hint]) =>
                 <label key={m} className="flex items-start gap-2">
                   <input type="radio" name="jitter-mode" className="mt-1" checked={jitter.mode === m} onChange={() => setJitter({ ...jitter, mode: m })} />
                   <span><span className="text-foreground">{label}</span> <span className="block text-xs">{hint}</span></span>
                 </label>)}
             </div>
-            <p className="text-xs">Recommended: turn on Instant Messaging so delayed messages sign by themselves when the wait ends. It isn't required; without it your wallet asks you to approve each message after its delay.</p>
+            <p className="text-xs">Recommended: turn on ⚡ Instant Messaging so delayed messages sign by themselves when the wait ends. It isn't required; without it your wallet asks you to approve each message after its delay.</p>
             {jitter.mode !== 'off' && <div className="space-y-2">
               <div className="flex flex-wrap gap-2">
                 {JITTER_PRESETS.map(p => {
