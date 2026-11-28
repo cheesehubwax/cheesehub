@@ -115,7 +115,7 @@ function AboutBody() {
           <>Every key is locked to your WAX account with Anchor before use — unlocking is a free signature.</>,
           <>Add friends by swapping public key files. Share your public key only, never your private key.</>,
           <>Keep your locked backup and your Anchor key safe: a lost key means old messages can't be read.</>,
-          <>📲 Move device copies your key, friends and groups to another device by QR code — nothing goes on chain or to a server.</>,
+          <>Move device copies your key, friends and groups to another device by QR code — nothing goes on chain or to a server.</>,
         ]} />
       </Section>
 
@@ -145,7 +145,7 @@ function AboutBody() {
           <><B>YouTube:</B> links stay encrypted; videos load only when you press ▶️ Play, through private mirrors first.</>,
           <><B>Tips:</B> reply with /tip 100 cheese to send CHEESE straight to the author. Final, and never held by CHEESEHub.</>,
           <><B>Search, names & avatars:</B> search runs on your screen only; set a name, pixel avatar and private nicknames.</>,
-          <><B>⚡ Instant Messaging:</B> sends free messages without Anchor popups, using a key that can only send messages.</>,
+          <><B>Instant Messaging:</B> sends free messages without Anchor popups, using a key that can only send messages.</>,
         ]} />
       </Section>
 
