@@ -16,7 +16,7 @@ export function CryptKeyRotationCard({ ageDays, retention, setRetention, retired
     <p>{ageDays === null ? 'Your key age is unknown.' : `Your key is ${ageDays} day${ageDays === 1 ? '' : 's'} old.`} Rotating swaps it for a fresh one, privately: only your friends get the new key, inside encrypted notices. Friends and groups stay.</p>
     <p className="text-xs">The real privacy gain comes when old keys are destroyed: messages only they could open become unreadable for everyone, including you. Backup files you downloaded earlier still hold old keys until you delete them.</p>
     <div className="flex flex-wrap gap-2">
-      <Button size="sm" onClick={onRotate}>🔄 Rotate key</Button>
+      <Button size="sm" onClick={onRotate}>Rotate key</Button>
       {pendingFriends > 0 && <Button size="sm" variant="outline" onClick={onAnnounce}>Tell {pendingFriends} friend{pendingFriends === 1 ? '' : 's'} my new key</Button>}
     </div>
     <div className="flex flex-wrap items-center gap-2">
@@ -30,7 +30,7 @@ export function CryptKeyRotationCard({ ageDays, retention, setRetention, retired
       {retired.map(r => <li key={r.publicKey} className="flex items-center justify-between gap-2 rounded border border-border px-2 py-1 text-xs">
         <span>Retired {day(r.retiredAt)} · {r.pinnedRooms ? `kept for ${r.pinnedRooms} room${r.pinnedRooms === 1 ? '' : 's'}` : `expires ${day(r.expiresAt)}`}</span>
         <Button size="sm" variant="outline" className="h-6 text-xs" disabled={r.pinnedRooms > 0} onClick={() => setConfirm({
-          title: '🔥 Destroy this old key now?',
+          title: 'Destroy this old key now?',
           body: `Messages that only this key can open become permanently unreadable on this device.${pendingFriends ? ` ${pendingFriends} friend${pendingFriends === 1 ? ' has' : 's have'} not been told your new key yet, so their next messages may not open.` : ''}`,
           okLabel: 'Destroy key', run: () => onDestroy(r.publicKey),
         })}>Destroy now</Button>

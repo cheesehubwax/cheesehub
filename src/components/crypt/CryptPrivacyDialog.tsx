@@ -91,7 +91,7 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
             )}
           </PrivacySection>
           <PrivacySection value="lock" title="🔒 Screen shield & panic lock" description={`Auto-lock: ${idleMinutes === 0 ? 'Off' : idleMinutes === 60 ? '1 hour' : idleMinutes === 240 ? '4 hours' : `${idleMinutes} min`} · Tab shield ${shieldOn ? 'on' : 'off'} · Cold lock ${hardening.cold ? 'on' : 'off'}`}>
-            <p>Press 🔒 Lock now, Esc twice quickly, or Ctrl/Cmd+Shift+L to clear the screen instantly. Unlocking again is one free Anchor signature.</p>
+            <p>Press Lock now, Esc twice quickly, or Ctrl/Cmd+Shift+L to clear the screen instantly. Unlocking again is one free Anchor signature.</p>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-foreground">Auto-lock after</span>
               {IDLE_OPTIONS.map(m => (
@@ -108,7 +108,7 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
             <label className="flex items-start gap-2">
               <input type="checkbox" className="mt-1" checked={hardening.cold} onChange={e => {
                 if (!e.target.checked) { setHardening({ ...hardening, cold: false }); return; }
-                setConfirm({ title: '🧊 Turn on cold lock?', body: COLD_LOCK_WARNING, okLabel: 'I have my backup — turn on', run: () => setHardening({ ...hardening, cold: true }) });
+                setConfirm({ title: 'Turn on cold lock?', body: COLD_LOCK_WARNING, okLabel: 'I have my backup — turn on', run: () => setHardening({ ...hardening, cold: true }) });
               }} />
               <span>Cold lock: forget the saved key on this device <span className="block text-xs">Friends, nicknames, avatars and settings stay. {COLD_LOCK_WARNING}</span></span>
             </label>
@@ -117,14 +117,14 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
             <p>Waits a random number of seconds before your wallet asks to sign, so the time your message lands on-chain doesn't line up neatly with the message you're replying to. The wait happens only in this tab: closing or locking it cancels unsent messages.</p>
             <div role="radiogroup" aria-label="Random send delay" className="space-y-1">
               {([['off', 'Off', 'No delay anywhere, even in chats you switched on.'],
-                ['chat', 'Per chat', `Only in chats switched on from their ⋯ menu → 🛡️ Privacy. Active in ${jitter.chats.length} chat${jitter.chats.length === 1 ? '' : 's'} on this device.`],
+                 ['chat', 'Per chat', `Only in chats switched on from their ⋯ menu → Privacy. Active in ${jitter.chats.length} chat${jitter.chats.length === 1 ? '' : 's'} on this device.`],
                 ['all', 'All chats', 'Every room and private chat, whatever each chat is set to.']] as const).map(([m, label, hint]) =>
                 <label key={m} className="flex items-start gap-2">
                   <input type="radio" name="jitter-mode" className="mt-1" checked={jitter.mode === m} onChange={() => setJitter({ ...jitter, mode: m })} />
                   <span><span className="text-foreground">{label}</span> <span className="block text-xs">{hint}</span></span>
                 </label>)}
             </div>
-            <p className="text-xs">💡 Recommended: turn on ⚡ Instant Messaging so delayed messages sign by themselves when the wait ends. It isn't required; without it your wallet asks you to approve each message after its delay.</p>
+            <p className="text-xs">Recommended: turn on Instant Messaging so delayed messages sign by themselves when the wait ends. It isn't required; without it your wallet asks you to approve each message after its delay.</p>
             {jitter.mode !== 'off' && <div className="space-y-2">
               <div className="flex flex-wrap gap-2">
                 {JITTER_PRESETS.map(p => {
@@ -169,7 +169,7 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
             </div>
             {note && <p role="status" className="text-foreground">{note}</p>}
             <details className="rounded-md border border-border p-2">
-              <summary className="cursor-pointer font-semibold text-foreground">🧅 How to use Tor with CHEESECrypt (free helper)</summary>
+              <summary className="cursor-pointer font-semibold text-foreground">How to use Tor with CHEESECrypt (free helper)</summary>
               <div className="mt-2 space-y-2 text-xs">
                 <p>A small open-source helper that runs only on your computer. It sends CHEESECrypt's history checks—and, when "Use only this server" is ticked, your already-signed CHEESECrypt transaction broadcasts—through Tor. From v1.3 it also loads NFTs shared in chats (their details, pictures, sounds and videos) through Tor whenever it is your saved server; if the helper stops, those NFTs stay hidden instead of loading from public servers. From v1.4 the checks behind Respect badges go through Tor too, so public servers never see which accounts you look at; if the helper stops, badges show as unknown instead. Those WAX servers see a Tor exit address instead of your home IP. It is not a Tor relay, only accepts connections from your own computer, and writes no traffic logs or files. Your wallet still signs; the helper never sees your private keys or changes the transaction.</p>
                 <ol className="list-decimal space-y-1 pl-4">

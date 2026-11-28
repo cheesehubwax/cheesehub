@@ -63,9 +63,9 @@ export function CryptNightcrawler({ account, canSetup, execute, vault }: { accou
         <label className="block text-xs">WAX account<Input value={row.account} onChange={e => updateRow(i, 'account', e.target.value)} aria-label={`Nightcrawler account ${i + 1}`} /></label>
         <label className="block text-xs">Restricted permission<Input value={row.permission} onChange={e => updateRow(i, 'permission', e.target.value)} aria-label={`Nightcrawler permission ${i + 1}`} /></label>
         <label className="block text-xs">Restricted private key<Input type="password" autoComplete="off" spellCheck={false} value={row.privateKey} onChange={e => updateRow(i, 'privateKey', e.target.value)} aria-label={`Nightcrawler private key ${i + 1}`} /></label>
-        {row.account === account && canSetup && <Button size="sm" variant="outline" className="h-auto min-h-9 max-w-full whitespace-normal py-2" onClick={() => setSetupConfirm(i)}>🔗 Create sendfree-only permission (Anchor)</Button>}
+        {row.account === account && canSetup && <Button size="sm" variant="outline" className="h-auto min-h-9 max-w-full whitespace-normal py-2" onClick={() => setSetupConfirm(i)}>Create sendfree-only permission (Anchor)</Button>}
         {pending.current.has(i) && <div className="space-y-1 text-xs">
-          <Button size="sm" variant="outline" className="h-auto min-h-9 max-w-full whitespace-normal py-2" onClick={() => downloadNightJson(`${row.account}-nightcrawler-signing-key.json`, row)}>⬇ Save generated signing key</Button>
+          <Button size="sm" variant="outline" className="h-auto min-h-9 max-w-full whitespace-normal py-2" onClick={() => downloadNightJson(`${row.account}-nightcrawler-signing-key.json`, row)}>Save generated signing key</Button>
           <p>Save this private key before closing Privacy or changing accounts. It is cleared from this form when Privacy closes. If setup was not confirmed, check the on-chain permission before retrying.</p>
         </div>}
         {setupConfirm === i && <div className="space-y-2 text-xs">
@@ -89,13 +89,13 @@ export function CryptNightcrawler({ account, canSetup, execute, vault }: { accou
         const [next, sources] = await Promise.all([buildNightDownload(rows, settings), loadNightFiles()]);
         if (!alive.current) return;
         setConfig(next); setFiles(sources); setNote('Both restricted keys verified. Ready to save; nothing has started.');
-      })}>{busy ? 'Checking…' : '✓ Verify & prepare configuration'}</Button>
+      })}>{busy ? 'Checking…' : 'Verify & prepare configuration'}</Button>
     </fieldset>
     {config && <div className="flex flex-wrap gap-2">
-      <Button size="sm" disabled={busy} onClick={() => downloadNightConfig(config)}>⬇ Download night-config.json</Button>
-      {vaultSupported() && <Button size="sm" variant="outline" disabled={busy || !files} onClick={() => void saveFolder()}>📁 Save Nightcrawler folder</Button>}
+      <Button size="sm" disabled={busy} onClick={() => downloadNightConfig(config)}>Download night-config.json</Button>
+      {vaultSupported() && <Button size="sm" variant="outline" disabled={busy || !files} onClick={() => void saveFolder()}>Save Nightcrawler folder</Button>}
     </div>}
-    <Button size="sm" variant="outline" asChild><a href={`${import.meta.env.BASE_URL}downloads/cheesecrypt-nightcrawler.zip`} download="cheesecrypt-nightcrawler.zip">⬇ Download Nightcrawler ZIP</a></Button>
+    <Button size="sm" variant="outline" asChild><a href={`${import.meta.env.BASE_URL}downloads/cheesecrypt-nightcrawler.zip`} download="cheesecrypt-nightcrawler.zip">Download Nightcrawler ZIP</a></Button>
     <p className="text-xs">Extract the ZIP into cheesecrypt/nightcrawler and save night-config.json there. Install Bun from <a className="text-cheese underline" href="https://bun.sh" target="_blank" rel="noopener noreferrer">bun.sh</a>, then run bun install once, bun run check to test, and bun run start to begin. Keep Tor Browser, the helper and your computer awake. Folder saving is available only in supported browsers outside the preview.</p>
     <p className="text-xs">Only free messages: unavailable sponsorship or CPU skips sends. No paid fallback or automatic powerups. Local preparation reads still reveal IP/account names to chain nodes; broadcasts use the Tor helper.</p>
     {note && <p role="status" className="text-xs text-foreground break-words">{note}</p>}
