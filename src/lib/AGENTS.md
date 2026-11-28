@@ -1,5 +1,7 @@
 # Connection rules
 
+- Room-stream sender subkeys are reused only within one decode call, never persisted; this reduces repeated hashing without retaining secrets across locks or key/roster changes.
+
 - Crypt device stores use cryptStorage with tab-local failed-write overlays and visible persistence warnings; recovery clears only allowlisted reconstructible lookups, never keys, contacts, decisions, receipts or authenticated controls. Instant secrets stay in sessionStorage and fail closed on failed persistence.
 
 - Crypt history shape validation precedes merge/decode and unread/profile derivation; skip invalid rows without mutating surviving identities or relaxing authenticated control parsing, so malformed legacy history cannot poison the conversation.

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import nacl from 'tweetnacl';
 import { encodeBase64 } from 'tweetnacl-util';
 import { encryptMemo } from '@/lib/cheeseCrypt';
@@ -52,6 +52,26 @@ describe('shared room key', () => {
     const memos = sealRoomText(rk, 'bob', text);
     expect(memos.length).toBeGreaterThan(1);
     expect(decodeRoomStream(memos.map(m => row('bob', m)), [rk], invites, 'alice')[0].control).toMatchObject({ text });
+  });
+  it('derives only one subkey per sender for a busy stream and rechecks each decode', () => {
+    const rows = Array.from({ length: 120 }, (_, i) => {
+      const sender = i % 2 ? 'bob' : 'owner';
+      return sealRoomText(rk, sender, `message ${i}`).map(m => row(sender, m, `tx${i}`));
+    }).flat();
+    const hash = vi.spyOn(nacl, 'hash');
+    try {
+      const entries = decodeRoomStream(rows, [rk], invites, 'alice');
+      expect(entries).toHaveLength(120);
+      expect(entries[119].text).toBe('message 119');
+      expect(hash).toHaveBeenCalledTimes(2);
+      hash.mockClear();
+      expect(decodeRoomStream(rows, [{ ...rk, key: newRoomKeyBytes() }], invites, 'alice')).toHaveLength(0);
+      expect(hash).toHaveBeenCalledTimes(2);
+    } finally { hash.mockRestore(); }
+  });
+  it('a malformed held key does not prevent opening with another held key', () => {
+    const rows = sealRoomText(rk, 'bob', 'still readable').map(m => row('bob', m));
+    expect(decodeRoomStream(rows, [{ ...rk, key: '?' }, rk], invites, 'alice')[0]?.text).toBe('still readable');
   });
   it('only the owner can deliver a key; newest epoch is current', () => {
     expect(collectRoomKeys([ctl('bob', 'alice', 10)], invites, 'alice')).toHaveLength(0);

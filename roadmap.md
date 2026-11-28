@@ -2,6 +2,8 @@
 
 Open tasks only. Completed work lives in git history.
 
+- [ ] Background glitch: confirm the intermittent freeze/flash on the user's original browser; global grid/blur animations removed, per-sender hashing reduced, 22 room tests and desktop/mobile background checks pass. Original device/GPU unavailable; unrelated homepage mobile overflow observed.
+
 - [ ] CHEESECrypt shared room key: verify owner on/off/re-enable and member message readback on WAX; requires the user's test accounts and wallet signatures.
 
 - [ ] Verify real YouTube title/picture lookups through the user’s Windows v1.8 Tor helper; 48 app/helper tests and browser title/picture readback pass with no direct fallback. Requires the user’s running local Tor connection; playback and Anchor remain separate.

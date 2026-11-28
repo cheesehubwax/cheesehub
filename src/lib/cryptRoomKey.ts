@@ -48,13 +48,18 @@ export function sealRoomText(rk: RoomKey, sender: string, text: string): string[
 }
 
 export function openRoomPart(memo: string, rk: RoomKey, sender: string): string | null {
+  try { return openRoomPartWithKey(memo, senderSubkey(rk, sender)); }
+  catch { return null; }
+}
+
+function openRoomPartWithKey(memo: string, subkey: Uint8Array): string | null {
   if (!memo.startsWith(MSG_PREFIX_V2)) return null;
   const [n, c, extra] = memo.slice(MSG_PREFIX_V2.length).split(':');
   if (!n || !c || extra !== undefined) return null;
   try {
     const nonce = decodeBase64(n);
     if (nonce.length !== 24) return null;
-    const opened = nacl.secretbox.open(decodeBase64(c), nonce, senderSubkey(rk, sender));
+    const opened = nacl.secretbox.open(decodeBase64(c), nonce, subkey);
     const bytes = opened && unpadPlaintext(opened);
     return bytes ? bytesToText(bytes) : null;
   } catch { return null; }
@@ -119,12 +124,23 @@ export function currentRoomKeys(keys: readonly RoomKey[], offs: readonly RoomKey
  */
 export function decodeRoomStream(rows: readonly ChainMemo[], keys: readonly RoomKey[], invites: Record<string, InviteGroup>, me: string): ConversationEntry[] {
   const opened: (DecodedMemo & { room: string })[] = [];
+  // Derive once per key/sender in this decode, never once per part. Kept local so lock/account changes
+  // cannot retain decrypted history or reuse subkeys across key/roster changes.
+  const subkeys = new Map<RoomKey, Map<string, Uint8Array | null>>();
   for (const r of rows) {
     if (r.to !== ROOM_STREAM_TO || !r.memo.startsWith(MSG_PREFIX_V2)) continue;
     for (const rk of keys) {
       const g = invites[rk.room];
       if (!g || !memberKey(g, r.from) || r.time < rk.since) continue;
-      const text = openRoomPart(r.memo, rk, r.from);
+      let senders = subkeys.get(rk);
+      if (!senders) { senders = new Map(); subkeys.set(rk, senders); }
+      if (!senders.has(r.from)) {
+        try { senders.set(r.from, senderSubkey(rk, r.from)); }
+        catch { senders.set(r.from, null); }
+      }
+      const subkey = senders.get(r.from);
+      if (!subkey) continue;
+      const text = openRoomPartWithKey(r.memo, subkey);
       if (text == null) continue;
       opened.push({ ...r, to: me, text, room: rk.room });
       break;
