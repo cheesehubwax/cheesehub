@@ -113,7 +113,7 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
               <span>Cold lock: forget the saved key on this device <span className="block text-xs">Friends, nicknames, avatars and settings stay. {COLD_LOCK_WARNING}</span></span>
             </label>
           </PrivacySection>
-          <PrivacySection value="delay" title="⏱️ Random send delay (optional)" description={jitter.mode === 'off' ? 'Off · No random delay.' : `${jitter.mode === 'all' ? 'All chats' : `Per chat · Active in ${jitter.chats.length} chats`} · ${jitter.minSeconds}–${jitter.maxSeconds}s`}>
+          <PrivacySection value="delay" title="⏱️ Random send delay" description={jitter.mode === 'off' ? 'Off · No random delay.' : `${jitter.mode === 'all' ? 'All chats' : `Per chat · Active in ${jitter.chats.length} chats`} · ${jitter.minSeconds}–${jitter.maxSeconds}s`}>
             <p>Waits a random number of seconds before your wallet asks to sign, so the time your message lands on-chain doesn't line up neatly with the message you're replying to. The wait happens only in this tab: closing or locking it cancels unsent messages.</p>
             <div role="radiogroup" aria-label="Random send delay" className="space-y-1">
               {([['off', 'Off', 'No delay anywhere, even in chats you switched on.'],
@@ -143,7 +143,7 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
             </div>}
           </PrivacySection>
           {rotationSlot && <PrivacySection value="rotation" title="🔄 Key rotation" description="Privately refresh your key and manage retained old keys.">{rotationSlot}</PrivacySection>}
-          {nightcrawlerSlot && <PrivacySection value="nightcrawler" title="🌙 Nightcrawler Companion (optional)" description="Set up a local off-hours schedule with an isolated signing key.">{nightcrawlerSlot}</PrivacySection>}
+          {nightcrawlerSlot && <PrivacySection value="nightcrawler" title="🌙 Nightcrawler Companion" description="Set up a local off-hours schedule with an isolated signing key.">{nightcrawlerSlot}</PrivacySection>}
           <PrivacySection value="server" title="🧅 Custom server & Tor helper" description={saved ? `${saved} · ${only ? 'Only this server' : 'Public backup allowed'}` : 'Public servers · Connect your own server or local Tor helper.'}>
             <p className="text-xs">The checkbox saves immediately. A new server is used only after Test &amp; connect succeeds.</p>
             <p>If you run your own WAX Hyperion server, or reach one through your own VPN or Tor setup, enter it here. It is stored only in this browser; nothing goes through CHEESEHub.</p>
