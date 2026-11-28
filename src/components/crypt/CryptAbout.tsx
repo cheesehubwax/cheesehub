@@ -156,7 +156,7 @@ function AboutBody() {
           <><B>Public forever on WAX:</B> who sent to whom, when, fees paid and number of parts.</>,
           <>Every part is padded to the same size, so a short "ok" looks like a long message.</>,
           <>✔ means in a block, ✔✔ means permanent.</>,
-          <>🔐 Verify compares a safety number with a friend to prove no one swapped your keys.</>,
+          <>🔐 Verify compares a safety number with a friend to prove no one is impersonating either of you. Once marked verified, a ⚠️ warning appears if their key ever changes.</>,
           <>🔒 Lock now, Esc twice, or Ctrl/Cmd+Shift+L clears the screen; it also locks itself when idle.</>,
           <>⏱️ Random send delay adds a random pause of your chosen seconds before a message is signed, so send times don't line up with incoming ones — all chats or per chat.</>,
           <>⏳ Scheduled sends hold a message until a time you pick, once you confirm the delay.</>,
