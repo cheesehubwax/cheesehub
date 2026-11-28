@@ -144,10 +144,9 @@ function AboutBody() {
           <><B>Voice notes:</B> up to 10 seconds, encrypted in your browser; plays only once fully received.</>,
           <><B>NFTs:</B> share pictures, music and sound effects from your own WAX wallet.</>,
           <><B>YouTube:</B> links stay encrypted; videos load only when you press ▶️ Play, through private mirrors first.</>,
-          <><B>Direct wallet-to-wallet tips:</B> reply with /tip 100 cheese to send CHEESE straight from your wallet to the author’s. Transfers are final; neither CHEESEHub nor crypt.cheese holds your tip.</>,
+          <><B>Direct wallet-to-wallet tips:</B> reply with /tip 100 cheese to tip the author directly — no intermediary holds your CHEESE.</>,
           <><B>Search, names & avatars:</B> search runs on your screen only; set a name, pixel avatar and private nicknames.</>,
-          <><B>Instant Messaging:</B> a WharfKit session uses a separate browser signing key on your account’s restricted cheesecrypt permission, linked only to crypt.cheese::sendfree. After Anchor-approved setup, eligible sponsored messages need no Anchor popup; transfers, tips and paid actions still require Anchor.</>,
-          <>The Instant Messaging key stays in this tab’s session storage, not permanent storage. Closing the tab or panic-locking discards it; four hours without activity expires it, even if chat auto-lock is off. Re-enabling creates a fresh key with Anchor approval — this is idle expiry, not automatic four-hour rotation of your encryption key. You can also revoke the permission on-chain through Anchor; a stolen signing key could still send messages and use resources until revoked.</>,
+          <><B>Instant Messaging:</B> sends free messages without Anchor popups using a restricted WharfKit session key — no transfers. Kept only in this tab, cleared on panic lock and expired after four idle hours; setup requires Anchor approval.</>,
         ]} />
       </Section>
 
@@ -159,17 +158,14 @@ function AboutBody() {
           <>Every part is padded to the same size, so a short "ok" looks like a long message.</>,
           <>✔ means in a block, ✔✔ means permanent.</>,
           <>Verify compares a safety number with a friend to prove no one is impersonating either of you. Once marked verified, a ⚠️ warning appears if their key ever changes.</>,
-          <><B>Screen shield:</B> optionally blurs messages when you switch tabs or minimise the browser. It hides the view without locking your keys; returning restores the chat.</>,
-          <><B>Panic lock:</B> Lock now, Esc twice quickly, or Ctrl/Cmd+Shift+L discards opened messaging keys, decrypted chat state and this tab’s Instant Messaging key. It signs your wallet out across CHEESEHub and replaces the page with Home. Reconnect and unlock your saved locked key with a free Anchor signature to return.</>,
-          <>Idle auto-lock performs the same panic lock after your chosen inactivity period (four hours by default; adjustable or off). Optional cold lock also removes the saved locked key and remembered folder from this device, so keep a backup first. Locking never deletes on-chain messages.</>,
-          <><B>Random send delay (jitter):</B> adds a random pause within your chosen seconds range before signing, making reply timing less predictable — all chats or per chat. The countdown is cancellable; leaving the chat, closing the tab or locking cancels unsent messages. It reduces timing clues, not the public transaction timestamps.</>,
+          <><B>Screen shield:</B> blurs chats when you switch tabs or minimise; returning restores the view without unlocking again.</>,
+          <><B>Panic lock:</B> Lock now, Esc twice, or Ctrl/Cmd+Shift+L clears decrypted chats and session keys, then signs you out. Idle auto-lock does the same; unlock your saved key with Anchor to return.</>,
+          <><B>Random send delay (jitter):</B> adds a cancellable random pause within your chosen range, making reply timing less predictable — per chat or all chats.</>,
           <>Scheduled sends hold a message until a time you pick, once you confirm the delay.</>,
           <>Key rotation privately refreshes your messaging key and manages the old keys you keep.</>,
           <>Nightcrawler Companion runs a local off-hours schedule from an isolated signing key you set up in the Privacy menu.</>,
-          <><B>Tor helper:</B> run the current helper locally and select it with “Use only this server” in Privacy. Supported history reads, account and Respect lookups, NFT metadata and media, transaction preparation and signed broadcasts travel through Tor instead of directly from your browser to public services. Tor-side DNS and separate circuit lanes reduce IP and cross-request linking; the helper writes no traffic logs.</>,
-          <>With the current helper configured, protected requests fail closed if it is unavailable — no silent direct fallback. Read servers rotate or temporarily sit out when busy; signed broadcasts go to one server once, never automatically retried. Your own history server is another option, but without Tor that server still sees your IP.</>,
-          <>Live message polling reads a shared contract stream rather than naming your account. Respect caches confirmed lookups locally for 24 hours and mixes fresh reads with shuffled, jittered decoy queries. Crypt also pauses balance heartbeats, banner ads and music-NFT scans; CHEESEWallet, CHEESESwap, ALCORBridge and CHEESEAmp are disabled, and Anchor Fuel is off to avoid its preflight disclosures.</>,
-          <>These protections reduce metadata leaks; they do not eliminate them or guarantee anonymity. Upstream services still see requested accounts or NFT IDs, but see a Tor exit IP for routed requests. Public WAX activity, Anchor’s own connections, loading the website and any explicitly allowed direct video playback remain outside the helper’s protection.</>,
+          <><B>Tor helper:</B> locally routes supported history, account checks, NFT media and transaction requests through Tor, hiding your IP from those services. Separate circuits reduce linking; protected requests stop if the helper is down, never silently switching to direct connections.</>,
+          <><B>Fewer metadata leaks:</B> account-blind live polling, 24-hour Respect caching with decoy queries, and paused balance, ad and music scans reduce exposure. Tor does not hide public WAX activity or requested account/NFT IDs; Anchor’s own connections remain separate.</>,
           <>Anyone you message can still copy or share it, and a compromised device can expose your messages.</>,
         ]} />
       </Section>
