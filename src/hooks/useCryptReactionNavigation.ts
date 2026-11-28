@@ -1,3 +1,4 @@
+import { cryptStorage } from '@/lib/cryptStorage';
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { reactionsToMe, type ActiveReaction } from '@/lib/cryptReactions';
 import { findCryptMessageNode } from '@/lib/cryptMessageDom';
@@ -8,7 +9,7 @@ type Store = Record<string, State>;
 const storageKey = (account: string) => `cheesecrypt-reaction-views-${account}`;
 function load(account: string): Store {
   try {
-    const raw = JSON.parse(localStorage.getItem(storageKey(account)) || '{}');
+    const raw = JSON.parse(cryptStorage.getItem(storageKey(account)) || '{}');
     const out: Store = {};
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
     for (const [id, value] of Object.entries(raw)) {
@@ -54,7 +55,7 @@ export function useCryptReactionNavigation(account: string, active: string | nul
 
   const save = useCallback((next: Store) => {
     current.current.store = next;
-    try { localStorage.setItem(storageKey(account), JSON.stringify(next)); } catch { /* keep session receipts when storage is unavailable */ }
+    try { cryptStorage.setItem(storageKey(account), JSON.stringify(next)); } catch { /* keep session receipts when storage is unavailable */ }
     setStore(next);
   }, [account]);
   // Persist the queue so unseen reactions survive switching chats, reloads and the read marker moving on.

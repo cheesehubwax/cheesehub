@@ -1,3 +1,4 @@
+import { cryptStorage } from '@/lib/cryptStorage';
 import type { RoomListing } from '@/lib/cryptRooms';
 import { HISTORY_PAGE, hyperionTransfers, KEY_PUBLISH_TO, type ChainMemo } from '@/lib/cheeseCrypt';
 import { cryptChainPost } from '@/lib/cryptChainRead';
@@ -82,14 +83,14 @@ export async function fetchRoomHides(): Promise<HideRecord[]> {
     return rows;
   }));
   const records = collectHides(per.flat(), admins);
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify(activeHides(records))); } catch { /* storage full or blocked */ }
+  try { cryptStorage.setItem(CACHE_KEY, JSON.stringify(activeHides(records))); } catch { /* storage full or blocked */ }
   return records;
 }
 
 /** Last successfully read hide list, so hidden rooms stay hidden while history nodes are down. */
 export function cachedHides(): string[] {
   try {
-    const v = JSON.parse(localStorage.getItem(CACHE_KEY) ?? '[]');
+    const v = JSON.parse(cryptStorage.getItem(CACHE_KEY) ?? '[]');
     return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && /^[a-z1-5.]{1,12}:(\*|[a-f0-9]{16})$/.test(x)) : [];
   } catch { return []; }
 }
@@ -110,9 +111,9 @@ export function filterCuratedListings<T extends Pick<RoomListing, 'creator'>>(li
 }
 export async function fetchRoomCurators(): Promise<string[]> {
   const admins = await readAdmins();
-  try { localStorage.setItem(CURATORS_CACHE_KEY, JSON.stringify(admins)); } catch { /* storage blocked */ }
+  try { cryptStorage.setItem(CURATORS_CACHE_KEY, JSON.stringify(admins)); } catch { /* storage blocked */ }
   return admins;
 }
 export function cachedCurators(): string[] {
-  try { const v = JSON.parse(localStorage.getItem(CURATORS_CACHE_KEY) ?? '[]'); return Array.isArray(v) ? v.filter((a: unknown) => typeof a === 'string' && ACCOUNT.test(a)) : []; } catch { return []; }
+  try { const v = JSON.parse(cryptStorage.getItem(CURATORS_CACHE_KEY) ?? '[]'); return Array.isArray(v) ? v.filter((a: unknown) => typeof a === 'string' && ACCOUNT.test(a)) : []; } catch { return []; }
 }

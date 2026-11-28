@@ -1,3 +1,4 @@
+import { cryptStorage } from '@/lib/cryptStorage';
 /**
  * CHEESECrypt key rotation (pure helpers + device-local settings).
  *
@@ -28,7 +29,7 @@ export const DEFAULT_RETENTION: Retention = 30;
 const retentionStore = (a: string) => `cheesecrypt-key-retention-${a}`;
 export function loadRetention(account: string): Retention {
   try {
-    const raw = localStorage.getItem(retentionStore(account));
+    const raw = cryptStorage.getItem(retentionStore(account));
     if (raw === null) return DEFAULT_RETENTION;
     if (raw === 'forever') return null;
     const n = Number(raw);
@@ -36,7 +37,7 @@ export function loadRetention(account: string): Retention {
   } catch { return DEFAULT_RETENTION; }
 }
 export const saveRetention = (account: string, r: Retention) => {
-  try { localStorage.setItem(retentionStore(account), r === null ? 'forever' : String(r)); } catch { /* ignore */ }
+  try { cryptStorage.setItem(retentionStore(account), r === null ? 'forever' : String(r)); } catch { /* ignore */ }
 };
 export const retentionLabel = (r: Retention) => r === null ? 'Forever' : r === 0 ? 'Destroy now' : `${r} days`;
 export const expiryFor = (retiredAt: number, r: Retention): string | null => r === null ? null : new Date(retiredAt + r * DAY_MS).toISOString();
@@ -47,8 +48,8 @@ export function keyAgeDays(created: string, now: number): number | null {
   return Number.isNaN(t) ? null : Math.max(0, Math.floor((now - t) / DAY_MS));
 }
 const snoozeStore = (a: string) => `cheesecrypt-rotate-snooze-${a}`;
-export const loadSnooze = (account: string) => { try { return Number(localStorage.getItem(snoozeStore(account))) || 0; } catch { return 0; } };
-export const saveSnooze = (account: string, until: number) => { try { localStorage.setItem(snoozeStore(account), String(until)); } catch { /* ignore */ } };
+export const loadSnooze = (account: string) => { try { return Number(cryptStorage.getItem(snoozeStore(account))) || 0; } catch { return 0; } };
+export const saveSnooze = (account: string, until: number) => { try { cryptStorage.setItem(snoozeStore(account), String(until)); } catch { /* ignore */ } };
 export function shouldNudge(now: number, created: string, snoozedUntil: number): boolean {
   const age = keyAgeDays(created, now);
   return age !== null && age >= NUDGE_DAYS && now >= snoozedUntil;
@@ -91,11 +92,11 @@ export interface RotationState { to: string; announced: string[] }
 const rotationStore = (a: string) => `cheesecrypt-rotation-${a}`;
 export function loadRotation(account: string): RotationState | null {
   try {
-    const raw = JSON.parse(localStorage.getItem(rotationStore(account)) || 'null');
+    const raw = JSON.parse(cryptStorage.getItem(rotationStore(account)) || 'null');
     return raw && validPub(raw.to) && Array.isArray(raw.announced) ? { to: raw.to, announced: raw.announced.filter((a: unknown): a is string => typeof a === 'string') } : null;
   } catch { return null; }
 }
-export const saveRotation = (account: string, s: RotationState) => localStorage.setItem(rotationStore(account), JSON.stringify(s));
+export const saveRotation = (account: string, s: RotationState) => cryptStorage.setItem(rotationStore(account), JSON.stringify(s));
 export function markAnnounced(account: string, to: string, friends: string[]) {
   const s = loadRotation(account);
   if (!s || s.to !== to) return;

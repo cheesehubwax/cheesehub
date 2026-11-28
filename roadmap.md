@@ -6,7 +6,7 @@ Open tasks only. Completed work lives in git history.
 
 - [ ] Verify real YouTube title/picture lookups through the user’s Windows v1.8 Tor helper; 48 app/helper tests and browser title/picture readback pass with no direct fallback. Requires the user’s running local Tor connection; playback and Anchor remain separate.
 
-- [ ] Eventhorizon: verify the original unlocked room after updating; safe visible diagnostics, malformed-history guards, 757-row/20-reply readback and 127 targeted tests pass; desktop/mobile diagnostic Retry works. Original user history/key remains unavailable.
+- [ ] Eventhorizon: confirm the original unlocked room after updating; quota-safe device stores, a 256 KiB Respect snapshot cap and non-destructive cache recovery pass unlocked-room tests and actual Chromium quota recovery on desktop/mobile. Original user history/key remains unavailable.
 
 - [ ] Nightcrawler Privacy setup: verify one real Anchor permission creation and folder save on the user's machine; config/ZIP downloads read back in browser with offline keys, permission and overwrite safeguards tested. Requires the user's Anchor signature and local folder permission.
 

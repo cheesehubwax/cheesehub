@@ -14,6 +14,7 @@ import { CRYPT_ROUTER_ACCOUNT } from './cheeseCrypt';
 import { CHEESE_RAM_CONTRACT, CHEESE_TOKEN_CONTRACT, estimateCheeseForTargetBytes, resolveQuoteRate, type CheeseRamConfig } from './cheeseRam';
 import { WAX_CHAIN_ID } from './wharfKit';
 import { walletRpcFetch } from './walletRpcFetch';
+import { cryptStorage } from './cryptStorage';
 
 export const INSTANT_PERMISSION = 'cheesecrypt';
 export const INSTANT_ACTION = 'sendfree';
@@ -45,14 +46,21 @@ export const instantIdleExpired = (lastActive: number | null, now: number) =>
   lastActive == null || !Number.isFinite(lastActive) || now - lastActive >= INSTANT_IDLE_LIMIT_MS;
 
 const ss = () => { try { return window.sessionStorage; } catch { return null; } };
+// A failed removal must still disable this tab's signer, even if stale bytes remain in storage.
+const disabledAccounts = new Set<string>();
 
 /** Removes keys left by older versions that kept the key in long-lived localStorage. */
 export function purgeLegacyInstantKey(account: string) {
-  try { localStorage.removeItem(storeKey(account)); } catch { /* storage unavailable */ }
+  cryptStorage.removeItem(storeKey(account));
 }
 
 export function markInstantActive(account: string, now = Date.now()) {
-  ss()?.setItem(activityKey(account), String(now));
+  try {
+    const store = ss();
+    if (!store) { forgetInstantKey(account); return false; }
+    store.setItem(activityKey(account), String(now));
+    return true;
+  } catch { forgetInstantKey(account); return false; }
 }
 
 /**
@@ -61,6 +69,7 @@ export function markInstantActive(account: string, now = Date.now()) {
  */
 export function loadInstantKey(account: string, now = Date.now()): InstantKey | null {
   purgeLegacyInstantKey(account);
+  if (disabledAccounts.has(account)) return null;
   const store = ss();
   if (!store) return null;
   try {
@@ -75,13 +84,22 @@ export function loadInstantKey(account: string, now = Date.now()): InstantKey | 
 }
 export const saveInstantKey = (k: InstantKey) => {
   purgeLegacyInstantKey(k.account);
-  ss()?.setItem(storeKey(k.account), JSON.stringify(k));
-  markInstantActive(k.account);
+  const store = ss();
+  try {
+    if (!store) throw new Error('Tab storage unavailable');
+    store.setItem(storeKey(k.account), JSON.stringify(k));
+    store.setItem(activityKey(k.account), String(Date.now()));
+    disabledAccounts.delete(k.account);
+  } catch {
+    forgetInstantKey(k.account);
+    throw new Error('Instant Messaging could not be saved in this tab. Allow site storage and try again.');
+  }
 };
 export const forgetInstantKey = (account: string) => {
+  disabledAccounts.add(account);
   purgeLegacyInstantKey(account);
-  ss()?.removeItem(storeKey(account));
-  ss()?.removeItem(activityKey(account));
+  try { ss()?.removeItem(storeKey(account)); } catch { /* disabled in this tab */ }
+  try { ss()?.removeItem(activityKey(account)); } catch { /* disabled in this tab */ }
 };
 
 export function generateInstantKey(account: string): InstantKey {

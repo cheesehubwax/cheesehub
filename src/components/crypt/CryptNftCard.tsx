@@ -1,3 +1,4 @@
+import { cryptStorage } from '@/lib/cryptStorage';
 import { explorerTx } from '@/lib/explorer';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -56,11 +57,11 @@ function CryptVideo({ url, poster, label }: { url: string; poster?: string; labe
 const PLAYED_KEY = 'crypt-sfx-played-v1';
 const PLAYED_MAX = 5000;
 const autoplayed: Set<string> = (() => {
-  try { return new Set<string>(JSON.parse(localStorage.getItem(PLAYED_KEY) || '[]')); } catch { return new Set<string>(); }
+  try { return new Set<string>(JSON.parse(cryptStorage.getItem(PLAYED_KEY) || '[]')); } catch { return new Set<string>(); }
 })();
 function markAutoplayed(key: string) {
   autoplayed.add(key);
-  try { localStorage.setItem(PLAYED_KEY, JSON.stringify([...autoplayed].slice(-PLAYED_MAX))); } catch { /* storage full/blocked: session-only */ }
+  try { cryptStorage.setItem(PLAYED_KEY, JSON.stringify([...autoplayed].slice(-PLAYED_MAX))); } catch { /* storage full/blocked: session-only */ }
 }
 
 /**
@@ -88,7 +89,7 @@ function TxLink({ txId }: { txId: string }) {
  * attached music video keeps streaming audio in the bubble and gets a "Watch video" toggle instead.
  * Every other NFT: a tile that opens a larger view with picture, name, artist and transaction link
  * (no asset ID, collection, mint number or explorer links are shown).
- * `autoplayKey` identifies the message per account; played keys persist in localStorage.
+ * `autoplayKey` identifies the message per account; played keys persist in cryptStorage.
  */
 export function CryptNftCard({ assetId, autoplayKey, txId }: { assetId: string; autoplayKey?: string; txId?: string }) {
   const [open, setOpen] = useState(false);

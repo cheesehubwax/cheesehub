@@ -1,3 +1,4 @@
+import { cryptStorage } from '@/lib/cryptStorage';
 import type { ChainMemo } from '@/lib/cheeseCrypt';
 import type { ConversationEntry } from '@/lib/cryptGroups';
 import { MAX_INVITE_MEMBERS, eventFromMember, policySnapshotValid, roomPolicyValid, type Cg2Event, type InviteGroup } from '@/lib/cryptInviteGroups';
@@ -138,10 +139,10 @@ export function collectReports(events: Cg2Event[], invites: Record<string, Invit
 const reportStore = (account: string) => `cheesecrypt-report-views-${account}`;
 export const reportKey = (r: Pick<RoomReport, 'id' | 'reporter' | 'author' | 'target'>) => `${r.id}:${r.reporter}:${r.author}:${r.target}`;
 export function loadSeenReports(account: string): string[] {
-  try { const raw: unknown = JSON.parse(localStorage.getItem(reportStore(account)) || '[]'); return Array.isArray(raw) ? raw.filter((k): k is string => typeof k === 'string') : []; } catch { return []; }
+  try { const raw: unknown = JSON.parse(cryptStorage.getItem(reportStore(account)) || '[]'); return Array.isArray(raw) ? raw.filter((k): k is string => typeof k === 'string') : []; } catch { return []; }
 }
 export function saveSeenReports(account: string, keys: string[]) {
-  try { localStorage.setItem(reportStore(account), JSON.stringify(keys)); } catch { /* viewed-report receipts remain session-local */ }
+  try { cryptStorage.setItem(reportStore(account), JSON.stringify(keys)); } catch { /* viewed-report receipts remain session-local */ }
 }
 export function restrictedAt(state: RoomModeration | undefined, member: string, at: number) {
   return !!state && ((state.bans[member] !== undefined && at >= state.bans[member]) || !!state.mutes[member]?.some(m => at >= m.from && at < m.until));
@@ -188,7 +189,7 @@ export function applyCollapses<T extends ConversationEntry>(entries: T[], collap
 const store = (account: string) => `cheesecrypt-room-controls-${account}`;
 export function loadModerationMemos(account: string): ChainMemo[] {
   try {
-    const raw: unknown = JSON.parse(localStorage.getItem(store(account)) || '[]');
+    const raw: unknown = JSON.parse(cryptStorage.getItem(store(account)) || '[]');
     return Array.isArray(raw) ? raw.filter((m): m is ChainMemo => !!m && typeof m === 'object' && typeof m.txId === 'string' && typeof m.memo === 'string' && typeof m.from === 'string' && typeof m.to === 'string' && typeof m.quantity === 'string' && Number.isFinite(m.time) && (m.from === account || m.to === account)) : [];
   } catch { return []; }
 }
@@ -196,5 +197,5 @@ export function mergeModerationMemos(old: ChainMemo[], incoming: ChainMemo[]) {
   return [...new Map([...old, ...incoming].map(m => [`${m.txId}:${m.from}:${m.to}:${m.memo}`, m])).values()];
 }
 export function saveModerationMemos(account: string, memos: ChainMemo[]) {
-  localStorage.setItem(store(account), JSON.stringify(memos));
+  cryptStorage.setItem(store(account), JSON.stringify(memos));
 }

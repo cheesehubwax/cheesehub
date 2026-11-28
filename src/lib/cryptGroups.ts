@@ -1,3 +1,4 @@
+import { cryptStorage } from '@/lib/cryptStorage';
 import nacl from 'tweetnacl';
 import {
   assembleMessages, buildSendMessageActions, bytesToText, ChainMemo, decryptMemoBytesAny, encryptMemo, type AssembledMessage, type DecodedMemo,
@@ -28,17 +29,17 @@ export function createGroup(account: string, friends: string[]): CryptGroup {
 
 export function loadGroups(account: string): CryptGroup[] {
   try {
-    const raw: unknown = JSON.parse(localStorage.getItem(`cheesecrypt-groups-${account}`) || '[]');
+    const raw: unknown = JSON.parse(cryptStorage.getItem(`cheesecrypt-groups-${account}`) || '[]');
     return Array.isArray(raw) ? raw.map(parseGroup).filter((g): g is CryptGroup => !!g && g.members.includes(account)) : [];
   } catch { return []; }
 }
 export function saveGroups(account: string, groups: CryptGroup[]) {
-  localStorage.setItem(`cheesecrypt-groups-${account}`, JSON.stringify(groups));
+  cryptStorage.setItem(`cheesecrypt-groups-${account}`, JSON.stringify(groups));
 }
 
 export function loadHiddenGroups(account: string): string[] {
   try {
-    const raw: unknown = JSON.parse(localStorage.getItem(`cheesecrypt-hidden-groups-${account}`) || '[]');
+    const raw: unknown = JSON.parse(cryptStorage.getItem(`cheesecrypt-hidden-groups-${account}`) || '[]');
     return Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string' && /^[a-f0-9]{16}$/.test(id)) : [];
   } catch { return []; }
 }
@@ -47,7 +48,7 @@ export function setGroupHidden(account: string, id: string, hidden: boolean) {
   if (!/^[a-f0-9]{16}$/.test(id)) return;
   const ids = new Set(loadHiddenGroups(account));
   if (hidden) ids.add(id); else ids.delete(id);
-  localStorage.setItem(`cheesecrypt-hidden-groups-${account}`, JSON.stringify([...ids]));
+  cryptStorage.setItem(`cheesecrypt-hidden-groups-${account}`, JSON.stringify([...ids]));
 }
 
 export function groupPayload(group: CryptGroup, text: string): string {

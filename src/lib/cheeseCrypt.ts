@@ -1,3 +1,4 @@
+import { cryptStorage } from '@/lib/cryptStorage';
 /**
  * CHEESECrypt — on-chain encrypted messaging (migrated from gpkonwax/collection-manager).
  * Messages are memos on CHEESE transfers with a same-transaction fee nulled to eosio.null,
@@ -140,18 +141,18 @@ export function loadKey(account: string): MessagingKey | null {
   const current = sessionKeys.get(account);
   if (current) return current;
   try {
-    const v = parseKeyFile(JSON.parse(localStorage.getItem(keyStore(account)) || 'null'));
+    const v = parseKeyFile(JSON.parse(cryptStorage.getItem(keyStore(account)) || 'null'));
     return v && v.type === 'gpk-msg-key' && v.account === account ? v : null;
   } catch { return null; }
 }
-export const saveKey = (k: MessagingKey) => { sessionKeys.set(k.account, k); localStorage.removeItem(keyStore(k.account)); };
+export const saveKey = (k: MessagingKey) => { sessionKeys.set(k.account, k); cryptStorage.removeItem(keyStore(k.account)); };
 
 export function loadContacts(account: string): Record<string, string> {
-  try { return JSON.parse(localStorage.getItem(contactStore(account)) || '{}') || {}; } catch { return {}; }
+  try { return JSON.parse(cryptStorage.getItem(contactStore(account)) || '{}') || {}; } catch { return {}; }
 }
 export function loadContactAvatars(account: string): Record<string, CryptAvatar> {
   try {
-    const raw = JSON.parse(localStorage.getItem(`cheesecrypt-avatars-${account}`) || '{}');
+    const raw = JSON.parse(cryptStorage.getItem(`cheesecrypt-avatars-${account}`) || '{}');
     const result: Record<string, CryptAvatar> = {};
     for (const [name, value] of Object.entries(raw || {})) {
       const avatar = parseAvatar(value);
@@ -162,27 +163,27 @@ export function loadContactAvatars(account: string): Record<string, CryptAvatar>
 }
 export function loadRemovedContacts(account: string): string[] {
   try {
-    const raw: unknown = JSON.parse(localStorage.getItem(`cheesecrypt-removed-contacts-${account}`) || '[]');
+    const raw: unknown = JSON.parse(cryptStorage.getItem(`cheesecrypt-removed-contacts-${account}`) || '[]');
     return Array.isArray(raw) ? raw.filter((value): value is string => typeof value === 'string') : [];
   } catch { return []; }
 }
 export function removeContact(account: string, contact: string) {
   const contacts = loadContacts(account);
   delete contacts[contact];
-  localStorage.setItem(contactStore(account), JSON.stringify(contacts));
+  cryptStorage.setItem(contactStore(account), JSON.stringify(contacts));
   const avatars = loadContactAvatars(account);
   delete avatars[contact];
-  localStorage.setItem(`cheesecrypt-avatars-${account}`, JSON.stringify(avatars));
+  cryptStorage.setItem(`cheesecrypt-avatars-${account}`, JSON.stringify(avatars));
   saveCryptName(account, contact, '');
   saveCryptName(account, contact, '', 'nicknames');
   saveCryptBio(account, contact, '');
-  localStorage.setItem(`cheesecrypt-removed-contacts-${account}`, JSON.stringify([...new Set([...loadRemovedContacts(account), contact])]));
+  cryptStorage.setItem(`cheesecrypt-removed-contacts-${account}`, JSON.stringify([...new Set([...loadRemovedContacts(account), contact])]));
 }
 /** Keys a friend has rotated away from (oldest first). They still open past chats but never become current again. */
 const previousStore = (a: string) => `cheesecrypt-previous-keys-${a}`;
 export function loadPreviousKeys(account: string): Record<string, string[]> {
   try {
-    const raw = JSON.parse(localStorage.getItem(previousStore(account)) || '{}') as Record<string, unknown>;
+    const raw = JSON.parse(cryptStorage.getItem(previousStore(account)) || '{}') as Record<string, unknown>;
     const out: Record<string, string[]> = {};
     for (const [name, list] of Object.entries(raw || {})) {
       if (Array.isArray(list)) { const keys = list.filter((k): k is string => typeof k === 'string' && validKey(k, 32)); if (keys.length) out[name] = keys; }
@@ -198,23 +199,23 @@ export function applyContactRotation(account: string, contact: string, newPublic
   const prev = loadPreviousKeys(account);
   if (prev[contact]?.includes(newPublicKey)) return false;
   prev[contact] = [...(prev[contact] ?? []).filter(k => k !== old), old];
-  localStorage.setItem(previousStore(account), JSON.stringify(prev));
+  cryptStorage.setItem(previousStore(account), JSON.stringify(prev));
   c[contact] = newPublicKey;
-  localStorage.setItem(contactStore(account), JSON.stringify(c));
+  cryptStorage.setItem(contactStore(account), JSON.stringify(c));
   return true;
 }
 export function saveContact(account: string, contact: string, publicKey: string, avatar?: CryptAvatar, displayName?: string, bio?: string) {
   const c = loadContacts(account);
   // A key the friend has already rotated away from (e.g. an old friends/ file or listing) never replaces the current one.
   if (!(c[contact] && loadPreviousKeys(account)[contact]?.includes(publicKey))) c[contact] = publicKey;
-  localStorage.setItem(contactStore(account), JSON.stringify(c));
-  localStorage.setItem(`cheesecrypt-removed-contacts-${account}`, JSON.stringify(loadRemovedContacts(account).filter(name => name !== contact)));
+  cryptStorage.setItem(contactStore(account), JSON.stringify(c));
+  cryptStorage.setItem(`cheesecrypt-removed-contacts-${account}`, JSON.stringify(loadRemovedContacts(account).filter(name => name !== contact)));
   if (displayName !== undefined) saveCryptName(account, contact, displayName);
   if (bio !== undefined) saveCryptBio(account, contact, bio);
   if (avatar) {
     const avatars = loadContactAvatars(account);
     avatars[contact] = avatar;
-    localStorage.setItem(`cheesecrypt-avatars-${account}`, JSON.stringify(avatars));
+    cryptStorage.setItem(`cheesecrypt-avatars-${account}`, JSON.stringify(avatars));
   }
 }
 

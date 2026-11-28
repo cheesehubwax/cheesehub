@@ -1,3 +1,4 @@
+import { cryptStorage } from '@/lib/cryptStorage';
 // CHEESECrypt local block list: accounts whose messages are never decrypted or shown on this device.
 // Stored per WAX account in this browser only; nothing changes on-chain.
 const ACCOUNT_RE = /^[a-z1-5.]{1,12}$/;
@@ -22,13 +23,13 @@ export const removeBlocked = (list: readonly string[], acct: string) => clean(li
 
 export function loadBlocked(account: string): string[] {
   try {
-    const raw: unknown = JSON.parse(localStorage.getItem(storeKey(account)) || '[]');
+    const raw: unknown = JSON.parse(cryptStorage.getItem(storeKey(account)) || '[]');
     return Array.isArray(raw) ? clean(raw.filter((x): x is string => typeof x === 'string')).filter(a => a !== account) : [];
   } catch { return []; }
 }
 
 export const saveBlocked = (account: string, list: readonly string[]) =>
-  localStorage.setItem(storeKey(account), JSON.stringify(clean(list)));
+  cryptStorage.setItem(storeKey(account), JSON.stringify(clean(list)));
 
 /** Drops every memo exchanged with a blocked account before anything is decrypted (DMs, group copies, voice parts). */
 export function withoutBlocked<T extends { from: string; to: string }>(memos: readonly T[], account: string, blocked: readonly string[]): T[] {

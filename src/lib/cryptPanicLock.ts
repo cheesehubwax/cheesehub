@@ -1,3 +1,4 @@
+import { cryptStorage } from '@/lib/cryptStorage';
 /** Screen Shield & Panic Lock: device-local settings and pure helpers. */
 export const IDLE_OPTIONS = [0, 15, 30, 60, 240] as const; // minutes; 0 = off
 export type IdleMinutes = typeof IDLE_OPTIONS[number];
@@ -9,15 +10,15 @@ const SHIELD_STORE = 'cheesecrypt-screen-shield';
 
 export function loadIdleMinutes(): IdleMinutes {
   try {
-    const raw = localStorage.getItem(IDLE_STORE);
+    const raw = cryptStorage.getItem(IDLE_STORE);
     if (raw === null) return DEFAULT_IDLE_MINUTES;
     const n = Number(raw);
     return (IDLE_OPTIONS as readonly number[]).includes(n) ? n as IdleMinutes : DEFAULT_IDLE_MINUTES;
   } catch { return DEFAULT_IDLE_MINUTES; }
 }
-export const saveIdleMinutes = (m: IdleMinutes) => { try { localStorage.setItem(IDLE_STORE, String(m)); } catch { /* ignore */ } };
-export const loadShield = () => { try { return localStorage.getItem(SHIELD_STORE) === '1'; } catch { return false; } };
-export const saveShield = (on: boolean) => { try { localStorage.setItem(SHIELD_STORE, on ? '1' : '0'); } catch { /* ignore */ } };
+export const saveIdleMinutes = (m: IdleMinutes) => { try { cryptStorage.setItem(IDLE_STORE, String(m)); } catch { /* ignore */ } };
+export const loadShield = () => { try { return cryptStorage.getItem(SHIELD_STORE) === '1'; } catch { return false; } };
+export const saveShield = (on: boolean) => { try { cryptStorage.setItem(SHIELD_STORE, on ? '1' : '0'); } catch { /* ignore */ } };
 
 /** True once `minutes` of inactivity have fully passed. 0 never expires. */
 export function idleExpired(lastActive: number, minutes: number, now: number): boolean {
@@ -40,10 +41,10 @@ const HARDEN_STORE = 'cheesecrypt-lock-hardening';
 export const DEFAULT_HARDENING: LockHardening = { cold: false };
 export function loadHardening(): LockHardening {
   try {
-    const v = JSON.parse(localStorage.getItem(HARDEN_STORE) || 'null');
+    const v = JSON.parse(cryptStorage.getItem(HARDEN_STORE) || 'null');
     if (!v || typeof v !== 'object') return { ...DEFAULT_HARDENING };
     return { cold: v.cold === true };
   } catch { return { ...DEFAULT_HARDENING }; }
 }
-export const saveHardening = (h: LockHardening) => { try { localStorage.setItem(HARDEN_STORE, JSON.stringify(h)); } catch { /* ignore */ } };
+export const saveHardening = (h: LockHardening) => { try { cryptStorage.setItem(HARDEN_STORE, JSON.stringify(h)); } catch { /* ignore */ } };
 export const COLD_LOCK_WARNING = "You will need your key backup file (or QR transfer) to get back in. Without it, your messages can't be read.";

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   forgetInstantKey, generateInstantKey, instantIdleExpired, loadInstantKey, markInstantActive, saveInstantKey,
   INSTANT_IDLE_LIMIT_MS,
@@ -8,6 +8,7 @@ const HOUR = 60 * 60 * 1000;
 
 describe('Instant Messaging key storage', () => {
   beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
+  afterEach(() => vi.restoreAllMocks());
 
   it('idle limit is 4 hours', () => {
     expect(INSTANT_IDLE_LIMIT_MS).toBe(4 * HOUR);
@@ -42,6 +43,25 @@ describe('Instant Messaging key storage', () => {
   it('forget removes the tab key', () => {
     saveInstantKey(generateInstantKey('alice'));
     forgetInstantKey('alice');
+    expect(loadInstantKey('alice')).toBeNull();
+  });
+  it('fails closed if a session key cannot be saved, without a localStorage fallback', () => {
+    const key = generateInstantKey('alice');
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('Full', 'QuotaExceededError'); });
+    expect(() => saveInstantKey(key)).toThrow('Instant Messaging could not be saved in this tab.');
+    expect(loadInstantKey('alice')).toBeNull();
+    expect(localStorage.getItem('cheesecrypt-instant:alice')).toBeNull();
+  });
+  it('drops a key if activity writes fail without throwing into an input event', () => {
+    saveInstantKey(generateInstantKey('alice'));
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('Full', 'QuotaExceededError'); });
+    expect(() => markInstantActive('alice')).not.toThrow();
+    expect(loadInstantKey('alice')).toBeNull();
+  });
+  it('disables a forgotten key even when session removal is blocked', () => {
+    saveInstantKey(generateInstantKey('alice'));
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => { throw new DOMException('Blocked', 'SecurityError'); });
+    expect(() => forgetInstantKey('alice')).not.toThrow();
     expect(loadInstantKey('alice')).toBeNull();
   });
 });

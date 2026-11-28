@@ -1,3 +1,4 @@
+import { cryptStorage } from '@/lib/cryptStorage';
 // CHEESECrypt room profile directory: names/pictures of public-room members that a newcomer
 // receives from the room owner inside the admission transaction. Display-only, never identity:
 // WAX accounts stay the identity, friends' own profile notes and local nicknames always win.
@@ -61,7 +62,7 @@ export function mergeRoomProfiles(a: RoomProfiles, b: RoomProfiles): RoomProfile
 const store = (account: string) => `cheesecrypt-room-profiles-${account}`;
 export function loadRoomProfiles(account: string): RoomProfiles {
   try {
-    const raw: unknown = JSON.parse(localStorage.getItem(store(account)) || '{}');
+    const raw: unknown = JSON.parse(cryptStorage.getItem(store(account)) || '{}');
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
     const out: RoomProfiles = {};
     for (const [acct, v] of Object.entries(raw as Record<string, unknown>)) {
@@ -74,7 +75,7 @@ export function loadRoomProfiles(account: string): RoomProfiles {
     return out;
   } catch { return {}; }
 }
-export const saveRoomProfiles = (account: string, p: RoomProfiles) => localStorage.setItem(store(account), JSON.stringify(p));
+export const saveRoomProfiles = (account: string, p: RoomProfiles) => cryptStorage.setItem(store(account), JSON.stringify(p));
 
 /**
  * What the owner sends a newcomer: owner first, then admins, founders and other members;

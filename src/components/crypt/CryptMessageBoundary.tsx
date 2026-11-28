@@ -2,6 +2,7 @@ import { Component, type ReactNode } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cryptDiagnostic, type CryptDiagnostic } from '@/lib/cryptDiagnostics';
+import { clearCryptLookupCache } from '@/lib/cryptStorage';
 
 /** Keep a failed message local; never log decrypted content or replace its stored identity. */
 export class CryptMessageBoundary extends Component<{ children: ReactNode; row?: boolean; inline?: boolean }, { failed: boolean; diagnostic: CryptDiagnostic | null }> {
@@ -21,6 +22,9 @@ export class CryptMessageBoundary extends Component<{ children: ReactNode; row?:
         <span className="block">{this.props.row || this.props.inline ? 'Unable to display this message.' : 'Unable to display this conversation.'}</span>
         {this.state.diagnostic && <span className="mt-1 block break-words font-mono text-xs">{this.state.diagnostic.name}: {this.state.diagnostic.message}</span>}
       </span>
+      {this.state.diagnostic?.storageQuota && <Button size="sm" variant="outline" onClick={() => {
+        if (clearCryptLookupCache()) this.setState({ failed: false, diagnostic: null });
+      }}>Clear lookup cache</Button>}
       <Button size="sm" variant="outline" className="shrink-0 gap-1" onClick={() => this.setState({ failed: false, diagnostic: null })}>
         <RefreshCw className="h-3.5 w-3.5" aria-hidden /> Retry
       </Button>

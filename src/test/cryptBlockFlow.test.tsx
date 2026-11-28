@@ -35,7 +35,8 @@ describe('blocking on this device', () => {
     mount(<Messenger account="alice" session={{ actor: 'alice', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} />);
     fireEvent.click(screen.getByRole('button', { name: /^bob/ }));
     await screen.findByText('bob dm');
-    fireEvent.click(screen.getByRole('button', { name: 'Block bob' }));
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Private chat options' }), { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Block bob' }));
     expect(confirm).toHaveBeenCalled();
     expect(loadBlocked('alice')).toEqual(['bob']);
     expect(loadContacts('alice').bob).toBe(bob.publicKey);
@@ -44,7 +45,8 @@ describe('blocking on this device', () => {
     await screen.findByText('carol in group');
     expect(screen.queryByText('bob in group')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Menu' })); fireEvent.click(await screen.findByRole('button', { name: 'Blocked accounts' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Unblock bob' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'OK' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Unblock bob' }));
     expect(loadBlocked('alice')).toEqual([]);
     await waitFor(() => expect(screen.getByText('bob in group')).toBeInTheDocument());
   });

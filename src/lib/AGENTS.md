@@ -1,5 +1,7 @@
 # Connection rules
 
+- Crypt device stores use cryptStorage with tab-local failed-write overlays and visible persistence warnings; recovery clears only allowlisted reconstructible lookups, never keys, contacts, decisions, receipts or authenticated controls. Instant secrets stay in sessionStorage and fail closed on failed persistence.
+
 - Crypt history shape validation precedes merge/decode and unread/profile derivation; skip invalid rows without mutating surviving identities or relaxing authenticated control parsing, so malformed legacy history cannot poison the conversation.
 - Render diagnostics use cryptDiagnostics for allowlisted messages and source-only stacks, never raw exceptions, because exception strings can contain decrypted content.
 

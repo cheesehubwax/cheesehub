@@ -1,3 +1,4 @@
+import { cryptStorage } from '@/lib/cryptStorage';
 // CHEESECrypt public rooms. A creator may publish a plaintext listing for one of their invite (CG2) groups so
 // others can find it and ask to join in an encrypted message. Only the room's name, topic, tags, member count,
 // creator account and the creator's public key are public — never the member list or any message.
@@ -36,12 +37,12 @@ export interface RoomListingInput { id: string; name: string; topic: string; tag
 const infoKey = (account: string) => `cheesecrypt-room-info-${account}`;
 export type RoomInfo = { topic: string; tags: string[] };
 export function loadRoomInfo(account: string): Record<string, RoomInfo> {
-  try { const o = JSON.parse(localStorage.getItem(infoKey(account)) ?? '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; }
+  try { const o = JSON.parse(cryptStorage.getItem(infoKey(account)) ?? '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; }
 }
 export function saveRoomInfo(account: string, id: string, info: RoomInfo) {
   const all = loadRoomInfo(account);
   all[id] = { topic: cleanRoomTopic(info.topic), tags: cleanTags(info.tags.join(' ')) };
-  localStorage.setItem(infoKey(account), JSON.stringify(all));
+  cryptStorage.setItem(infoKey(account), JSON.stringify(all));
 }
 export interface RoomListing extends RoomListingInput { creator: string; time: number; txId: string }
 
@@ -266,7 +267,7 @@ const listedStore = (a: string) => `cheesecrypt-listed-rooms-${a}`;
 const requestStore = (a: string) => `cheesecrypt-room-requests-${a}`;
 const declineStore = (a: string) => `cheesecrypt-join-declines-${a}`;
 const readObject = (k: string): Record<string, unknown> => {
-  try { const raw: unknown = JSON.parse(localStorage.getItem(k) || '{}'); return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {}; } catch { return {}; }
+  try { const raw: unknown = JSON.parse(cryptStorage.getItem(k) || '{}'); return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {}; } catch { return {}; }
 };
 const finite = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n >= 0;
 
@@ -280,7 +281,7 @@ export function loadLocalListings(account: string): Record<string, LocalListing>
 }
 export function saveLocalListing(account: string, id: string, listed: boolean, at = Date.now()) {
   const next = { ...loadLocalListings(account), [id]: { listed, at } };
-  localStorage.setItem(listedStore(account), JSON.stringify(next));
+  cryptStorage.setItem(listedStore(account), JSON.stringify(next));
   return next;
 }
 export function loadRoomRequests(account: string): Record<string, RoomRequest> {
@@ -294,7 +295,7 @@ export function loadRoomRequests(account: string): Record<string, RoomRequest> {
 }
 export function saveRoomRequest(account: string, l: Pick<RoomListing, 'id' | 'creator' | 'publicKey'> & { name?: string }, time = Date.now()) {
   const next = { ...loadRoomRequests(account), [l.id]: { id: l.id, creator: l.creator, publicKey: l.publicKey, time, ...(l.name ? { name: l.name.slice(0, 64) } : {}) } };
-  localStorage.setItem(requestStore(account), JSON.stringify(next));
+  cryptStorage.setItem(requestStore(account), JSON.stringify(next));
   return next;
 }
 export function loadJoinDeclines(account: string): Record<string, number> {
@@ -305,7 +306,7 @@ export function loadJoinDeclines(account: string): Record<string, number> {
 export function declineJoin(account: string, id: string, from: string, time: number) {
   const all = loadJoinDeclines(account), k = `${id}:${from}`;
   const next = { ...all, [k]: Math.max(all[k] ?? 0, time) };
-  localStorage.setItem(declineStore(account), JSON.stringify(next));
+  cryptStorage.setItem(declineStore(account), JSON.stringify(next));
   return next;
 }
 
@@ -313,7 +314,7 @@ export function declineJoin(account: string, id: string, from: string, time: num
 export function removeRoomRequest(account: string, id: string) {
   const next = { ...loadRoomRequests(account) };
   delete next[id];
-  localStorage.setItem(requestStore(account), JSON.stringify(next));
+  cryptStorage.setItem(requestStore(account), JSON.stringify(next));
   return next;
 }
 

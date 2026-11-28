@@ -1,3 +1,4 @@
+import { cryptStorage } from '@/lib/cryptStorage';
 /**
  * CHEESECrypt safety numbers (Signal-style). Each side's 30 digits come from 5200 rounds of SHA-512 over
  * version || public key || account; the two halves are ordered by account so both people see the same 60 digits.
@@ -45,7 +46,7 @@ const store = (account: string) => `cheesecrypt-verified-${account}`;
 
 export function loadVerified(account: string): Record<string, string> {
   try {
-    const raw: unknown = JSON.parse(localStorage.getItem(store(account)) || '{}');
+    const raw: unknown = JSON.parse(cryptStorage.getItem(store(account)) || '{}');
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
     return Object.fromEntries(Object.entries(raw as Record<string, unknown>).filter((e): e is [string, string] => typeof e[1] === 'string'));
   } catch { return {}; }
@@ -54,7 +55,7 @@ export function loadVerified(account: string): Record<string, string> {
 export function setVerified(account: string, partner: string, publicKey: string | null): Record<string, string> {
   const next = { ...loadVerified(account) };
   if (publicKey) next[partner] = publicKey; else delete next[partner];
-  localStorage.setItem(store(account), JSON.stringify(next));
+  cryptStorage.setItem(store(account), JSON.stringify(next));
   return next;
 }
 

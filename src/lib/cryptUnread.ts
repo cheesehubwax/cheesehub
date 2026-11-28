@@ -1,3 +1,4 @@
+import { cryptStorage } from '@/lib/cryptStorage';
 /** Per-account read markers: conversation id ("group:<id>" or a WAX account) -> newest read message time. */
 export type ReadMarks = Record<string, number>;
 import { repliesTo } from '@/lib/cryptReply';
@@ -17,7 +18,7 @@ export const conversationId = (m: Msg, account: string) => m.group ? `group:${m.
 /** Null when this account has never stored read markers on this device. */
 export function loadReadMarks(account: string): ReadMarks | null {
   try {
-    const raw: unknown = JSON.parse(localStorage.getItem(storeKey(account)) || 'null');
+    const raw: unknown = JSON.parse(cryptStorage.getItem(storeKey(account)) || 'null');
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
     const out: ReadMarks = {};
     for (const [k, v] of Object.entries(raw)) if (typeof v === 'number' && Number.isFinite(v)) out[k] = v;
@@ -25,7 +26,7 @@ export function loadReadMarks(account: string): ReadMarks | null {
   } catch { return null; }
 }
 export function saveReadMarks(account: string, marks: ReadMarks) {
-  try { localStorage.setItem(storeKey(account), JSON.stringify(marks)); } catch { /* callers retain read markers in memory */ }
+  try { cryptStorage.setItem(storeKey(account), JSON.stringify(marks)); } catch { /* callers retain read markers in memory */ }
 }
 
 /** Marks every existing conversation read at its newest message (first visit: no phantom badges on old history). */

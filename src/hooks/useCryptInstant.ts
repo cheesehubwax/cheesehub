@@ -32,7 +32,7 @@ export function useCryptInstant(account: string, session: Session, executeDirect
       const now = Date.now();
       if (now - lastWrite < 30_000) return;
       lastWrite = now;
-      markInstantActive(account, now);
+      if (!markInstantActive(account, now)) setKey(null);
     };
     const check = () => { if (!loadInstantKey(account)) setKey(null); };
     const events = ['keydown', 'pointerdown', 'touchstart', 'wheel'] as const;
@@ -92,7 +92,7 @@ export function useCryptInstant(account: string, session: Session, executeDirect
   const send = useCallback(async (actions: unknown[]) => {
     const live = loadInstantKey(account);
     if (!key || !live) { setKey(null); throw new Error('Instant Messaging is off.'); }
-    markInstantActive(account);
+    if (!markInstantActive(account)) { setKey(null); throw new Error('Instant Messaging is off.'); }
     return sendInstant(session.chain, live, actions);
   }, [key, session, account]);
 

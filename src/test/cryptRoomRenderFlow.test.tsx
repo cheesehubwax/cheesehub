@@ -8,6 +8,9 @@ import { encodeGroupText, loadInvites, saveDecision, saveInvites } from '@/lib/c
 import { encodeReply } from '@/lib/cryptReply';
 import { saveReadMarks } from '@/lib/cryptUnread';
 import { Messenger } from '@/pages/CheeseCrypt';
+import { CryptStorageNotice } from '@/components/crypt/CryptStorageNotice';
+import { clearCryptLookupCache } from '@/lib/cryptStorage';
+import { loadRoomProfiles, saveRoomProfiles } from '@/lib/cryptRoomProfiles';
 
 const calls = vi.hoisted(() => ({ fetch: vi.fn(), transact: vi.fn() }));
 vi.mock('@/context/WaxContext', () => ({ useWax: vi.fn() }));
@@ -39,12 +42,41 @@ beforeEach(async () => {
   saveDecision('alice', id, 'joined', 2);
   saveReadMarks('alice', { [`group:${id}`]: 1, bob: 1 });
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); clearCryptLookupCache(); });
 const mount = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
   <Messenger account="alice" session={{ actor: 'alice', walletPlugin: { id: 'anchor' }, permissionLevel: { actor: 'alice', permission: 'active' } } as unknown as Session} />
 </QueryClientProvider>);
 
 describe('authenticated public-room rendering', () => {
+  it('opens an unlocked public room with full storage and recovers without losing draft, profiles or consent', async () => {
+    localStorage.setItem('cheesecrypt-trust-snapshot-v1', 'old disposable lookup cache');
+    const write = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (key, value) {
+      if (localStorage.getItem('cheesecrypt-trust-snapshot-v1')) throw new DOMException('Full', 'QuotaExceededError');
+      return write.call(this, key, value);
+    });
+    saveRoomProfiles('alice', { bob: { displayName: 'Bob', time: 1, self: true } });
+    calls.fetch.mockResolvedValue([memo(encodeReply({ author: 'alice', time: 1, quote: 'original' }, 'Quota-safe reply'), 0)]);
+    render(<CryptStorageNotice />);
+    const view = mount();
+    fireEvent.click(await screen.findByRole('button', { name: /Public cheese room/ }));
+    expect(await screen.findByText('Quota-safe reply')).toBeInTheDocument();
+    const draft = screen.getByPlaceholderText('Message group');
+    fireEvent.change(draft, { target: { value: 'Keep my draft through recovery' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Jump to earliest unseen reply (1 remaining)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clear lookup cache' }));
+    expect(draft).toHaveValue('Keep my draft through recovery');
+    expect(loadRoomProfiles('alice').bob?.displayName).toBe('Bob');
+    expect(localStorage.getItem('cheesecrypt-invite-decisions-alice')).toContain('joined');
+    expect(localStorage.getItem('cheesecrypt-keylock-alice')).not.toBeNull();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    view.unmount();
+    mount();
+    fireEvent.click(await screen.findByRole('button', { name: /Public cheese room/ }));
+    expect(await screen.findByText('Quota-safe reply')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Jump to earliest unseen reply/ })).not.toBeInTheDocument();
+    expect(calls.transact).not.toHaveBeenCalled();
+  });
   it('opens 757 mixed history rows, skipping malformed controls while preserving 20 replies and an unsent draft', async () => {
     const badPayloads = ['\u0002CG2:msg:{"i":"0123456789abcdef","t":{}}', '\u0002CG2:invite:null', '\u0002CP1:{"avatar":null}', '\u0002CG1:{"id":"0123456789abcdef","members":[null]}'];
     const rows = [...Array.from({ length: 737 }, (_, i) => memo(badPayloads[i % badPayloads.length], i, false)),

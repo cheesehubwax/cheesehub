@@ -1,3 +1,4 @@
+import { cryptStorage } from '@/lib/cryptStorage';
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { repliesTo } from '@/lib/cryptReply';
 import { findCryptMessageNode } from '@/lib/cryptMessageDom';
@@ -9,7 +10,7 @@ type ReplyStore = Record<string, ReplyState>;
 const storageKey = (account: string) => `cheesecrypt-reply-views-${account}`;
 function load(account: string): ReplyStore {
   try {
-    const raw = JSON.parse(localStorage.getItem(storageKey(account)) || '{}');
+    const raw = JSON.parse(cryptStorage.getItem(storageKey(account)) || '{}');
     const out: ReplyStore = {};
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
     for (const [id, value] of Object.entries(raw)) {
@@ -25,7 +26,7 @@ function load(account: string): ReplyStore {
 
 function save(account: string, store: ReplyStore) {
   // Storage denial/quota must not crash scrolling; retain receipts in memory for this session.
-  try { localStorage.setItem(storageKey(account), JSON.stringify(store)); } catch { /* device storage unavailable */ }
+  try { cryptStorage.setItem(storageKey(account), JSON.stringify(store)); } catch { /* device storage unavailable */ }
 }
 
 /** Separate per-message receipts: jumping past a reply never marks that skipped reply viewed. */

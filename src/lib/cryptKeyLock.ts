@@ -1,3 +1,4 @@
+import { cryptStorage } from '@/lib/cryptStorage';
 /**
  * Wallet-locked CHEESECrypt key files (CHEESECrypt's own scheme, never WAXCrypt's).
  * The messaging secret key is sealed with a key derived from an Anchor signature over a fixed,
@@ -187,12 +188,12 @@ export const withProfile = (f: LockedKeyFile, k: Pick<MessagingKey, 'avatar' | '
 const envelopeStore = (a: string) => `cheesecrypt-keylock-${a}`;
 export function loadLockedEnvelope(account: string, publicKey?: string): LockedKeyFile | null {
   try {
-    const f = parseLockedKeyFile(JSON.parse(localStorage.getItem(envelopeStore(account)) || 'null'));
+    const f = parseLockedKeyFile(JSON.parse(cryptStorage.getItem(envelopeStore(account)) || 'null'));
     return f && f.account === account && (!publicKey || f.publicKey === publicKey) ? f : null;
   } catch { return null; }
 }
-export const saveLockedEnvelope = (f: LockedKeyFile) => localStorage.setItem(envelopeStore(f.account), JSON.stringify(f));
-export const clearLockedEnvelope = (account: string) => localStorage.removeItem(envelopeStore(account));
+export const saveLockedEnvelope = (f: LockedKeyFile) => cryptStorage.setItem(envelopeStore(f.account), JSON.stringify(f));
+export const clearLockedEnvelope = (account: string) => cryptStorage.removeItem(envelopeStore(account));
 
 export const ANCHOR_REQUIRED = 'Locking and unlocking keys needs the Anchor wallet.';
 

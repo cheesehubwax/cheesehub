@@ -1,3 +1,4 @@
+import { cryptStorage } from '@/lib/cryptStorage';
 // CHEESECrypt invite groups (CG2). Everything travels inside ordinary encrypted CHEESECrypt messages,
 // so on-chain an invite or notice looks like any other message between two people.
 // Membership is fixed by the creator's invite; joined/left status comes only from authenticated notices.
@@ -552,7 +553,7 @@ const friendDecisionsStore = (a: string) => `cheesecrypt-invite-friend-decisions
 
 export function loadInvites(account: string): Record<string, InviteGroup> {
   try {
-    const raw: unknown = JSON.parse(localStorage.getItem(invitesStore(account)) || '{}');
+    const raw: unknown = JSON.parse(cryptStorage.getItem(invitesStore(account)) || '{}');
     const out: Record<string, InviteGroup> = {};
     if (raw && typeof raw === 'object' && !Array.isArray(raw)) for (const v of Object.values(raw)) {
       const g = validateInvite(v, !!(v && typeof v === 'object' && 'r' in v && v.r === true));
@@ -564,12 +565,12 @@ export function loadInvites(account: string): Record<string, InviteGroup> {
 export function saveInvites(account: string, invites: Record<string, InviteGroup>) {
   const out: Record<string, unknown> = {};
   for (const g of Object.values(invites)) out[g.id] = { i: g.id, n: g.name, o: g.creator, c: g.created, m: g.members.map(m => [m.account, m.publicKey]), ...(g.avatar ? { a: g.avatar.pixels } : {}), ...(g.publicRoom ? { r: true } : {}) };
-  localStorage.setItem(invitesStore(account), JSON.stringify(out));
+  cryptStorage.setItem(invitesStore(account), JSON.stringify(out));
 }
 
 export function loadDecisions(account: string): Record<string, LocalDecision> {
   try {
-    const raw: unknown = JSON.parse(localStorage.getItem(decisionsStore(account)) || '{}');
+    const raw: unknown = JSON.parse(cryptStorage.getItem(decisionsStore(account)) || '{}');
     const out: Record<string, LocalDecision> = {};
     if (raw && typeof raw === 'object' && !Array.isArray(raw)) for (const [id, v] of Object.entries(raw)) {
       const d = v as Partial<LocalDecision>;
@@ -581,20 +582,20 @@ export function loadDecisions(account: string): Record<string, LocalDecision> {
 export function saveDecision(account: string, id: string, status: LocalDecision['status'], at = Date.now()) {
   const all = loadDecisions(account);
   all[checkId(id)] = { status, at };
-  localStorage.setItem(decisionsStore(account), JSON.stringify(all));
+  cryptStorage.setItem(decisionsStore(account), JSON.stringify(all));
   return all;
 }
 
 /** Friend requests I declined (`<groupId>:<account>`), so they stop showing. */
 export function loadFriendDecisions(account: string): string[] {
   try {
-    const raw: unknown = JSON.parse(localStorage.getItem(friendDecisionsStore(account)) || '[]');
+    const raw: unknown = JSON.parse(cryptStorage.getItem(friendDecisionsStore(account)) || '[]');
     return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string' && /^[a-f0-9]{16}:[a-z1-5.]{1,12}$/.test(x)) : [];
   } catch { return []; }
 }
 export function declineFriendRequest(account: string, id: string, from: string) {
   const next = [...new Set([...loadFriendDecisions(account), `${checkId(id)}:${from}`])];
-  localStorage.setItem(friendDecisionsStore(account), JSON.stringify(next));
+  cryptStorage.setItem(friendDecisionsStore(account), JSON.stringify(next));
   return next;
 }
 

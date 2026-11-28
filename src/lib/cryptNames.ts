@@ -1,3 +1,4 @@
+import { cryptStorage } from '@/lib/cryptStorage';
 /** Names are presentation-only; WAX account IDs remain the identity. */
 export const MAX_CRYPT_NAME_LENGTH = 40;
 export function parseCryptName(value: unknown): string | undefined {
@@ -9,7 +10,7 @@ type NameKind = 'names' | 'nicknames';
 const store = (account: string, kind: NameKind) => `cheesecrypt-${kind}-${account}`;
 export function loadCryptNames(account: string, kind: NameKind = 'names'): Record<string, string> {
   try {
-    const raw = JSON.parse(localStorage.getItem(store(account, kind)) || '{}');
+    const raw = JSON.parse(cryptStorage.getItem(store(account, kind)) || '{}');
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
     const entries = Object.entries(raw).flatMap(([id, value]) => {
       const name = parseCryptName(value);
@@ -23,7 +24,7 @@ export function saveCryptName(account: string, contact: string, value: unknown, 
   const name = parseCryptName(value);
   if (name) names[contact] = name;
   else delete names[contact];
-  localStorage.setItem(store(account, kind), JSON.stringify(names));
+  cryptStorage.setItem(store(account, kind), JSON.stringify(names));
 }
 export function cryptDisplayName(account: string, names: Record<string, string>, nicknames: Record<string, string>): string {
   return parseCryptName(nicknames[account]) ?? parseCryptName(names[account]) ?? account;
@@ -40,7 +41,7 @@ export function parseCryptBio(value: unknown): string | undefined {
 const bioStore = (account: string) => `cheesecrypt-bios-${account}`;
 export function loadCryptBios(account: string): Record<string, string> {
   try {
-    const raw = JSON.parse(localStorage.getItem(bioStore(account)) || '{}');
+    const raw = JSON.parse(cryptStorage.getItem(bioStore(account)) || '{}');
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
     return Object.fromEntries(Object.entries(raw).flatMap(([id, v]) => { const b = parseCryptBio(v); return b ? [[id, b]] : []; }));
   } catch { return {}; }
@@ -49,5 +50,5 @@ export function saveCryptBio(account: string, contact: string, value: unknown) {
   const bios = loadCryptBios(account);
   const bio = parseCryptBio(value);
   if (bio) bios[contact] = bio; else delete bios[contact];
-  localStorage.setItem(bioStore(account), JSON.stringify(bios));
+  cryptStorage.setItem(bioStore(account), JSON.stringify(bios));
 }

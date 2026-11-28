@@ -1,3 +1,4 @@
+import { cryptStorage } from '@/lib/cryptStorage';
 // CHEESECrypt network privacy settings: device-local only, never sent anywhere.
 // No CHEESEHub-run relay exists; a custom server only points this browser at a server the user chose.
 import { normalizeEndpoint, resolveEndpoints } from '@/lib/endpointHealth';
@@ -7,9 +8,9 @@ const MODE_KEY = 'cheesecrypt-privacy-mode';
 const NODE_KEY = 'cheesecrypt-custom-hyperion';
 const ONLY_KEY = 'cheesecrypt-custom-hyperion-only';
 
-const read = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
+const read = (k: string) => { try { return cryptStorage.getItem(k); } catch { return null; } };
 const write = (k: string, v: string | null) => {
-  try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* storage blocked */ }
+  try { if (v === null) cryptStorage.removeItem(k); else cryptStorage.setItem(k, v); } catch { /* storage blocked */ }
 };
 
 export const loadPrivacyMode = (): PrivacyMode => (read(MODE_KEY) === 'maximum' ? 'maximum' : 'standard');

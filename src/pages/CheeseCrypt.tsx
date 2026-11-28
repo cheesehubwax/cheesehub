@@ -1,3 +1,5 @@
+import { cryptStorage } from '@/lib/cryptStorage';
+import { CryptStorageNotice } from '@/components/crypt/CryptStorageNotice';
 import { explorerTx } from '@/lib/explorer';
 // CHEESECrypt — encrypted on-chain messages paid in CHEESE.
 // Intentionally not linked from the header or menus: reachable at /crypt only.
@@ -135,6 +137,7 @@ const CheeseCrypt = () => {
       <CryptHero />
 
       <div className="container pb-12 flex flex-col items-center max-w-5xl">
+        <CryptStorageNotice />
         {!gateOk ? (
           <CryptPrivacyGate onDone={() => setGateOk(privacyGateSatisfied())} />
         ) : !isConnected || !accountName || !session ? (
@@ -345,9 +348,9 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const [verifiedKeys, setVerifiedKeys] = useState<Record<string, string>>(() => loadVerified(account));
   useEffect(() => { setVerifiedKeys(loadVerified(account)); }, [account]);
   const [safetyOpen, setSafetyOpen] = useState(false);
-  const [listHidden, setListHidden] = useState(() => { try { return localStorage.getItem(`cheesecrypt-sidebar-collapsed-${account}`) === '1'; } catch { return false; } });
+  const [listHidden, setListHidden] = useState(() => { try { return cryptStorage.getItem(`cheesecrypt-sidebar-collapsed-${account}`) === '1'; } catch { return false; } });
   const toggleList = () => setListHidden(v => {
-    try { localStorage.setItem(`cheesecrypt-sidebar-collapsed-${account}`, v ? '0' : '1'); } catch { /* storage unavailable */ }
+    try { cryptStorage.setItem(`cheesecrypt-sidebar-collapsed-${account}`, v ? '0' : '1'); } catch { /* storage unavailable */ }
     return !v;
   });
   const [memos, setMemos] = useState<ChainMemo[]>([]);
@@ -407,7 +410,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
       update(setSavedControls, loadModerationMemos(account)); update(setReadMarks, loadReadMarks(account));
     };
     const onStorage = (event: StorageEvent) => {
-      if (event.storageArea === localStorage && isAccountStorageKey(event.key, account)) sync();
+      try { if (event.storageArea === window.localStorage && isAccountStorageKey(event.key, account)) sync(); } catch { /* storage unavailable */ }
     };
     window.addEventListener('storage', onStorage);
     window.addEventListener('focus', sync);
@@ -802,7 +805,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   useEffect(() => {
     const storeKey = `cheesecrypt-room-outcomes-${account}`;
     let seen: Record<string, string> = {};
-    try { const raw: unknown = JSON.parse(localStorage.getItem(storeKey) || '{}'); if (raw && typeof raw === 'object' && !Array.isArray(raw)) seen = raw as Record<string, string>; } catch { /* reset */ }
+    try { const raw: unknown = JSON.parse(cryptStorage.getItem(storeKey) || '{}'); if (raw && typeof raw === 'object' && !Array.isArray(raw)) seen = raw as Record<string, string>; } catch { /* reset */ }
     let changed = false;
     for (const [id, outcome] of Object.entries(requestOutcomes)) {
       const tag = `${outcome}:${roomRequests[id]?.time ?? 0}`;
@@ -814,7 +817,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
         : { title: `❌ Request declined: ${name}`, description: `The room owner declined your request to join.${said}`, variant: 'destructive' });
       seen[id] = tag; changed = true;
     }
-    if (changed) try { localStorage.setItem(storeKey, JSON.stringify(seen)); } catch { /* storage unavailable */ }
+    if (changed) try { cryptStorage.setItem(storeKey, JSON.stringify(seen)); } catch { /* storage unavailable */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestOutcomes, requestNotes, account]);
   const requestRow = (id: string) => {

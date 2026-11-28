@@ -1,3 +1,4 @@
+import { cryptStorage } from '@/lib/cryptStorage';
 /**
  * Air-gapped device transfer: the Anchor-locked key envelope plus this account's local CHEESECrypt
  * lists are compressed, encrypted with a one-time code (PBKDF2 → AES-256-GCM) and shown as cycling
@@ -29,7 +30,7 @@ export interface StorageLike { getItem(k: string): string | null; setItem(k: str
 const readJson = (s: StorageLike, k: string): unknown => { try { return JSON.parse(s.getItem(k) || 'null'); } catch { return null; } };
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
-export function buildBundle(account: string, lockedKey: unknown, storage: StorageLike = localStorage, now = Date.now()): TransferBundle {
+export function buildBundle(account: string, lockedKey: unknown, storage: StorageLike = cryptStorage, now = Date.now()): TransferBundle {
   const locked = parseLockedKeyFile(lockedKey);
   if (!locked || locked.account !== account) throw new Error('Only a wallet-locked key can be moved to another device.');
   const stores: TransferBundle['stores'] = {};
@@ -46,7 +47,7 @@ export function summarize(b: TransferBundle) {
 const stamp = (v: unknown) => isObj(v) ? (typeof v.at === 'number' ? v.at : typeof v.time === 'number' ? v.time : typeof v.c === 'number' ? v.c : null) : typeof v === 'number' ? v : null;
 
 /** Merge into this device: nothing is wiped; timestamped entries keep the newer one, others keep this device's copy. */
-export function mergeBundle(b: TransferBundle, storage: StorageLike = localStorage) {
+export function mergeBundle(b: TransferBundle, storage: StorageLike = cryptStorage) {
   const a = b.account;
   const localRemoved = new Set((readJson(storage, storeKey('removed-contacts', a)) as unknown[] | null ?? []).filter((x): x is string => typeof x === 'string'));
   for (const k of OBJECT_KINDS) {

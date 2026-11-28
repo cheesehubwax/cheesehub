@@ -3,6 +3,7 @@ import { useRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useCryptReactionNavigation } from '@/hooks/useCryptReactionNavigation';
 import { activeReactions, encodeReaction } from '@/lib/cryptReactions';
+import { clearCryptLookupCache } from '@/lib/cryptStorage';
 
 const wireKey = 'cg2:tx:alice:room:\u0004R1:quote\n"[row]\\';
 const reactions = activeReactions([{ key: 'reaction', from: 'bob', time: 20, missing: 0,
@@ -16,7 +17,7 @@ function Room({ show = true }: { show?: boolean }) {
   </ol></>;
 }
 beforeEach(() => localStorage.clear());
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); clearCryptLookupCache(); });
 describe('reaction navigation crash safety', () => {
   it('works when browser storage is full and keeps the original wire identity', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('Full', 'QuotaExceededError'); });

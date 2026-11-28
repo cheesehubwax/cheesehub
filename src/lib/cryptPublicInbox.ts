@@ -1,20 +1,21 @@
+import { cryptStorage } from '@/lib/cryptStorage';
 import { assembleMessages, bytesToText, decryptMemoBytesAny, type ChainMemo, type MessagingKey } from '@/lib/cheeseCrypt';
 
 export const MAX_INBOX_KEY_LOOKUPS = 10;
 const ACCOUNT = /^[a-z1-5.]{1,12}$/;
 const setting = (account: string) => `cheesecrypt-public-inbox-${account}`;
 const gone = (account: string) => `cheesecrypt-request-declines-${account}`;
-export const loadPublicInbox = (account: string): boolean => localStorage.getItem(setting(account)) === 'true';
-export const savePublicInbox = (account: string, enabled: boolean) => localStorage.setItem(setting(account), String(enabled));
+export const loadPublicInbox = (account: string): boolean => cryptStorage.getItem(setting(account)) === 'true';
+export const savePublicInbox = (account: string, enabled: boolean) => cryptStorage.setItem(setting(account), String(enabled));
 export function loadRequestDeclines(account: string): Record<string, number> {
   try {
-    const raw = JSON.parse(localStorage.getItem(gone(account)) || '{}');
+    const raw = JSON.parse(cryptStorage.getItem(gone(account)) || '{}');
     return Object.fromEntries(Object.entries(raw || {}).filter(([a, t]) => ACCOUNT.test(a) && typeof t === 'number' && Number.isFinite(t) && t >= 0)) as Record<string, number>;
   } catch { return {}; }
 }
 export function declineRequest(account: string, from: string, time: number) {
   const next = { ...loadRequestDeclines(account), [from]: Math.max(loadRequestDeclines(account)[from] ?? 0, time) };
-  localStorage.setItem(gone(account), JSON.stringify(next));
+  cryptStorage.setItem(gone(account), JSON.stringify(next));
   return next;
 }
 
