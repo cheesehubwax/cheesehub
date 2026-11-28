@@ -17,3 +17,5 @@
 - Crypt account-named chain reads use cryptChainRead (helper v1.4+, public without/older helper, fail closed when down); wallet prep reads on /crypt go only to a v1.6 helper, never mixed with broadcast retries.
 
 - Crypt YouTube title and thumbnail lookups use capability-gated local helper routing; a saved old/down helper blocks them, and fixed video-ID paths with bounded JSON/raster responses prevent a general-purpose proxy. Playback remains separate with explicit Google consent.
+
+- Crypt shared room keys: owner-only pairwise CG2 `roomkey` (epoch) controls; text/reactions go once to eosio.null as padded CRYPT2 secretbox under a per-sender subkey derived from the chain-authorized sender, so members can't impersonate and nothing names the room. Read via the account-blind crypt.cheese stream; one normal part fee (never per-member: it would reveal room size); bans rotate the key in-transaction; voice stays pairwise.

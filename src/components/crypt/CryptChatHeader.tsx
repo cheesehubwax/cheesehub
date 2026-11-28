@@ -19,7 +19,7 @@ type Notice = { kind: 'joined' | 'leave' | 'friend' | 'friend-ok' | 'profile'; i
 /** Chat title bar: friend or group title, Members dropdown and per-chat actions. State lives in Messenger. */
 export function CryptChatHeader({
   account, active, activeGroup, activeInvite, keyAvatar, avatars, contacts, blocked, friendDeclines, setFriendDeclines,
-  nameFor, membersOpen, setMembersOpen, setPendingNotice, setEditingInvite, setEditingFriend, saveFriend, blockAccount, admins = [], onReportRoom, verify, onVerify, onOpenProfile, lockSlot, instantReady = false,
+  nameFor, membersOpen, setMembersOpen, setPendingNotice, setEditingInvite, setEditingFriend, saveFriend, blockAccount, admins = [], onReportRoom, verify, onVerify, onOpenProfile, lockSlot, instantReady = false, sharedKey,
 }: {
   account: string; active: string | null; activeGroup: CryptGroup | undefined; activeInvite: InviteGroupView | undefined;
   keyAvatar?: CryptAvatar; avatars: Record<string, CryptAvatar>; contacts: Record<string, string>; blocked: string[];
@@ -39,6 +39,8 @@ export function CryptChatHeader({
   lockSlot?: ReactNode;
   /** Instant Messaging ready (only used for a recommendation in the Privacy submenu). */
   instantReady?: boolean;
+  /** Shared room key state; `onSend` only for the owner (turn on, or change the key). */
+  sharedKey?: { on: boolean; onSend?: () => void };
 }) {
   // Per-chat random send delay; the master mode and delay range live in Privacy settings.
   const [jitter, setJitter] = useState(loadSendJitter);
@@ -117,6 +119,10 @@ export function CryptChatHeader({
                       {activeInvite.status === 'joined' && <DropdownMenuItem title="Send your current name and picture to everyone in this group, including people who aren't your friends" onSelect={() => setPendingNotice({ kind: 'profile', id: activeInvite.invite.id })}>📣 Share my profile</DropdownMenuItem>}
                       {activeInvite.isCreator && activeInvite.status === 'joined' && <DropdownMenuItem onSelect={() => setEditingInvite({ id: activeInvite.invite.id, name: activeInvite.name, avatar: activeInvite.avatar })}>✏️ Edit group</DropdownMenuItem>}
                       {active && activeInvite.status === 'joined' && privacySub(active)}
+                      {sharedKey?.onSend && <DropdownMenuItem onSelect={sharedKey.onSend}
+                        title={sharedKey.on ? 'Send everyone still in the room a new key, so people who left cannot read new messages' : 'Send each message once instead of a copy per member, so the chain no longer shows who is in this room or how many'}>
+                        {sharedKey.on ? '🔑 Change room key' : '🔑 Turn on shared room key'}</DropdownMenuItem>}
+                      {sharedKey?.on && !sharedKey.onSend && <p className="px-2 py-1.5 text-[10px] text-muted-foreground">🔑 Shared room key on</p>}
                       {onReportRoom && <DropdownMenuItem title="Report this group, including its owner or admins, to the CHEESEHub moderation team" onSelect={onReportRoom}>🚩 Report group</DropdownMenuItem>}
                       {activeInvite.status === 'joined' && <><DropdownMenuSeparator />
                       <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setPendingNotice({ kind: 'leave', id: activeInvite.invite.id })}>🚪 Leave group</DropdownMenuItem></>}

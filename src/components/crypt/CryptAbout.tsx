@@ -160,6 +160,7 @@ function AboutBody() {
           <>Verify compares a safety number with a friend to prove no one is impersonating either of you. Once marked verified, a ⚠️ warning appears if their key ever changes.</>,
           <><B>Screen shield:</B> blurs chats while you’re away from the tab; returning reveals them without unlocking.</>,
           <><B>Panic lock:</B> Lock now, Esc twice, Ctrl/Cmd+Shift+L or idle auto-lock clears chats and session keys and signs you out. Reconnect and unlock with Anchor to return.</>,
+          <><B>Shared room key:</B> public room owners can send each text message once, to eosio.null, in the normal message format — the chain no longer shows who is in the room or how many. One normal part fee; the key changes when someone is removed.</>,
           <><B>Random send delay (jitter):</B> adds a cancellable pause within your chosen range to obscure reply timing — per chat or all chats.</>,
           <>Scheduled sends hold a message until a time you pick, once you confirm the delay.</>,
           <>Key rotation privately refreshes your messaging key and manages the old keys you keep.</>,

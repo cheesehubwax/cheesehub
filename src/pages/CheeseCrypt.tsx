@@ -45,7 +45,7 @@ import { PixelAvatar } from '@/components/crypt/PixelAvatar';
 import { VaultPrompt } from '@/components/crypt/VaultPrompt';
 import { CreateGroupDialog } from '@/components/crypt/CreateGroupDialog';
 import { PaidActionDialog } from '@/components/crypt/PaidActionDialog';
-import { buildCg2Actions, JOIN_NOTE_MAX, encodeAdmission, encodeMemberAdd, encodeRoomProfiles, MAX_PUBLIC_ROOM_MEMBERS, collectInvites, countFriendRequests, friendRequestResendable, deriveInviteGroups, encodeGroupText, encodeInvite, encodeMeta, encodeNotice, inviteTextSize, invitesSignature, loadDecisions, MAX_INVITE_MEMBERS, loadFriendDecisions, loadInvites, newInviteGroupId, saveDecision, saveInvites, scopedKeys, eventFromMember, ownerLeaveNotices, VOICE_REF_PREFIX, type Cg2Event, type InviteGroup, type InviteGroupView } from '@/lib/cryptInviteGroups';
+import { buildCg2Actions, JOIN_NOTE_MAX, encodeAdmission, encodeMemberAdd, encodeRoomProfiles, MAX_PUBLIC_ROOM_MEMBERS, collectInvites, countFriendRequests, friendRequestResendable, deriveInviteGroups, encodeGroupText, encodeInvite, encodeRoomKeyControl, encodeMeta, encodeNotice, inviteTextSize, invitesSignature, loadDecisions, MAX_INVITE_MEMBERS, loadFriendDecisions, loadInvites, newInviteGroupId, saveDecision, saveInvites, scopedKeys, eventFromMember, ownerLeaveNotices, VOICE_REF_PREFIX, type Cg2Event, type InviteGroup, type InviteGroupView } from '@/lib/cryptInviteGroups';
 import { ShareKeyDialog } from '@/components/crypt/ShareKeyDialog';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { useCryptInstant } from '@/hooks/useCryptInstant';
@@ -69,7 +69,7 @@ import {
   findPrivateKey, readFriendKeys, readVaultMarks, recallVault, vaultStatus, writeVaultMarks, rememberVault, replaceWithLocked, vaultSupported, vaultWritable, writeFriendKey, writeOwnPublicKey,
 } from '@/lib/cryptVault';
 import type { PublicKeyFile } from '@/lib/cheeseCrypt';
-import { ChainMemo, MessagingKey, MAX_MESSAGE_BYTES, MAX_HISTORY_PAGES, MAX_PARTS, messageCost, partCount, splitMessage, buildCreateKeyActions, KEY_CREATION_QUANTITY, buildPublishKeyActions, buildSendMessageActions, CRYPT_ROUTER_ENABLED, routeCryptActions, encryptMemo, fetchMessages, fetchContractStream, fetchStreamHistory, mergeMemos, generateKey, loadContacts, loadContactAvatars, loadKey, loadRemovedContacts, removeContact, lookupPublishedKey, parseKeyFile, plaintextBytes, saveContact, saveKey, toPublicFile } from '@/lib/cheeseCrypt';
+import { ChainMemo, MessagingKey, MAX_MESSAGE_BYTES, MAX_HISTORY_PAGES, MAX_PARTS, messageCost, partCount, splitMessage, buildCreateKeyActions, KEY_CREATION_QUANTITY, buildPublishKeyActions, buildSendMessageActions, CRYPT_ROUTER_ENABLED, routeCryptActions, encryptMemo, fetchMessages, fetchContractStream, fetchStreamHistory, fetchRoomStream, mergeMemos, generateKey, loadContacts, loadContactAvatars, loadKey, loadRemovedContacts, removeContact, lookupPublishedKey, parseKeyFile, plaintextBytes, saveContact, saveKey, toPublicFile } from '@/lib/cheeseCrypt';
 import { download } from '@/components/crypt/cryptDownload';
 import { ChatMessageItem } from '@/components/crypt/ChatMessageItem';
 import { CryptMessageBoundary } from '@/components/crypt/CryptMessageBoundary';
@@ -79,6 +79,7 @@ import { encodeAdmin, encodeFounder, encodeCollapse, encodeReport, encodeModerat
 import { applyCollapses, canCollapseAuthor, canMuteMember, collapsedKeys, collectReports, loadSeenReports, reportKey, saveSeenReports, deriveModeration, founderBadges, MAX_FOUNDERS, loadModerationMemos, mergeModerationMemos, moderateMessages, mutedUntil, restrictedAt, roomRole, saveModerationMemos } from '@/lib/cryptModeration';
 import { applyEdits, canEdit, editTarget, encodeEdit, publicEditLog } from '@/lib/cryptEdits';
 import type { ConversationEntry } from '@/lib/cryptGroups';
+import { collectRoomKeys, currentRoomKeys, decodeRoomStream, newRoomKeyBytes, ownedRoomKeys, ROOM_STREAM_TO, sealRoomText } from '@/lib/cryptRoomKey';
 import { CryptHero } from '@/components/crypt/CryptHero';
 import { CryptKeySetup } from '@/components/crypt/CryptKeySetup';
 import { CryptLockGate } from '@/components/crypt/CryptLockGate';
@@ -662,7 +663,9 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   }, [key, poll]);
 
   // Blocked accounts are dropped before any decryption, so their DMs, group copies and voice parts never surface.
-  const visibleMemos = useMemo(() => withoutBlocked(mergeModerationMemos(savedControls, memos), account, blocked), [memos, savedControls, account, blocked]);
+  const visibleAll = useMemo(() => withoutBlocked(mergeModerationMemos(savedControls, memos), account, blocked), [memos, savedControls, account, blocked]);
+  // Shared-key room copies go to eosio.null and are decoded only with room keys (cryptRoomKey.ts), never as a DM.
+  const visibleMemos = useMemo(() => visibleAll.some(m => m.to === ROOM_STREAM_TO) ? visibleAll.filter(m => m.to !== ROOM_STREAM_TO) : visibleAll, [visibleAll]);
 
   const restoreCandidates = useMemo(() => recoveryCandidates(visibleMemos, account,
     new Set([...Object.keys(contacts), ...blocked, ...removedContacts])), [visibleMemos, account, contacts, blocked, removedContacts]);
@@ -741,6 +744,19 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const allGroupEvents = useMemo(() => [...new Map([...cg2Events, ...roomInviteEvents, ...ownedRoomEvents].map(e => [e.key, e])).values()], [cg2Events, roomInviteEvents, ownedRoomEvents]);
   const invites = useMemo(() => key ? collectInvites(allGroupEvents, account, [key.publicKey, ...(key.retired ?? []).map(r => r.publicKey)], contacts, inviteStore, restoredRequests) : inviteStore,
     [allGroupEvents, account, key, contacts, inviteStore, restoredRequests]);
+  const roomKeyList = useMemo(() => [...collectRoomKeys(allGroupEvents, invites, account), ...ownedRoomKeys(allGroupEvents, invites, account)], [allGroupEvents, invites, account]);
+  const roomKeysNow = useMemo(() => currentRoomKeys(roomKeyList), [roomKeyList]);
+  // Account-blind: reads the same crypt.cheese stream every user reads, only while I hold a room key.
+  const { data: roomStream } = useQuery({
+    queryKey: ['crypt-room-stream', account], enabled: !!key && roomKeyList.length > 0, queryFn: () => fetchRoomStream(),
+    staleTime: 10_000, refetchInterval: () => (document.visibilityState === 'visible' ? LIVE_POLL_MS : false), retry: false,
+  });
+  const roomEntries = useMemo(() => {
+    if (!roomKeyList.length) return [];
+    const own = visibleAll.filter(m => m.to === ROOM_STREAM_TO);
+    const rows = mergeMemos(own, (roomStream ?? []).filter(m => !blocked.includes(m.from)));
+    return decodeRoomStream(rows, roomKeyList, invites, account);
+  }, [roomKeyList, visibleAll, roomStream, blocked, invites, account]);
   useEffect(() => {
     // Owners and members can both have admissions outside the fast first page.
     // Finish each read before increasing depth; failures must not skip recovery pages.
@@ -829,14 +845,14 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   }, [invites, account, contacts]);
   // Profile notes and group notices update state and never appear as chat messages or unread badges.
   // Invite-group messages/voice show only when they come from a member with that member's invite key.
-  const editableConversations = useMemo(() => decoded.filter(c => {
+  const editableConversations = useMemo(() => (roomEntries.length ? [...decoded, ...roomEntries] : decoded).filter(c => {
     if (isProfileNote(c.text) || isRotateNotice(c.text)) return false;
     if (!c.igroup) return !!c.group || !!contacts[c.from === account ? c.to : c.from];
     if (c.control && c.control.kind !== 'msg') return false;
     if (!c.usedKey) return false;
     const view = inviteViews.find(v => v.invite.id === c.igroup);
     return !!view && view.status !== 'declined' && !!eventFromMember({ key: c.key, txId: c.txId, time: c.time, from: c.from, to: c.to, control: { kind: 'joined', id: c.igroup }, usedKey: c.usedKey }, invites, account);
-  }), [decoded, inviteViews, invites, account, contacts]);
+  }), [decoded, roomEntries, inviteViews, invites, account, contacts]);
   const edited = useMemo(() => {
     const originals = moderateMessages(editableConversations, moderation);
     const collapsed = collapsedKeys(originals, moderation);
@@ -1510,7 +1526,9 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     if (editingMessage && !canEdit(editingMessage, account)) { toast({ title: 'The 24-hour editing window has ended', variant: 'destructive' }); return; }
     setBusy(true);
     try {
-      const actions = activeInvite ? buildCg2Actions(key, recipients, inviteKeys, encodeGroupText(activeInvite.invite.id, outgoing), [permission], hasNft)
+      const roomKey = activeInvite ? roomKeysNow[activeInvite.invite.id] : undefined;
+      const actions = roomKey ? buildSendMessageActions(account, ROOM_STREAM_TO, sealRoomText(roomKey, account, outgoing), [permission], hasNft)
+        : activeInvite ? buildCg2Actions(key, recipients, inviteKeys, encodeGroupText(activeInvite.invite.id, outgoing), [permission], hasNft)
         : activeGroup ? buildGroupMessageActions(key, activeGroup, outgoing, contacts, [permission], hasNft)
         : buildSendMessageActions(account, active, splitMessage(outgoing).map(p => encryptMemo(p, contacts[active], key.secretKey)), [permission], hasNft);
       // Tips stay wallet-to-wallet; only the encrypted card and its message fee go through crypt.cheese.
@@ -1535,7 +1553,9 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     const line = encodeReaction({ add: !mine, author: m.from, time: m.time, emoji });
     setBusy(true);
     try {
-      const actions = activeInvite ? buildCg2Actions(key, recipients, inviteKeys, encodeGroupText(activeInvite.invite.id, line), [permission], false)
+      const roomKey = activeInvite ? roomKeysNow[activeInvite.invite.id] : undefined;
+      const actions = roomKey ? buildSendMessageActions(account, ROOM_STREAM_TO, sealRoomText(roomKey, account, line), [permission], false)
+        : activeInvite ? buildCg2Actions(key, recipients, inviteKeys, encodeGroupText(activeInvite.invite.id, line), [permission], false)
         : activeGroup ? buildGroupMessageActions(key, activeGroup, line, contacts, [permission], false)
         : buildSendMessageActions(account, active, splitMessage(line).map(p => encryptMemo(p, contacts[active], key.secretKey)), [permission], false);
       const notices = activeInvite ? { list: [], actions: [] } : rotationNotices(recipients);
@@ -1605,6 +1625,22 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     return true;
   };
   const viewById = (id: string) => inviteViews.find(v => v.invite.id === id);
+  /** Owner: turn on the shared room key, or rotate it (after someone leaves). Sent pairwise to current members. */
+  const sendRoomKey = async (id: string) => {
+    const v = viewById(id);
+    if (!key || busy || !v || !v.isCreator || v.status !== 'joined' || !listedIds.has(id)) return;
+    const state = moderation[id];
+    const to = v.invite.members.map(m => m.account).filter(a => a !== account && state?.bans[a] === undefined && !v.left.includes(a));
+    if (!to.length) { toast({ title: 'Nobody else is in this room yet' }); return; }
+    const current = roomKeysNow[id];
+    setBusy(true);
+    try {
+      const r = await executeTransaction(buildCg2Actions(key, to, keysOf(v.invite), encodeRoomKeyControl(id, (current?.epoch ?? 0) + 1, newRoomKeyBytes()), [permission]),
+        { successTitle: current ? 'Room key changed' : 'Shared room key turned on' });
+      if (r.success && r.txId) await refresh();
+    } catch (e) { toast({ title: 'Could not send the room key', description: (e as Error).message, variant: 'destructive' }); }
+    finally { setBusy(false); }
+  };
   const keysOf = (g: InviteGroup) => Object.fromEntries(g.members.map(m => [m.account, m.publicKey]));
   /** Who a notice goes to and what it costs. */
   const noticePlan = (n: NonNullable<typeof pendingNotice>) => {
@@ -1771,6 +1807,10 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     setBusy(true);
     try {
       const actions = [...(plan.policy ? buildCg2Actions(key, plan.to, keysOf(plan.v.invite), plan.policy, [permission]) : []), ...buildCg2Actions(key, plan.to, keysOf(plan.v.invite), plan.payload, [permission])];
+      // Removing someone from a shared-key room rotates the key for everyone else in the same transaction.
+      const rk = pendingModeration.action === 'ban' ? roomKeysNow[plan.v.invite.id] : undefined;
+      const keepers = plan.to.filter(a => a !== pendingModeration.member);
+      if (rk && keepers.length) actions.push(...buildCg2Actions(key, keepers, keysOf(plan.v.invite), encodeRoomKeyControl(plan.v.invite.id, rk.epoch + 1, newRoomKeyBytes()), [permission]));
       const r = await executeTransaction(actions, { successTitle: moderationTitles[pendingModeration.action] });
       if (!r.success || !r.txId) return false;
       setPendingModeration(null); await refresh();
@@ -1807,7 +1847,8 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     const plan = joinPlan(acceptingJoin);
     if (!plan) { toast({ title: 'This room is full or the request is out of date', variant: 'destructive' }); setAcceptingJoin(null); return false; }
     if (!key) return false;
-    const actions = [...buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.payload, [permission]), ...(plan.deltaTo.length ? buildCg2Actions(key, plan.deltaTo, keysOf(plan.updated), plan.delta, [permission]) : []), ...buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.snapshot, [permission]), ...(plan.profiles ? buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.profiles, [permission]) : []), ...buildCg2Actions(key, [...plan.to, acceptingJoin.from], keysOf(plan.updated), plan.policy, [permission])];
+    const actions = [...buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.payload, [permission]), ...(plan.deltaTo.length ? buildCg2Actions(key, plan.deltaTo, keysOf(plan.updated), plan.delta, [permission]) : []), ...buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.snapshot, [permission]), ...(plan.profiles ? buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.profiles, [permission]) : []), ...buildCg2Actions(key, [...plan.to, acceptingJoin.from], keysOf(plan.updated), plan.policy, [permission]),
+      ...(roomKeysNow[plan.updated.id] ? buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), encodeRoomKeyControl(plan.updated.id, roomKeysNow[plan.updated.id].epoch, roomKeysNow[plan.updated.id].key), [permission]) : [])];
     setBusy(true);
     let r;
     try { r = await executeTransaction(actions, { successTitle: `${acceptingJoin.from} invited to ${plan.v.name}` }); }
@@ -1850,12 +1891,14 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const { bytes, parts, maxBytes } = size;
   const tooLong = bytes > maxBytes || parts > MAX_PARTS;
   const copies = activeGroup || activeInvite ? recipients.length : 1;
+  // A shared-key room sends text as one copy to eosio.null (voice stays per member).
+  const textCopies = activeInvite && roomKeysNow[activeInvite.invite.id] ? 1 : copies;
   const voiceParts = voice ? voicePartCount(voice) + (editingMessage ? 1 : 0) : 0;
   const voiceTxs = voiceTransactions(voiceParts);
   const totalCost = voice
     ? voiceNoteCost(voiceParts, copies)
     : sponsorUnits >= (parts || 1) * SPONSOR_PART_UNITS && !text.trim().startsWith('/tip') ? 'Free message'
-    : activeGroup || activeInvite ? groupMessageCost(parts || 1, copies, hasNft) : messageCost(parts || 1, hasNft);
+    : activeGroup || activeInvite ? groupMessageCost(parts || 1, textCopies, hasNft) : messageCost(parts || 1, hasNft);
   const fileInput = (
     <input ref={fileRef} type="file" className="hidden"
       onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }} />
@@ -2128,6 +2171,9 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
         verify={active ? verifyState(verifiedKeys, active, contacts[active]) : undefined}
         onVerify={active && contacts[active] && !activeGroup && !activeInvite ? () => setSafetyOpen(true) : undefined}
         onOpenProfile={setProfileOf}
+        sharedKey={activeInvite && activeInvite.isCreator && activeInvite.status === 'joined' && listedIds.has(activeInvite.invite.id)
+          ? { on: !!roomKeysNow[activeInvite.invite.id], onSend: () => void sendRoomKey(activeInvite.invite.id) }
+          : activeInvite ? { on: !!roomKeysNow[activeInvite.invite.id] } : undefined}
         />
       {active && contacts[active] && !activeGroup && !activeInvite && <SafetyNumberDialog open={safetyOpen} onOpenChange={setSafetyOpen}
         me={{ account, publicKey: key.publicKey }} partner={{ account: active, publicKey: contacts[active] }} partnerName={nameFor(active)}

@@ -25,7 +25,7 @@ export interface InviteMember { account: string; publicKey: string }
 export interface InviteGroup { id: string; name: string; creator: string; created: number; members: InviteMember[]; avatar?: CryptAvatar; publicRoom?: boolean }
 export const MUTE_MINUTES = [15, 60, 360, 1440] as const;
 export type MuteMinutes = typeof MUTE_MINUTES[number];
-export type Cg2Kind = 'invite' | 'admission' | 'add' | 'readmit' | 'msg' | 'joined' | 'leave' | 'meta' | 'friend' | 'friend-ok' | 'join' | 'join-no' | 'room' | 'mute' | 'ban' | 'policy' | 'admin' | 'collapse' | 'report' | 'profiles' | 'founder';
+export type Cg2Kind = 'invite' | 'admission' | 'add' | 'readmit' | 'msg' | 'joined' | 'leave' | 'meta' | 'friend' | 'friend-ok' | 'join' | 'join-no' | 'room' | 'mute' | 'ban' | 'policy' | 'admin' | 'collapse' | 'report' | 'profiles' | 'founder' | 'roomkey';
 export type Cg2 =
   | { kind: 'invite'; invite: InviteGroup }
   /** `note`: optional short text from the creator when accepting a join request. */
@@ -40,6 +40,8 @@ export type Cg2 =
   /** Owner-only: appoint (`on`) or dismiss a public-room admin. */
   | { kind: 'admin'; id: string; member: string; on: boolean }
   | { kind: 'founder'; id: string; member: string }
+  /** Owner-only, pairwise: the room's shared key for epoch `epoch` (cryptRoomKey.ts). */
+  | { kind: 'roomkey'; id: string; epoch: number; key: string }
   /** Owner/admin: collapse the message by `member` whose edit digest (cryptEdits.editTarget) is `target`. */
   | { kind: 'collapse'; id: string; member: string; target: string }
   /** Notification only: a member reports to moderators (`admin`), an admin escalates to the owner for a ban (`owner`). */
@@ -148,6 +150,10 @@ export function encodeFounder(id: string, member: string) {
   if (!ACCOUNT.test(member)) throw new Error('Invalid founder');
   return wire('founder', { i: checkId(id), a: member });
 }
+export function encodeRoomKeyControl(id: string, epoch: number, key: string) {
+  if (!Number.isSafeInteger(epoch) || epoch < 1 || epoch > 1_000_000 || !validPublicKey(key)) throw new Error('Invalid room key');
+  return wire('roomkey', { i: checkId(id), e: epoch, k: key });
+}
 export function encodeCollapse(id: string, author: string, target: string) {
   if (!ACCOUNT.test(author) || !/^[a-f0-9]{64}$/.test(target)) throw new Error('Invalid collapse');
   return wire('collapse', { i: checkId(id), a: author, h: target });
@@ -219,6 +225,7 @@ export function parseCg2(text: string | null | undefined): Cg2 | null {
     return { kind, id, listed: body.l, protected: body.p as string[] };
   }
   if (kind === 'admin') return typeof body.a === 'string' && ACCOUNT.test(body.a) && typeof body.e === 'boolean' ? { kind, id, member: body.a, on: body.e } : null;
+  if (kind === 'roomkey') return Number.isSafeInteger(body.e) && (body.e as number) >= 1 && (body.e as number) <= 1_000_000 && validPublicKey(body.k) ? { kind, id, epoch: body.e as number, key: body.k as string } : null;
   if (kind === 'founder') return typeof body.a === 'string' && ACCOUNT.test(body.a) ? { kind, id, member: body.a } : null;
   if (kind === 'collapse') return typeof body.a === 'string' && ACCOUNT.test(body.a) && typeof body.h === 'string' && /^[a-f0-9]{64}$/.test(body.h) ? { kind, id, member: body.a, target: body.h } : null;
   if (kind === 'report') return typeof body.a === 'string' && ACCOUNT.test(body.a) && typeof body.h === 'string' && /^[a-f0-9]{64}$/.test(body.h) && (body.l === 'admin' || body.l === 'owner') ? { kind, id, member: body.a, target: body.h, level: body.l } : null;

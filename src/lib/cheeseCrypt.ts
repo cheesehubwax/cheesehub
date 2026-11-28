@@ -455,6 +455,10 @@ export function routeCryptActions<T>(actions: T[], opts: { payfee?: boolean } = 
         || !/^[a-z1-5.]{1,12}$/.test(to) || to === CRYPT_ROUTER_ACCOUNT || to === sender
         || !Array.isArray(a.authorization) || !a.authorization.some(x => String(x?.actor) === sender)) return actions;
       tips.push(a);
+    } else if (to === KEY_PUBLISH_TO && quantity === MESSAGE_RECIPIENT_QUANTITY && msgPrefixOf(memo)) {
+      // Shared-key room copy (cryptRoomKey.ts): an ordinary message copy whose recipient is eosio.null.
+      if (new TextEncoder().encode(memo).length > MEMO_MAX_BYTES) return actions;
+      copies.push({ to, memo });
     } else if (to === KEY_PUBLISH_TO || to === LIQUIDITY_FEE_TO) {
       const q = /^\d+\.\d{4} CHEESE$/.test(quantity) ? units(quantity) : NaN;
       if (!Number.isSafeInteger(q) || q <= 0 || !memo || new TextEncoder().encode(memo).length > MEMO_MAX_BYTES) return actions;
@@ -774,6 +778,31 @@ export async function fetchStreamHistory(account: string, pages = MAX_HISTORY_PA
   for (let p = 0; p < Math.max(1, pages); p++) {
     const page = await fetchPage(`account=${CRYPT_ROUTER_ACCOUNT}&${STREAM_FILTER}&sort=desc&limit=${HISTORY_PAGE}${before ? `&before=${encodeURIComponent(before)}` : ''}`);
     rows.push(...streamRows(account, page));
+    const oldest = Math.min(...page.map(actionTime).filter(Number.isFinite));
+    if (page.length < HISTORY_PAGE || !Number.isFinite(oldest)) break;
+    before = new Date(oldest).toISOString();
+  }
+  return mergeMemos([], rows);
+}
+
+/** Shared-key room copies (to eosio.null) from the account-blind crypt.cheese stream, authenticated like streamRows. */
+export function roomStreamRows(actions: any[]): ChainMemo[] {
+  const rows = expandSponsoredActions(actions);
+  for (const a of actions) if (a?.act?.name === 'sendmsg' && typeof a.trx_id === 'string')
+    rows.push(...expandRouterActions(a.trx_id, actionTime(a), [a]));
+  return rows.filter(r => r.to === KEY_PUBLISH_TO && r.memo.startsWith(MSG_PREFIX_V2));
+}
+
+/**
+ * Recent room-stream copies, newest first. The request names only crypt.cheese (the same read every
+ * CHEESECrypt user makes), so the server cannot tell which rooms or account this browser follows.
+ */
+export async function fetchRoomStream(pages = MAX_HISTORY_PAGES, fetchPage: (q: string) => Promise<any[]> = hyperionActions): Promise<ChainMemo[]> {
+  const rows: ChainMemo[] = [];
+  let before: string | null = null;
+  for (let p = 0; p < Math.max(1, pages); p++) {
+    const page = await fetchPage(`account=${CRYPT_ROUTER_ACCOUNT}&${STREAM_FILTER}&sort=desc&limit=${HISTORY_PAGE}${before ? `&before=${encodeURIComponent(before)}` : ''}`);
+    rows.push(...roomStreamRows(page));
     const oldest = Math.min(...page.map(actionTime).filter(Number.isFinite));
     if (page.length < HISTORY_PAGE || !Number.isFinite(oldest)) break;
     before = new Date(oldest).toISOString();
