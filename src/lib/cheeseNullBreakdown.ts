@@ -110,26 +110,112 @@ const NULL_CONTRACTS = [
   { account: 'liquidcheese', displayName: 'Liquidity Fees' },
 ] as const;
 
+const FIRST_SEEN_KEY = 'cheesenull-first-seen-v1';
+const READ_TIMEOUT_MS = 20000;
+const BROAD_QUERY = 'act.account=cheeseburger&act.name=transfer&transfer.to=eosio.null';
+const contractQuery = (account: string) =>
+  `act.account=cheeseburger&act.name=transfer&transfer.from=${account}&transfer.to=eosio.null`;
+/** Exact memos for CHEESECrypt legs paid directly by users; their earliest record starts the Crypt span. */
+const CRYPT_DIRECT_START_MEMOS = [LEGACY_FEE_MEMO, FEE_MEMO, KEY_CREATION_MEMO];
+
+/** Earliest null per contract, confirmed by oldest-first reads. Contract starts never move later, so the cache only ever shrinks a value. */
+function readFirstSeenCache(): Record<string, number> {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(FIRST_SEEN_KEY) || '{}');
+    const out: Record<string, number> = {};
+    if (parsed && typeof parsed === 'object') {
+      for (const [k, v] of Object.entries(parsed)) {
+        if (typeof v === 'number' && Number.isFinite(v) && v > 0) out[k] = v;
+      }
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function writeFirstSeenCache(value: Record<string, number>): void {
+  try {
+    localStorage.setItem(FIRST_SEEN_KEY, JSON.stringify(value));
+  } catch {
+    // Cache is an optimisation; a full or blocked store just means re-reading next time.
+  }
+}
+
+/** Oldest matching action's time across providers (sort=asc, one row each), or null when unknown. */
+async function fetchEarliest(query: string): Promise<number | null> {
+  try {
+    const read = await fetchActionsUnion(`${query}&sort=asc`, {
+      batchSize: 1, maxActions: 1, paginate: false, timeoutMs: READ_TIMEOUT_MS,
+    });
+    let earliest: number | null = null;
+    for (const action of read.actions) {
+      const t = timestampMs(action);
+      if (t && (earliest === null || t < earliest)) earliest = t;
+    }
+    return earliest;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
   const coverage: CoverageTracker = { succeeded: 0, reads: 0 };
   const contractAccounts = new Set<string>(NULL_CONTRACTS.map(({ account }) => account));
+  const historyOptions = { batchSize: BATCH_SIZE, maxActions: MAX_ACTIONS, timeoutMs: READ_TIMEOUT_MS };
+  const cachedStarts = readFirstSeenCache();
 
-  const [nullHistoryResult, powerHistoryResult, burnerStats, powerTotal] = await Promise.all([
-    Promise.resolve().then(() =>
-    fetchActionsUnion(
-      'act.account=cheeseburger&act.name=transfer&transfer.to=eosio.null',
-      { batchSize: BATCH_SIZE, maxActions: MAX_ACTIONS, timeoutMs: 10000 },
-    )).catch(() => null),
+  // Each contract is read on its own filtered query, so one busy sender (e.g.
+  // cheesepowerz or tiny Crypt copies) can never push another contract's older
+  // history past a read deadline. The broad sweep only attributes direct user
+  // CHEESECrypt fee legs, whose senders are not contracts.
+  const contractReads = Promise.all(
+    NULL_CONTRACTS.map(({ account }) =>
+      Promise.resolve().then(() => fetchActionsUnion(contractQuery(account), historyOptions)).catch(() => null),
+    ),
+  );
+  // Starts already confirmed are never re-queried.
+  const startReads = Promise.all([
+    ...NULL_CONTRACTS.map(({ account }) =>
+      cachedStarts[account] !== undefined ? Promise.resolve(null) : fetchEarliest(contractQuery(account)),
+    ),
+    ...CRYPT_DIRECT_START_MEMOS.map((memo) =>
+      cachedStarts[`memo:${memo}`] !== undefined
+        ? Promise.resolve(null)
+        : fetchEarliest(`${BROAD_QUERY}&transfer.memo=${encodeURIComponent(memo)}`),
+    ),
+  ]);
+
+  const [perContract, broadResult, powerHistoryResult, burnerStats, powerTotal, starts] = await Promise.all([
+    contractReads,
+    Promise.resolve().then(() => fetchActionsUnion(BROAD_QUERY, historyOptions)).catch(() => null),
     Promise.resolve().then(() =>
     fetchActionsUnion(
       'act.account=cheeseburger&act.name=transfer&transfer.to=cheesepowerz',
-      { batchSize: BATCH_SIZE, maxActions: MAX_ACTIONS, timeoutMs: 10000 },
+      historyOptions,
     )).catch(() => null),
     fetchContractStats('cheeseburner').catch(() => null),
     fetchCheesepowerzNulled(),
+    startReads,
   ]);
 
-  const successfulReads = [nullHistoryResult, powerHistoryResult].filter(
+  // Merge newly confirmed starts into the cache (keeping the earlier of each).
+  const startKeys = [
+    ...NULL_CONTRACTS.map(({ account }) => account),
+    ...CRYPT_DIRECT_START_MEMOS.map((memo) => `memo:${memo}`),
+  ];
+  let cacheChanged = false;
+  startKeys.forEach((key, i) => {
+    const t = starts[i];
+    if (t !== null && (cachedStarts[key] === undefined || t < cachedStarts[key])) {
+      cachedStarts[key] = t;
+      cacheChanged = true;
+    }
+  });
+  if (cacheChanged) writeFirstSeenCache(cachedStarts);
+
+  const historyReads = [...perContract, broadResult, powerHistoryResult];
+  const successfulReads = historyReads.filter(
     (read): read is NonNullable<typeof read> => read !== null,
   );
   if (successfulReads.length === 0 && !burnerStats && powerTotal === null) {
@@ -139,8 +225,8 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
     coverage.reads += 1;
     coverage.succeeded += read.endpointsSucceeded;
   }
-  const nullActions = nullHistoryResult?.actions ?? [];
   const powerActions = powerHistoryResult?.actions ?? [];
+  type Actions = NonNullable<typeof broadResult>['actions'];
 
   const now = Date.now();
   const DAY_MS = 24 * 60 * 60 * 1000;
@@ -159,16 +245,23 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
   for (const account of contractAccounts) {
     totals.set(account, { all: 0, day: 0, week: 0, month: 0 });
   }
-  // Earliest transfer timestamp observed per contract — the start of its
-  // tracked span. Averages divide the lifetime total by this span.
+  // Earliest transfer timestamp per contract — the start of its tracked span.
+  // Confirmed oldest-first starts (cached) win over whatever a read returned.
   const firstSeen = new Map<string, number>();
   const noteSeen = (account: string, time: number) => {
     if (!time) return;
     const prev = firstSeen.get(account);
     if (prev === undefined || time < prev) firstSeen.set(account, time);
   };
+  for (const { account } of NULL_CONTRACTS) {
+    if (cachedStarts[account] !== undefined) noteSeen(account, cachedStarts[account]);
+  }
+  for (const memo of CRYPT_DIRECT_START_MEMOS) {
+    const t = cachedStarts[`memo:${memo}`];
+    if (t !== undefined) noteSeen(CRYPT_ROUTER_ACCOUNT, t);
+  }
 
-  const addActions = (actions: typeof nullActions, accountFor: (data: Record<string, unknown>) => string | null) => {
+  const addActions = (actions: Actions, accountFor: (data: Record<string, unknown>) => string | null) => {
     for (const action of actions) {
       const data = action.act?.data;
       if (!data) continue;
@@ -189,11 +282,18 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
   // Period figures come ONLY from what each contract actually sent to
   // eosio.null. Deposits into cheesepowerz are not nulls yet, and counting them
   // here double-counted cheesepowerz in the 24h/7d/30d columns.
-  addActions(nullActions, (data) => {
+  NULL_CONTRACTS.forEach(({ account }, i) => {
+    const read = perContract[i];
+    if (!read) return;
+    addActions(read.actions, (data) =>
+      data.to === 'eosio.null' && data.from === account ? account : null);
+  });
+  // Direct user CHEESECrypt fee legs (pre-contract or non-routed). Contract
+  // senders are skipped here because their own reads above already count them.
+  addActions(broadResult?.actions ?? [], (data) => {
     if (data.to !== 'eosio.null' || typeof data.from !== 'string') return null;
-    // CHEESECrypt: router nulls by sender, direct user fee legs by memo label.
-    if (data.from === CRYPT_ROUTER_ACCOUNT || isCryptNullMemo(data.memo)) return CRYPT_ROUTER_ACCOUNT;
-    return data.from;
+    if (contractAccounts.has(data.from)) return null;
+    return isCryptNullMemo(data.memo) ? CRYPT_ROUTER_ACCOUNT : null;
   });
 
   // Incoming cheesepowerz transfers are kept as a lifetime-only fallback for
@@ -255,6 +355,6 @@ export async function fetchNullBreakdown(): Promise<NullBreakdownResult> {
   const avgSucceeded = coverage.reads > 0 ? coverage.succeeded / coverage.reads : 0;
   return {
     entries,
-    isPartial: successfulReads.length < 2 || avgSucceeded < 2,
+    isPartial: successfulReads.length < historyReads.length || avgSucceeded < 2,
   };
 }

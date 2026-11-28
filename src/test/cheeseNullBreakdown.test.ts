@@ -36,16 +36,30 @@ import { fetchNullBreakdown } from '../lib/cheeseNullBreakdown';
 
 beforeEach(() => {
   fetchActionsUnion.mockReset();
+  localStorage.clear();
   fetchContractStats.mockReset();
   chainPost.mockReset();
   fetchContractStats.mockResolvedValue(null);
   chainPost.mockResolvedValue({ rows: [] });
 });
 
-function mockHistory(nullActions: unknown[], powerActions: unknown[] = []) {
-  fetchActionsUnion
-    .mockResolvedValueOnce({ actions: nullActions, endpointsSucceeded: 3 })
-    .mockResolvedValueOnce({ actions: powerActions, endpointsSucceeded: 3 });
+type MockAction = { act: { data: Record<string, unknown> }; '@timestamp': string };
+
+function mockHistory(nullActions: unknown[], powerActions: unknown[] = [], earliest: Record<string, number> = {}) {
+  const all = nullActions as MockAction[];
+  fetchActionsUnion.mockImplementation(async (query: string) => {
+    const from = /transfer\.from=([^&]+)/.exec(query)?.[1];
+    if (query.includes('sort=asc')) {
+      const daysAgo = from ? earliest[from] : undefined;
+      return {
+        actions: daysAgo === undefined ? [] : [nullAction(from!, 0, daysAgo)],
+        endpointsSucceeded: 3,
+      };
+    }
+    if (query.includes('transfer.to=cheesepowerz')) return { actions: powerActions, endpointsSucceeded: 3 };
+    if (from) return { actions: all.filter((a) => a.act.data.from === from), endpointsSucceeded: 3 };
+    return { actions: all, endpointsSucceeded: 3 };
+  });
 }
 
 describe('fetchNullBreakdown averages', () => {
@@ -147,5 +161,36 @@ describe('CHEESECrypt null tracking', () => {
     ]);
     const { entries } = await fetchNullBreakdown();
     expect(entries.find((x) => x.contract === 'crypt.cheese')!.amount).toBe(0);
+  });
+});
+
+describe('fetchNullBreakdown tracked span', () => {
+  it('uses the confirmed oldest-first start, not a truncated recent read', async () => {
+    // The read only returned recent nulls, but the contract began 200 days ago.
+    mockHistory([nullAction('cheesebannad', 2000, 2)], [], { cheesebannad: 200 });
+    const { entries } = await fetchNullBreakdown();
+    const entry = entries.find((e) => e.contract === 'cheesebannad')!;
+    expect(entry.trackedDays).toBeCloseTo(200, 0);
+    expect(entry.avg24h).toBeCloseTo(10, 1); // 2000 / 200, not 2000 / 2
+  });
+
+  it('remembers confirmed starts when a later start read fails', async () => {
+    mockHistory([nullAction('ram.chz', 100, 1)], [], { 'ram.chz': 100 });
+    await fetchNullBreakdown();
+    mockHistory([nullAction('ram.chz', 100, 1)]);
+    const { entries } = await fetchNullBreakdown();
+    expect(entries.find((e) => e.contract === 'ram.chz')!.trackedDays).toBeCloseTo(100, 0);
+  });
+
+  it('flags the table partial when one contract read fails', async () => {
+    mockHistory([nullAction('cheesenftwax', 5, 3)]);
+    const base = fetchActionsUnion.getMockImplementation()!;
+    fetchActionsUnion.mockImplementation(async (q: string) => {
+      if (q.includes('transfer.from=cheesepowerz') && !q.includes('sort=asc')) throw new Error('timeout');
+      return base(q);
+    });
+    const { isPartial, entries } = await fetchNullBreakdown();
+    expect(isPartial).toBe(true);
+    expect(entries.find((e) => e.contract === 'cheesenftwax')!.amount).toBeCloseTo(5, 4);
   });
 });
