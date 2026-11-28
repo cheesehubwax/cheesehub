@@ -8,7 +8,7 @@ response times under periodic and burst loads.
 
 1. Copy `config.example.json` to `config.json` and fill in accounts and keys
    (git-ignored; keep it private).
-2. Run the Tor helper (`public/downloads/cheesecrypt-tor-proxy-v1.6.mjs`).
+2. Run the Tor helper (`public/downloads/cheesecrypt-tor-proxy-v1.7.mjs`).
 3. Run:
 
    ```

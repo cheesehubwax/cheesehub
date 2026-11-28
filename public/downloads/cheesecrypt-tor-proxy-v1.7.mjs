@@ -18,6 +18,10 @@
 // v1.6 also forwards the read-only lookups a wallet makes while preparing a transaction
 // (chain info, block headers, ABIs, required keys) and the wallet NFT list used by the
 // avatar and attach-NFT pickers, each on a fresh circuit with rotating servers.
+// v1.7 adds resilience: more vetted WAX and NFT servers, a server that rate-limits (429),
+// is overloaded (5xx) or times out sits out for a short while and is tried last, NFT media
+// moves on when a gateway sends nothing for 15 seconds, and server health is refreshed
+// through Tor every 10 minutes instead of only at startup. Broadcasts are still ONE try.
 // Those public servers see a Tor exit address instead of your home IP.
 //
 // What it does NOT do: it is not a Tor relay or exit node, it never accepts connections
@@ -25,7 +29,7 @@
 // logs or files. Media is passed through in memory only (never saved to disk). A broadcast is attempted on ONE upstream only, never retried: a lost
 // reply does not prove the chain rejected it. Check the account before manually retrying.
 //
-// Run:  node cheesecrypt-tor-proxy-v1.6.mjs
+// Run:  node cheesecrypt-tor-proxy-v1.7.mjs
 // Then in CHEESECrypt → Menu → Privacy → "Your own history server" enter http://localhost:8088
 // Tick "Use only this server" to route CHEESECrypt's signed broadcasts here too.
 //
@@ -46,11 +50,14 @@ const UPSTREAMS = [
   'https://wax.eosdac.io',
   'https://wax.eosusa.io',
 ];
+// Read-only chain lookups (v1.7) may also use these proven chain-API servers; history stays on UPSTREAMS.
+const CHAIN_UPSTREAMS = [...UPSTREAMS, 'https://wax.greymass.com', 'https://api.wax.alohaeos.com'];
 const ATOMIC_UPSTREAMS = [
   'https://wax.api.atomicassets.io',
   'https://aa.wax.blacklusion.io',
   'https://wax-aa.eu.eosamsterdam.net',
   'https://atomic.wax.eosrio.io',
+  'https://wax-atomic-api.eosphere.io',
 ];
 const IPFS_GATEWAYS = [
   'https://ipfs.filebase.io',
@@ -59,7 +66,7 @@ const IPFS_GATEWAYS = [
   'https://ipfs.io',
 ];
 const ALCOR_UPSTREAMS = ['https://wax.alcor.exchange'];
-export const HELPER_VERSION = '1.6';
+export const HELPER_VERSION = '1.7';
 export const MEDIA_LANES = 4;
 // Circuit labels are random per helper run and never leave this computer except as the
 // SOCKS username/password Tor uses to keep circuits apart.
@@ -79,6 +86,25 @@ export function rotate(list, counter) {
 }
 export const TIMEOUT_MS = 8000;
 export const MEDIA_TIMEOUT_MS = 45000;
+/** Media gateways that send no reply headers within this time are skipped (v1.7). */
+export const MEDIA_HEADER_TIMEOUT_MS = 15000;
+/** How long a failing server sits out (v1.7); it stays as a last resort, never removed. */
+export const BENCH_MS = { rateLimited: 60000, overloaded: 30000, network: 30000 };
+export const HEALTH_REFRESH_MS = 10 * 60 * 1000;
+const benched = new Map();
+/** Sit a server out after a 429, a 5xx or a network failure/timeout. */
+export function benchFor(upstream, error) {
+  const m = /HTTP (\d{3})/.exec(String(error?.message || ''));
+  const code = m ? Number(m[1]) : 0;
+  const ms = code === 429 || code === 420 ? BENCH_MS.rateLimited : code >= 500 ? BENCH_MS.overloaded : code ? 0 : BENCH_MS.network;
+  if (ms) benched.set(upstream, Date.now() + ms);
+}
+export function clearBench() { benched.clear(); }
+/** Same order, but servers sitting out move to the back (still tried if everything else fails). */
+export function preferReady(list, now = Date.now()) {
+  const out = (u) => (benched.get(u) || 0) > now;
+  return [...list.filter(u => !out(u)), ...list.filter(out)];
+}
 export const MAX_MEDIA = 50 * 1024 * 1024;
 const ATOMIC_PATH = /^\/atomic\/v1\/assets\/(\d{1,20})$/;
 // Respect lookups: exact read-only shapes, WAX account names only.
@@ -168,7 +194,7 @@ async function findTor(ports = TOR_PORTS) {
  * are returned to the caller; network failures and malformed JSON are rejected.
  * The dedicated Agent cannot open a direct/DNS connection.
  */
-export function requestViaTor(torPort, upstream, path, { method = 'GET', body, contentType = 'text/plain;charset=UTF-8', timeoutMs = TIMEOUT_MS, ca, media = false, isolation } = {}) {
+export function requestViaTor(torPort, upstream, path, { method = 'GET', body, contentType = 'text/plain;charset=UTF-8', timeoutMs = TIMEOUT_MS, headerTimeoutMs = 0, ca, media = false, isolation } = {}) {
   const base = new URL(upstream);
   const u = new URL(path, base);
   if (u.protocol !== 'https:' || u.origin !== base.origin) return Promise.reject(new Error('upstream must stay on the original HTTPS server'));
@@ -177,11 +203,13 @@ export function requestViaTor(torPort, upstream, path, { method = 'GET', body, c
     let raw, sock, req, agent, settled = false;
     const finish = (error, result) => {
       if (settled) return;
-      settled = true; clearTimeout(timer);
+      settled = true; clearTimeout(timer); if (headerTimer) clearTimeout(headerTimer);
       req?.destroy(); sock?.destroy(); raw?.destroy(); agent?.destroy();
       if (error) reject(error); else resolve(result);
     };
     const timer = setTimeout(() => finish(new Error('timed out')), timeoutMs);
+    // Media: a gateway that has not even started replying is skipped early (v1.7).
+    const headerTimer = headerTimeoutMs ? setTimeout(() => finish(new Error('no reply started')), headerTimeoutMs) : null;
     socksConnect(torPort, u.hostname, 443, isolation).then((socket) => {
       raw = socket;
       if (settled) { raw.destroy(); return; }
@@ -199,6 +227,7 @@ export function requestViaTor(torPort, upstream, path, { method = 'GET', body, c
           ...(payload ? { 'Content-Type': contentType, 'Content-Length': payload.length } : {}),
         },
       }, (res) => {
+        if (headerTimer) clearTimeout(headerTimer);
         const parts = []; let size = 0;
         res.on('data', (c) => {
           size += c.length;
@@ -231,19 +260,30 @@ export async function fetchViaTor(torPort, upstream, path, options = {}) {
 }
 
 let upstreamOrder = [...UPSTREAMS];
+let chainOrder = [...CHAIN_UPSTREAMS];
+/** Health order within a vetted list: healthy first, down hosts dropped, never adds new hosts. */
+export function orderByHealth(list, endpoints) {
+  if (!Array.isArray(endpoints)) return null;
+  const norm = (u) => String(u || '').replace(/\/+$/, '');
+  const healthy = endpoints.filter(e => e.status === 'healthy' || e.status === 'degraded').map(e => norm(e.url)).filter(u => list.includes(u));
+  const down = new Set(endpoints.filter(e => e.status === 'down').map(e => norm(e.url)));
+  const ordered = [...new Set(healthy)];
+  const remaining = list.filter(u => !down.has(u) && !ordered.includes(u));
+  return ordered.length + remaining.length ? [...ordered, ...remaining] : null;
+}
 // The standalone download cannot import the app's resolver. Fetch the same
 // HerdCheck source through Tor only; an outage leaves the vetted fallback intact.
 async function updateHealthOrder(torPort) {
-  try {
-    const r = await fetchViaTor(torPort, 'https://herdcheck.blocdraig.com', '/api/v1/wax/endpoints?feature=hyperion-v2', { timeoutMs: 4000, isolation: isolationFor('health') });
-    const j = JSON.parse(r.body.toString('utf8'));
-    if (!Array.isArray(j.endpoints)) return;
-    const healthy = j.endpoints.filter(e => e.status === 'healthy' || e.status === 'degraded');
-    const down = new Set(j.endpoints.filter(e => e.status === 'down').map(e => e.url?.replace(/\/+$/, '')));
-    const ordered = healthy.map(e => e.url?.replace(/\/+$/, '')).filter(u => UPSTREAMS.includes(u));
-    const remaining = UPSTREAMS.filter(u => !down.has(u) && !ordered.includes(u));
-    if (ordered.length + remaining.length) upstreamOrder = [...ordered, ...remaining];
-  } catch { /* health outage never prevents Tor reads */ }
+  for (const [feature, list, set] of [
+    ['hyperion-v2', UPSTREAMS, (o) => { upstreamOrder = o; }],
+    ['chain-api', CHAIN_UPSTREAMS, (o) => { chainOrder = o; }],
+  ]) {
+    try {
+      const r = await fetchViaTor(torPort, 'https://herdcheck.blocdraig.com', `/api/v1/wax/endpoints?feature=${feature}`, { timeoutMs: 6000, isolation: isolationFor('health') });
+      const order = orderByHealth(list, JSON.parse(r.body.toString('utf8')).endpoints);
+      if (order) set(order);
+    } catch { /* health outage never prevents Tor reads; the last order stays */ }
+  }
 }
 
 function readRequestBody(req, limit = MAX_REQUEST_BODY) {
@@ -274,7 +314,7 @@ function readRequestBody(req, limit = MAX_REQUEST_BODY) {
   });
 }
 
-export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS, atomicUpstreams = ATOMIC_UPSTREAMS, ipfsGateways = IPFS_GATEWAYS, alcorUpstreams = ALCOR_UPSTREAMS, ca } = {}) {
+export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS, chainUpstreams, atomicUpstreams = ATOMIC_UPSTREAMS, ipfsGateways = IPFS_GATEWAYS, alcorUpstreams = ALCOR_UPSTREAMS, ca } = {}) {
   let lastGood = null, turn = 0;
   return http.createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -285,7 +325,7 @@ export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS,
     const send = (code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
 
     if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
-    if (req.method === 'GET' && req.url === '/v2/helper') return send(200, { helper: 'cheesecrypt-tor', version: HELPER_VERSION, features: ['history', 'broadcast', 'atomic', 'ipfs', 'chain', 'respect', 'isolation', 'rotation', 'prep', 'atomic-list'] });
+    if (req.method === 'GET' && req.url === '/v2/helper') return send(200, { helper: 'cheesecrypt-tor', version: HELPER_VERSION, features: ['history', 'broadcast', 'atomic', 'ipfs', 'chain', 'respect', 'isolation', 'rotation', 'prep', 'atomic-list', 'resilience'] });
 
     // Respect lookups (v1.4): read-only, so trying the next server on failure is safe.
     const listMatch = req.method === 'GET' ? ATOMIC_LIST_PATH.exec(req.url || '') : null;
@@ -294,7 +334,7 @@ export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS,
       if (!torPort) return send(503, { error: 'Tor is not running. Open Tor Browser (or start the Tor service) and try again.' });
       const isolation = isolationFor('nftlist');
       const n = turn++;
-      for (const upstream of rotate(atomicUpstreams, n)) {
+      for (const upstream of preferReady(rotate(atomicUpstreams, n))) {
         if (res.destroyed) return;
         try {
           const r = await fetchViaTor(torPort, upstream, `/atomicassets/v1/assets?owner=${listMatch[1]}&page=${listMatch[2]}&limit=${listMatch[3]}&order=desc&sort=transferred`, { ca, isolation });
@@ -302,7 +342,7 @@ export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS,
           if (!j?.success || !Array.isArray(j.data)) throw new Error('no NFT list in reply');
           res.writeHead(200, { 'Content-Type': r.type });
           return res.end(r.body);
-        } catch (e) { console.warn(`  ${new URL(upstream).hostname} NFT list via Tor failed: ${e.message} — trying next`); }
+        } catch (e) { benchFor(upstream, e); console.warn(`  ${new URL(upstream).hostname} NFT list via Tor failed: ${e.message} — trying next`); }
       }
       return send(502, { error: 'Every NFT server failed through Tor. Try again in a minute.' });
     }
@@ -326,7 +366,7 @@ export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS,
       const isolation = isolationFor('respect');
       const n = turn++;
       if (accountMatch) {
-        for (const upstream of rotate(atomicUpstreams, n)) {
+        for (const upstream of preferReady(rotate(atomicUpstreams, n))) {
           if (res.destroyed) return;
           try {
             const r = await fetchViaTor(torPort, upstream, `/atomicassets/v1/accounts/${accountMatch[1]}${accountMatch[2] || ''}`, { ca, isolation });
@@ -334,32 +374,32 @@ export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS,
             if (!j?.success || !j.data) throw new Error('no account in reply');
             res.writeHead(200, { 'Content-Type': r.type });
             return res.end(r.body);
-          } catch (e) { console.warn(`  ${new URL(upstream).hostname} NFT count via Tor failed: ${e.message} — trying next`); }
+          } catch (e) { benchFor(upstream, e); console.warn(`  ${new URL(upstream).hostname} NFT count via Tor failed: ${e.message} — trying next`); }
         }
         return send(502, { error: 'Every NFT server failed through Tor. Try again in a minute.' });
       }
       if (alcorMatch) {
-        for (const upstream of alcorUpstreams) {
+        for (const upstream of preferReady(alcorUpstreams)) {
           if (res.destroyed) return;
           try {
             const r = await fetchViaTor(torPort, upstream, `/api/v2/account/${alcorMatch[1]}/positions`, { ca, isolation });
             if (!Array.isArray(JSON.parse(r.body.toString('utf8')))) throw new Error('no positions list in reply');
             res.writeHead(200, { 'Content-Type': r.type });
             return res.end(r.body);
-          } catch (e) { console.warn(`  ${new URL(upstream).hostname} Alcor lookup via Tor failed: ${e.message} — trying next`); }
+          } catch (e) { benchFor(upstream, e); console.warn(`  ${new URL(upstream).hostname} Alcor lookup via Tor failed: ${e.message} — trying next`); }
         }
         return send(502, { error: 'Alcor failed through Tor. Try again in a minute.' });
       }
       // Complete nodeos replies (including 4xx errors) are returned; 5xx and network failures try the next server.
       let lastReply = null;
-      for (const upstream of rotate(upstreams === UPSTREAMS ? upstreamOrder : upstreams, n)) {
+      for (const upstream of preferReady(rotate(chainUpstreams || (upstreams === UPSTREAMS ? chainOrder : upstreams), n))) {
         if (res.destroyed) return;
         try {
           const r = await requestViaTor(torPort, upstream, req.url, { method: 'POST', body, contentType: 'application/json', ca, isolation });
           if (r.status >= 500) { lastReply = r; throw new Error(`HTTP ${r.status}`); }
           res.writeHead(r.status, { 'Content-Type': r.type });
           return res.end(r.body);
-        } catch (e) { console.warn(`  ${new URL(upstream).hostname} chain lookup via Tor failed: ${e.message} — trying next`); }
+        } catch (e) { benchFor(upstream, e); console.warn(`  ${new URL(upstream).hostname} chain lookup via Tor failed: ${e.message} — trying next`); }
       }
       if (lastReply) { res.writeHead(lastReply.status, { 'Content-Type': lastReply.type }); return res.end(lastReply.body); }
       return send(502, { error: 'Every WAX server failed through Tor. Try again in a minute.' });
@@ -373,7 +413,7 @@ export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS,
       const isolation = isolationFor('media');
       const n = turn++;
       if (atomicMatch) {
-        for (const upstream of rotate(atomicUpstreams, n)) {
+        for (const upstream of preferReady(rotate(atomicUpstreams, n))) {
           if (res.destroyed) return;
           try {
             const r = await fetchViaTor(torPort, upstream, `/atomicassets/v1/assets/${atomicMatch[1]}`, { ca, isolation });
@@ -381,19 +421,19 @@ export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS,
             if (!j?.success || !j.data) throw new Error('no asset in reply');
             res.writeHead(200, { 'Content-Type': r.type });
             return res.end(r.body);
-          } catch (e) { console.warn(`  ${new URL(upstream).hostname} NFT lookup via Tor failed: ${e.message} — trying next`); }
+          } catch (e) { benchFor(upstream, e); console.warn(`  ${new URL(upstream).hostname} NFT lookup via Tor failed: ${e.message} — trying next`); }
         }
         return send(502, { error: 'Every NFT server failed through Tor. Try again in a minute.' });
       }
-      for (const gateway of rotate(ipfsGateways, n)) {
+      for (const gateway of preferReady(rotate(ipfsGateways, n))) {
         if (res.destroyed) return;
         try {
-          const r = await requestViaTor(torPort, gateway, req.url, { ca, media: true, timeoutMs: MEDIA_TIMEOUT_MS, isolation });
+          const r = await requestViaTor(torPort, gateway, req.url, { ca, media: true, timeoutMs: MEDIA_TIMEOUT_MS, headerTimeoutMs: MEDIA_HEADER_TIMEOUT_MS, isolation });
           if (r.status < 200 || r.status >= 300) throw new Error(`HTTP ${r.status}`);
           // Served to <img>/<audio>/<video> only: no sniffing, no scripts, no framing.
           res.writeHead(200, { 'Content-Type': r.type, 'Content-Length': r.body.length, 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; sandbox", 'Cross-Origin-Resource-Policy': 'cross-origin' });
           return res.end(r.body);
-        } catch (e) { console.warn(`  ${new URL(gateway).hostname} media via Tor failed: ${e.message} — trying next`); }
+        } catch (e) { benchFor(gateway, e); console.warn(`  ${new URL(gateway).hostname} media via Tor failed: ${e.message} — trying next`); }
       }
       return send(502, { error: 'Every IPFS gateway failed through Tor. Try again in a minute.' });
     }
@@ -405,7 +445,7 @@ export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS,
     if (!torPort) return send(503, { error: 'Tor is not running. Open Tor Browser (or start the Tor service) and try again.' });
 
     const available = upstreams === UPSTREAMS ? upstreamOrder : upstreams;
-    const order = lastGood ? [lastGood, ...available.filter(u => u !== lastGood)] : available;
+    const order = preferReady(lastGood ? [lastGood, ...available.filter(u => u !== lastGood)] : available);
 
     if (broadcastRequest) {
       let body;
@@ -445,6 +485,7 @@ export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS,
         res.writeHead(200, { 'Content-Type': r.type });
         return res.end(r.body);
       } catch (e) {
+        benchFor(upstream, e);
         console.warn(`  ${new URL(upstream).hostname} via Tor failed: ${e.message} — trying next`);
       }
     }
@@ -461,9 +502,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   console.log(`   Address for CHEESECrypt: http://localhost:${LISTEN_PORT}`);
   console.log('   History reads, Respect lookups, single-attempt signed broadcasts and chat NFT media use Tor');
   console.log('   Each kind of traffic uses its own Tor circuit; Respect and NFT lookups rotate servers');
+  console.log('   Busy or slow servers sit out briefly; server health refreshes every 10 minutes');
   console.log(tor ? `   Tor port ${tor} is open (connection verified on first request)` : '   ⚠️  Tor not found yet — open Tor Browser or start the Tor service');
   console.log('   Leave this window open. Press Ctrl+C to stop.\n');
   if (tor) void updateHealthOrder(tor);
+  // Refresh health through Tor every 10 minutes; never keeps the process alive on its own.
+  setInterval(async () => { const t = await findTor(); if (t) void updateHealthOrder(t); }, HEALTH_REFRESH_MS).unref();
 });
 server.on('error', (e) => {
   console.error(e.code === 'EADDRINUSE' ? `Port ${LISTEN_PORT} is already in use. Is the helper already running?` : e.message);

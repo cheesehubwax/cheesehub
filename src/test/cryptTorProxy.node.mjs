@@ -6,7 +6,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { createProxyServer, fetchViaTor, isolationFor, rotate, TIMEOUT_MS } from '../../public/downloads/cheesecrypt-tor-proxy-v1.6.mjs';
+import { benchFor, clearBench, createProxyServer, fetchViaTor, isolationFor, orderByHealth, preferReady, rotate, TIMEOUT_MS } from '../../public/downloads/cheesecrypt-tor-proxy-v1.7.mjs';
 
 const CID = 'QmYTvGVY8eVxrzYf7VTgqJJqZiNJF7gAfji6ewxo4qUyeM';
 const folder = mkdtempSync(join(tmpdir(), 'crypt-tor-test-'));
@@ -171,10 +171,10 @@ test('loopback helper blocks other writes and non-history paths, and supports br
   assert.match(preflight.headers.get('access-control-allow-methods'), /POST/);
 });
 
-test('v1.6 reports its media, Respect, isolation, rotation, prep and NFT list capabilities', async () => {
+test('v1.7 reports its media, Respect, isolation, rotation, prep and NFT list capabilities', async () => {
   const j = await (await fetch(`http://127.0.0.1:${proxyPort}/v2/helper`)).json();
-  assert.equal(j.version, '1.6');
-  for (const f of ['atomic', 'ipfs', 'chain', 'respect', 'isolation', 'rotation', 'prep', 'atomic-list']) assert.ok(j.features.includes(f), f);
+  assert.equal(j.version, '1.7');
+  for (const f of ['atomic', 'ipfs', 'chain', 'respect', 'isolation', 'rotation', 'prep', 'atomic-list', 'resilience']) assert.ok(j.features.includes(f), f);
 });
 
 test('circuit labels: steady history, four media lanes, fresh Respect and broadcast circuits', () => {
@@ -258,4 +258,34 @@ test('non-media gateway replies and unsafe media paths are refused', async () =>
   for (const path of [`/ipfs/${CID}/..`, `/ipfs/${CID}/%2e%2e`, '/ipfs/notacid', `/ipfs/${CID}?x=1`, '/atomic/v1/assets/abc', '/atomic/v1/collections/x']) {
     assert.equal((await fetch(base + path)).status, 403, path);
   }
+});
+
+test('rate-limited, overloaded and unreachable servers sit out but stay as a last resort', () => {
+  clearBench();
+  const list = ['https://a', 'https://b', 'https://c', 'https://d'];
+  benchFor('https://a', new Error('HTTP 429'));
+  benchFor('https://b', new Error('HTTP 503'));
+  benchFor('https://c', new Error('timed out'));
+  benchFor('https://d', new Error('HTTP 404'));
+  assert.deepEqual(preferReady(list), ['https://d', 'https://a', 'https://b', 'https://c']);
+  assert.deepEqual(preferReady(list, Date.now() + 31000), ['https://b', 'https://c', 'https://d', 'https://a']);
+  assert.deepEqual(preferReady(list, Date.now() + 61000), list);
+  clearBench();
+});
+
+test('health ordering never adds unvetted hosts and drops only reported-down ones', () => {
+  const list = ['https://a', 'https://b', 'https://c'];
+  assert.deepEqual(orderByHealth(list, [{ url: 'https://c/', status: 'healthy' }, { url: 'https://evil', status: 'healthy' }, { url: 'https://a', status: 'down' }]), ['https://c', 'https://b']);
+  assert.equal(orderByHealth(list, undefined), null);
+  assert.equal(orderByHealth(list, list.map(url => ({ url, status: 'down' }))), null);
+});
+
+test('a broadcast is still attempted on exactly one server even when servers are benched', async () => {
+  clearBench();
+  benchFor('https://history.invalid', new Error('HTTP 429'));
+  const before = upstreamRequests.length;
+  const response = await fetch(`http://127.0.0.1:${proxyPort}/v1/chain/push_transaction`, { method: 'POST', body: '{"signatures":[],"packed_trx":"00"}' });
+  assert.equal(response.status, 500);
+  assert.equal(upstreamRequests.length - before, 1);
+  clearBench();
 });
