@@ -3,21 +3,57 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { ROUTER, validateConfig, poissonDelayMs, planBurst, isOrganic, burstAllowed } from './policy';
 import { createRuntime, log, rand } from './runtime';
+import { acquireRunnerControl } from './runnerControl';
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
 const configPath = args.find(a => !a.startsWith('--')) ?? (existsSync('config.json') || !existsSync('swarm-config.json') ? 'config.json' : 'swarm-config.json');
-const stop = (e: unknown) => { console.error(`Stopped: ${e instanceof Error ? e.message : 'runner failed'} — inspect before restarting`); process.exit(1); };
 async function main() {
   const config = validateConfig(JSON.parse(readFileSync(configPath, 'utf8')));
+  const control = acquireRunnerControl(configPath);
+  process.on('exit', () => control.release());
   const runtime = createRuntime(config, configPath.replace(/\.json$/, '') + '.state.json', dryRun);
   const { botNames, send, preflight, saveState } = runtime;
   const botSet = new Set(botNames);
+  let stopping = false;
+  let exitCode = 0;
+  const timers = new Set<ReturnType<typeof setTimeout>>();
+  const pending = new Set<Promise<unknown>>();
+  let finish: (() => void) | undefined;
+  const finished = new Promise<void>(resolve => { finish = resolve; });
+  const shutdown = async (error?: unknown) => {
+    if (error) { exitCode = 1; console.error('Stopped: runner operation failed — inspect the log before restarting'); }
+    if (stopping) return;
+    stopping = true;
+    log('stopping: cancelling timers and waiting for in-flight operations; no transaction retries');
+    timers.forEach(clearTimeout); timers.clear();
+    clearInterval(stopPoll);
+    while (pending.size) await Promise.allSettled([...pending]);
+    try { saveState(); control.release(); log('stopped'); }
+    catch { exitCode = 1; console.error('Shutdown persistence failed; inspect counters and lock before restarting'); }
+    process.exitCode = exitCode; finish?.();
+  };
+  const track = (job: Promise<unknown>) => {
+    pending.add(job);
+    void job.then(() => pending.delete(job), error => { pending.delete(job); void shutdown(error); });
+    return job;
+  };
+  const later = (fn: () => void, ms: number) => {
+    if (stopping) return;
+    const timer = setTimeout(() => { timers.delete(timer); if (!stopping) fn(); }, ms);
+    timers.add(timer);
+  };
+  const stopPoll = setInterval(() => {
+    try { if (control.stopRequested()) void shutdown(); }
+    catch (error) { void shutdown(error); }
+  }, 500);
+  process.on('SIGINT', () => void shutdown());
+  process.on('SIGTERM', () => void shutdown());
 // ---- Poisson trickle: each bot has its own independent timer ----
 function trickle(name: string) {
   const next = () => {
     const ms = poissonDelayMs(config.trickleRatePerHour, rand());
     if (!Number.isFinite(ms)) return;
-    setTimeout(() => { void send(name, 'trickle').catch(stop); next(); }, ms);
+    later(() => { track(send(name, 'trickle')); next(); }, ms);
   };
   next();
 }
@@ -38,6 +74,7 @@ async function watch() {
   try {
     const q = `/v2/history/get_actions?account=${ROUTER}&filter=${ROUTER}:sendmsg,${ROUTER}:sendfree&sort=asc&limit=100&after=${encodeURIComponent(cursor)}`;
     const { actions = [] } = await history(q);
+    if (stopping) return;
     let triggers = 0;
     for (const a of actions) {
       if (seen.has(a.trx_id)) continue;
@@ -54,7 +91,7 @@ async function watch() {
         state.bursts.push(now); saveState();
         const plan = planBurst(config, rand);
         log(`batch: ${triggers} external send(s) seen; ${plan.length} worker(s) scheduled`);
-        for (const p of plan) setTimeout(() => void send(p.sender, 'batch').catch(stop), p.delayMs);
+        for (const p of plan) later(() => { track(send(p.sender, 'batch')); }, p.delayMs);
       } else log(`batch skipped: ${config.maxBurstsPerHour}/hour limit`);
     }
   } catch (e) { log(`watch error: ${(e as Error).message}`); }
@@ -63,10 +100,13 @@ async function watch() {
 
   log(`CHEESECrypt synthetic test starting${dryRun ? ' (DRY RUN: nothing is broadcast)' : ''}: ${botNames.length} workers, broadcast ${config.broadcast}`);
   if (config.broadcast === 'direct') log('note: direct mode shows your IP to the nodes.');
-  await preflight();
+  try { await track(preflight()); } catch { await finished; return; }
+  if (stopping) { await finished; return; }
   for (const n of botNames) trickle(n);
-  if (config.maxBurstsPerHour > 0 && config.burstMax > 0) { await watch(); setInterval(() => void watch(), 15_000); }
-  process.on('SIGINT', () => { log('stopping'); saveState(); process.exit(0); });
-  await new Promise(() => {});
+  if (config.maxBurstsPerHour > 0 && config.burstMax > 0) {
+    const watchNext = async () => { await track(watch()); later(() => { void watchNext(); }, 15_000); };
+    await watchNext();
+  }
+  await finished;
 }
-main().catch(stop);
+main().catch(() => { console.error('Stopped: startup failed — check config, permissions and runner lock before restarting'); process.exit(1); });

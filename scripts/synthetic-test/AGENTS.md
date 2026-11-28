@@ -3,6 +3,7 @@
 - Rebuild public/downloads/nightcrawler and its ZIP with package-nightcrawler.py after changing shared runner sources, because downloadable companion code must match the tested runner without bundling private configs or the daytime entry point.
 
 - Keep the runner isolated (own package and lockfile, not wired into the frontend or CI) so unattended signing never runs unless the user starts it by hand.
+- Windows launch controls require a healthy local helper, use an exclusive per-config token lock, and request a drained shutdown without killing processes or retrying writes; stale locks require manual inspection because automatic recovery can duplicate paid activity.
 - Use neutral naming (workers, batches, sample messages) in code and logs, but keep docs truthful about what it does; config keys (`bots`, `burst*`) stay unchanged for compatibility with existing local configs.
 - Amounts, timing, shapes and permission checks live in pure tested `policy.ts`; use integer CHEESE units because float amounts would misprice sends.
 - The send shape must stay exactly the app's: lone `sendfree` when the live budget covers it, else payment then one-part `sendmsg`, and sample memos must match real padded memo length so they stay indistinguishable by size.
