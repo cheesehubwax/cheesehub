@@ -14,11 +14,11 @@ import type { CryptConfirm } from './CryptConfirmDialog';
 const TOR_CHECK_COMMAND = 'curl.exe --socks5-hostname 127.0.0.1:9150 https://check.torproject.org/api/ip';
 
 /** Network privacy settings. Presentational: the mode lives in the Messenger, the server setting on this device. */
-export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFullHistory, idleMinutes, setIdleMinutes, shieldOn, setShieldOn, hardening, setHardening, rotationSlot }: {
+export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFullHistory, idleMinutes, setIdleMinutes, shieldOn, setShieldOn, hardening, setHardening, rotationSlot, nightcrawlerSlot }: {
   open: boolean; onOpenChange: (v: boolean) => void; mode: PrivacyMode; setMode: (m: PrivacyMode) => void;
   loadFullHistory: () => Promise<void>;
   idleMinutes: IdleMinutes; setIdleMinutes: (m: IdleMinutes) => void; shieldOn: boolean; setShieldOn: (on: boolean) => void;
-  hardening: LockHardening; setHardening: (h: LockHardening) => void; rotationSlot?: ReactNode;
+  hardening: LockHardening; setHardening: (h: LockHardening) => void; rotationSlot?: ReactNode; nightcrawlerSlot?: ReactNode;
 }) {
   const [url, setUrl] = useState('');
   const [only, setOnly] = useState(false);
@@ -129,6 +129,7 @@ export function CryptPrivacyDialog({ open, onOpenChange, mode, setMode, loadFull
             </div>}
           </section>
           {rotationSlot}
+          {nightcrawlerSlot}
           <section className="space-y-2 rounded-md border border-border p-3">
             <h3 className="font-semibold text-foreground">Your own history &amp; broadcast server (optional)</h3>
             <p className="text-xs">The checkbox saves immediately. A new server is used only after Test &amp; connect succeeds.</p>

@@ -1,0 +1,12 @@
+{
+  "name": "cheesecrypt-synthetic-test",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun run night.ts night-config.json",
+    "check": "bun run night.ts night-config.json --dry-run"
+  },
+  "dependencies": {
+    "@wharfkit/antelope": "1.1.1"
+  }
+}

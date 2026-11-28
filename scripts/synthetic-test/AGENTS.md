@@ -1,5 +1,7 @@
 # Synthetic test runner rules
 
+- Rebuild public/downloads/nightcrawler and its ZIP with package-nightcrawler.py after changing shared runner sources, because downloadable companion code must match the tested runner without bundling private configs or the daytime entry point.
+
 - Keep the runner isolated (own package and lockfile, not wired into the frontend or CI) so unattended signing never runs unless the user starts it by hand.
 - Use neutral naming (workers, batches, sample messages) in code and logs, but keep docs truthful about what it does; config keys (`bots`, `burst*`) stay unchanged for compatibility with existing local configs.
 - Amounts, timing, shapes and permission checks live in pure tested `policy.ts`; use integer CHEESE units because float amounts would misprice sends.

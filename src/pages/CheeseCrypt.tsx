@@ -52,6 +52,7 @@ import { useCryptInstant } from '@/hooks/useCryptInstant';
 import { isInstantAuthFailure, isResourceShortage, RESOURCE_SHORTAGE_MESSAGE } from '@/lib/cryptInstant';
 import { CryptInstantDialog } from '@/components/crypt/CryptInstantDialog';
 import { CryptPrivacyDialog } from '@/components/crypt/CryptPrivacyDialog';
+import { CryptNightcrawler } from '@/components/crypt/CryptNightcrawler';
 import { CryptPrivacyGate } from '@/components/crypt/CryptPrivacyGate';
 import { privacyGateSatisfied } from '@/lib/cryptNetworkPrivacy';
 import { DeviceTransferSendDialog } from '@/components/crypt/DeviceTransferSendDialog';
@@ -2079,6 +2080,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
                   <CryptPrivacyDialog open={privacyOpen} onOpenChange={setPrivacyOpen} mode={privacyMode} setMode={setPrivacyMode} loadFullHistory={loadFullHistory}
                     idleMinutes={idleMinutes} setIdleMinutes={setIdleMinutes} shieldOn={shieldOn} setShieldOn={setShieldOn}
                     hardening={hardening} setHardening={setHardening}
+                    nightcrawlerSlot={privacyOpen ? <CryptNightcrawler key={account} account={account} canSetup={canLock && String(session.permission) === 'active'} execute={executeDirect} vault={vault} /> : undefined}
                     rotationSlot={lockedFile ? <CryptKeyRotationCard ageDays={rot.ageDays} retention={rot.retention} setRetention={rot.setRetention}
                       retired={rot.retired} pendingFriends={rot.pendingFriends.length} onRotate={startRotation}
                       onAnnounce={() => { setPrivacyOpen(false); setRotateStep('announce'); }} onDestroy={pub => void rot.destroyNow(pub)} /> : undefined} />

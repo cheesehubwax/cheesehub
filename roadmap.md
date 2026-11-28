@@ -2,6 +2,8 @@
 
 Open tasks only. Completed work lives in git history.
 
+- [ ] Nightcrawler Privacy setup: verify one real Anchor permission creation and folder save on the user's machine; config/ZIP downloads read back in browser with offline keys, permission and overwrite safeguards tested. Requires the user's Anchor signature and local folder permission.
+
 - [ ] Nightcrawler: verify live activation on the user's machine with sendfree-only isolated keys and Tor helper; separation, signing, disk readback and restart safety are tested offline. No real keys or local Tor connection are available here.
 
 - [ ] CHEESECrypt busy-room safety: confirm eventhorizon's original unlocked room; 500-reply/multiple-sender observer stress and unlocked-fixture recovery preserve drafts and receipts, but their original wallet/key and browser error are unavailable here.
