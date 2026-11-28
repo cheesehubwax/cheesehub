@@ -1,7 +1,15 @@
 /** Per-account read markers: conversation id ("group:<id>" or a WAX account) -> newest read message time. */
 export type ReadMarks = Record<string, number>;
 import { repliesTo } from '@/lib/cryptReply';
+import { validHistoryTime } from '@/lib/cryptHistoryValidation';
 interface Msg { from: string; to: string; time: number; group: { id: string } | null; igroup?: string; text?: string | null }
+
+function validMessage(m: Msg): boolean {
+  return !!m && typeof m.from === 'string' && !!m.from && typeof m.to === 'string' && !!m.to && validHistoryTime(m.time)
+    && (m.group == null || typeof m.group.id === 'string' && !!m.group.id)
+    && (m.igroup === undefined || typeof m.igroup === 'string' && !!m.igroup)
+    && (m.text == null || typeof m.text === 'string');
+}
 
 const storeKey = (account: string) => `cheesecrypt-read-${account}`;
 export const conversationId = (m: Msg, account: string) => m.group ? `group:${m.group.id}` : m.igroup ? `group:${m.igroup}` : (m.from === account ? m.to : m.from);
@@ -23,7 +31,7 @@ export function saveReadMarks(account: string, marks: ReadMarks) {
 /** Marks every existing conversation read at its newest message (first visit: no phantom badges on old history). */
 export function baselineMarks(messages: Msg[], account: string): ReadMarks {
   const out: ReadMarks = {};
-  for (const m of messages) { const id = conversationId(m, account); out[id] = Math.max(out[id] ?? 0, m.time); }
+  for (const m of messages) { if (!validMessage(m)) continue; const id = conversationId(m, account); out[id] = Math.max(out[id] ?? 0, m.time); }
   return out;
 }
 
@@ -31,7 +39,7 @@ export function baselineMarks(messages: Msg[], account: string): ReadMarks {
 export function unreadCounts(messages: Msg[], account: string, marks: ReadMarks): Record<string, number> {
   const out: Record<string, number> = {};
   for (const m of messages) {
-    if (m.from === account) continue;
+    if (!validMessage(m) || m.from === account) continue;
     const id = conversationId(m, account);
     if (m.time > (marks[id] ?? 0)) out[id] = (out[id] ?? 0) + 1;
   }
@@ -42,7 +50,7 @@ export function unreadCounts(messages: Msg[], account: string, marks: ReadMarks)
 export function unreadReplies(messages: Msg[], account: string, marks: ReadMarks): Record<string, number> {
   const out: Record<string, number> = {};
   for (const m of messages) {
-    if (m.from === account || !repliesTo(m.text, account)) continue;
+    if (!validMessage(m) || m.from === account || !repliesTo(m.text, account)) continue;
     const id = conversationId(m, account);
     if (m.time > (marks[id] ?? 0)) out[id] = (out[id] ?? 0) + 1;
   }
@@ -52,7 +60,7 @@ export function unreadReplies(messages: Msg[], account: string, marks: ReadMarks
 /** Index of the first message newer than the resume point, or -1 when nothing is newer (or there is no resume point). */
 export function firstUnreadIndex<T extends { time: number }>(messages: T[], resumeAt: number | null): number {
   if (resumeAt == null) return -1;
-  return messages.findIndex(m => m.time > resumeAt);
+  return messages.findIndex(m => m && validHistoryTime(m.time) && m.time > resumeAt);
 }
 
 // ---- read markers shared with the vault folder (device-only; no message content or keys) ----

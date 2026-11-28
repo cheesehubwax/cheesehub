@@ -5,6 +5,7 @@ import {
 } from '@/lib/cheeseCrypt';
 import { assembleVoice, parseVoicePart, type VoiceNote, type VoicePartMemo } from '@/lib/cryptVoice';
 import { isCg2, parseCg2, VOICE_REF_PREFIX, type Cg2, type ScopedKey } from '@/lib/cryptInviteGroups';
+import { isChainMemo } from '@/lib/cryptHistoryValidation';
 
 export interface CryptGroup { id: string; members: string[] }
 const PREFIX = '\u0002CG1:';
@@ -106,6 +107,7 @@ export function decodeConversations(memos: ChainMemo[], key: MessagingKey, conta
     return b;
   };
   for (const m of memos) {
+    if (!isChainMemo(m)) continue;
     if (m.from !== key.account && m.to !== key.account) continue;
     const partner = m.from === key.account ? m.to : m.from;
     let bytes = contacts[partner] ? decryptMemoBytesAny(m.memo, contacts[partner], key) : null;
@@ -183,7 +185,7 @@ export function decodeConversations(memos: ChainMemo[], key: MessagingKey, conta
       const k = igroup ? `ivoice:${n.from}:${igroup}:${n.id}` : group ? `voice:${n.from}:${group.id}:${n.id}` : `voice:${n.key}`;
       const prev = voices.get(k);
       if (prev?.voice && prev.voice.received >= n.received) continue;
-      voices.set(k, { key: k, txId: n.txId, time: n.time, from: n.from, to: n.to, text: null, parts: n.total, missing: n.missing, group, voice: n, ...(igroup ? { igroup, usedKey: b.usedKey! } : {}) });
+      voices.set(k, { key: k, txId: n.txId, time: n.time, from: n.from, to: n.to, text: null, parts: n.total, missing: n.missing, group, voice: n, ...(igroup && b.usedKey ? { igroup, usedKey: b.usedKey } : {}) });
     }
   }
   return [...texts, ...voices.values()].sort((a, b) => a.time - b.time);

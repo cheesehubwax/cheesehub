@@ -13,6 +13,7 @@ import type { CryptAvatar } from '@/lib/cryptAvatar';
 import type { CryptGroup } from '@/lib/cryptGroups';
 import type { InviteGroupView } from '@/lib/cryptInviteGroups';
 import { MESSAGE_FEE_QUANTITY, type MessagingKey } from '@/lib/cheeseCrypt';
+import { parseCryptName } from '@/lib/cryptNames';
 
 /** Sidebar: always-visible profile box with Menu and hide arrow, then the hideable requests, Groups and Friends lists. State lives in Messenger. */
 export function CryptSidebar({
@@ -122,7 +123,7 @@ export function CryptSidebar({
           <CollapsibleContent>
             <ul className="space-y-1 pt-1">
         {pendingRequests}
-        {inviteViews.filter(v => inviteShown(v) && !hiddenGroups.includes(v.invite.id)).sort((a, b) => Number(b.status === 'invited') - Number(a.status === 'invited') || a.name.localeCompare(b.name)).map(v => inviteRow(v, false))}
+        {inviteViews.filter(v => inviteShown(v) && !hiddenGroups.includes(v.invite.id)).sort((a, b) => Number(b.status === 'invited') - Number(a.status === 'invited') || (parseCryptName(a.name) ?? a.invite.id).localeCompare(parseCryptName(b.name) ?? b.invite.id)).map(v => inviteRow(v, false))}
         {groups.filter(g => !hiddenGroups.includes(g.id)).map(g => groupRow(g, false))}
         {!pendingRequests.length && !groups.some(g => !hiddenGroups.includes(g.id)) && !inviteViews.some(v => inviteShown(v) && !hiddenGroups.includes(v.invite.id)) && <li className="text-xs text-muted-foreground px-2 pb-1">No groups yet.</li>}
         {(groups.some(g => hiddenGroups.includes(g.id)) || inviteViews.some(v => inviteShown(v) && hiddenGroups.includes(v.invite.id))) && <li>

@@ -4,6 +4,7 @@ import { buildSendMessageActions, encryptMemo, MessagingKey, splitMessage, partC
 import { groupMessageCost } from '@/lib/cryptGroups';
 import { parseAvatar, type CryptAvatar } from '@/lib/cryptAvatar';
 import { parseCryptBio, parseCryptName } from '@/lib/cryptNames';
+import { validHistoryTime } from '@/lib/cryptHistoryValidation';
 
 export const PROFILE_PREFIX = '\u0002CP1:';
 /** Recipient transfers per transaction; the shared platform fee rides in the first one. */
@@ -18,12 +19,12 @@ export function profileNotePayload(key: Pick<MessagingKey, 'avatar' | 'displayNa
   return PROFILE_PREFIX + JSON.stringify({ ...(displayName ? { displayName } : {}), avatar, ...(bio ? { bio } : {}) });
 }
 
-export const isProfileNote = (text: string | null | undefined) => !!text && text.startsWith(PROFILE_PREFIX);
+export const isProfileNote = (text: unknown): boolean => typeof text === 'string' && text.startsWith(PROFILE_PREFIX);
 
 export function parseProfileNote(text: string | null | undefined): ProfileNote | null {
-  if (!isProfileNote(text)) return null;
+  if (typeof text !== 'string' || !isProfileNote(text)) return null;
   try {
-    const raw = JSON.parse(text!.slice(PROFILE_PREFIX.length));
+    const raw = JSON.parse(text.slice(PROFILE_PREFIX.length));
     const avatar = parseAvatar(raw?.avatar);
     if (!avatar) return null;
     if (raw.displayName !== undefined && !parseCryptName(raw.displayName)) return null;
@@ -37,7 +38,7 @@ export function parseProfileNote(text: string | null | undefined): ProfileNote |
 export function latestProfiles(entries: readonly { from: string; time: number; text: string | null; missing: number }[], account: string) {
   const out: Record<string, ProfileNote & { time: number }> = {};
   for (const e of entries) {
-    if (e.from === account || e.missing) continue;
+    if (!e || typeof e.from !== 'string' || !/^[a-z1-5.]{1,12}$/.test(e.from) || !validHistoryTime(e.time) || e.from === account || e.missing !== 0) continue;
     const note = parseProfileNote(e.text);
     if (note && (out[e.from]?.time ?? -1) < e.time) out[e.from] = { ...note, time: e.time };
   }

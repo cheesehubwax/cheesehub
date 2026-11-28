@@ -716,12 +716,12 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const shownNames = useMemo(() => {
     const out: Record<string, string> = {};
     for (const l of listings) if (l.creatorName && !out[l.creator]) out[l.creator] = l.creatorName;
-    for (const [a, p] of Object.entries(roomProfiles)) if (p.displayName) out[a] = p.displayName;
+    for (const [a, p] of Object.entries(roomProfiles)) if (p?.displayName) out[a] = p.displayName;
     return { ...out, ...names };
   }, [listings, roomProfiles, names]);
   const shownAvatars = useMemo(() => {
     const out: typeof avatars = {};
-    for (const [a, p] of Object.entries(roomProfiles)) if (p.avatar) out[a] = p.avatar;
+    for (const [a, p] of Object.entries(roomProfiles)) if (p?.avatar) out[a] = p.avatar;
     return { ...out, ...avatars };
   }, [roomProfiles, avatars]);
   const restoredRequests = useMemo(() => key ? recoverRoomRequests(visibleMemos, key, listings, roomRequests) : roomRequests,

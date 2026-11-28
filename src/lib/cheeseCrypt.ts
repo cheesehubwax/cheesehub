@@ -16,6 +16,7 @@ import { decodeBase64, encodeBase64, decodeUTF8, encodeUTF8 } from 'tweetnacl-ut
 import { benchEndpoint, normalizeEndpoint } from '@/lib/endpointHealth';
 import { cryptHistoryEndpoints, fetchCryptHistoryJson } from '@/lib/cryptNetworkPrivacy';
 import { TIP_MEMO } from '@/lib/cryptTips';
+import { isChainMemo } from '@/lib/cryptHistoryValidation';
 
 export const MSG_PREFIX = 'CRYPT1:';
 /** Padded messages: plaintext is ISO/IEC 7816-4 padded (0x80 then zeros) so every memo has the same length. */
@@ -782,10 +783,11 @@ export async function fetchStreamHistory(account: string, pages = MAX_HISTORY_PA
 
 /** Union by `txId:memo`, newest first; existing rows keep their identity. */
 export function mergeMemos(prev: ChainMemo[], incoming: ChainMemo[]): ChainMemo[] {
-  const seen = new Set(prev.map(r => `${r.txId}:${r.memo}`));
-  const add = incoming.filter(r => { const id = `${r.txId}:${r.memo}`; if (seen.has(id)) return false; seen.add(id); return true; });
-  if (!add.length) return prev;
-  return [...prev, ...add].sort((a, b) => b.time - a.time);
+  const valid = prev.filter(isChainMemo);
+  const seen = new Set(valid.map(r => `${r.txId}:${r.memo}`));
+  const add = incoming.filter(isChainMemo).filter(r => { const id = `${r.txId}:${r.memo}`; if (seen.has(id)) return false; seen.add(id); return true; });
+  if (!add.length) return valid.length === prev.length ? prev : valid;
+  return [...valid, ...add].sort((a, b) => b.time - a.time);
 }
 
 export const ROOM_SCAN_PAGES = 4;

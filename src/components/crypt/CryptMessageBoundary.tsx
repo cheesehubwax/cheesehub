@@ -1,18 +1,27 @@
 import { Component, type ReactNode } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cryptDiagnostic, type CryptDiagnostic } from '@/lib/cryptDiagnostics';
 
 /** Keep a failed message local; never log decrypted content or replace its stored identity. */
-export class CryptMessageBoundary extends Component<{ children: ReactNode; row?: boolean; inline?: boolean }, { failed: boolean }> {
-  state = { failed: false };
+export class CryptMessageBoundary extends Component<{ children: ReactNode; row?: boolean; inline?: boolean }, { failed: boolean; diagnostic: CryptDiagnostic | null }> {
+  state = { failed: false, diagnostic: null as CryptDiagnostic | null };
 
-  static getDerivedStateFromError() { return { failed: true }; }
+  static getDerivedStateFromError(error: unknown) { return { failed: true, diagnostic: cryptDiagnostic(error) }; }
+
+  componentDidCatch(error: unknown) {
+    // Never pass the exception object or raw stack to the console (may contain plaintext).
+    console.error('[CHEESECrypt render failure]\n' + cryptDiagnostic(error).stack);
+  }
 
   render() {
     if (!this.state.failed) return this.props.children;
     const content = <>
-      <span>{this.props.row || this.props.inline ? 'Unable to display this message.' : 'Unable to display this conversation.'}</span>
-      <Button size="sm" variant="outline" className="shrink-0 gap-1" onClick={() => this.setState({ failed: false })}>
+      <span className="min-w-0 max-w-full">
+        <span className="block">{this.props.row || this.props.inline ? 'Unable to display this message.' : 'Unable to display this conversation.'}</span>
+        {this.state.diagnostic && <span className="mt-1 block break-words font-mono text-xs">{this.state.diagnostic.name}: {this.state.diagnostic.message}</span>}
+      </span>
+      <Button size="sm" variant="outline" className="shrink-0 gap-1" onClick={() => this.setState({ failed: false, diagnostic: null })}>
         <RefreshCw className="h-3.5 w-3.5" aria-hidden /> Retry
       </Button>
     </>;

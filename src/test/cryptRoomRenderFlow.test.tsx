@@ -45,6 +45,25 @@ const mount = () => render(<QueryClientProvider client={new QueryClient({ defaul
 </QueryClientProvider>);
 
 describe('authenticated public-room rendering', () => {
+  it('opens 757 mixed history rows, skipping malformed controls while preserving 20 replies and an unsent draft', async () => {
+    const badPayloads = ['\u0002CG2:msg:{"i":"0123456789abcdef","t":{}}', '\u0002CG2:invite:null', '\u0002CP1:{"avatar":null}', '\u0002CG1:{"id":"0123456789abcdef","members":[null]}'];
+    const rows = [...Array.from({ length: 737 }, (_, i) => memo(badPayloads[i % badPayloads.length], i, false)),
+      ...Array.from({ length: 20 }, (_, i) => memo(encodeReply({ author: 'alice', time: 1, quote: 'original' }, `busy answer ${i}`), 737 + i))];
+    expect(rows).toHaveLength(757);
+    calls.fetch.mockResolvedValue(rows);
+    mount();
+    await waitFor(() => expect(screen.getByLabelText('20 unread')).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: /Public cheese room/ }));
+    const list = await screen.findByRole('list', { name: 'Chat messages' });
+    expect(within(list).getByText('busy answer 19')).toBeInTheDocument();
+    const draft = screen.getByPlaceholderText('Message group');
+    fireEvent.change(draft, { target: { value: 'Retain my unsent text' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Jump to earliest unseen reply (20 remaining)' }));
+    expect(screen.getByRole('button', { name: 'Jump to earliest unseen reply (19 remaining)' })).toBeInTheDocument();
+    expect(draft).toHaveValue('Retain my unsent text');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(calls.transact).not.toHaveBeenCalled();
+  }, 20_000);
   it('keeps an unlocked room and its draft usable after an asynchronous visibility failure', async () => {
     calls.fetch.mockResolvedValue([memo(encodeReply({ author: 'alice', time: 1, quote: 'original' }, 'Incoming reply'), 0)]);
     mount();

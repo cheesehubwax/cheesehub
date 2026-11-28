@@ -2,6 +2,8 @@
 
 Open tasks only. Completed work lives in git history.
 
+- [ ] Eventhorizon: verify the original unlocked room after updating; safe visible diagnostics, malformed-history guards, 757-row/20-reply readback and 127 targeted tests pass; desktop/mobile diagnostic Retry works. Original user history/key remains unavailable.
+
 - [ ] Nightcrawler Privacy setup: verify one real Anchor permission creation and folder save on the user's machine; config/ZIP downloads read back in browser with offline keys, permission and overwrite safeguards tested. Requires the user's Anchor signature and local folder permission.
 
 - [ ] Nightcrawler: verify live activation on the user's machine with sendfree-only isolated keys and Tor helper; separation, signing, disk readback and restart safety are tested offline. No real keys or local Tor connection are available here.

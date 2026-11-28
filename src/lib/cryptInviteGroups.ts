@@ -162,7 +162,7 @@ export function encodeMeta(id: string, name: string, avatar?: CryptAvatar): stri
   return wire('meta', { i: checkId(id), n, ...(avatar ? { a: avatar.pixels } : {}) });
 }
 
-export const isCg2 = (text: string | null | undefined) => !!text && text.startsWith(CG2_PREFIX);
+export const isCg2 = (text: unknown): boolean => typeof text === 'string' && text.startsWith(CG2_PREFIX);
 
 /** Strict decode; anything malformed is null (and, being CG2-prefixed, never shown as chat text). */
 export function parseCg2(text: string | null | undefined): Cg2 | null {

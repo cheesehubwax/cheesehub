@@ -2,10 +2,31 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CryptMessageBoundary } from '@/components/crypt/CryptMessageBoundary';
 import { findCryptMessageNode } from '@/lib/cryptMessageDom';
+import { cryptDiagnostic } from '@/lib/cryptDiagnostics';
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('Crypt message crash isolation', () => {
+  it('captures a sanitized diagnostic and source-only stack without logging the exception object', () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const error = new TypeError("Cannot read properties of undefined (reading 'localeCompare')");
+    error.stack = error.message + '\n    at secretMessage (http://localhost:8080/src/pages/CheeseCrypt.tsx?t=123:70:4)';
+    function Broken(): never { throw error; }
+    const boundary = { current: null as CryptMessageBoundary | null };
+    render(<CryptMessageBoundary ref={boundary}><Broken /></CryptMessageBoundary>);
+    expect(boundary.current?.state.diagnostic).toEqual({ name: 'TypeError', message: error.message, stack: error.name + ': ' + error.message + '\n    at /src/pages/CheeseCrypt.tsx:70:4' });
+    const diagnosticLog = log.mock.calls.filter(call => typeof call[0] === 'string' && call[0].startsWith('[CHEESECrypt render failure]'));
+    expect(diagnosticLog).toHaveLength(1);
+    expect(diagnosticLog[0]).toEqual(['[CHEESECrypt render failure]\n' + boundary.current?.state.diagnostic?.stack]);
+  });
+  it('withholds arbitrary message/key content and unexpected error names', () => {
+    const error = new Error('Decrypted secret message CRYPTKEY1:private-key');
+    error.name = 'Another secret';
+    error.stack = error.message;
+    expect(cryptDiagnostic(error)).toEqual({ name: 'Error', message: 'Error details withheld for privacy.', stack: 'Error: Error details withheld for privacy.' });
+    expect(cryptDiagnostic(new TypeError("Cannot read properties of null (reading 'privateMessage')")).message).toBe("Cannot read properties of null (reading '[redacted]')");
+    expect(cryptDiagnostic(new TypeError('privateMessage.map is not a function')).message).toBe('[value].map is not a function');
+  });
   it('isolates a failed row, preserves adjacent messages and retries without marking it read', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     let fail = true;

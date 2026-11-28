@@ -1,5 +1,8 @@
 # Connection rules
 
+- Crypt history shape validation precedes merge/decode and unread/profile derivation; skip invalid rows without mutating surviving identities or relaxing authenticated control parsing, so malformed legacy history cannot poison the conversation.
+- Render diagnostics use cryptDiagnostics for allowlisted messages and source-only stacks, never raw exceptions, because exception strings can contain decrypted content.
+
 - Nightcrawler setup exports only verified isolated sendfree keys from mounted form state; never replace existing permission/links or overwrite local files. Static bundles mirror the standalone runner; the website never starts or stops its local process.
 
 - Wallet RPC fallback belongs in SessionKit's shared fetch transport, inherited by login/restore; retry only allowlisted read requests, never restart transact or rebroadcast, so wallet prompts, signed bytes and Fuel semantics stay intact. On /crypt, an exclusive loopback Tor helper is the sole signed-broadcast transport: preserve exact bytes, make one attempt and never fall back directly.
