@@ -17,29 +17,6 @@ response times under periodic and burst loads.
    bun run run.ts config.json
    ```
 
-## Windows one-click daytime launcher
-
-Extract the launcher update into your existing swarm folder, replacing `run.ts`
-and adding `runnerControl.ts`, `swarm-launcher.ps1`, `start-swarm.bat` and
-`stop-swarm.bat`. Keep your existing private configuration and counters unchanged.
-Stop the old terminal runner with Ctrl+C before replacing files or launching.
-Requires Bun, installed dependencies, Windows PowerShell, Tor and the local helper.
-
-After a reboot, start Tor and the helper first, then double-click `start-swarm.bat`.
-It checks helper health and launches the daytime runner hidden in the background.
-Open `swarm.log` for activity and `swarm-error.log` for failures; previous launch logs
-are retained once as `.previous`. Logs expose account names, timing and transaction
-IDs, so keep them local. Closing the launcher window does not stop the runner.
-Double-click `stop-swarm.bat` to cancel future timers and wait for in-flight work.
-No forced kills, transaction retries, Windows auto-start or Nightcrawler launch.
-No elevation is needed; execution-policy bypass applies only to that launcher process.
-
-A per-config `.runner.lock` prevents duplicate updated runners, even from a terminal.
-After an unclean shutdown, confirm the old process is gone before deleting only
-the `.runner.lock` and its `.stop` file. Never delete counters to clear a lock.
-Different configs using the same accounts can still overlap: do not run those together.
-An older runner without the new control file cannot be detected by this lock.
-
 ## Nightcrawler (separate, optional)
 
 Nightcrawler schedules random **synthetic sample messages**, not readable conversations.

@@ -2,8 +2,6 @@
 
 Open tasks only. Completed work lives in git history.
 
-- [ ] Windows daytime launcher: verify background Start/Stop on the user's Windows PC with their Tor helper; Windows process launch is unavailable in this Linux sandbox.
-
 - [ ] Nightcrawler Privacy setup: verify one real Anchor permission creation and folder save on the user's machine; config/ZIP downloads read back in browser with offline keys, permission and overwrite safeguards tested. Requires the user's Anchor signature and local folder permission.
 
 - [ ] Nightcrawler: verify live activation on the user's machine with sendfree-only isolated keys and Tor helper; separation, signing, disk readback and restart safety are tested offline. No real keys or local Tor connection are available here.

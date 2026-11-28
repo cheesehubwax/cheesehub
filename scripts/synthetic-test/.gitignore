@@ -7,6 +7,3 @@ night-config*.json
 !night-config.example.json
 *.night.json.lock
 *.tmp
-*.runner.lock
-*.runner.lock.stop
-*.log.previous
