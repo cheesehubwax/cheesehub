@@ -39,7 +39,7 @@ function CryptographyDetails() {
           <section className="space-y-2">
             <h3 className="font-semibold text-foreground">Private content versus public activity</h3>
             <dl className="space-y-3">
-              <div><dt className="font-medium text-foreground">Encrypted</dt><dd>Message text and chunk contents; group membership metadata inside the encrypted group envelope.</dd></div>
+              <div><dt className="font-medium text-foreground">Encrypted</dt><dd>Message text and chunk contents, including voice recordings and shared NFT references; group membership metadata inside the encrypted group envelope.</dd></div>
               <div><dt className="font-medium text-foreground">Public on WAX</dt><dd>Sender and recipient accounts, transaction timestamps and IDs, any CHEESE amounts paid, the encrypted message data (in a transfer memo for paid messages, or inside the crypt.cheese action for free messages) and chunk counts. A group’s recipient fanout can reveal likely participants even though the membership envelope is encrypted.</dd></div>
               <div><dt className="font-medium text-foreground">Avatars and key files</dt><dd>Avatars are not included in encrypted message memos. They are shared through public-key JSON files and saved locally by contacts. Public keys may also be published on-chain; private keys must never be shared.</dd></div>
             </dl>
@@ -47,7 +47,8 @@ function CryptographyDetails() {
           <section className="space-y-2">
             <h3 className="font-semibold text-foreground">Important security limits</h3>
             <p>Observers, block producers and history services cannot normally decrypt the content without the relevant keys. However, recipients can copy or share plaintext, and a compromised device, malicious browser extension or exposed private key can reveal messages. Keys must be locked to their owning WAX account with Anchor before use. Only the locked envelope is saved; the opened secret stays in this browser session’s memory. Legacy plain backups must be upgraded, and old copies deleted by you. Keep your locked backup and access to the same Anchor signing key: a changed wallet signing key may not unlock an older backup.</p>
-            <p>There is no forward secrecy: because the same long-term keys are reused and ciphertext remains on-chain, later compromise of either participant’s private key can expose past messages for that pair when the other public key is available. Group members receive separate encrypted copies. Protect your device and backups, and keep a safe copy of your private key—losing it can make old messages unreadable.</p>
+            <p><strong className="font-medium text-foreground">Key rotation and forward secrecy:</strong> CHEESECrypt does not use automatic per-message ephemeral ratchets like Signal. It provides epoch-based forward secrecy through key rotation: once you rotate your key and destroy the retired copy, later compromise of your active key cannot decrypt messages from that retired epoch. Because ciphertext stays on the WAX blockchain permanently, past messages remain readable for as long as the matching keys still exist — so a friend who has not rotated, or who still keeps the old key, can still have that part of the history exposed, and retired keys you keep in your locked backup to read history stay exposed until you destroy them.</p>
+            <p>Group members receive separate encrypted copies. Protect your device and backups, and keep a safe copy of any key you still need to read history — losing it can make those messages unreadable.</p>
           </section>
         </div>
       </DialogContent>
