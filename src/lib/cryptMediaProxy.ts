@@ -14,10 +14,10 @@ export type MediaRoute =
   | { kind: 'blocked'; base: string }; // helper configured but unreachable: fail closed
 
 /**
- * 'prep' = v1.6+ (adds wallet transaction-prep reads and the wallet NFT list),
+ * 'youtube' = v1.8+ (adds video titles and pictures), 'prep' = v1.6+ (adds wallet transaction-prep reads and the wallet NFT list),
  * 'full' = v1.4+ (media plus Respect/account chain reads), 'media' = v1.3, 'legacy' = older helper.
  */
-export type ProbeResult = 'prep' | 'full' | 'media' | 'legacy' | 'down';
+export type ProbeResult = 'youtube' | 'prep' | 'full' | 'media' | 'legacy' | 'down';
 
 const LOOPBACK = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(?=[:/]|$)/;
 export const isLoopbackHelper = (url: string | null): url is string => !!url && LOOPBACK.test(url);
@@ -25,7 +25,7 @@ export const isLoopbackHelper = (url: string | null): url is string => !!url && 
 /** Pure routing rule: which path chat NFT media may take for a saved server and probe outcome. */
 export function decideMediaRoute(custom: string | null, probe: ProbeResult | null): MediaRoute {
   if (!isLoopbackHelper(custom)) return { kind: 'public' };
-  if (probe === 'prep' || probe === 'full' || probe === 'media') return { kind: 'tor', base: custom };
+  if (probe === 'youtube' || probe === 'prep' || probe === 'full' || probe === 'media') return { kind: 'tor', base: custom };
   if (probe === 'legacy') return { kind: 'legacy', base: custom };
   return { kind: 'blocked', base: custom }; // unknown or down never leaks
 }
@@ -70,6 +70,7 @@ export async function probeHelper(base: string, fetcher: typeof fetch = fetch): 
       const f: unknown[] = Array.isArray(j?.features) ? j.features : [];
       if (!f.includes('ipfs') || !f.includes('atomic')) return 'legacy';
       if (!f.includes('chain') || !f.includes('respect')) return 'media';
+      if (f.includes('youtube') && f.includes('prep') && f.includes('atomic-list')) return 'youtube';
       return f.includes('prep') && f.includes('atomic-list') ? 'prep' : 'full';
     }
     return r.status === 403 || r.status === 404 ? 'legacy' : 'down';
@@ -89,7 +90,7 @@ export function currentMediaRoute(): MediaRoute {
  */
 export function decideRespectRoute(custom: string | null, probe: ProbeResult | null): MediaRoute {
   if (!isLoopbackHelper(custom)) return { kind: 'public' };
-  if (probe === 'prep' || probe === 'full') return { kind: 'tor', base: custom };
+  if (probe === 'youtube' || probe === 'prep' || probe === 'full') return { kind: 'tor', base: custom };
   if (probe === 'media' || probe === 'legacy') return { kind: 'legacy', base: custom };
   return { kind: 'blocked', base: custom };
 }
@@ -103,7 +104,7 @@ export const decideChainReadRoute = decideRespectRoute;
  */
 export function decidePrepRoute(custom: string | null, probe: ProbeResult | null): MediaRoute {
   if (!isLoopbackHelper(custom)) return { kind: 'public' };
-  if (probe === 'prep') return { kind: 'tor', base: custom };
+  if (probe === 'youtube' || probe === 'prep') return { kind: 'tor', base: custom };
   if (probe === 'full' || probe === 'media' || probe === 'legacy') return { kind: 'legacy', base: custom };
   return { kind: 'blocked', base: custom };
 }
@@ -158,3 +159,14 @@ export async function fetchCryptAsset(assetId: string) {
 
 /** Test hook. */
 export const __resetMediaRouteCache = () => { cached = null; inflight = null; };
+
+/** Unlike legacy NFT routes, a saved older helper must never leak video lookups directly. */
+export function decideYoutubeRoute(custom: string | null, probe: ProbeResult | null): MediaRoute {
+  if (!isLoopbackHelper(custom)) return { kind: 'public' };
+  return { kind: probe === 'youtube' ? 'tor' : 'blocked', base: custom };
+}
+export async function resolveYoutubeRoute(fetcher: typeof fetch = fetch): Promise<MediaRoute> {
+  const custom = loadCustomEndpoint();
+  if (!isLoopbackHelper(custom)) return { kind: 'public' };
+  return decideYoutubeRoute(custom, await ensureProbe(custom, fetcher));
+}

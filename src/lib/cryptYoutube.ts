@@ -1,3 +1,4 @@
+import { resolveYoutubeRoute, type MediaRoute } from './cryptMediaProxy';
 /**
  * YouTube links inside decrypted CHEESECrypt text. Links are only parsed locally; nothing is fetched
  * until the reader presses play. Playback tiers: Invidious (default), Piped, then direct YouTube
@@ -126,6 +127,11 @@ export function nextTier(t: YoutubeTier): YoutubeTier | null {
   return YOUTUBE_TIERS[i + 1] ?? null;
 }
 
+export function routedYoutubeThumbnail(link: YoutubeLink, route: MediaRoute): string | null {
+  if (!ID.test(link.id) || route.kind === 'blocked' || route.kind === 'legacy') return null;
+  return route.kind === 'tor' ? `${route.base}/youtube/thumbnail/${link.id}` : privateThumbnailUrl(link);
+}
+
 /** Proxied still picture from the default private mirror; only requested when the reader asks. */
 export function privateThumbnailUrl(link: YoutubeLink): string {
   return new URL(`/vi/${encodeURIComponent(link.id)}/mqdefault.jpg`, INVIDIOUS_HOST).toString();
@@ -134,13 +140,13 @@ export function privateThumbnailUrl(link: YoutubeLink): string {
 /**
  * Sender-side title lookup, only on an explicit tap. Tries the private Invidious mirrors, then
  * noembed.com (a third-party oEmbed proxy). Neither path contacts Google from the sender's browser;
- * whichever service answers sees the sender's IP. Returns null when nothing answers.
+ * With a saved helper, only v1.8+ may answer; older/down helpers block rather than connect directly. Without a helper the service sees the sender's IP.
  */
 export async function fetchYoutubeTitle(id: string, fetcher: typeof fetch = fetch): Promise<string | null> {
   if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return null;
-  const tryJson = async (url: string) => {
+  const tryJson = async (url: string, timeoutMs = 8000) => {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
       const r = await fetcher(url, { referrerPolicy: 'no-referrer', credentials: 'omit', signal: ctrl.signal });
       if (!r.ok) return null;
@@ -148,6 +154,9 @@ export async function fetchYoutubeTitle(id: string, fetcher: typeof fetch = fetc
       return cleanYoutubeTitle(j?.title);
     } catch { return null; } finally { clearTimeout(timer); }
   };
+  const route = await resolveYoutubeRoute(fetcher);
+  if (route.kind === 'blocked' || route.kind === 'legacy') return null;
+  if (route.kind === 'tor') return tryJson(`${route.base}/youtube/title/${id}`, 20000);
   for (const m of PRIVATE_YOUTUBE_MIRRORS) {
     if (m.tier !== 'invidious') continue;
     const t = await tryJson(`${m.host}/api/v1/videos/${id}?fields=title`);

@@ -15,3 +15,5 @@
 - Crypt founder rosters only grow: owner `founder` controls and superset relists add non-banned members (capped at MAX_FOUNDERS for fixed-size room controls); nothing removes a founder.
 - Crypt: getTransactPlugins returns no Greymass Fuel on /crypt and Instant sends use none; Fuel preflight leaks account/actions/IP.
 - Crypt account-named chain reads use cryptChainRead (helper v1.4+, public without/older helper, fail closed when down); wallet prep reads on /crypt go only to a v1.6 helper, never mixed with broadcast retries.
+
+- Crypt YouTube title and thumbnail lookups use capability-gated local helper routing; a saved old/down helper blocks them, and fixed video-ID paths with bounded JSON/raster responses prevent a general-purpose proxy. Playback remains separate with explicit Google consent.

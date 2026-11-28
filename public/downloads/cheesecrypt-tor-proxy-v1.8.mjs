@@ -8,7 +8,7 @@
 // sounds and videos (GET /ipfs/<cid>) so AtomicAssets and IPFS gateways never see you.
 // v1.4 also forwards the read-only lookups behind Respect badges (account age, CHEESE
 // balance, staked CHEESE, Alcor pool positions and CHEESE NFT count) so the public WAX,
-// AtomicAssets and Alcor servers never learn which accounts you are looking at.
+// AtomicAssets and Alcor servers see a Tor exit IP; queried accounts remain visible.
 // v1.5 gives each kind of traffic its own Tor circuit (Tor's IsolateSOCKSAuth, on by
 // default): every Respect lookup and every broadcast gets a brand-new circuit, history
 // reads keep one steady circuit, and NFT media spreads over four circuits. Read-only
@@ -22,6 +22,7 @@
 // is overloaded (5xx) or times out sits out for a short while and is tried last, NFT media
 // moves on when a gateway sends nothing for 15 seconds, and server health is refreshed
 // through Tor every 10 minutes instead of only at startup. Broadcasts are still ONE try.
+// v1.8 adds bounded, read-only YouTube title and thumbnail lookups through Tor; playback stays separate.
 // Those public servers see a Tor exit address instead of your home IP.
 //
 // What it does NOT do: it is not a Tor relay or exit node, it never accepts connections
@@ -29,7 +30,7 @@
 // logs or files. Media is passed through in memory only (never saved to disk). A broadcast is attempted on ONE upstream only, never retried: a lost
 // reply does not prove the chain rejected it. Check the account before manually retrying.
 //
-// Run:  node cheesecrypt-tor-proxy-v1.7.mjs
+// Run:  node cheesecrypt-tor-proxy-v1.8.mjs
 // Then in CHEESECrypt → Menu → Privacy → "Your own history server" enter http://localhost:8088
 // Tick "Use only this server" to route CHEESECrypt's signed broadcasts here too.
 //
@@ -65,8 +66,13 @@ const IPFS_GATEWAYS = [
   'https://nftstorage.link',
   'https://ipfs.io',
 ];
+const YOUTUBE_UPSTREAMS = ['https://invidious.tiekoetter.com', 'https://yewtu.be'];
+export function youtubeRequest(path) {
+  const match = /^\/youtube\/(title|thumbnail)\/([A-Za-z0-9_-]{11})$/.exec(path || '');
+  return match ? { kind: match[1], id: match[2] } : null;
+}
 const ALCOR_UPSTREAMS = ['https://wax.alcor.exchange'];
-export const HELPER_VERSION = '1.7';
+export const HELPER_VERSION = '1.8';
 export const MEDIA_LANES = 4;
 // Circuit labels are random per helper run and never leave this computer except as the
 // SOCKS username/password Tor uses to keep circuits apart.
@@ -194,7 +200,7 @@ async function findTor(ports = TOR_PORTS) {
  * are returned to the caller; network failures and malformed JSON are rejected.
  * The dedicated Agent cannot open a direct/DNS connection.
  */
-export function requestViaTor(torPort, upstream, path, { method = 'GET', body, contentType = 'text/plain;charset=UTF-8', timeoutMs = TIMEOUT_MS, headerTimeoutMs = 0, ca, media = false, isolation } = {}) {
+export function requestViaTor(torPort, upstream, path, { method = 'GET', body, contentType = 'text/plain;charset=UTF-8', timeoutMs = TIMEOUT_MS, headerTimeoutMs = 0, ca, media = false, maxResponseBytes, isolation } = {}) {
   const base = new URL(upstream);
   const u = new URL(path, base);
   if (u.protocol !== 'https:' || u.origin !== base.origin) return Promise.reject(new Error('upstream must stay on the original HTTPS server'));
@@ -231,7 +237,7 @@ export function requestViaTor(torPort, upstream, path, { method = 'GET', body, c
         const parts = []; let size = 0;
         res.on('data', (c) => {
           size += c.length;
-          if (size > (media ? MAX_MEDIA : MAX_BODY)) finish(new Error('response too large')); else parts.push(c);
+          if (size > (maxResponseBytes ?? (media ? MAX_MEDIA : MAX_BODY))) finish(new Error('response too large')); else parts.push(c);
         });
         res.on('end', () => {
           const responseBody = Buffer.concat(parts);
@@ -314,7 +320,7 @@ function readRequestBody(req, limit = MAX_REQUEST_BODY) {
   });
 }
 
-export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS, chainUpstreams, atomicUpstreams = ATOMIC_UPSTREAMS, ipfsGateways = IPFS_GATEWAYS, alcorUpstreams = ALCOR_UPSTREAMS, ca } = {}) {
+export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS, chainUpstreams, atomicUpstreams = ATOMIC_UPSTREAMS, ipfsGateways = IPFS_GATEWAYS, alcorUpstreams = ALCOR_UPSTREAMS, youtubeUpstreams = YOUTUBE_UPSTREAMS, ca } = {}) {
   let lastGood = null, turn = 0;
   return http.createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -325,7 +331,33 @@ export function createProxyServer({ torPorts = TOR_PORTS, upstreams = UPSTREAMS,
     const send = (code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
 
     if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
-    if (req.method === 'GET' && req.url === '/v2/helper') return send(200, { helper: 'cheesecrypt-tor', version: HELPER_VERSION, features: ['history', 'broadcast', 'atomic', 'ipfs', 'chain', 'respect', 'isolation', 'rotation', 'prep', 'atomic-list', 'resilience'] });
+    if (req.method === 'GET' && req.url === '/v2/helper') return send(200, { helper: 'cheesecrypt-tor', version: HELPER_VERSION, features: ['history', 'broadcast', 'atomic', 'ipfs', 'chain', 'respect', 'isolation', 'rotation', 'prep', 'atomic-list', 'resilience', 'youtube'] });
+
+    // Fixed read-only YouTube paths, never a general URL or iframe proxy.
+    const youtube = req.method === 'GET' ? youtubeRequest(req.url) : null;
+    if (youtube) {
+      const torPort = await findTor(torPorts);
+      if (!torPort) return send(503, { error: 'Tor is not running.' });
+      const isolation = isolationFor('youtube');
+      for (const upstream of preferReady(rotate(youtubeUpstreams, turn++))) {
+        if (res.destroyed) return;
+        try {
+          const picture = youtube.kind === 'thumbnail';
+          const path = picture ? `/vi/${youtube.id}/mqdefault.jpg` : `/api/v1/videos/${youtube.id}?fields=title`;
+          const r = await requestViaTor(torPort, upstream, path, { ca, isolation, media: picture, maxResponseBytes: picture ? 2 * 1024 * 1024 : 16 * 1024 });
+          if (r.status < 200 || r.status >= 300) throw new Error(`HTTP ${r.status}`);
+          if (!picture) {
+            const title = JSON.parse(r.body.toString('utf8'))?.title;
+            if (typeof title !== 'string' || !title.trim()) throw new Error('no title');
+            return send(200, { title: title.slice(0, 400) });
+          }
+          if (!/^image\/(jpeg|png|webp)$/.test(r.type)) throw new Error('not a safe picture');
+          res.writeHead(200, { 'Content-Type': r.type, 'Content-Length': r.body.length, 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; sandbox", 'Cross-Origin-Resource-Policy': 'cross-origin' });
+          return res.end(r.body);
+        } catch (error) { benchFor(upstream, error); }
+      }
+      return send(502, { error: 'Video lookup failed through Tor. No direct connection was made.' });
+    }
 
     // Respect lookups (v1.4): read-only, so trying the next server on failure is safe.
     const listMatch = req.method === 'GET' ? ATOMIC_LIST_PATH.exec(req.url || '') : null;

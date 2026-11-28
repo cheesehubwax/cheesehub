@@ -1,4 +1,6 @@
-import { fireEvent, render, screen, cleanup } from '@testing-library/react';
+import { saveCustomEndpoint } from '@/lib/cryptNetworkPrivacy';
+import { __resetMediaRouteCache } from '@/lib/cryptMediaProxy';
+import { fireEvent, render, screen, cleanup, waitFor } from '@testing-library/react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PRIVATE_YOUTUBE_MIRRORS } from '@/lib/cryptYoutube';
 
@@ -13,7 +15,7 @@ beforeAll(() => {
   HTMLDialogElement.prototype.showModal = function () { this.open = true; };
   HTMLDialogElement.prototype.close = function () { this.open = false; };
 });
-afterEach(cleanup);
+afterEach(() => { cleanup(); localStorage.clear(); __resetMediaRouteCache(); vi.unstubAllGlobals(); });
 const link = { id: 'dQw4w9WgXcQ', start: 90, url: 'https://youtu.be/dQw4w9WgXcQ?t=90' };
 const mount = () => render(<CryptYoutubeEmbed link={link} />);
 
@@ -79,5 +81,28 @@ describe('private YouTube playback consent', () => {
     expect(new URL(external.getAttribute('href') ?? '').searchParams.get('local')).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: /Try Piped/ }));
     expect(container.querySelector('iframe')?.getAttribute('src')).toContain('https://piped.video/embed/');
+  });
+});
+describe('protected picture interaction', () => {
+  it('makes no request before preview and loads only the helper image after preview', async () => {
+    saveCustomEndpoint('http://localhost:8088', true);
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ features: ['atomic', 'ipfs', 'chain', 'respect', 'prep', 'atomic-list', 'youtube'] })));
+    vi.stubGlobal('fetch', fetcher);
+    const { container } = mount();
+    expect(fetcher).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /Preview picture/ }));
+    await waitFor(() => expect(container.querySelector('img')?.getAttribute('src')).toBe('http://localhost:8088/youtube/thumbnail/dQw4w9WgXcQ'));
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    fireEvent.error(container.querySelector('img') as HTMLImageElement);
+    expect(container.querySelector('img')).toBeNull();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+  it('does not load a public picture if a saved old helper lacks video support', async () => {
+    saveCustomEndpoint('http://localhost:8088', true);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ features: ['atomic', 'ipfs', 'chain', 'respect', 'prep', 'atomic-list'] }))));
+    const { container } = mount();
+    fireEvent.click(screen.getByRole('button', { name: /Preview picture/ }));
+    await waitFor(() => expect(container.querySelector('img')).toBeNull());
+    await waitFor(() => expect(screen.getByText('Picture unavailable')).toBeInTheDocument());
   });
 });

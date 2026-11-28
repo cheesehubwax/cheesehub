@@ -6,7 +6,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { benchFor, clearBench, createProxyServer, fetchViaTor, isolationFor, orderByHealth, preferReady, rotate, TIMEOUT_MS } from '../../public/downloads/cheesecrypt-tor-proxy-v1.7.mjs';
+import { benchFor, clearBench, createProxyServer, requestViaTor, fetchViaTor, isolationFor, orderByHealth, preferReady, rotate, youtubeRequest, TIMEOUT_MS } from '../../public/downloads/cheesecrypt-tor-proxy-v1.8.mjs';
 
 const CID = 'QmYTvGVY8eVxrzYf7VTgqJJqZiNJF7gAfji6ewxo4qUyeM';
 const folder = mkdtempSync(join(tmpdir(), 'crypt-tor-test-'));
@@ -28,6 +28,8 @@ before(async () => {
     if (req.url === '/stall') { res.writeHead(200); res.write('{'); return; }
     if (req.url === `/ipfs/${CID}/art.png`) { res.writeHead(200, { 'Content-Type': 'image/png' }); res.end(Buffer.from([137, 80, 78, 71])); return; }
     if (req.url === `/ipfs/${CID}/page.html`) { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<script>alert(1)</script>'); return; }
+    if (req.url === '/vi/dQw4w9WgXcQ/mqdefault.jpg') { res.writeHead(200, { 'Content-Type': 'image/jpeg' }); res.end(Buffer.from([255, 216, 255])); return; }
+    if (req.url === '/api/v1/videos/dQw4w9WgXcQ?fields=title') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ title: 'Song', ignored: 'not forwarded' })); return; }
     res.setHeader('Content-Type', 'application/json');
     if (req.url === '/atomicassets/v1/assets/42') { res.end(JSON.stringify({ success: true, data: { asset_id: '42' } })); return; }
     if (req.url === '/v1/chain/get_account') { res.end(JSON.stringify({ account_name: JSON.parse(upstreamRequests.at(-1).body).account_name, created: '2020-01-01T00:00:00.000' })); return; }
@@ -90,7 +92,7 @@ before(async () => {
     socket.on('data', handshake);
   });
   socksPort = await listen(socks);
-  proxy = createProxyServer({ torPorts: [socksPort], upstreams: ['https://history.invalid'], atomicUpstreams: ['https://history.invalid'], ipfsGateways: ['https://history.invalid'], alcorUpstreams: ['https://history.invalid'], ca });
+  proxy = createProxyServer({ torPorts: [socksPort], upstreams: ['https://history.invalid'], atomicUpstreams: ['https://history.invalid'], ipfsGateways: ['https://history.invalid'], alcorUpstreams: ['https://history.invalid'], youtubeUpstreams: ['https://history.invalid'], ca });
   proxyPort = await listen(proxy);
 });
 
@@ -171,10 +173,10 @@ test('loopback helper blocks other writes and non-history paths, and supports br
   assert.match(preflight.headers.get('access-control-allow-methods'), /POST/);
 });
 
-test('v1.7 reports its media, Respect, isolation, rotation, prep and NFT list capabilities', async () => {
+test('v1.8 reports its media, Respect, isolation, rotation, prep and NFT list capabilities', async () => {
   const j = await (await fetch(`http://127.0.0.1:${proxyPort}/v2/helper`)).json();
-  assert.equal(j.version, '1.7');
-  for (const f of ['atomic', 'ipfs', 'chain', 'respect', 'isolation', 'rotation', 'prep', 'atomic-list', 'resilience']) assert.ok(j.features.includes(f), f);
+  assert.equal(j.version, '1.8');
+  for (const f of ['atomic', 'ipfs', 'chain', 'respect', 'isolation', 'rotation', 'prep', 'atomic-list', 'resilience', 'youtube']) assert.ok(j.features.includes(f), f);
 });
 
 test('circuit labels: steady history, four media lanes, fresh Respect and broadcast circuits', () => {
@@ -288,4 +290,32 @@ test('a broadcast is still attempted on exactly one server even when servers are
   assert.equal(response.status, 500);
   assert.equal(upstreamRequests.length - before, 1);
   clearBench();
+});
+
+test('YouTube title and picture lookups traverse SOCKS with isolated labels', async () => {
+  const before = destinations.length, start = labels.length;
+  const base = `http://127.0.0.1:${proxyPort}`;
+  const title = await fetch(`${base}/youtube/title/dQw4w9WgXcQ`);
+  assert.deepEqual(await title.json(), { title: 'Song' });
+  assert.equal(upstreamRequests.at(-1).url, '/api/v1/videos/dQw4w9WgXcQ?fields=title');
+  const picture = await fetch(`${base}/youtube/thumbnail/dQw4w9WgXcQ`);
+  assert.equal(picture.headers.get('content-type'), 'image/jpeg');
+  assert.equal(picture.headers.get('x-content-type-options'), 'nosniff');
+  assert.deepEqual([...new Uint8Array(await picture.arrayBuffer())], [255, 216, 255]);
+  assert.equal(destinations.length - before, 2);
+  assert.ok(destinations.slice(before).every(d => d.host === 'history.invalid'));
+  assert.notEqual(labels[start], labels[start + 1]);
+});
+test('YouTube proxy refuses arbitrary hosts, queries, invalid IDs and writes before Tor', async () => {
+  const before = destinations.length;
+  for (const path of ['/youtube/title/short', '/youtube/title/dQw4w9WgXcQ?host=https://evil', '/youtube/embed/dQw4w9WgXcQ', '/youtube/thumbnail/https://evil']) {
+    assert.equal(youtubeRequest(path), null);
+    assert.equal((await fetch(`http://127.0.0.1:${proxyPort}${path}`)).status, 403);
+  }
+  assert.equal((await fetch(`http://127.0.0.1:${proxyPort}/youtube/title/dQw4w9WgXcQ`, { method: 'POST' })).status, 403);
+  assert.equal(destinations.length, before);
+});
+
+test('video lookup response sizes are bounded', async () => {
+  await assert.rejects(requestViaTor(socksPort, 'https://history.invalid', '/api/v1/videos/dQw4w9WgXcQ?fields=title', { ca, maxResponseBytes: 8 }), /response too large/);
 });

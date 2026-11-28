@@ -1,9 +1,10 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { resolveYoutubeRoute } from '@/lib/cryptMediaProxy';
 import { getAudioPlayer } from '@/lib/musicPlayer';
 import { announcePlaying, CRYPT_NOW_PLAYING } from '@/lib/cryptAudio';
-import { embedUrl, nextPrivateMirror, PRIVATE_YOUTUBE_MIRRORS, privateThumbnailUrl, privateVideoUrl, type YoutubeLink } from '@/lib/cryptYoutube';
+import { embedUrl, nextPrivateMirror, PRIVATE_YOUTUBE_MIRRORS, routedYoutubeThumbnail, privateVideoUrl, type YoutubeLink } from '@/lib/cryptYoutube';
 
 /** No remote image, probe or iframe before the reader taps play or "Preview picture"; failures never silently connect to Google. */
 export function CryptYoutubeEmbed({ link }: { link: YoutubeLink }) {
@@ -11,6 +12,7 @@ export function CryptYoutubeEmbed({ link }: { link: YoutubeLink }) {
   const [warn, setWarn] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [thumb, setThumb] = useState(false);
+  const [thumbUrl, setThumbUrl] = useState<string | null>(null);
   const [thumbFailed, setThumbFailed] = useState(false);
   const playerDialog = useRef<HTMLDialogElement>(null);
   const source = `crypt-youtube-${useId()}`;
@@ -38,6 +40,18 @@ export function CryptYoutubeEmbed({ link }: { link: YoutubeLink }) {
   }, [source]);
   useEffect(() => { if (selection === null) setExpanded(false); }, [selection]);
   useEffect(() => { setSelection(null); setWarn(false); setThumb(false); setThumbFailed(false); }, [link.id, link.start]);
+
+  useEffect(() => {
+    let active = true;
+    setThumbUrl(null);
+    if (thumb) void resolveYoutubeRoute().then(route => {
+      if (!active) return;
+      const url = routedYoutubeThumbnail(link, route);
+      setThumbUrl(url);
+      if (!url) setThumbFailed(true);
+    }).catch(() => { if (active) setThumbFailed(true); });
+    return () => { active = false; };
+  }, [thumb, link.id]);
 
   const play = (choice: number | 'direct') => {
     getAudioPlayer().pause();
@@ -81,7 +95,7 @@ export function CryptYoutubeEmbed({ link }: { link: YoutubeLink }) {
         <div className="relative">
           <Button type="button" variant="secondary" onClick={() => play(0)} aria-label={`Play video privately${link.title ? `: ${link.title}` : ''}`}
             className="relative h-auto aspect-video w-full flex-col gap-1 overflow-hidden whitespace-normal p-0">
-            {thumb && !thumbFailed && <img src={privateThumbnailUrl(link)} alt="" referrerPolicy="no-referrer"
+            {thumb && thumbUrl && !thumbFailed && <img src={thumbUrl} alt="" referrerPolicy="no-referrer"
               onError={() => setThumbFailed(true)} className="absolute inset-0 h-full w-full object-cover" />}
             <span className="relative flex flex-col items-center gap-1 rounded bg-background/70 px-3 py-2">
               <span className="text-3xl" aria-hidden>▶️</span>
