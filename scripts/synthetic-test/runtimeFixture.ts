@@ -2,7 +2,7 @@
 import { PrivateKey } from '@wharfkit/antelope';
 import { WAX_CHAIN_ID } from './runtime';
 
-export function runtimeFixture(sponsored: boolean) {
+export function runtimeFixture(sponsored: boolean, freeOnly = false) {
   const accounts = ['alpha.chz', 'brie.chz'];
   const keys = accounts.map(() => PrivateKey.generate('K1'));
   const highKey = String(PrivateKey.generate('K1').toPublic());
@@ -17,7 +17,7 @@ export function runtimeFixture(sponsored: boolean) {
       { perm_name: 'owner', parent: '', required_auth: authority(highKey) },
       { perm_name: 'active', parent: 'owner', required_auth: authority(highKey) },
       { perm_name: 'cheesecrypt', parent: 'active', required_auth: authority(String(keys[accounts.indexOf(account)].toPublic())), linked_actions: [
-        { account: 'cheeseburger', action: 'transfer' }, { account: 'crypt.cheese', action: 'sendfree' }, { account: 'crypt.cheese', action: 'sendmsg' },
+        ...(freeOnly ? [{ account: 'crypt.cheese', action: 'sendfree' }] : [{ account: 'cheeseburger', action: 'transfer' }, { account: 'crypt.cheese', action: 'sendfree' }, { account: 'crypt.cheese', action: 'sendmsg' }]),
       ] },
     ],
   });

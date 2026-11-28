@@ -2,7 +2,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { randomBytes, randomInt } from 'node:crypto';
 import { APIClient, FetchProvider, PrivateKey, Transaction, Action, ABI, Serializer } from '@wharfkit/antelope';
-import { ROUTER, TOKEN, buildSend, dummyMemo, pickRecipient, refuseSend, buildPowerup, planPowerup, POWERUP_UNITS, parseBudget, sponsorRemaining, SPONSOR_PART_UNITS, SEND_COST_UNITS, utcDay, cheeseUnits, checkPermission, type Config, type Bot } from './policy';
+import { ROUTER, TOKEN, buildSend, dummyMemo, pickRecipient, refuseSend, buildPowerup, planPowerup, POWERUP_UNITS, parseBudget, sponsorRemaining, SPONSOR_PART_UNITS, SEND_COST_UNITS, utcDay, cheeseUnits, checkPermission, type Config, type Bot, type SendMode } from './policy';
 import { writeJsonAtomic } from './nightState';
 export const WAX_CHAIN_ID = '1064487b3cd1a897ce03ae5b6a865651747e2e152090f99c1d19d44e01aea5a4';
 export const log = (m: string) => console.log(`${new Date().toISOString()}  ${m}`);
@@ -16,8 +16,10 @@ export async function submitOnce(target: string, body: string, id: string): Prom
   if (json.transaction_id !== id || json.processed?.receipt?.status !== 'executed') throw new Error('submission not confirmed executed with matching transaction ID; not retried');
   return id;
 }
-export type RuntimeConfig = Pick<Config, 'bots' | 'chainApi' | 'broadcast' | 'reserve' | 'maxSendsPerBotPerDay'>;
+export type RuntimeConfig = Pick<Config, 'bots' | 'chainApi' | 'broadcast' | 'reserve' | 'maxSendsPerBotPerDay'> & { sendMode?: SendMode };
 export function createRuntime(config: RuntimeConfig, STATE_PATH: string, dryRun: boolean) {
+  const mode = config.sendMode ?? 'standard';
+  let preflightPassed = false;
   const bots = new Map<string, Bot & { key: PrivateKey }>();
   for (const b of config.bots) {
     try { bots.set(b.account, { ...b, key: PrivateKey.from(b.privateKey) }); }
@@ -53,7 +55,7 @@ async function balanceUnits(account: string): Promise<number> {
   return rows.length ? cheeseUnits(String(rows[0])) : 0;
 }
 
-/** Live sponsor budget; any read failure means "not sponsored", so the send stays on the paid route. */
+/** Live sponsor budget; failure means not sponsored (free-only skips; standard may pay). */
 async function freeAvailable(): Promise<boolean> {
   try {
     const r = await withEndpoint(c => c.v1.chain.get_table_rows({ code: ROUTER, scope: ROUTER, table: 'budget', limit: 1, json: true } as never));
@@ -67,6 +69,7 @@ async function broadcast(bot: Bot & { key: PrivateKey }, to: string, free: boole
   return broadcastActions(bot, buildSend(bot.account, bot.permission, to, memo, free), `${bot.account} → ${to}: ${free ? 'sendfree' : 'paid sendmsg'}`);
 }
 async function broadcastActions(bot: Bot & { key: PrivateKey }, actionsJson: { account: string }[], label: string): Promise<string> {
+  if (mode === 'free-only' && actionsJson.some(a => a.account !== ROUTER || (a as { name?: string }).name !== 'sendfree')) throw new Error('Nightcrawler permits only crypt.cheese::sendfree');
   const { tx, signature, url } = await withEndpoint(async (client, url) => {
     const info = await client.v1.chain.get_info();
     if (String(info.chain_id) !== WAX_CHAIN_ID) throw new Error('endpoint is not WAX mainnet');
@@ -87,13 +90,15 @@ const serial = (fn: () => Promise<void>) => { chain = chain.then(fn, fn); return
 
 async function send(senderName: string, why: string, fixedTo?: string) {
   await serial(async () => {
+    if (!preflightPassed) throw new Error('permission preflight required before sending');
     rollDay();
     const bot = bots.get(senderName);
     if (!bot || !botNames.includes(fixedTo ?? botNames.find(n => n !== senderName) ?? '')) throw new Error('sender or recipient not configured');
     const to = fixedTo ?? pickRecipient(botNames, senderName, rand());
     try {
-      if (!(await ensureCpu(senderName))) { log(`skip ${senderName} (${why}): CPU too low and no worker could power it up`); return; }
+      if (!(await ensureCpu(senderName))) { if (mode !== 'free-only') log(`skip ${senderName} (${why}): CPU too low and no worker could power it up`); return; }
       const free = await freeAvailable();
+      if (mode === 'free-only' && !free) { log(`skip ${senderName} (${why}): sponsor budget unavailable; no paid fallback`); return; }
       const refusal = refuseSend(state.sent[senderName] ?? 0, config.maxSendsPerBotPerDay, free ? 0 : await balanceUnits(senderName), cheeseUnits(config.reserve), free ? 0 : SEND_COST_UNITS);
       if (refusal) { log(`skip ${senderName} (${why}): ${refusal}`); return; }
       if (!dryRun) { state.sent[senderName] = (state.sent[senderName] ?? 0) + 1; saveState(); }
@@ -114,6 +119,11 @@ async function cpuAvailable(account: string): Promise<number | null> {
 }
 /** False only when the bot is too low to send and nobody could top it up. */
 async function ensureCpu(target: string): Promise<boolean> {
+  if (mode === 'free-only') {
+    const available = await cpuAvailable(target);
+    if (available === null || available < 500) { log(`skip ${target}: CPU low or unknown; rent CPU or stake WAX manually (no automatic powerups)`); return false; }
+    return true;
+  }
   const cpu: Record<string, number | null> = {};
   for (const n of botNames) cpu[n] = await cpuAvailable(n);
   const plan = planPowerup(target, cpu, state.powerups[target], Date.now());
@@ -133,12 +143,14 @@ async function ensureCpu(target: string): Promise<boolean> {
 
 // ---- Safety check at start: dedicated, narrowly linked permission only ----
 async function preflight() {
+  preflightPassed = false;
   for (const bot of bots.values()) {
     const acc = await withEndpoint(c => c.v1.chain.get_account(bot.account));
-    const problem = checkPermission(acc.toJSON() as never, bot.permission, [String(bot.key.toPublic())]);
+    const problem = checkPermission(acc.toJSON() as never, bot.permission, [String(bot.key.toPublic())], mode);
     if (problem) throw new Error(`${bot.account}: ${problem}`);
     log(`ok ${bot.account}@${bot.permission}`);
   }
+  preflightPassed = true;
 }
 
 

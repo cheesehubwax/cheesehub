@@ -216,12 +216,15 @@ export function burstAllowed(starts: number[], now: number, maxPerHour: number):
 
 /** Linked actions the dedicated permission must have, and nothing broader. */
 export const REQUIRED_LINKS = [`${TOKEN}::transfer`, `${ROUTER}::sendmsg`, `${ROUTER}::sendfree`];
+export type SendMode = 'standard' | 'free-only';
+export const NIGHT_REQUIRED_LINKS = [`${ROUTER}::sendfree`];
 type ChainAccount = { permissions?: { perm_name: unknown; required_auth?: { keys?: { key: unknown }[] }; linked_actions?: { account: unknown; action?: unknown }[] }[] };
 /**
  * Chain libraries return names and keys as objects, so everything is compared as strings;
  * keys match in either PUB_K1_ or legacy EOS form.
  */
-export function checkPermission(account: ChainAccount, permission: string, publicKeys: string[]): string | null {
+export function checkPermission(account: ChainAccount, permission: string, publicKeys: string[], mode: SendMode = 'standard'): string | null {
+  const requiredLinks = mode === 'free-only' ? NIGHT_REQUIRED_LINKS : REQUIRED_LINKS;
   const perms = account?.permissions ?? [];
   const p = perms.find(x => String(x.perm_name) === permission);
   if (!p) return `permission ${permission} not found`;
@@ -230,10 +233,14 @@ export function checkPermission(account: ChainAccount, permission: string, publi
   const keyMatch = (x: { required_auth?: { keys?: { key: unknown }[] } }) => (x.required_auth?.keys ?? []).some(k => forms(k.key).some(f => f && wanted.includes(f)));
   if (!keyMatch(p)) return `configured key is not on ${permission}`;
   for (const high of perms.filter(x => ['owner', 'active'].includes(String(x.perm_name)))) if (keyMatch(high)) return `configured key is also on ${String(high.perm_name)} — refuse (too much authority)`;
+  if (mode === 'free-only') {
+    if (perms.some(x => x !== p && keyMatch(x))) return 'Nightcrawler key is also on another permission — use an isolated key';
+    if (!Array.isArray(p.linked_actions)) return 'cannot verify sendfree-only links — use a node exposing linked_actions';
+  }
   if (p.linked_actions) {
     const links = p.linked_actions.map(l => `${String(l.account)}::${l.action == null ? '*' : String(l.action)}`);
-    if (links.some(l => !REQUIRED_LINKS.includes(l))) return `${permission} is linked to more than ${REQUIRED_LINKS.join(', ')}`;
-    const missing = REQUIRED_LINKS.filter(l => !links.includes(l));
+    if (links.some(l => !requiredLinks.includes(l))) return `${permission} is linked to more than ${requiredLinks.join(', ')}`;
+    const missing = requiredLinks.filter(l => !links.includes(l));
     if (missing.length) return `${permission} is missing linkauth for ${missing.join(', ')}`;
   }
   return null;

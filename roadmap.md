@@ -2,7 +2,7 @@
 
 Open tasks only. Completed work lives in git history.
 
-- [ ] Nightcrawler: verify live activation on the user's machine with their dedicated restricted keys and Tor helper; separation, disabled entrypoint, signing, disk readback and restart safety are tested offline. No real keys or local Tor connection are available here.
+- [ ] Nightcrawler: verify live activation on the user's machine with sendfree-only isolated keys and Tor helper; separation, signing, disk readback and restart safety are tested offline. No real keys or local Tor connection are available here.
 
 - [ ] CHEESECrypt busy-room safety: confirm eventhorizon's original unlocked room; 500-reply/multiple-sender observer stress and unlocked-fixture recovery preserve drafts and receipts, but their original wallet/key and browser error are unavailable here.
 

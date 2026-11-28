@@ -35,7 +35,7 @@ test('missing/mismatched IDs and non-executed receipts never report success', as
 
 test('full standalone scheduled flow checks permissions, signs, submits once and reads progress back after restart', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'night-flow-'));
-  const fixture = runtimeFixture(true);
+  const fixture = runtimeFixture(true, true);
   const names = fixture.bots.map(b => b.account);
   const night: NightConfig = { enabled: true, timezone: 'Australia/Brisbane', start: '23:00', end: '06:30', sendsMin: 1, sendsMax: 1, skipNightChance: 0, replyChance: 0, replyDelayMinSeconds: 180, replyDelayMaxSeconds: 900, senders: [names[0]] };
   const now = Date.parse('2026-11-27T14:00:00Z');
@@ -63,7 +63,7 @@ test('full standalone scheduled flow checks permissions, signs, submits once and
       // No history endpoint or daytime subscription is available to this flow.
       return Response.json(fixture.respond(target, body));
     }) as typeof fetch;
-    const config = { bots: fixture.bots, chainApi: ['https://offline-chain.test'], broadcast: 'http://127.0.0.1:8088', reserve: '1.0000 CHEESE', maxSendsPerBotPerDay: 10 };
+    const config = { bots: fixture.bots, sendMode: 'free-only' as const, chainApi: ['https://offline-chain.test'], broadcast: 'http://127.0.0.1:8088', reserve: '1.0000 CHEESE', maxSendsPerBotPerDay: 10 };
     const make = async () => {
       const runtime = createRuntime(config, counterPath, false);
       await runtime.preflight();
@@ -76,7 +76,7 @@ test('full standalone scheduled flow checks permissions, signs, submits once and
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('dry-run verifies and signs the paid route but never broadcasts or writes counters', async () => {
+test('daytime dry-run verifies and signs the paid route but never broadcasts or writes counters', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'night-dry-'));
   const fixture = runtimeFixture(false);
   const path = join(dir, 'night-config.state.json');

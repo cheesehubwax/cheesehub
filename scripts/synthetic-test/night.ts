@@ -19,12 +19,13 @@ async function main() {
   if (!c.night.enabled) { log('Nightcrawler disabled; no connections or sends started'); return; }
   const base = configPath.replace(/\.json$/, '');
   if (!dryRun) unlock = lockRunner(`${base}.night.json`);
-  const runtime = createRuntime({ bots: c.accounts, maxSendsPerBotPerDay: c.maxSendsPerAccountPerDay, reserve: c.reserve, chainApi: c.chainApi, broadcast: c.broadcast }, `${base}.state.json`, dryRun);
+  const runtime = createRuntime({ bots: c.accounts, sendMode: 'free-only', maxSendsPerBotPerDay: c.maxSendsPerAccountPerDay, reserve: c.reserve, chainApi: c.chainApi, broadcast: c.broadcast }, `${base}.state.json`, dryRun);
   const printPlan = (s: NightState) => {
     log(`night ${s.key}: ${s.plan.length} scheduled sample send(s)`);
     for (const e of s.plan) log(`${new Date(e.atMs).toLocaleString('en-GB', { timeZone: c.night.timezone, hour12: false })} ${e.sender} → ${e.recipient}`);
   };
   log(`Nightcrawler${dryRun ? ' DRY RUN (no broadcasts or progress writes)' : ''}: ${c.night.timezone}, ${c.night.start}–${c.night.end}, ${c.accounts.length} private accounts`);
+  log('sendfree only: no token transfers, paid fallback or automatic powerups; unavailable budget/CPU skips the scheduled entry');
   if (c.broadcast === 'direct') log('warning: direct mode exposes your IP to chain nodes; public preparation reads also remain direct');
   else log('note: signed sends use the helper; public account/preparation reads still go to chainApi nodes');
   await runtime.preflight();
