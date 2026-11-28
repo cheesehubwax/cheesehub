@@ -145,6 +145,7 @@ function AboutBody() {
           <><B>YouTube:</B> links stay encrypted; videos load only when you press ▶️ Play, through private mirrors first.</>,
           <><B>Tips:</B> reply with /tip 100 cheese to send CHEESE straight to the author. Final, and never held by CHEESEHub.</>,
           <><B>Search, names & avatars:</B> search runs on your screen only; set a name, pixel avatar and private nicknames.</>,
+          <><B>⚡ Instant Messaging:</B> sends free messages without Anchor popups, using a key that can only send messages.</>,
         ]} />
       </Section>
 
@@ -157,8 +158,11 @@ function AboutBody() {
           <>✔ means in a block, ✔✔ means permanent.</>,
           <>🔐 Verify compares a safety number with a friend to prove no one swapped your keys.</>,
           <>🔒 Lock now, Esc twice, or Ctrl/Cmd+Shift+L clears the screen; it also locks itself when idle.</>,
-          <>⚡ Instant Messaging sends free messages without Anchor popups, using a key that can only send messages.</>,
-          <>🛡️ Privacy menu: Tor helper, your own history server, random send delay, scheduled sends and Nightcrawler.</>,
+          <>⏱️ Random send delay adds a random pause of your chosen seconds before a message is signed, so send times don't line up with incoming ones — all chats or per chat.</>,
+          <>⏳ Scheduled sends hold a message until a time you pick, once you confirm the delay.</>,
+          <>🔄 Key rotation privately refreshes your messaging key and manages the old keys you keep.</>,
+          <>🌙 Nightcrawler Companion runs a local off-hours schedule from an isolated signing key you set up in the Privacy menu.</>,
+          <>🧅 Tor helper and your own history server keep account lookups off public endpoints.</>,
           <>Anyone you message can still copy or share it, and a compromised device can expose your messages.</>,
         ]} />
       </Section>
