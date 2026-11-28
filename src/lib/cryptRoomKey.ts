@@ -22,6 +22,7 @@ import { encodeGroupText, eventFromMember, memberKey, parseCg2, type Cg2Event, t
 
 export const ROOM_STREAM_TO = 'eosio.null';
 export interface RoomKey { room: string; epoch: number; key: string; /** chain time (ms) the owner sent it */ since: number }
+export interface RoomKeyOff { room: string; epoch: number }
 
 export const newRoomKeyBytes = (random: (n: number) => Uint8Array = nacl.randomBytes) => encodeBase64(random(32));
 
@@ -88,10 +89,25 @@ export function ownedRoomKeys(events: readonly Cg2Event[], invites: Record<strin
   return [...out.values()];
 }
 
-/** The newest epoch per room. */
-export function currentRoomKeys(keys: readonly RoomKey[]): Record<string, RoomKey> {
+/** Authenticated incoming or outgoing owner controls; never trust local switch state. */
+export function collectRoomKeyOffs(events: readonly Cg2Event[], invites: Record<string, InviteGroup>, me: string): RoomKeyOff[] {
+  return events.flatMap(e => {
+    if (e.control.kind !== 'roomkey-off') return [];
+    const g = eventFromMember(e, invites, me);
+    return g?.publicRoom && e.from === g.creator ? [{ room: g.id, epoch: e.control.epoch }] : [];
+  });
+}
+
+/** Include retired epochs so re-enabling never reuses an old key's epoch. */
+export function latestRoomKeyEpoch(room: string, keys: readonly RoomKey[], offs: readonly RoomKeyOff[]): number {
+  return [...keys, ...offs].reduce((epoch, k) => k.room === room ? Math.max(epoch, k.epoch) : epoch, 0);
+}
+
+/** Newest sending key per room; an off control wins ties, while historical keys stay held. */
+export function currentRoomKeys(keys: readonly RoomKey[], offs: readonly RoomKeyOff[] = []): Record<string, RoomKey> {
   const out: Record<string, RoomKey> = {};
   for (const k of keys) if (!out[k.room] || k.epoch > out[k.room].epoch) out[k.room] = k;
+  for (const off of offs) if (out[off.room] && off.epoch >= out[off.room].epoch) delete out[off.room];
   return out;
 }
 

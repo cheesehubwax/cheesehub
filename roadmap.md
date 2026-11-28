@@ -2,6 +2,8 @@
 
 Open tasks only. Completed work lives in git history.
 
+- [ ] CHEESECrypt shared room key: verify owner on/off/re-enable and member message readback on WAX; requires the user's test accounts and wallet signatures.
+
 - [ ] Verify real YouTube title/picture lookups through the user’s Windows v1.8 Tor helper; 48 app/helper tests and browser title/picture readback pass with no direct fallback. Requires the user’s running local Tor connection; playback and Anchor remain separate.
 
 - [ ] Eventhorizon: verify the original unlocked room after updating; safe visible diagnostics, malformed-history guards, 757-row/20-reply readback and 127 targeted tests pass; desktop/mobile diagnostic Retry works. Original user history/key remains unavailable.

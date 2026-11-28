@@ -40,7 +40,7 @@ export function CryptChatHeader({
   /** Instant Messaging ready (only used for a recommendation in the Privacy submenu). */
   instantReady?: boolean;
   /** Shared room key state; `onSend` only for the owner (turn on, or change the key). */
-  sharedKey?: { on: boolean; onSend?: () => void };
+  sharedKey?: { on: boolean; onSend?: () => void; onDisable?: () => void };
 }) {
   // Per-chat random send delay; the master mode and delay range live in Privacy settings.
   const [jitter, setJitter] = useState(loadSendJitter);
@@ -122,6 +122,8 @@ export function CryptChatHeader({
                       {sharedKey?.onSend && <DropdownMenuItem onSelect={sharedKey.onSend}
                         title={sharedKey.on ? 'Send everyone still in the room a new key, so people who left cannot read new messages' : 'Send each message once instead of a copy per member, so the chain no longer shows who is in this room or how many'}>
                         {sharedKey.on ? '🔑 Change room key' : '🔑 Turn on shared room key'}</DropdownMenuItem>}
+                      {sharedKey?.on && sharedKey.onDisable && <DropdownMenuItem onSelect={sharedKey.onDisable}
+                        title="Return to one encrypted copy per member; earlier shared-key messages remain readable">🔑 Turn off shared room key</DropdownMenuItem>}
                       {sharedKey?.on && !sharedKey.onSend && <p className="px-2 py-1.5 text-[10px] text-muted-foreground">🔑 Shared room key on</p>}
                       {onReportRoom && <DropdownMenuItem title="Report this group, including its owner or admins, to the CHEESEHub moderation team" onSelect={onReportRoom}>🚩 Report group</DropdownMenuItem>}
                       {activeInvite.status === 'joined' && <><DropdownMenuSeparator />

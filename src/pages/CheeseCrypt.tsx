@@ -79,7 +79,8 @@ import { encodeAdmin, encodeFounder, encodeCollapse, encodeReport, encodeModerat
 import { applyCollapses, canCollapseAuthor, canMuteMember, collapsedKeys, collectReports, loadSeenReports, reportKey, saveSeenReports, deriveModeration, founderBadges, MAX_FOUNDERS, loadModerationMemos, mergeModerationMemos, moderateMessages, mutedUntil, restrictedAt, roomRole, saveModerationMemos } from '@/lib/cryptModeration';
 import { applyEdits, canEdit, editTarget, encodeEdit, publicEditLog } from '@/lib/cryptEdits';
 import type { ConversationEntry } from '@/lib/cryptGroups';
-import { collectRoomKeys, currentRoomKeys, decodeRoomStream, newRoomKeyBytes, ownedRoomKeys, ROOM_STREAM_TO, sealRoomText } from '@/lib/cryptRoomKey';
+import { collectRoomKeys, collectRoomKeyOffs, currentRoomKeys, decodeRoomStream, latestRoomKeyEpoch, newRoomKeyBytes, ownedRoomKeys, ROOM_STREAM_TO, sealRoomText } from '@/lib/cryptRoomKey';
+import { encodeRoomKeyOff } from '@/lib/cryptInviteGroups';
 import { CryptHero } from '@/components/crypt/CryptHero';
 import { CryptKeySetup } from '@/components/crypt/CryptKeySetup';
 import { CryptLockGate } from '@/components/crypt/CryptLockGate';
@@ -745,7 +746,8 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   const invites = useMemo(() => key ? collectInvites(allGroupEvents, account, [key.publicKey, ...(key.retired ?? []).map(r => r.publicKey)], contacts, inviteStore, restoredRequests) : inviteStore,
     [allGroupEvents, account, key, contacts, inviteStore, restoredRequests]);
   const roomKeyList = useMemo(() => [...collectRoomKeys(allGroupEvents, invites, account), ...ownedRoomKeys(allGroupEvents, invites, account)], [allGroupEvents, invites, account]);
-  const roomKeysNow = useMemo(() => currentRoomKeys(roomKeyList), [roomKeyList]);
+  const roomKeyOffs = useMemo(() => collectRoomKeyOffs(allGroupEvents, invites, account), [allGroupEvents, invites, account]);
+  const roomKeysNow = useMemo(() => currentRoomKeys(roomKeyList, roomKeyOffs), [roomKeyList, roomKeyOffs]);
   // Account-blind: reads the same crypt.cheese stream every user reads, only while I hold a room key.
   const { data: roomStream } = useQuery({
     queryKey: ['crypt-room-stream', account], enabled: !!key && roomKeyList.length > 0, queryFn: () => fetchRoomStream(),
@@ -777,8 +779,9 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     saveRoomProfiles(account, next); setRoomProfiles(next);
   }, [allGroupEvents, invites, account, roomProfiles, moderation]);
   useEffect(() => {
-    const controlTxs = new Set(allGroupEvents.filter(e => (e.control.kind === 'invite' || e.control.kind === 'admission') || e.control.kind === 'add' || e.control.kind === 'readmit' || e.control.kind === 'leave' || e.control.kind === 'joined' || e.control.kind === 'room' || e.control.kind === 'mute' || e.control.kind === 'ban' || e.control.kind === 'policy' || e.control.kind === 'admin' || e.control.kind === 'founder' || e.control.kind === 'collapse' || e.control.kind === 'report').filter(e => {
+    const controlTxs = new Set(allGroupEvents.filter(e => (e.control.kind === 'invite' || e.control.kind === 'admission') || e.control.kind === 'add' || e.control.kind === 'readmit' || e.control.kind === 'leave' || e.control.kind === 'joined' || e.control.kind === 'room' || e.control.kind === 'mute' || e.control.kind === 'ban' || e.control.kind === 'policy' || e.control.kind === 'admin' || e.control.kind === 'founder' || e.control.kind === 'collapse' || e.control.kind === 'report' || e.control.kind === 'roomkey' || e.control.kind === 'roomkey-off').filter(e => {
       if ((e.control.kind === 'invite' || e.control.kind === 'admission')) return invites[e.control.invite.id]?.creator === e.from;
+      if (e.control.kind === 'roomkey' || e.control.kind === 'roomkey-off') return invites[e.control.id]?.creator === e.from && !!eventFromMember(e, invites, account);
       return !!eventFromMember(e, invites, account);
     }).map(e => e.txId));
     const next = mergeModerationMemos(savedControls, memos.filter(m => controlTxs.has(m.txId)));
@@ -1626,17 +1629,20 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
   };
   const viewById = (id: string) => inviteViews.find(v => v.invite.id === id);
   /** Owner: turn on the shared room key, or rotate it (after someone leaves). Sent pairwise to current members. */
-  const sendRoomKey = async (id: string) => {
+  const sendRoomKey = async (id: string, disable = false) => {
     const v = viewById(id);
     if (!key || busy || !v || !v.isCreator || v.status !== 'joined' || !listedIds.has(id)) return;
     const state = moderation[id];
     const to = v.invite.members.map(m => m.account).filter(a => a !== account && state?.bans[a] === undefined && !v.left.includes(a));
     if (!to.length) { toast({ title: 'Nobody else is in this room yet' }); return; }
     const current = roomKeysNow[id];
+    if (disable && !current) return;
     setBusy(true);
     try {
-      const r = await executeTransaction(buildCg2Actions(key, to, keysOf(v.invite), encodeRoomKeyControl(id, (current?.epoch ?? 0) + 1, newRoomKeyBytes()), [permission]),
-        { successTitle: current ? 'Room key changed' : 'Shared room key turned on' });
+      const epoch = latestRoomKeyEpoch(id, roomKeyList, roomKeyOffs) + 1;
+      const payload = disable ? encodeRoomKeyOff(id, epoch) : encodeRoomKeyControl(id, epoch, newRoomKeyBytes());
+      const r = await executeTransaction(buildCg2Actions(key, to, keysOf(v.invite), payload, [permission]),
+        { successTitle: disable ? 'Shared room key turned off' : current ? 'Room key changed' : 'Shared room key turned on' });
       if (r.success && r.txId) await refresh();
     } catch (e) { toast({ title: 'Could not send the room key', description: (e as Error).message, variant: 'destructive' }); }
     finally { setBusy(false); }
@@ -1848,7 +1854,8 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
     if (!plan) { toast({ title: 'This room is full or the request is out of date', variant: 'destructive' }); setAcceptingJoin(null); return false; }
     if (!key) return false;
     const actions = [...buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.payload, [permission]), ...(plan.deltaTo.length ? buildCg2Actions(key, plan.deltaTo, keysOf(plan.updated), plan.delta, [permission]) : []), ...buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.snapshot, [permission]), ...(plan.profiles ? buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), plan.profiles, [permission]) : []), ...buildCg2Actions(key, [...plan.to, acceptingJoin.from], keysOf(plan.updated), plan.policy, [permission]),
-      ...(roomKeysNow[plan.updated.id] ? buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), encodeRoomKeyControl(plan.updated.id, roomKeysNow[plan.updated.id].epoch, roomKeysNow[plan.updated.id].key), [permission]) : [])];
+      ...(roomKeysNow[plan.updated.id] ? buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), encodeRoomKeyControl(plan.updated.id, roomKeysNow[plan.updated.id].epoch, roomKeysNow[plan.updated.id].key), [permission])
+        : roomKeyOffs.some(off => off.room === plan.updated.id) ? buildCg2Actions(key, [acceptingJoin.from], keysOf(plan.updated), encodeRoomKeyOff(plan.updated.id, latestRoomKeyEpoch(plan.updated.id, roomKeyList, roomKeyOffs)), [permission]) : [])];
     setBusy(true);
     let r;
     try { r = await executeTransaction(actions, { successTitle: `${acceptingJoin.from} invited to ${plan.v.name}` }); }
@@ -2172,7 +2179,7 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
         onVerify={active && contacts[active] && !activeGroup && !activeInvite ? () => setSafetyOpen(true) : undefined}
         onOpenProfile={setProfileOf}
         sharedKey={activeInvite && activeInvite.isCreator && activeInvite.status === 'joined' && listedIds.has(activeInvite.invite.id)
-          ? { on: !!roomKeysNow[activeInvite.invite.id], onSend: () => void sendRoomKey(activeInvite.invite.id) }
+          ? { on: !!roomKeysNow[activeInvite.invite.id], onSend: () => void sendRoomKey(activeInvite.invite.id), onDisable: () => void sendRoomKey(activeInvite.invite.id, true) }
           : activeInvite ? { on: !!roomKeysNow[activeInvite.invite.id] } : undefined}
         />
       {active && contacts[active] && !activeGroup && !activeInvite && <SafetyNumberDialog open={safetyOpen} onOpenChange={setSafetyOpen}

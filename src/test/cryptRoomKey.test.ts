@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import nacl from 'tweetnacl';
 import { encodeBase64 } from 'tweetnacl-util';
 import { encryptMemo } from '@/lib/cheeseCrypt';
-import { encodeRoomKeyControl, parseCg2, type Cg2Event, type InviteGroup } from '@/lib/cryptInviteGroups';
-import { collectRoomKeys, currentRoomKeys, decodeRoomStream, newRoomKeyBytes, sealRoomText, type RoomKey } from '@/lib/cryptRoomKey';
+import { encodeRoomKeyControl, encodeRoomKeyOff, parseCg2, type Cg2, type Cg2Event, type InviteGroup } from '@/lib/cryptInviteGroups';
+import { collectRoomKeys, collectRoomKeyOffs, currentRoomKeys, decodeRoomStream, latestRoomKeyEpoch, newRoomKeyBytes, ownedRoomKeys, sealRoomText, type RoomKey } from '@/lib/cryptRoomKey';
 
 const pk = () => encodeBase64(nacl.box.keyPair().publicKey);
 const room: InviteGroup = { id: 'a'.repeat(16), name: 'Room', creator: 'owner', created: 1, publicRoom: true,
@@ -11,8 +11,16 @@ const room: InviteGroup = { id: 'a'.repeat(16), name: 'Room', creator: 'owner', 
 const invites = { [room.id]: room };
 const rk: RoomKey = { room: room.id, epoch: 1, key: newRoomKeyBytes(), since: 100 };
 const row = (from: string, memo: string, txId = 't1', time = 200) => ({ txId, time, from, to: 'eosio.null', memo, quantity: '' });
-const ctl = (from: string, to: string, time: number, control = parseCg2(encodeRoomKeyControl(room.id, 1, rk.key))!): Cg2Event =>
-  ({ key: `${from}${to}${time}`, txId: 'k', time, from, to, control, usedKey: room.members.find(m => m.account === (from === 'alice' ? to : from))!.publicKey });
+const parsed = (text: string): Cg2 => {
+  const control = parseCg2(text);
+  if (!control) throw new Error('Invalid test control');
+  return control;
+};
+const ctl = (from: string, to: string, time: number, control = parsed(encodeRoomKeyControl(room.id, 1, rk.key)), me = 'alice'): Cg2Event => {
+  const member = room.members.find(m => m.account === (from === me ? to : from));
+  if (!member) throw new Error('Missing test member');
+  return { key: `${from}${to}${time}`, txId: 'k', time, from, to, control, usedKey: member.publicKey };
+};
 
 describe('shared room key', () => {
   it('memos have the same length as an ordinary padded message', () => {
@@ -47,7 +55,7 @@ describe('shared room key', () => {
   });
   it('only the owner can deliver a key; newest epoch is current', () => {
     expect(collectRoomKeys([ctl('bob', 'alice', 10)], invites, 'alice')).toHaveLength(0);
-    const two = parseCg2(encodeRoomKeyControl(room.id, 2, newRoomKeyBytes()))!;
+    const two = parsed(encodeRoomKeyControl(room.id, 2, newRoomKeyBytes()));
     const keys = collectRoomKeys([ctl('owner', 'alice', 10), ctl('owner', 'alice', 20, two)], invites, 'alice');
     expect(keys).toHaveLength(2);
     expect(currentRoomKeys(keys)[room.id].epoch).toBe(2);
@@ -57,6 +65,38 @@ describe('shared room key', () => {
     const rows = sealRoomText(next, 'owner', 'after').map(m => row('owner', m, 't2', 400));
     expect(decodeRoomStream(rows, [rk], invites, 'bob')).toHaveLength(0);
     expect(decodeRoomStream(rows, [rk, next], invites, 'alice')).toHaveLength(1);
+  });
+  it('owner off restores pairwise state without losing historical room messages', () => {
+    const events = [ctl('owner', 'alice', 100), ctl('owner', 'alice', 300, parsed(encodeRoomKeyOff(room.id, 2)))];
+    const keys = collectRoomKeys(events, invites, 'alice');
+    expect(currentRoomKeys(keys, collectRoomKeyOffs(events, invites, 'alice'))[room.id]).toBeUndefined();
+    expect(decodeRoomStream(sealRoomText(rk, 'bob', 'before off').map(m => row('bob', m)), keys, invites, 'alice')[0]?.text).toBe('before off');
+    expect(keys).toHaveLength(1);
+  });
+  it('only roster-authenticated owner off controls count', () => {
+    const off = parsed(encodeRoomKeyOff(room.id, 2));
+    const valid = ctl('owner', 'alice', 300, off);
+    expect(collectRoomKeyOffs([ctl('bob', 'alice', 300, off), { ...valid, usedKey: pk() }, { ...valid, to: 'bob' }], invites, 'alice')).toEqual([]);
+    expect(collectRoomKeyOffs([valid], invites, 'alice')).toEqual([{ room: room.id, epoch: 2 }]);
+  });
+  it('owner derives off state from its authenticated outgoing history too', () => {
+    const events = [ctl('owner', 'alice', 100, parsed(encodeRoomKeyControl(room.id, 1, rk.key)), 'owner'), ctl('owner', 'alice', 300, parsed(encodeRoomKeyOff(room.id, 2)), 'owner')];
+    expect(ownedRoomKeys(events, invites, 'owner')).toHaveLength(1);
+    expect(currentRoomKeys(ownedRoomKeys(events, invites, 'owner'), collectRoomKeyOffs(events, invites, 'owner'))).toEqual({});
+  });
+  it('re-enabling advances past off epochs and ignores stale off replays', () => {
+    const offs = [{ room: room.id, epoch: 2 }];
+    expect(latestRoomKeyEpoch(room.id, [rk], offs) + 1).toBe(3);
+    const next = { ...rk, epoch: 3, key: newRoomKeyBytes(), since: 400 };
+    expect(currentRoomKeys([rk, next], offs)[room.id]).toEqual(next);
+    expect(currentRoomKeys([rk], [{ room: room.id, epoch: 1 }])).toEqual({});
+  });
+  it('rejects malformed off epochs and never accepts a key in an off notice', () => {
+    for (const epoch of [0, -1, 1.5, 1_000_001]) {
+      expect(() => encodeRoomKeyOff(room.id, epoch)).toThrow();
+      expect(parseCg2(`\u0002CG2:roomkey-off:${JSON.stringify({ i: room.id, e: epoch })}`)).toBeNull();
+    }
+    expect(parseCg2(`\u0002CG2:roomkey-off:${JSON.stringify({ i: room.id, e: 2, k: rk.key })}`)).toBeNull();
   });
 });
 
