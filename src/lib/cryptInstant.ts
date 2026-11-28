@@ -209,6 +209,13 @@ export const isResourceShortage = (message: string | undefined) =>
 /** Shown when a Crypt send runs out of CPU/NET; Fuel is off on /crypt so the account pays its own resources. */
 export const RESOURCE_SHORTAGE_MESSAGE = 'Your account ran out of CPU or NET for this message. Greymass Fuel is turned off on CHEESECrypt for privacy, so your account pays for its own resources. Rent CPU with CHEESE on CHEESEUp or stake more WAX to CPU/NET, wait a minute, then press Send again.';
 
+/** Generic node/network failures with no chain reason (502/503/504, timeouts, Tor hiccups); the transaction may or may not have landed. */
+export const isTransientNodeError = (message: string | undefined) =>
+  !!message && /(unknown api error|bad gateway|service unavailable|gateway time-?out|\b50[234]\b|timed? ?out|timeout|failed to fetch|network ?error|networkerror|load failed|econnreset|socket hang up|aborted)/i.test(message);
+
+/** Shown for transient node failures; never claims the send failed, because the broadcast may have reached the chain. */
+export const TRANSIENT_NODE_MESSAGE = 'The WAX node timed out or was temporarily unreachable. If the message does not appear in the chat within a minute, press Send again.';
+
 /** Chain rejections meaning the browser key no longer matches the account's permission (revoked elsewhere). */
 export const isInstantAuthFailure = (message: string | undefined) =>
   !!message && /(missing (required )?auth|irrelevant (signature|authority)|unsatisfied_authorization|does not have signatures|permission .* not found|unknown key)/i.test(message);

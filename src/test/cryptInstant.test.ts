@@ -91,3 +91,17 @@ describe('CPU shortage detection', () => {
     expect(isResourceShortage('free messaging budget reached for today')).toBe(false);
   });
 });
+
+import { isTransientNodeError, isResourceShortage as _rs } from '@/lib/cryptInstant';
+describe('isTransientNodeError', () => {
+  it('flags generic node failures', () => {
+    expect(isTransientNodeError('Error: Unknown API error at /v1/chain/send_transaction')).toBe(true);
+    expect(isTransientNodeError('HTTP 502 Bad Gateway')).toBe(true);
+    expect(isTransientNodeError('Failed to fetch')).toBe(true);
+  });
+  it('leaves real chain rejections alone', () => {
+    expect(isTransientNodeError('assertion failure with message: overdrawn balance')).toBe(false);
+    expect(isTransientNodeError('tx_cpu_usage_exceeded')).toBe(false);
+    expect(_rs('tx_cpu_usage_exceeded')).toBe(true);
+  });
+});

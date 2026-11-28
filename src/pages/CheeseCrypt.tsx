@@ -51,7 +51,7 @@ import { buildCg2Actions, JOIN_NOTE_MAX, encodeAdmission, encodeMemberAdd, encod
 import { ShareKeyDialog } from '@/components/crypt/ShareKeyDialog';
 import { VoiceNoteBubble } from '@/components/crypt/VoiceNoteBubble';
 import { useCryptInstant } from '@/hooks/useCryptInstant';
-import { isInstantAuthFailure, isResourceShortage, RESOURCE_SHORTAGE_MESSAGE } from '@/lib/cryptInstant';
+import { isInstantAuthFailure, isResourceShortage, isTransientNodeError, RESOURCE_SHORTAGE_MESSAGE, TRANSIENT_NODE_MESSAGE } from '@/lib/cryptInstant';
 import { CryptInstantDialog } from '@/components/crypt/CryptInstantDialog';
 import { CryptPrivacyDialog } from '@/components/crypt/CryptPrivacyDialog';
 import { CryptNightcrawler } from '@/components/crypt/CryptNightcrawler';
@@ -214,14 +214,16 @@ export function Messenger({ account, session, onLocked }: { account: string; ses
           return { success: false, txId: null, error };
         }
         if (!isInstantAuthFailure(message)) {
-          if (options?.showErrorToast !== false) toast({ title: 'Message not sent', description: message, variant: 'destructive' });
-          return { success: false, txId: null, error: new Error(message) };
+          const shown = isTransientNodeError(message) ? TRANSIENT_NODE_MESSAGE : message;
+          if (options?.showErrorToast !== false) toast({ title: 'Message not sent', description: shown, variant: 'destructive' });
+          return { success: false, txId: null, error: new Error(shown) };
         }
         void instantRef.current.refresh();
       }
     }
     const r = await executeDirect(out, options);
     if (!r.success && isResourceShortage(r.error?.message)) return { ...r, error: new Error(RESOURCE_SHORTAGE_MESSAGE) };
+    if (!r.success && isTransientNodeError(r.error?.message)) return { ...r, error: new Error(TRANSIENT_NODE_MESSAGE) };
     if (sponsored) {
       invalidateSponsorBudget();
       void fetchSponsorBudget(true).then(b => setSponsorUnits(sponsorRemaining(b)));
