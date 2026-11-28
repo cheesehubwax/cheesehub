@@ -1,7 +1,7 @@
 # Shared-key public rooms via eosio.null (stealth format)
 
-## Correction first
-Our messages today use the `CRYPT1:` prefix, not `CRYPT2:` (earlier wording was wrong). Room messages will use the same `CRYPT1:<nonce>:<box>` shape and size padding as ordinary messages, so on explorers they look like any other CHEESECrypt copy.
+## Stealth format
+New messages already use padded `CRYPT2:` memos (every part the same 256-byte size). Room messages will use the identical `CRYPT2:<nonce>:<box>` shape and padding, so on explorers they look like any other CHEESECrypt copy.
 
 ## What changes for users
 - Public room owners get a "Shared room key" switch in room settings (off by default).
