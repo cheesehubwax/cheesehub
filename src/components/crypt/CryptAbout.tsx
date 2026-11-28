@@ -122,7 +122,7 @@ function AboutBody() {
       <Section title="💬 Chats & rooms">
         <Grid
           label="Chat types compared"
-          head={['', '💬 Private chat', '🔒 Private group', '📣 Public room']}
+          head={['', 'Private chat', 'Private group', 'Public room']}
           rows={[
             ['Who', 'You and one friend', 'Up to 8 people', 'Up to 50 people'],
             ['Joining', 'Add each other as friends', 'Invite from the creator', 'Ask to join; the owner admits you'],
@@ -159,7 +159,7 @@ function AboutBody() {
           <>🔐 Verify compares a safety number with a friend to prove no one is impersonating either of you. Once marked verified, a ⚠️ warning appears if their key ever changes.</>,
           <>🔒 Lock now, Esc twice, or Ctrl/Cmd+Shift+L clears the screen; it also locks itself when idle.</>,
           <>⏱️ Random send delay adds a random pause of your chosen seconds before a message is signed, so send times don't line up with incoming ones — all chats or per chat.</>,
-          <>⏳ Scheduled sends hold a message until a time you pick, once you confirm the delay.</>,
+          <>⏰ Scheduled sends hold a message until a time you pick, once you confirm the delay.</>,
           <>🔄 Key rotation privately refreshes your messaging key and manages the old keys you keep.</>,
           <>🌙 Nightcrawler Companion runs a local off-hours schedule from an isolated signing key you set up in the Privacy menu.</>,
           <>🧅 Tor helper and your own history server keep account lookups off public endpoints.</>,
@@ -178,10 +178,10 @@ function AboutBody() {
       </Section>
 
       <Section title="👑 Public room moderation">
-        <p className={P}>👑 Owner → 🛡️ Admin → 👤 Member. <span className="font-semibold text-cheese">⭐ Founder</span> is a permanent badge for members present when a room is first listed (up to 8, owner included). Right-click or long-press a message for commands.</p>
+        <p className={P}>👑 Owner → 🛡️ Admin → Member. <span className="font-semibold text-cheese">⭐ Founder</span> is a permanent badge for members present when a room is first listed (up to 8, owner included). Right-click or long-press a message for commands.</p>
         <Grid
           label="What each role can do"
-          head={['Action', '👑 Owner', '🛡️ Admin', '⭐ Founder', '👤 Member']}
+          head={['Action', '👑 Owner', '🛡️ Admin', '⭐ Founder', 'Member']}
           rows={[
             ['Admit members, list or unlist', Y, N, N, N],
             ['Appoint admins', Y, N, N, N],
